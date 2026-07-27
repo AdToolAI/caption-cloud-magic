@@ -2882,6 +2882,13 @@ serve(async (req) => {
                             composedUrl,
                             idResolved.dims,
                             idResolved.faces,
+                            characterIds.filter((cid): cid is string => typeof cid === "string" && cid.length > 0),
+                          );
+                          const anchorLayoutComplete = anchorFaceLayout.slots.length >= expected;
+                          console.log(
+                            `[compose-video-clips] v278_anchor_layout scene=${scene.id} ` +
+                            `slots=${anchorFaceLayout.slots.length}/${expected} ` +
+                            `source=geometry_plus_prompt_order biometric=${resolved}/${expected}`,
                           );
                           const nextDialogShots = {
                             ...nextDialogShotsBase,
@@ -2896,6 +2903,8 @@ serve(async (req) => {
                               assignmentLock: idResolved.assignmentLock,
                               resolvedCount: resolved,
                               expectedCount: expected,
+                              v278AnchorLayoutSlots: anchorFaceLayout.slots.length,
+                              v278AnchorLayoutComplete: anchorLayoutComplete,
                             },
                           };
                           // v276: hard-block only on total miss (0/N) when soft-gate enabled.

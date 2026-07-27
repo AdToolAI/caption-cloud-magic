@@ -1072,6 +1072,23 @@ serve(async (req) => {
     const existing = (scene as any).dialog_shots as SegmentsState | null;
     const existingStatus = String((existing as any)?.status ?? "");
     const existingError = String((existing as any)?.error ?? (scene as any)?.clip_error ?? "");
+    const mergeDialogShots = (base: any, patch: Record<string, unknown>) => {
+      const safeBase = base && typeof base === "object" && !Array.isArray(base) ? base : {};
+      return {
+        ...safeBase,
+        ...patch,
+        // v278.1 — routing artefacts are expensive and must survive terminal
+        // error updates. A later failure state may set status/error, but it
+        // must not erase the anchor layout that lets the next retry take the
+        // Hungarian route instead of falling back to v153 duplicates.
+        ...(safeBase.anchor_face_layout && !patch.anchor_face_layout
+          ? { anchor_face_layout: safeBase.anchor_face_layout }
+          : {}),
+        ...(safeBase.plate_identity && !patch.plate_identity
+          ? { plate_identity: safeBase.plate_identity }
+          : {}),
+      };
+    };
     const isStaleFailedState =
       !isRetry &&
       !isAdvance &&
@@ -1412,8 +1429,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...(existing ?? {}),
+          dialog_shots: mergeDialogShots(existing, {
             version: 5,
             engine: "sync-segments",
             status: "failed",
@@ -1421,7 +1437,7 @@ serve(async (req) => {
             refunded: !alreadyRefunded,
             error: "plate_probe_failed_3plus_speakers",
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: 'plate_probe_failed_3plus_speakers: Video-Geometrie konnte nicht gelesen werden. Bitte "Sauber neu starten" drücken — beim erneuten Versuch nutzt das System die Anchor-Dimensionen als Fallback.',
@@ -1554,6 +1570,15 @@ serve(async (req) => {
           .map((face: any) => face?.bbox)
           .filter((bbox: unknown) => Array.isArray(bbox) && (bbox as unknown[]).length === 4)
         : [];
+    const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
+    const anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
+    const hasCompleteV278AnchorLayout = !!(
+      v278Enabled &&
+      speakers.length >= 3 &&
+      anchorLayoutRaw &&
+      Array.isArray(anchorLayoutRaw.slots) &&
+      anchorLayoutRaw.slots.length >= speakers.length
+    );
     // v154 — Geometry sanity gate against the persisted bboxes. The pre-v154
     // detector path occasionally cached torso/upper-body boxes (center y >
     // 0.55 of plate height). If those got persisted into dialog_shots, they
@@ -1608,7 +1633,7 @@ serve(async (req) => {
       String(id ?? "")
         .toLowerCase()
         .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
-    if (persistedGateOk && persistedBboxes.length >= speakers.length) {
+    if (persistedGateOk && persistedBboxes.length >= speakers.length && !hasCompleteV278AnchorLayout) {
       const persistedMouths: any[] = Array.isArray(persistedPlateIdentity?.mouths)
         ? persistedPlateIdentity.mouths
         : [];
@@ -1698,12 +1723,43 @@ serve(async (req) => {
         }
       }
       plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "persisted" : "missing";
+      if (plateHydrationSource === "persisted") {
+        const hydratedBoxes = speakerPlateBboxes
+          .map((b, i) => (Array.isArray(b) && b.length === 4 ? { i, b } : null))
+          .filter(Boolean) as Array<{ i: number; b: [number, number, number, number] }>;
+        const duplicateHydratedIdx: number[] = [];
+        for (let a = 0; a < hydratedBoxes.length; a++) {
+          for (let c = a + 1; c < hydratedBoxes.length; c++) {
+            const ba = hydratedBoxes[a].b;
+            const bc = hydratedBoxes[c].b;
+            const ca = [(ba[0] + ba[2]) / 2, (ba[1] + ba[3]) / 2];
+            const cc = [(bc[0] + bc[2]) / 2, (bc[1] + bc[3]) / 2];
+            if (Math.hypot(ca[0] - cc[0], ca[1] - cc[1]) < 8) duplicateHydratedIdx.push(hydratedBoxes[c].i);
+          }
+        }
+        if (duplicateHydratedIdx.length > 0) {
+          for (let i = 0; i < speakerPlateBboxes.length; i++) {
+            speakerPlateBboxes[i] = null;
+            speakerPlateMouths[i] = null;
+          }
+          plateHydrationSource = "missing";
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v278_persisted_identity_duplicate_evict ` +
+            `speakers=[${duplicateHydratedIdx.join(",")}] — forcing Hungarian/live routing instead of frozen cache`,
+          );
+        }
+      }
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v242_persisted_id_first_hydration ` +
         `lock=${lockMatched}/${speakers.length} cid=${idMatched}/${speakers.length} ` +
         `positional=${positionalFallback}/${speakers.length} mouths=${mouthHydrated}/${speakers.length} ` +
         `bboxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} ` +
         `lock_present=${Object.keys(assignmentLock).length > 0}`,
+      );
+    } else if (persistedBboxes.length >= speakers.length && hasCompleteV278AnchorLayout && anchorLayoutRaw) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v278_skip_legacy_persisted_hydration ` +
+        `anchor_layout=${anchorLayoutRaw.slots.length}/${speakers.length} persisted_boxes=${persistedBboxes.length} — trying Hungarian router first`,
       );
     }
     if (plateHydrationSource !== "persisted" && speakers.length >= 1 && plateDims && sourceClipUrl) {
@@ -1721,14 +1777,9 @@ serve(async (req) => {
       // when: N < 3 (legacy is cheap and reliable there), the anchor
       // layout is missing (older scenes), face-count mismatch, or the
       // AWS DetectFaces call fails.
-      const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
-      const anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
       if (
-        v278Enabled &&
-        speakers.length >= 3 &&
-        anchorLayoutRaw &&
-        Array.isArray(anchorLayoutRaw.slots) &&
-        anchorLayoutRaw.slots.length >= speakers.length
+        hasCompleteV278AnchorLayout &&
+        anchorLayoutRaw
       ) {
         try {
           const routed = await routePlateFacesToAnchor({
@@ -2348,8 +2399,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -2357,7 +2407,7 @@ serve(async (req) => {
               refunded: true,
               error: "v183_cast_duplicate_character_id",
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_error: msg,
@@ -2551,8 +2601,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -2560,7 +2609,7 @@ serve(async (req) => {
               refunded: true,
               error: reason,
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_error: (() => {
@@ -2675,7 +2724,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -2692,7 +2741,7 @@ serve(async (req) => {
                 scoreMatrix: (plateIdentityMap as any).scoreMatrix ?? null,
               },
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "needs_clip_rerender",
             clip_status: "pending",
@@ -2841,8 +2890,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -2850,7 +2898,7 @@ serve(async (req) => {
               refunded: true,
               error: `v117_plate_quality_gate:${reason}`,
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_status: "pending",
@@ -3084,8 +3132,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -3094,7 +3141,7 @@ serve(async (req) => {
               error: `v132_turn_visibility:${detail}`,
               v132_turn_gate: { failures, probes },
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "needs_clip_rerender",
             clip_status: "pending",
@@ -3221,13 +3268,13 @@ serve(async (req) => {
                 twoshot_stage: "failed",
                 clip_error:
                   "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
-                dialog_shots: { ...existingDs, face_detect_retry_count: 0 },
+                dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: 0 }),
               }
             : {
                 lip_sync_status: "pending",
                 twoshot_stage: "pending",
                 clip_error: `awaiting_face_detection_retry_${nextRetryCount}_of_3`,
-                dialog_shots: { ...existingDs, face_detect_retry_count: nextRetryCount },
+                dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: nextRetryCount }),
               },
         )
         .eq("id", sceneId);
@@ -3782,8 +3829,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...(existing ?? {}),
+          dialog_shots: mergeDialogShots(existing, {
             version: 5,
             engine: "sync-segments",
             status: "failed",
@@ -3792,7 +3838,7 @@ serve(async (req) => {
             error: reason,
             audio_diagnostics: audioDiagnostics,
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: `syncso_audio_preflight_${reason}`,
@@ -4625,8 +4671,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -4634,7 +4679,7 @@ serve(async (req) => {
               refunded: true,
               error: `v118_circuit_breaker:${reason}`,
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_status: "failed",
@@ -5334,8 +5379,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...existingDsLocal,
+          dialog_shots: mergeDialogShots(existingDsLocal, {
             version: 5,
             engine: "sync-segments",
             passes: passesPatched,
@@ -5352,7 +5396,7 @@ serve(async (req) => {
               resolved_count: plateIdentityMap?.resolvedCount ?? 0,
             },
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "needs_clip_rerender",
           clip_status: "pending",
@@ -5820,8 +5864,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...(prevState ?? {}),
+          dialog_shots: mergeDialogShots(prevState, {
             canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
             input_space: passes.length >= 2 ? "plate" : undefined,
             preclip_used: passes.length >= 2 ? false : undefined,
@@ -5840,7 +5883,7 @@ serve(async (req) => {
             plate_identity: v153PlateIdentitySnapshot,
             error: reason,
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: reason,
@@ -6903,8 +6946,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...(prevState ?? {}),
+          dialog_shots: mergeDialogShots(prevState, {
             version: 5,
             engine: "sync-segments",
             status: "failed",
@@ -6919,7 +6961,7 @@ serve(async (req) => {
             refunded: !alreadyRefunded,
             error: pass.error,
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: resp.status === 429
@@ -7301,14 +7343,13 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...freshState,
+            dialog_shots: mergeDialogShots(freshState, {
               ...state,
               canonical_lipsync_pipeline: passes.length >= 2 ? "v204_preclip_bbox_clipspace" : "v201_id_bbox_sync3",
               input_space: passes.length >= 2 ? "plate" : undefined,
               preclip_used: passes.length >= 2 ? false : undefined,
               passes: freshPasses,
-            },
+            }),
           })
           .eq("id", sceneId);
       } else {
@@ -7486,7 +7527,7 @@ serve(async (req) => {
             await supabase
               .from("composer_scenes")
               .update({
-                dialog_shots: { ...freshDs, passes: freshPasses, total_passes: passes.length, multi_pass: passes.length > 1 },
+                dialog_shots: mergeDialogShots(freshDs, { passes: freshPasses, total_passes: passes.length, multi_pass: passes.length > 1 }),
                 updated_at: nowIso,
               })
               .eq("id", sceneId);
