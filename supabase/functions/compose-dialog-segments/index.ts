@@ -1572,12 +1572,13 @@ serve(async (req) => {
         : [];
     const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
     const anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
-    const hasCompleteV278AnchorLayout =
+    const hasCompleteV278AnchorLayout = !!(
       v278Enabled &&
       speakers.length >= 3 &&
       anchorLayoutRaw &&
       Array.isArray(anchorLayoutRaw.slots) &&
-      anchorLayoutRaw.slots.length >= speakers.length;
+      anchorLayoutRaw.slots.length >= speakers.length
+    );
     // v154 — Geometry sanity gate against the persisted bboxes. The pre-v154
     // detector path occasionally cached torso/upper-body boxes (center y >
     // 0.55 of plate height). If those got persisted into dialog_shots, they
