@@ -2957,7 +2957,29 @@ serve(async (req) => {
                     ambiguous: "anchor_identity_ambiguous",
                     swap: "anchor_identity_swap_detected",
                   };
-                  if (identityFailure && identityFailure !== "extra") {
+                  // v266 — Multi-Speaker Cinematic-Sync: Anchor + Identity-Audit
+                  // sind KEIN blockendes Gate mehr. Der Anker wird best-effort
+                  // erzeugt (dient als Referenzbild für den Provider), aber ein
+                  // fehlgeschlagener Gemini-Identity-Audit stoppt den Render
+                  // nicht mehr. Ursache der wiederkehrenden
+                  // "anchor_identity_missing/clone/swap"-Fehler war das
+                  // KI-Zwischenbild + KI-Audit auf ähnlichen Gesichtern
+                  // (gleicher Nachname). Sync.so-Multi-Face-Lipsync arbeitet
+                  // auf dem echten Video-Frame, nicht auf diesem Anker.
+                  const noAnchorGateFlag = String(
+                    Deno.env.get("CINEMATIC_SYNC_NO_ANCHOR") ?? "1",
+                  ).toLowerCase();
+                  const noAnchorGate =
+                    (noAnchorGateFlag === "1" ||
+                      noAnchorGateFlag === "true" ||
+                      noAnchorGateFlag === "on") &&
+                    portraitUrls.length >= 2;
+                  if (identityFailure && identityFailure !== "extra" && noAnchorGate) {
+                    console.log(
+                      `[compose-video-clips] v266_anchor_gate_bypass scene=${scene.id} identity=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}] — bypassing (multi-speaker, no-anchor-gate)`,
+                    );
+                    // Fall through into normal provider dispatch — no block.
+                  } else if (identityFailure && identityFailure !== "extra") {
                     const code =
                       reasonMap[identityFailure] ?? "anchor_identity_failed";
                     // v250 — Soft-Pass: when three retries produced the right
@@ -3020,6 +3042,7 @@ serve(async (req) => {
                 }
               }
             }
+
           } catch (anchorErr) {
             console.warn(
               `[compose-video-clips] cinematic-sync scene ${scene.id}: multi-cast anchor safety net failed:`,
