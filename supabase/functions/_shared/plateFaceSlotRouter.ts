@@ -40,12 +40,15 @@ const REK_TIMEOUT_MS = 15_000;
 
 async function sha256Hex(data: Uint8Array | string): Promise<string> {
   const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  const hash = await crypto.subtle.digest("SHA-256", bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 async function hmac(key: ArrayBuffer | Uint8Array, data: string): Promise<ArrayBuffer> {
   const k = await crypto.subtle.importKey(
-    "raw", key instanceof Uint8Array ? key : new Uint8Array(key),
+    "raw",
+    key instanceof Uint8Array
+      ? key.buffer.slice(key.byteOffset, key.byteOffset + key.byteLength)
+      : key,
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
   );
   return await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(data));
