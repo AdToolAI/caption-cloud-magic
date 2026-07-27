@@ -380,9 +380,11 @@ serve(async (req) => {
         : ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} cast characters are fully visible in the SAME frame at roughly EQUAL screen share. Each cast face must be unobstructed, front-3/4 to camera, with clear separation between subjects. NEVER produce a single-character close-up, NEVER cut a cast member out of frame, NEVER show only the back of a head.`)
       : "";
     const TWO_SHOT_NEGATIVE = isMulti
-      ? (hasAsymmetricCast
-        ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`
-        : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`)
+      ? (gridRequested
+        ? ` AVOID: duplicated cast identity across panels, swapped identities between panels, more or fewer than ${N} panels, uneven panel sizes, cast member cropped out of their panel, back-of-head only.`
+        : (hasAsymmetricCast
+          ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`
+          : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`))
       : ` AVOID: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same cast person, photo collage, contact sheet, before/after grid, mirror duplicates of the cast person, twins of the cast person, doppelgängers, repeated cast face, two of the same cast person, three of the same cast person.`;
     const STRICT_RETRY_SUFFIX = strictMode
       ? (isMulti
