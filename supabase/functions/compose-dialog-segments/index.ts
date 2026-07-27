@@ -5595,16 +5595,21 @@ serve(async (req) => {
           const useMouth = Array.isArray(platePassMouth)
             && Number.isFinite(platePassMouth[0])
             && Number.isFinite(platePassMouth[1]);
-          const multiSpeakerNoMouth = speakers.length >= 2 && !useMouth;
-          if (multiSpeakerNoMouth) {
-            console.error(
-              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v159_mouth_missing_multi_speaker ` +
+          // v280 — Der v159-Hard-Refuse war zu streng: wenn die Plate-Bbox
+          // durch v185_anchor_plate_bbox_gate bereits als vertrauenswürdig
+          // markiert wurde, ist eine bbox-abgeleitete Mundposition (h*0.66)
+          // eine sichere Näherung und morpht nicht — Sync.so bekommt eine
+          // korrekt lokalisierte Face-Region. Ohne diesen Zweig kippte die
+          // Szene stumm in v152 mit dem irreführenden
+          // `bbox_geometry_insane:area_pct=0.00`.
+          if (!useMouth && speakers.length >= 2) {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v280_bbox_derived_mouth_anchor ` +
               `speaker=${pass.speaker_name} hydration=${plateHydrationSource} bbox=${JSON.stringify(platePassBox)} — ` +
-              `refusing to dispatch without mouth landmark (would morph)`,
+              `no detector mouth landmark, using bbox lower-third anchor`,
             );
-            // Hand off to v152 hard-fail path below: leave box=null so the
-            // pre-dispatch gate refunds instead of sending a bad target.
-          } else {
+          }
+          {
             const anchorX = useMouth ? platePassMouth![0] : Math.round((bx1 + bx2) / 2);
             const anchorY = useMouth ? platePassMouth![1] : Math.round(by1 + h * 0.66);
             const padX = Math.max(2, Math.round(w * 0.08));
@@ -5616,7 +5621,9 @@ serve(async (req) => {
             const y2 = Math.min(dims.height, Math.round(by2 + padBottom));
             if (x2 > x1 + 4 && y2 > y1 + 4) {
               box = [x1, y1, x2, y2];
-              bboxSource = useMouth ? "plate-native:v160-face-mouth-verified" : "plate-native:v160-face-single";
+              bboxSource = useMouth
+                ? "plate-native:v160-face-mouth-verified"
+                : "plate-native:v280-face-bbox-derived";
               const plateArea = Math.max(1, dims.width * dims.height);
               const boxArea = Math.max(0, (x2 - x1) * (y2 - y1));
               const areaPct = (boxArea / plateArea) * 100;
@@ -5630,6 +5637,7 @@ serve(async (req) => {
               );
             }
           }
+
         }
       }
 
