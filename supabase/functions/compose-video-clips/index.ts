@@ -2604,6 +2604,7 @@ serve(async (req) => {
                         ok: okFinal,
                         identityFailure,
                         notes: identityNotes || undefined,
+                        min_face_check: minFaceCheck ?? undefined,
                         at: new Date().toISOString(),
                       },
                       // v131.6 — forensic trail per compose attempt.
