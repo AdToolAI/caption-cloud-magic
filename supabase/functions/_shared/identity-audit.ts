@@ -264,11 +264,16 @@ export async function auditAnchorIdentity(
       ok: false,
       reason: "clone",
       duplicated: duplicated.length > 0 ? duplicated : undefined,
+      // v263 — always surface `missing` alongside `clone` so the composer can
+      // decide between soft-pass (lookalike cast) and face-lock retry
+      // (a character is actually absent from the anchor).
+      missing: missing.length > 0 ? missing : undefined,
       totalPeople,
       extraPeople,
       detail: detail || `duplicated: ${duplicated.join(", ") || "unspecified"}`,
     };
   }
+
   if (missing.length > 0 || reason === "missing") {
     return { ok: false, reason: "missing", missing, totalPeople, extraPeople, detail };
   }

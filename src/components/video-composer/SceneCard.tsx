@@ -60,6 +60,8 @@ import {
 } from "@/types/video-composer";
 
 import SceneMediaUpload from "./SceneMediaUpload";
+import AnchorPreviewGate from "./AnchorPreviewGate";
+
 import StockMediaBrowser, { type StockMediaItem } from "./StockMediaBrowser";
 import SceneReferenceImageUpload from "./SceneReferenceImageUpload";
 import SceneReferenceImageSlot from "./SceneReferenceImageSlot";
@@ -460,6 +462,8 @@ export default function SceneCard({
   const dialogStudioRef = useRef<HTMLDivElement | null>(null);
   const [splitConfirmOpen, setSplitConfirmOpen] = useState(false);
   const [autoSplitArmed, setAutoSplitArmed] = useState(false);
+  const [anchorPreviewOpen, setAnchorPreviewOpen] = useState(false);
+
 
   const cleanRestartLipSync = async (opts: { force?: boolean } = {}) => {
     const { data, error } = await supabase.functions.invoke("reset-lipsync-scene", {
@@ -2204,8 +2208,43 @@ export default function SceneCard({
                       🎥 Clip + Lip-Sync neu rendern
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setAnchorPreviewOpen(true)}
+                    className="text-[10px] px-2 py-1 rounded border border-emerald-400/40 text-emerald-300 hover:bg-emerald-400/10"
+                    title="Anchor-Bild komponieren und prüfen, bevor Video + Lip-Sync abgerechnet werden."
+                  >
+                    👁 Vorschau statt Full-Render
+                  </button>
                 </div>
               )}
+
+              <AnchorPreviewGate
+                open={anchorPreviewOpen}
+                onOpenChange={setAnchorPreviewOpen}
+                sceneId={scene.id}
+                composeBody={{
+                  projectId: scene.projectId,
+                  scenes: [
+                    {
+                      id: scene.id,
+                      clipSource: scene.clipSource,
+                      clipQuality: scene.clipQuality || "standard",
+                      aiPrompt: scene.aiPrompt,
+                      durationSeconds: scene.durationSeconds,
+                      characterShot: scene.characterShot,
+                      characterShots: scene.characterShots,
+                      dialogScript: scene.dialogScript,
+                      dialogVoices: scene.dialogVoices,
+                      engineOverride: "cinematic-sync",
+                      withAudio: scene.withAudio !== false,
+                    },
+                  ],
+                  characters,
+                }}
+                onConfirmed={() => onUpdate({ clipStatus: "generating" as any })}
+              />
+
 
 
 
