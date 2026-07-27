@@ -226,7 +226,11 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           error: p?.error ?? p?.last_error,
         }))
       : [];
-  const isDialog = isCinematic && !lipSyncCanceled && (dialogShots.length > 0 || lipSyncRunning);
+  const isDialog =
+    isCinematic &&
+    !lipSyncCanceled &&
+    scene.clipStatus !== 'failed' &&
+    (dialogShots.length > 0 || lipSyncRunning);
   const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
   const dialogTotal = dialogShots.length;
   const showDialogOverlay = isDialog && !hqReady && !['done', 'canceled'].includes(String(dialogShotsState?.status ?? ''));
