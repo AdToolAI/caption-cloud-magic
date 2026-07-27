@@ -52,7 +52,7 @@ import {
   summarizeSceneAssets,
   type AssetRef,
 } from "../_shared/asset-ref.ts";
-const ANCHOR_AUDIT_VERSION = 14;
+const ANCHOR_AUDIT_VERSION = 15;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
