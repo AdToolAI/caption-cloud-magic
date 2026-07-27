@@ -276,6 +276,10 @@ serve(async (req) => {
             const nowIso = new Date().toISOString();
             await supabaseAdmin.from('composer_scenes').update({
               clip_url: finalOutputUrl,
+              // v268 — dialog-stitch finalisiert die Szene komplett; ohne
+              // clip_status='ready' bleibt die UI ewig auf „Szene wird
+              // gebaut…" obwohl das MP4 längst existiert.
+              clip_status: 'ready',
               lip_sync_source_clip_url: prevState?.source_clip_url ?? null,
               lip_sync_applied_at: nowIso,
               lip_sync_status: 'done',
