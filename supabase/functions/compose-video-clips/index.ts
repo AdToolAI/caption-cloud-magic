@@ -2875,8 +2875,17 @@ serve(async (req) => {
                           const nextDialogShotsBase = existingDs && typeof existingDs === "object"
                             ? existingDs
                             : {};
+                          // v278 — Persist anchor_face_layout as SEPARATE
+                          // struct so it survives when plate_identity is
+                          // overwritten later by the real plate detector.
+                          const anchorFaceLayout = buildAnchorLayoutFromV274(
+                            composedUrl,
+                            idResolved.dims,
+                            idResolved.faces,
+                          );
                           const nextDialogShots = {
                             ...nextDialogShotsBase,
+                            anchor_face_layout: anchorFaceLayout,
                             plate_identity: {
                               ...(nextDialogShotsBase.plate_identity ?? {}),
                               method: idResolved.method,
