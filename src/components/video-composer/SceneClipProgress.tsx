@@ -127,7 +127,14 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     scene.clipStatus === 'ready' &&
     typeof scene.clipUrl === 'string' &&
     scene.clipUrl.includes('/talking-head-renders/');
-  const lipSyncRunning = isCinematic && !lipSyncCanceled && scene.lipSyncStatus === 'running';
+  // v264 — Never show a Lip-Sync spinner when the clip itself is marked
+  // failed. This handles legacy rows with a contradictory `failed + done`
+  // state (see mem/architecture/lipsync/orphaned-pending-after-clip-fail.md).
+  const lipSyncRunning =
+    isCinematic &&
+    !lipSyncCanceled &&
+    scene.clipStatus !== 'failed' &&
+    scene.lipSyncStatus === 'running';
 
   const resetWrongRenderPath = async () => {
     if (busy) return;
