@@ -1,72 +1,52 @@
-# Plan v274 — Speaker↔Face Identity via AWS Rekognition
+## Kurzantwort auf deine zwei Fragen
 
-## Ziel
+**1) Wird AWS Rekognition wirklich im Anchor abgerufen?**
+Nein — für die letzte erfolgreiche Szene `fa7b1caf…` ist `audio_plan.twoshot.anchor_identity` in der DB **`NULL`**. Unser v274-Log-Marker `v274_rekognition_id` taucht in den Function-Logs nicht auf. Was in `dialog_shots.plate_identity` steht (`version: "v242"`, fester `matchConfidence: 0.85`) kommt vom **alten Gemini-Post-Hoc-Pfad in `compose-dialog-segments`**, nicht von Rekognition. → Der v274-Anker-Match läuft entweder gar nicht oder wird gleich wieder überschrieben. Deshalb bringt v274 aktuell nichts fürs Routing.
 
-Silent-Misfires beheben, bei denen `plate_identity.resolvedCount = 0` und der Dispatcher auf "Slot-Reihenfolge = Script-Reihenfolge" zurückfällt — mit dem Ergebnis, dass Audio auf falsche Gesichter geroutet wird (z.B. Sprecher 4 landet bei Position 1).
+**2) Zurück auf Nano Banana 2 für den Anker?**
+Nicht wegen des Lip-Syncs — das Anker-Modell ist nicht die kaputte Stelle. Der Fehler sitzt bei „welches Gesicht bekommt welches Audio", nicht bei „wer sieht wie aus". Modelwechsel würde nur die Anti-Grid/Environment-Härtung aus v271/v272 wieder verlieren. Anker bleibt Gemini 3 Pro.
 
-Ursache: Im Anchor-Schritt läuft bisher **kein** Identitäts-Matching. Slots werden rein geometrisch vergeben.
+## Plan v275 — v274 fertigverdrahten & Identity-Overwrite stoppen
 
-Lösung: AWS Rekognition matched die im Anchor detektierten Gesichter gegen die bereits vorhandenen Cast & World Portrait-Descriptors.
+### Ursache in einer Zeile
+`compose-dialog-segments` rechnet Identität **nach dem Anker nochmal neu** (Gemini/v242 auf dem gerenderten Clip) und überschreibt damit alles, was v274 auf dem Anker sauber via Rekognition zugeordnet hat.
 
-## Umfang
+### Änderungen (chirurgisch, kein neuer Feature-Layer)
 
-- Nur der Anchor-Schritt für N≥2 Sprecher.
-- N=1 bleibt unverändert.
-- Keine Änderung an Cast & World, Focus-Plates, Sync.so oder Rendering.
-- Bonus-Idee (Focus-Plates als zusätzliche Referenz) **nicht** enthalten — Risiko von Style-Drift-Fehlmatches.
+1. **`compose-video-clips` — v274 verifizierbar machen**
+   - Zwei Pflicht-Logs pro N≥2-Szene: `v274_enter scene=… n=…` (immer) + `v274_result …` (nach dem Call).
+   - Fehlerpfad schreibt `audio_plan.twoshot.anchor_identity = { method: "rekognition", ok: false, reason: <string> }` statt still zu schlucken — so sehen wir in der DB, dass es lief.
+   - Kein Environment-Check umgehen: wenn `AWS_ACCESS_KEY_ID` fehlt, einmalig als `reason: "aws_creds_missing"` markieren.
 
-## Änderungen
+2. **`compose-dialog-segments` — Rekognition-Lock hat Vorrang**
+   - Wenn `audio_plan.twoshot.anchor_identity.ok === true` und `assignmentLock` vollständig ist (`resolvedCount === speakerCount`):
+     - `assignmentLock` wird **eingefroren** und darf vom v242-Pfad nicht ersetzt werden.
+     - v242 darf nur noch `bboxes/mouths/center` aus dem Clip nachziehen (Geometrie), aber die `slot → characterId`-Zuordnung bleibt die vom Anker.
+   - Nur wenn Rekognition **nicht** vollständig lief, fällt es auf den heutigen Gemini-Pfad zurück (heutiges Verhalten).
 
-### 1. Neue Utility: `resolveIdentityViaRekognition`
-- Input: Anchor-Bild-URL + Liste `{ characterId, portraitUrl }` aus Cast.
-- Ablauf:
-  1. `DetectFaces` auf dem Anchor → Bounding-Boxes.
-  2. Pro Cast-Portrait `CompareFaces` gegen jede Bounding-Box.
-  3. Hungarian-Assignment über die Similarity-Matrix (optimale globale Zuordnung, keine Greedy-Doppelbelegung).
-  4. Threshold: Similarity ≥ 55. Alles darunter → `unresolved`.
-- Output: `Array<{ boxIdx, characterId | null, similarity }>`.
+3. **Latenz-Fix (die 1 Sekunde)**
+   - v274 läuft parallel zu **Step B** (Focus-Plate-Prep) statt davor: `Promise.all([resolveIdentityViaRekognition(...), prepareFocusPlates(...)])`.
+   - Netto-Overhead danach: ~0 ms, weil Rekognition (~800 ms) hinter dem längeren Focus-Plate-Job verschwindet.
 
-### 2. Dispatcher-Guard in `compose-video-clips`
-- Nach Anchor-Generierung `resolveIdentityViaRekognition` aufrufen.
-- Ergebnis in `plate_identity.faces[]` und `resolvedCount` schreiben.
-- Für N≥3 Sprecher: harter Stop, wenn `resolvedCount < N` → Szene auf `clip_status = 'awaiting_manual_face_map'`.
-- Für N=2: Soft-Warn, aber weiter (2-Sprecher-Fehlzuordnung ist audit-visuell schnell erkennbar).
+4. **Kein Anker-Modellwechsel.** Kein UI-Change. Kein neuer State (`awaiting_manual_face_map` aus v274 bleibt wie er ist).
 
-### 3. Manuelle Review-UI: `FaceMapReviewDialog.tsx`
-- Zeigt Anchor-Frame mit numerierten Bounding-Boxes.
-- User zieht Speaker-Chip auf die passende Box (Drag & Drop).
-- Speichern → `plate_identity.faces[]` überschreiben, `clip_status` zurück auf `awaiting_render`.
-- Trigger aus `SceneClipProgress.tsx` wenn Status = `awaiting_manual_face_map`.
+### Verifikation nach Deploy
+Neue Szene mit 4 Sprechern rendern, dann:
+```sql
+SELECT id,
+  audio_plan->'twoshot'->'anchor_identity'->>'method'         AS m,
+  audio_plan->'twoshot'->'anchor_identity'->>'resolvedCount'  AS r,
+  audio_plan->'twoshot'->'anchor_identity'->>'reason'         AS why,
+  dialog_shots->'plate_identity'->>'version'                  AS v,
+  dialog_shots->'plate_identity'->'assignmentLock'            AS lock
+FROM composer_scenes WHERE id = '<neue-szene>';
+```
+Erwartung: `m = "rekognition"`, `r = 4`, `lock` identisch zu dem, was in `anchor_identity.assignmentLock` steht. Log zeigt `v274_enter` + `v274_result` + neu `v275_lock_frozen`.
 
-### 4. One-Shot DB-Fix
-- Szene `ef5bff66…` auf `awaiting_manual_face_map` setzen, damit der User sie direkt über den neuen Dialog reparieren kann.
+### Was NICHT geändert wird
+Sync.so-Payload, Focus-Plate-Erzeugung, Anker-Prompts, UI, Kling-/Hailuo-Dispatch, Credits, `awaiting_manual_face_map`-Review-Dialog.
 
-## Was NICHT geändert wird
-
-- Cast & World Portraits, `IndexFaces`, Rekognition-Collection — bleiben unangetastet.
-- Focus-Plates / SPF Phase 1 — kein Einfluss.
-- Anchor-Modell (Gemini 3 Pro Image) — kein Wechsel.
-- Sync.so Pipeline, dialog-stitch, Rendering — kein Eingriff.
-- Grid-Layout-Detection v273 — bleibt.
-
-## Risiken & Mitigation
-
-- **Zwillinge / sehr ähnliche Charaktere:** Hungarian-Assignment verhindert Doppelbelegung; unter Threshold → Manual Review statt Silent-Misfire.
-- **Rekognition-Latenz:** ~800ms extra pro N≥2-Szene. Akzeptabel gegenüber Re-Render-Kosten.
-- **Kosten:** ~$0.001 pro Szene (4× CompareFaces). Vernachlässigbar.
-- **Neuer State `awaiting_manual_face_map`:** einmalig testen dass Webhook und UI ihn korrekt handhaben.
-
-## Erwartung
-
-- ~90% aller aktuellen Slot-Misfires bei N≥3 verschwinden.
-- Verbleibende ~10%: Manual Review — kein Silent Fail mehr, User hat volle Kontrolle.
-- Keine Regressionen für N=1 oder Rendering.
-
-## Technische Details
-
-- **Datei neu:** `supabase/functions/_shared/resolveIdentityViaRekognition.ts`
-- **Datei geändert:** `supabase/functions/compose-video-clips/index.ts` (Guard + plate_identity schreiben)
-- **Datei neu:** `src/components/scene/FaceMapReviewDialog.tsx`
-- **Datei geändert:** `src/components/scene/SceneClipProgress.tsx` (Trigger für Dialog)
-- **DB Migration:** enum `clip_status` um `awaiting_manual_face_map` erweitern falls nicht vorhanden.
-- **One-Shot:** UPDATE auf Szene `ef5bff66…`.
+### Erwartetes Ergebnis
+- Lip-Sync trifft die richtigen Gesichter, weil das Rekognition-Mapping nicht mehr vom v242-Post-Hoc-Pfad überschrieben wird.
+- Die zusätzliche Sekunde verschwindet (parallelisiert).
+- Sichtbarer DB-Beweis pro Szene, dass Rekognition wirklich lief.
