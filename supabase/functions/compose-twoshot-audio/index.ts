@@ -1335,11 +1335,32 @@ serve(async (req) => {
     // Only set useExternalAudio when 2+ speakers actually need the external
     // merged track.
     const isMultiSpeaker = publicSpeakerTracks.length >= 2;
+    // v277 — merge against the freshest row before writing `audio_plan`.
+    // The anchor/identity stage can persist `twoshot.anchor_identity` in
+    // parallel while audio is being generated; using the scene snapshot loaded
+    // at function entry can silently erase that routing lock.
+    let latestAudioPlan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
+    try {
+      const { data: latestPlanRow } = await supabase
+        .from("composer_scenes")
+        .select("audio_plan")
+        .eq("id", scene_id)
+        .maybeSingle();
+      if ((latestPlanRow as any)?.audio_plan && typeof (latestPlanRow as any).audio_plan === "object") {
+        latestAudioPlan = (latestPlanRow as any).audio_plan as Record<string, any>;
+      }
+    } catch (planReadErr) {
+      console.warn(
+        `[compose-twoshot-audio] v277 latest audio_plan read failed; using entry snapshot: ${(planReadErr as Error)?.message ?? planReadErr}`,
+      );
+    }
+    const latestTwoshot = (latestAudioPlan.twoshot ?? {}) as Record<string, any>;
     const sceneUpdate: Record<string, unknown> = {
       character_audio_url: publicUrl,
       audio_plan: {
-        ...(scene as any).audio_plan,
+        ...latestAudioPlan,
         twoshot: {
+          ...latestTwoshot,
           segments: publicSegments,
           speakers: publicSpeakerTracks,
           spokenSec: Math.round(spokenSec * 1000) / 1000,

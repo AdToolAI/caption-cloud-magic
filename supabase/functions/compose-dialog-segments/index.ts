@@ -1447,6 +1447,22 @@ serve(async (req) => {
     // `audio_plan.twoshot.anchor_identity` seeded by compose-video-clips.
     const _anchorIdentitySeed = ((scene as any)?.audio_plan?.twoshot?.anchor_identity ?? null) as any;
     const persistedPlateIdentity = (((existing as any)?.plate_identity) ?? _anchorIdentitySeed ?? null) as any;
+    const anchorRekLockSeed: Record<string, string> | null =
+      (_anchorIdentitySeed &&
+        _anchorIdentitySeed.assignmentLock &&
+        typeof _anchorIdentitySeed.assignmentLock === "object" &&
+        Object.keys(_anchorIdentitySeed.assignmentLock).length > 0)
+        ? { ...(_anchorIdentitySeed.assignmentLock as Record<string, string>) }
+        : null;
+    const anchorRekLockCount = anchorRekLockSeed ? Object.keys(anchorRekLockSeed).length : 0;
+    const anchorRekLockPartial = !!anchorRekLockSeed && anchorRekLockCount > 0 && anchorRekLockCount < speakers.length;
+    const anchorRekLockComplete = !!anchorRekLockSeed && anchorRekLockCount >= speakers.length;
+    if (anchorRekLockSeed) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v277_anchor_rekognition_seed ` +
+        `locked_slots=${anchorRekLockCount}/${speakers.length} status=${_anchorIdentitySeed?.status ?? "unknown"}`,
+      );
+    }
     const persistedPlateDims = persistedPlateIdentity?.dims;
     if (
       !plateDims &&
@@ -1841,16 +1857,49 @@ serve(async (req) => {
       const assignedFaceKeys = new Set<string>();
       const canFallbackUnlabeled =
         plateIdentityMap.faces.length >= speakers.length;
+      const anchorLockedCids = new Set(
+        Object.values(anchorRekLockSeed ?? {})
+          .map((cid) => stripIdPrefix(cid))
+          .filter(Boolean),
+      );
+      const anchorRekFacesByCid = new Map<string, PlateIdentityFace>();
+      if (anchorRekLockSeed) {
+        for (const face of plateIdentityMap.faces) {
+          const faceCid = stripIdPrefix((face as any)?.characterId);
+          if (faceCid && anchorLockedCids.has(faceCid) && !anchorRekFacesByCid.has(faceCid)) {
+            anchorRekFacesByCid.set(faceCid, face);
+          }
+        }
+      }
 
       speakers.forEach((sp, idx) => {
         const cid = stripIdPrefix(sp.character_id);
         let plateFace: PlateIdentityFace | undefined;
         let source = "plate-identity";
 
+        // v277 — Rekognition-Lock is authoritative per slot, even when only
+        // partial (e.g. 3/4). Only unresolved slots may fall through to the
+        // older cid/geometry fallback paths.
+        const lockedCid = stripIdPrefix(anchorRekLockSeed?.[String(idx)]);
+        if (lockedCid) {
+          const lockedFace = anchorRekFacesByCid.get(lockedCid);
+          if (lockedFace && !assignedFaceKeys.has(faceKey(lockedFace))) {
+            plateFace = lockedFace;
+            source = anchorRekLockComplete
+              ? "v277-anchor-rekognition-complete"
+              : "v277-anchor-rekognition-partial";
+          } else {
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v277_anchor_lock_face_missing ` +
+              `speaker=${sp.speaker ?? `idx${idx}`} cid=${lockedCid} — falling back for this slot only`,
+            );
+          }
+        }
+
         // 1) Top-Ranked Face für cid nehmen, das noch nicht vergeben ist.
         if (cid) {
           const ranked = byIdRanked.get(cid);
-          if (ranked && ranked.length > 0) {
+          if (!plateFace && ranked && ranked.length > 0) {
             for (const cand of ranked) {
               const k = faceKey(cand);
               if (!assignedFaceKeys.has(k)) {
@@ -2287,23 +2336,9 @@ serve(async (req) => {
       typeof (persistedPlateIdentity as any).assignmentLock === "object"
         ? { ...(persistedPlateIdentity as any).assignmentLock }
         : {};
-    // v275 — When the v274 Rekognition step at the anchor stage produced
-    // a complete, verified `slot → characterId` map, that mapping is the
-    // deterministic source of truth. Do NOT let the downstream v242
-    // plate-identity path (which re-runs on the already-rendered clip)
-    // reorder the assignment, or we lose the biometric routing.
-    const anchorRekLock =
-      (_anchorIdentitySeed && _anchorIdentitySeed.ok === true &&
-        _anchorIdentitySeed.assignmentLock &&
-        typeof _anchorIdentitySeed.assignmentLock === "object")
-        ? { ...(_anchorIdentitySeed.assignmentLock as Record<string, string>) }
-        : null;
-    const anchorLockComplete =
-      !!anchorRekLock &&
-      Object.keys(anchorRekLock).length >= speakers.length;
     let freshLock: Record<string, string> | null = null;
     if (
-      !anchorLockComplete &&
+      !anchorRekLockComplete &&
       plateIdentityMap &&
       plateIdentityMap.faces.length > 0 &&
       speakers.every((sp) => !!stripLockPrefix(sp.character_id)) &&
@@ -2315,12 +2350,17 @@ serve(async (req) => {
         if (cid) freshLock![String(idx)] = cid;
       });
     }
-    const finalAssignmentLock = anchorRekLock ?? freshLock ?? existingLock;
-    const lockSource = anchorLockComplete
-      ? "v275_anchor_rekognition_frozen"
-      : freshLock
-        ? "v242_fresh"
-        : "existing";
+    const mergedFallbackLock = { ...(freshLock ?? existingLock) };
+    const finalAssignmentLock = anchorRekLockSeed
+      ? { ...mergedFallbackLock, ...anchorRekLockSeed }
+      : mergedFallbackLock;
+    const lockSource = anchorRekLockComplete
+      ? "v277_anchor_rekognition_complete"
+      : anchorRekLockPartial
+        ? "v277_anchor_rekognition_partial"
+        : freshLock
+          ? "v242_fresh"
+          : "existing";
     const v153PlateIdentitySnapshot = {
       version: "v242" as const,
       dims: plateDims,
@@ -2335,7 +2375,7 @@ serve(async (req) => {
       assignmentLockSource: lockSource,
     };
     console.warn(
-      `[compose-dialog-segments] scene=${sceneId} v275_assignment_lock ` +
+      `[compose-dialog-segments] scene=${sceneId} v277_assignment_lock ` +
       `source=${lockSource} locked_slots=${Object.keys(finalAssignmentLock).length}/${speakers.length}`,
     );
     console.warn(

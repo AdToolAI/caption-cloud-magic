@@ -2844,10 +2844,17 @@ serve(async (req) => {
                           const matchedSlots = idResolved.assignmentLock
                             ? Object.keys(idResolved.assignmentLock)
                             : [];
+                          const assignmentLockSource = resolved >= expected
+                            ? "v274_anchor_rekognition_complete"
+                            : isPartial
+                              ? "v274_anchor_rekognition_partial"
+                              : "v274_anchor_rekognition_unresolved";
                           const anchorIdentityPayload = {
                             method: idResolved.method,
                             ok: idResolved.ok,
                             status: identityStatus,
+                            assignmentLockSource,
+                            partial: isPartial,
                             matched: matchedSlots,
                             dims: idResolved.dims,
                             faces: idResolved.faces,
@@ -2864,20 +2871,23 @@ serve(async (req) => {
                           // change on the compose-dialog-segments side when
                           // dialog_shots already exists.
                           const existingDs = (sceneRow?.dialog_shots ?? null) as Record<string, any> | null;
-                          const nextDialogShots = existingDs && typeof existingDs === "object"
-                            ? {
-                                ...existingDs,
-                                plate_identity: {
-                                  ...(existingDs.plate_identity ?? {}),
-                                  method: idResolved.method,
-                                  status: identityStatus,
-                                  dims: idResolved.dims,
-                                  faces: idResolved.faces,
-                                  assignmentLock: idResolved.assignmentLock,
-                                  resolvedCount: resolved,
-                                },
-                              }
-                            : existingDs;
+                          const nextDialogShotsBase = existingDs && typeof existingDs === "object"
+                            ? existingDs
+                            : {};
+                          const nextDialogShots = {
+                            ...nextDialogShotsBase,
+                            plate_identity: {
+                              ...(nextDialogShotsBase.plate_identity ?? {}),
+                              method: idResolved.method,
+                              status: identityStatus,
+                              assignmentLockSource,
+                              dims: idResolved.dims,
+                              faces: idResolved.faces,
+                              assignmentLock: idResolved.assignmentLock,
+                              resolvedCount: resolved,
+                              expectedCount: expected,
+                            },
+                          };
                           // v276: hard-block only on total miss (0/N) when soft-gate enabled.
                           // Legacy hard-gate (any partial for N>=3) restored via V276_SOFT_GATE=false.
                           const needsManualReview = softGateEnabled
@@ -2893,7 +2903,7 @@ serve(async (req) => {
                                   anchor_identity: anchorIdentityPayload,
                                 },
                               },
-                              ...(nextDialogShots ? { dialog_shots: nextDialogShots } : {}),
+                              dialog_shots: nextDialogShots,
                               ...(needsManualReview
                                 ? {
                                     clip_status: "awaiting_manual_face_map",
