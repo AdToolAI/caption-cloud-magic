@@ -1,49 +1,58 @@
-## Befund
+## Diagnose
 
-Der Screenshot passt zur Datenlage: Die letzte Szene `6d0d31d5-276d-453e-a154-30557fe1e207` ist wieder im alten `v153_preflight_block` gelandet.
+Der Fehler `bbox_geometry_insane:area_pct=0.00` in Szene S01 bedeutet: die für Sync.so berechnete Face-Bbox hat **Fläche 0** — d.h. `dispatchBox` war `null` oder degeneriert, bevor der v152-Sanity-Gate lief.
 
-Was ich geprüft habe:
-- `dialog_shots.anchor_face_layout` ist bei der Szene **nicht vorhanden**.
-- `compose-video-clips` Logs zeigen für diese Szene **kein** `v278_anchor_layout`.
-- `compose-dialog-segments` Logs zeigen deshalb: alter `v242_persisted_id_first_hydration` mit nur `lock=1/4`, danach `v153_plate_box_duplicate_for_speakers=[3]`.
-- Es gibt aber verwertbare Daten in `audio_plan.twoshot.faceMap`: 4 Anchor-Gesichter mit Character-IDs. Das kann als Recovery-Quelle für v278 dienen.
+Konkreter Pfad in `compose-dialog-segments/index.ts` (Zeilen 5580–5687):
 
-Kurz: Die v278.1-Idee ist richtig, aber die Route wird für diese Szene nicht erreicht, weil der persistierte `anchor_face_layout` fehlt. Der alte partielle Rekognition-Seed wird dann zuerst benutzt und verursacht wieder die Duplicate-Fehlermeldung.
+1. Für **N ≥ 2 Sprecher** wird die Bbox **ausschließlich** aus `speakerPlateBboxes[pass.speaker_idx]` gelesen (plate-native).
+2. Der `facemap`-Fallback und der synthetische Coords-Fallback sind hart auf `speakers.length < 2` beschränkt (v153.1 Absicht: keine identischen Boxen pro Sprecher).
+3. In dieser Szene war `speakerPlateBboxes[idx]` also `null` oder eine 0-Fläche-Box → `box` bleibt `null` → `dispatchBox = null` → `boxArea = 0` → `area_pct = 0.00` → v152 Hard-Fail + Refund.
 
-## Plan
+Ursache stromaufwärts: Rekognition/Plate-Face-Detection hat für mindestens einen Speaker-Slot keine gültige Bbox geliefert (Slot leer nach v278.1-Bijection, oder Face wurde nicht detektiert, oder persistierte Bboxes waren stale/leer). Das passt zur Symptomatik: Cast&World-Namen (54d905, 5c81f9, 4d5438) sind **generische Platzhalter-IDs** — die Rekognition/Router-Bijection läuft ins Leere.
 
-1. **Fallback-Anchor-Layout direkt in `compose-dialog-segments` bauen**
-   - Wenn `dialog_shots.anchor_face_layout` fehlt, aber `audio_plan.twoshot.faceMap` vollständige Anchor-Gesichter enthält, baut `compose-dialog-segments` daraus zur Laufzeit ein `AnchorFaceLayout`.
-   - Quelle: `faceMap.faces[].bbox`, `faceMap.width`, `faceMap.height`, `faceMap.faces[].characterId`.
-   - Damit können auch bereits existierende/halb kaputte Szenen in den v278-Router kommen, ohne dass der Clip komplett neu durch `compose-video-clips` muss.
+**Nicht bestätigt** ohne Live-Logs: ob `speakerPlateBboxes` komplett `[null, null, null]` war (Detection-Ausfall) oder ob nur ein einzelner Slot leer war (Router-Mismatch bei asymmetrischer Aktion). Erster Schritt des Plans ist daher: Logs abrufen und Ursache eindeutig zuordnen.
 
-2. **v278-Router vor alten persisted/partial Locks priorisieren**
-   - Sobald ein vollständiges Anchor-Layout vorhanden ist, wird die alte `persistedBboxes`-/`assignmentLock`-Hydration übersprungen.
-   - Dadurch kann ein partieller `v274_anchor_rekognition_partial` Seed den v278-Pfad nicht mehr blockieren.
+## Plan v280 — Diagnose + gezielter Fix
 
-3. **v278-Layout bei erfolgreicher Recovery speichern**
-   - Wenn das Layout aus `faceMap` gebaut wurde, wird es in `dialog_shots.anchor_face_layout` persistiert.
-   - Spätere Retries/Webhooks müssen es nicht erneut rekonstruieren.
+### Schritt 1 — Verifizieren (read-only)
+- `supabase--edge_function_logs` für `compose-dialog-segments`, Suche nach der Szenen-ID aus dem Screenshot.
+- Extrahieren:
+  - `v158_plate_hydration source=… boxes=X/N mouths=Y/N` (persisted vs. live vs. missing)
+  - `v160_sync3_face_box` Log pro Pass (fehlt es ganz für den fehlgeschlagenen Pass?)
+  - `v152_BBOX_HARD_FAIL … non_null=… area_pct=0.00` mit `bbox_source`
 
-4. **Preflight-Block entschärfen, wenn v278 verfügbar ist**
-   - Der `v153_plate_box_duplicate` Block bleibt für alte/unsichere Pfade aktiv.
-   - Für den v278-Pfad blockt er nicht mehr auf alte doppelte Cache-Boxen, sondern bewertet die vom Hungarian Router erzeugten bijektiven Boxen.
+Damit ist klar, ob:
+- (A) **alle Slots** leer sind → Rekognition-/Face-Detection-Ausfall auf dem Plate (globales Problem)
+- (B) **ein Slot** leer ist → Bijection-Router hat den Speaker nicht auf ein Face gemappt
 
-5. **Letzte Szene sauber zurücksetzen**
-   - Nach dem Code-Fix setze ich nur diese letzte Szene von `v153_preflight_block` wieder in einen retry-fähigen Lip-Sync-Zustand zurück, ohne den ganzen Clip neu rendern zu müssen.
-   - Credits bleiben nicht doppelt belastet; Refund-Status bleibt idempotent.
+### Schritt 2 — Fix je nach Ursache
 
-6. **Gezielte Verifikation**
-   - Edge Function deployen.
-   - Für die Szene prüfen, dass Logs `v278_router` zeigen und nicht mehr `v153_preflight_block`.
-   - Danach Datenbank prüfen: `anchor_face_layout.slots = 4`, `plate_identity` kommt vom `v278-rekognition-hungarian` Pfad oder es gibt eine echte Count-Mismatch-Meldung statt Duplicate-Falschalarm.
+**Fall A (Detection global fehlgeschlagen):**
+- In `compose-dialog-segments` beim Plate-Hydration-Punkt (Z. 2193/2203): wenn nach live-detect `speakerPlateBboxes.every(b => !b)` → Szene früh mit klarer Fehlermeldung „Keine Gesichter im Plate erkannt — Szene neu rendern (Sprecher frontal, unverdeckt)" hart failen **statt** erst später im Dispatch-Loop pro Pass zu failen. Refund einmal, nicht N-mal.
 
-## Technische Änderung
+**Fall B (nur einzelner Slot leer bei N≥2):**
+- Kontrolliertes Aufweichen der N≥2-Hardgrenze in Z. 5638 / 5678: wenn **mindestens ein anderer** Slot eine valide Bbox hat, für den leeren Slot einen **Rescue-Pfad** erlauben:
+  - Nachbelegung via `faceMap.faces` (falls anchor_face_layout einen Slot hat, der nicht in `speakerPlateBboxes` gelandet ist).
+  - Wenn auch das leer ist: **diesen Pass** als `_v152HardFail` mit Reason `plate_slot_missing:idx=X` markieren (klar benannt, nicht `area_pct=0.00`), Rest der Passes läuft normal weiter.
+- Damit fällt bei N=3/4 nicht mehr die ganze Szene, wenn nur 1 Sprecher-Slot leer ist.
+
+**Beide Fälle:**
+- Fehlermeldung im UI von `bbox_geometry_insane:area_pct=0.00` auf sprechend umbenennen (`plate_face_missing:slot=X` bzw. `plate_no_faces_detected`), damit „Re-Render empfohlen" konkret wird.
+
+### Schritt 3 — Verifizieren
+- Szene `Neu rendern` triggern, Edge-Logs prüfen: neuer Reason-String, korrekter Refund (einmalig), UI zeigt neue Message.
+
+## Technische Details
 
 Betroffene Datei:
 - `supabase/functions/compose-dialog-segments/index.ts`
+  - Z. 2200–2210: Early-Fail bei `plateHydrationSource === "missing"` und `boxes = 0/N`.
+  - Z. 5580–5687: Rescue-Pfad für Einzel-Slot-Miss bei N≥2 (nur facemap-Nachbelegung, kein synthetischer coords-Fallback — der bleibt gesperrt wegen v153.1).
+  - Z. 5845–5871: `v152FailReason` um `plate_slot_missing`/`plate_no_faces_detected` erweitern.
 
-Wahrscheinliche kleine Ergänzung:
-- Helper `buildAnchorLayoutFromFaceMap(...)`, lokal oder in `_shared/plateFaceSlotRouter.ts`, je nachdem was sauberer in die bestehenden Imports passt.
+Keine Client-Änderungen nötig außer optional dem Toast-Text in `SceneClipProgress`.
 
-Keine UI-Änderung, keine neue Datenbank-Migration.
+## Was NICHT geändert wird
+- v278.1 Bijection-Router bleibt (der ist orthogonal).
+- v279 Inline-Fallback bleibt (behebt Upload-Probleme, nicht Detection-Probleme).
+- Anker-Pipeline / NB2 / Gemini3-Pro-Wahl unverändert.
