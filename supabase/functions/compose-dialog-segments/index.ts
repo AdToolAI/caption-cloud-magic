@@ -1429,8 +1429,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...(existing ?? {}),
+          dialog_shots: mergeDialogShots(existing, {
             version: 5,
             engine: "sync-segments",
             status: "failed",
@@ -1438,7 +1437,7 @@ serve(async (req) => {
             refunded: !alreadyRefunded,
             error: "plate_probe_failed_3plus_speakers",
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: 'plate_probe_failed_3plus_speakers: Video-Geometrie konnte nicht gelesen werden. Bitte "Sauber neu starten" drücken — beim erneuten Versuch nutzt das System die Anchor-Dimensionen als Fallback.',
@@ -2576,8 +2575,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -2585,7 +2583,7 @@ serve(async (req) => {
               refunded: true,
               error: reason,
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_error: (() => {
@@ -2700,7 +2698,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -2717,7 +2715,7 @@ serve(async (req) => {
                 scoreMatrix: (plateIdentityMap as any).scoreMatrix ?? null,
               },
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "needs_clip_rerender",
             clip_status: "pending",
@@ -2866,8 +2864,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -2875,7 +2872,7 @@ serve(async (req) => {
               refunded: true,
               error: `v117_plate_quality_gate:${reason}`,
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_status: "pending",
@@ -3109,8 +3106,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -3119,7 +3115,7 @@ serve(async (req) => {
               error: `v132_turn_visibility:${detail}`,
               v132_turn_gate: { failures, probes },
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "needs_clip_rerender",
             clip_status: "pending",
@@ -3807,8 +3803,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: {
-            ...(existing ?? {}),
+          dialog_shots: mergeDialogShots(existing, {
             version: 5,
             engine: "sync-segments",
             status: "failed",
@@ -3817,7 +3812,7 @@ serve(async (req) => {
             error: reason,
             audio_diagnostics: audioDiagnostics,
             finished_at: new Date().toISOString(),
-          },
+          }),
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: `syncso_audio_preflight_${reason}`,
@@ -4650,8 +4645,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: {
-              ...(existing ?? {}),
+            dialog_shots: mergeDialogShots(existing, {
               version: 5,
               engine: "sync-segments",
               status: "failed",
@@ -4659,7 +4653,7 @@ serve(async (req) => {
               refunded: true,
               error: `v118_circuit_breaker:${reason}`,
               finished_at: new Date().toISOString(),
-            },
+            }),
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_status: "failed",
