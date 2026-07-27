@@ -4103,8 +4103,16 @@ serve(async (req) => {
         const blockedNames = gateResults
           .filter((r) => !r.ok)
           .map((r) => (r as Extract<GateOutcome, { ok: false }>).pass.speaker_name);
+        const resolvedNames = new Set(
+          (plateIdentityMap?.faces ?? [])
+            .filter((f: any) => f.characterId)
+            .map((f: any) => String(f.characterId)),
+        );
+        const unresolvedBlocked = blockedNames.filter(
+          (n) => !resolvedNames.has(String(n)),
+        );
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v139_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} v283_face_gate_SOFT_WARN strict_blocks=${blockedNames.join(",")} unresolved_soft_pass=${unresolvedBlocked.join(",") || "none"} plate_identity_resolved=${plateIdentityMap?.resolvedCount}/${speakers.length} — proceeding with plate-identity coords + bbox-url dispatch`,
         );
         for (const r of gateResults) {
           if (!r.ok) {
