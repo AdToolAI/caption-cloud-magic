@@ -127,7 +127,14 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     scene.clipStatus === 'ready' &&
     typeof scene.clipUrl === 'string' &&
     scene.clipUrl.includes('/talking-head-renders/');
-  const lipSyncRunning = isCinematic && !lipSyncCanceled && scene.lipSyncStatus === 'running';
+  // v264 — Never show a Lip-Sync spinner when the clip itself is marked
+  // failed. This handles legacy rows with a contradictory `failed + done`
+  // state (see mem/architecture/lipsync/orphaned-pending-after-clip-fail.md).
+  const lipSyncRunning =
+    isCinematic &&
+    !lipSyncCanceled &&
+    scene.clipStatus !== 'failed' &&
+    scene.lipSyncStatus === 'running';
 
   const resetWrongRenderPath = async () => {
     if (busy) return;
@@ -219,7 +226,11 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           error: p?.error ?? p?.last_error,
         }))
       : [];
-  const isDialog = isCinematic && !lipSyncCanceled && (dialogShots.length > 0 || lipSyncRunning);
+  const isDialog =
+    isCinematic &&
+    !lipSyncCanceled &&
+    scene.clipStatus !== 'failed' &&
+    (dialogShots.length > 0 || lipSyncRunning);
   const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
   const dialogTotal = dialogShots.length;
   const showDialogOverlay = isDialog && !hqReady && !['done', 'canceled'].includes(String(dialogShotsState?.status ?? ''));

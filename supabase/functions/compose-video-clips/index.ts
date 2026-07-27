@@ -498,7 +498,12 @@ serve(async (req) => {
       clipError?: string,
     ): Record<string, unknown> => ({
       clip_status: "failed",
-      ...(clipError ? { clip_error: clipError.slice(0, 500) } : {}),
+      // v264 — Never allow silent failures. A missing clip_error paired with
+      // clip_status='failed' is a bug (produces the "Fehlgeschlagen"-Badge
+      // with no explanation and orphans the lip-sync spinner).
+      clip_error: (clipError && clipError.length > 0
+        ? clipError
+        : "unknown_failure_no_details").slice(0, 500),
       ...(isCinematicSyncScene
         ? {
             lip_sync_status: null,
@@ -509,6 +514,79 @@ serve(async (req) => {
         : {}),
       updated_at: new Date().toISOString(),
     });
+
+    /**
+     * v264 — Safe failed-write.
+     *
+     * Root cause of the "Szene fehlgeschlagen aber Lip-Sync läuft weiter"-Bug:
+     * multiple writers race on `composer_scenes`. A late identity-audit or
+     * hard-guard fires AFTER the async Hailuo + Sync.so + mux pipeline has
+     * already produced a valid `clip_url` and stamped `lip_sync_status='done'`.
+     * The extra `clip_status='failed'` write clobbers the good state and
+     * leaves a contradictory row (failed + done + valid clip_url).
+     *
+     * Rule: if the row already has a `clip_url` OR its lipsync is currently
+     * running / done, DO NOT flip `clip_status` to 'failed'. The async result
+     * is authoritative. We still surface the concern as a `clip_error` note so
+     * the audit trail is preserved.
+     *
+     * For cinematic-sync scenes, a genuine failure additionally clears the
+     * lip_sync_status / twoshot_stage / dialog_shots / lip_sync_source_clip_url
+     * fields (mem/architecture/lipsync/orphaned-pending-after-clip-fail.md).
+     */
+    const safeMarkSceneFailed = async (
+      sceneId: string,
+      clipError: string,
+      opts: {
+        isCinematicSyncScene: boolean;
+        /** Extra fields to merge into the update payload (e.g. twoshot_stage:'failed'). */
+        extra?: Record<string, unknown>;
+      },
+    ): Promise<"failed" | "skipped_already_succeeded"> => {
+      try {
+        const { data: current } = await supabaseAdmin
+          .from("composer_scenes")
+          .select("clip_url, clip_status, lip_sync_status")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const hasClipUrl =
+          typeof current?.clip_url === "string" && current.clip_url.length > 0;
+        const lipsyncLive =
+          current?.lip_sync_status === "running" ||
+          current?.lip_sync_status === "done";
+        if (hasClipUrl || lipsyncLive) {
+          console.warn(
+            `[compose-video-clips] v264_safe_fail_skip scene=${sceneId} reason=already_succeeded clip_url=${hasClipUrl} lip_sync_status=${current?.lip_sync_status ?? "null"} would_have_written=${clipError.slice(0, 120)}`,
+          );
+          // Preserve the concern as a diagnostic note but do NOT flip status.
+          try {
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({
+                clip_error: `[v264_safe_fail_skip] ${clipError}`.slice(0, 500),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", sceneId);
+          } catch (_) { /* best-effort */ }
+          return "skipped_already_succeeded";
+        }
+      } catch (readErr) {
+        console.warn(
+          `[compose-video-clips] v264_safe_fail read failed for ${sceneId}, proceeding with failed-write:`,
+          readErr,
+        );
+      }
+      const payload = {
+        ...failedClipUpdate(opts.isCinematicSyncScene, clipError),
+        ...(opts.extra ?? {}),
+      };
+      await supabaseAdmin
+        .from("composer_scenes")
+        .update(payload)
+        .eq("id", sceneId);
+      return "failed";
+    };
+
 
     // Build a quick character lookup for the safety-net injection
     const charById = new Map<string, ComposerCharacter>();
@@ -1530,14 +1608,11 @@ serve(async (req) => {
         console.warn(
           `[compose-video-clips] scene ${scene.id}: blocked legacy talking-head-renders upload URL`,
         );
-        await supabaseAdmin
-          .from("composer_scenes")
-          .update({
-            clip_status: "failed",
-            clip_error: "legacy_talking_head_route_blocked",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", scene.id);
+        await safeMarkSceneFailed(
+          scene.id,
+          "legacy_talking_head_route_blocked",
+          { isCinematicSyncScene: scene.engineOverride === "cinematic-sync" },
+        );
         results.push({
           sceneId: scene.id,
           status: "failed",
@@ -2168,15 +2243,10 @@ serve(async (req) => {
                 console.warn(
                   `[compose-video-clips] cinematic-sync scene ${scene.id}: ${msg}`,
                 );
-                await supabaseAdmin
-                  .from("composer_scenes")
-                  .update({
-                    clip_status: "failed",
-                    clip_error: msg,
-                    twoshot_stage: "failed",
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq("id", scene.id);
+                await safeMarkSceneFailed(scene.id, msg, {
+                  isCinematicSyncScene: true,
+                  extra: { twoshot_stage: "failed" },
+                });
                 results.push({ sceneId: scene.id, status: "failed", error: msg });
                 continue;
               }
@@ -2936,14 +3006,9 @@ serve(async (req) => {
                         : "";
                       const msg = `${code}: ${identityNotes || identityFailure}${missingSuffix} — Anchor wurde mehrfach neu gerendert und Cast-Integrität ist weiterhin nicht sauber (clone/swap/missing). Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen (ähnliche Gesichter/gleicher Nachname?).`;
 
-                      await supabaseAdmin
-                        .from("composer_scenes")
-                        .update({
-                          clip_status: "failed",
-                          clip_error: msg,
-                          updated_at: new Date().toISOString(),
-                        })
-                        .eq("id", scene.id);
+                      await safeMarkSceneFailed(scene.id, msg, {
+                        isCinematicSyncScene: true,
+                      });
                       results.push({
                         sceneId: scene.id,
                         status: "failed",
@@ -2981,15 +3046,10 @@ serve(async (req) => {
           console.warn(
             `[compose-video-clips] scene ${scene.id}: v195_cinematic_sync_anchor_missing → hard-fail before provider dispatch`,
           );
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({
-              clip_status: "failed",
-              clip_error: msg,
-              twoshot_stage: "failed",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", scene.id);
+          await safeMarkSceneFailed(scene.id, msg, {
+            isCinematicSyncScene: true,
+            extra: { twoshot_stage: "failed" },
+          });
           results.push({ sceneId: scene.id, status: "failed", error: msg });
           continue;
         }
@@ -3288,15 +3348,11 @@ serve(async (req) => {
           console.warn(
             `[compose-video-clips] v263_preview_gate scene ${scene.id}: no composed anchor available (anchorUrl='${anchorUrl.slice(0, 60)}') → skipping preview`,
           );
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({
-              clip_status: "failed",
-              clip_error:
-                "preview_gate_no_anchor: Für diese Szene konnte kein Anchor-Bild komponiert werden (kein Cast oder Upload/Stock-Szene). Bitte direkt rendern statt Preview.",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", scene.id);
+          await safeMarkSceneFailed(
+            scene.id,
+            "preview_gate_no_anchor: Für diese Szene konnte kein Anchor-Bild komponiert werden (kein Cast oder Upload/Stock-Szene). Bitte direkt rendern statt Preview.",
+            { isCinematicSyncScene: scene.engineOverride === "cinematic-sync" },
+          );
           results.push({
             sceneId: scene.id,
             status: "failed",
@@ -4006,14 +4062,9 @@ serve(async (req) => {
             console.warn(
               `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} — no composed reference_image_url, failing loud (v174, no silent Hailuo migration).`,
             );
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                clip_error: msg,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", scene.id);
+            await safeMarkSceneFailed(scene.id, msg, {
+              isCinematicSyncScene: true,
+            });
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4232,25 +4283,60 @@ serve(async (req) => {
             .filter((s) => s?.engineOverride === "cinematic-sync")
             .map((s) => s?.id)
             .filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id));
-          await admin
+          // v264 — Skip rows whose async pipeline has already produced a
+          // valid clip_url or is actively lipsyncing / done. The FATAL catch
+          // must not clobber a good state; the async pipeline is authoritative
+          // once it starts. Preserve the diagnostic as a clip_error note.
+          const { data: liveRows } = await admin
             .from("composer_scenes")
-            .update({
-              clip_status: "failed",
-              clip_error: `[${__stage}] ${msg}`.slice(0, 500),
-              updated_at: new Date().toISOString(),
-            })
+            .select("id, clip_url, lip_sync_status")
             .in("id", failedSceneIds);
-          if (cinematicFailedSceneIds.length > 0) {
+          const safeToFail = (liveRows ?? [])
+            .filter((r) => {
+              const hasUrl = typeof r?.clip_url === "string" && r.clip_url.length > 0;
+              const live = r?.lip_sync_status === "running" || r?.lip_sync_status === "done";
+              return !hasUrl && !live;
+            })
+            .map((r) => r.id as string);
+          const rescueIds = (liveRows ?? [])
+            .map((r) => r.id as string)
+            .filter((id) => !safeToFail.includes(id));
+          if (rescueIds.length > 0) {
+            console.warn(
+              `[compose-video-clips] v264_fatal_catch_skip preserving ${rescueIds.length} already-succeeded scene(s): ${rescueIds.join(",")}`,
+            );
             await admin
               .from("composer_scenes")
               .update({
-                lip_sync_status: null,
-                twoshot_stage: null,
-                lip_sync_source_clip_url: null,
-                dialog_shots: null,
+                clip_error: `[v264_safe_fail_skip] [${__stage}] ${msg}`.slice(0, 500),
                 updated_at: new Date().toISOString(),
               })
-              .in("id", cinematicFailedSceneIds);
+              .in("id", rescueIds);
+          }
+          if (safeToFail.length > 0) {
+            await admin
+              .from("composer_scenes")
+              .update({
+                clip_status: "failed",
+                clip_error: `[${__stage}] ${msg}`.slice(0, 500),
+                updated_at: new Date().toISOString(),
+              })
+              .in("id", safeToFail);
+            const cinematicSafeToFail = cinematicFailedSceneIds.filter((id) =>
+              safeToFail.includes(id),
+            );
+            if (cinematicSafeToFail.length > 0) {
+              await admin
+                .from("composer_scenes")
+                .update({
+                  lip_sync_status: null,
+                  twoshot_stage: null,
+                  lip_sync_source_clip_url: null,
+                  dialog_shots: null,
+                  updated_at: new Date().toISOString(),
+                })
+                .in("id", cinematicSafeToFail);
+            }
           }
         }
       }
