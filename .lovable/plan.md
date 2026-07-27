@@ -1,35 +1,61 @@
-## Plan v272 — Multi-Sprecher-Anchor: Anti-Grid/Collage-Härtung
+# Plan v273 — Grid-Layout nur auf explizite Kunden-Anforderung
 
-### Diagnose (aus Screenshot bestätigt)
-- Szene rendert 4 Portraits als **2×2-Grid** statt als eine gemeinsame Bürszene.
-- Ursache liegt im Prompt, nicht im Modell: `compose-scene-anchor/index.ts` verbietet Panel-Grid / Split-Screen / Collage / Contact-Sheet **nur im N=1-Zweig** von `EXACT_COUNT_SUFFIX` (Zeile 353) und `TWO_SHOT_NEGATIVE` (Zeile 370). Der N≥2-Zweig verbietet nur duplizierte Identitäten und versteckte Gesichter — Gemini 3 Pro Image nimmt die 4 Portraits daher wörtlich als 4 Panels.
-- Zusätzlich fehlt im Multi-Zweig ein explizites "ONE continuous frame / single shot"-Statement.
+## Ziel
+Single-Frame ("eine gemeinsame Szene") bleibt der Standard für alle Multi-Sprecher-Anchors. Ein 2×2-/Split-/Collage-Layout wird **nur** dann erzeugt, wenn der Kunde es im Briefing/Prompt explizit anfordert (z. B. „Grid", „Split-Screen", „2x2", „Kacheln", „Collage", „Panel", „Interview-Split"). Kein UI-Toggle, keine Automatik — allein der Prompt entscheidet.
 
-### Änderungen (nur Prompt, kein Modellwechsel)
+## Warum diese Lösung
+- Sauberste UX: kein zusätzlicher Schalter, keine Erklärungsfläche.
+- Kein Modus-Switching-Risiko: der Kunde bekommt was er schreibt.
+- Deckt den v272-Bug (ungewollte Grids) sauber ab und lässt Grid als bewusstes Stilmittel offen.
+- Konsistent mit unserer „Prompt = Wahrheit"-Linie aus Plan v266/v270.
 
-**Datei:** `supabase/functions/compose-scene-anchor/index.ts`
+## Umfang der Änderungen
 
-1. **`EXACT_COUNT_SUFFIX` (Multi-Zweig, ab Z. 348)** — Ergänzen:
-   - `"All ${N} cast people appear together in ONE single continuous photographic frame — one shared physical space, one camera, one exposure."`
-   - `"FORBIDDEN LAYOUTS: 2×2 grid, 2×1 or 1×2 split-screen, panel grid, multi-panel composition, photo collage, contact sheet, tiled portraits, framed headshot arrangement, video-conference/Zoom/Teams grid, before/after grid, magazine-style portrait grid, side-by-side headshot strip."`
+### 1) Grid-Intent-Detector (neu, server-seitig)
+Neue kleine Helper-Datei, die aus dem Scene-/Briefing-Prompt erkennt, ob Grid gewünscht ist. Erkannte Signale (DE/EN, case-insensitive, Wortgrenzen):
 
-2. **`TWO_SHOT_NEGATIVE` (Multi-Zweig, beide Varianten asymmetric + symmetric, Z. 366–369)** — Ergänzen an bestehende Liste:
-   - `"panel grid, split-screen, 2×2 grid, 2×1 grid, collage, contact sheet, tiled portraits, Zoom-style video call grid, individual headshots stitched together"`
+- `grid`, `2x2`, `2 x 2`, `four-panel`, `vier panels`, `panels`, `split[- ]?screen`, `split view`, `kachel`, `tiles`, `collage`, `mosaic`, `mosaik`, `interview split`, `zoom[- ]?call`, `videocall grid`, `brady bunch`
 
-3. **Neues `SINGLE_FRAME_SUFFIX` (Multi)** — Am Ende der Multi-Instruction (nach `identityClause`) einfügen:
-   - `" SINGLE CONTINUOUS PHOTOGRAPH — the output is ONE unbroken photorealistic photograph taken with ONE camera in ONE moment. It is NOT a composite, NOT a grid, NOT a collage, NOT a stitched image, NOT a video-conference screenshot. All ${N} people share the SAME floor, SAME walls, SAME lighting, SAME perspective."`
+Rückgabe: `{ gridRequested: boolean, gridStyle?: '2x2' | 'split' | 'collage' }`.
 
-4. **`ANCHOR_AUDIT_VERSION` bumpen** in `compose-video-clips/index.ts` (aktuell 10 → 11), damit bestehende Grid-Anchors aus dem Cache invalidiert und neu komponiert werden.
+### 2) `compose-scene-anchor` verzweigt sauber
+Im Multi-Sprecher-Zweig (N≥2):
 
-### Nicht Teil dieses Plans
-- Kein Modellwechsel (Gemini 3 Pro bleibt Default — es hat Identität + Environment korrekt getroffen, nur das Layout war falsch).
-- Keine Änderung an `compose-video-clips`, Sync.so-Pfad, oder Refund-Logik.
-- Keine Änderung an N=1-Prompts.
-- Feature-Flag-Fallback (`ANCHOR_MODEL_MULTI=nano_banana_2` / `seedream4`) bleibt erhalten.
+- **Wenn `gridRequested = false` (Default):** aktuelle v272-Härtung bleibt aktiv — `SINGLE_FRAME_SUFFIX`, Anti-Grid-/Anti-Collage-/Anti-Split-Klauseln, „ONE continuous photograph".
+- **Wenn `gridRequested = true`:** Anti-Grid-Klauseln werden entfernt und durch eine positive Grid-Direktive ersetzt („Compose as a clean N-panel grid, equal tiles, thin neutral divider, each speaker centered in their own tile, sharp focus on each face"). `EXACT_COUNT_SUFFIX` bleibt (Headcount-Lock).
 
-### Rollback
-- Prompt-Änderung ist textuell — Revert des Commits reicht.
-- `ANCHOR_AUDIT_VERSION` kann auf 10 zurückgesetzt werden, falls die alten Cache-Einträge wieder gebraucht werden.
+### 3) `compose-video-clips` reicht Intent durch
+- Detector auch hier aufrufen (Fallback, falls anchor direkt gecacht).
+- `gridRequested` in den Anchor-Payload und in die Master-Plate-Prompts propagieren, damit Video-Modell nicht gegen den Anchor arbeitet.
+- Face-Gate/Framing-Regeln: bei `gridRequested = true` das 12%-Min-Face-Size-Invariant lockern (Grid-Kacheln haben ohnehin große Gesichter) und die Focus-Plate-Sequenz überspringen — im Grid ist jede Kachel bereits ein Speaker-Focus.
 
-### Erfolgskriterium
-- Nächster 4-Sprecher-Render zeigt alle 4 Personen in **einem** gemeinsamen Büroraum, mit gemeinsamer Perspektive und Beleuchtung (kein Grid, keine getrennten Panels), Identität + Lip-Sync bleiben wie zuletzt intakt.
+### 4) Cache-Invalidierung
+- `ANCHOR_AUDIT_VERSION` 14 → 15 in `compose-video-clips`, damit alte Anchors ohne Intent-Klassifikation neu komponiert werden.
+
+### 5) Keine UI-Änderungen
+Composer, Briefing-UI und Scene-Card bekommen **keinen** Grid-Toggle. Wenn ein Kunde Grid will, schreibt er es ins Szenen-Prompt/Briefing — der Detector greift automatisch.
+
+## Nicht im Umfang
+- Kein UI-Schalter, keine Preset-Buttons.
+- Keine Änderung an Single-Speaker-Anchors (Nano Banana 2 bleibt).
+- Keine Änderung an Sync.so / Lip-Sync-Pipeline.
+- Keine Preis- oder Credit-Änderungen.
+
+## Technische Details
+
+**Neue Datei:** `supabase/functions/_shared/detectGridIntent.ts`
+```ts
+export function detectGridIntent(text: string): { gridRequested: boolean; gridStyle?: '2x2'|'split'|'collage' }
+```
+
+**Geänderte Dateien:**
+- `supabase/functions/compose-scene-anchor/index.ts` — Verzweigung Single-Frame vs. Grid im N≥2-Zweig.
+- `supabase/functions/compose-video-clips/index.ts` — Intent-Erkennung, Payload-Propagation, `ANCHOR_AUDIT_VERSION` 14→15, Face-Gate-Lockerung bei Grid.
+
+**Signal-Quelle für Detector:** Scene-Prompt + Briefing-Text (falls verfügbar) — beides zusammenkonkateniert prüfen.
+
+## Verifikation
+1. Test-Szene ohne Grid-Keyword → Single-Frame (Büro-Szene, alle 4 in einem Raum).
+2. Test-Szene mit „als 2x2 Grid" im Prompt → sauberes 4-Panel-Grid, jede Kachel = ein Sprecher.
+3. Edge-Function-Logs prüfen: `gridRequested`-Flag wird korrekt geloggt.
+4. Bestehende fehlgeschlagene Szene (`d2aa4ad5…`) rerendern und bestätigen, dass Single-Frame kommt.

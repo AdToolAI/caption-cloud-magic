@@ -13,6 +13,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { detectGridIntent } from "../_shared/detectGridIntent.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -169,6 +170,15 @@ serve(async (req) => {
     };
     const { stripped: rawWithoutCast, actions: castActions } = extractCastActions(body.scenePrompt || "");
 
+    // v273 — Grid-Intent-Detection. Detect on the RAW user prompt (before
+    // dialog/quotes stripping) so keywords like "als 2x2 Grid" survive.
+    const gridIntent = detectGridIntent(body.scenePrompt || "");
+    const gridRequested = gridIntent.gridRequested === true;
+    const gridStyle = gridIntent.gridStyle ?? "2x2";
+    if (gridRequested) {
+      console.log(`[compose-scene-anchor] grid intent detected (style=${gridStyle}) scene=${body.sceneId}`);
+    }
+
     // Heuristic: does any cast action describe an asymmetric placement /
     // activity that contradicts the default equal-share two-shot framing?
     const ASYM_RE = /\b(background|foreground|phone|standing|walking|leaning|distance|behind|away\s+from|aside|in\s+the\s+back|in\s+the\s+front|on\s+the\s+couch|by\s+the\s+window|across\s+the\s+room|on\s+(?:their|the|his|her)\s+(?:phone|laptop))\b/i;
@@ -290,7 +300,7 @@ serve(async (req) => {
       ? await sha1(framingSuffix)
       : "none";
     const promptHash = await sha1(
-      `v19|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}|fs=${framingSuffixHash}`,
+      `v20|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}|fs=${framingSuffixHash}|grid=${gridRequested ? gridStyle : 0}`,
     );
 
 
@@ -345,12 +355,16 @@ serve(async (req) => {
     // multiple copies of the same identity. Lipsync targets cast portraits,
     // not arbitrary faces, so extras do not break the pipeline.
     const EXACT_COUNT_SUFFIX = isMulti
-      ? ` CAST COUNT — NON-NEGOTIABLE: the final image must show the ${N} CAST reference people, each appearing EXACTLY ONCE as a clearly visible, individually recognizable person. ` +
-        `All ${N} cast people appear together in ONE single continuous photographic frame — one shared physical space, one camera, one exposure, one moment in time. ` +
-        `FORBIDDEN LAYOUTS: 2x2 grid, 2x1 or 1x2 split-screen, 3x1 or 1x3 strip, panel grid, multi-panel composition, photo collage, contact sheet, tiled portraits, framed headshot arrangement, video-conference / Zoom / Teams / Google Meet grid, before/after grid, magazine-style portrait grid, side-by-side headshot strip, stitched individual portraits, picture-in-picture. ` +
-        `FORBIDDEN: duplicating any cast reference, rendering the same cast identity twice, twins, doppelgängers, clones, mirror reflections of a cast person, posters/photos/screens/statues/mannequins depicting a cast person, ADDING ANY NEW NAMED SUBJECT (no children, no babies, no toddlers, no pets, no dogs, no cats, no extra adult held/carried by anyone). Headcount of foreground/mid-ground named people MUST equal exactly ${N} — not ${N + 1}, not ${N + 2}. ` +
-        `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people whose face is not a cast reference — include them naturally when the scene calls for it. ` +
-        `Each of the ${N} cast people remains clearly identifiable and unobstructed.`
+      ? (gridRequested
+          ? ` CAST COUNT — NON-NEGOTIABLE: the final image must show the ${N} CAST reference people, each appearing EXACTLY ONCE, one per grid panel, clearly recognizable. ` +
+            `FORBIDDEN: duplicating any cast reference, rendering the same cast identity in two different panels, twins, doppelgängers, clones, ADDING ANY NEW NAMED SUBJECT (no extra adults, no children, no babies, no pets). Panel count MUST equal exactly ${N}. ` +
+            `Each of the ${N} cast people fills their own panel and is unobstructed.`
+          : ` CAST COUNT — NON-NEGOTIABLE: the final image must show the ${N} CAST reference people, each appearing EXACTLY ONCE as a clearly visible, individually recognizable person. ` +
+            `All ${N} cast people appear together in ONE single continuous photographic frame — one shared physical space, one camera, one exposure, one moment in time. ` +
+            `FORBIDDEN LAYOUTS: 2x2 grid, 2x1 or 1x2 split-screen, 3x1 or 1x3 strip, panel grid, multi-panel composition, photo collage, contact sheet, tiled portraits, framed headshot arrangement, video-conference / Zoom / Teams / Google Meet grid, before/after grid, magazine-style portrait grid, side-by-side headshot strip, stitched individual portraits, picture-in-picture. ` +
+            `FORBIDDEN: duplicating any cast reference, rendering the same cast identity twice, twins, doppelgängers, clones, mirror reflections of a cast person, posters/photos/screens/statues/mannequins depicting a cast person, ADDING ANY NEW NAMED SUBJECT (no children, no babies, no toddlers, no pets, no dogs, no cats, no extra adult held/carried by anyone). Headcount of foreground/mid-ground named people MUST equal exactly ${N} — not ${N + 1}, not ${N + 2}. ` +
+            `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people whose face is not a cast reference — include them naturally when the scene calls for it. ` +
+            `Each of the ${N} cast people remains clearly identifiable and unobstructed.`)
       : ` CAST COUNT — NON-NEGOTIABLE: the final image must contain the 1 CAST reference person, appearing EXACTLY ONCE as a clearly visible, individually recognizable person in ONE continuous frame. ` +
         `FORBIDDEN: duplicating the cast person, rendering the same identity twice or three times, twins, doppelgängers, clones, mirror duplicates of the cast person, triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same person, photo collage, contact sheet, before/after grid, adding a child/baby/pet held or carried by the cast person unless the scene explicitly names one. ` +
         `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people — include them naturally when the scene calls for it. Decorative depicted humans on laptop/phone/TV screens, framed photos, mirror reflections of bystanders, posters and statues are also allowed. ` +
@@ -361,14 +375,18 @@ serve(async (req) => {
     // crops to a single character or stacks faces and the multi-pass
     // face-target lipsync collapses to one speaker.
     const TWO_SHOT_FRAMING_SUFFIX = isMulti
-      ? (hasAsymmetricCast
-        ? ` MULTI-CHARACTER FRAMING (asymmetric, per CHARACTER ACTIONS above): all ${N} cast people must be clearly visible and individually recognizable in the SAME frame. Screen share may be UNEQUAL — honor the per-character placement (foreground/background, primary/secondary, near/far) exactly as written in CHARACTER ACTIONS. Each cast face must still be unobstructed enough that a face detector can locate ${N} distinct cast faces (no full back-of-head, no fully hidden face, no silhouette).`
-        : ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} cast characters are fully visible in the SAME frame at roughly EQUAL screen share. Each cast face must be unobstructed, front-3/4 to camera, with clear separation between subjects. NEVER produce a single-character close-up, NEVER cut a cast member out of frame, NEVER show only the back of a head.`)
+      ? (gridRequested
+        ? ` GRID PANEL FRAMING: exactly ${N} equal panels arranged as a clean ${N === 4 ? "2x2" : N === 2 ? "1x2 side-by-side" : N === 3 ? "1x3 strip" : `${N}-panel grid`}, thin neutral divider between panels. Each panel is centered on exactly ONE cast member, framed as a medium close-up (chest up), front or slight three-quarter to camera, mouth and jaw fully visible. Each cast face must be unobstructed and sharp. NEVER put two cast members in the same panel, NEVER leave a panel empty, NEVER duplicate a cast identity across panels.`
+        : (hasAsymmetricCast
+          ? ` MULTI-CHARACTER FRAMING (asymmetric, per CHARACTER ACTIONS above): all ${N} cast people must be clearly visible and individually recognizable in the SAME frame. Screen share may be UNEQUAL — honor the per-character placement (foreground/background, primary/secondary, near/far) exactly as written in CHARACTER ACTIONS. Each cast face must still be unobstructed enough that a face detector can locate ${N} distinct cast faces (no full back-of-head, no fully hidden face, no silhouette).`
+          : ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} cast characters are fully visible in the SAME frame at roughly EQUAL screen share. Each cast face must be unobstructed, front-3/4 to camera, with clear separation between subjects. NEVER produce a single-character close-up, NEVER cut a cast member out of frame, NEVER show only the back of a head.`))
       : "";
     const TWO_SHOT_NEGATIVE = isMulti
-      ? (hasAsymmetricCast
-        ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`
-        : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`)
+      ? (gridRequested
+        ? ` AVOID: duplicated cast identity across panels, swapped identities between panels, more or fewer than ${N} panels, uneven panel sizes, cast member cropped out of their panel, back-of-head only.`
+        : (hasAsymmetricCast
+          ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`
+          : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`))
       : ` AVOID: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same cast person, photo collage, contact sheet, before/after grid, mirror duplicates of the cast person, twins of the cast person, doppelgängers, repeated cast face, two of the same cast person, three of the same cast person.`;
     const STRICT_RETRY_SUFFIX = strictMode
       ? (isMulti
@@ -492,8 +510,12 @@ serve(async (req) => {
     // Image otherwise interprets N reference portraits literally as N panels
     // (2x2 grid, Zoom-style tiles). This hard-locks the output to one shared
     // physical frame.
+    // v273 — When the user explicitly asks for a grid / split / collage in
+    // the prompt, we flip this to a POSITIVE grid directive instead.
     const SINGLE_FRAME_SUFFIX = isMulti
-      ? ` SINGLE CONTINUOUS PHOTOGRAPH — the output is ONE unbroken photorealistic photograph taken with ONE camera in ONE moment. It is NOT a composite, NOT a grid, NOT a 2x2 layout, NOT a collage, NOT a stitched image, NOT a video-conference / Zoom / Teams / Meet screenshot, NOT a picture-in-picture, NOT a framed portrait wall. All ${N} people share the SAME floor, SAME walls, SAME lighting direction, SAME perspective, SAME camera focal length. Zero panel borders, zero dividing lines, zero separate frames.`
+      ? (gridRequested
+        ? ` GRID LAYOUT REQUESTED — compose the output as ${N === 4 ? "a clean 2x2 grid of four equal panels" : N === 2 ? "a clean 1x2 side-by-side split-screen" : N === 3 ? "a clean 1x3 strip of three equal panels" : `a clean ${N}-panel grid of equal panels`}, with a thin neutral divider between panels. Each panel contains exactly ONE cast member, centered, framed as a medium close-up (chest up), mouth and jaw fully visible for lip-sync. The panels may share a consistent color grade and background style. This IS the intended composition — deliver it as a grid.`
+        : ` SINGLE CONTINUOUS PHOTOGRAPH — the output is ONE unbroken photorealistic photograph taken with ONE camera in ONE moment. It is NOT a composite, NOT a grid, NOT a 2x2 layout, NOT a collage, NOT a stitched image, NOT a video-conference / Zoom / Teams / Meet screenshot, NOT a picture-in-picture, NOT a framed portrait wall. All ${N} people share the SAME floor, SAME walls, SAME lighting direction, SAME perspective, SAME camera focal length. Zero panel borders, zero dividing lines, zero separate frames.`)
       : "";
 
     const editInstruction = isMulti
