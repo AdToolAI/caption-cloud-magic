@@ -493,90 +493,173 @@ serve(async (req) => {
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
 
-    // --- Call Nano Banana 2 with all portraits + world refs + identity refs as separate image_url parts ---
-    const userContent: any[] = [{ type: "text", text: editInstruction }];
-    for (const url of portraits) {
-      userContent.push({ type: "image_url", image_url: { url } });
-    }
-    for (const url of locationUrls) {
-      userContent.push({ type: "image_url", image_url: { url } });
-    }
-    for (const url of buildingUrls) {
-      userContent.push({ type: "image_url", image_url: { url } });
-    }
-    for (const url of propUrls) {
-      userContent.push({ type: "image_url", image_url: { url } });
-    }
-    for (const url of identityPortraits) {
-      userContent.push({ type: "image_url", image_url: { url } });
-    }
+    // ------------------------------------------------------------------
+    // v270 — Anchor-Modell-Router (Seedream 4 als Default für Multi-Sprecher)
+    // ------------------------------------------------------------------
+    // Nano Banana 2 (google/gemini-3.1-flash-image-preview) verwechselt bei
+    // 3–4 Charakteren mit ähnlichen Merkmalen (z.B. gleicher Nachname)
+    // regelmäßig Identitäten oder klont einen Sprecher doppelt.
+    // Seedream 4 (bytedance/seedream-4) über Replicate unterstützt native
+    // Multi-Image-Reference und hält 3–4 unterschiedliche Identitäten
+    // deutlich stabiler. Feature-Flag `ANCHOR_MODEL_MULTI` erlaubt Rollback
+    // ohne Redeploy.
+    const ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "seedream4").toLowerCase();
+    const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
+    const useSeedream = isMulti && ANCHOR_MODEL_MULTI === "seedream4" && REPLICATE_API_KEY.length > 0;
 
-    // Hard 45s timeout — Nano Banana 2 multi-portrait calls can hang on the
-    // gateway and would otherwise stall the client invoke() forever.
-    const ac = new AbortController();
+    // Reference image URLs, in strict order: portraits → identity headshots →
+    // world refs. Seedream 4 accepts an array of reference URLs directly.
+    const seedreamRefs: string[] = [
+      ...portraits,
+      ...identityPortraits,
+      ...locationUrls,
+      ...buildingUrls,
+      ...propUrls,
+    ].slice(0, 10); // Seedream cap
+
+    // --- Common helpers ---------------------------------------------------
+    let bytes: Uint8Array | null = null;
+    let mime = "image/png";
+    let ext = "png";
+    let anchorProvider: "seedream4" | "nano_banana_2" = "nano_banana_2";
     const t0 = Date.now();
-    const timeoutId = setTimeout(() => ac.abort(), 45_000);
-    let aiResp: Response;
-    try {
-      aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3.1-flash-image-preview",
-          messages: [{ role: "user", content: userContent }],
-          modalities: ["image", "text"],
-          // v131.6 — force deterministic generation for the final face-lock
-          // attempt so the model does not "creatively reinterpret" identity.
-          ...(faceLockMode ? { temperature: 0 } : {}),
-        }),
-        signal: ac.signal,
-      });
-    } catch (e) {
-      clearTimeout(timeoutId);
-      const elapsedMs = Date.now() - t0;
-      const reason = (e as any)?.name === "AbortError" ? "ai_timeout" : "ai_network";
-      console.warn(
-        `[compose-scene-anchor] ${reason} sceneId=${body.sceneId} portraits=${portraits.length} elapsedMs=${elapsedMs}`,
-      );
-      return new Response(
-        JSON.stringify({ strategy: "text-only", error: reason }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-    clearTimeout(timeoutId);
 
-    if (!aiResp.ok) {
-      const txt = await aiResp.text();
-      console.error("[compose-scene-anchor] AI gateway error", aiResp.status, txt);
+    const callNanoBanana2 = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
+      const userContent: any[] = [{ type: "text", text: editInstruction }];
+      for (const url of portraits) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of locationUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of buildingUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of propUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of identityPortraits) userContent.push({ type: "image_url", image_url: { url } });
+
+      const ac = new AbortController();
+      const timeoutId = setTimeout(() => ac.abort(), 45_000);
+      let aiResp: Response;
+      try {
+        aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3.1-flash-image-preview",
+            messages: [{ role: "user", content: userContent }],
+            modalities: ["image", "text"],
+            ...(faceLockMode ? { temperature: 0 } : {}),
+          }),
+          signal: ac.signal,
+        });
+      } catch (e) {
+        clearTimeout(timeoutId);
+        console.warn(`[compose-scene-anchor] nano_banana ${(e as any)?.name === "AbortError" ? "timeout" : "network"} sceneId=${body.sceneId}`);
+        return null;
+      }
+      clearTimeout(timeoutId);
+      if (!aiResp.ok) {
+        console.error("[compose-scene-anchor] nano_banana error", aiResp.status, (await aiResp.text()).slice(0, 300));
+        return null;
+      }
+      const aiJson = await aiResp.json();
+      const dataUrl: string | undefined = aiJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (!dataUrl || !dataUrl.startsWith("data:image")) {
+        console.error("[compose-scene-anchor] nano_banana no image", JSON.stringify(aiJson).slice(0, 300));
+        return null;
+      }
+      const [meta, b64] = dataUrl.split(",", 2);
+      const m = /data:(image\/[a-z+]+);/.exec(meta)?.[1] ?? "image/png";
+      const e2 = m.includes("png") ? "png" : m.includes("webp") ? "webp" : "jpg";
+      return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)), mime: m, ext: e2 };
+    };
+
+    const callSeedream4 = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
+      // Direct Replicate API — same pattern as animate-scene-hailuo.
+      // 90s timeout: Seedream 4 typically finishes in 10–30s for a single image.
+      const input = {
+        prompt: editInstruction,
+        image_input: seedreamRefs,
+        size: "2K",
+        aspect_ratio: aspect,
+        max_images: 1,
+        sequential_image_generation: "disabled" as const,
+      };
+      try {
+        const createResp = await fetch("https://api.replicate.com/v1/models/bytedance/seedream-4/predictions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${REPLICATE_API_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "wait=60",
+          },
+          body: JSON.stringify({ input }),
+        });
+        if (!createResp.ok) {
+          console.error("[compose-scene-anchor] seedream create error", createResp.status, (await createResp.text()).slice(0, 300));
+          return null;
+        }
+        let pred = await createResp.json();
+        // Poll if not finished after Prefer:wait
+        const predId = pred?.id;
+        const deadline = Date.now() + 90_000;
+        while (pred?.status && !["succeeded", "failed", "canceled"].includes(pred.status) && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const pollResp = await fetch(`https://api.replicate.com/v1/predictions/${predId}`, {
+            headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` },
+          });
+          if (!pollResp.ok) break;
+          pred = await pollResp.json();
+        }
+        if (pred?.status !== "succeeded") {
+          console.error("[compose-scene-anchor] seedream not succeeded", pred?.status, JSON.stringify(pred?.error ?? {}).slice(0, 200));
+          return null;
+        }
+        const out = pred.output;
+        const imgUrl: string | undefined = Array.isArray(out) ? out[0] : (typeof out === "string" ? out : undefined);
+        if (!imgUrl) {
+          console.error("[compose-scene-anchor] seedream no output url", JSON.stringify(out).slice(0, 200));
+          return null;
+        }
+        const imgResp = await fetch(imgUrl);
+        if (!imgResp.ok) {
+          console.error("[compose-scene-anchor] seedream fetch image failed", imgResp.status);
+          return null;
+        }
+        const buf = new Uint8Array(await imgResp.arrayBuffer());
+        const m = imgResp.headers.get("content-type") ?? "image/webp";
+        const e2 = m.includes("png") ? "png" : m.includes("webp") ? "webp" : "jpg";
+        return { bytes: buf, mime: m, ext: e2 };
+      } catch (e) {
+        console.warn("[compose-scene-anchor] seedream exception", e instanceof Error ? e.message : e);
+        return null;
+      }
+    };
+
+    // --- Execute with fallback -------------------------------------------
+    if (useSeedream) {
+      const r = await callSeedream4();
+      if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "seedream4"; }
+      else {
+        console.warn(`[compose-scene-anchor] seedream failed → fallback nano_banana_2 sceneId=${body.sceneId}`);
+        const r2 = await callNanoBanana2();
+        if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "nano_banana_2"; }
+      }
+    } else {
+      const r = await callNanoBanana2();
+      if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "nano_banana_2"; }
+    }
+
+    if (!bytes) {
       return new Response(
-        JSON.stringify({ strategy: "text-only", error: "ai_failed" }),
+        JSON.stringify({ strategy: "text-only", error: "anchor_provider_failed" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
     console.log(
-      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} wardrobeLock=${body.wardrobeLock ? 1 : 0}${body.wardrobeLock && body.wardrobeLockNames?.length ? `(${body.wardrobeLockNames.join("/")})` : ""} spf=${speakerFocusIdx >= 0 ? `${speakerFocusIdx}:${speakerFocusName}` : "off"} elapsedMs=${Date.now() - t0}`,
+      `[compose-scene-anchor] ok sceneId=${body.sceneId} provider=${anchorProvider} portraits=${portraits.length} identityRefs=${identityPortraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} swap=${swapMode ? 1 : 0} faceLock=${faceLockMode ? 1 : 0} strict=${strictMode ? 1 : 0} wardrobeLock=${body.wardrobeLock ? 1 : 0} spf=${speakerFocusIdx >= 0 ? `${speakerFocusIdx}:${speakerFocusName}` : "off"} elapsedMs=${Date.now() - t0}`,
     );
 
 
-    const aiJson = await aiResp.json();
-    const dataUrl: string | undefined =
-      aiJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!dataUrl || !dataUrl.startsWith("data:image")) {
-      console.error("[compose-scene-anchor] no image in response", JSON.stringify(aiJson).slice(0, 400));
-      return new Response(
-        JSON.stringify({ strategy: "text-only", error: "no_image" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // Decode + upload
-    const [meta, b64] = dataUrl.split(",", 2);
-    const mime = /data:(image\/[a-z+]+);/.exec(meta)?.[1] ?? "image/png";
-    const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
     const path = `${user.id}/scene-anchors/${body.sceneId}-${promptHash.slice(0, 12)}.${ext}`;
     // cacheControl: 3600s so Cloudflare serves the anchor PNG from CDN edge on
