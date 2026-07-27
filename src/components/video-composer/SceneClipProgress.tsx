@@ -46,6 +46,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const [busy, setBusy] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
   const [trimOpen, setTrimOpen] = useState(false);
+  const [faceMapOpen, setFaceMapOpen] = useState(false);
   const variantCount = (scene.seedVariations ?? []).length;
   const variantsGenerating = (scene.seedVariations ?? []).some((v) => v?.status === 'generating');
 
