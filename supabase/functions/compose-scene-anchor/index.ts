@@ -76,6 +76,13 @@ interface Body {
    *  `characterNames`. When absent → legacy neutral group-shot behavior. */
   speakerFocusIdx?: number;
   speakerFocusName?: string;
+  /** v262 — extra framing-retry suffix (e.g. "medium shot, tight 2x2 grid,
+   *  each face ≥ 30% of frame width"). Appended AFTER the standard framing
+   *  clauses so the model treats it as a corrective directive on top of
+   *  the base composition. Used by compose-video-clips when the previous
+   *  attempt produced faces too small for lip-sync to be visible in the
+   *  final composited output. */
+  framingSuffix?: string;
 }
 
 
