@@ -408,11 +408,12 @@ export async function resolveIdentityViaRekognition(params: {
   const assignmentLock: Record<string, string> = {};
   let minSim: number | null = null;
   let resolved = 0;
+  const unresolvedIdx: number[] = [];
   params.characters.forEach((c, i) => {
     const col = pick[i];
-    if (col == null || col < 0) return;
+    if (col == null || col < 0) { unresolvedIdx.push(i); return; }
     const sim = scoreMatrix[i][col] ?? 0;
-    if (sim < MIN_SIMILARITY) return;
+    if (sim < MIN_SIMILARITY) { unresolvedIdx.push(i); return; }
     faces[col].characterId = c.characterId;
     faces[col].similarity = sim;
     assignmentLock[String(c.speakerIdx)] = c.characterId;
@@ -420,15 +421,52 @@ export async function resolveIdentityViaRekognition(params: {
     if (minSim === null || sim < minSim) minSim = sim;
   });
 
+  // v276 — Pass 2: relax threshold for characters not yet matched against
+  // detected slots that are still unclaimed. Best-first greedy over remaining.
+  let pass2Hits = 0;
+  if (unresolvedIdx.length > 0) {
+    const claimedSlots = new Set<number>();
+    for (const face of faces) {
+      if (face.characterId) claimedSlots.add(face.slot);
+    }
+    type Cand = { charIdx: number; slot: number; sim: number };
+    const cands: Cand[] = [];
+    for (const i of unresolvedIdx) {
+      for (let s = 0; s < detected.length; s++) {
+        if (claimedSlots.has(s)) continue;
+        const sim = scoreMatrix[i][s] ?? 0;
+        if (sim >= MIN_SIMILARITY_PASS2 && sim < MIN_SIMILARITY) {
+          cands.push({ charIdx: i, slot: s, sim });
+        }
+      }
+    }
+    cands.sort((a, b) => b.sim - a.sim);
+    const usedChars = new Set<number>();
+    for (const cand of cands) {
+      if (usedChars.has(cand.charIdx) || claimedSlots.has(cand.slot)) continue;
+      const c = params.characters[cand.charIdx];
+      faces[cand.slot].characterId = c.characterId;
+      faces[cand.slot].similarity = cand.sim;
+      assignmentLock[String(c.speakerIdx)] = c.characterId;
+      claimedSlots.add(cand.slot);
+      usedChars.add(cand.charIdx);
+      resolved++;
+      pass2Hits++;
+      if (minSim === null || cand.sim < minSim) minSim = cand.sim;
+    }
+  }
+
+  const method: RekognitionIdentityResult["method"] =
+    pass2Hits > 0 ? "aws-rekognition-anchor-v274-twopass" : "aws-rekognition-anchor-v274";
   const msTotal = Date.now() - t0;
   console.log(
-    `[resolveIdentityViaRekognition] v274 anchor=${params.anchorUrl.slice(-80)} ` +
+    `[resolveIdentityViaRekognition] v276 anchor=${params.anchorUrl.slice(-80)} ` +
     `detected=${detected.length} chars=${params.characters.length} ` +
-    `resolved=${resolved}/${params.characters.length} minSim=${minSim ?? "-"} ms=${msTotal}`,
+    `resolved=${resolved}/${params.characters.length} pass2=${pass2Hits} minSim=${minSim ?? "-"} ms=${msTotal}`,
   );
   return {
     ok: true,
-    method: "aws-rekognition-anchor-v274",
+    method,
     dims: { width: W, height: H },
     faces,
     assignmentLock,
@@ -438,3 +476,4 @@ export async function resolveIdentityViaRekognition(params: {
     msTotal,
   };
 }
+
