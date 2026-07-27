@@ -5817,34 +5817,40 @@ serve(async (req) => {
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
-      } else if (retryVariant === "coords-pro-box") {
-        // Legacy inline path bleibt verfügbar für explizite coords-pro-box Retries.
+      } else if (
+        retryVariant === "coords-pro-box" ||
+        // v279 — Graceful-Degrade: wenn NUR der Storage-Upload gescheitert ist,
+        // aber Geometrie sane und voiced-frames vorhanden → inline bboxes statt
+        // Hard-Fail/Refund. Entspricht dem in v82 dokumentierten Default-Pfad.
+        (!usedUrl && v152BboxSane && dispatchBox)
+      ) {
         const boundingBoxes: ([number, number, number, number] | null)[] =
           v124VoicedWindows.length > 0
             ? buildPerFrameBoxes({
-                box,
+                box: dispatchBox ?? box,
                 frameCount,
-                fps: ASSUMED_FPS,
+                fps: dispatchFps ?? ASSUMED_FPS,
                 voicedWindowsSec: v124VoicedWindows,
               })
-            : new Array(frameCount).fill(box);
+            : new Array(frameCount).fill(dispatchBox ?? box);
         const inlineNonNull = boundingBoxes.reduce((a, v) => a + (v ? 1 : 0), 0);
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes: boundingBoxes,
         };
+        const degradeReason = retryVariant === "coords-pro-box" ? "explicit_variant" : "v279_upload_degrade";
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v124_BBOX_INLINE variant=${retryVariant} speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} windows=${JSON.stringify(v124VoicedWindows)}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v279_BBOX_INLINE_FALLBACK reason=${degradeReason} speaker=${pass.speaker_name} box=${JSON.stringify(dispatchBox ?? box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} area_pct=${(boxAreaPct * 100).toFixed(2)}`,
         );
       } else {
-        // v152 — Hard-Fail statt Silent-Downgrade. Lieber sofort transparent
-        // abbrechen + refunden + klare User-Message als 30 min später mit
-        // einem stillen Pseudo-Lipsync zu enden.
-        const v152FailReason = !usedUrl
-          ? "bbox_url_upload_failed"
-          : nonNullFrames < 1
-            ? "bbox_zero_voiced_frames"
-            : `bbox_geometry_insane:area_pct=${(boxAreaPct * 100).toFixed(2)}`;
+        // v152 — Hard-Fail nur noch für echte Datenprobleme (zero voiced frames
+        // oder geometrisch unsinnige Boxen). Upload-Fehler werden oben durch
+        // v279 Inline-Fallback abgefangen.
+        const v152FailReason = nonNullFrames < 1
+          ? "bbox_zero_voiced_frames"
+          : !v152BboxSane
+            ? `bbox_geometry_insane:area_pct=${(boxAreaPct * 100).toFixed(2)}`
+            : "bbox_url_upload_failed";
         (pass as any)._v152HardFail = {
           reason: v152FailReason,
           errorClass: "v152_bbox_hard_fail",
@@ -5864,15 +5870,15 @@ serve(async (req) => {
           },
         };
         console.error(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_BBOX_HARD_FAIL reason=${v152FailReason} usedUrl=${!!usedUrl} non_null=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} — refund + abort, no silent downgrade`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v152_BBOX_HARD_FAIL reason=${v152FailReason} usedUrl=${!!usedUrl} non_null=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} — refund + abort`,
         );
-        // Defer the actual refund/return until failBeforeProviderDispatch
-        // is declared (~ line 4486). syncOptions wird unten überschrieben.
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes_url: "deferred-v152-hard-fail",
         };
       }
+
+
 
 
 
