@@ -1166,7 +1166,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 projectId: pid,
                 ...(tuning ?? {}),
               };
-          const { data, error } = await supabase.functions.invoke(fnName, { body });
+          const { data, error } = await invokeVoiceoverWithRetry(fnName, body);
+
           if (error) throw error;
           audioUrl = (data as any)?.audioUrl as string | undefined;
           if (!audioUrl) throw new Error('No audioUrl returned');
@@ -1618,7 +1619,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 projectId: pidForSrs,
                 ...(tuning ?? {}),
               };
-          const { data, error } = await supabase.functions.invoke(fnName, { body });
+          const { data, error } = await invokeVoiceoverWithRetry(fnName, body);
+
           if (error) throw error;
           audioUrl = (data as any)?.audioUrl as string | undefined;
           if (!audioUrl) throw new Error(`No audioUrl returned for ${c.name}`);
