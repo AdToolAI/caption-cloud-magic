@@ -237,6 +237,31 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const dialogTotal = dialogShots.length;
   const showDialogOverlay = isDialog && !hqReady && !['done', 'canceled'].includes(String(dialogShotsState?.status ?? ''));
 
+  // v274 — awaiting manual speaker↔face mapping. Block the auto-spinner
+  // and surface a review button so the user finishes the mapping BEFORE
+  // any provider clip is dispatched with wrong routing.
+  if ((scene.clipStatus as string) === 'awaiting_manual_face_map') {
+    return (
+      <>
+        <div className="relative w-full h-full bg-amber-500/10 border border-amber-500/40 flex flex-col items-center justify-center gap-1 p-2 text-center">
+          <UserCheck className="h-5 w-5 text-amber-500" />
+          <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">Face-Map prüfen</span>
+          <span className="text-[8px] text-muted-foreground leading-tight">
+            Sprecher konnten dem Anker nicht eindeutig zugeordnet werden.
+          </span>
+          <button
+            type="button"
+            onClick={() => setFaceMapOpen(true)}
+            className="mt-1 bg-amber-500/90 hover:bg-amber-500 text-black rounded px-2 py-1 text-[9px] font-semibold"
+          >
+            Zuordnung öffnen
+          </button>
+        </div>
+        <FaceMapReviewDialog open={faceMapOpen} onOpenChange={setFaceMapOpen} scene={scene} />
+      </>
+    );
+  }
+
   if (wrongTalkingHeadReady) {
     return (
       <div className="relative w-full h-full bg-destructive/10 border border-destructive/40 flex flex-col items-center justify-center gap-1 p-2 text-center">
