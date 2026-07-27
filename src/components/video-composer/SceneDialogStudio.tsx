@@ -1893,11 +1893,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       }
     } catch (e) {
       console.error('[SceneDialogStudio] generate error', e);
+      const degraded = isEdgeRuntimeDegraded(e);
+      const description = degraded
+        ? language === 'de'
+          ? 'Voiceover-Service kurzzeitig nicht erreichbar (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Bitte in ~30 s erneut auf „Clip generieren mit Voiceover" klicken — bereits erzeugte Voiceovers werden aus dem Cache wiederverwendet.'
+          : language === 'es'
+          ? 'Servicio de voiceover temporalmente no disponible. Vuelve a intentarlo en ~30 s — los voiceovers ya generados se reutilizan.'
+          : 'Voiceover service briefly unavailable (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Please click "Generate clip with voiceover" again in ~30s — already-generated voiceovers are cached.'
+        : formatError(e);
       toast({
         title: t.failed,
-        description: formatError(e),
+        description,
         variant: 'destructive',
       });
+
     } finally {
       emitPipelineEvent({ type: 'voiceover:end' });
       emitPipelineEvent({ type: 'lipsync:end' });
