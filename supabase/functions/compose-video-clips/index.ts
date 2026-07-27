@@ -35,6 +35,7 @@ import {
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
+import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
