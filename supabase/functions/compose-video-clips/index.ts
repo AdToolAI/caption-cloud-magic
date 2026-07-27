@@ -2828,14 +2828,32 @@ serve(async (req) => {
                             .single();
                           const baseAudioPlan = (sceneRow?.audio_plan ?? {}) as Record<string, any>;
                           const baseTwoshot = (baseAudioPlan.twoshot ?? {}) as Record<string, any>;
+                          // v276 — Soft-Gate: only hard-block when NO speaker matched.
+                          // Partial matches proceed with matched slots locked and
+                          // unresolved slots falling back to v242 row-major order.
+                          const softGateEnabled = (Deno.env.get("V276_SOFT_GATE") ?? "true").toLowerCase() !== "false";
+                          const expected = portraitUrls.length;
+                          const resolved = idResolved.resolvedCount ?? 0;
+                          const isPartial = expected >= 2 && resolved > 0 && resolved < expected;
+                          const isTotalMiss = expected >= 2 && (!idResolved.ok || resolved === 0);
+                          const identityStatus = isTotalMiss
+                            ? "unresolved"
+                            : isPartial
+                              ? "partial"
+                              : "ok";
+                          const matchedSlots = idResolved.assignmentLock
+                            ? Object.keys(idResolved.assignmentLock)
+                            : [];
                           const anchorIdentityPayload = {
                             method: idResolved.method,
                             ok: idResolved.ok,
+                            status: identityStatus,
+                            matched: matchedSlots,
                             dims: idResolved.dims,
                             faces: idResolved.faces,
                             assignmentLock: idResolved.assignmentLock,
-                            resolvedCount: idResolved.resolvedCount,
-                            expectedCount: idResolved.expectedCount,
+                            resolvedCount: resolved,
+                            expectedCount: expected,
                             minSimilarity: idResolved.minSimilarity,
                             reason: idResolved.reason ?? null,
                             anchor_url: composedUrl,
@@ -2852,16 +2870,19 @@ serve(async (req) => {
                                 plate_identity: {
                                   ...(existingDs.plate_identity ?? {}),
                                   method: idResolved.method,
+                                  status: identityStatus,
                                   dims: idResolved.dims,
                                   faces: idResolved.faces,
                                   assignmentLock: idResolved.assignmentLock,
-                                  resolvedCount: idResolved.resolvedCount,
+                                  resolvedCount: resolved,
                                 },
                               }
                             : existingDs;
-                          const needsManualReview =
-                            portraitUrls.length >= 3 &&
-                            (!idResolved.ok || idResolved.resolvedCount < portraitUrls.length);
+                          // v276: hard-block only on total miss (0/N) when soft-gate enabled.
+                          // Legacy hard-gate (any partial for N>=3) restored via V276_SOFT_GATE=false.
+                          const needsManualReview = softGateEnabled
+                            ? isTotalMiss
+                            : (expected >= 3 && (!idResolved.ok || resolved < expected));
                           await supabaseAdmin
                             .from("composer_scenes")
                             .update({
@@ -2877,7 +2898,7 @@ serve(async (req) => {
                                 ? {
                                     clip_status: "awaiting_manual_face_map",
                                     clip_error:
-                                      `anchor_identity_needs_review: ${idResolved.resolvedCount}/${portraitUrls.length} Sprecher konnten automatisch zugeordnet werden. Bitte im Face-Map-Review die Sprecher den Gesichtern auf dem Anchor zuweisen, bevor der Clip gerendert wird.`,
+                                      `anchor_identity_needs_review: ${resolved}/${expected} Sprecher konnten automatisch zugeordnet werden. Bitte im Face-Map-Review die Sprecher den Gesichtern auf dem Anchor zuweisen, bevor der Clip gerendert wird.`,
                                   }
                                 : {}),
                               updated_at: new Date().toISOString(),
@@ -2885,16 +2906,22 @@ serve(async (req) => {
                             .eq("id", scene.id);
                           if (needsManualReview) {
                             console.log(
-                              `[compose-video-clips] v274_awaiting_manual_face_map scene=${scene.id} resolved=${idResolved.resolvedCount}/${portraitUrls.length} — skipping provider dispatch`,
+                              `[compose-video-clips] v276_awaiting_manual_face_map scene=${scene.id} resolved=${resolved}/${expected} softGate=${softGateEnabled} — skipping provider dispatch`,
                             );
                             results.push({
                               sceneId: scene.id,
                               status: "awaiting_manual_face_map",
-                              resolved: idResolved.resolvedCount,
-                              expected: portraitUrls.length,
+                              resolved,
+                              expected,
                             } as any);
                             continue;
                           }
+                          if (isPartial) {
+                            console.log(
+                              `[compose-video-clips] v276_partial_soft_pass scene=${scene.id} resolved=${resolved}/${expected} matched=${matchedSlots.join(",")} — continuing dispatch`,
+                            );
+                          }
+
                         } catch (persistErr) {
                           v274FailReason = `persist_failed:${(persistErr as Error)?.message ?? "unknown"}`;
                           console.warn(
