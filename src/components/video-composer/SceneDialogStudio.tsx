@@ -130,6 +130,78 @@ function formatError(e: unknown): string {
   );
 }
 
+/**
+ * Invoke a voiceover edge function with retry on transient Supabase Edge
+ * Runtime failures (503 SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED, 502, 504,
+ * boot/worker limits, network drops). Non-transient errors (400/401/402/422)
+ * are re-thrown immediately so credit / validation failures still surface.
+ *
+ * Up to 3 attempts with exponential backoff + jitter (~600ms, 1500ms, 3000ms).
+ */
+async function invokeVoiceoverWithRetry(
+  fnName: string,
+  body: Record<string, unknown>,
+): Promise<{ data: any; error: null } | { data: null; error: unknown }> {
+  const MAX_ATTEMPTS = 3;
+  const BASE_DELAYS_MS = [600, 1500, 3000];
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.functions.invoke as any)(fnName, { body });
+    if (!error) return { data, error: null };
+    lastError = error;
+    // Decide if this error is retryable.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyErr = error as any;
+    const status: number | undefined = anyErr?.context?.status;
+    let bodyText = '';
+    try {
+      const ctx = anyErr?.context;
+      if (ctx && typeof ctx.clone === 'function') {
+        bodyText = await ctx.clone().text();
+      }
+    } catch {
+      // ignore body-read failures
+    }
+    const headerCode =
+      (anyErr?.context?.headers?.get?.('sb-error-code') as string | undefined) || '';
+    const msg = `${anyErr?.message ?? ''} ${bodyText} ${headerCode}`.toLowerCase();
+    const isNetworkErr = !status && (anyErr instanceof TypeError || /failed to fetch|network/i.test(msg));
+    const isTransientStatus = status === 502 || status === 503 || status === 504;
+    const isDegraded =
+      msg.includes('supabase_edge_runtime_service_degraded') ||
+      msg.includes('worker_limit') ||
+      msg.includes('boot_error') ||
+      msg.includes('worker_boot');
+    const retryable = isNetworkErr || isTransientStatus || isDegraded;
+    if (!retryable || attempt === MAX_ATTEMPTS - 1) break;
+    const delay = BASE_DELAYS_MS[attempt] + Math.floor(Math.random() * 250);
+    console.warn(
+      `[SceneDialogStudio] VO retry ${attempt + 1}/${MAX_ATTEMPTS - 1} on ${fnName} after ` +
+        `status=${status ?? 'net'} code=${headerCode || (isDegraded ? 'degraded' : 'transient')} — waiting ${delay}ms`,
+    );
+    await new Promise((r) => setTimeout(r, delay));
+  }
+  return { data: null, error: lastError };
+}
+
+/** Detect the transient Supabase Edge Runtime degradation for user-facing toast. */
+function isEdgeRuntimeDegraded(err: unknown): boolean {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyErr = err as any;
+  const status: number | undefined = anyErr?.context?.status;
+  const msg = String(anyErr?.message ?? '').toLowerCase();
+  return (
+    status === 503 ||
+    status === 502 ||
+    status === 504 ||
+    msg.includes('supabase_edge_runtime_service_degraded') ||
+    msg.includes('non-2xx')
+  );
+}
+
+
+
 /** Pure reader for Phase 3.1 per-line Shot Director overrides. */
 function getDialogShotOverride(
   scene: ComposerScene,
