@@ -510,8 +510,12 @@ serve(async (req) => {
     // Image otherwise interprets N reference portraits literally as N panels
     // (2x2 grid, Zoom-style tiles). This hard-locks the output to one shared
     // physical frame.
+    // v273 — When the user explicitly asks for a grid / split / collage in
+    // the prompt, we flip this to a POSITIVE grid directive instead.
     const SINGLE_FRAME_SUFFIX = isMulti
-      ? ` SINGLE CONTINUOUS PHOTOGRAPH — the output is ONE unbroken photorealistic photograph taken with ONE camera in ONE moment. It is NOT a composite, NOT a grid, NOT a 2x2 layout, NOT a collage, NOT a stitched image, NOT a video-conference / Zoom / Teams / Meet screenshot, NOT a picture-in-picture, NOT a framed portrait wall. All ${N} people share the SAME floor, SAME walls, SAME lighting direction, SAME perspective, SAME camera focal length. Zero panel borders, zero dividing lines, zero separate frames.`
+      ? (gridRequested
+        ? ` GRID LAYOUT REQUESTED — compose the output as ${N === 4 ? "a clean 2x2 grid of four equal panels" : N === 2 ? "a clean 1x2 side-by-side split-screen" : N === 3 ? "a clean 1x3 strip of three equal panels" : `a clean ${N}-panel grid of equal panels`}, with a thin neutral divider between panels. Each panel contains exactly ONE cast member, centered, framed as a medium close-up (chest up), mouth and jaw fully visible for lip-sync. The panels may share a consistent color grade and background style. This IS the intended composition — deliver it as a grid.`
+        : ` SINGLE CONTINUOUS PHOTOGRAPH — the output is ONE unbroken photorealistic photograph taken with ONE camera in ONE moment. It is NOT a composite, NOT a grid, NOT a 2x2 layout, NOT a collage, NOT a stitched image, NOT a video-conference / Zoom / Teams / Meet screenshot, NOT a picture-in-picture, NOT a framed portrait wall. All ${N} people share the SAME floor, SAME walls, SAME lighting direction, SAME perspective, SAME camera focal length. Zero panel borders, zero dividing lines, zero separate frames.`)
       : "";
 
     const editInstruction = isMulti
