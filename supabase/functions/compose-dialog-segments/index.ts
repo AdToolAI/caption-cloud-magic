@@ -414,25 +414,31 @@ async function uploadBoundingBoxesJson(
       : new Array(totalFrames).fill(params.box);
     const nonNullFrames = boxes.reduce((acc, v) => acc + (v ? 1 : 0), 0);
     const payload = { bounding_boxes: boxes };
-    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-    const { error: upErr } = await supabase.storage
+    // v279 — Uint8Array instead of Blob: supabase-js 2.75 in Deno silently
+    // rejects Blob payloads on some builds → upload "succeeds" but public URL
+    // is unreachable. Bytes path is deterministic + faster.
+    const bytes = new TextEncoder().encode(JSON.stringify(payload));
+    const { data: upData, error: upErr } = await supabase.storage
       .from("composer-frames")
-      .upload(path, blob, {
+      .upload(path, bytes, {
         contentType: "application/json",
         upsert: true,
         cacheControl: "31536000",
       });
     if (upErr) {
-      console.warn(`[compose-dialog-segments] bbox-url upload failed: ${upErr.message}`);
+      console.warn(`[compose-dialog-segments] v279 bbox-url upload failed path=${path} bytes=${bytes.byteLength} err=${upErr.message}`);
       return { url: null, nonNullFrames, totalFrames };
     }
     const { data: pub } = supabase.storage.from("composer-frames").getPublicUrl(path);
-    return { url: pub?.publicUrl ?? null, nonNullFrames, totalFrames };
+    const url = pub?.publicUrl ?? null;
+    console.log(`[compose-dialog-segments] v279 bbox-url uploaded path=${path} bytes=${bytes.byteLength} frames=${totalFrames} voiced=${nonNullFrames} url=${url ? "…" + url.slice(-60) : "null"} upData=${upData ? "ok" : "empty"}`);
+    return { url, nonNullFrames, totalFrames };
   } catch (e) {
-    console.warn(`[compose-dialog-segments] bbox-url upload threw: ${(e as Error).message}`);
+    console.warn(`[compose-dialog-segments] v279 bbox-url upload threw: ${(e as Error).message}`);
     return { url: null, nonNullFrames: 0, totalFrames: Math.max(1, params.frameCount) };
   }
 }
+
 
 // Pricing: Sync.so lipsync-2-pro = 16 credits/s (raised from 9, 3.5× margin cap
 // on ~€0.046/s raw cost). ONE pass over the full clip (regardless of speaker
