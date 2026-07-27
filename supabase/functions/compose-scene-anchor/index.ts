@@ -499,18 +499,20 @@ serve(async (req) => {
         `Scene: ${safeScenePrompt}`;
 
     // ------------------------------------------------------------------
-    // v270 — Anchor-Modell-Router (Seedream 4 als Default für Multi-Sprecher)
+    // v271 — Anchor-Modell-Router (Gemini 3 Pro Image als Default für Multi)
     // ------------------------------------------------------------------
-    // Nano Banana 2 (google/gemini-3.1-flash-image-preview) verwechselt bei
-    // 3–4 Charakteren mit ähnlichen Merkmalen (z.B. gleicher Nachname)
-    // regelmäßig Identitäten oder klont einen Sprecher doppelt.
-    // Seedream 4 (bytedance/seedream-4) über Replicate unterstützt native
-    // Multi-Image-Reference und hält 3–4 unterschiedliche Identitäten
-    // deutlich stabiler. Feature-Flag `ANCHOR_MODEL_MULTI` erlaubt Rollback
-    // ohne Redeploy.
-    const ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "seedream4").toLowerCase();
+    // Nano Banana 2 verwechselt Identitäten bei 3–4 Charakteren.
+    // Seedream 4 hält Identitäten, isoliert Personen aber auf neutralem
+    // Hintergrund und ignoriert die Location.
+    // Gemini 3 Pro Image (`google/gemini-3-pro-image`) läuft über den
+    // Lovable AI Gateway, respektiert Multi-Image-Refs + Scene-Prompt
+    // gleichzeitig und hält Identitäten deutlich besser als Nano Banana 2.
+    // Feature-Flag `ANCHOR_MODEL_MULTI` erlaubt Rollback ohne Redeploy.
+    //   Werte: "gemini3pro" (Default) | "nano_banana_2" | "seedream4"
+    const ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "gemini3pro").toLowerCase();
     const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
     const useSeedream = isMulti && ANCHOR_MODEL_MULTI === "seedream4" && REPLICATE_API_KEY.length > 0;
+    const useGemini3Pro = isMulti && ANCHOR_MODEL_MULTI === "gemini3pro";
 
     // Reference image URLs, in strict order: portraits → identity headshots →
     // world refs. Seedream 4 accepts an array of reference URLs directly.
@@ -526,7 +528,7 @@ serve(async (req) => {
     let bytes: Uint8Array | null = null;
     let mime = "image/png";
     let ext = "png";
-    let anchorProvider: "seedream4" | "nano_banana_2" = "nano_banana_2";
+    let anchorProvider: "seedream4" | "nano_banana_2" | "gemini3pro" = "nano_banana_2";
     const t0 = Date.now();
 
     const callNanoBanana2 = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
