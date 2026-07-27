@@ -1,61 +1,72 @@
-# Plan v273 — Grid-Layout nur auf explizite Kunden-Anforderung
+# Plan v274 — Speaker↔Face Identity via AWS Rekognition
 
 ## Ziel
-Single-Frame ("eine gemeinsame Szene") bleibt der Standard für alle Multi-Sprecher-Anchors. Ein 2×2-/Split-/Collage-Layout wird **nur** dann erzeugt, wenn der Kunde es im Briefing/Prompt explizit anfordert (z. B. „Grid", „Split-Screen", „2x2", „Kacheln", „Collage", „Panel", „Interview-Split"). Kein UI-Toggle, keine Automatik — allein der Prompt entscheidet.
 
-## Warum diese Lösung
-- Sauberste UX: kein zusätzlicher Schalter, keine Erklärungsfläche.
-- Kein Modus-Switching-Risiko: der Kunde bekommt was er schreibt.
-- Deckt den v272-Bug (ungewollte Grids) sauber ab und lässt Grid als bewusstes Stilmittel offen.
-- Konsistent mit unserer „Prompt = Wahrheit"-Linie aus Plan v266/v270.
+Silent-Misfires beheben, bei denen `plate_identity.resolvedCount = 0` und der Dispatcher auf "Slot-Reihenfolge = Script-Reihenfolge" zurückfällt — mit dem Ergebnis, dass Audio auf falsche Gesichter geroutet wird (z.B. Sprecher 4 landet bei Position 1).
 
-## Umfang der Änderungen
+Ursache: Im Anchor-Schritt läuft bisher **kein** Identitäts-Matching. Slots werden rein geometrisch vergeben.
 
-### 1) Grid-Intent-Detector (neu, server-seitig)
-Neue kleine Helper-Datei, die aus dem Scene-/Briefing-Prompt erkennt, ob Grid gewünscht ist. Erkannte Signale (DE/EN, case-insensitive, Wortgrenzen):
+Lösung: AWS Rekognition matched die im Anchor detektierten Gesichter gegen die bereits vorhandenen Cast & World Portrait-Descriptors.
 
-- `grid`, `2x2`, `2 x 2`, `four-panel`, `vier panels`, `panels`, `split[- ]?screen`, `split view`, `kachel`, `tiles`, `collage`, `mosaic`, `mosaik`, `interview split`, `zoom[- ]?call`, `videocall grid`, `brady bunch`
+## Umfang
 
-Rückgabe: `{ gridRequested: boolean, gridStyle?: '2x2' | 'split' | 'collage' }`.
+- Nur der Anchor-Schritt für N≥2 Sprecher.
+- N=1 bleibt unverändert.
+- Keine Änderung an Cast & World, Focus-Plates, Sync.so oder Rendering.
+- Bonus-Idee (Focus-Plates als zusätzliche Referenz) **nicht** enthalten — Risiko von Style-Drift-Fehlmatches.
 
-### 2) `compose-scene-anchor` verzweigt sauber
-Im Multi-Sprecher-Zweig (N≥2):
+## Änderungen
 
-- **Wenn `gridRequested = false` (Default):** aktuelle v272-Härtung bleibt aktiv — `SINGLE_FRAME_SUFFIX`, Anti-Grid-/Anti-Collage-/Anti-Split-Klauseln, „ONE continuous photograph".
-- **Wenn `gridRequested = true`:** Anti-Grid-Klauseln werden entfernt und durch eine positive Grid-Direktive ersetzt („Compose as a clean N-panel grid, equal tiles, thin neutral divider, each speaker centered in their own tile, sharp focus on each face"). `EXACT_COUNT_SUFFIX` bleibt (Headcount-Lock).
+### 1. Neue Utility: `resolveIdentityViaRekognition`
+- Input: Anchor-Bild-URL + Liste `{ characterId, portraitUrl }` aus Cast.
+- Ablauf:
+  1. `DetectFaces` auf dem Anchor → Bounding-Boxes.
+  2. Pro Cast-Portrait `CompareFaces` gegen jede Bounding-Box.
+  3. Hungarian-Assignment über die Similarity-Matrix (optimale globale Zuordnung, keine Greedy-Doppelbelegung).
+  4. Threshold: Similarity ≥ 55. Alles darunter → `unresolved`.
+- Output: `Array<{ boxIdx, characterId | null, similarity }>`.
 
-### 3) `compose-video-clips` reicht Intent durch
-- Detector auch hier aufrufen (Fallback, falls anchor direkt gecacht).
-- `gridRequested` in den Anchor-Payload und in die Master-Plate-Prompts propagieren, damit Video-Modell nicht gegen den Anchor arbeitet.
-- Face-Gate/Framing-Regeln: bei `gridRequested = true` das 12%-Min-Face-Size-Invariant lockern (Grid-Kacheln haben ohnehin große Gesichter) und die Focus-Plate-Sequenz überspringen — im Grid ist jede Kachel bereits ein Speaker-Focus.
+### 2. Dispatcher-Guard in `compose-video-clips`
+- Nach Anchor-Generierung `resolveIdentityViaRekognition` aufrufen.
+- Ergebnis in `plate_identity.faces[]` und `resolvedCount` schreiben.
+- Für N≥3 Sprecher: harter Stop, wenn `resolvedCount < N` → Szene auf `clip_status = 'awaiting_manual_face_map'`.
+- Für N=2: Soft-Warn, aber weiter (2-Sprecher-Fehlzuordnung ist audit-visuell schnell erkennbar).
 
-### 4) Cache-Invalidierung
-- `ANCHOR_AUDIT_VERSION` 14 → 15 in `compose-video-clips`, damit alte Anchors ohne Intent-Klassifikation neu komponiert werden.
+### 3. Manuelle Review-UI: `FaceMapReviewDialog.tsx`
+- Zeigt Anchor-Frame mit numerierten Bounding-Boxes.
+- User zieht Speaker-Chip auf die passende Box (Drag & Drop).
+- Speichern → `plate_identity.faces[]` überschreiben, `clip_status` zurück auf `awaiting_render`.
+- Trigger aus `SceneClipProgress.tsx` wenn Status = `awaiting_manual_face_map`.
 
-### 5) Keine UI-Änderungen
-Composer, Briefing-UI und Scene-Card bekommen **keinen** Grid-Toggle. Wenn ein Kunde Grid will, schreibt er es ins Szenen-Prompt/Briefing — der Detector greift automatisch.
+### 4. One-Shot DB-Fix
+- Szene `ef5bff66…` auf `awaiting_manual_face_map` setzen, damit der User sie direkt über den neuen Dialog reparieren kann.
 
-## Nicht im Umfang
-- Kein UI-Schalter, keine Preset-Buttons.
-- Keine Änderung an Single-Speaker-Anchors (Nano Banana 2 bleibt).
-- Keine Änderung an Sync.so / Lip-Sync-Pipeline.
-- Keine Preis- oder Credit-Änderungen.
+## Was NICHT geändert wird
+
+- Cast & World Portraits, `IndexFaces`, Rekognition-Collection — bleiben unangetastet.
+- Focus-Plates / SPF Phase 1 — kein Einfluss.
+- Anchor-Modell (Gemini 3 Pro Image) — kein Wechsel.
+- Sync.so Pipeline, dialog-stitch, Rendering — kein Eingriff.
+- Grid-Layout-Detection v273 — bleibt.
+
+## Risiken & Mitigation
+
+- **Zwillinge / sehr ähnliche Charaktere:** Hungarian-Assignment verhindert Doppelbelegung; unter Threshold → Manual Review statt Silent-Misfire.
+- **Rekognition-Latenz:** ~800ms extra pro N≥2-Szene. Akzeptabel gegenüber Re-Render-Kosten.
+- **Kosten:** ~$0.001 pro Szene (4× CompareFaces). Vernachlässigbar.
+- **Neuer State `awaiting_manual_face_map`:** einmalig testen dass Webhook und UI ihn korrekt handhaben.
+
+## Erwartung
+
+- ~90% aller aktuellen Slot-Misfires bei N≥3 verschwinden.
+- Verbleibende ~10%: Manual Review — kein Silent Fail mehr, User hat volle Kontrolle.
+- Keine Regressionen für N=1 oder Rendering.
 
 ## Technische Details
 
-**Neue Datei:** `supabase/functions/_shared/detectGridIntent.ts`
-```ts
-export function detectGridIntent(text: string): { gridRequested: boolean; gridStyle?: '2x2'|'split'|'collage' }
-```
-
-**Geänderte Dateien:**
-- `supabase/functions/compose-scene-anchor/index.ts` — Verzweigung Single-Frame vs. Grid im N≥2-Zweig.
-- `supabase/functions/compose-video-clips/index.ts` — Intent-Erkennung, Payload-Propagation, `ANCHOR_AUDIT_VERSION` 14→15, Face-Gate-Lockerung bei Grid.
-
-**Signal-Quelle für Detector:** Scene-Prompt + Briefing-Text (falls verfügbar) — beides zusammenkonkateniert prüfen.
-
-## Verifikation
-1. Test-Szene ohne Grid-Keyword → Single-Frame (Büro-Szene, alle 4 in einem Raum).
-2. Test-Szene mit „als 2x2 Grid" im Prompt → sauberes 4-Panel-Grid, jede Kachel = ein Sprecher.
-3. Edge-Function-Logs prüfen: `gridRequested`-Flag wird korrekt geloggt.
-4. Bestehende fehlgeschlagene Szene (`d2aa4ad5…`) rerendern und bestätigen, dass Single-Frame kommt.
+- **Datei neu:** `supabase/functions/_shared/resolveIdentityViaRekognition.ts`
+- **Datei geändert:** `supabase/functions/compose-video-clips/index.ts` (Guard + plate_identity schreiben)
+- **Datei neu:** `src/components/scene/FaceMapReviewDialog.tsx`
+- **Datei geändert:** `src/components/scene/SceneClipProgress.tsx` (Trigger für Dialog)
+- **DB Migration:** enum `clip_status` um `awaiting_manual_face_map` erweitern falls nicht vorhanden.
+- **One-Shot:** UPDATE auf Szene `ef5bff66…`.
