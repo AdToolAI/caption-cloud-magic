@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2, Scissors, RotateCcw } from 'lucide-react';
+import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2, Scissors, RotateCcw, UserCheck } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { SceneGenerationSkeleton } from './SceneGenerationSkeleton';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,7 @@ import RerollVariantGrid from './RerollVariantGrid';
 import LeadInTrimSheet from './LeadInTrimSheet';
 import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
 import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
+import { FaceMapReviewDialog } from './FaceMapReviewDialog';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
