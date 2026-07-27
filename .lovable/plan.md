@@ -1,51 +1,58 @@
-# Plan v276 — Latency-Fix & Soft-Gate
+## Befund zur letzten Szene
 
-Ziel: Sync.so-Dispatch bei 4-Sprecher-Szenen wieder in ~1:30–2 min statt 8+ min, ohne Identitäts-Regression.
+Letzte Szene: `90aa26ee-e30d-45ac-8e01-52be8fa294b2`
 
-## Ursachen (verifiziert)
+Was die Logs zeigen:
+- Der Clip wurde gebaut und Sync.so wurde für alle 4 Passes abgeschlossen.
+- `compose-video-clips` hat v274/v276 korrekt gestartet: Rekognition hat `3/4` Sprecher erkannt und `v276_partial_soft_pass` erlaubt.
+- Danach hat `compose-dialog-segments` aber gemeldet: `v275_assignment_lock source=existing locked_slots=0/4`.
+- Anschließend fiel die Pipeline auf alte Anchor-/Geometrie-Fallbacks zurück: `faceMap=anchor`, `v183_unlabeled_fallback`.
 
-- **v274-Hard-Gate** blockt N≥3, wenn Rekognition nicht alle Speaker matcht. Szene `e1265769…`: `resolved=2/4 → clip_status=awaiting_manual_face_map` → Sync.so wurde nie angeworfen. Das ist der 8-min-Hänger.
-- **Gemini 3 Pro Anchor (v271)** ist ~2 min langsamer als Nano Banana 2. NB2 hat laut Nutzer-Feedback **kein** Identitäts-Morphing verursacht — Morphing kam erst mit v266 (Anchor komplett raus).
-- **Rekognition MIN_SIMILARITY=55** ist für Profile/Occlusions zu strikt und produziert die häufigen 2/4-Fälle.
+Kurz: Sync.so lief, aber nicht mit dem Rekognition-Routing. Deshalb bewegen sich falsche oder keine passenden Sprecher.
 
-## Änderungen
+## Wahrscheinliche Ursache
 
-### 1. `supabase/functions/compose-video-clips/index.ts` — Soft-Gate
-`needsManualReview`-Logik (Zeilen ~2862–2897) umbauen:
-- Hard-Block **nur** wenn `resolvedCount === 0` bei N≥2 → dann `awaiting_manual_face_map` wie bisher.
-- Bei `0 < resolvedCount < expected`: Szene läuft weiter. `assignmentLock` enthält die matchbaren Slots deterministisch, unresolved Slots fallen auf v242 Row-Major zurück. `audio_plan.twoshot.anchor_identity.status = "partial"` + `matched=[…]` / `unresolved=[…]` für UI-Warnung.
-- FaceMapReviewDialog bleibt für den 0/N-Fall erhalten.
+Der v274-Lock wird nicht stabil genug durchgereicht:
 
-### 2. `supabase/functions/compose-scene-anchor/index.ts` — Modell-Reihenfolge
-- Default für N≥2 zurück auf `nano-banana-2`.
-- `gemini3pro` nur noch als **Auto-Fallback**, wenn NB2 nach 1 Retry den v262-Face-Size-/Face-Count-Gate nicht besteht.
-- Solo-Szenen (N=1): unverändert NB2.
+1. `compose-video-clips` speichert die Rekognition-Zuordnung in `audio_plan.twoshot.anchor_identity`.
+2. In manchen Abläufen ist `dialog_shots` zu diesem Zeitpunkt noch leer, daher wird `dialog_shots.plate_identity.assignmentLock` nicht vorbefüllt.
+3. `compose-twoshot-audio` schreibt später `audio_plan.twoshot` neu und übernimmt dabei nicht garantiert alle bereits parallel gespeicherten v274-Felder.
+4. `compose-dialog-segments` akzeptiert den v274-Lock aktuell nur als „komplett“ als frozen source. Bei `3/4` Partial-Lock fällt er auf den alten Pfad zurück.
 
-### 3. `supabase/functions/_shared/resolveIdentityViaRekognition.ts` — Two-Pass
-- Pass 1: `MIN_SIMILARITY = 55` (wie heute) auf alle Slots.
-- Pass 2: für noch unresolved Slots erneut mit `MIN_SIMILARITY = 45` gegen dieselben Cast-Portraits + Focus-Plate-Referenzen.
-- `method`-Feld erweitert um `"rekognition_two_pass"` für Logging.
+## Plan v277 — Rekognition-Lock wird echte Routing-Quelle
 
-### 4. UI — Partial-Warnung
-- `SceneClipProgress.tsx` liest `audio_plan.twoshot.anchor_identity.status`.
-- Bei `partial`: kleiner gelber Hinweis „Identität: X/N biometrisch bestätigt, restliche via Reihenfolge". Kein Blocker.
-- Bei `awaiting_manual_face_map` (0/N): bestehender „Face-Map prüfen"-Button bleibt.
+### 1. `compose-twoshot-audio` merge-sicher machen
+- Vor dem finalen `audio_plan`-Update den neuesten Row-Stand nochmals lesen.
+- `twoshot.anchor_identity`, `twoshot.speaker_priority_plates`, `twoshot.faceMap` und andere parallel erzeugte technische Felder erhalten.
+- Damit überschreibt die Audio-Erzeugung keine vorher gespeicherten Identity-Ergebnisse mehr.
 
-## Nicht-Ziele
+### 2. `compose-video-clips` persistiert den Lock an zwei stabilen Orten
+- `audio_plan.twoshot.anchor_identity` bleibt erhalten.
+- Zusätzlich wird `dialog_shots.plate_identity` auch dann initialisiert, wenn vorher noch kein `dialog_shots` existiert.
+- Der gespeicherte Snapshot bekommt klaren Status:
+  - `assignmentLockSource: "v274_anchor_rekognition_partial"` bei Teiltreffer
+  - `assignmentLockSource: "v274_anchor_rekognition_complete"` bei Volltreffer
 
-- Keine Änderung an Sync.so-Dispatch, Focus-Plates, oder v275 Assignment-Lock-Freeze.
-- Kein Rebuild von v274 — nur Gate-Semantik + Threshold.
-- Kein Rückbau von v266/v267 Anchor-Referenz-Logik.
+### 3. `compose-dialog-segments` nutzt Partial-Locks korrekt
+- Auch ein `3/4` Rekognition-Lock darf nicht verworfen werden.
+- Für gematchte Slots gilt Rekognition zwingend.
+- Nur unresolved Slots fallen auf Row-Major/Geometrie zurück.
+- Der Log soll danach nicht mehr `locked_slots=0/4` zeigen, sondern z. B. `locked_slots=3/4 source=v277_anchor_rekognition_partial`.
 
-## Verifikation
+### 4. Alte Anchor-FaceMap darf Rekognition nicht überschreiben
+- Wenn `anchor_identity.assignmentLock` vorhanden ist, darf `faceMap=anchor` oder `v183_unlabeled_fallback` nur noch für nicht erkannte Sprecher einspringen.
+- Keine vollständige Rückkehr auf alte Koordinaten, sobald Rekognition mindestens einen Slot sicher erkannt hat.
 
-1. Neue 4-Sprecher-Szene rendern, Szenen-ID notieren.
-2. Logs prüfen: `v274_enter` → `v274_result` mit `method="rekognition"` oder `"rekognition_two_pass"`, `resolved≥2`.
-3. `clip_status` geht **nicht** auf `awaiting_manual_face_map` bei partial.
-4. Sync.so-Dispatch startet innerhalb ~90 s nach Anchor-Pin.
-5. Bei matchbaren Slots: korrekter Lip-Sync auf richtigem Speaker verifizieren.
+### 5. Validierung nach Umsetzung
+- Edge Functions deployen:
+  - `compose-video-clips`
+  - `compose-twoshot-audio`
+  - `compose-dialog-segments`
+- Danach bei einer neuen 4-Sprecher-Szene prüfen:
+  - `compose-video-clips`: `v274_result resolved=X/4`
+  - `compose-dialog-segments`: `v277_assignment_lock locked_slots=X/4`
+  - `syncso_dispatch_log`: jeder Pass hat den passenden `character_id` und die passende Preclip-/BBox-Quelle
 
-## Rollback
+## Erwartetes Ergebnis
 
-- Env-Flag `V276_SOFT_GATE=false` → Verhalten wie v274 (hard).
-- Env-Flag `ANCHOR_MODEL_DEFAULT=gemini3pro` → Anchor-Modell wie v271.
+Die Pipeline bleibt Single-Take mit Tasks/Office-Aktionen, aber die Sprecher-Zuordnung wird nicht mehr durch spätere Audio-/Fallback-Schritte verloren. Damit sollte der Fall „Sync.so fertig, aber kein Sprecher getroffen“ deutlich reduziert werden.
