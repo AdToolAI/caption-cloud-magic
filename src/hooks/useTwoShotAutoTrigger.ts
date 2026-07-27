@@ -356,16 +356,40 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             .then(async ({ data: aData, error: aErr }) => {
               if (aErr || !aData?.success) {
                 const realMsg = aErr ? await extractFunctionsError(aErr) : (aData?.error ?? 'unknown');
+                const msgStr = String(realMsg ?? '');
+                const isTransient =
+                  (aErr as any)?.name === 'FunctionsFetchError' ||
+                  /Failed to send a request|Failed to fetch|NetworkError|load failed|ECONNRESET|ETIMEDOUT|\b(502|503|504)\b/i.test(msgStr);
+                const retryKey = `audio-prep-net:${d.id}`;
+                if (isTransient && !autoRetried.current.has(retryKey)) {
+                  autoRetried.current.add(retryKey);
+                  console.warn(
+                    `[useTwoShotAutoTrigger] audio-prep transient fetch error for ${d.id} — auto-retry:`,
+                    msgStr,
+                  );
+                  await supabase
+                    .from('composer_scenes')
+                    .update({
+                      twoshot_stage: null,
+                      clip_error: 'audio_prep_transient_retry',
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', d.id);
+                  // Sofort freigeben, damit der nächste Poll-Tick (2.5s)
+                  // die Szene wieder aufnimmt.
+                  inflight.current.delete(`audio-prep:${d.id}`);
+                  return;
+                }
                 console.warn(
                   `[useTwoShotAutoTrigger] audio-prep failed for ${d.id}:`,
-                  realMsg,
+                  msgStr,
                 );
                 await supabase
                   .from('composer_scenes')
                   .update({
                     twoshot_stage: 'failed',
                     lip_sync_status: 'failed',
-                    clip_error: `twoshot_audio_prep_failed: ${String(realMsg).slice(0, 200)}`,
+                    clip_error: `twoshot_audio_prep_failed: ${msgStr.slice(0, 200)}`,
                   })
                   .eq('id', d.id);
               } else {
@@ -385,6 +409,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               setTimeout(() => inflight.current.delete(`audio-prep:${d.id}`), 30_000);
             });
         }
+
 
 
 
