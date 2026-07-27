@@ -1723,6 +1723,32 @@ serve(async (req) => {
         }
       }
       plateHydrationSource = speakerPlateBboxes.every(Boolean) ? "persisted" : "missing";
+      if (plateHydrationSource === "persisted") {
+        const hydratedBoxes = speakerPlateBboxes
+          .map((b, i) => (Array.isArray(b) && b.length === 4 ? { i, b } : null))
+          .filter(Boolean) as Array<{ i: number; b: [number, number, number, number] }>;
+        const duplicateHydratedIdx: number[] = [];
+        for (let a = 0; a < hydratedBoxes.length; a++) {
+          for (let c = a + 1; c < hydratedBoxes.length; c++) {
+            const ba = hydratedBoxes[a].b;
+            const bc = hydratedBoxes[c].b;
+            const ca = [(ba[0] + ba[2]) / 2, (ba[1] + ba[3]) / 2];
+            const cc = [(bc[0] + bc[2]) / 2, (bc[1] + bc[3]) / 2];
+            if (Math.hypot(ca[0] - cc[0], ca[1] - cc[1]) < 8) duplicateHydratedIdx.push(hydratedBoxes[c].i);
+          }
+        }
+        if (duplicateHydratedIdx.length > 0) {
+          for (let i = 0; i < speakerPlateBboxes.length; i++) {
+            speakerPlateBboxes[i] = null;
+            speakerPlateMouths[i] = null;
+          }
+          plateHydrationSource = "missing";
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v278_persisted_identity_duplicate_evict ` +
+            `speakers=[${duplicateHydratedIdx.join(",")}] — forcing Hungarian/live routing instead of frozen cache`,
+          );
+        }
+      }
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v242_persisted_id_first_hydration ` +
         `lock=${lockMatched}/${speakers.length} cid=${idMatched}/${speakers.length} ` +
