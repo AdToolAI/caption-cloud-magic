@@ -255,6 +255,35 @@ export function validatePlateFacesGeometry(
       detail: aspects.map((a) => a.toFixed(2)).join(","),
     };
   }
+
+  // v282 — Min-Face-Size floor. Prevents Rekognition/Gemini hallucinations
+  // on brick/mortar/window textures from being dispatched as "faces".
+  // Real head bboxes on a 720p+ plate are essentially always ≥ 5 % of the
+  // plate height. Anything under 3 % is a false positive on background
+  // texture; a full cluster under 6 % median means the detector missed the
+  // real (small) heads and returned only background hits.
+  const W = Math.max(1, _plateWidth);
+  const hRatios = heights.map((h) => h / H);
+  const wRatios = widths.map((w) => w / W);
+  const tinyCount = hRatios.filter((r) => r < 0.03).length;
+  if (tinyCount > 0) {
+    return {
+      ok: false,
+      reason: "bbox_too_small_absolute",
+      detail: `tiny=${tinyCount}/${hRatios.length} hRatios=[${hRatios.map((r) => r.toFixed(3)).join(",")}]`,
+    };
+  }
+  if (faces.length >= 2) {
+    const sortedH = [...hRatios].sort((a, b) => a - b);
+    const median = sortedH[Math.floor(sortedH.length / 2)];
+    if (median < 0.06) {
+      return {
+        ok: false,
+        reason: "cluster_all_small",
+        detail: `medianHRatio=${median.toFixed(3)} hRatios=[${hRatios.map((r) => r.toFixed(3)).join(",")}] wRatios=[${wRatios.map((r) => r.toFixed(3)).join(",")}]`,
+      };
+    }
+  }
   return { ok: true };
 }
 
