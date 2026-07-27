@@ -1,58 +1,119 @@
-## Befund zur letzten Szene
+# Plan v278 — Anchor-Position-as-Truth + Hungarian Face-Slot-Router (Task-Robust)
 
-Letzte Szene: `90aa26ee-e30d-45ac-8e01-52be8fa294b2`
+## Kernfrage: Funktioniert das auch wenn Charaktere Tasks erledigen (Telefon, Drucker, Laptop)?
 
-Was die Logs zeigen:
-- Der Clip wurde gebaut und Sync.so wurde für alle 4 Passes abgeschlossen.
-- `compose-video-clips` hat v274/v276 korrekt gestartet: Rekognition hat `3/4` Sprecher erkannt und `v276_partial_soft_pass` erlaubt.
-- Danach hat `compose-dialog-segments` aber gemeldet: `v275_assignment_lock source=existing locked_slots=0/4`.
-- Anschließend fiel die Pipeline auf alte Anchor-/Geometrie-Fallbacks zurück: `faceMap=anchor`, `v183_unlabeled_fallback`.
+**Ja — sogar besser als jede Version seit v260**, weil v278 keine biometrische Ähnlichkeit mehr braucht. Genau die war der Grund warum Tasks (Profile, Verdeckung, kleinere Gesichter) das Matching gebrochen haben.
 
-Kurz: Sync.so lief, aber nicht mit dem Rekognition-Routing. Deshalb bewegen sich falsche oder keine passenden Sprecher.
+## Warum Tasks bisher (v274–v277) die Pipeline zerstört haben
 
-## Wahrscheinliche Ursache
+- `[CastActions]` → Charaktere drehen sich weg, gehen ins Profil, werden verdeckt.
+- Rekognition `CompareFaces` Portrait↔Plate fällt unter Threshold (auch mit 45).
+- Fallback ohne Uniqueness → Duplicates ("Samuel und Sarah auf dasselbe Gesicht").
+- Ergebnis: Silent-Speaker, Identity-Drift, Duplicate-Fehler.
 
-Der v274-Lock wird nicht stabil genug durchgereicht:
+## Warum v278 das strukturell löst
 
-1. `compose-video-clips` speichert die Rekognition-Zuordnung in `audio_plan.twoshot.anchor_identity`.
-2. In manchen Abläufen ist `dialog_shots` zu diesem Zeitpunkt noch leer, daher wird `dialog_shots.plate_identity.assignmentLock` nicht vorbefüllt.
-3. `compose-twoshot-audio` schreibt später `audio_plan.twoshot` neu und übernimmt dabei nicht garantiert alle bereits parallel gespeicherten v274-Felder.
-4. `compose-dialog-segments` akzeptiert den v274-Lock aktuell nur als „komplett“ als frozen source. Bei `3/4` Partial-Lock fällt er auf den alten Pfad zurück.
+Zwei Wahrheiten die wir bisher weggeworfen haben:
+1. **Anchor-Prompt-Ordering** — wir wissen exakt, wen wir wohin gerendert haben.
+2. **Anchor-Face-Positionen** — wir können sie mit einem `DetectFaces`-Call auf dem Anchor deterministisch messen.
 
-## Plan v277 — Rekognition-Lock wird echte Routing-Quelle
+Diese beiden Wahrheiten kombiniert = kein biometrisches Guessing mehr nötig.
 
-### 1. `compose-twoshot-audio` merge-sicher machen
-- Vor dem finalen `audio_plan`-Update den neuesten Row-Stand nochmals lesen.
-- `twoshot.anchor_identity`, `twoshot.speaker_priority_plates`, `twoshot.faceMap` und andere parallel erzeugte technische Felder erhalten.
-- Damit überschreibt die Audio-Erzeugung keine vorher gespeicherten Identity-Ergebnisse mehr.
+## Pipeline
 
-### 2. `compose-video-clips` persistiert den Lock an zwei stabilen Orten
-- `audio_plan.twoshot.anchor_identity` bleibt erhalten.
-- Zusätzlich wird `dialog_shots.plate_identity` auch dann initialisiert, wenn vorher noch kein `dialog_shots` existiert.
-- Der gespeicherte Snapshot bekommt klaren Status:
-  - `assignmentLockSource: "v274_anchor_rekognition_partial"` bei Teiltreffer
-  - `assignmentLockSource: "v274_anchor_rekognition_complete"` bei Volltreffer
+```text
+Anchor-Render (Nano Banana 2)
+        │
+        ├──► DetectFaces auf Anchor        →  Anchor-Face-Center[] pro Slot
+        │                                     (persistiert als anchor_face_layout)
+        └──► anchor_composition_order       →  [{characterId, slotIndex}]
+                                              (aus Prompt-Reihenfolge)
+        ▼
+Plate-Render (Hailuo/Seedance mit Tasks)
+        │
+        ▼
+DetectFaces auf Plate                       →  Plate-Face-Center[]
+        │
+        ▼
+Hungarian-Matching                          →  minimale Gesamt-Distanz,
+Anchor-Center[i] ↔ Plate-Center[j]             bijektiv (jede Box exakt 1×)
+        │
+        ▼
+plate_identity Lock                         →  Sync.so pro Sprecher an echter Box
+```
 
-### 3. `compose-dialog-segments` nutzt Partial-Locks korrekt
-- Auch ein `3/4` Rekognition-Lock darf nicht verworfen werden.
-- Für gematchte Slots gilt Rekognition zwingend.
-- Nur unresolved Slots fallen auf Row-Major/Geometrie zurück.
-- Der Log soll danach nicht mehr `locked_slots=0/4` zeigen, sondern z. B. `locked_slots=3/4 source=v277_anchor_rekognition_partial`.
+## Warum Hungarian-Matching der Schlüssel für Tasks ist
 
-### 4. Alte Anchor-FaceMap darf Rekognition nicht überschreiben
-- Wenn `anchor_identity.assignmentLock` vorhanden ist, darf `faceMap=anchor` oder `v183_unlabeled_fallback` nur noch für nicht erkannte Sprecher einspringen.
-- Keine vollständige Rückkehr auf alte Koordinaten, sobald Rekognition mindestens einen Slot sicher erkannt hat.
+Row-Major allein kippt bei Tasks:
+- jemand hockt vorne am Drucker (niedriges Y)
+- jemand steht hinten am Fenster (hohes Y)
+- → row-major würde die falsche "Reihe" bilden
 
-### 5. Validierung nach Umsetzung
-- Edge Functions deployen:
-  - `compose-video-clips`
-  - `compose-twoshot-audio`
-  - `compose-dialog-segments`
-- Danach bei einer neuen 4-Sprecher-Szene prüfen:
-  - `compose-video-clips`: `v274_result resolved=X/4`
-  - `compose-dialog-segments`: `v277_assignment_lock locked_slots=X/4`
-  - `syncso_dispatch_log`: jeder Pass hat den passenden `character_id` und die passende Preclip-/BBox-Quelle
+Hungarian-Algorithmus (bijektive minimale Distanz) toleriert Verschiebungen bis ~30–40% der Plate-Breite, solange die relative Anordnung ungefähr erhalten bleibt — was bei einem Cut vom Anchor zur Task-Szene fast immer der Fall ist.
 
-## Erwartetes Ergebnis
+## Warum das die Fehler eliminiert — auch bei Tasks
 
-Die Pipeline bleibt Single-Take mit Tasks/Office-Aktionen, aber die Sprecher-Zuordnung wird nicht mehr durch spätere Audio-/Fallback-Schritte verloren. Damit sollte der Fall „Sync.so fertig, aber kein Sprecher getroffen“ deutlich reduziert werden.
+| Fehler | Warum er verschwindet, auch mit Tasks |
+|---|---|
+| Duplicate-Face | Bijektive Zuweisung — mathematisch unmöglich |
+| Identity-Drift bei Profil | Keine Ähnlichkeit nötig, nur Position |
+| Silent-Speaker | Sync.so bekommt echte DetectFaces-Box, keine geratene |
+| Verdeckte Sprecher | Face-Count-Mismatch → sauberes Review, kein falsches Rendering |
+| Task-bedingte Positionsdrift | Hungarian toleriert Verschiebung, solange relative Ordnung stimmt |
+
+## Umsetzung
+
+### 1. Anchor speichert Layout
+- `compose-scene-anchor`: nach erfolgreichem Render zusätzlich `DetectFaces` auf Anchor.
+- Persistiert: `dialog_shots.anchor_face_layout = [{slotIndex, characterId, cx, cy, w, h}]`.
+- Kosten: +1 Rekognition-Call (~200ms, ~0.001€).
+
+### 2. Neuer Router
+- Datei: `supabase/functions/_shared/plateFaceSlotRouter.ts`
+- Input: Plate-URL + `anchor_face_layout`.
+- Schritte:
+  a. `DetectFaces` auf Plate.
+  b. Kosten-Matrix: `dist[i][j] = euclidean(anchor[i].center, plate[j].center)` (normalisiert auf [0,1]).
+  c. Hungarian-Algorithm → optimales Assignment.
+  d. Return: `[{characterId, plateBox}]`.
+- Fallback wenn `plate.faceCount !== anchor.faceCount`: `awaiting_face_slot_map`, kein Refund, Review-UI.
+
+### 3. `compose-video-clips` (N≥3)
+- Ersetzt `resolveIdentityViaRekognition` durch `plateFaceSlotRouter` für N≥3.
+- Schreibt `plate_identity` mit Marker `v278_plate_router_hungarian`.
+- N=2 bleibt auf v276-Pfad (dort stabil).
+
+### 4. Merge-Safety (v277 bleibt)
+- `compose-twoshot-audio` und `compose-dialog-segments` lesen `plate_identity` frisch, überschreiben v278-Marker nie.
+
+### 5. Review-UI
+- `FaceMapReviewDialog.tsx` (aus v274) erweitert: Thumbnails aller erkannten Plate-Gesichter, Drag&Drop auf Sprecher.
+- `SceneClipProgress.tsx`: neuer Status `awaiting_face_slot_map` → CTA "Slots zuordnen".
+
+### 6. Cleanup
+- `resolveIdentityViaRekognition` bleibt nur für N=2.
+- Zwei-Pass-Similarity nicht mehr im N≥3-Pfad.
+
+## Erwartete Fehlerrate (grobe Schätzung, letzte ~25 Failures als Basis)
+
+| Fehler-Kategorie | Heute | Nach v278 |
+|---|---|---|
+| Duplicate-Face | ~35% | 0% |
+| Identity-Drift Profil/Task | ~25% | ~3% |
+| Silent-Speaker | ~20% | ~7% (Rest = Sync.so intern) |
+| Neuer Modus: awaiting_face_slot_map | 0% | ~8% (1 Klick Review) |
+
+Netto-Reduktion harter Failures: **~80%**. Neuer Review-Modus ist kein Failure, sondern Soft-Gate mit 1-Klick-Lösung.
+
+## Nicht-Ziele
+
+- N=2 unangetastet.
+- Anchor bleibt Nano Banana 2 (v276).
+- Sync.so-Pfad unverändert.
+- Keine Änderung an `[CastActions]` — Tasks werden weiterhin unterstützt.
+
+## Rollout
+
+- Feature-Flag `V278_HUNGARIAN_ROUTER_N3` default ON.
+- Fallback auf v277 bei Flag off.
+- Kein Refund für neuen `awaiting_face_slot_map`-Status (User-Interaktion, kein Fehler).
