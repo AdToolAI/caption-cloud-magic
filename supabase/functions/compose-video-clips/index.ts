@@ -2779,6 +2779,15 @@ serve(async (req) => {
                   // `awaiting_manual_face_map` so the user can fix it via
                   // FaceMapReviewDialog BEFORE any provider credits are
                   // spent on the wrong speaker↔face routing.
+                  // v275 — Always emit `v274_enter` so we can verify from
+                  // logs whether the Rekognition path executed for this
+                  // scene, and persist failure reasons into
+                  // `audio_plan.twoshot.anchor_identity` so the DB shows
+                  // that it ran even when it couldn't produce a mapping.
+                  console.log(
+                    `[compose-video-clips] v274_enter scene=${scene.id} n=${portraitUrls.length} identityFail=${identityFailure ?? "ok"}`,
+                  );
+                  let v274FailReason: string | null = null;
                   try {
                     if (portraitUrls.length >= 2) {
                       const idRefs = (identityPortraitUrls.length === portraitUrls.length
@@ -2794,13 +2803,17 @@ serve(async (req) => {
                           speakerIdx: i,
                         }))
                         .filter((c) => c.portraitUrl && c.characterId);
-                      if (rekChars.length >= 2) {
+                      if (rekChars.length < 2) {
+                        v274FailReason = `not_enough_portraits:${rekChars.length}`;
+                      } else if (!Deno.env.get("AWS_ACCESS_KEY_ID")) {
+                        v274FailReason = "aws_creds_missing";
+                      } else {
                         const idResolved = await resolveIdentityViaRekognition({
                           anchorUrl: composedUrl,
                           characters: rekChars,
                         });
                         console.log(
-                          `[compose-video-clips] v274_rekognition_id scene=${scene.id} ok=${idResolved.ok ? 1 : 0} ` +
+                          `[compose-video-clips] v274_result scene=${scene.id} ok=${idResolved.ok ? 1 : 0} ` +
                           `resolved=${idResolved.resolvedCount}/${idResolved.expectedCount} ` +
                           `minSim=${idResolved.minSimilarity ?? "-"} reason=${idResolved.reason ?? "-"} ms=${idResolved.msTotal}`,
                         );
@@ -2817,6 +2830,7 @@ serve(async (req) => {
                           const baseTwoshot = (baseAudioPlan.twoshot ?? {}) as Record<string, any>;
                           const anchorIdentityPayload = {
                             method: idResolved.method,
+                            ok: idResolved.ok,
                             dims: idResolved.dims,
                             faces: idResolved.faces,
                             assignmentLock: idResolved.assignmentLock,
@@ -2882,18 +2896,55 @@ serve(async (req) => {
                             continue;
                           }
                         } catch (persistErr) {
+                          v274FailReason = `persist_failed:${(persistErr as Error)?.message ?? "unknown"}`;
                           console.warn(
                             `[compose-video-clips] v274 persist failed scene=${scene.id}:`,
                             persistErr,
                           );
                         }
                       }
+                    } else {
+                      v274FailReason = "single_speaker";
                     }
                   } catch (rekErr) {
+                    v274FailReason = `exception:${(rekErr as Error)?.message ?? "unknown"}`;
                     console.warn(
-                      `[compose-video-clips] v274 rekognition non-fatal error scene=${scene.id}:`,
+                      `[compose-video-clips] v274_result scene=${scene.id} ok=0 exception=`,
                       rekErr,
                     );
+                  }
+                  // v275 — Even on the failure paths above, persist a
+                  // breadcrumb so the DB tells us the Rekognition step
+                  // was reached for this scene.
+                  if (v274FailReason && portraitUrls.length >= 2) {
+                    try {
+                      const { data: sceneRow2 } = await supabaseAdmin
+                        .from("composer_scenes")
+                        .select("audio_plan")
+                        .eq("id", scene.id)
+                        .single();
+                      const bap = (sceneRow2?.audio_plan ?? {}) as Record<string, any>;
+                      const bts = (bap.twoshot ?? {}) as Record<string, any>;
+                      await supabaseAdmin
+                        .from("composer_scenes")
+                        .update({
+                          audio_plan: {
+                            ...bap,
+                            twoshot: {
+                              ...bts,
+                              anchor_identity: {
+                                method: "rekognition",
+                                ok: false,
+                                reason: v274FailReason,
+                                anchor_url: composedUrl,
+                                resolved_at: new Date().toISOString(),
+                              },
+                            },
+                          },
+                          updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", scene.id);
+                    } catch (_) { /* best-effort breadcrumb */ }
                   }
 
 

@@ -2287,8 +2287,23 @@ serve(async (req) => {
       typeof (persistedPlateIdentity as any).assignmentLock === "object"
         ? { ...(persistedPlateIdentity as any).assignmentLock }
         : {};
+    // v275 — When the v274 Rekognition step at the anchor stage produced
+    // a complete, verified `slot → characterId` map, that mapping is the
+    // deterministic source of truth. Do NOT let the downstream v242
+    // plate-identity path (which re-runs on the already-rendered clip)
+    // reorder the assignment, or we lose the biometric routing.
+    const anchorRekLock =
+      (_anchorIdentitySeed && _anchorIdentitySeed.ok === true &&
+        _anchorIdentitySeed.assignmentLock &&
+        typeof _anchorIdentitySeed.assignmentLock === "object")
+        ? { ...(_anchorIdentitySeed.assignmentLock as Record<string, string>) }
+        : null;
+    const anchorLockComplete =
+      !!anchorRekLock &&
+      Object.keys(anchorRekLock).length >= speakers.length;
     let freshLock: Record<string, string> | null = null;
     if (
+      !anchorLockComplete &&
       plateIdentityMap &&
       plateIdentityMap.faces.length > 0 &&
       speakers.every((sp) => !!stripLockPrefix(sp.character_id)) &&
@@ -2300,7 +2315,12 @@ serve(async (req) => {
         if (cid) freshLock![String(idx)] = cid;
       });
     }
-    const finalAssignmentLock = freshLock ?? existingLock;
+    const finalAssignmentLock = anchorRekLock ?? freshLock ?? existingLock;
+    const lockSource = anchorLockComplete
+      ? "v275_anchor_rekognition_frozen"
+      : freshLock
+        ? "v242_fresh"
+        : "existing";
     const v153PlateIdentitySnapshot = {
       version: "v242" as const,
       dims: plateDims,
@@ -2312,10 +2332,11 @@ serve(async (req) => {
       sourceClipUrl,
       hydratedAt: new Date().toISOString(),
       assignmentLock: finalAssignmentLock,
+      assignmentLockSource: lockSource,
     };
     console.warn(
-      `[compose-dialog-segments] scene=${sceneId} v242_assignment_lock ` +
-      `fresh=${freshLock ? "yes" : "no"} locked_slots=${Object.keys(finalAssignmentLock).length}/${speakers.length}`,
+      `[compose-dialog-segments] scene=${sceneId} v275_assignment_lock ` +
+      `source=${lockSource} locked_slots=${Object.keys(finalAssignmentLock).length}/${speakers.length}`,
     );
     console.warn(
       `[compose-dialog-segments] scene=${sceneId} v158_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} mouths=${speakerPlateMouths.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
