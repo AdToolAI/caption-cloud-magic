@@ -3348,15 +3348,11 @@ serve(async (req) => {
           console.warn(
             `[compose-video-clips] v263_preview_gate scene ${scene.id}: no composed anchor available (anchorUrl='${anchorUrl.slice(0, 60)}') → skipping preview`,
           );
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update({
-              clip_status: "failed",
-              clip_error:
-                "preview_gate_no_anchor: Für diese Szene konnte kein Anchor-Bild komponiert werden (kein Cast oder Upload/Stock-Szene). Bitte direkt rendern statt Preview.",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", scene.id);
+          await safeMarkSceneFailed(
+            scene.id,
+            "preview_gate_no_anchor: Für diese Szene konnte kein Anchor-Bild komponiert werden (kein Cast oder Upload/Stock-Szene). Bitte direkt rendern statt Preview.",
+            { isCinematicSyncScene: scene.engineOverride === "cinematic-sync" },
+          );
           results.push({
             sceneId: scene.id,
             status: "failed",
