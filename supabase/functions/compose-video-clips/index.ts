@@ -4062,14 +4062,9 @@ serve(async (req) => {
             console.warn(
               `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} — no composed reference_image_url, failing loud (v174, no silent Hailuo migration).`,
             );
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update({
-                clip_status: "failed",
-                clip_error: msg,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", scene.id);
+            await safeMarkSceneFailed(scene.id, msg, {
+              isCinematicSyncScene: true,
+            });
             results.push({
               sceneId: scene.id,
               status: "failed",
