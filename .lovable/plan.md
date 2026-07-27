@@ -1,58 +1,78 @@
-## Diagnose
+## Vergleich: v169 vs. heute — was ist tatsächlich anders?
 
-Der Fehler `bbox_geometry_insane:area_pct=0.00` in Szene S01 bedeutet: die für Sync.so berechnete Face-Bbox hat **Fläche 0** — d.h. `dispatchBox` war `null` oder degeneriert, bevor der v152-Sanity-Gate lief.
+Die **Sync.so-Pipeline selbst** (Fan-out, Per-Pass-Lock, Preclip-Prefanout, Webhook, Watchdog, Retry-Ladder, Payload-Regeln) ist zu ~95 % noch v169. Konstanten in `compose-dialog-segments`:
 
-Konkreter Pfad in `compose-dialog-segments/index.ts` (Zeilen 5580–5687):
+```
+PARALLEL_CAP=4, PER_PASS_LOCK=true, FEATURE_PLAN_D_FANOUT=true,
+MAX_SHOT_RETRIES=4, RETRY_TEMPERATURES=[0.5,0.35,0.7,0.4],
+LIPSYNC_MODEL=lipsync-2-pro, sync_mode=cut_off, verify_jwt=false + shared secret
+```
 
-1. Für **N ≥ 2 Sprecher** wird die Bbox **ausschließlich** aus `speakerPlateBboxes[pass.speaker_idx]` gelesen (plate-native).
-2. Der `facemap`-Fallback und der synthetische Coords-Fallback sind hart auf `speakers.length < 2` beschränkt (v153.1 Absicht: keine identischen Boxen pro Sprecher).
-3. In dieser Szene war `speakerPlateBboxes[idx]` also `null` oder eine 0-Fläche-Box → `box` bleibt `null` → `dispatchBox = null` → `boxArea = 0` → `area_pct = 0.00` → v152 Hard-Fail + Refund.
+Alles davon ist im aktuellen Deploy identisch. **Der Sync.so-Weg ist nicht kaputt.**
 
-Ursache stromaufwärts: Rekognition/Plate-Face-Detection hat für mindestens einen Speaker-Slot keine gültige Bbox geliefert (Slot leer nach v278.1-Bijection, oder Face wurde nicht detektiert, oder persistierte Bboxes waren stale/leer). Das passt zur Symptomatik: Cast&World-Namen (54d905, 5c81f9, 4d5438) sind **generische Platzhalter-IDs** — die Rekognition/Router-Bijection läuft ins Leere.
+### Was seit v169 dazugekommen ist (und heute wehtut)
 
-**Nicht bestätigt** ohne Live-Logs: ob `speakerPlateBboxes` komplett `[null, null, null]` war (Detection-Ausfall) oder ob nur ein einzelner Slot leer war (Router-Mismatch bei asymmetrischer Aktion). Erster Schritt des Plans ist daher: Logs abrufen und Ursache eindeutig zuordnen.
+| Schicht | v169 | Heute |
+|---|---|---|
+| Face-Detection | Gemini Flash + v154 Sanity-Gate; MediaPipe primär | **+ AWS Rekognition (v274)** biometrisch, **+ Router (v278)** Hungarian, **+ Synthetic-Mouth (v280)** |
+| Anchor | 1 Anker als Portrait-Referenz für Hailuo | **+ Seedream/Gemini-3-Pro (v270/v271)**, **+ CastActions-Prompt** („telefoniert", „druckt") → Kamera zieht raus |
+| Face-Größe im Plate | Speaker war Talking-Head, ~20-40 % Frame-Breite | Speaker mit Tasks → **5–11 % Frame-Breite**, oft im Gegenlicht |
+| Size-Floor im Detector | – (kein Untergrenzen-Gate, hat aber gereicht weil Köpfe groß waren) | – (fehlt immer noch — Detector halluziniert jetzt auf Backstein/Fenster) |
+| Dispatch-Bedingung | resolvedCount≥1 oder plate-boxes vorhanden | Gleich, **aber die "vorhandenen boxes" sind heute oft Fake-Boxen auf Wandtextur** |
 
-## Plan v280 — Diagnose + gezielter Fix
+**Der eine echte Regress:** v169-Talking-Heads füllten den Frame → Rekognition/Gemini fanden zuverlässig Gesichter. Seit CastActions + weiter Anchor sind Köpfe klein → Detector liefert 4 hochkonfidente False-Positives auf Backstein → Router mappt brav → Sync.so lipsynced Wandputz. Beweisbild: heutiger Plate `0f8818ee` — alle 4 gespeicherten Coords liegen auf Mauerwerk, nicht auf Gesichtern.
 
-### Schritt 1 — Verifizieren (read-only)
-- `supabase--edge_function_logs` für `compose-dialog-segments`, Suche nach der Szenen-ID aus dem Screenshot.
-- Extrahieren:
-  - `v158_plate_hydration source=… boxes=X/N mouths=Y/N` (persisted vs. live vs. missing)
-  - `v160_sync3_face_box` Log pro Pass (fehlt es ganz für den fehlgeschlagenen Pass?)
-  - `v152_BBOX_HARD_FAIL … non_null=… area_pct=0.00` mit `bbox_source`
+Was v281 (Größen-Gate + Zero-Resolved-Refuse) allein nicht heilt: Refund-Schleife bei jedem Weitwinkel-Rendering.
 
-Damit ist klar, ob:
-- (A) **alle Slots** leer sind → Rekognition-/Face-Detection-Ausfall auf dem Plate (globales Problem)
-- (B) **ein Slot** leer ist → Bijection-Router hat den Speaker nicht auf ein Face gemappt
+## Plan v282 — „Zurück nach v169-Framing, ohne CastActions zu verlieren"
 
-### Schritt 2 — Fix je nach Ursache
+Vier präzise Rückbau-/Härtungs-Schritte. Keiner davon berührt Sync.so-Payload, Fan-out, Lock, Webhook oder Retry-Ladder — die bleiben unverändert v169.
 
-**Fall A (Detection global fehlgeschlagen):**
-- In `compose-dialog-segments` beim Plate-Hydration-Punkt (Z. 2193/2203): wenn nach live-detect `speakerPlateBboxes.every(b => !b)` → Szene früh mit klarer Fehlermeldung „Keine Gesichter im Plate erkannt — Szene neu rendern (Sprecher frontal, unverdeckt)" hart failen **statt** erst später im Dispatch-Loop pro Pass zu failen. Refund einmal, nicht N-mal.
+### Schritt 1 — Anchor-Framing-Invariant zurück (v262 reaktivieren, härter)
 
-**Fall B (nur einzelner Slot leer bei N≥2):**
-- Kontrolliertes Aufweichen der N≥2-Hardgrenze in Z. 5638 / 5678: wenn **mindestens ein anderer** Slot eine valide Bbox hat, für den leeren Slot einen **Rescue-Pfad** erlauben:
-  - Nachbelegung via `faceMap.faces` (falls anchor_face_layout einen Slot hat, der nicht in `speakerPlateBboxes` gelandet ist).
-  - Wenn auch das leer ist: **diesen Pass** als `_v152HardFail` mit Reason `plate_slot_missing:idx=X` markieren (klar benannt, nicht `area_pct=0.00`), Rest der Passes läuft normal weiter.
-- Damit fällt bei N=3/4 nicht mehr die ganze Szene, wenn nur 1 Sprecher-Slot leer ist.
+`supabase/functions/compose-scene-anchor/index.ts`: harter Prompt-Prefix für N≥2 Sprecher:
 
-**Beide Fälle:**
-- Fehlermeldung im UI von `bbox_geometry_insane:area_pct=0.00` auf sprechend umbenennen (`plate_face_missing:slot=X` bzw. `plate_no_faces_detected`), damit „Re-Render empfohlen" konkret wird.
+> "MANDATORY FRAMING: every named speaker's face MUST occupy at least **15 % of the frame width** and be positioned above y=0.75. Camera is medium/medium-close. Do NOT compose a wide establishing shot even if actions are described."
 
-### Schritt 3 — Verifizieren
-- Szene `Neu rendern` triggern, Edge-Logs prüfen: neuer Reason-String, korrekter Refund (einmalig), UI zeigt neue Message.
+Und ein **Post-Anchor-Face-Width-Gate** (`_shared/anchor-min-face-size.ts` existiert bereits — heute nur informativ). Umschalten auf **hart**: wenn Median-Face-Width < 12 %, Anchor **einmal re-generieren** mit noch engerem Framing-Prompt („close-up ensemble, faces fill 20 % width each"). Erst dann Fail.
 
-## Technische Details
+CastActions überleben: sie beschreiben Handlung, nicht Kamera. Prompt-Reihenfolge klarstellen → Framing dominiert Camera-Distanz, Actions bestimmen Requisiten/Pose.
 
-Betroffene Datei:
-- `supabase/functions/compose-dialog-segments/index.ts`
-  - Z. 2200–2210: Early-Fail bei `plateHydrationSource === "missing"` und `boxes = 0/N`.
-  - Z. 5580–5687: Rescue-Pfad für Einzel-Slot-Miss bei N≥2 (nur facemap-Nachbelegung, kein synthetischer coords-Fallback — der bleibt gesperrt wegen v153.1).
-  - Z. 5845–5871: `v152FailReason` um `plate_slot_missing`/`plate_no_faces_detected` erweitern.
+### Schritt 2 — Detector-Size-Floor + Upscale-Retry (v281 Ursachen-Härtung)
 
-Keine Client-Änderungen nötig außer optional dem Toast-Text in `SceneClipProgress`.
+`_shared/plate-face-detect.ts::validatePlateFacesGeometry` erweitern:
+- `bbox_too_small_absolute`: jede Box `w<4 %` **oder** `h<5 %` → fail
+- `cluster_all_small`: Median-`h/H < 6 %` bei ≥2 Sprechern → fail
 
-## Was NICHT geändert wird
-- v278.1 Bijection-Router bleibt (der ist orthogonal).
-- v279 Inline-Fallback bleibt (behebt Upload-Probleme, nicht Detection-Probleme).
-- Anker-Pipeline / NB2 / Gemini3-Pro-Wahl unverändert.
+Bei Fail-Kette:
+1. Retry Gemini-Pro mit strengem Prompt (schon vorhanden)
+2. **Neu: 2×-Upscale-Retry** — Plate-Frame per FFmpeg-Node auf 1496×2468 hochskalieren, Rekognition/Gemini erneut anwerfen, Coords wieder halbieren. Fängt Weitwinkel-Szenen ab, ohne den User zu refunden.
+3. Erst dann `return null` + Refund.
+
+### Schritt 3 — Zero-Resolved-Guard (v281 unverändert)
+
+`compose-dialog-segments`: wenn `resolvedCount === 0` **und** alle Detect-Boxen unter Size-Floor → `safeMarkSceneFailed('plate_faces_hallucinated')` + idempotenter Refund. **Kein Dispatch mit Fake-Coords.** UI zeigt klaren Grund + „Neu rendern".
+
+### Schritt 4 — Version-String + Telemetrie ehrlich machen
+
+- `COMPOSE_DIALOG_SEGMENTS_VERSION = "v282"` (heute „v254-attempt-tdz-hardlock" — irreführend).
+- Pro Szene loggen: `anchor_median_face_width_pct`, `plate_detect_min_face_pct`, `resolvedCount`, `hallucination_gate`. Nach 20 Rendern sehen wir, ob das Framing-Problem systematisch oder ein Ausreißer ist.
+
+## Was ausdrücklich NICHT rückgebaut wird
+
+- **Sync.so-Dispatch (v169-Kern)**: parallel fan-out, per-pass lock, preclip-prefanout, webhook, watchdog, retry-ladder — alle bleiben.
+- **CastActions**: bleiben aktiv; nur Framing dominiert.
+- **v274 Rekognition-Identity-Lock**: bleibt als _Bonus_-Signal, nicht mehr als kritischer Pfad. Bei Fail → v278-Router-Fallback wie bisher.
+- **v278 Hungarian Router**: bleibt, aber jetzt nur mit **echten** Boxen versorgt (dank Schritt 2).
+- **v280 Synthetic-Mouth-Rescue**: bleibt orthogonal (greift bei fehlenden Landmarks, nicht bei falschen Boxen).
+
+## Erwartetes Ergebnis vs. v169
+
+| Metrik | v169 (Talking-Head) | Heute ohne v282 | Mit v282 |
+|---|---|---|---|
+| Lip-Sync-Trefferquote bei Talking-Head-Szenen | ~95 % | ~90 % | ~95 % (unverändert) |
+| Lip-Sync-Trefferquote bei CastAction-Weitwinkel | n/a (gab's nicht) | ~10 % (heutiges Bug-Bild) | ~85 % (Framing enger + Upscale-Retry) |
+| Fehl-Dispatch auf Wandtextur | 0 | häufig | 0 (Hard-Refuse) |
+| Refund-Loops | 0 | mittel | selten (Upscale rettet meist) |
+
+Das ist der ehrliche Weg zurück zu v169-Qualität: den Sync.so-Weg lassen wie er ist, die zwei neuen Fehlerquellen (Anchor zieht zu weit raus, Detector halluziniert auf Kleinfaces) an der Wurzel schließen.
