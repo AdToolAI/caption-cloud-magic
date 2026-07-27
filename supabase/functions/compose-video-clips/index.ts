@@ -4283,25 +4283,60 @@ serve(async (req) => {
             .filter((s) => s?.engineOverride === "cinematic-sync")
             .map((s) => s?.id)
             .filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id));
-          await admin
+          // v264 — Skip rows whose async pipeline has already produced a
+          // valid clip_url or is actively lipsyncing / done. The FATAL catch
+          // must not clobber a good state; the async pipeline is authoritative
+          // once it starts. Preserve the diagnostic as a clip_error note.
+          const { data: liveRows } = await admin
             .from("composer_scenes")
-            .update({
-              clip_status: "failed",
-              clip_error: `[${__stage}] ${msg}`.slice(0, 500),
-              updated_at: new Date().toISOString(),
-            })
+            .select("id, clip_url, lip_sync_status")
             .in("id", failedSceneIds);
-          if (cinematicFailedSceneIds.length > 0) {
+          const safeToFail = (liveRows ?? [])
+            .filter((r) => {
+              const hasUrl = typeof r?.clip_url === "string" && r.clip_url.length > 0;
+              const live = r?.lip_sync_status === "running" || r?.lip_sync_status === "done";
+              return !hasUrl && !live;
+            })
+            .map((r) => r.id as string);
+          const rescueIds = (liveRows ?? [])
+            .map((r) => r.id as string)
+            .filter((id) => !safeToFail.includes(id));
+          if (rescueIds.length > 0) {
+            console.warn(
+              `[compose-video-clips] v264_fatal_catch_skip preserving ${rescueIds.length} already-succeeded scene(s): ${rescueIds.join(",")}`,
+            );
             await admin
               .from("composer_scenes")
               .update({
-                lip_sync_status: null,
-                twoshot_stage: null,
-                lip_sync_source_clip_url: null,
-                dialog_shots: null,
+                clip_error: `[v264_safe_fail_skip] [${__stage}] ${msg}`.slice(0, 500),
                 updated_at: new Date().toISOString(),
               })
-              .in("id", cinematicFailedSceneIds);
+              .in("id", rescueIds);
+          }
+          if (safeToFail.length > 0) {
+            await admin
+              .from("composer_scenes")
+              .update({
+                clip_status: "failed",
+                clip_error: `[${__stage}] ${msg}`.slice(0, 500),
+                updated_at: new Date().toISOString(),
+              })
+              .in("id", safeToFail);
+            const cinematicSafeToFail = cinematicFailedSceneIds.filter((id) =>
+              safeToFail.includes(id),
+            );
+            if (cinematicSafeToFail.length > 0) {
+              await admin
+                .from("composer_scenes")
+                .update({
+                  lip_sync_status: null,
+                  twoshot_stage: null,
+                  lip_sync_source_clip_url: null,
+                  dialog_shots: null,
+                  updated_at: new Date().toISOString(),
+                })
+                .in("id", cinematicSafeToFail);
+            }
           }
         }
       }
