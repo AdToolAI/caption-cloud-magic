@@ -350,6 +350,24 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               ⚠ Drift {scene.continuityDriftScore.toFixed(2)}
             </div>
           )}
+          {/* v276 — Partial biometric identity (soft-gate pass). */}
+          {(() => {
+            const ai =
+              (scene as any)?.audioPlan?.twoshot?.anchor_identity ??
+              (scene as any)?.audio_plan?.twoshot?.anchor_identity;
+            if (!ai || ai.status !== 'partial') return null;
+            const r = Number(ai.resolvedCount ?? 0);
+            const e = Number(ai.expectedCount ?? 0);
+            return (
+              <div
+                className="absolute bottom-1 right-1 bg-amber-400/90 text-black rounded px-1.5 py-0.5 text-[9px] font-semibold shadow"
+                title={`Identität: ${r}/${e} biometrisch bestätigt (AWS Rekognition). Restliche Sprecher via Reihenfolge zugeordnet.`}
+              >
+                ⓘ ID {r}/{e}
+              </div>
+            );
+          })()}
+
         </div>
         <LeadInTrimSheet scene={scene} open={trimOpen} onOpenChange={setTrimOpen} />
       </>

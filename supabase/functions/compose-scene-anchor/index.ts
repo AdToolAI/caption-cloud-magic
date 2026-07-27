@@ -539,12 +539,16 @@ serve(async (req) => {
     // Gemini 3 Pro Image (`google/gemini-3-pro-image`) läuft über den
     // Lovable AI Gateway, respektiert Multi-Image-Refs + Scene-Prompt
     // gleichzeitig und hält Identitäten deutlich besser als Nano Banana 2.
+    // v276 — Default zurück auf Nano Banana 2 (2-3x schneller als Gemini 3 Pro).
+    // Gemini 3 Pro läuft nur noch als expliziter Modus oder Auto-Fallback bei NB2-Fehler.
     // Feature-Flag `ANCHOR_MODEL_MULTI` erlaubt Rollback ohne Redeploy.
-    //   Werte: "gemini3pro" (Default) | "nano_banana_2" | "seedream4"
-    const ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "gemini3pro").toLowerCase();
+    //   Werte: "nano_banana_2" (Default) | "gemini3pro" | "seedream4"
+    const ANCHOR_MODEL_MULTI = (Deno.env.get("ANCHOR_MODEL_MULTI") ?? "nano_banana_2").toLowerCase();
     const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
     const useSeedream = isMulti && ANCHOR_MODEL_MULTI === "seedream4" && REPLICATE_API_KEY.length > 0;
     const useGemini3Pro = isMulti && ANCHOR_MODEL_MULTI === "gemini3pro";
+    const useNanoBananaFirst = isMulti && ANCHOR_MODEL_MULTI === "nano_banana_2";
+
 
     // Reference image URLs, in strict order: portraits → identity headshots →
     // world refs. Seedream 4 accepts an array of reference URLs directly.
@@ -741,10 +745,20 @@ serve(async (req) => {
         const r2 = await callNanoBanana2();
         if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "nano_banana_2"; }
       }
+    } else if (useNanoBananaFirst) {
+      // v276 — NB2 first with Gemini 3 Pro auto-fallback.
+      const r = await callNanoBanana2();
+      if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "nano_banana_2"; }
+      else {
+        console.warn(`[compose-scene-anchor] v276 nano_banana_2 failed → fallback gemini3pro sceneId=${body.sceneId}`);
+        const r2 = await callGemini3ProImage();
+        if (r2) { bytes = r2.bytes; mime = r2.mime; ext = r2.ext; anchorProvider = "gemini3pro"; }
+      }
     } else {
       const r = await callNanoBanana2();
       if (r) { bytes = r.bytes; mime = r.mime; ext = r.ext; anchorProvider = "nano_banana_2"; }
     }
+
 
     if (!bytes) {
       return new Response(
