@@ -38,14 +38,23 @@ const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY") ?? "";
 const FETCH_TIMEOUT_MS = 12_000;
 const REK_TIMEOUT_MS = 15_000;
 
+function asBufferSource(bytes: Uint8Array): BufferSource {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy as unknown as BufferSource;
+}
+
 async function sha256Hex(data: Uint8Array | string): Promise<string> {
   const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  const hash = await crypto.subtle.digest("SHA-256", asBufferSource(bytes));
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 async function hmac(key: ArrayBuffer | Uint8Array, data: string): Promise<ArrayBuffer> {
   const k = await crypto.subtle.importKey(
-    "raw", key instanceof Uint8Array ? key : new Uint8Array(key),
+    "raw",
+    key instanceof Uint8Array
+      ? asBufferSource(key)
+      : key as BufferSource,
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
   );
   return await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(data));
@@ -385,9 +394,12 @@ export async function routePlateFacesToAnchor(params: {
     if (dist > maxDist) maxDist = dist;
   }
 
-  const countMismatch = rows !== cols;
+  // v278.3 — Extra faces are not a failure. Office/task scenes can contain
+  // reflections, background people, or poster faces. Hungarian assignment is
+  // already bijective, so the only hard count mismatch is "too few faces".
+  const countMismatch = cols < rows;
   return {
-    ok: resolved > 0 && !countMismatch,
+    ok: resolved >= rows && !countMismatch,
     method: "v278_hungarian_plate_router",
     dims,
     faces,

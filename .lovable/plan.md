@@ -1,89 +1,49 @@
-## Befund zur letzten Szene
+## Befund
 
-Die letzte relevante Szene ist `9cd16340-c893-45d2-821a-e4e7252d0272`.
+Der Screenshot passt zur Datenlage: Die letzte Szene `6d0d31d5-276d-453e-a154-30557fe1e207` ist wieder im alten `v153_preflight_block` gelandet.
 
-**Kurzantwort:** Nein — die neue v278-Route wurde bei dieser Szene nicht genutzt.
+Was ich geprüft habe:
+- `dialog_shots.anchor_face_layout` ist bei der Szene **nicht vorhanden**.
+- `compose-video-clips` Logs zeigen für diese Szene **kein** `v278_anchor_layout`.
+- `compose-dialog-segments` Logs zeigen deshalb: alter `v242_persisted_id_first_hydration` mit nur `lock=1/4`, danach `v153_plate_box_duplicate_for_speakers=[3]`.
+- Es gibt aber verwertbare Daten in `audio_plan.twoshot.faceMap`: 4 Anchor-Gesichter mit Character-IDs. Das kann als Recovery-Quelle für v278 dienen.
 
-**Warum ich das sagen kann:**
-- In den Dispatch-Logs stehen nur alte `sync-segments`-Einträge mit `PREFLIGHT_BLOCKED` und `v153_plate_box_duplicate_for_speakers=[3]`.
-- Es gibt keinen `v278_router ok=...`-Eintrag und keine v278-Metadaten in den Dispatch-Logs.
-- In der Szene fehlt `dialog_shots.anchor_face_layout` komplett.
-- In der Szene fehlt auch `dialog_shots.plate_identity`.
-- Es existiert nur `audio_plan.twoshot.anchor_identity`, aber nur teilweise: `resolvedCount = 2`, `expectedCount = 4`.
+Kurz: Die v278.1-Idee ist richtig, aber die Route wird für diese Szene nicht erreicht, weil der persistierte `anchor_face_layout` fehlt. Der alte partielle Rekognition-Seed wird dann zuerst benutzt und verursacht wieder die Duplicate-Fehlermeldung.
 
-## Was aktuell falsch läuft
+## Plan
 
-Die v278-Route ist im Code vorhanden, startet aber nur wenn diese Bedingung erfüllt ist:
+1. **Fallback-Anchor-Layout direkt in `compose-dialog-segments` bauen**
+   - Wenn `dialog_shots.anchor_face_layout` fehlt, aber `audio_plan.twoshot.faceMap` vollständige Anchor-Gesichter enthält, baut `compose-dialog-segments` daraus zur Laufzeit ein `AnchorFaceLayout`.
+   - Quelle: `faceMap.faces[].bbox`, `faceMap.width`, `faceMap.height`, `faceMap.faces[].characterId`.
+   - Damit können auch bereits existierende/halb kaputte Szenen in den v278-Router kommen, ohne dass der Clip komplett neu durch `compose-video-clips` muss.
 
-```text
-N >= 3 Sprecher
-UND dialog_shots.anchor_face_layout existiert
-UND anchor_face_layout.slots.length >= Sprecheranzahl
-```
+2. **v278-Router vor alten persisted/partial Locks priorisieren**
+   - Sobald ein vollständiges Anchor-Layout vorhanden ist, wird die alte `persistedBboxes`-/`assignmentLock`-Hydration übersprungen.
+   - Dadurch kann ein partieller `v274_anchor_rekognition_partial` Seed den v278-Pfad nicht mehr blockieren.
 
-Bei der geprüften Szene ist `anchor_face_layout` leer/nicht vorhanden. Dadurch fällt die Pipeline automatisch zurück in den alten v153/v274/v277-Pfad. Genau dort entsteht weiterhin die bekannte Fehlermeldung: zwei Sprecher werden auf dieselbe Plate-Box gemappt.
+3. **v278-Layout bei erfolgreicher Recovery speichern**
+   - Wenn das Layout aus `faceMap` gebaut wurde, wird es in `dialog_shots.anchor_face_layout` persistiert.
+   - Spätere Retries/Webhooks müssen es nicht erneut rekonstruieren.
 
-## Wahrscheinliche Ursache
+4. **Preflight-Block entschärfen, wenn v278 verfügbar ist**
+   - Der `v153_plate_box_duplicate` Block bleibt für alte/unsichere Pfade aktiv.
+   - Für den v278-Pfad blockt er nicht mehr auf alte doppelte Cache-Boxen, sondern bewertet die vom Hungarian Router erzeugten bijektiven Boxen.
 
-Der aktuelle v278-Layout-Aufbau hängt noch zu stark am alten Rekognition/Identity-Ergebnis. Wenn die Anchor-Identität nur teilweise erkannt wird, hier 2 von 4, entsteht kein vollständiges `anchor_face_layout` für alle 4 Sprecher. Damit kann der neue Hungarian-Router gar nicht arbeiten.
+5. **Letzte Szene sauber zurücksetzen**
+   - Nach dem Code-Fix setze ich nur diese letzte Szene von `v153_preflight_block` wieder in einen retry-fähigen Lip-Sync-Zustand zurück, ohne den ganzen Clip neu rendern zu müssen.
+   - Credits bleiben nicht doppelt belastet; Refund-Status bleibt idempotent.
 
-Zusätzlich scheint der spätere Fehlerzustand `dialog_shots` auf ein reines Fehlerobjekt zu reduzieren, wodurch eventuell vorher vorhandene Routing-Daten nicht stabil erhalten bleiben.
+6. **Gezielte Verifikation**
+   - Edge Function deployen.
+   - Für die Szene prüfen, dass Logs `v278_router` zeigen und nicht mehr `v153_preflight_block`.
+   - Danach Datenbank prüfen: `anchor_face_layout.slots = 4`, `plate_identity` kommt vom `v278-rekognition-hungarian` Pfad oder es gibt eine echte Count-Mismatch-Meldung statt Duplicate-Falschalarm.
 
-## Plan zur sauberen Korrektur
+## Technische Änderung
 
-### 1. v278 wirklich unabhängig von biometrischer Identität machen
-`anchor_face_layout` darf nicht nur aus erfolgreich biometrisch erkannten Gesichtern entstehen.
+Betroffene Datei:
+- `supabase/functions/compose-dialog-segments/index.ts`
 
-Stattdessen:
-- Anchor-Gesichter geometrisch erkennen.
-- Sprecher-Reihenfolge aus der Szene/Dialogstruktur nehmen.
-- Face-Slots bijektiv nach Anchor-Komposition zuordnen.
-- Dadurch immer 4 Slots für 4 Sprecher erzeugen, solange 4 Gesichter im Anchor erkannt wurden.
+Wahrscheinliche kleine Ergänzung:
+- Helper `buildAnchorLayoutFromFaceMap(...)`, lokal oder in `_shared/plateFaceSlotRouter.ts`, je nachdem was sauberer in die bestehenden Imports passt.
 
-### 2. `anchor_face_layout` dauerhaft schützen
-Beim Schreiben von Fehlerstatus in `dialog_shots` darf `anchor_face_layout` nicht überschrieben/gelöscht werden.
-
-Die Update-Logik soll immer mergen:
-
-```text
-bestehende dialog_shots behalten
-+ status/error aktualisieren
-+ anchor_face_layout/plate_identity nicht verlieren
-```
-
-### 3. v278 vor dem alten v153-Duplicate-Guard erzwingen
-Wenn `anchor_face_layout` vollständig ist, muss der Hungarian-Router laufen, bevor der alte v153-Duplicate-Block entscheidet.
-
-Erwartetes Ergebnis:
-
-```text
-v278_router ok=1 resolved=4/4
-```
-
-Erst wenn der Plate-Face-Count nicht passt, soll ein Review-/Soft-Gate greifen — nicht der alte Duplicate-Fail.
-
-### 4. Diagnose sichtbar machen
-In den Logs und optional im UI sollte klar stehen, welcher Pfad genutzt wurde:
-
-```text
-Route: v278 Hungarian
-Anchor layout: 4/4
-Plate faces: 4/4
-Assignment: unique/bijective
-```
-
-So sehen wir sofort, ob die neue Route wirklich aktiv war.
-
-### 5. Letzte Szene nach Fix gezielt zurücksetzen
-Nach der Code-Korrektur würde ich genau diese Szene oder den letzten Re-Render so zurücksetzen, dass sie mit der korrigierten v278-Route erneut durchläuft, ohne dass der alte v153-Fehlerpfad wieder gewinnt.
-
-## Erwartung nach Umsetzung
-
-Diese konkrete Fehlerklasse sollte dann verschwinden:
-
-```text
-Samuel und Kailee wurden auf dasselbe Gesicht gemappt
-v153_plate_box_duplicate_for_speakers
-```
-
-Denn der Hungarian-Router vergibt jedes erkannte Plate-Gesicht nur einmal. Die Verwechslung kann dann nicht mehr durch Duplicate-Zuweisung entstehen, sondern höchstens noch durch echten Face-Count-Mismatch oder starke Positionsverschiebung — dafür wäre dann ein Review-Gate statt ein harter Fehlalarm zuständig.
+Keine UI-Änderung, keine neue Datenbank-Migration.
