@@ -1756,7 +1756,7 @@ serve(async (req) => {
         `bboxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} ` +
         `lock_present=${Object.keys(assignmentLock).length > 0}`,
       );
-    } else if (persistedBboxes.length >= speakers.length && hasCompleteV278AnchorLayout) {
+    } else if (persistedBboxes.length >= speakers.length && hasCompleteV278AnchorLayout && anchorLayoutRaw) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v278_skip_legacy_persisted_hydration ` +
         `anchor_layout=${anchorLayoutRaw.slots.length}/${speakers.length} persisted_boxes=${persistedBboxes.length} — trying Hungarian router first`,
