@@ -88,7 +88,7 @@ import {
 } from "../_shared/twoshot-face-map.ts";
 import { detectPlateFaces, validatePlateFacesGeometry } from "../_shared/plate-face-detect.ts";
 import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
-import { routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
+import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -1072,6 +1072,7 @@ serve(async (req) => {
     const existing = (scene as any).dialog_shots as SegmentsState | null;
     const existingStatus = String((existing as any)?.status ?? "");
     const existingError = String((existing as any)?.error ?? (scene as any)?.clip_error ?? "");
+    let runtimeRecoveredAnchorFaceLayout: AnchorFaceLayout | null = null;
     const mergeDialogShots = (base: any, patch: Record<string, unknown>) => {
       const safeBase = base && typeof base === "object" && !Array.isArray(base) ? base : {};
       return {
@@ -1083,6 +1084,9 @@ serve(async (req) => {
         // Hungarian route instead of falling back to v153 duplicates.
         ...(safeBase.anchor_face_layout && !patch.anchor_face_layout
           ? { anchor_face_layout: safeBase.anchor_face_layout }
+          : {}),
+        ...(!safeBase.anchor_face_layout && runtimeRecoveredAnchorFaceLayout && !patch.anchor_face_layout
+          ? { anchor_face_layout: runtimeRecoveredAnchorFaceLayout }
           : {}),
         ...(safeBase.plate_identity && !patch.plate_identity
           ? { plate_identity: safeBase.plate_identity }
@@ -1571,13 +1575,87 @@ serve(async (req) => {
           .filter((bbox: unknown) => Array.isArray(bbox) && (bbox as unknown[]).length === 4)
         : [];
     const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
-    const anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
+    let anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
+    let anchorLayoutSource: "persisted" | "facemap_recovery" | "missing" = anchorLayoutRaw ? "persisted" : "missing";
+    const normalizeCharacterIdForRouting = (id?: string | null) =>
+      String(id ?? "")
+        .toLowerCase()
+        .replace(/^(outfit|pose|wardrobe|vibe|prop|look):/, "");
+    const layoutCoversSpeakers = (layout: AnchorFaceLayout | null) => {
+      if (!layout || !Array.isArray(layout.slots) || layout.slots.length < speakers.length) return false;
+      const layoutIds = new Set(
+        layout.slots
+          .map((slot) => normalizeCharacterIdForRouting(slot.characterId))
+          .filter(Boolean),
+      );
+      const speakerIds = speakers
+        .map((sp) => normalizeCharacterIdForRouting(sp.character_id))
+        .filter(Boolean);
+      return speakerIds.length === speakers.length && speakerIds.every((id) => layoutIds.has(id));
+    };
+    if (v278Enabled && speakers.length >= 3 && !layoutCoversSpeakers(anchorLayoutRaw)) {
+      const fm = (faceMap ?? cachedFaceMap) as any;
+      const fmFaces = Array.isArray(fm?.faces) ? fm.faces : [];
+      const fmW = Number(fm?.width);
+      const fmH = Number(fm?.height);
+      const fmDimsOk = Number.isFinite(fmW) && Number.isFinite(fmH) && fmW > 0 && fmH > 0;
+      const recoveredFaces = fmFaces
+        .map((f: any, idx: number) => {
+          const bbox = Array.isArray(f?.bbox) && f.bbox.length === 4
+            ? f.bbox.map((n: unknown) => Math.round(Number(n)))
+            : null;
+          if (!bbox || bbox.some((n: number) => !Number.isFinite(n))) return null;
+          const slot = Number.isFinite(Number(f?.slotIndex))
+            ? Math.max(0, Math.round(Number(f.slotIndex)))
+            : Number.isFinite(Number(f?.slot))
+              ? Math.max(0, Math.round(Number(f.slot)))
+              : idx;
+          const characterId = typeof f?.characterId === "string" && f.characterId.length > 0
+            ? f.characterId
+            : null;
+          return { slot, bbox: bbox as [number, number, number, number], characterId };
+        })
+        .filter(Boolean) as Array<{ slot: number; bbox: [number, number, number, number]; characterId: string | null }>;
+      if (fmDimsOk && recoveredFaces.length >= speakers.length) {
+        const recoveredLayout = buildAnchorLayoutFromV274(
+          anchorUrl ?? `facemap-recovery:${sceneId}`,
+          { width: Math.round(fmW), height: Math.round(fmH) },
+          recoveredFaces,
+        );
+        if (layoutCoversSpeakers(recoveredLayout)) {
+          anchorLayoutRaw = recoveredLayout;
+          anchorLayoutSource = "facemap_recovery";
+          runtimeRecoveredAnchorFaceLayout = recoveredLayout;
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v278_anchor_layout_recovered_from_facemap ` +
+            `slots=${recoveredLayout.slots.length}/${speakers.length} dims=${recoveredLayout.dims.width}x${recoveredLayout.dims.height}`,
+          );
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: mergeDialogShots(existing, {
+                anchor_face_layout: recoveredLayout,
+                v278_anchor_layout_source: "facemap_recovery",
+                v278_anchor_layout_recovered_at: new Date().toISOString(),
+              }),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", sceneId);
+        } else {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v278_anchor_layout_facemap_recovery_rejected ` +
+            `reason=missing_speaker_ids recovered=${recoveredLayout.slots.length}/${speakers.length}`,
+          );
+        }
+      }
+    }
     const hasCompleteV278AnchorLayout = !!(
       v278Enabled &&
       speakers.length >= 3 &&
       anchorLayoutRaw &&
       Array.isArray(anchorLayoutRaw.slots) &&
-      anchorLayoutRaw.slots.length >= speakers.length
+      anchorLayoutRaw.slots.length >= speakers.length &&
+      layoutCoversSpeakers(anchorLayoutRaw)
     );
     // v154 — Geometry sanity gate against the persisted bboxes. The pre-v154
     // detector path occasionally cached torso/upper-body boxes (center y >
@@ -1759,7 +1837,7 @@ serve(async (req) => {
     } else if (persistedBboxes.length >= speakers.length && hasCompleteV278AnchorLayout && anchorLayoutRaw) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v278_skip_legacy_persisted_hydration ` +
-        `anchor_layout=${anchorLayoutRaw.slots.length}/${speakers.length} persisted_boxes=${persistedBboxes.length} — trying Hungarian router first`,
+        `anchor_layout=${anchorLayoutRaw.slots.length}/${speakers.length} source=${anchorLayoutSource} persisted_boxes=${persistedBboxes.length} — trying Hungarian router first`,
       );
     }
     if (plateHydrationSource !== "persisted" && speakers.length >= 1 && plateDims && sourceClipUrl) {
@@ -1810,6 +1888,9 @@ serve(async (req) => {
               cached: false,
               resolvedCount: routed.resolvedCount,
               identityMethod: "per-char-hungarian",
+              assignmentLock: routed.assignmentLock,
+              assignmentLockSource: "v278_hungarian_plate_router",
+              anchorLayoutSource,
               minConfidence: Math.min(...routed.faces.filter((f) => f.characterId).map((f) => f.matchConfidence)),
               minMargin: 1,
               ambiguous: false,
