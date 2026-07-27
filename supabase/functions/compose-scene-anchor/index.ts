@@ -170,6 +170,15 @@ serve(async (req) => {
     };
     const { stripped: rawWithoutCast, actions: castActions } = extractCastActions(body.scenePrompt || "");
 
+    // v273 — Grid-Intent-Detection. Detect on the RAW user prompt (before
+    // dialog/quotes stripping) so keywords like "als 2x2 Grid" survive.
+    const gridIntent = detectGridIntent(body.scenePrompt || "");
+    const gridRequested = gridIntent.gridRequested === true;
+    const gridStyle = gridIntent.gridStyle ?? "2x2";
+    if (gridRequested) {
+      console.log(`[compose-scene-anchor] grid intent detected (style=${gridStyle}) scene=${body.sceneId}`);
+    }
+
     // Heuristic: does any cast action describe an asymmetric placement /
     // activity that contradicts the default equal-share two-shot framing?
     const ASYM_RE = /\b(background|foreground|phone|standing|walking|leaning|distance|behind|away\s+from|aside|in\s+the\s+back|in\s+the\s+front|on\s+the\s+couch|by\s+the\s+window|across\s+the\s+room|on\s+(?:their|the|his|her)\s+(?:phone|laptop))\b/i;
