@@ -300,7 +300,7 @@ serve(async (req) => {
       ? await sha1(framingSuffix)
       : "none";
     const promptHash = await sha1(
-      `v19|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}|fs=${framingSuffixHash}`,
+      `v20|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}|fs=${framingSuffixHash}|grid=${gridRequested ? gridStyle : 0}`,
     );
 
 
