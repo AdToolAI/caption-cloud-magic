@@ -5856,9 +5856,12 @@ serve(async (req) => {
         // v279 Inline-Fallback abgefangen.
         const v152FailReason = nonNullFrames < 1
           ? "bbox_zero_voiced_frames"
-          : !v152BboxSane
-            ? `bbox_geometry_insane:area_pct=${(boxAreaPct * 100).toFixed(2)}`
-            : "bbox_url_upload_failed";
+          : !dispatchBox
+            ? "plate_face_missing"
+            : !v152BboxSane
+              ? `bbox_geometry_insane:area_pct=${(boxAreaPct * 100).toFixed(2)}`
+              : "bbox_url_upload_failed";
+
         (pass as any)._v152HardFail = {
           reason: v152FailReason,
           errorClass: "v152_bbox_hard_fail",
