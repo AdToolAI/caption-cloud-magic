@@ -1442,7 +1442,11 @@ serve(async (req) => {
         422,
       );
     }
-    const persistedPlateIdentity = ((existing as any)?.plate_identity ?? null) as any;
+    // v274 — fallback: if `dialog_shots.plate_identity` is missing (e.g. this
+    // is the first dispatch after v274 anchor stage), hydrate from
+    // `audio_plan.twoshot.anchor_identity` seeded by compose-video-clips.
+    const _anchorIdentitySeed = ((scene as any)?.audio_plan?.twoshot?.anchor_identity ?? null) as any;
+    const persistedPlateIdentity = (((existing as any)?.plate_identity) ?? _anchorIdentitySeed ?? null) as any;
     const persistedPlateDims = persistedPlateIdentity?.dims;
     if (
       !plateDims &&
