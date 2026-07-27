@@ -1,40 +1,35 @@
-## Plan v271 — Multi-Anchor: Seedream ➜ Gemini 3 Pro Image + Lip-Sync-Diagnose
+## Plan v272 — Multi-Sprecher-Anchor: Anti-Grid/Collage-Härtung
 
-### Warum
-- **Seedream 4** freistellt/isoliert Personen bei 3+ Refs auf neutralem Grund und ignoriert die Location — genau der Bug im Screenshot (steifes Line-up ohne Büro).
-- **Flux Kontext Max** wäre eine Option, ist aber teurer und braucht neues Payload-Shape.
-- **Gemini 3 Pro Image** (`google/gemini-3-pro-image`) läuft schon über den Lovable AI Gateway (kein neuer Provider-Key), respektiert Multi-Image-Refs + Scene-Prompt gleichzeitig und hält Identität deutlich besser als Nano Banana 2 (der Grund, weshalb wir überhaupt weg wollten).
-- Der **kein-Lip-Sync-Effekt** ist eine separate Baustelle: durch das mit-generierte Baby (5. „Kopf") schlägt der Face-Match fehl → Sync.so Soft-Degrade → Master-Video ohne Sync. Wird sich mit korrektem Anchor (kein Baby, korrekter Count) automatisch bessern; wir verifizieren aber an der konkreten Szene.
+### Diagnose (aus Screenshot bestätigt)
+- Szene rendert 4 Portraits als **2×2-Grid** statt als eine gemeinsame Bürszene.
+- Ursache liegt im Prompt, nicht im Modell: `compose-scene-anchor/index.ts` verbietet Panel-Grid / Split-Screen / Collage / Contact-Sheet **nur im N=1-Zweig** von `EXACT_COUNT_SUFFIX` (Zeile 353) und `TWO_SHOT_NEGATIVE` (Zeile 370). Der N≥2-Zweig verbietet nur duplizierte Identitäten und versteckte Gesichter — Gemini 3 Pro Image nimmt die 4 Portraits daher wörtlich als 4 Panels.
+- Zusätzlich fehlt im Multi-Zweig ein explizites "ONE continuous frame / single shot"-Statement.
 
-### Änderungen (Server, klein)
+### Änderungen (nur Prompt, kein Modellwechsel)
 
-**1. `supabase/functions/compose-scene-anchor/index.ts` — Router-Switch**
-   - Neuer Flag-Wert: `ANCHOR_MODEL_MULTI = "gemini3pro"` als Default (statt `seedream4`).
-   - Erlaubte Werte: `gemini3pro` (neu, Default) | `nano_banana_2` (Fallback) | `seedream4` (nur bei explizitem Opt-in).
-   - Neue `callGemini3ProImage()`-Funktion: gleicher Prompt-Body wie Nano Banana 2 (chat-completions image shape, `modalities: ["image","text"]`), aber `model: "google/gemini-3-pro-image"`. Alle Refs (portraits + identity + locations + props) werden als `image_url`-Parts angehängt.
-   - Fallback-Kette bei Multi: `gemini3pro → nano_banana_2` (Seedream nur wenn Flag explizit).
+**Datei:** `supabase/functions/compose-scene-anchor/index.ts`
 
-**2. Prompt-Fix (schmal): environment-first bei Multi-Speaker**
-   - Aktuell: „Place ${peopleNoun} into the following scene…". Neu für N≥2: das `Scene:`-Segment kommt **vor** „Place people". Verhindert isolate-Kompositionen.
-   - Kein Kind/Baby erzeugen: harte Negativ-Klausel `NEVER add extra subjects (no children, pets, or bystanders) — headcount MUST match the ${N} named speakers exactly`. Ergänzt bestehenden `EXACT_COUNT_SUFFIX`.
+1. **`EXACT_COUNT_SUFFIX` (Multi-Zweig, ab Z. 348)** — Ergänzen:
+   - `"All ${N} cast people appear together in ONE single continuous photographic frame — one shared physical space, one camera, one exposure."`
+   - `"FORBIDDEN LAYOUTS: 2×2 grid, 2×1 or 1×2 split-screen, panel grid, multi-panel composition, photo collage, contact sheet, tiled portraits, framed headshot arrangement, video-conference/Zoom/Teams grid, before/after grid, magazine-style portrait grid, side-by-side headshot strip."`
 
-**3. Seedream-Prompt-Härtung (defensiv, falls jemand später zurückschaltet)**
-   - Selber environment-first + no-extra-subjects Suffix.
+2. **`TWO_SHOT_NEGATIVE` (Multi-Zweig, beide Varianten asymmetric + symmetric, Z. 366–369)** — Ergänzen an bestehende Liste:
+   - `"panel grid, split-screen, 2×2 grid, 2×1 grid, collage, contact sheet, tiled portraits, Zoom-style video call grid, individual headshots stitched together"`
 
-### Lip-Sync-Diagnose (kein Code, nur DB-Read im Build-Turn)
-- Aus Screenshot Scene ableiten (`/video-composer`, Szene 1 von 1). Ich lese im Build-Turn:
-  - `composer_scenes` Zeile: `audio_plan`, `dialog_turns`, `lip_sync_status`, `clip_error`, `lipsync_provider_result`.
-- Erwartetes Ergebnis: entweder `audio_plan.twoshot.url = null` (Audio-Prep hing noch, siehe v264) oder `face_gate_failed` (5-Kopf-Problem). Entsprechend: entweder Auto-Trigger erneut anstoßen oder Szene mit neuem Gemini-3-Pro-Anchor neu rendern (Baby verschwindet → Face-Match trifft).
-- Kein separater Codefix hier — die Diagnose zeigt ob v264 (Transient-Retry) oder v268 (Webhook-ready) greifen mussten.
+3. **Neues `SINGLE_FRAME_SUFFIX` (Multi)** — Am Ende der Multi-Instruction (nach `identityClause`) einfügen:
+   - `" SINGLE CONTINUOUS PHOTOGRAPH — the output is ONE unbroken photorealistic photograph taken with ONE camera in ONE moment. It is NOT a composite, NOT a grid, NOT a collage, NOT a stitched image, NOT a video-conference screenshot. All ${N} people share the SAME floor, SAME walls, SAME lighting, SAME perspective."`
+
+4. **`ANCHOR_AUDIT_VERSION` bumpen** in `compose-video-clips/index.ts` (aktuell 10 → 11), damit bestehende Grid-Anchors aus dem Cache invalidiert und neu komponiert werden.
 
 ### Nicht Teil dieses Plans
-- Kein Flux-Kontext-Max-Integration (bewusst zurückgestellt: erst Gemini-3-Pro-Ergebnis abwarten, dann entscheiden).
-- Keine Änderungen an Sync.so / compose-dialog-segments / compose-video-clips.
-- Keine Änderung an Credit-/Refund-Logik (Anchor selbst bucht keine Video-Credits).
+- Kein Modellwechsel (Gemini 3 Pro bleibt Default — es hat Identität + Environment korrekt getroffen, nur das Layout war falsch).
+- Keine Änderung an `compose-video-clips`, Sync.so-Pfad, oder Refund-Logik.
+- Keine Änderung an N=1-Prompts.
+- Feature-Flag-Fallback (`ANCHOR_MODEL_MULTI=nano_banana_2` / `seedream4`) bleibt erhalten.
 
 ### Rollback
-- Env `ANCHOR_MODEL_MULTI=nano_banana_2` → sofort zurück auf alten Pfad ohne Deploy.
-- Env `ANCHOR_MODEL_MULTI=seedream4` → aktueller Pfad bleibt erreichbar für A/B-Tests.
+- Prompt-Änderung ist textuell — Revert des Commits reicht.
+- `ANCHOR_AUDIT_VERSION` kann auf 10 zurückgesetzt werden, falls die alten Cache-Einträge wieder gebraucht werden.
 
 ### Erfolgskriterium
-- Neue Test-Szene: 4 Sprecher im echten Büro-Hintergrund, kein zusätzliches Kind/Objekt, Identitäten treffen, Lip-Sync läuft auf allen 4.
+- Nächster 4-Sprecher-Render zeigt alle 4 Personen in **einem** gemeinsamen Büroraum, mit gemeinsamer Perspektive und Beleuchtung (kein Grid, keine getrennten Panels), Identität + Lip-Sync bleiben wie zuletzt intakt.
