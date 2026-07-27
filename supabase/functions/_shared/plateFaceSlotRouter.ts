@@ -394,9 +394,12 @@ export async function routePlateFacesToAnchor(params: {
     if (dist > maxDist) maxDist = dist;
   }
 
-  const countMismatch = rows !== cols;
+  // v278.3 — Extra faces are not a failure. Office/task scenes can contain
+  // reflections, background people, or poster faces. Hungarian assignment is
+  // already bijective, so the only hard count mismatch is "too few faces".
+  const countMismatch = cols < rows;
   return {
-    ok: resolved > 0 && !countMismatch,
+    ok: resolved >= rows && !countMismatch,
     method: "v278_hungarian_plate_router",
     dims,
     faces,
