@@ -4092,9 +4092,12 @@ serve(async (req) => {
       // probed frame) blocks a perfectly dispatchable Sync.so call with
       // `bounding_boxes_url` — the exact false positive the user is hitting
       // on scene 90116518…  Demote it to a soft warning and dispatch on.
+      // v283 — nach v282 (Size-Floor) sind Rekognition-Halluzinationen weg.
+      // Partielle plate-identity (≥1) ist verlässlicher als ein Hard-Block
+      // auf Anchor-Fallback-Coords. Nur bei resolvedCount===0 hart blocken.
       const plateIdentityAuthoritative =
         !!plateIdentityMap &&
-        (plateIdentityMap.resolvedCount ?? 0) >= speakers.length;
+        (plateIdentityMap.resolvedCount ?? 0) >= 1;
       const firstReject = gateResults.find((r) => !r.ok) as Extract<GateOutcome, { ok: false }> | undefined;
       if (firstReject && plateIdentityAuthoritative) {
         const blockedNames = gateResults
