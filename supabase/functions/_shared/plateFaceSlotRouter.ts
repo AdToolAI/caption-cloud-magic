@@ -169,16 +169,25 @@ export function buildAnchorLayoutFromV274(
     bbox: [number, number, number, number];
     characterId: string | null;
   }>,
+  fallbackCharacterIds: string[] = [],
 ): AnchorFaceLayout {
   const slots: AnchorFaceSlot[] = [];
   for (const f of v274Faces) {
-    if (!f?.characterId || !f.bbox || dims.width <= 0 || dims.height <= 0) continue;
+    if (!f?.bbox || dims.width <= 0 || dims.height <= 0) continue;
+    const slotIndex = Number.isFinite(Number(f.slot)) ? Math.max(0, Math.round(Number(f.slot))) : slots.length;
+    // v278.1 — Anchor-position-as-truth must not depend on biometric
+    // Rekognition resolving every identity. The visual slot/order is already
+    // known from the anchor composition prompt, so use the prompt/speaker order
+    // as the primary character source and only fall back to v274's biometric
+    // label for older call sites without explicit ordering.
+    const characterId = fallbackCharacterIds[slotIndex] ?? f.characterId;
+    if (!characterId) continue;
     const [x1, y1, x2, y2] = f.bbox;
     const w = (x2 - x1) / dims.width;
     const h = (y2 - y1) / dims.height;
     const cx = (x1 + (x2 - x1) / 2) / dims.width;
     const cy = (y1 + (y2 - y1) / 2) / dims.height;
-    slots.push({ slotIndex: f.slot, characterId: f.characterId, cx, cy, w, h });
+    slots.push({ slotIndex, characterId, cx, cy, w, h });
   }
   return { version: "v278", anchorUrl, dims, slots };
 }
