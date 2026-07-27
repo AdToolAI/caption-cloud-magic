@@ -88,6 +88,7 @@ import {
 } from "../_shared/twoshot-face-map.ts";
 import { detectPlateFaces, validatePlateFacesGeometry } from "../_shared/plate-face-detect.ts";
 import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
+import { routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -1706,7 +1707,70 @@ serve(async (req) => {
       );
     }
     if (plateHydrationSource !== "persisted" && speakers.length >= 1 && plateDims && sourceClipUrl) {
-      try {
+      // ── v278 FAST-PATH — HUNGARIAN PLATE ROUTER ────────────────────
+      // For N ≥ 3 scenes we have a persisted anchor_face_layout from
+      // compose-video-clips (v274 Rekognition on the anchor gave us the
+      // characterId per anchor slot + normalized centers). Use pure
+      // geometric bijection against the rendered plate — no biometric
+      // Gemini call needed. This eliminates the "same face assigned to
+      // two speakers" duplicate bug and the profile-shot silent-speaker
+      // bug, while remaining robust to [CastActions] positional drift
+      // via minimum-distance Hungarian assignment.
+      //
+      // Falls back to the legacy resolvePlateFaceIdentities pipeline
+      // when: N < 3 (legacy is cheap and reliable there), the anchor
+      // layout is missing (older scenes), face-count mismatch, or the
+      // AWS DetectFaces call fails.
+      const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
+      const anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
+      if (
+        v278Enabled &&
+        speakers.length >= 3 &&
+        anchorLayoutRaw &&
+        Array.isArray(anchorLayoutRaw.slots) &&
+        anchorLayoutRaw.slots.length >= speakers.length
+      ) {
+        try {
+          const routed = await routePlateFacesToAnchor({
+            plateUrl: sourceClipUrl,
+            anchorLayout: anchorLayoutRaw,
+            plateDims,
+          });
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v278_router ok=${routed.ok ? 1 : 0} ` +
+            `resolved=${routed.resolvedCount}/${routed.expectedCount} faces=${routed.faces.length} ` +
+            `mismatch=${routed.countMismatch ? 1 : 0} maxDist=${routed.maxDistance?.toFixed(3) ?? "-"} ` +
+            `ms=${routed.msTotal} reason=${routed.reason ?? "-"}`,
+          );
+          if (routed.ok && routed.resolvedCount === speakers.length) {
+            // Adapt router output to PlateIdentityMap shape.
+            plateIdentityMap = {
+              faces: routed.faces.map((f) => ({
+                bbox: f.bbox,
+                center: [Math.round((f.bbox[0] + f.bbox[2]) / 2), Math.round((f.bbox[1] + f.bbox[3]) / 2)] as [number, number],
+                slot: f.slot,
+                confidence: f.matchConfidence,
+                characterId: f.characterId,
+                matchConfidence: f.matchConfidence,
+              })),
+              width: routed.dims.width || plateDims.width,
+              height: routed.dims.height || plateDims.height,
+              detector: "v278-rekognition-hungarian",
+              cached: false,
+              resolvedCount: routed.resolvedCount,
+              identityMethod: "per-char-hungarian",
+              minConfidence: Math.min(...routed.faces.filter((f) => f.characterId).map((f) => f.matchConfidence)),
+              minMargin: 1,
+              ambiguous: false,
+            } as any;
+          }
+        } catch (err) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v278_router threw — falling back to legacy: ${(err as Error)?.message}`,
+          );
+        }
+      }
+      if (!plateIdentityMap) try {
         plateIdentityMap = await resolvePlateFaceIdentities({
           supabase,
           sceneId,

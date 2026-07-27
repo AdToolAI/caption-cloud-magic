@@ -36,6 +36,7 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
+import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
@@ -2874,8 +2875,17 @@ serve(async (req) => {
                           const nextDialogShotsBase = existingDs && typeof existingDs === "object"
                             ? existingDs
                             : {};
+                          // v278 — Persist anchor_face_layout as SEPARATE
+                          // struct so it survives when plate_identity is
+                          // overwritten later by the real plate detector.
+                          const anchorFaceLayout = buildAnchorLayoutFromV274(
+                            composedUrl,
+                            idResolved.dims,
+                            idResolved.faces,
+                          );
                           const nextDialogShots = {
                             ...nextDialogShotsBase,
+                            anchor_face_layout: anchorFaceLayout,
                             plate_identity: {
                               ...(nextDialogShotsBase.plate_identity ?? {}),
                               method: idResolved.method,
