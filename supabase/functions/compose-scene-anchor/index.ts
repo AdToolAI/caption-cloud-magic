@@ -279,10 +279,18 @@ serve(async (req) => {
       .sort()
       .join(",");
     // v18 — adds speaker-focus signature (v260 Speaker Priority Framing).
-    // Any pass with a different focus speaker gets its own cache slot; the
-    // legacy neutral group-shot path (speakerFocusIdx=-1) is unchanged.
+    // v19 — adds framing-suffix signature (v262 Min-Face-Size Retry).
+    // Any pass with a different focus speaker or framing retry gets its
+    // own cache slot; the legacy neutral group-shot path (no focus, no
+    // framingSuffix) is unchanged.
+    const framingSuffix = typeof body.framingSuffix === "string"
+      ? body.framingSuffix.trim()
+      : "";
+    const framingSuffixHash = framingSuffix
+      ? await sha1(framingSuffix)
+      : "none";
     const promptHash = await sha1(
-      `v18|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}`,
+      `v19|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|swap=${swapMode ? 1 : 0}|fl=${faceLockMode ? 1 : 0}|sm=${swapMismatches.join(',').toLowerCase()}|names=${names.join(',').toLowerCase()}|${worldRefSig}|${identitySig}|cast=${castActionsSig}|asym=${hasAsymmetricCast ? 1 : 0}|fam=${familyHash}|spf=${speakerFocusIdx}:${speakerFocusName.toLowerCase()}|fs=${framingSuffixHash}`,
     );
 
 
