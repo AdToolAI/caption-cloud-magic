@@ -1,119 +1,89 @@
-# Plan v278 — Anchor-Position-as-Truth + Hungarian Face-Slot-Router (Task-Robust)
+## Befund zur letzten Szene
 
-## Kernfrage: Funktioniert das auch wenn Charaktere Tasks erledigen (Telefon, Drucker, Laptop)?
+Die letzte relevante Szene ist `9cd16340-c893-45d2-821a-e4e7252d0272`.
 
-**Ja — sogar besser als jede Version seit v260**, weil v278 keine biometrische Ähnlichkeit mehr braucht. Genau die war der Grund warum Tasks (Profile, Verdeckung, kleinere Gesichter) das Matching gebrochen haben.
+**Kurzantwort:** Nein — die neue v278-Route wurde bei dieser Szene nicht genutzt.
 
-## Warum Tasks bisher (v274–v277) die Pipeline zerstört haben
+**Warum ich das sagen kann:**
+- In den Dispatch-Logs stehen nur alte `sync-segments`-Einträge mit `PREFLIGHT_BLOCKED` und `v153_plate_box_duplicate_for_speakers=[3]`.
+- Es gibt keinen `v278_router ok=...`-Eintrag und keine v278-Metadaten in den Dispatch-Logs.
+- In der Szene fehlt `dialog_shots.anchor_face_layout` komplett.
+- In der Szene fehlt auch `dialog_shots.plate_identity`.
+- Es existiert nur `audio_plan.twoshot.anchor_identity`, aber nur teilweise: `resolvedCount = 2`, `expectedCount = 4`.
 
-- `[CastActions]` → Charaktere drehen sich weg, gehen ins Profil, werden verdeckt.
-- Rekognition `CompareFaces` Portrait↔Plate fällt unter Threshold (auch mit 45).
-- Fallback ohne Uniqueness → Duplicates ("Samuel und Sarah auf dasselbe Gesicht").
-- Ergebnis: Silent-Speaker, Identity-Drift, Duplicate-Fehler.
+## Was aktuell falsch läuft
 
-## Warum v278 das strukturell löst
-
-Zwei Wahrheiten die wir bisher weggeworfen haben:
-1. **Anchor-Prompt-Ordering** — wir wissen exakt, wen wir wohin gerendert haben.
-2. **Anchor-Face-Positionen** — wir können sie mit einem `DetectFaces`-Call auf dem Anchor deterministisch messen.
-
-Diese beiden Wahrheiten kombiniert = kein biometrisches Guessing mehr nötig.
-
-## Pipeline
+Die v278-Route ist im Code vorhanden, startet aber nur wenn diese Bedingung erfüllt ist:
 
 ```text
-Anchor-Render (Nano Banana 2)
-        │
-        ├──► DetectFaces auf Anchor        →  Anchor-Face-Center[] pro Slot
-        │                                     (persistiert als anchor_face_layout)
-        └──► anchor_composition_order       →  [{characterId, slotIndex}]
-                                              (aus Prompt-Reihenfolge)
-        ▼
-Plate-Render (Hailuo/Seedance mit Tasks)
-        │
-        ▼
-DetectFaces auf Plate                       →  Plate-Face-Center[]
-        │
-        ▼
-Hungarian-Matching                          →  minimale Gesamt-Distanz,
-Anchor-Center[i] ↔ Plate-Center[j]             bijektiv (jede Box exakt 1×)
-        │
-        ▼
-plate_identity Lock                         →  Sync.so pro Sprecher an echter Box
+N >= 3 Sprecher
+UND dialog_shots.anchor_face_layout existiert
+UND anchor_face_layout.slots.length >= Sprecheranzahl
 ```
 
-## Warum Hungarian-Matching der Schlüssel für Tasks ist
+Bei der geprüften Szene ist `anchor_face_layout` leer/nicht vorhanden. Dadurch fällt die Pipeline automatisch zurück in den alten v153/v274/v277-Pfad. Genau dort entsteht weiterhin die bekannte Fehlermeldung: zwei Sprecher werden auf dieselbe Plate-Box gemappt.
 
-Row-Major allein kippt bei Tasks:
-- jemand hockt vorne am Drucker (niedriges Y)
-- jemand steht hinten am Fenster (hohes Y)
-- → row-major würde die falsche "Reihe" bilden
+## Wahrscheinliche Ursache
 
-Hungarian-Algorithmus (bijektive minimale Distanz) toleriert Verschiebungen bis ~30–40% der Plate-Breite, solange die relative Anordnung ungefähr erhalten bleibt — was bei einem Cut vom Anchor zur Task-Szene fast immer der Fall ist.
+Der aktuelle v278-Layout-Aufbau hängt noch zu stark am alten Rekognition/Identity-Ergebnis. Wenn die Anchor-Identität nur teilweise erkannt wird, hier 2 von 4, entsteht kein vollständiges `anchor_face_layout` für alle 4 Sprecher. Damit kann der neue Hungarian-Router gar nicht arbeiten.
 
-## Warum das die Fehler eliminiert — auch bei Tasks
+Zusätzlich scheint der spätere Fehlerzustand `dialog_shots` auf ein reines Fehlerobjekt zu reduzieren, wodurch eventuell vorher vorhandene Routing-Daten nicht stabil erhalten bleiben.
 
-| Fehler | Warum er verschwindet, auch mit Tasks |
-|---|---|
-| Duplicate-Face | Bijektive Zuweisung — mathematisch unmöglich |
-| Identity-Drift bei Profil | Keine Ähnlichkeit nötig, nur Position |
-| Silent-Speaker | Sync.so bekommt echte DetectFaces-Box, keine geratene |
-| Verdeckte Sprecher | Face-Count-Mismatch → sauberes Review, kein falsches Rendering |
-| Task-bedingte Positionsdrift | Hungarian toleriert Verschiebung, solange relative Ordnung stimmt |
+## Plan zur sauberen Korrektur
 
-## Umsetzung
+### 1. v278 wirklich unabhängig von biometrischer Identität machen
+`anchor_face_layout` darf nicht nur aus erfolgreich biometrisch erkannten Gesichtern entstehen.
 
-### 1. Anchor speichert Layout
-- `compose-scene-anchor`: nach erfolgreichem Render zusätzlich `DetectFaces` auf Anchor.
-- Persistiert: `dialog_shots.anchor_face_layout = [{slotIndex, characterId, cx, cy, w, h}]`.
-- Kosten: +1 Rekognition-Call (~200ms, ~0.001€).
+Stattdessen:
+- Anchor-Gesichter geometrisch erkennen.
+- Sprecher-Reihenfolge aus der Szene/Dialogstruktur nehmen.
+- Face-Slots bijektiv nach Anchor-Komposition zuordnen.
+- Dadurch immer 4 Slots für 4 Sprecher erzeugen, solange 4 Gesichter im Anchor erkannt wurden.
 
-### 2. Neuer Router
-- Datei: `supabase/functions/_shared/plateFaceSlotRouter.ts`
-- Input: Plate-URL + `anchor_face_layout`.
-- Schritte:
-  a. `DetectFaces` auf Plate.
-  b. Kosten-Matrix: `dist[i][j] = euclidean(anchor[i].center, plate[j].center)` (normalisiert auf [0,1]).
-  c. Hungarian-Algorithm → optimales Assignment.
-  d. Return: `[{characterId, plateBox}]`.
-- Fallback wenn `plate.faceCount !== anchor.faceCount`: `awaiting_face_slot_map`, kein Refund, Review-UI.
+### 2. `anchor_face_layout` dauerhaft schützen
+Beim Schreiben von Fehlerstatus in `dialog_shots` darf `anchor_face_layout` nicht überschrieben/gelöscht werden.
 
-### 3. `compose-video-clips` (N≥3)
-- Ersetzt `resolveIdentityViaRekognition` durch `plateFaceSlotRouter` für N≥3.
-- Schreibt `plate_identity` mit Marker `v278_plate_router_hungarian`.
-- N=2 bleibt auf v276-Pfad (dort stabil).
+Die Update-Logik soll immer mergen:
 
-### 4. Merge-Safety (v277 bleibt)
-- `compose-twoshot-audio` und `compose-dialog-segments` lesen `plate_identity` frisch, überschreiben v278-Marker nie.
+```text
+bestehende dialog_shots behalten
++ status/error aktualisieren
++ anchor_face_layout/plate_identity nicht verlieren
+```
 
-### 5. Review-UI
-- `FaceMapReviewDialog.tsx` (aus v274) erweitert: Thumbnails aller erkannten Plate-Gesichter, Drag&Drop auf Sprecher.
-- `SceneClipProgress.tsx`: neuer Status `awaiting_face_slot_map` → CTA "Slots zuordnen".
+### 3. v278 vor dem alten v153-Duplicate-Guard erzwingen
+Wenn `anchor_face_layout` vollständig ist, muss der Hungarian-Router laufen, bevor der alte v153-Duplicate-Block entscheidet.
 
-### 6. Cleanup
-- `resolveIdentityViaRekognition` bleibt nur für N=2.
-- Zwei-Pass-Similarity nicht mehr im N≥3-Pfad.
+Erwartetes Ergebnis:
 
-## Erwartete Fehlerrate (grobe Schätzung, letzte ~25 Failures als Basis)
+```text
+v278_router ok=1 resolved=4/4
+```
 
-| Fehler-Kategorie | Heute | Nach v278 |
-|---|---|---|
-| Duplicate-Face | ~35% | 0% |
-| Identity-Drift Profil/Task | ~25% | ~3% |
-| Silent-Speaker | ~20% | ~7% (Rest = Sync.so intern) |
-| Neuer Modus: awaiting_face_slot_map | 0% | ~8% (1 Klick Review) |
+Erst wenn der Plate-Face-Count nicht passt, soll ein Review-/Soft-Gate greifen — nicht der alte Duplicate-Fail.
 
-Netto-Reduktion harter Failures: **~80%**. Neuer Review-Modus ist kein Failure, sondern Soft-Gate mit 1-Klick-Lösung.
+### 4. Diagnose sichtbar machen
+In den Logs und optional im UI sollte klar stehen, welcher Pfad genutzt wurde:
 
-## Nicht-Ziele
+```text
+Route: v278 Hungarian
+Anchor layout: 4/4
+Plate faces: 4/4
+Assignment: unique/bijective
+```
 
-- N=2 unangetastet.
-- Anchor bleibt Nano Banana 2 (v276).
-- Sync.so-Pfad unverändert.
-- Keine Änderung an `[CastActions]` — Tasks werden weiterhin unterstützt.
+So sehen wir sofort, ob die neue Route wirklich aktiv war.
 
-## Rollout
+### 5. Letzte Szene nach Fix gezielt zurücksetzen
+Nach der Code-Korrektur würde ich genau diese Szene oder den letzten Re-Render so zurücksetzen, dass sie mit der korrigierten v278-Route erneut durchläuft, ohne dass der alte v153-Fehlerpfad wieder gewinnt.
 
-- Feature-Flag `V278_HUNGARIAN_ROUTER_N3` default ON.
-- Fallback auf v277 bei Flag off.
-- Kein Refund für neuen `awaiting_face_slot_map`-Status (User-Interaktion, kein Fehler).
+## Erwartung nach Umsetzung
+
+Diese konkrete Fehlerklasse sollte dann verschwinden:
+
+```text
+Samuel und Kailee wurden auf dasselbe Gesicht gemappt
+v153_plate_box_duplicate_for_speakers
+```
+
+Denn der Hungarian-Router vergibt jedes erkannte Plate-Gesicht nur einmal. Die Verwechslung kann dann nicht mehr durch Duplicate-Zuweisung entstehen, sondern höchstens noch durch echten Face-Count-Mismatch oder starke Positionsverschiebung — dafür wäre dann ein Review-Gate statt ein harter Fehlalarm zuständig.
