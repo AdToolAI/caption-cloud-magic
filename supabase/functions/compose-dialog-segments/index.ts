@@ -1447,12 +1447,13 @@ serve(async (req) => {
     // `audio_plan.twoshot.anchor_identity` seeded by compose-video-clips.
     const _anchorIdentitySeed = ((scene as any)?.audio_plan?.twoshot?.anchor_identity ?? null) as any;
     const persistedPlateIdentity = (((existing as any)?.plate_identity) ?? _anchorIdentitySeed ?? null) as any;
+    const _persistedAssignmentLock =
+      persistedPlateIdentity?.assignmentLock && typeof persistedPlateIdentity.assignmentLock === "object"
+        ? persistedPlateIdentity.assignmentLock
+        : null;
     const anchorRekLockSeed: Record<string, string> | null =
-      (_anchorIdentitySeed &&
-        _anchorIdentitySeed.assignmentLock &&
-        typeof _anchorIdentitySeed.assignmentLock === "object" &&
-        Object.keys(_anchorIdentitySeed.assignmentLock).length > 0)
-        ? { ...(_anchorIdentitySeed.assignmentLock as Record<string, string>) }
+      (_persistedAssignmentLock && Object.keys(_persistedAssignmentLock).length > 0)
+        ? { ...(_persistedAssignmentLock as Record<string, string>) }
         : null;
     const anchorRekLockCount = anchorRekLockSeed ? Object.keys(anchorRekLockSeed).length : 0;
     const anchorRekLockPartial = !!anchorRekLockSeed && anchorRekLockCount > 0 && anchorRekLockCount < speakers.length;
@@ -1460,7 +1461,7 @@ serve(async (req) => {
     if (anchorRekLockSeed) {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} v277_anchor_rekognition_seed ` +
-        `locked_slots=${anchorRekLockCount}/${speakers.length} status=${_anchorIdentitySeed?.status ?? "unknown"}`,
+        `locked_slots=${anchorRekLockCount}/${speakers.length} status=${persistedPlateIdentity?.status ?? "unknown"}`,
       );
     }
     const persistedPlateDims = persistedPlateIdentity?.dims;
@@ -1543,9 +1544,13 @@ serve(async (req) => {
       new Array(speakers.length).fill(null);
     let plateIdentityMap: Awaited<ReturnType<typeof resolvePlateFaceIdentities>> | null = null;
     let plateHydrationSource: "persisted" | "live" | "missing" = "missing";
-    const persistedBboxes = Array.isArray(persistedPlateIdentity?.bboxes)
+    const persistedBboxes = Array.isArray(persistedPlateIdentity?.bboxes) && persistedPlateIdentity.bboxes.length > 0
       ? persistedPlateIdentity.bboxes
-      : [];
+      : Array.isArray(persistedPlateIdentity?.faces)
+        ? persistedPlateIdentity.faces
+          .map((face: any) => face?.bbox)
+          .filter((bbox: unknown) => Array.isArray(bbox) && (bbox as unknown[]).length === 4)
+        : [];
     // v154 — Geometry sanity gate against the persisted bboxes. The pre-v154
     // detector path occasionally cached torso/upper-body boxes (center y >
     // 0.55 of plate height). If those got persisted into dialog_shots, they
