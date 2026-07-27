@@ -462,6 +462,8 @@ export default function SceneCard({
   const dialogStudioRef = useRef<HTMLDivElement | null>(null);
   const [splitConfirmOpen, setSplitConfirmOpen] = useState(false);
   const [autoSplitArmed, setAutoSplitArmed] = useState(false);
+  const [anchorPreviewOpen, setAnchorPreviewOpen] = useState(false);
+
 
   const cleanRestartLipSync = async (opts: { force?: boolean } = {}) => {
     const { data, error } = await supabase.functions.invoke("reset-lipsync-scene", {
