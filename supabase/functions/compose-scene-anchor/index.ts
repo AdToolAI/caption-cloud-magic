@@ -367,8 +367,8 @@ serve(async (req) => {
       : "";
     const TWO_SHOT_NEGATIVE = isMulti
       ? (hasAsymmetricCast
-        ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity.`
-        : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face.`)
+        ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`
+        : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`)
       : ` AVOID: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same cast person, photo collage, contact sheet, before/after grid, mirror duplicates of the cast person, twins of the cast person, doppelgängers, repeated cast face, two of the same cast person, three of the same cast person.`;
     const STRICT_RETRY_SUFFIX = strictMode
       ? (isMulti
