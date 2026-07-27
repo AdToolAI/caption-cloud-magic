@@ -48,8 +48,11 @@ const FETCH_TIMEOUT_MS = 12_000;
 const REK_TIMEOUT_MS = 15_000;
 /** Similarity threshold to accept a portrait→box match (Rekognition 0..100). */
 const MIN_SIMILARITY = 55;
+/** v276 — Two-pass: relaxed threshold retried against still-unresolved slots. */
+const MIN_SIMILARITY_PASS2 = 45;
 /** IoU threshold to link a CompareFaces box back to a DetectFaces slot. */
 const BOX_IOU_LINK_MIN = 0.35;
+
 
 // ── SigV4 helpers ───────────────────────────────────────────────────────
 async function sha256Hex(data: Uint8Array | string): Promise<string> {
