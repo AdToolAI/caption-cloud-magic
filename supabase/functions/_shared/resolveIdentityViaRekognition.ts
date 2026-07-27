@@ -290,7 +290,7 @@ export interface ResolvedIdentityFace {
 
 export interface RekognitionIdentityResult {
   ok: boolean;
-  method: "aws-rekognition-anchor-v274";
+  method: "aws-rekognition-anchor-v274" | "aws-rekognition-anchor-v274-twopass";
   dims: { width: number; height: number };
   faces: ResolvedIdentityFace[];
   /** speakerIdx (as string) → characterId. Only assigned speakers are listed. */
