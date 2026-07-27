@@ -498,7 +498,12 @@ serve(async (req) => {
       clipError?: string,
     ): Record<string, unknown> => ({
       clip_status: "failed",
-      ...(clipError ? { clip_error: clipError.slice(0, 500) } : {}),
+      // v264 — Never allow silent failures. A missing clip_error paired with
+      // clip_status='failed' is a bug (produces the "Fehlgeschlagen"-Badge
+      // with no explanation and orphans the lip-sync spinner).
+      clip_error: (clipError && clipError.length > 0
+        ? clipError
+        : "unknown_failure_no_details").slice(0, 500),
       ...(isCinematicSyncScene
         ? {
             lip_sync_status: null,
@@ -509,6 +514,79 @@ serve(async (req) => {
         : {}),
       updated_at: new Date().toISOString(),
     });
+
+    /**
+     * v264 — Safe failed-write.
+     *
+     * Root cause of the "Szene fehlgeschlagen aber Lip-Sync läuft weiter"-Bug:
+     * multiple writers race on `composer_scenes`. A late identity-audit or
+     * hard-guard fires AFTER the async Hailuo + Sync.so + mux pipeline has
+     * already produced a valid `clip_url` and stamped `lip_sync_status='done'`.
+     * The extra `clip_status='failed'` write clobbers the good state and
+     * leaves a contradictory row (failed + done + valid clip_url).
+     *
+     * Rule: if the row already has a `clip_url` OR its lipsync is currently
+     * running / done, DO NOT flip `clip_status` to 'failed'. The async result
+     * is authoritative. We still surface the concern as a `clip_error` note so
+     * the audit trail is preserved.
+     *
+     * For cinematic-sync scenes, a genuine failure additionally clears the
+     * lip_sync_status / twoshot_stage / dialog_shots / lip_sync_source_clip_url
+     * fields (mem/architecture/lipsync/orphaned-pending-after-clip-fail.md).
+     */
+    const safeMarkSceneFailed = async (
+      sceneId: string,
+      clipError: string,
+      opts: {
+        isCinematicSyncScene: boolean;
+        /** Extra fields to merge into the update payload (e.g. twoshot_stage:'failed'). */
+        extra?: Record<string, unknown>;
+      },
+    ): Promise<"failed" | "skipped_already_succeeded"> => {
+      try {
+        const { data: current } = await supabaseAdmin
+          .from("composer_scenes")
+          .select("clip_url, clip_status, lip_sync_status")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const hasClipUrl =
+          typeof current?.clip_url === "string" && current.clip_url.length > 0;
+        const lipsyncLive =
+          current?.lip_sync_status === "running" ||
+          current?.lip_sync_status === "done";
+        if (hasClipUrl || lipsyncLive) {
+          console.warn(
+            `[compose-video-clips] v264_safe_fail_skip scene=${sceneId} reason=already_succeeded clip_url=${hasClipUrl} lip_sync_status=${current?.lip_sync_status ?? "null"} would_have_written=${clipError.slice(0, 120)}`,
+          );
+          // Preserve the concern as a diagnostic note but do NOT flip status.
+          try {
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({
+                clip_error: `[v264_safe_fail_skip] ${clipError}`.slice(0, 500),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", sceneId);
+          } catch (_) { /* best-effort */ }
+          return "skipped_already_succeeded";
+        }
+      } catch (readErr) {
+        console.warn(
+          `[compose-video-clips] v264_safe_fail read failed for ${sceneId}, proceeding with failed-write:`,
+          readErr,
+        );
+      }
+      const payload = {
+        ...failedClipUpdate(opts.isCinematicSyncScene, clipError),
+        ...(opts.extra ?? {}),
+      };
+      await supabaseAdmin
+        .from("composer_scenes")
+        .update(payload)
+        .eq("id", sceneId);
+      return "failed";
+    };
+
 
     // Build a quick character lookup for the safety-net injection
     const charById = new Map<string, ComposerCharacter>();
