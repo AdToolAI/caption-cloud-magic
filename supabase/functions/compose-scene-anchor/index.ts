@@ -346,6 +346,8 @@ serve(async (req) => {
     // not arbitrary faces, so extras do not break the pipeline.
     const EXACT_COUNT_SUFFIX = isMulti
       ? ` CAST COUNT — NON-NEGOTIABLE: the final image must show the ${N} CAST reference people, each appearing EXACTLY ONCE as a clearly visible, individually recognizable person. ` +
+        `All ${N} cast people appear together in ONE single continuous photographic frame — one shared physical space, one camera, one exposure, one moment in time. ` +
+        `FORBIDDEN LAYOUTS: 2x2 grid, 2x1 or 1x2 split-screen, 3x1 or 1x3 strip, panel grid, multi-panel composition, photo collage, contact sheet, tiled portraits, framed headshot arrangement, video-conference / Zoom / Teams / Google Meet grid, before/after grid, magazine-style portrait grid, side-by-side headshot strip, stitched individual portraits, picture-in-picture. ` +
         `FORBIDDEN: duplicating any cast reference, rendering the same cast identity twice, twins, doppelgängers, clones, mirror reflections of a cast person, posters/photos/screens/statues/mannequins depicting a cast person, ADDING ANY NEW NAMED SUBJECT (no children, no babies, no toddlers, no pets, no dogs, no cats, no extra adult held/carried by anyone). Headcount of foreground/mid-ground named people MUST equal exactly ${N} — not ${N + 1}, not ${N + 2}. ` +
         `ALLOWED (do NOT forbid these): background pedestrians, bystanders, crowd, people walking by, coworkers in the distance, café patrons, anonymous people whose face is not a cast reference — include them naturally when the scene calls for it. ` +
         `Each of the ${N} cast people remains clearly identifiable and unobstructed.`
@@ -365,8 +367,8 @@ serve(async (req) => {
       : "";
     const TWO_SHOT_NEGATIVE = isMulti
       ? (hasAsymmetricCast
-        ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity.`
-        : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face.`)
+        ? ` AVOID: any cast person with face fully hidden, back of head only, full silhouette where the face is unreadable, faces fully occluded by laptops/phones/objects, duplicated cast identity, swapped cast identity, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`
+        : ` AVOID: solo close-up of one cast member when both are required, one cast member cropped out of frame, faces overlapping, duplicated cast identity, swapped cast identity, twins of the same cast face, panel grid, split-screen, 2x2 grid, 2x1 grid, 3x1 strip, collage, contact sheet, tiled portraits, Zoom-style video call grid, Teams/Meet grid, individual headshots stitched together, framed portrait arrangement, picture-in-picture.`)
       : ` AVOID: triptych layout, panel grid, multi-panel composition, split-screen, side-by-side panels of the same cast person, photo collage, contact sheet, before/after grid, mirror duplicates of the cast person, twins of the cast person, doppelgängers, repeated cast face, two of the same cast person, three of the same cast person.`;
     const STRICT_RETRY_SUFFIX = strictMode
       ? (isMulti
@@ -486,12 +488,20 @@ serve(async (req) => {
     // string when the caller didn't request a retry.
     const FRAMING_RETRY_SUFFIX = framingSuffix ? ` ${framingSuffix}` : "";
 
+    // v272 — SINGLE CONTINUOUS PHOTOGRAPH suffix (multi only). Gemini 3 Pro
+    // Image otherwise interprets N reference portraits literally as N panels
+    // (2x2 grid, Zoom-style tiles). This hard-locks the output to one shared
+    // physical frame.
+    const SINGLE_FRAME_SUFFIX = isMulti
+      ? ` SINGLE CONTINUOUS PHOTOGRAPH — the output is ONE unbroken photorealistic photograph taken with ONE camera in ONE moment. It is NOT a composite, NOT a grid, NOT a 2x2 layout, NOT a collage, NOT a stitched image, NOT a video-conference / Zoom / Teams / Meet screenshot, NOT a picture-in-picture, NOT a framed portrait wall. All ${N} people share the SAME floor, SAME walls, SAME lighting direction, SAME perspective, SAME camera focal length. Zero panel borders, zero dividing lines, zero separate frames.`
+      : "";
+
     const editInstruction = isMulti
       ? // Environment-first for multi-speaker: lead with the scene, THEN place people.
         // Prevents Seedream/Gemini from treating this as "isolate subjects on neutral bg".
         `Scene / environment (MANDATORY — render this location faithfully as the full background and setting of the image): ${safeScenePrompt}\n\n` +
         `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description above. The named location, its architecture, props, and atmosphere MUST be clearly visible around the people — never a neutral studio or white/black background.\n\n` +
-        `Now place ${peopleNoun} INTO that environment without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
+        `Now place ${peopleNoun} INTO that environment without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause}${SINGLE_FRAME_SUFFIX} ` +
         `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable.`
       : `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
         `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
