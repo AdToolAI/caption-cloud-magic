@@ -33,6 +33,8 @@ import {
   countHumansInImage,
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
+import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
+import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
@@ -2203,9 +2205,10 @@ serve(async (req) => {
                   swap = false,
                   swapMismatches: string[] = [],
                   faceLock = false,
+                  framingSuffix = "",
                 ): Promise<string | null> => {
                   console.log(
-                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}${faceLock ? ", face-lock" : ""}]`,
+                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}${faceLock ? ", face-lock" : ""}${framingSuffix ? ", framing-retry" : ""}]`,
                   );
                   // v250 — enrich the anchor prompt with server-side
                   // [CastActions] block before the strippers run so
@@ -2246,6 +2249,7 @@ serve(async (req) => {
                         faceLockMode: faceLock,
                         wardrobeLock: wardrobeLockNamesCS.length > 0,
                         wardrobeLockNames: wardrobeLockNamesCS,
+                        framingSuffix,
                       }),
                     },
                   );
@@ -2438,6 +2442,153 @@ serve(async (req) => {
                   (scene as any).__anchorAttempts = anchorAttempts;
                 }
 
+                // ── v262 MIN-FACE-SIZE GATE ────────────────────────────
+                // After the identity retry ladder settles, verify that
+                // the composed anchor has faces LARGE ENOUGH that the
+                // downstream Sync.so → 720px preclip → downsample-back
+                // pipeline still shows visible lip motion. When a face
+                // occupies < 12 % of the plate width, the ~4 px mouth
+                // movement in the 720×720 preclip becomes < 1 px in the
+                // final composite → user sees "no lipsync" even though
+                // every provider succeeded.
+                //
+                // Runs a lightweight AWS Rekognition pass on the anchor
+                // (normalized coords via W=H=1000, so we don't need real
+                // plate dims). On failure, re-composes ONCE with a
+                // FRAMING RETRY suffix telling Nano Banana to tighten
+                // the shot. If retry still fails, we persist the warning
+                // but keep the anchor — soft-pass, do not block the run.
+                let minFaceCheck: {
+                  ok: boolean;
+                  minWidthRatio: number;
+                  minWidthPx: number;
+                  suggestion: string;
+                  retried: boolean;
+                  reason?: string;
+                } | null = null;
+                if (composedUrl && identityFailure === null && expectedFaces >= 1) {
+                  try {
+                    const detect = await detectFacesMediaPipe({
+                      videoUrl: composedUrl,
+                      plateWidth: 1000,
+                      plateHeight: 1000,
+                      durationSec: 0,
+                      prebuiltFrameUrls: [composedUrl],
+                    });
+                    if (detect.ok && detect.faces.length > 0) {
+                      const check = enforceMinFaceSize({
+                        faces: detect.faces.map((f) => ({ bbox: f.bbox })),
+                        plateWidth: 1000,
+                        plateHeight: 1000,
+                        expectedSpeakers: expectedFaces,
+                      });
+                      console.log(
+                        `[compose-video-clips] v262_min_face_gate scene=${scene.id} ` +
+                        `ok=${check.ok ? 1 : 0} minRatio=${check.minWidthRatio.toFixed(3)} ` +
+                        `n_detected=${detect.faces.length} n_expected=${expectedFaces} ` +
+                        `suggestion=${check.suggestion} ${check.reason ? `reason=${check.reason}` : ""}`,
+                      );
+                      minFaceCheck = {
+                        ok: check.ok,
+                        minWidthRatio: check.minWidthRatio,
+                        minWidthPx: check.minWidthPx,
+                        suggestion: check.suggestion,
+                        retried: false,
+                        reason: check.reason,
+                      };
+                      if (!check.ok) {
+                        console.log(
+                          `[compose-video-clips] v262_framing_retry scene=${scene.id} ` +
+                          `→ re-composing anchor with framing suffix (${check.suggestion})`,
+                        );
+                        await invalidateCache();
+                        const retryUrl = await composeAnchor(
+                          "attempt-4-framing",
+                          false,
+                          false,
+                          [],
+                          false,
+                          check.framingSuffix,
+                        );
+                        if (retryUrl) {
+                          // Re-audit the retry: identity + size.
+                          const eRetry = await evaluate(retryUrl, "attempt-4-framing");
+                          const dRetry = await detectFacesMediaPipe({
+                            videoUrl: retryUrl,
+                            plateWidth: 1000,
+                            plateHeight: 1000,
+                            durationSec: 0,
+                            prebuiltFrameUrls: [retryUrl],
+                          });
+                          const checkRetry = dRetry.ok && dRetry.faces.length > 0
+                            ? enforceMinFaceSize({
+                                faces: dRetry.faces.map((f) => ({ bbox: f.bbox })),
+                                plateWidth: 1000,
+                                plateHeight: 1000,
+                                expectedSpeakers: expectedFaces,
+                              })
+                            : null;
+                          console.log(
+                            `[compose-video-clips] v262_framing_retry_result scene=${scene.id} ` +
+                            `identity=${eRetry.identity ?? "ok"} ` +
+                            `sizeOk=${checkRetry?.ok ? 1 : 0} minRatio=${checkRetry?.minWidthRatio.toFixed(3) ?? "?"}`,
+                          );
+                          // Only accept the retry when it is BETTER on both dimensions:
+                          //   identity still ok AND face-size improved.
+                          const retryIsBetter =
+                            eRetry.identity === null &&
+                            checkRetry !== null &&
+                            checkRetry.minWidthRatio > minFaceCheck.minWidthRatio;
+                          if (retryIsBetter) {
+                            composedUrl = retryUrl;
+                            faceCount = eRetry.faceCount;
+                            humanCount = eRetry.humanCount;
+                            identityFailure = eRetry.identity;
+                            identityNotes = eRetry.notes;
+                            identityMismatched = eRetry.mismatched ?? [];
+                            minFaceCheck = {
+                              ok: checkRetry.ok,
+                              minWidthRatio: checkRetry.minWidthRatio,
+                              minWidthPx: checkRetry.minWidthPx,
+                              suggestion: checkRetry.suggestion,
+                              retried: true,
+                              reason: checkRetry.reason,
+                            };
+                            const attempts =
+                              ((scene as any).__anchorAttempts as Array<Record<string, unknown>>) ?? [];
+                            attempts.push({
+                              attempt: attempts.length + 1,
+                              mode: "framing-retry",
+                              identity: identityFailure ?? "ok",
+                              faces: faceCount,
+                              humans: humanCount,
+                              minFaceRatio: checkRetry.minWidthRatio,
+                              sizeOk: checkRetry.ok,
+                              at: new Date().toISOString(),
+                            });
+                            (scene as any).__anchorAttempts = attempts;
+                          } else {
+                            // Keep the original anchor — retry did not improve.
+                            minFaceCheck.retried = true;
+                          }
+                        } else {
+                          minFaceCheck.retried = true;
+                        }
+                      }
+                    } else {
+                      console.warn(
+                        `[compose-video-clips] v262_min_face_gate scene=${scene.id} ` +
+                        `detection failed (${detect.error ?? "unknown"}) — skipping gate`,
+                      );
+                    }
+                  } catch (e) {
+                    console.warn(
+                      `[compose-video-clips] v262_min_face_gate scene=${scene.id} exception: ${(e as Error).message}`,
+                    );
+                  }
+                }
+                (scene as any).__minFaceCheck = minFaceCheck;
+
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
                   if (!skipAuditPersist) {
@@ -2453,6 +2604,7 @@ serve(async (req) => {
                         ok: okFinal,
                         identityFailure,
                         notes: identityNotes || undefined,
+                        min_face_check: minFaceCheck ?? undefined,
                         at: new Date().toISOString(),
                       },
                       // v131.6 — forensic trail per compose attempt.

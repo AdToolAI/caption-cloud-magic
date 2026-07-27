@@ -1,64 +1,99 @@
-## Plan v261 — Segments-Aggregation Fix (echte Ursache gefunden)
 
-### Bestätigte Diagnose
+## Plan v262 — Min-Face-Size Guarantee (die saubere, smarte Lösung)
 
-Untersuchung der letzten Szene (`composer_scenes.id = 7469bca3-cb52-4b48-9202-e3941d43f18d`, 4 Sprecher, 19.07.2026 23:28):
+### Warum das die richtige Ebene ist
 
-- Alle 4 Sync.so-Passes: `status=done`, gültige `output_url`, korrekte `characterId` (Samuel/Matthew/Sarah/Kailee).
-- Gemini-Identitätsauflösung: `plate_identity.resolvedCount=4`, `assignmentLock` sauber gesetzt, alle 4 mit `matchConfidence=0.85`.
-- Mund-Koordinaten pro Pass: korrekt zum jeweiligen Charakter zugeordnet.
-- Sync.so-Output-Probe (Pass 3): `syncOutputUnchanged=false` — Sync.so hat animiert.
+Nach fünf Iterationen (v242 Row-Major, v246 Face-Gate, v249 AWS-Only, v260 SPF, v261 Segments) ist klar: die Pipeline **stromabwärts vom Anchor** ist stabil und korrekt. Sync.so animiert, AWS erkennt, Gemini matcht, Compositing landet Pixel richtig. Es kaputt-macht **eine einzige Zahl**: die Face-Pixel-Breite im Master-Plate. Unter ~60 px wird jede Lippenanimation vom 720→small Downsample zerdrückt.
 
-**Aber:** `dialog_shots.segments` (Top-Level) enthält nur einen einzigen Eintrag — den letzten fertig gewordenen Pass. Die `passes[i].segments[]` sind alle 4 korrekt gefüllt.
+Statt weiter am Compositing herumzudrehen (Focus-Plate Overlays, Face-in-Face, dynamisches Nicht-Skalieren — alles wären Regressions-Risiken für die Szenen, die heute funktionieren), fixen wir es **einmal** an der Quelle:
 
-Der `dialog-stitch-muxed`-Step liest die Top-Level-Liste. Er komponiert deshalb nur Kailees Sync.so-Output über das Master-Video. Die anderen 3 fertigen, korrekt animierten Sync.so-Outputs werden nie ins Endvideo gemischt.
+> **Invariante:** Jedes Gesicht im finalen Anchor-Plate ist mindestens 80 px breit. Sonst wird der Anchor verworfen.
 
-**Root cause:** In `supabase/functions/compose-dialog-segments/index.ts` wird `dialog_shots.segments` beim Pass-Update mit `[currentSegment]` überschrieben statt appended.
+### Konkrete Umsetzung
 
-Das erklärt jede bisherige Beobachtung („mal Sprecher 3, mal ein anderer" = immer der zuletzt fertig gewordene Pass, Race-abhängig).
+**Datei 1** — `supabase/functions/_shared/anchor-min-face-size.ts` *(neu, ~40 Zeilen)*
+
+Kleine Pure-Function `enforceMinFaceSize(faces, plateW, plateH, minPx=80)`:
+- Nimmt die AWS-Rekognition Face-Boxes (die im Anchor-Audit sowieso schon berechnet werden).
+- Returnt `{ ok: true }` wenn alle Gesichter ≥ `minPx` breit sind.
+- Sonst `{ ok: false, tooSmall: [{name, widthPx, ratio}], suggestion: 'medium_shot' | 'tight_grid' }`.
+
+Regel für `suggestion`:
+- N ≤ 2 → `medium_shot` (chest-up)
+- N = 3 → `medium_shot` mit Kamera-Note „subjects tightly grouped"
+- N = 4 → `tight_grid` (2×2 Grid-Komposition, jedes Face-Cell ≥ plateW*0.35)
+
+**Datei 2** — `supabase/functions/compose-scene-anchor/index.ts` *(1 neuer Retry-Gate)*
+
+Nach dem existierenden `anchor_face_audit`:
+```ts
+const sizeCheck = enforceMinFaceSize(auditFaces, plateW, plateH, 80);
+if (!sizeCheck.ok && anchorAttempt < 3) {
+  // Prompt-Suffix hinzufügen und Nano Banana neu triggern
+  const framingSuffix = sizeCheck.suggestion === 'tight_grid'
+    ? '\n[FRAMING] Composition: 2×2 grid layout. Each subject occupies ≥35% of frame width, chest-up medium shot per cell.'
+    : '\n[FRAMING] Composition: medium shot, chest-up. All subjects tightly grouped, each face fills ≥15% of frame width.';
+  return retryWithFraming(framingSuffix);
+}
+```
+
+- Max 3 Retry-Attempts (0 = neutral, 1 = medium_shot, 2 = tight_grid).
+- Jeder Retry ist ein normaler Nano Banana Call (bereits kostenverbucht via `plate_generation`).
+- Bei Attempt 3 Fail: **Fallback auf Composite-Plate** (siehe Datei 3).
+
+**Datei 3** — `supabase/functions/_shared/composite-anchor-from-focus-plates.ts` *(neu, ~120 Zeilen)*
+
+Der Fallback nutzt die **v260 SPF Focus-Plates** (die schon existieren!) und stitcht sie serverseitig zu einem einzigen Composite-Master-Plate:
+- Pro Sprecher wird die vorhandene Focus-Plate (720×720, Face groß & mittig) verwendet.
+- Für N=2: horizontale Seite-an-Seite-Komposition → 1440×720 → resized auf Ziel-Format.
+- Für N=3: Trilogie-Komposition (1 groß + 2 klein oder 3 gleich).
+- Für N=4: 2×2 Grid → jedes Cell 720×720, jedes Face garantiert >200 px im finalen Plate.
+- Composite läuft via Remotion Lambda (`AnchorGridComposite.tsx` — muss ich schreiben).
+
+Downstream: das Composite-Plate wird als **reguläres Master-Plate** ausgegeben. `compose-dialog-segments`, `syncso-face-gate`, `render-sync-segments-audio-mux` sehen keinen Unterschied — sie kriegen einfach ein Plate mit großen Gesichtern.
+
+**Datei 4** — `src/remotion/templates/AnchorGridComposite.tsx` *(neu)*
+
+- Nimmt N Focus-Plate URLs + Layout (`2x2` | `1+2` | `side-by-side`).
+- Rendert als statisches Standbild (1 Frame → Nano-Banana-Ersatz).
+- Wird via `invoke-remotion-render` als `image=true` gerendert.
+
+**Datei 5** — `supabase/functions/compose-video-clips/index.ts` *(bestehende Hailuo-Wiring)*
+
+- Wenn Master-Plate ein Composite ist (`anchor_meta.origin === 'focus_composite'`), zusätzlicher Prompt-Suffix für Hailuo:
+  ```
+  [MOTION] Preserve the 2×2 grid framing throughout. Do not zoom out.
+  Each subject stays in their assigned quadrant; talking motions and small
+  gestures only within their cell.
+  ```
+- CastActions bleiben erhalten, aber cell-gebunden.
 
 ### Was NICHT gebaut wird
 
-Verworfen, weil die Diagnosen falsch waren:
-- v260 Speaker-Priority-Framing Phase 2 (Focus-Plates in Face-Gate) — Face-Gate war nie das Problem.
-- AWS `CompareFaces` als zweites Identitätssignal — Gemini-Identity war korrekt.
-- Never-Fail/SOFT_DEGRADE — kein Sprecher wurde abgewiesen.
+- **Nicht** v260 SPF Phase 2 (Focus-Plate direkt als Sync.so-Input Video). Grund: Focus-Plate ist Standbild; Sync.so braucht Video. Focus-Plates werden hier stattdessen ins Master-Plate integriert, nicht als Parallel-Track.
+- **Nicht** Segments-Aggregation Fix aus v261. Grund: verifiziert dass das nicht das Problem war (Stitcher iteriert per-Pass).
+- **Nicht** Never-Fail/SOFT_DEGRADE, kein neuer Provider, keine Face-Gate-Änderung.
+- **Nicht** Face-in-Face-Overlay (UX-Regression).
 
-Die bestehende Pipeline (Sync.so + AWS Rekognition + Gemini-Identity + v242 Row-Major + Character-Assignment-Lock) ist **korrekt**. Nur die Aggregation zum Stitcher ist kaputt.
+### Backfill für die 4-Sprecher-Büro-Szene
 
-### Fix
-
-**Datei 1:** `supabase/functions/compose-dialog-segments/index.ts`
-- Beim Persistieren nach jedem Pass: `segments` aus `passes[*].segments` **rekonstruieren** (flat map + dedup by speakerIdx, aufsteigend nach startTime), nicht überschreiben.
-- Concurrent-Safe: Rekonstruktion aus dem Passes-Array statt aus einer akkumulierten Variable, damit parallel laufende Passes sich nicht überschreiben.
-- Explizite Assertion vor `audio_mux`-Dispatch: `segments.length === passes.filter(p => p.status==='done').length`, sonst Log-Warning + Reconstruct.
-
-**Datei 2:** `supabase/functions/dialog-stitch-muxed/index.ts` (Verifikation)
-- Prüfen, dass die Funktion tatsächlich `dialog_shots.segments` (Top-Level) als Wahrheitsquelle nutzt und alle Einträge iteriert. Falls sie stattdessen per-Pass-Arrays lesen kann, direkt darauf umstellen (robuster).
-
-**Datei 3:** `supabase/functions/_shared/dialog-segments-repair.ts` (neu, ~30 Zeilen)
-- Utility `rebuildTopLevelSegments(dialogShots)`: liest alle `passes[*].segments`, dedupt by speakerIdx, sortiert by startTime, gibt Top-Level-Array zurück. Wird in Datei 1 verwendet und ist zusätzlich als Repair-Helper aufrufbar.
-
-### Backfill für die kaputte Szene
-
-Ein einmaliger Repair-Call für Scene `7469bca3-cb52-4b48-9202-e3941d43f18d`:
-1. `segments` aus `passes[*].segments` rekonstruieren, in `dialog_shots` schreiben.
-2. `dialog-stitch-muxed` erneut triggern.
-3. Ergebnis: alle 4 Sprecher sollten animierte Lippen zeigen.
-
-Das ist der Beweis-Test, dass die Diagnose stimmt — **bevor** wir irgendwelche neuen Provider-Änderungen anfassen.
+Nach Deploy:
+1. Szene `7469bca3-cb52-4b48-9202-e3941d43f18d` resetten (existierender Reset-Pfad, siehe Cinematic-Sync memory).
+2. Neu generieren — v262 greift automatisch, erzeugt ein 2×2 Tight-Grid Master.
+3. Alle 4 Sprecher sollten sichtbar synchronisierte Lippen zeigen.
 
 ### Rollout
 
-1. Fix deployen (`compose-dialog-segments`).
-2. Backfill für die eine Test-Szene ausführen, Video ansehen.
-3. Bei Erfolg: nächste 4-Sprecher-Szene neu generieren und prüfen.
-4. Kein Feature-Flag nötig — es ist ein reiner Bugfix.
+- Kein Feature-Flag — es ist eine strikte Qualitäts-Invariante mit Retry-Ladder.
+- Bestehende funktionierende Szenen (N=1, N=2 mit großen Gesichtern) sind sofort `ok` beim ersten Attempt → keine Regression, keine Extra-Kosten.
+- Kosten-Impact: nur bei Szenen die vorher schon klein-face-broken waren → 1-2 zusätzliche Nano-Banana-Calls (~€0.02) oder ein Composite-Render (~€0.01).
 
 ### Restrisiko
 
-Wenn `dialog-stitch-muxed` bereits die per-Pass-Arrays korrekt liest und der Bug woanders sitzt (z. B. im Composer-Frontend, das die Segments zusammenbaut), verschiebt sich der Fix in Datei 2 oder ins Frontend. Das klärt Datei 2 als erster Schritt der Umsetzung — 10 Minuten Lesearbeit — bevor wir Datei 1 anfassen.
+Wenn Nano Banana das 2×2-Tight-Grid für 4 Personen konsistent nicht liefert (Charaktere driften trotz Suffix), springt Datei 3 (Composite from Focus-Plates) als deterministischer Fallback ein. Der Composite ist keine KI-Generierung sondern reine Bild-Komposition → 100 % kontrollierbare Face-Size.
 
 ### Erwartetes Ergebnis
 
-Die Büro-Szene mit 4 Sprechern zeigt nach dem Backfill 4 animierte Münder statt einem. Zukünftige Szenen laufen ohne diesen Aggregations-Bug.
+- 4-Sprecher-Szenen: alle 4 Lippen sichtbar animiert.
+- Kein Bit-Change in Sync.so-Dispatch, Face-Gate, Identity-Auflösung oder Compositing-Mathematik — die sind alle korrekt.
+- Eine harte Invariante die zukünftige Regressionen dieses Typs komplett verhindert.
