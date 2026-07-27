@@ -2205,9 +2205,10 @@ serve(async (req) => {
                   swap = false,
                   swapMismatches: string[] = [],
                   faceLock = false,
+                  framingSuffix = "",
                 ): Promise<string | null> => {
                   console.log(
-                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}${faceLock ? ", face-lock" : ""}]`,
+                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, identityRefs=${identityPortraitUrls.length}, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}${swap ? ", swap" : ""}${faceLock ? ", face-lock" : ""}${framingSuffix ? ", framing-retry" : ""}]`,
                   );
                   // v250 — enrich the anchor prompt with server-side
                   // [CastActions] block before the strippers run so
@@ -2248,6 +2249,7 @@ serve(async (req) => {
                         faceLockMode: faceLock,
                         wardrobeLock: wardrobeLockNamesCS.length > 0,
                         wardrobeLockNames: wardrobeLockNamesCS,
+                        framingSuffix,
                       }),
                     },
                   );
