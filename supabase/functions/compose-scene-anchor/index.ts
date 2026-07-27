@@ -579,6 +579,57 @@ serve(async (req) => {
       return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)), mime: m, ext: e2 };
     };
 
+    // v271 — Gemini 3 Pro Image via Lovable Gateway (chat-completions image shape).
+    // Same payload as Nano Banana 2 but with a stronger model; better identity
+    // preservation + better environment retention for multi-speaker scenes.
+    const callGemini3ProImage = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
+      const userContent: any[] = [{ type: "text", text: editInstruction }];
+      for (const url of portraits) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of locationUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of buildingUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of propUrls) userContent.push({ type: "image_url", image_url: { url } });
+      for (const url of identityPortraits) userContent.push({ type: "image_url", image_url: { url } });
+
+      const ac = new AbortController();
+      const timeoutId = setTimeout(() => ac.abort(), 90_000);
+      let aiResp: Response;
+      try {
+        aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-pro-image",
+            messages: [{ role: "user", content: userContent }],
+            modalities: ["image", "text"],
+            ...(faceLockMode ? { temperature: 0 } : {}),
+          }),
+          signal: ac.signal,
+        });
+      } catch (e) {
+        clearTimeout(timeoutId);
+        console.warn(`[compose-scene-anchor] gemini3pro ${(e as any)?.name === "AbortError" ? "timeout" : "network"} sceneId=${body.sceneId}`);
+        return null;
+      }
+      clearTimeout(timeoutId);
+      if (!aiResp.ok) {
+        console.error("[compose-scene-anchor] gemini3pro error", aiResp.status, (await aiResp.text()).slice(0, 300));
+        return null;
+      }
+      const aiJson = await aiResp.json();
+      const dataUrl: string | undefined = aiJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (!dataUrl || !dataUrl.startsWith("data:image")) {
+        console.error("[compose-scene-anchor] gemini3pro no image", JSON.stringify(aiJson).slice(0, 300));
+        return null;
+      }
+      const [meta, b64] = dataUrl.split(",", 2);
+      const m = /data:(image\/[a-z+]+);/.exec(meta)?.[1] ?? "image/png";
+      const e2 = m.includes("png") ? "png" : m.includes("webp") ? "webp" : "jpg";
+      return { bytes: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)), mime: m, ext: e2 };
+    };
+
     const callSeedream4 = async (): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> => {
       // Direct Replicate API — same pattern as animate-scene-hailuo.
       // 90s timeout: Seedream 4 typically finishes in 10–30s for a single image.
