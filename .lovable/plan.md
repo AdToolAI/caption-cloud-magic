@@ -1,40 +1,40 @@
-## Diagnose
+## Plan v271 — Multi-Anchor: Seedream ➜ Gemini 3 Pro Image + Lip-Sync-Diagnose
 
-Szene `d2aa4ad5…` (S01 HOOK):
+### Warum
+- **Seedream 4** freistellt/isoliert Personen bei 3+ Refs auf neutralem Grund und ignoriert die Location — genau der Bug im Screenshot (steifes Line-up ohne Büro).
+- **Flux Kontext Max** wäre eine Option, ist aber teurer und braucht neues Payload-Shape.
+- **Gemini 3 Pro Image** (`google/gemini-3-pro-image`) läuft schon über den Lovable AI Gateway (kein neuer Provider-Key), respektiert Multi-Image-Refs + Scene-Prompt gleichzeitig und hält Identität deutlich besser als Nano Banana 2 (der Grund, weshalb wir überhaupt weg wollten).
+- Der **kein-Lip-Sync-Effekt** ist eine separate Baustelle: durch das mit-generierte Baby (5. „Kopf") schlägt der Face-Match fehl → Sync.so Soft-Degrade → Master-Video ohne Sync. Wird sich mit korrektem Anchor (kein Baby, korrekter Count) automatisch bessern; wir verifizieren aber an der konkreten Szene.
 
-- `clip_status='ready'`, `clip_url` vorhanden, Video ist gerendert.
-- `audio_plan` existiert, aber `audio_plan.twoshot.url` ist `null` → Auto-Trigger ruft korrekt `compose-twoshot-audio` auf.
-- Der Aufruf schlägt clientseitig fehl mit **`Failed to send a request to the Edge Function`** (`FunctionsFetchError`). Das ist ein reiner Netzwerk-/Cold-Start-Fetch-Fehler des Browsers zur Edge-Function — die Function selbst bootet sauber (direkter Curl-Test antwortet mit HTTP 401 „Unauthorized", also erreicht Requests). In den Function-Logs erscheint der Request nie, was den Netzwerk-Klassen-Fehler bestätigt.
-- Der Fehler-Handler in `useTwoShotAutoTrigger.ts` (Zeile ~356–370) markiert die Szene bei **jedem** Fehler sofort als `twoshot_stage='failed' / lip_sync_status='failed'` — auch bei transienten Netzwerkfehlern. Dadurch bleibt die Szene ohne echten Grund als „fehlgeschlagen" liegen und der User muss manuell „Neu rendern" klicken.
+### Änderungen (Server, klein)
 
-Kurz: das Video ist okay, nur die Audio-Prep-Invocation ist einmal beim Fetch verunglückt und die Fehlerbehandlung ist zu hart.
+**1. `supabase/functions/compose-scene-anchor/index.ts` — Router-Switch**
+   - Neuer Flag-Wert: `ANCHOR_MODEL_MULTI = "gemini3pro"` als Default (statt `seedream4`).
+   - Erlaubte Werte: `gemini3pro` (neu, Default) | `nano_banana_2` (Fallback) | `seedream4` (nur bei explizitem Opt-in).
+   - Neue `callGemini3ProImage()`-Funktion: gleicher Prompt-Body wie Nano Banana 2 (chat-completions image shape, `modalities: ["image","text"]`), aber `model: "google/gemini-3-pro-image"`. Alle Refs (portraits + identity + locations + props) werden als `image_url`-Parts angehängt.
+   - Fallback-Kette bei Multi: `gemini3pro → nano_banana_2` (Seedream nur wenn Flag explizit).
 
-## Fix (klein, UI/Client-only)
+**2. Prompt-Fix (schmal): environment-first bei Multi-Speaker**
+   - Aktuell: „Place ${peopleNoun} into the following scene…". Neu für N≥2: das `Scene:`-Segment kommt **vor** „Place people". Verhindert isolate-Kompositionen.
+   - Kein Kind/Baby erzeugen: harte Negativ-Klausel `NEVER add extra subjects (no children, pets, or bystanders) — headcount MUST match the ${N} named speakers exactly`. Ergänzt bestehenden `EXACT_COUNT_SUFFIX`.
 
-1. **Transiente Fetch-Fehler als retryable behandeln** in `src/hooks/useTwoShotAutoTrigger.ts` (Zweig `needsAudioPrep`):
-   - Wenn `aErr` ein `FunctionsFetchError` ist **oder** die extrahierte Message eine der bekannten Netz-Signaturen enthält (`Failed to send a request`, `Failed to fetch`, `NetworkError`, `load failed`, `ECONNRESET`, `502`, `503`, `504`), **NICHT** `twoshot_stage='failed'` schreiben.
-   - Stattdessen `twoshot_stage` zurücksetzen (auf `null`), `clip_error` als weichen Hinweis setzen (`audio_prep_transient_retry`) und den Inflight-Marker sofort freigeben, damit der nächste 2,5s-Poll-Tick die Szene erneut aufnimmt.
-   - Harte Fehler (echte 4xx/5xx-Antworten mit strukturiertem Body wie `missing_voice`) verhalten sich weiter wie bisher: `twoshot_stage='failed'`.
+**3. Seedream-Prompt-Härtung (defensiv, falls jemand später zurückschaltet)**
+   - Selber environment-first + no-extra-subjects Suffix.
 
-2. **Max 2 Auto-Retries** pro Mount für diese Klasse (`autoRetried` Set wiederverwenden, Key `audio-prep-net:${sceneId}`). Danach als `failed` markieren, damit keine Endlos-Schleife entsteht.
+### Lip-Sync-Diagnose (kein Code, nur DB-Read im Build-Turn)
+- Aus Screenshot Scene ableiten (`/video-composer`, Szene 1 von 1). Ich lese im Build-Turn:
+  - `composer_scenes` Zeile: `audio_plan`, `dialog_turns`, `lip_sync_status`, `clip_error`, `lipsync_provider_result`.
+- Erwartetes Ergebnis: entweder `audio_plan.twoshot.url = null` (Audio-Prep hing noch, siehe v264) oder `face_gate_failed` (5-Kopf-Problem). Entsprechend: entweder Auto-Trigger erneut anstoßen oder Szene mit neuem Gemini-3-Pro-Anchor neu rendern (Baby verschwindet → Face-Match trifft).
+- Kein separater Codefix hier — die Diagnose zeigt ob v264 (Transient-Retry) oder v268 (Webhook-ready) greifen mussten.
 
-3. **Sanftes Reset der aktuellen Szene** `d2aa4ad5…`: einmalige DB-Korrektur
-   ```
-   UPDATE composer_scenes
-   SET twoshot_stage=NULL, lip_sync_status=NULL, clip_error=NULL, updated_at=now()
-   WHERE id='d2aa4ad5-9964-41cb-8a4f-81f6571183b6'
-     AND clip_url IS NOT NULL AND clip_status='ready';
-   ```
-   Kein Refund nötig (kein Sync.so-Job dispatched).
+### Nicht Teil dieses Plans
+- Kein Flux-Kontext-Max-Integration (bewusst zurückgestellt: erst Gemini-3-Pro-Ergebnis abwarten, dann entscheiden).
+- Keine Änderungen an Sync.so / compose-dialog-segments / compose-video-clips.
+- Keine Änderung an Credit-/Refund-Logik (Anchor selbst bucht keine Video-Credits).
 
-## Nicht Teil dieses Plans
+### Rollback
+- Env `ANCHOR_MODEL_MULTI=nano_banana_2` → sofort zurück auf alten Pfad ohne Deploy.
+- Env `ANCHOR_MODEL_MULTI=seedream4` → aktueller Pfad bleibt erreichbar für A/B-Tests.
 
-- Keine Änderungen an `compose-twoshot-audio`, `compose-dialog-segments` oder Anchor/Seedream-Logik.
-- Kein neues UI-Element — der bestehende „Lip-Sync wird gestartet…"-Progress bleibt sichtbar, während der stille Retry läuft.
-- Kreditlogik unverändert (Audio-Prep verbraucht keine Video-Credits; TTS-Credits werden erst bei erfolgreicher Function-Ausführung abgebucht).
-
-## Technische Details
-
-- Datei: `src/hooks/useTwoShotAutoTrigger.ts` — `.then()`-Handler des `compose-twoshot-audio`-Invokes (~Z. 356–386).
-- Klassifikator: kleine Helper-Funktion `isTransientInvokeError(err, msg)` direkt in derselben Datei, importfrei.
-- DB-Korrektur: einmalige `UPDATE`-Migration via `supabase--migration` (idempotent auf `id`).
+### Erfolgskriterium
+- Neue Test-Szene: 4 Sprecher im echten Büro-Hintergrund, kein zusätzliches Kind/Objekt, Identitäten treffen, Lip-Sync läuft auf allen 4.
