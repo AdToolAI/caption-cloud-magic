@@ -481,8 +481,13 @@ serve(async (req) => {
       ? ` SPEAKER PRIORITY FRAMING — ${speakerFocusName} is the current active speaker for this shot. Place ${speakerFocusName} in the FOREGROUND, clearly closer to camera than the other cast members, framed at a FRONT or slight THREE-QUARTER angle with the mouth and jaw fully visible and unobstructed by hands, phones, props, hair or microphones (sync-3 needs a readable mouth on this speaker). ${speakerFocusName}'s face must occupy a visibly larger share of the frame than any other cast member, positioned in the upper third of the composition. The OTHER cast members remain in the SAME room performing their CHARACTER ACTIONS above (phone, laptop, printer, coffee, etc.) but they are staged in the MID-ground or BACKGROUND, slightly turned away, in profile, or engaged with their prop so their attention does not compete with ${speakerFocusName}'s face for the viewer. Every cast face still stays visible enough that a face detector can find ${N} distinct people, but only ${speakerFocusName} is framed talking-head-ready. Do NOT change the camera position or focal length compared to sibling plates — depth staging changes, camera lock does not.`
       : "";
 
+    // v262 — framing-retry suffix. Appended AFTER all standard clauses so
+    // the model reads it as a CORRECTIVE override on top of them. Empty
+    // string when the caller didn't request a retry.
+    const FRAMING_RETRY_SUFFIX = framingSuffix ? ` ${framingSuffix}` : "";
+
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${worldClause}${identityClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${CAST_ACTIONS_CLAUSE}${SPEAKER_PRIORITY_FRAMING_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${STRICT_SWAP_SUFFIX}${FACE_LOCK_SUFFIX}${FAMILY_DISTINGUISH_SUFFIX}${WARDROBE_LOCK_SUFFIX}${FRAMING_RETRY_SUFFIX}${worldClause}${identityClause} ` +
 
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
