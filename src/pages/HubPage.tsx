@@ -4,6 +4,7 @@ import { Lock, ArrowRight } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { hubDefinitions, type HubSubItem } from "@/config/hubConfig";
+import { hubCovers } from "@/config/hubCovers";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
