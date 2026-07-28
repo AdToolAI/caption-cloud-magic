@@ -711,7 +711,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Founders · 04", "Founders · 04", "Founders · 04"],
         ["24 Monate voller Preis-Sicherheit.", "24 months of price certainty.", "24 meses de precio seguro."],
         [
-          "Vom ersten Tag bis Monat 24: dein Preis ist fix. Keine stillen Erhöhungen, keine „Fair-Use"-Aufschläge, kein Kleingedrucktes.",
+          "Vom ersten Tag bis Monat 24: dein Preis ist fix. Keine stillen Erhöhungen, keine Fair-Use-Aufschläge, kein Kleingedrucktes.",
           "From day one to month 24: your price is fixed. No silent bumps, no fair-use surcharges, no small print.",
           "Del día uno al mes 24: tu precio es fijo. Sin subidas silenciosas, sin recargos de fair-use, sin letra pequeña.",
         ],
