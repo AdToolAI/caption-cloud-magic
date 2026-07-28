@@ -23,13 +23,20 @@ export const MissionFeatures = () => {
   const [selectedProof, setSelectedProof] = useState<StudioKey | null>(null);
   const { t } = useTranslation();
 
-  const missions = [
+  const missions: {
+    icon: typeof CalendarDays;
+    title: string;
+    description: string;
+    step: string;
+    outcomeKey: OutcomeKey;
+    Cockpit: typeof PlanCockpit;
+  }[] = [
     {
       icon: CalendarDays,
       title: t("landing.mission.planMonth"),
       description: t("landing.mission.planMonthDesc"),
       step: "01",
-      featureId: "planMonth",
+      outcomeKey: "planMonth",
       Cockpit: PlanCockpit,
     },
     {
@@ -37,7 +44,7 @@ export const MissionFeatures = () => {
       title: t("landing.mission.optimizePerformance"),
       description: t("landing.mission.optimizePerformanceDesc"),
       step: "02",
-      featureId: "optimizePerformance",
+      outcomeKey: "optimizePerformance",
       Cockpit: SignalCockpit,
     },
     {
@@ -45,16 +52,16 @@ export const MissionFeatures = () => {
       title: t("landing.mission.scaleCampaigns"),
       description: t("landing.mission.scaleCampaignsDesc"),
       step: "03",
-      featureId: "scaleCampaigns",
+      outcomeKey: "scaleCampaigns",
       Cockpit: ScaleCockpit,
     },
   ];
 
-  const proofs = [
-    { icon: Zap, label: t("landing.mission.proof.multiProvider") },
-    { icon: Film, label: t("landing.mission.proof.lipSync") },
-    { icon: Users, label: t("landing.mission.proof.castLock") },
-    { icon: ShieldCheck, label: t("landing.mission.proof.priceGuarantee") },
+  const proofs: ProofItem[] = [
+    { icon: Zap, label: t("landing.mission.proof.multiProvider"), studio: "multiProvider" },
+    { icon: Film, label: t("landing.mission.proof.lipSync"), studio: "motion" },
+    { icon: Users, label: t("landing.mission.proof.castLock"), studio: "cast" },
+    { icon: ShieldCheck, label: t("landing.mission.proof.priceGuarantee"), studio: "priceGuarantee" },
   ];
 
   return (
