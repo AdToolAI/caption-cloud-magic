@@ -45,12 +45,14 @@ export const StudioStorylineDialog = ({ studio, href, onOpenChange, studioTitle 
     progressStart.current = Date.now();
   }, [slides.length]);
 
+  const currentDuration = slides[index]?.durationMs ?? AUTOPLAY_MS;
+
   // autoplay
   useEffect(() => {
     if (!open || reduce || paused || hovered) return;
-    const t = setTimeout(advance, AUTOPLAY_MS);
+    const t = setTimeout(advance, currentDuration);
     return () => clearTimeout(t);
-  }, [open, reduce, paused, hovered, index, advance]);
+  }, [open, reduce, paused, hovered, index, advance, currentDuration]);
 
   // keyboard
   useEffect(() => {
@@ -88,7 +90,7 @@ export const StudioStorylineDialog = ({ studio, href, onOpenChange, studioTitle 
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-gold-dark"
             initial={{ width: "0%" }}
             animate={{ width: autoplayActive ? "100%" : "0%" }}
-            transition={{ duration: autoplayActive ? AUTOPLAY_MS / 1000 : 0, ease: "linear" }}
+            transition={{ duration: autoplayActive ? currentDuration / 1000 : 0, ease: "linear" }}
           />
         </div>
 

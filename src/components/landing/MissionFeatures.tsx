@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, BarChart3, Rocket, ArrowRight, Zap, Film, Users, ShieldCheck } from "lucide-react";
+import { CalendarDays, BarChart3, Rocket, ArrowUpRight, Zap, Film, Users, ShieldCheck } from "lucide-react";
 import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
 import { useTranslation } from "@/hooks/useTranslation";
 import { PlanCockpit } from "./cockpits/PlanCockpit";
@@ -125,11 +125,22 @@ export const MissionFeatures = () => {
                 whileHover={{ y: -4 }}
                 className="group relative"
               >
-                <div className="relative bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl p-6 h-full hover:border-primary/50 transition-all duration-500 hover:shadow-[var(--shadow-glow-gold)] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setSelectedMission(mission.featureId)}
+                  className="relative w-full text-left bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl p-6 h-full hover:border-primary/50 transition-all duration-500 hover:shadow-[var(--shadow-glow-gold)] overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 cursor-pointer"
+                  aria-label={mission.title}
+                >
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-gold-dark transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
 
                   <div className="absolute top-4 right-4 text-5xl font-bold text-border/30 font-display pointer-events-none">
                     {mission.step}
+                  </div>
+
+                  <div className="absolute top-4 right-4 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <div className="w-8 h-8 rounded-full bg-background/70 border border-primary/30 flex items-center justify-center group-hover:border-primary/70 group-hover:bg-background transition-colors">
+                      <ArrowUpRight className="h-4 w-4 text-primary" />
+                    </div>
                   </div>
 
                   {/* Live-Metric Cockpit */}
@@ -153,15 +164,12 @@ export const MissionFeatures = () => {
                       <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                       {t("landing.mission.betaPreview")}
                     </div>
-                    <button
-                      onClick={() => setSelectedMission(mission.featureId)}
-                      className="flex items-center gap-1.5 text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:underline"
-                    >
-                      <span>{t("landing.mission.learnMore")}</span>
-                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
+                    <span className="inline-flex items-center gap-1.5 text-primary text-sm font-medium opacity-70 group-hover:opacity-100 transition-opacity">
+                      {t("landing.mission.learnMore")}
+                      <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </span>
                   </div>
-                </div>
+                </button>
               </motion.div>
             ))}
           </div>
