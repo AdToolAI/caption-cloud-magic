@@ -45,12 +45,14 @@ export const StudioStorylineDialog = ({ studio, href, onOpenChange, studioTitle 
     progressStart.current = Date.now();
   }, [slides.length]);
 
+  const currentDuration = slides[index]?.durationMs ?? AUTOPLAY_MS;
+
   // autoplay
   useEffect(() => {
     if (!open || reduce || paused || hovered) return;
-    const t = setTimeout(advance, AUTOPLAY_MS);
+    const t = setTimeout(advance, currentDuration);
     return () => clearTimeout(t);
-  }, [open, reduce, paused, hovered, index, advance]);
+  }, [open, reduce, paused, hovered, index, advance, currentDuration]);
 
   // keyboard
   useEffect(() => {
