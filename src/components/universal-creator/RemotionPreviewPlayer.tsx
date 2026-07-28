@@ -107,8 +107,8 @@ export function RemotionPreviewPlayer({
   height = 1920,
   durationInFrames = 300,
   fps = 30,
-  loop: loopProp = false,
-  autoPlay = false,
+  loop: loopProp = true,
+  autoPlay = true,
   showControls = true,
   className,
 }: RemotionPreviewPlayerProps) {
