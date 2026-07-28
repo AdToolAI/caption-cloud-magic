@@ -1,42 +1,68 @@
 ## Ziel
-Jeder Provider im "AI Models Arsenal" auf der Startseite bekommt ein passendes, hochwertiges Cover-Bild — im gleichen filmischen Bond-2028-Look wie die bestehenden (Kling, Sora, Veo Pro etc.). Aktuell haben ~15 von 32 Modellen kein Cover und fallen auf den generischen Genre-Hero zurück, wodurch die Karten leer wirken.
+Der Bereich „Why this tool wins the game" (`MissionFeatures.tsx`) wird zum **Live-Metrik-Cockpit** im Bond-2028-Look — ohne erfundene Zahlen. Alle Werte sind qualitative Demo-Visualisierungen mit deutlich sichtbarem **„Beta Preview"**-Label.
 
-## Scope (nur Frontend / Assets)
-Keine Änderung an Business-Logik, Pipelines, Backend. Reine Presentation-Ebene:
-- `src/assets/landing/ai-arsenal/gen/` — neue JPGs (1024×1024, filmisch)
-- `src/components/landing/ai-arsenal/arsenalCatalog.ts` — imports + `cover:` pro Modell
+## Neue Section-Struktur
 
-## Fehlende Cover (15)
-**Video (10):** veo-3.1-fast, wan-2-6-standard, seedance-2-mini, seedance-pro, veo-3.1-lite-720p, grok-imagine, kling-3, kling-2.6, kling-2.5-turbo, pika-2-2-standard, vidu-q2-reference, vidu-q2-i2v, ltx-pro, happyhorse-pro
-**Image (1):** style-reference
+```text
+[Warum AdTool • Beta Preview]
+  Why this tool wins the game
+  Drei Schritte … skalierbar.
 
-## Visual Direction pro Provider
-Jedes Bild bekommt ein eigenes, thematisch passendes Motiv im Bond-2028-Look (deep black, gold accents, cinematic light, subtle glassmorphism), kein Text im Bild:
+┌───────────────────────┐ ┌───────────────────────┐ ┌───────────────────────┐
+│ 01  📅 Plan Cockpit   │ │ 02  📊 Signal Cockpit │ │ 03  🚀 Scale Cockpit  │
+│                       │ │                       │ │                       │
+│ Mini-Kalender-Heatmap │ │ Live-Sparkline        │ │ Radiale Progress-Ringe│
+│ (7×4 pulsierende Slots│ │ + animierter Counter  │ │ + „Auto-Publish"-     │
+│  in Gold, „optimal"-  │ │ (Reach ▲, CTR ▲) mit  │ │ Ticker mit fließenden │
+│  Slots leuchten)      │ │ Rising-Bars           │ │ Kanälen (TikTok,      │
+│                       │ │                       │ │  Meta, YT, X)         │
+│ „Plane deinen Monat"  │ │ „Optimiere Performance│ │ „Skaliere Kampagnen"  │
+│  Beschreibung…        │ │  Beschreibung…        │ │  Beschreibung…        │
+│                       │ │                       │ │                       │
+│ [Beta Preview]  →     │ │ [Beta Preview]  →     │ │ [Beta Preview]  →     │
+└───────────────────────┘ └───────────────────────┘ └───────────────────────┘
 
-| Modell | Motiv |
-|---|---|
-| Veo 3.1 Fast | Motion-blur Lichtstreifen, Speed-Trails, Gold-Cyan |
-| Veo 3.1 Lite | Klarer minimalistischer Kinoframe, sanftes Rim-Light |
-| Wan 2.6 | Physik-getriebene Wassertropfen in Slow-Motion, Gold |
-| Seedance 2 Pro | Tänzerin-Silhouette in dynamischer Pose, Bewegungsspur |
-| Seedance 2 Mini | Kompaktere Tanz-Silhouette, hellerer Akzent |
-| Grok Imagine | Neon-Cyan/Magenta Glow, xAI-typischer Retro-Futurismus |
-| Kling 3.0 | Zeremonielles Portrait, tiefe Schärfe, kinematisches Bokeh |
-| Kling 2.6 | Elegantes Fashion-Frame, warmes Goldlicht |
-| Kling 2.5 Turbo | Bewegungs-Streak eines fahrenden Autos bei Nacht |
-| Pika 2.2 | Zwei Keyframe-Karten mit sanfter Verbindungslinie |
-| Vidu Q2 Reference | Charakter-Triptychon, drei gleiche Gesichter aus 3 Winkeln |
-| Vidu Q2 I2V | Standbild löst sich in Bewegungs-Partikel auf |
-| LTX Pro | Filmset-Blende / Studio-Kamera mit Gold-Rim |
-| HappyHorse 1.1 Pro | Verspielte, warme Alltagsszene mit goldenem Highlight |
-| Style Reference | Farbpaletten-Swatches + Portrait, das die Palette annimmt |
+Untere Leiste: 4 Micro-Beweiskacheln (rein qualitativ):
+  ⚡ Multi-Provider  │  🎬 Cinematic Lip-Sync  │  🧠 Cast & World Lock  │  🔒 Beta-Preisgarantie
+```
 
-Qualitätsstufe: `standard` (Foto-Detail, kein Text nötig), `.jpg`, 1024×1024.
+## Umsetzung (Frontend only, `MissionFeatures.tsx` + 3 neue Cockpit-Komponenten)
 
-## Änderungen
-1. 15 neue `.jpg`-Dateien in `src/assets/landing/ai-arsenal/gen/` via `imagegen`.
-2. `arsenalCatalog.ts`: 15 neue `import cover* from …` + `cover: cover*` in den jeweiligen `m(...)`-Einträgen einfügen.
+1. **Neue Komponenten** unter `src/components/landing/cockpits/`:
+   - `PlanCockpit.tsx` — 7×4 Grid pulsierender Zellen; goldene „optimal slots" leuchten in Wellen (framer-motion `staggerChildren` + Opazitäts-Loop). Keine Zahlen, nur Slots.
+   - `SignalCockpit.tsx` — SVG-Sparkline animiert per `pathLength`, darunter 4 kleine Rising-Bars. Ein weicher Counter (0 → „▲") ohne konkrete KPI-Zahl — stattdessen Labels „Reach", „CTR", „Watch-Time" mit ▲-Pfeil.
+   - `ScaleCockpit.tsx` — 4 kleine radiale Progress-Ringe (SVG `strokeDashoffset` Animation) für Kanäle (TikTok/Meta/YT/X) + darüber laufender „Auto-Publish"-Ticker mit `translateY`-Loop.
+   - Alle drei sind pure Presentational-Komponenten, respektieren `prefers-reduced-motion`, kein Data-Fetching, kein Netzwerk.
 
-## Verifikation
-- `tsgo`-Check saubere Imports
-- Startseite → Arsenal-Sektion → jede Karte hat jetzt ein einzigartiges Motiv (keine Fallback-Wiederholung mehr)
+2. **`MissionFeatures.tsx` Refactor**:
+   - Karten werden höher, Cockpit-Visual sitzt oben (h ~180px), darunter Icon+Titel+Beschreibung.
+   - Hover: Bond-Goldrand-Glow (`shadow-glow-gold`), leichter 3D-Tilt via `whileHover={{ y: -4 }}`, Cockpit-Animation beschleunigt.
+   - Jede Karte bekommt ein kleines **„Beta Preview"**-Chip unten links (Cyan-Punkt + Text), damit klar ist: Visualisierung, keine echten KPIs.
+   - Step-Nummer (01/02/03) bleibt als große Ghost-Zahl im Hintergrund.
+
+3. **Untere Beweisleiste (neu, gleiche Section)**:
+   - 4 kleine Glas-Kacheln mit Icon + Kurz-Label (rein qualitativ, keine Zahlen). Fade-In bei Viewport-Sicht.
+
+4. **Übersetzungen** in `src/lib/translations.ts`:
+   - Neue Keys (EN/DE/ES): `landing.mission.betaPreview`, `landing.mission.cockpit.plan.label`, `.signal.label`, `.scale.label`, `landing.mission.proof.multiProvider|lipSync|castLock|priceGuarantee`.
+   - Bestehende Titel/Beschreibungen unverändert.
+
+5. **Design-Tokens**: Nur bestehende Tokens (`primary`, `gold-dark`, `accent`, `shadow-glow-gold`, `card`, `border`). Keine hartkodierten Farben.
+
+6. **Motion-Regeln**: Alle Loops respektieren `useReducedMotion()` von framer-motion (freeze auf statisches Frame).
+
+## Ehrlichkeits-Guard
+- **Kein einziger konkreter Zahlenwert** (kein „+248%", kein „12.400 Reichweite"). Nur Pfeile (▲), Slot-Leuchten, Fortschrittsringe ohne %-Zahl.
+- **Beta-Preview-Chip** auf jeder Cockpit-Karte.
+- Beweisleiste zeigt nur Feature-Namen, keine Metriken.
+
+## Nicht enthalten
+- Kein Backend-Call, keine echten Nutzerdaten (per deiner Antwort ausgeschlossen).
+- Keine Änderung an Text der Section-Headline oder Subtitle.
+- Keine Änderung an anderen Landing-Sections.
+
+## Technische Details
+- Neue Dateien: `PlanCockpit.tsx`, `SignalCockpit.tsx`, `ScaleCockpit.tsx`.
+- Geänderte Dateien: `MissionFeatures.tsx`, `src/lib/translations.ts`.
+- Libraries: framer-motion (bereits im Projekt), keine neuen Deps.
+- Accessibility: `aria-hidden` auf reine Deko-SVGs, `role="img"` mit `aria-label` auf Cockpit-Container.
