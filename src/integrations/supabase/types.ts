@@ -8376,6 +8376,24 @@ export type Database = {
           },
         ]
       }
+      instant_avatar_rate: {
+        Row: {
+          created_at: string
+          id: string
+          ip_hash: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_hash: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_hash?: string
+        }
+        Relationships: []
+      }
       kv_secrets_backup: {
         Row: {
           created_at: string
