@@ -236,7 +236,17 @@ export default function TeamWorkspace() {
       supabase.from("content_approvals").select("*").eq("workspace_id", selectedWorkspace)
         .order("created_at", { ascending: false }),
     ]);
-    setMembers(m || []);
+    let hydrated = m || [];
+    if (hydrated.length > 0) {
+      const ids = Array.from(new Set(hydrated.map((x: any) => x.user_id)));
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, display_name, email, avatar_url")
+        .in("id", ids);
+      const byId = new Map((profs || []).map((p: any) => [p.id, p]));
+      hydrated = hydrated.map((x: any) => ({ ...x, profile: byId.get(x.user_id) || null }));
+    }
+    setMembers(hydrated);
     setTasks(ts || []);
     setApprovals(ap || []);
   };
@@ -279,21 +289,54 @@ export default function TeamWorkspace() {
     e.preventDefault();
     if (!selectedWorkspace) return;
     try {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-      const { error } = await supabase.from("workspace_invitations").insert({
-        workspace_id: selectedWorkspace,
-        email: inviteForm.email,
-        role: inviteForm.role,
-        invited_by: user!.id,
-        expires_at: expiresAt.toISOString(),
+      const { data, error } = await supabase.functions.invoke("send-workspace-invitation", {
+        body: {
+          workspaceId: selectedWorkspace,
+          email: inviteForm.email,
+          role: inviteForm.role,
+        },
       });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
       toast({ title: t("success"), description: t("team.inviteSent") });
       setShowInviteMember(false);
       setInviteForm({ email: "", role: "viewer" });
       if (isEnterprise) await updateWorkspaceSeats();
     } catch (error: any) {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const updateTaskStatus = async (taskId: string, status: string) => {
+    const prev = tasks;
+    setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    const { error } = await supabase.from("content_tasks").update({ status }).eq("id", taskId);
+    if (error) {
+      setTasks(prev);
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    const prev = tasks;
+    setTasks(tasks.filter((t) => t.id !== taskId));
+    const { error } = await supabase.from("content_tasks").delete().eq("id", taskId);
+    if (error) {
+      setTasks(prev);
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const decideApproval = async (approvalId: string, decision: "approved" | "rejected") => {
+    if (!user) return;
+    const prev = approvals;
+    setApprovals(approvals.map((a) => (a.id === approvalId ? { ...a, status: decision } : a)));
+    const { error } = await supabase
+      .from("content_approvals")
+      .update({ status: decision, approver_id: user.id, approved_at: new Date().toISOString() })
+      .eq("id", approvalId);
+    if (error) {
+      setApprovals(prev);
       toast({ title: t("error"), description: error.message, variant: "destructive" });
     }
   };
