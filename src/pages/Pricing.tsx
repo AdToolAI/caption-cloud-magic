@@ -382,6 +382,11 @@ const Pricing = () => {
               </p>
             )}
 
+            <div className="max-w-3xl mx-auto mb-8">
+              <RefundPolicyMini />
+            </div>
+
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {Object.entries(AI_VIDEO_CREDIT_PACKS).map(([key, pack], idx) => {
                 const isPopular = pack.popular;
