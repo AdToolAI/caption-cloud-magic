@@ -44,7 +44,30 @@ import {
   SceneCastDropVisual,
 } from "./castJourneyVisuals";
 
-export type StudioKey = "cast" | "motion" | "video" | "picture" | "music" | "voice";
+import {
+  ProviderConstellationVisual,
+  RouteBestPickVisual,
+  FallbackChainVisual,
+  CostGuardMeterVisual,
+  LatencyDuelVisual,
+  UnifiedOutputVisual,
+  FoundersSeatCounterVisual,
+  PriceLock24mVisual,
+  DiscountShieldVisual,
+  TimelineGuaranteeVisual,
+  SeatMap1000Visual,
+  SavingsCurveVisual,
+} from "./proofVisuals";
+
+export type StudioKey =
+  | "cast"
+  | "motion"
+  | "video"
+  | "picture"
+  | "music"
+  | "voice"
+  | "multiProvider"
+  | "priceGuarantee";
 
 export type StorylineSlide = {
   kind: "cinematic" | "ui";
