@@ -16,6 +16,8 @@ export interface HubSubItem {
   descKey: string;
   icon: LucideIcon;
   plan?: string;
+  /** Optional override for the card cover image (defaults to hub-level cover). */
+  cover?: string;
 }
 
 export interface HubDefinition {
