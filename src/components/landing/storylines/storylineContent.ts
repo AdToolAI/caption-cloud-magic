@@ -40,6 +40,7 @@ import {
   AnchorMorphVisual,
   IdentityLockVisual,
   WardrobeCarouselVisual,
+  CharacterLoadoutVisual,
   VoiceBindingVisual,
   SceneCastDropVisual,
 } from "./castJourneyVisuals";
