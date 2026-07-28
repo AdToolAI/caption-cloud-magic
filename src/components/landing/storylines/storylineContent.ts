@@ -44,7 +44,30 @@ import {
   SceneCastDropVisual,
 } from "./castJourneyVisuals";
 
-export type StudioKey = "cast" | "motion" | "video" | "picture" | "music" | "voice";
+import {
+  ProviderConstellationVisual,
+  RouteBestPickVisual,
+  FallbackChainVisual,
+  CostGuardMeterVisual,
+  LatencyDuelVisual,
+  UnifiedOutputVisual,
+  FoundersSeatCounterVisual,
+  PriceLock24mVisual,
+  DiscountShieldVisual,
+  TimelineGuaranteeVisual,
+  SeatMap1000Visual,
+  SavingsCurveVisual,
+} from "./proofVisuals";
+
+export type StudioKey =
+  | "cast"
+  | "motion"
+  | "video"
+  | "picture"
+  | "music"
+  | "voice"
+  | "multiProvider"
+  | "priceGuarantee";
 
 export type StorylineSlide = {
   kind: "cinematic" | "ui";
@@ -547,6 +570,178 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
           "Assign per-line: Sprecher 1, 2, 3, 4. Voice Studio rendert alle in einem Rutsch und liefert eine saubere, gemischte Dialogdatei — bereit für Motion Studio.",
           "Assign per line: speaker 1, 2, 3, 4. Voice Studio renders them all in one pass and delivers a clean, mixed dialogue file — ready for Motion Studio.",
           "Asigna por línea: hablante 1, 2, 3, 4. Voice Studio los renderiza en una pasada y entrega un archivo mezclado — listo para Motion Studio.",
+        ],
+      ),
+    },
+  ],
+  multiProvider: [
+    {
+      kind: "ui",
+      UIComponent: ProviderConstellationVisual,
+      durationMs: 5000,
+      copy: S(
+        ["Multi-Provider · 01", "Multi-provider · 01", "Multi-provider · 01"],
+        ["Ein Zugang, jede KI.", "One account, every AI.", "Una cuenta, cada IA."],
+        [
+          "Kling, Hailuo, Sora, Veo, Runway, Luma, Flux, Stable Diffusion — alles unter einem Dach. Kein Provider-Hopping, keine 8 Rechnungen.",
+          "Kling, Hailuo, Sora, Veo, Runway, Luma, Flux, Stable Diffusion — all under one roof. No provider-hopping, no 8 invoices.",
+          "Kling, Hailuo, Sora, Veo, Runway, Luma, Flux, Stable Diffusion — todo bajo un techo. Sin saltar de proveedor, sin 8 facturas.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: RouteBestPickVisual,
+      durationMs: 5000,
+      copy: S(
+        ["Multi-Provider · 02", "Multi-provider · 02", "Multi-provider · 02"],
+        ["Wir routen zum besten Modell.", "We route to the best model.", "Enrutamos al mejor modelo."],
+        [
+          "Für jeden Job scoren wir Provider live nach Qualität, Preis und Latenz. Der Gewinner rendert — vollautomatisch.",
+          "For every job we score providers live by quality, price and latency. The winner renders — fully automatic.",
+          "Para cada trabajo puntuamos proveedores en vivo por calidad, precio y latencia. El ganador renderiza — automático.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: FallbackChainVisual,
+      durationMs: 4800,
+      copy: S(
+        ["Multi-Provider · 03", "Multi-provider · 03", "Multi-provider · 03"],
+        ["Fällt einer aus, springt der nächste.", "If one fails, the next steps in.", "Si uno falla, entra el siguiente."],
+        [
+          "Primary → Fallback → Safety. Wenn ein Provider zickt oder in Wartung ist, übernimmt automatisch der nächste. Deine Kampagne merkt nichts.",
+          "Primary → Fallback → Safety. If a provider stumbles or hits maintenance, the next one takes over automatically. Your campaign never notices.",
+          "Primary → Fallback → Safety. Si un proveedor falla o está en mantenimiento, el siguiente entra automáticamente.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: CostGuardMeterVisual,
+      durationMs: 4800,
+      copy: S(
+        ["Multi-Provider · 04", "Multi-provider · 04", "Multi-provider · 04"],
+        ["Cost-Guard schützt dein Budget.", "Cost-Guard protects your budget.", "Cost-Guard protege tu presupuesto."],
+        [
+          "Jeder Render bekommt eine harte Budget-Kappe. Sobald die Prognose kippt, routen wir zum günstigeren Provider oder pausieren die Queue.",
+          "Every render has a hard budget cap. The moment the forecast tips, we route to a cheaper provider or pause the queue.",
+          "Cada render tiene un tope duro. Si el pronóstico se dispara, enrutamos a un proveedor más barato o pausamos la cola.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: LatencyDuelVisual,
+      durationMs: 4800,
+      copy: S(
+        ["Multi-Provider · 05", "Multi-provider · 05", "Multi-provider · 05"],
+        ["Sekunden schlagen Minuten.", "Seconds beat minutes.", "Segundos vencen minutos."],
+        [
+          "Bei Deadline-Jobs zählt Latenz mehr als Preis. Der Router priorisiert automatisch die schnellste Route — perfekt für Reactive-Content.",
+          "For deadline jobs, latency beats price. The router automatically picks the fastest route — perfect for reactive content.",
+          "Para jobs con deadline, la latencia manda. El router elige la ruta más rápida — perfecto para contenido reactivo.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: UnifiedOutputVisual,
+      durationMs: 4800,
+      copy: S(
+        ["Multi-Provider · 06", "Multi-provider · 06", "Multi-provider · 06"],
+        ["Ein Output-Format. Immer.", "One output format. Always.", "Un formato de salida. Siempre."],
+        [
+          "Egal welcher Provider — du bekommst dieselbe Qualität, denselben Codec, denselben Farbraum. Deine Timeline bleibt konsistent.",
+          "Whichever provider — you get the same quality, codec and colour space. Your timeline stays consistent.",
+          "Sea cual sea el proveedor — misma calidad, mismo códec, mismo color. Tu timeline se mantiene consistente.",
+        ],
+      ),
+    },
+  ],
+  priceGuarantee: [
+    {
+      kind: "ui",
+      UIComponent: FoundersSeatCounterVisual,
+      durationMs: 5000,
+      copy: S(
+        ["Founders · 01", "Founders · 01", "Founders · 01"],
+        ["Nur 1 000 Founder-Plätze.", "Only 1,000 founder seats.", "Solo 1.000 plazas de founder."],
+        [
+          "Die ersten 1 000 Founders sichern sich exklusive Konditionen. Jeder Slot ist gezählt — wenn er weg ist, ist er weg.",
+          "The first 1,000 founders lock in exclusive terms. Every seat is counted — once it's gone, it's gone.",
+          "Los primeros 1.000 founders aseguran condiciones exclusivas. Cada plaza cuenta — cuando se agota, se agota.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: PriceLock24mVisual,
+      durationMs: 5000,
+      copy: S(
+        ["Founders · 02", "Founders · 02", "Founders · 02"],
+        ["14,95 € für 24 Monate.", "€14.95 for 24 months.", "14,95 € durante 24 meses."],
+        [
+          "Der Founder-Preis ist auf 24 Monate garantiert. Egal wie sich unsere reguläre Preisliste entwickelt — deine 14,95 € stehen fest.",
+          "The founder price is guaranteed for 24 months. No matter how our regular pricing evolves — your €14.95 stays put.",
+          "El precio founder está garantizado 24 meses. Pase lo que pase con la tarifa regular — tus 14,95 € se mantienen.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: DiscountShieldVisual,
+      durationMs: 4800,
+      copy: S(
+        ["Founders · 03", "Founders · 03", "Founders · 03"],
+        ["Plus 20 % Founder-Rabatt.", "Plus 20 % founder discount.", "Además 20 % de descuento founder."],
+        [
+          "Zusätzlich zum Beta-Preis bekommen Founders 20 % Rabatt on top. Automatisch bei jeder Rechnung — solange dein Abo läuft.",
+          "On top of the beta price, founders get an extra 20 % discount. Applied automatically to every invoice — as long as your subscription runs.",
+          "Sobre el precio beta, los founders reciben un 20 % extra. Aplicado automáticamente en cada factura — mientras dure tu suscripción.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: TimelineGuaranteeVisual,
+      durationMs: 5200,
+      copy: S(
+        ["Founders · 04", "Founders · 04", "Founders · 04"],
+        ["24 Monate voller Preis-Sicherheit.", "24 months of price certainty.", "24 meses de precio seguro."],
+        [
+          "Vom ersten Tag bis Monat 24: dein Preis ist fix. Keine stillen Erhöhungen, keine Fair-Use-Aufschläge, kein Kleingedrucktes.",
+          "From day one to month 24: your price is fixed. No silent bumps, no fair-use surcharges, no small print.",
+          "Del día uno al mes 24: tu precio es fijo. Sin subidas silenciosas, sin recargos de fair-use, sin letra pequeña.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: SeatMap1000Visual,
+      durationMs: 5000,
+      copy: S(
+        ["Founders · 05", "Founders · 05", "Founders · 05"],
+        ["Jeder Sitz ist sichtbar.", "Every seat is visible.", "Cada plaza es visible."],
+        [
+          "Wir zeigen die Founder-Map live: wie viele Plätze bereits vergeben sind und wie viele noch frei. Kein Fake-Countdown, echte Zahlen.",
+          "We show the founder map live: how many seats are taken and how many are still open. No fake countdown, real numbers.",
+          "Mostramos el mapa founder en vivo: cuántas plazas están tomadas y cuántas libres. Sin countdown falso, cifras reales.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: SavingsCurveVisual,
+      durationMs: 5000,
+      copy: S(
+        ["Founders · 06", "Founders · 06", "Founders · 06"],
+        ["− 90,96 € über 24 Monate.", "− €90.96 across 24 months.", "− 90,96 € en 24 meses."],
+        [
+          "Rechnet man Beta-Preis plus 20 % Founder-Rabatt gegen den regulären Tarif, sparst du über 24 Monate 90,96 €. Bei Kündigung ist der Vorteil weg.",
+          "Beta price plus 20 % founder discount vs. the regular tariff: you save €90.96 across 24 months. Cancel and the perk is gone.",
+          "Precio beta más 20 % de descuento vs. tarifa regular: ahorras 90,96 € en 24 meses. Cancelas y el beneficio se pierde.",
         ],
       ),
     },

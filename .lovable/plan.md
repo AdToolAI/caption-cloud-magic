@@ -1,52 +1,55 @@
-## Ziel
+# Plan v287 — Outcome-Storylines & Proof-Strip Interaktion
 
-1. Der Bereich **„Planen · Optimieren · Skalieren"** (3 Outcome-Cockpits) soll **komplett klickbar** werden – nicht nur der versteckte „Mehr erfahren"-Link.
-2. Die **Cast & World Storyline** im `StudioStorylineDialog` bekommt einen visuellen Deep-Dive: eine echte, animierte **Charakter-Erstellungs-Journey** statt statischer Slides.
+Zwei Baustellen im Abschnitt „Planen · Optimieren · Skalieren" auf `/` (Datei: `src/components/landing/MissionFeatures.tsx`):
 
----
+1. „Mehr erfahren" der 3 Cockpit-Karten öffnet aktuell den generischen `FeatureGuideDialog` (Timeline-Look). Der User will hier denselben Bond-Storyline-Effekt wie bei den Studio-Kacheln (`StudioStorylineDialog`) — animierte SVG-UI-Slides, 4-6 Sekunden Autoplay, Dots/Arrows, CTA.
+2. Die 4 Chips darunter (Multi-Provider Stack, Cinematic Lip-Sync, Cast & World Lock, Beta-Preisgarantie) sind pure `<div>`s ohne Interaktion. „Cast & World Lock" sollte die Cast-Storyline öffnen, die anderen drei jeweils passende Storylines/Ziele.
 
-## Teil 1 — Outcome-Cockpits klickbar (MissionFeatures.tsx)
+## Umsetzung
 
-Aktuell öffnet nur der kleine „Mehr erfahren"-Button den `FeatureGuideDialog`, und das auch nur beim Hover sichtbar. Änderungen:
+### A) Outcome-Storylines (Plan · Optimize · Scale)
 
-- Die drei Karten (`Plane deinen Monat`, `Optimiere Performance`, `Skaliere Kampagnen`) werden zu vollflächigen `<button>`-Elementen (analog zum `CapabilityBento`-Pattern).
-- Die ganze Karte triggert `setSelectedMission(mission.featureId)`.
-- Cursor `pointer`, Fokus-Ring, dauerhaft sichtbarer `ArrowUpRight`-Indikator oben rechts (statt Opacity-0-Hover-Link unten).
-- Hover-States (Border-Glow, gold-Underline, `-translate-y-1`) bleiben; wirken jetzt auf die ganze Karte.
-- Keine Business-Logik-Änderungen — nur Präsentations-Layer.
+- Neue Datei `src/components/landing/storylines/outcomeContent.ts`
+  - Typ `OutcomeKey = "planMonth" | "optimizePerformance" | "scaleCampaigns"`
+  - Je 5 Slides in DE/EN/ES, gleiches `StorylineSlide`-Schema wie `storylineContent.ts` (title, body, caption, visual, durationMs).
+- Neue Datei `src/components/landing/storylines/outcomeVisuals.tsx` — 15 animierte SVG-Komponenten im Bond-Gold-Stil:
+  - Plan: `HeatmapBuild`, `SlotAutoPick`, `ChannelMatrix`, `RecurrenceLoop`, `MonthLocked`
+  - Optimize: `SignalStream`, `CtrDeltaBar`, `WatchtimeCurve`, `ABDuel`, `InsightCards`
+  - Scale: `ChannelRingsFill`, `AutoPublishRail`, `CloneMultiplier`, `QueueRocket`, `GlobalReachMap`
+- Neue Datei `src/components/landing/OutcomeStorylineDialog.tsx`
+  - Kopiert die UX von `StudioStorylineDialog.tsx` (Glass, Playfair, Fortschritts-Dots, Pause/Play, „Studio öffnen"-CTA), nutzt aber `OUTCOMES` statt `STORYLINES` und einen dynamischen CTA (`href` + Label pro Outcome, z. B. Planer, Analytics, Publish-Queue).
+- `MissionFeatures.tsx`
+  - `FeatureGuideDialog` entfernen.
+  - State `selectedOutcome: OutcomeKey | null`.
+  - Cockpit-Buttons öffnen `OutcomeStorylineDialog` statt Guide.
 
----
+### B) Proof-Strip klickbar mit Storylines
 
-## Teil 2 — Cast & World Storyline: Charakter-Creation-Journey
+- `storylineContent.ts` um zwei neue Studio-Keys erweitern: `multiProvider` und `priceGuarantee` (je 6 Slides DE/EN/ES).
+- `src/components/landing/storylines/proofVisuals.tsx` — 12 animierte SVG-Mockups:
+  - Multi-Provider: `ProviderConstellation`, `RouteBestPick`, `FallbackChain`, `CostGuardMeter`, `LatencyDuel`, `UnifiedOutput`
+  - Preisgarantie: `FoundersSeatCounter`, `PriceLock24m`, `DiscountShield`, `TimelineGuarantee`, `SeatMap1000`, `SavingsCurve`
+- Proof-Strip in `MissionFeatures.tsx` von `<div>` auf `<button>` umbauen (gleicher Bond-Gold-Hover), Zuordnung:
+  - Multi-Provider Stack → `StudioStorylineDialog` (studio="multiProvider", CTA → `/pricing` bzw. Arsenal-Section)
+  - Cinematic Lip-Sync → `StudioStorylineDialog` (studio="motion", CTA → `/motion-studio`)
+  - Cast & World Lock → `StudioStorylineDialog` (studio="cast", CTA → `/cast-and-world`)
+  - Beta-Preisgarantie → `StudioStorylineDialog` (studio="priceGuarantee", CTA → öffnet `FoundersBenefitsDialog` oder scrollt zu `#pricing`)
 
-Momentan sind die 6 Slides für `cast` generische Text-Slides mit UI-Mockup-SVGs (`storylineContent.ts` + `uiVisuals.tsx`). Wir ersetzen die 6 Cast-Slides durch eine **narrative Journey**, die Schritt für Schritt zeigt, wie ein Charakter entsteht — mit echten, dedizierten Visuals.
+### C) i18n
 
-### Neue 6-Slide-Journey (DE/EN/ES)
+- Keys `landing.mission.outcomeStory.*` (15 Slides × 3 Sprachen) in `useTranslation`-Quelle ergänzen.
+- Keys `landing.storyline.multiProvider.*` und `landing.storyline.priceGuarantee.*` (je 6 Slides × 3 Sprachen).
 
-| # | Titel | Was passiert im Visual |
-|---|-------|------------------------|
-| 1 | **Brief** | Textarea-Mockup fließt in Tokens („25, blond, warmes Lächeln, Berlin") — Tokens animieren nach unten in einen Charakter-Slot |
-| 2 | **Anchor Portrait** | Drei Provider-Chips (Nano Banana 2 · Seedream 4 · Gemini 3 Pro) rotieren, ein Porträt-Frame morpht in ein final gerendertes Face (Ken-Burns Reveal) |
-| 3 | **Identity Lock** | AWS-Rekognition-Landmark-Overlay (Punkte auf Augen/Mund/Nase) mit „Face-ID 98% match"-Badge, Lock-Animation |
-| 4 | **Wardrobe / Looks** | Karussell mit 4 Outfit-Cards („Look 01 – Studio", „Look 02 – Street" …), aktive Karte pulsiert in gold |
-| 5 | **Voice Binding** | Charakter-Avatar links, Waveform-Bar mittig, Voice-Chip rechts snappen mit Linie zusammen → „Voice locked" |
-| 6 | **Scene Cast** | Charakter-Chip wird in eine 3-Karten-Storyboard-Row gezogen; „Ready for Motion Studio"-CTA |
+## Technische Details
 
-### Dateien
-
-- `src/components/landing/storylines/castJourneyVisuals.tsx` **(neu)** — 6 dedizierte SVG/Motion-Komponenten (`BriefTokens`, `AnchorMorph`, `IdentityLock`, `WardrobeCarousel`, `VoiceBinding`, `SceneCastDrop`), reine SVG + Framer-Motion, keine externen Assets.
-- `src/components/landing/storylines/storylineContent.ts` — Cast-Slides (Slot `cast`) auf die 6 neuen Titel/Copies (DE/EN/ES) umstellen und pro Slide `visual: 'castJourney:brief' | 'castJourney:anchor' | …` referenzieren.
-- `src/components/landing/StudioStorylineDialog.tsx` — Visual-Renderer erweitern, sodass die neuen `castJourney:*`-Keys auf die entsprechenden Komponenten aus `castJourneyVisuals.tsx` mappen. Bestehende Studios (motion/video/picture/music/voice) unverändert.
-- `StudioStorylineDialog`: Autoplay bleibt 4s, aber pro Cast-Slide leicht länger (5.5s) damit die Journey-Animationen sichtbar durchlaufen; Progress-Ring passt sich der Dauer an.
-
-### Optional (nice-to-have, im Scope)
-
-- Kleine „Step X/6"-Timeline unten im Dialog nur für den Cast-Storyline-Modus (visualisiert die Journey-Struktur explizit).
-
----
+- Keine neuen Dependencies.
+- Wiederverwendung des bestehenden `StorylineSlide`-Schemas → Autoplay/Pause/Dots-Logik unverändert.
+- `OutcomeStorylineDialog` ist eine schlanke Kopie von `StudioStorylineDialog` mit separatem Content-Map, damit die bestehende Studio-Slideshow (CapabilityBento) unangetastet bleibt.
+- Kein Backend-, DB- oder Edge-Function-Change.
+- Bilder rein SVG/CSS-animiert (kein `imagegen` nötig, konsistent mit `castJourneyVisuals.tsx`).
 
 ## Nicht im Scope
 
-- Keine Änderungen an Backend, Edge Functions, Auth, Pricing.
-- Keine neuen Bild-Generierungen — reines SVG/Motion.
-- Motion/Video/Picture/Music/Voice-Storylines bleiben wie sie sind (können später gleich aufgewertet werden, falls gewünscht).
+- Änderungen am AI-Arsenal, CommandDeck, CapabilityBento.
+- Neue Landingpage-Sektionen.
+- Änderungen an `FeatureGuideDialog` (bleibt für andere Aufrufer erhalten).
