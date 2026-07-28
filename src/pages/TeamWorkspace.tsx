@@ -307,7 +307,7 @@ export default function TeamWorkspace() {
     }
   };
 
-  const updateTaskStatus = async (taskId: string, status: string) => {
+  const updateTaskStatus = async (taskId: string, status: "todo" | "in_progress" | "review" | "done") => {
     const prev = tasks;
     setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status } : t)));
     const { error } = await supabase.from("content_tasks").update({ status }).eq("id", taskId);
