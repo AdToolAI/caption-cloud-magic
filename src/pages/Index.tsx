@@ -13,6 +13,7 @@ import { MissionFeatures } from "@/components/landing/MissionFeatures";
 import { AIArsenalShowcase } from "@/components/landing/AIArsenalShowcase";
 import { LiveDemoShowcase } from "@/components/landing/LiveDemoShowcase";
 import { UDCShowcase } from "@/components/landing/UDCShowcase";
+import { InstantAvatarDemo } from "@/components/landing/InstantAvatarDemo";
 // TestimonialSpotlight hidden during Beta — real testimonials pending
 
 import { TrialPromiseStrip } from "@/components/landing/TrialPromiseStrip";
@@ -104,6 +105,9 @@ const Index = () => {
 
           {/* Live Demo Showcase - Before/After */}
           <LiveDemoShowcase />
+
+          {/* Instant Avatar Try-On — interactive eyecatcher */}
+          <InstantAvatarDemo />
 
           {/* UDC — Consistency-First moat */}
           <UDCShowcase />
