@@ -436,11 +436,12 @@ export function RemotionPreviewPlayer({
       <div className="mx-auto flex items-center justify-center w-full">
         <div
           className="relative overflow-hidden rounded-lg bg-black"
-          style={
-            isPortrait
-              ? { aspectRatio, height: '70vh', maxHeight: '70vh', maxWidth: '100%', width: 'auto' }
-              : { aspectRatio, width: '100%', maxHeight: '70vh' }
-          }
+          style={{
+            aspectRatio: 16 / 9,
+            width: '100%',
+            maxWidth: 'min(100%, 720px)',
+            maxHeight: '55vh',
+          }}
         >
           <MemoizedPlayer
             playerRef={playerRef}
