@@ -626,7 +626,7 @@ export default function TeamWorkspace() {
                   eyebrow="Roster"
                   title={t("team.teamMembers")}
                   action={
-                    canManage && isEnterprise ? (
+                    canManage ? (
                       <Button
                         onClick={() => setShowInviteMember(true)}
                         className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
@@ -634,11 +634,6 @@ export default function TeamWorkspace() {
                         <Mail className="mr-2 h-4 w-4" />
                         {t("team.inviteMember")}
                       </Button>
-                    ) : canManage ? (
-                      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                        <Crown className="h-3 w-3 text-primary" />
-                        Enterprise required to invite
-                      </span>
                     ) : null
                   }
                 />
@@ -672,10 +667,14 @@ export default function TeamWorkspace() {
                           </div>
                           <div className="min-w-0">
                             <p className="truncate font-medium text-foreground">
-                              {member.user_id.slice(0, 8)}…{member.user_id.slice(-4)}
+                              {member.profile?.display_name
+                                || member.profile?.email
+                                || `${member.user_id.slice(0, 8)}…${member.user_id.slice(-4)}`}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              {t("team.joined")} · {relTime(member.joined_at)}
+                            <p className="truncate text-xs text-muted-foreground">
+                              {member.profile?.email
+                                ? `${member.profile.email} · ${t("team.joined")} ${relTime(member.joined_at)}`
+                                : `${t("team.joined")} · ${relTime(member.joined_at)}`}
                             </p>
                           </div>
                         </div>
