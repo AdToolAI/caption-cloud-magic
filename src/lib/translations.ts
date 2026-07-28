@@ -13309,7 +13309,7 @@ export const translations: Record<Language, any> = {
         badge: "Por qué AdTool",
         title1: "Por qué esta herramienta ",
         title2: "gana el juego",
-        subtitle: "Tres pasos hacia un marketing más efectivo – sistemático, basado en datos, escalable.",
+        subtitle: "No una herramienta. Un estudio de medios completo — del briefing a la publicación, todo en un solo lienzo.",
         planMonth: "Planifica tu mes",
         planMonthDesc: "Planificación de contenido con IA con optimización automática de horarios para máximo alcance.",
         optimizePerformance: "Optimiza el Rendimiento",
@@ -13318,6 +13318,60 @@ export const translations: Record<Language, any> = {
         scaleCampaignsDesc: "Automatiza tareas recurrentes y multiplica tu producción.",
         learnMore: "Saber más",
         betaPreview: "Vista Beta",
+        outcomeLabel: "El Resultado",
+        outcomeTitle: "Planifica · Optimiza · Escala",
+        deck: {
+          pipelineLabel: "Pipeline de Producción",
+          title: "Un lienzo. Siete etapas. Cero cambios de contexto.",
+          subtitle: "Cada etapa de una campaña — del primer briefing al último post — corre en un solo flujo continuo.",
+          oneCanvas: "Un lienzo · Un cast · Un clic",
+          capLabel: "Capacidades de la Plataforma",
+          capFootnote: "Capacidades disponibles hoy. Sin cifras de usuarios inventadas — estamos en beta.",
+          stations: {
+            briefing: "Briefing",
+            cast: "Cast",
+            script: "Guion",
+            anchor: "Anchor",
+            motion: "Motion",
+            music: "Música",
+            publish: "Publicar"
+          },
+          cap: {
+            models: "Modelos IA",
+            speakers: "Voces por Escena",
+            languages: "Idiomas",
+            characters: "Personajes Persistentes"
+          }
+        },
+        bento: {
+          label: "Seis Estudios · Un Login",
+          title1: "Tu ",
+          title2: "media command deck",
+          cast: {
+            title: "Cast & World",
+            desc: "Bloquea personajes una vez — recupéralos en cada escena, en cada estudio. Identidad persistente, no ruleta."
+          },
+          motion: {
+            title: "Motion Studio",
+            desc: "Cuatro voces, una toma continua, lip-sync cinematográfico. Sin cortes, sin morphs, sin compromisos."
+          },
+          video: {
+            title: "AI Video Studio",
+            desc: "Todos los motores top bajo una sola prompt. Cambia de proveedor sin salir del lienzo."
+          },
+          picture: {
+            title: "Picture Studio",
+            desc: "De editorial a producto a retrato — anchor frames en el estilo exacto que exige tu marca."
+          },
+          music: {
+            title: "Music Studio",
+            desc: "Cuatro motores de scoring, una waveform. Tracks, stems y SFX — listos en minutos."
+          },
+          voice: {
+            title: "Voice Studio",
+            desc: "Clona una voz, vincúlala a un personaje — y cada escena futura habla con el timbre de tu cast."
+          }
+        },
         cockpit: {
           signal: { reach: "Alcance", ctr: "CTR", watch: "Tiempo de vista" }
         },
