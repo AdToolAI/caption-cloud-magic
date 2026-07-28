@@ -188,6 +188,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ],
       ),
     },
+  ],
   motion: [
     {
       kind: "cinematic",
