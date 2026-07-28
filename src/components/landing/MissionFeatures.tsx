@@ -6,6 +6,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { PlanCockpit } from "./cockpits/PlanCockpit";
 import { SignalCockpit } from "./cockpits/SignalCockpit";
 import { ScaleCockpit } from "./cockpits/ScaleCockpit";
+import { CommandDeck } from "./CommandDeck";
+import { CapabilityBento } from "./CapabilityBento";
 
 export const MissionFeatures = () => {
   const [selectedMission, setSelectedMission] = useState<string | null>(null);
