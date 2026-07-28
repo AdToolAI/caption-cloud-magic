@@ -36,6 +36,7 @@ export const BlackTieFooter = () => {
       { label: t("landing.footer.terms"), href: "/terms" },
       { label: t("landing.footer.imprint"), href: "/imprint" },
       { label: t("landing.footer.avv"), href: "/legal/avv" },
+      { label: t("landing.footer.aiRefund"), href: "/legal/ai-video-refund" },
       { label: t("landing.footer.cookieSettings"), href: "#", onClick: () => window.dispatchEvent(new CustomEvent('openCookiePreferences')) },
     ],
   };

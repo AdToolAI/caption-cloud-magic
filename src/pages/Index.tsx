@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { BlackTieHero } from "@/components/landing/BlackTieHero";
 import { SocialProofStrip } from "@/components/landing/SocialProofStrip";
 import { MissionFeatures } from "@/components/landing/MissionFeatures";
-import { FeatureGrid } from "@/components/landing/FeatureGrid";
+
 import { AIArsenalShowcase } from "@/components/landing/AIArsenalShowcase";
 import { LiveDemoShowcase } from "@/components/landing/LiveDemoShowcase";
 import { UDCShowcase } from "@/components/landing/UDCShowcase";
@@ -111,8 +111,6 @@ const Index = () => {
           {/* AI Arsenal - all integrated AI modules */}
           <AIArsenalShowcase />
 
-          {/* Feature Grid */}
-          <FeatureGrid />
 
           {/* Testimonial Spotlight hidden during Beta — will return with real user quotes */}
 
