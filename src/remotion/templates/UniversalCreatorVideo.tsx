@@ -1470,16 +1470,16 @@ const ParallaxBackground: React.FC<{
           src={imageUrl!}
           style={{
             position: 'absolute',
-            width: '110%',
-            height: '110%',
-            objectFit: 'cover',
-            left: '-5%',
-            top: '-5%',
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            left: 0,
+            top: 0,
             transform: `translateY(${interpolate(progress, [0, 1], [0, -10])}px)`,
           }}
         />
       ) : (
-        <div style={{ position: 'absolute', width: '110%', height: '110%', left: '-5%', top: '-5%', background: DEFAULT_FALLBACK_GRADIENT }} />
+        <div style={{ position: 'absolute', width: '100%', height: '100%', left: 0, top: 0, background: DEFAULT_FALLBACK_GRADIENT }} />
       )}
       {/* v242: bottom-gradient + inset-boxShadow removed — no cinematic framing in Universal Creator. */}
 
