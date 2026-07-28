@@ -3962,7 +3962,7 @@ export const translations: Record<Language, any> = {
         badge: "Why AdTool",
         title1: "Why this tool ",
         title2: "wins the game",
-        subtitle: "Three steps to more effective marketing – systematic, data-driven, scalable.",
+        subtitle: "Not a tool. A complete media studio — from briefing to publishing, all in one canvas.",
         planMonth: "Plan your month",
         planMonthDesc: "AI-powered content planning with automatic time optimization for maximum reach.",
         optimizePerformance: "Optimize Performance",
@@ -3971,6 +3971,60 @@ export const translations: Record<Language, any> = {
         scaleCampaignsDesc: "Automate recurring tasks and multiply your output.",
         learnMore: "Learn more",
         betaPreview: "Beta Preview",
+        outcomeLabel: "The Outcome",
+        outcomeTitle: "Plan · Optimize · Scale",
+        deck: {
+          pipelineLabel: "Production Pipeline",
+          title: "One canvas. Seven stages. Zero context switches.",
+          subtitle: "Every stage of a campaign — from the first briefing to the last publish — runs inside one continuous workflow.",
+          oneCanvas: "One canvas · One cast · One click",
+          capLabel: "Platform Capabilities",
+          capFootnote: "Capabilities available today. No fabricated user numbers — we're in beta.",
+          stations: {
+            briefing: "Briefing",
+            cast: "Cast",
+            script: "Script",
+            anchor: "Anchor",
+            motion: "Motion",
+            music: "Music",
+            publish: "Publish"
+          },
+          cap: {
+            models: "AI Models",
+            speakers: "Speakers per Scene",
+            languages: "Languages",
+            characters: "Persistent Characters"
+          }
+        },
+        bento: {
+          label: "Six Studios · One Login",
+          title1: "Your ",
+          title2: "media command deck",
+          cast: {
+            title: "Cast & World",
+            desc: "Lock characters once — recall them in every scene, across every studio. Persistent identity, not roulette."
+          },
+          motion: {
+            title: "Motion Studio",
+            desc: "Four speakers, one continuous take, cinematic lip-sync. No cuts, no morphs, no compromise."
+          },
+          video: {
+            title: "AI Video Studio",
+            desc: "Every top-tier engine under one prompt bar. Switch providers without leaving the canvas."
+          },
+          picture: {
+            title: "Picture Studio",
+            desc: "From editorial to product to portrait — anchor frames in the exact style your brand demands."
+          },
+          music: {
+            title: "Music Studio",
+            desc: "Four scoring engines, one waveform. Full tracks, stems and SFX — production-ready in minutes."
+          },
+          voice: {
+            title: "Voice Studio",
+            desc: "Clone a voice, bind it to a character, and every future scene speaks in your cast's own timbre."
+          }
+        },
         cockpit: {
           signal: { reach: "Reach", ctr: "CTR", watch: "Watch-Time" }
         },
