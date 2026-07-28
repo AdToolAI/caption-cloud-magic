@@ -1,59 +1,66 @@
-## Ziel
-Team-Workspace-Seite auf das „Bond-Gold"-Niveau der Plattform heben (Deep-Black + Gold + Glass) und funktional ausbauen. Aktuell zeigt die Seite rohe i18n-Keys (`team.title`, `team.members`, …), weil der DE- und ES-Sprachblock keinen `team: { … }`-Namespace enthält – das wird nebenbei sauber behoben.
+## Kurzbefund
 
-## 1. i18n-Fix (Root-Cause der „team.xxx"-Anzeige)
-- In `src/lib/translations.ts` den kompletten `team: { … }`-Namespace, den es aktuell nur im `en`-Block gibt (Zeile 1388), 1:1 in den `de:`- und `es:`-Block einfügen (übersetzt).
-- Fehlende neue Keys für die unten beschriebenen Cockpit-/Ausbau-Bereiche in allen drei Sprachen ergänzen.
+Der Team Workspace ist **visuell fertig, funktional aber nur ~60 % verdrahtet**. UI, i18n, Tabs, KPIs, Kanban-Ansicht und Enterprise-Checkout laufen. Mehrere Kern-Flows sind aber Read-only Attrappen oder haben Schema-Mismatches, die im Live-Betrieb sofort auffallen würden. Zusätzlich wird der Beta-Basic-Preis von 14,99 € auf **19,99 €** angehoben.
 
-## 2. Visueller Rebuild `src/pages/TeamWorkspace.tsx`
-Komplett neu aufgebaut im Bond-Gold-Stil (analog Analysieren-Hub, Mission Command Deck):
+## Was funktioniert (verifiziert)
 
-- **Cinematic Hero**: schwarzer Radial-Gradient, Playfair-Display-Headline in Gold, animierter Signal-Ring, KPI-Chips („Aktive Seats", „Offene Approvals", „Tasks diese Woche", „Ø Reaktionszeit").
-- **Workspace-Switcher** als Glass-Card mit Rolle, Mitgliedszahl, Plan-Badge, Owner-Avatar-Stack.
-- **Command-Tabs** (Members · Roles · Tasks · Approvals · Activity · Billing) als Gold-underline Segmented-Nav mit Icon-Chips und Live-Count-Badges.
+- Alle Tabellen existieren: `workspaces`, `workspace_members`, `workspace_invitations`, `content_tasks`, `content_approvals`, `user_roles`.
+- Edge Functions vorhanden: `create-enterprise-checkout`, `update-workspace-seats`, `upgrade-to-enterprise`, `accept-invitation`.
+- Workspace anlegen, Workspace wechseln, KPI-Chips, Kanban-Anzeige, Task anlegen, Enterprise-Upgrade-Checkout, Rollen-Matrix (rein visuell).
 
-## 3. Funktionaler Ausbau
-Innerhalb der bestehenden Tabellen (`workspaces`, `workspace_members`, `content_tasks`, `content_approvals`, `user_roles`) – **kein Schema-Change**, nur zusätzliche Reads/Writes:
+## Bestätigte Lücken / Bugs
 
-- **Members-Tab**
-  - Roster-Grid mit Avatar-Ring, Rolle, „Last Active" (aus `updated_at`), Seat-Status.
-  - Bulk-Invite (Textarea mit Komma-Liste), Rollen-Vorschlag.
-  - Inline Rollenwechsel + Entfernen (nur Owner/Admin, per `has_role`).
-- **Roles-Tab**
-  - Bestehender `RoleManager` in Glass-Card gerahmt, Permission-Matrix-Visualisierung (Read/Write/Approve/Billing) als Bond-Gold-Grid.
-- **Tasks-Tab**
-  - Kanban-Ansicht (Backlog · In Arbeit · Review · Done) statt Formular-only, Priority-Chips, Assignee-Avatar, Due-Countdown.
-  - Formular als Slide-Over statt Inline-Card.
-- **Approvals-Tab**
-  - Approval-Queue mit Vorschau-Thumb (aus `content_items`/`video_creations`), Approve/Reject direkt inline, Kommentar-Feld.
-- **Activity-Tab (neu)**
-  - Signal-Log-Komponente wie auf der Startseite, gefiltert auf `workspace_id` (Task-, Approval-, Member-Events).
-- **Billing/Seats-Tab**
-  - `EnterpriseSeatManager` + `EnterpriseUpgradePrompt` neu gestylt, Seat-Auslastungs-Ring, klarer CTA.
+1. **Einladung verschickt keine E-Mail.** `inviteMember` schreibt nur eine Zeile in `workspace_invitations`. Es gibt keine `send-invitation` Function und keinen DB-Trigger → der Eingeladene erfährt nie davon. `accept-invitation` existiert, wird aber ohne Link nie erreicht.
+2. **Nicht-Enterprise-Owner können gar nicht einladen.** Der Invite-Button ist an `isEnterprise && canManage` gekoppelt. Solo-Plan-Kunden sehen nur den Upgrade-Prompt.
+3. **Approvals sind read-only.** Approve/Reject/Kommentar fehlen komplett — kein Update auf `status`, `reviewed_by`, `reviewed_at`, `rejection_reason`, obwohl die Spalten existieren.
+4. **Tasks lassen sich nach Anlage nicht bewegen.** Kein Statuswechsel (Backlog → In Progress → Review → Done), kein Löschen, kein Edit.
+5. **Mitglieder als User-ID-Hash angezeigt.** Kein Join auf `profiles` für Name/E-Mail/Avatar.
+6. **`RoleManager` Schema-Mismatch.** Component liest `user_roles` gefiltert nach `workspace_id`, doch dieselben Rollen leben schon in `workspace_members.role`. Doppelte Wahrheit, keine Sync-Logik → Tab bleibt in der Praxis leer.
+7. **Activity-Tab hat kein echtes Event-Log** — nur lokale Aggregation aus Members/Tasks/Approvals.
+8. **`updateWorkspaceSeats` triggert direkt nach Invite-Insert**, obwohl die Person noch nicht beigetreten ist → potenziell vorzeitige Seat-Abrechnung.
+9. **PermissionMatrix ist rein visuell** — die dargestellten Rechte (invite, approve, billing) werden im UI nur teilweise per `canManage` erzwungen.
 
-## 4. Neue/angepasste Dateien
-```text
-src/pages/TeamWorkspace.tsx                 (Rewrite, Bond-Gold + neue Tabs)
-src/components/team/TeamHero.tsx            (neu)
-src/components/team/WorkspaceSwitcher.tsx   (neu)
-src/components/team/MembersRoster.tsx       (neu)
-src/components/team/TasksKanban.tsx         (neu)
-src/components/team/ApprovalsQueue.tsx      (neu)
-src/components/team/TeamActivityLog.tsx     (neu, nutzt vorhandenes Signal-Log-Muster)
-src/components/team/PermissionMatrix.tsx    (neu)
-src/components/team/RoleManager.tsx         (Styling-Refactor)
-src/components/team/EnterpriseSeatManager.tsx (Styling-Refactor)
-src/components/team/EnterpriseUpgradePrompt.tsx (Styling-Refactor)
-src/lib/translations.ts                     (DE + ES team-Namespace + neue Keys)
-```
+## Preis-Anpassung 14,99 € → 19,99 €
 
-## 5. Technische Leitplanken
-- Nur semantische Design-Tokens (`bg-background`, `text-primary`, `border-primary/20`) – keine Hardcodes wie `text-white`/`#F5C76A`.
-- Keine Schema-Changes, keine neuen RLS-Policies (bestehende Policies decken alle CRUD-Aktionen).
-- Alle DB-Reads laufen weiter über `supabase` client mit `workspace_id`-Filter.
-- Keine Änderung an Auth/Founders/Preis-Logik.
+- `src/config/pricing.ts`: Alle drei Beta-Basic-Einträge (`price: { EUR: 14.99, USD: 14.99 }`) und `getPlanFromPriceId`-Fallback auf `19.99` setzen.
+- Neues Stripe-Price-Objekt für 19,99 € EUR/monatlich anlegen und `priceId` an allen drei Stellen tauschen (alter Price bleibt für Bestandskunden gültig).
+- Founders-Rabatt (20 %) und 24-Monats-Preisgarantie neu rechnen: garantierter Preis für die ersten 1 000 Nutzer = **15,99 €** (statt bisher 11,99 €). Text in `FoundersBenefitsDialog.tsx` und auf der Landing-Page (`Hero`, Beta-Banner, Pricing-Sektion) entsprechend anpassen.
+- Übersetzungen in `src/lib/translations.ts` (DE/EN/ES) für alle sichtbaren Preistexte aktualisieren.
+- Keine Migration bestehender Abos — läuft rein Stripe-seitig über den neuen Price für Neubuchungen.
 
-## 6. Nicht enthalten
-- Neue Backend-Tabellen oder Edge-Functions.
-- Änderungen an Cast & World / Studios / Rendering-Pipeline.
-- Preis- oder Plan-Änderungen.
+## Vorgeschlagener Fix-Umfang Team Workspace (kein Schema-Change)
+
+**A. Invitation-Loop schließen (kritisch für Live-Gang)**
+- Neue Edge Function `send-workspace-invitation` (Resend über bestehende E-Mail-Infra): schreibt Invitation + verschickt Mail mit Accept-Link `/accept-invitation?token=<id>`.
+- `TeamWorkspace.inviteMember` ruft diese Function statt Direkt-Insert auf.
+- `updateWorkspaceSeats` erst in `accept-invitation` triggern.
+- Invite-Button auch für Solo-Owner freischalten (Enterprise-Gate nur auf Bulk-Invite / harte Seat-Grenze).
+
+**B. Approvals interaktiv machen**
+- Inline-Approve / Reject Buttons für `pending`-Zeilen, sichtbar für `canManage`.
+- Update `status`, `reviewed_by=user.id`, `reviewed_at=now()`, optional `rejection_reason` aus Textarea.
+
+**C. Kanban voll bedienbar**
+- Status-Dropdown je Karte + Delete für `canManage`; `completed_at` setzen bei `done`.
+- Optional HTML5-Drag&Drop.
+
+**D. Mitglieder mit Profil-Join**
+- Zusätzlicher `profiles`-Query (email, display_name, avatar_url) für angezeigte Members.
+- Inline Rollenwechsel + Entfernen für Owner/Admin über `workspace_members`.
+
+**E. Roles-Tab entwirren**
+- `RoleManager` durch schlanke Ansicht ersetzen, die `workspace_members` liest/mutiert — eine Quelle der Wahrheit. `user_roles` bleibt der App-globalen Admin-Rolle vorbehalten.
+
+**F. Activity-Tab realistisch labeln**
+- Klare Beschriftung „Abgeleitete Signale (letzte 25)" statt „Signal Log". Echtes Audit-Log bleibt spätere Ausbaustufe.
+
+## Nicht enthalten
+
+- Neue Tabellen, RLS-Änderungen, neue Plan-Struktur.
+- Vollständiges Audit-Log-System.
+- Realtime-Subscriptions.
+- Migration bestehender 14,99 €-Abos auf den neuen Price.
+
+## Ergebnis nach dem Fix
+
+Ein Team-Workspace, in dem Owner tatsächlich einladen, Rollen ändern, Tasks durch den Kanban schieben und Approvals mit einem Klick freigeben — mit echten Namen statt IDs. Gleichzeitig läuft das Beta-Pricing sauber auf 19,99 € / Monat mit garantierten 15,99 € für die ersten 1 000 Founders über 24 Monate.
