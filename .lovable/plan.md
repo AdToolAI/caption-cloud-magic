@@ -1,32 +1,39 @@
-## Problem
+## Ziel
 
-Stufe 3 zeigt Hintergründe mit einem einfachen `<img/video className="object-contain">` in einem Container mit `aspectRatio: formatConfig.width / formatConfig.height` (UniversalCreator.tsx:640–645). Das Bild wird also **komplett** dargestellt — Landscape-Assets bekommen im 9:16-Rahmen schwarze Balken oben/unten (Screenshot 2).
+Der Live-Preview in Stufe 4 des Universal Content Creator soll:
+1. **Sich wie Stufe 3 verhalten** — Bilder werden im Format-Frame mit `object-contain` (Letterbox erlaubt) angezeigt.
+2. **Die gleiche Bildschärfe** wie Stufe 3 haben.
 
-Ab Stufe 4 rendert der Remotion-`Player` dieselbe Szene über die `UniversalCreatorVideo`-Composition. Der Container ist bereits korrekt (`aspectRatio: width/height`, 65vh cap). **Aber**: Die Scene-Backgrounds innerhalb der Composition sind hart auf `objectFit: 'cover'` gesetzt (UniversalCreatorVideo.tsx:2094 Video, 2018/2070 als Default in SafeVideo/SafeImg). `cover` **beschneidet** das Landscape-Asset auf das Portrait-Frame → Screenshot 1 zeigt nur einen Ausschnitt des Originals. Genau die Diskrepanz, die der User meint.
+## Analyse
 
-## Fix — Scene-Background auf `contain` umstellen (Preview-Parität zu Stufe 3)
+- **Stufe 3** rendert das Hintergrundbild direkt via `<img … object-contain>` in einem Container mit `aspectRatio: formatConfig.width / formatConfig.height`. Native Auflösung, keine zusätzliche Skalierungsstufe.
+- **Stufe 4+** rendert über den Remotion-Player die `UniversalCreatorVideo`-Komposition. Der Frame stimmt zwar bereits mit dem Zielformat überein, aber intern gibt es zwei Schärfe-Killer:
+  - Wenn eine Szene-Animation `kenBurns` oder `parallax` aktiv ist, verwenden die entsprechenden Komponenten noch `objectFit: 'cover'` und zusätzlich `scale(1.15)`/`110%`-Vergrößerung → das Bild wird hochskaliert und beschnitten, wodurch der 1:1-Inhalt in einem 9:16-Frame gestreckt/unscharf wirkt.
+  - `SafeImg` rendert ohne explizite `image-rendering`-Hinweise; bei Downscaling im Player kann der Browser weichzeichnen.
 
-Datei: `src/remotion/templates/UniversalCreatorVideo.tsx`
+## Änderungen
 
-Nur die **Scene-Background-Renderer** (Video + Bild) ändern:
+### 1. `src/remotion/templates/UniversalCreatorVideo.tsx`
+- **KenBurnsBackground** (~Zeile 1436–1450): `objectFit` von `cover` → `contain`, `scale(1.15)`/Pan-Transform entfernen bzw. auf sanftes `scale(1.0 → 1.03)` reduzieren, damit kein Zuschnitt entsteht (identisches Verhalten wie Stufe 3).
+- **ParallaxBackground** (~Zeile 1466–1487): `objectFit: cover` → `contain`, `width/height: 110%` und `left/top: -5%` auf `100%` / `0` zurücksetzen. Parallax-Translate optional beibehalten, aber ohne Overflow-Zuschnitt.
+- Damit nutzt jede Animationsvariante dieselbe „einpassen ohne beschneiden"-Logik wie `renderBackgroundContent`.
 
-1. Zeile 2091–2097 (Video-Background):
-   - `<AbsoluteFill>` → `<AbsoluteFill style={{ backgroundColor: '#000' }}>` (Letterbox-Balken).
-   - `SafeVideo` style: `objectFit: 'cover'` → `'contain'`.
-2. Zeile 2100–2106 (Image-Background):
-   - `<AbsoluteFill style={{ backgroundColor: '#000', ...(rawMediaMode ? {} : { filter: 'saturate(1.15) contrast(1.05)' }) }}>`.
-   - `SafeImg` explizit mit `style={{ width: '100%', height: '100%', objectFit: 'contain' }}` übergeben.
+### 2. `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+- Am Player-Container zusätzlich `imageRendering: 'high-quality'` und `WebkitBackfaceVisibility: 'hidden'` setzen, damit der Browser beim CSS-Downscaling nicht weichzeichnet.
+- `<MemoizedPlayer>` mit `style={{ width: '100%', height: '100%' }}` explizit ausfüllen (falls noch nicht geschehen), damit die Komposition nicht in einer kleineren inneren Box gerendert und dann per CSS erneut skaliert wird (Doppel-Downscaling).
 
-`SafeVideo`/`SafeImg` Defaults (Z. 2018, 2070) **nicht** ändern — sie werden auch von anderen Templates/Stellen genutzt und dort ist `cover` korrekt.
+### 3. Kein UI-/Business-Logic-Change
+- Frame-Rahmen (`aspectRatio: formatConfig.width / formatConfig.height`, `maxHeight: 65vh`) bleibt.
+- Controls-Leiste bleibt unverändert.
+- Keine Änderungen am Export-Renderer (Lambda) — die betroffenen Komponenten werden zur Renderzeit ohnehin auf Zielauflösung gezeichnet, dort ist `contain` visuell identisch zu vorher (keine Beschneidung mehr, aber Konsistenz mit Preview gewünscht).
 
-## Effekt
+## Technische Details
 
-- Stufe 3 und Stufe 4+ zeigen exakt denselben Bildausschnitt (voller Frame, ggf. schwarze Balken oben/unten oder links/rechts je nach Asset-Aspect vs. Format-Aspect).
-- Kein Layout-Shift zwischen den Wizard-Stufen.
-- Gilt auch für den finalen Render — Landscape-Assets in Portrait-Format werden nicht mehr stumm zugeschnitten, was zur Preview passt (WYSIWYG).
+- `SafeImg` unterstützt bereits alle `style`-Props → keine Signatur-Änderung nötig.
+- `objectFit: contain` in Ken-Burns/Parallax bedeutet: Ken-Burns-Zoom wird durch das leichte `scale`-Transform simuliert, ohne dass das Bild über den Frame hinausragt.
+- Keine Migrationen, keine Edge-Function-Änderungen.
 
 ## Verifikation
 
-- Playwright: Screenshot Stufe 3 & Stufe 4 mit einem 16:9-Background in 9:16-Format — beide Frames identisch, gleiche Balken oben/unten.
-- Gegenprobe: 9:16-Background in 9:16-Format — kein Balken, Bild füllt komplett (contain = cover, wenn Aspects gleich).
-- Kein Anfassen von RemotionPreviewPlayer, PreviewExportStep, Composer, Render-Pipeline oder Backend.
+- Preview-Vergleich Stufe 3 vs. Stufe 4 bei 9:16-Format mit 1:1-Szenenbild: identische Letterbox-Balken, identische Bildschärfe.
+- Bei Ken-Burns- und Parallax-Szenen keine gestauchten/beschnittenen Bilder mehr.

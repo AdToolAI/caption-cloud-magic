@@ -440,7 +440,11 @@ export function RemotionPreviewPlayer({
             aspectRatio: `${width} / ${height}`,
             width: '100%',
             maxHeight: '65vh',
-          }}
+            imageRendering: 'auto',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
+            transform: 'translateZ(0)',
+          } as React.CSSProperties}
         >
           <MemoizedPlayer
             playerRef={playerRef}
