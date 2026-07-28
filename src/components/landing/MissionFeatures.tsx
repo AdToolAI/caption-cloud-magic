@@ -1,16 +1,26 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarDays, BarChart3, Rocket, ArrowUpRight, Zap, Film, Users, ShieldCheck } from "lucide-react";
-import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
 import { useTranslation } from "@/hooks/useTranslation";
 import { PlanCockpit } from "./cockpits/PlanCockpit";
 import { SignalCockpit } from "./cockpits/SignalCockpit";
 import { ScaleCockpit } from "./cockpits/ScaleCockpit";
 import { CommandDeck } from "./CommandDeck";
 import { CapabilityBento } from "./CapabilityBento";
+import { OutcomeStorylineDialog } from "./OutcomeStorylineDialog";
+import { StudioStorylineDialog } from "./StudioStorylineDialog";
+import type { OutcomeKey } from "./storylines/outcomeContent";
+import type { StudioKey } from "./storylines/storylineContent";
+
+type ProofItem = {
+  icon: typeof Zap;
+  label: string;
+  studio: StudioKey;
+};
 
 export const MissionFeatures = () => {
-  const [selectedMission, setSelectedMission] = useState<string | null>(null);
+  const [selectedOutcome, setSelectedOutcome] = useState<OutcomeKey | null>(null);
+  const [selectedProof, setSelectedProof] = useState<StudioKey | null>(null);
   const { t } = useTranslation();
 
   const missions = [
