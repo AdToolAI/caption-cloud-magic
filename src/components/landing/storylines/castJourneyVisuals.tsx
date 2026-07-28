@@ -1,5 +1,12 @@
 import { motion } from "framer-motion";
-import { Lock, Sparkles, Mic, Film, User, Shirt } from "lucide-react";
+import { Lock, Sparkles, Mic, Film, User, Shirt, Zap, Palette, Waves, ScanFace } from "lucide-react";
+import characterSheetHero from "@/assets/landing/storylines/cast/cast-character-sheet-hero.jpg";
+import lookStudio from "@/assets/landing/storylines/cast/cast-look-studio.jpg";
+import lookStreet from "@/assets/landing/storylines/cast/cast-look-street.jpg";
+import lookExecutive from "@/assets/landing/storylines/cast/cast-look-executive.jpg";
+import lookEditorial from "@/assets/landing/storylines/cast/cast-look-editorial.jpg";
+import anchorPortrait from "@/assets/landing/storylines/cast/cast-anchor-portrait.jpg";
+import storyboardTile from "@/assets/landing/storylines/cast/cast-storyboard-tile.jpg";
 
 /* ─────────────────────────────────────────────────────────
    Cast & World — Character Creation Journey visuals
