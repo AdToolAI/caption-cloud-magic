@@ -843,37 +843,39 @@ export default function TeamWorkspace() {
                             </p>
                           </div>
                         </div>
-                      <Badge
-                          className={cn(
-                            "border",
-                            approval.status === "approved" && "border-primary/50 bg-primary/15 text-primary",
-                            approval.status === "rejected" && "border-destructive/50 bg-destructive/10 text-destructive",
-                            (approval.status === "pending" || !approval.status) &&
-                              "border-primary/20 bg-background/60 text-foreground",
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={cn(
+                              "border",
+                              approval.status === "approved" && "border-primary/50 bg-primary/15 text-primary",
+                              approval.status === "rejected" && "border-destructive/50 bg-destructive/10 text-destructive",
+                              (approval.status === "pending" || !approval.status) &&
+                                "border-primary/20 bg-background/60 text-foreground",
+                            )}
+                          >
+                            {approval.status === "pending" ? t("team.pending") : approval.status}
+                          </Badge>
+                          {canManage && (approval.status === "pending" || !approval.status) && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 rounded-full border-primary/30 text-primary hover:bg-primary/10"
+                                onClick={() => decideApproval(approval.id, "approved")}
+                              >
+                                <Check className="mr-1 h-3 w-3" /> {t("team.approve") || "Approve"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                                onClick={() => decideApproval(approval.id, "rejected")}
+                              >
+                                <X className="mr-1 h-3 w-3" /> {t("team.reject") || "Reject"}
+                              </Button>
+                            </>
                           )}
-                        >
-                          {approval.status === "pending" ? t("team.pending") : approval.status}
-                        </Badge>
-                        {canManage && (approval.status === "pending" || !approval.status) && (
-                          <div className="ml-3 flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 rounded-full border-primary/30 text-primary hover:bg-primary/10"
-                              onClick={() => decideApproval(approval.id, "approved")}
-                            >
-                              <Check className="mr-1 h-3 w-3" /> {t("team.approve") || "Approve"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
-                              onClick={() => decideApproval(approval.id, "rejected")}
-                            >
-                              <X className="mr-1 h-3 w-3" /> {t("team.reject") || "Reject"}
-                            </Button>
-                          </div>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>
