@@ -24,6 +24,21 @@ import coverElevenTts from "@/assets/landing/ai-arsenal/gen/elevenlabs-tts.jpg";
 import coverVoiceClone from "@/assets/landing/ai-arsenal/gen/voice-clone.jpg";
 import coverBrandLock from "@/assets/landing/ai-arsenal/gen/brand-lock.jpg";
 import coverCastWorld from "@/assets/landing/ai-arsenal/gen/cast-world.jpg";
+import coverVeoFast from "@/assets/landing/ai-arsenal/gen/veo-fast.jpg";
+import coverVeoLite from "@/assets/landing/ai-arsenal/gen/veo-lite.jpg";
+import coverWanStandard from "@/assets/landing/ai-arsenal/gen/wan-standard.jpg";
+import coverSeedancePro from "@/assets/landing/ai-arsenal/gen/seedance-pro.jpg";
+import coverSeedanceMini from "@/assets/landing/ai-arsenal/gen/seedance-mini.jpg";
+import coverGrok from "@/assets/landing/ai-arsenal/gen/grok-imagine.jpg";
+import coverKling3 from "@/assets/landing/ai-arsenal/gen/kling-3.jpg";
+import coverKling26 from "@/assets/landing/ai-arsenal/gen/kling-2-6.jpg";
+import coverKling25Turbo from "@/assets/landing/ai-arsenal/gen/kling-2-5-turbo.jpg";
+import coverPikaStandard from "@/assets/landing/ai-arsenal/gen/pika-standard.jpg";
+import coverViduReference from "@/assets/landing/ai-arsenal/gen/vidu-reference.jpg";
+import coverViduI2V from "@/assets/landing/ai-arsenal/gen/vidu-i2v.jpg";
+import coverLtxPro from "@/assets/landing/ai-arsenal/gen/ltx-pro.jpg";
+import coverHappyHorse from "@/assets/landing/ai-arsenal/gen/happyhorse-pro.jpg";
+import coverStyleRef from "@/assets/landing/ai-arsenal/gen/style-reference.jpg";
 
 // -------- Animated flagship loops (asset.json pointers) --------
 import soraLoop from "@/assets/landing/ai-arsenal/gen/sora-loop.mp4.asset.json";
@@ -139,7 +154,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Auf Geschwindigkeit optimiertes Veo für schnelle Iterationen.",
       "Veo optimizado para iteración rápida.",
     ],
-    [T2V, FAST, P1080]
+    [T2V, FAST, P1080],
+    { cover: coverVeoFast }
   ),
   m("wan-2-6-pro", "video",
     ["Wan 2.6 Pro", "Wan 2.6 Pro", "Wan 2.6 Pro"],
@@ -158,7 +174,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Ausbalancierte 1080p-Generation für den Produktionsalltag.",
       "Generación 1080p equilibrada para producción diaria.",
     ],
-    [T2V, P1080]
+    [T2V, P1080],
+    { cover: coverWanStandard }
   ),
   m("luma-pro", "video",
     ["Luma Ray 2 Pro", "Luma Ray 2 Pro", "Luma Ray 2 Pro"],
@@ -187,7 +204,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Schnelle, ausdrucksstarke Bewegung zum Sparpreis.",
       "Movimiento rápido y expresivo a precio reducido.",
     ],
-    [T2V, FAST]
+    [T2V, FAST],
+    { cover: coverSeedanceMini }
   ),
   m("seedance-pro", "video",
     ["Seedance 2 Pro", "Seedance 2 Pro", "Seedance 2 Pro"],
@@ -196,7 +214,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Pro-Motion und Charakter-Ausdruck.",
       "Movimiento y expresión a nivel Pro.",
     ],
-    [T2V, I2V]
+    [T2V, I2V],
+    { cover: coverSeedancePro }
   ),
   m("veo-3.1-lite-720p", "video",
     ["Veo 3.1 Lite", "Veo 3.1 Lite", "Veo 3.1 Lite"],
@@ -205,7 +224,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Kosteneffiziente Veo-Stufe mit 720p.",
       "Nivel Veo económico a 720p.",
     ],
-    [T2V, FAST]
+    [T2V, FAST],
+    { cover: coverVeoLite }
   ),
   m("grok-imagine", "video",
     ["Grok Imagine", "Grok Imagine", "Grok Imagine"],
@@ -214,7 +234,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "xAIs ausdrucksstarkes Video-Modell mit unverkennbarem Stil.",
       "Modelo expresivo de xAI con estilo distintivo.",
     ],
-    [T2V, I2V]
+    [T2V, I2V],
+    { cover: coverGrok }
   ),
   m("kling-3", "video",
     ["Kling 3.0", "Kling 3.0", "Kling 3.0"],
@@ -223,7 +244,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Kling-Flaggschiff mit bester Bewegung & Physik.",
       "Buque insignia Kling con mejor movimiento y física.",
     ],
-    [T2V, I2V, V2V, P1080]
+    [T2V, I2V, V2V, P1080],
+    { cover: coverKling3 }
   ),
   m("kling-2.6", "video",
     ["Kling 2.6", "Kling 2.6", "Kling 2.6"],
@@ -232,7 +254,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Verfeinerte Kling-Generation mit präziser Kontrolle.",
       "Kling refinado con controles precisos.",
     ],
-    [T2V, I2V, P1080]
+    [T2V, I2V, P1080],
+    { cover: coverKling26 }
   ),
   m("kling-2.5-turbo", "video",
     ["Kling 2.5 Turbo", "Kling 2.5 Turbo", "Kling 2.5 Turbo"],
@@ -241,7 +264,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Geschwindigkeitsoptimiertes Kling für schnelle Drafts.",
       "Kling optimizado para bocetos rápidos.",
     ],
-    [T2V, FAST]
+    [T2V, FAST],
+    { cover: coverKling25Turbo }
   ),
   m("pika-2-2-pro", "video",
     ["Pika 2.2 Pro", "Pika 2.2 Pro", "Pika 2.2 Pro"],
@@ -260,7 +284,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Zuverlässiges I2V mit Keyframe-Kontrolle.",
       "I2V fiable con control por keyframes.",
     ],
-    [I2V, KEYS]
+    [I2V, KEYS],
+    { cover: coverPikaStandard }
   ),
   m("vidu-q2-reference", "video",
     ["Vidu Q2 Reference", "Vidu Q2 Reference", "Vidu Q2 Reference"],
@@ -269,7 +294,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Multi-Referenz für Charakter-Konsistenz.",
       "Multi-referencia para consistencia de personajes.",
     ],
-    [MULTIREF, I2V]
+    [MULTIREF, I2V],
+    { cover: coverViduReference }
   ),
   m("vidu-q2-i2v", "video",
     ["Vidu Q2 I2V", "Vidu Q2 I2V", "Vidu Q2 I2V"],
@@ -278,7 +304,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Bild-zu-Video mit Referenz-Lock.",
       "Imagen a vídeo con anclaje de referencia.",
     ],
-    [I2V, MULTIREF]
+    [I2V, MULTIREF],
+    { cover: coverViduI2V }
   ),
   m("runway-gen4-aleph", "video",
     ["Runway Gen-4 Aleph", "Runway Gen-4 Aleph", "Runway Gen-4 Aleph"],
@@ -297,7 +324,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Studio-LTX-Qualität zu praktikablen Kosten.",
       "Calidad LTX estudio a coste práctico.",
     ],
-    [T2V, I2V]
+    [T2V, I2V],
+    { cover: coverLtxPro }
   ),
   m("happyhorse-pro", "video",
     ["HappyHorse 1.1 Pro", "HappyHorse 1.1 Pro", "HappyHorse 1.1 Pro"],
@@ -306,7 +334,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Kosteneffizientes T2V & I2V für Volumen-Produktion.",
       "T2V e I2V rentables para gran volumen.",
     ],
-    [T2V, I2V, FAST]
+    [T2V, I2V, FAST],
+    { cover: coverHappyHorse }
   ),
 
   // ============ IMAGE ============
@@ -367,7 +396,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Fixiere deinen Brand-Look über alle Renders.",
       "Fija el look de marca en todos los renders.",
     ],
-    [STYLE, CONS]
+    [STYLE, CONS],
+    { cover: coverStyleRef }
   ),
 
   // ============ AUDIO ============
