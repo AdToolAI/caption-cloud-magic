@@ -13,7 +13,7 @@ import { PlanId } from "@/config/pricing";
 const HEAVY_USAGE_THRESHOLD = 5;
 
 /**
- * Disabled during Beta: there is only one paid plan (14,99€), so the
+ * Disabled during Beta: there is only one paid plan (19,99€), so the
  * "heavy user should upgrade" nudge has nothing to recommend.
  * Re-enable once tiered plans (Autopilot etc.) launch post-Beta.
  */

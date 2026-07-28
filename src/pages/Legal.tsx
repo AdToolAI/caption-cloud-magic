@@ -157,7 +157,7 @@ const Legal = () => {
                 <div className="space-y-3">
                   <p>
                     Sämtliche als „Founders-Deal", „Launch-Promo", „Einführungspreis" oder vergleichbar gekennzeichneten
-                    Angebote (insbesondere der Pro-Plan zu € 14,99/Monat für 24 bzw. 3 Monate) sind
+                    Angebote (insbesondere der Pro-Plan zu € 19,99/Monat für 24 bzw. 3 Monate) sind
                     <strong className="text-foreground"> zeitlich und mengenmäßig begrenzte Einführungsangebote</strong>.
                   </p>
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">

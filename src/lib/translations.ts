@@ -1559,7 +1559,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "14.95",
+          price: "19.99",
           currency: "$",
           period: "month",
           credits: "800 credits",
@@ -1654,7 +1654,7 @@ export const translations: Record<Language, any> = {
         toPro: "Upgrade to Pro"
       },
       intro: {
-        basic: "Intro Month: Only $4.99 instead of $14.99",
+        basic: "Intro Month: Only $4.99 instead of $19.99",
         enterprise: "Intro Month: Only $9.99 instead of $69.95",
         monthly: "Cancel anytime"
       },
@@ -3904,7 +3904,7 @@ export const translations: Record<Language, any> = {
         headline1: "Effective Marketing.",
         headline2: "Smart Campaigns.",
         subline: "Your AI-powered marketing toolkit for social media. Create, plan and analyze content like a pro.",
-        pricingHint: "From €14.99/month (Launch promo) · 14-day trial · No auto-subscription",
+        pricingHint: "From €19.99/month (Launch promo) · 14-day trial · No auto-subscription",
         ctaPrimary: "Start for free",
         ctaSecondary: "Watch demo",
         stats: {
@@ -6415,7 +6415,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "14,95",
+          price: "19,99",
           currency: "€",
           period: "Monat",
           credits: "800 Credits",
@@ -6500,7 +6500,7 @@ export const translations: Record<Language, any> = {
         remove: "Coupon entfernen"
       },
       intro: {
-        basic: "Intro-Monat: Nur 4,99 € statt 14,99 €",
+        basic: "Intro-Monat: Nur 4,99 € statt 19,99 €",
         enterprise: "Intro-Monat: Nur 9,99 € statt 69,95 €",
         monthly: "Jederzeit kündbar"
       },
@@ -8752,7 +8752,7 @@ export const translations: Record<Language, any> = {
         headline1: "Effektives Marketing.",
         headline2: "Smarte Kampagnen.",
         subline: "Dein KI-gestütztes Marketing-Toolkit für Social Media. Erstelle, plane und analysiere Content wie ein Profi.",
-        pricingHint: "Ab 14,99 €/Monat (Launch-Promo) · 14 Tage testen · Kein Auto-Abo",
+        pricingHint: "Ab 19,99 €/Monat (Launch-Promo) · 14 Tage testen · Kein Auto-Abo",
         ctaPrimary: "Kostenlos starten",
         ctaSecondary: "Demo ansehen",
         stats: {
@@ -11301,7 +11301,7 @@ export const translations: Record<Language, any> = {
         remove: "Eliminar cupón"
       },
       intro: {
-        basic: "Mes de Intro: Solo €4.99 en lugar de €14.99",
+        basic: "Mes de Intro: Solo €4.99 en lugar de €19.99",
         enterprise: "Mes de Intro: Solo €9.99 en lugar de €69.95",
         monthly: "Cancelar en cualquier momento"
       },
@@ -13333,7 +13333,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
-          price: "14,95",
+          price: "19,99",
           currency: "€",
           period: "mes",
           credits: "800 créditos por mes",
@@ -13385,7 +13385,7 @@ export const translations: Record<Language, any> = {
         headline1: "Marketing Efectivo.",
         headline2: "Campañas Inteligentes.",
         subline: "Tu kit de marketing impulsado por IA para redes sociales. Crea, planifica y analiza contenido como un profesional.",
-        pricingHint: "Desde 14,99 €/mes (promo de lanzamiento) · 14 días de prueba · Sin suscripción automática",
+        pricingHint: "Desde 19,99 €/mes (promo de lanzamiento) · 14 días de prueba · Sin suscripción automática",
         ctaPrimary: "Empezar gratis",
         ctaSecondary: "Ver demo",
         stats: {

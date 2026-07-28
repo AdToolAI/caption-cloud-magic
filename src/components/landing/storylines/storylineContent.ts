@@ -329,9 +329,9 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Kosten-Transparenz", "Cost transparency", "Transparencia de costes"],
         ["Preis vor dem Render, nicht danach.", "Cost shown before render, not after.", "Coste antes del render, no después."],
         [
-          "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 14,99 € eingerechnet.",
-          "Every render shows how many media credits it costs — up front. No surprise burn, no hidden markup — beta price 14.99 € included.",
-          "Cada render muestra su coste en créditos — antes de lanzarlo. Sin sorpresas, sin recargos ocultos — precio beta 14,99 € incluido.",
+          "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 19,99 € eingerechnet.",
+          "Every render shows how many media credits it costs — up front. No surprise burn, no hidden markup — beta price 19.99 € included.",
+          "Cada render muestra su coste en créditos — antes de lanzarlo. Sin sorpresas, sin recargos ocultos — precio beta 19,99 € incluido.",
         ],
       ),
     },
@@ -696,11 +696,11 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Founders · 02", "Founders · 02", "Founders · 02"],
-        ["14,95 € für 24 Monate.", "€14.95 for 24 months.", "14,95 € durante 24 meses."],
+        ["15,99 € für 24 Monate.", "€15.99 for 24 months.", "15,99 € durante 24 meses."],
         [
-          "Der Founder-Preis ist auf 24 Monate garantiert. Egal wie sich unsere reguläre Preisliste entwickelt — deine 14,95 € stehen fest.",
-          "The founder price is guaranteed for 24 months. No matter how our regular pricing evolves — your €14.95 stays put.",
-          "El precio founder está garantizado 24 meses. Pase lo que pase con la tarifa regular — tus 14,95 € se mantienen.",
+          "Der Founder-Preis ist auf 24 Monate garantiert. Egal wie sich unsere reguläre Preisliste entwickelt — deine 15,99 € stehen fest.",
+          "The founder price is guaranteed for 24 months. No matter how our regular pricing evolves — your €15.99 stays put.",
+          "El precio founder está garantizado 24 meses. Pase lo que pase con la tarifa regular — tus 15,99 € se mantienen.",
         ],
       ),
     },
