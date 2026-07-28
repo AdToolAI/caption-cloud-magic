@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, BarChart3, Rocket, ArrowRight, Zap, Film, Users, ShieldCheck } from "lucide-react";
+import { CalendarDays, BarChart3, Rocket, ArrowUpRight, Zap, Film, Users, ShieldCheck } from "lucide-react";
 import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
 import { useTranslation } from "@/hooks/useTranslation";
 import { PlanCockpit } from "./cockpits/PlanCockpit";
