@@ -1,5 +1,5 @@
-import { motion, useReducedMotion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   Users,
   MessagesSquare,
@@ -10,6 +10,8 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { StudioStorylineDialog } from "./StudioStorylineDialog";
+import type { StudioKey } from "./storylines/storylineContent";
 
 /* ────────────────────────────────────────────────────────────────
    Mini visuals — pure SVG / DOM, no external assets.
