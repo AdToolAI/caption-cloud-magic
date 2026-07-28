@@ -152,6 +152,7 @@ export function RemotionPreviewPlayer({
     // via useOriginalAudio + per-scene overrides. previewMode enables SafeVideo's
     // 2s delayRender fallback so buffering doesn't cause a black screen.
     previewMode: true,
+    rawMediaMode: true,
     diag: {
       ...(customizations?.diag || {}),
       silentRender: true,
