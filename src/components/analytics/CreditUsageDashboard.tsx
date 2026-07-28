@@ -6,7 +6,7 @@ import { Sparkles } from 'lucide-react';
  *
  * Das generische Credit-Nutzungs-Dashboard ist mit Abschaffung des alten
  * Credit-Systems entfallen. Chat, Edge Functions, Automation und Publishing
- * sind im Beta-Basic-Abo (14,99 €) enthalten. Media-Credit-Verbrauch
+ * sind im Beta-Basic-Abo (19,99 €) enthalten. Media-Credit-Verbrauch
  * (AI-Video, Music, Bild) wird direkt im jeweiligen Studio angezeigt.
  */
 export const CreditUsageDashboard = () => {
@@ -18,7 +18,7 @@ export const CreditUsageDashboard = () => {
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground space-y-2">
         <p>
-          Mit dem Beta-Basic-Abo (14,99 €/Monat) sind Chat, Automatisierung,
+          Mit dem Beta-Basic-Abo (19,99 €/Monat) sind Chat, Automatisierung,
           Publishing und alle Plattform-Features unbegrenzt nutzbar.
         </p>
         <p>

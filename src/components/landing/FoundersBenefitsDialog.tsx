@@ -19,13 +19,13 @@ interface Props {
 const benefits = [
   {
     icon: ShieldCheck,
-    title: "14,99 € Preisgarantie für 24 Monate",
-    text: "Dein Beta-Preis bleibt für zwei volle Jahre eingefroren — unabhängig von späteren Preisanpassungen.",
+    title: "15,99 € Preisgarantie für 24 Monate",
+    text: "Als Founder zahlst du statt 19,99 € nur 15,99 € — dieser Preis bleibt für zwei volle Jahre eingefroren, unabhängig von späteren Preisanpassungen.",
   },
   {
     icon: Percent,
-    title: "20 % Rabatt auf alle Video-Credits",
-    text: "Automatisch angewendet auf jeden Video-Credit-Kauf, 24 Monate lang. Kein Code nötig.",
+    title: "20 % Founders-Rabatt automatisch",
+    text: "Der 20 % Rabatt wird 24 Monate lang automatisch auf jede Rechnung angewendet — Beta-Basis-Preis 19,99 € → dein Preis 15,99 €. Kein Code nötig.",
   },
   {
     icon: Sparkles,

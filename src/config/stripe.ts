@@ -12,16 +12,16 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
     USD: '' // Free plan has no price
   },
   basic: {
-    EUR: 'price_1SLqZyDRu4kfSFxjfhMnx186', // UPDATE: Create new price in Stripe for €14.99/month
-    USD: 'price_1SO4JdDRu4kfSFxjDInm0jUQ' // Basic Plan $14.99/month
+    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ', // Beta-Basic €19.99/month
+    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'  // Reuse EUR price (single Beta-Basic during Beta)
   },
   pro: {
-    EUR: 'price_1TSLxWDRu4kfSFxjEJNi8nGN', // Pro Plan €29.99/month (Regular v2 — promo applied via coupon)
-    USD: 'price_1TSLxWDRu4kfSFxjEJNi8nGN'  // EUR-only price (USD checkout falls back to EUR)
+    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ', // Beta-Basic (Pro tier disabled during Beta)
+    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'
   },
   enterprise: {
-    EUR: 'price_1SLqfFDRu4kfSFxjy2ZxDkby',
-    USD: 'price_1SO4LVDRu4kfSFxj8HEmHlHq'
+    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
+    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'
   }
 };
 
@@ -30,9 +30,9 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
  */
 export const STRIPE_PRODUCT_MAP: Record<PlanId, string> = {
   free: '',
-  basic: 'prod_TIRSoTyzmRpbpT',
-  pro: 'prod_UOG4wbiQjDONAj', // Pro Plan v2 (€29.99 regular, canonical "AdTool AI Pro")
-  enterprise: 'prod_TIRYBu4fdR2BEw'
+  basic: 'prod_UyE4edZ94ktyOt',
+  pro: 'prod_UyE4edZ94ktyOt',
+  enterprise: 'prod_UyE4edZ94ktyOt'
 };
 
 /**
@@ -64,10 +64,10 @@ export const INTRO_PROMO_CODES = {
 } as const;
 
 /**
- * Pro Launch promo coupons (applied automatically by create-checkout)
- *  - FOUNDERS: first 1000 subscribers, €15 off for 24 months
- *  - LAUNCH:   everyone else, €15 off for 3 months
- * Both bring €29.99 → €14.99 effective.
+ * Founders Launch promo coupons (applied automatically by create-checkout)
+ *  - FOUNDERS: first 1000 subscribers, 20 % off for 24 months
+ *              → €19.99 → €15.99 effective for 24 months.
+ *  - LAUNCH:   everyone else, standard Beta price €19.99 (no discount).
  */
 export const PRO_PROMO_COUPONS = {
   founders: 'PRO-FOUNDERS-24M',
@@ -75,5 +75,5 @@ export const PRO_PROMO_COUPONS = {
 } as const;
 
 export const FOUNDERS_MAX_SLOTS = 1000;
-export const PRO_REGULAR_PRICE_EUR = 29.99;
-export const PRO_PROMO_PRICE_EUR = 14.99;
+export const PRO_REGULAR_PRICE_EUR = 19.99;
+export const PRO_PROMO_PRICE_EUR = 15.99;

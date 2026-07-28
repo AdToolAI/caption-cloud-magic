@@ -199,7 +199,7 @@ export const PriceLock24mVisual = () => (
     <div className="flex items-center gap-6">
       <div className="flex flex-col items-center">
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground line-through">18,74 €</div>
-        <div className="font-display text-4xl text-primary">14,95 €</div>
+        <div className="font-display text-4xl text-primary">15,99 €</div>
         <div className="text-[10px] uppercase tracking-widest text-primary/70">MONTHLY</div>
       </div>
       <div className="flex flex-col items-center gap-2">
@@ -249,7 +249,7 @@ export const TimelineGuaranteeVisual = () => (
         ))}
       </div>
       <div className="mt-8 flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest text-primary/80">
-        <Calendar className="h-3 w-3" /> 14,95 € · GUARANTEED
+        <Calendar className="h-3 w-3" /> 15,99 € · GUARANTEED
       </div>
     </div>
   </Frame>

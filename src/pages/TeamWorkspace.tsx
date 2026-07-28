@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users, Plus, Mail, CheckCircle, XCircle, ListTodo, Shield, Crown,
-  Sparkles, Activity, Clock, TrendingUp, Circle, MoreHorizontal, Radar,
+  Sparkles, Activity, Clock, TrendingUp, Circle, MoreHorizontal, Radar, Trash2, Check, X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -236,7 +236,17 @@ export default function TeamWorkspace() {
       supabase.from("content_approvals").select("*").eq("workspace_id", selectedWorkspace)
         .order("created_at", { ascending: false }),
     ]);
-    setMembers(m || []);
+    let hydrated = m || [];
+    if (hydrated.length > 0) {
+      const ids = Array.from(new Set(hydrated.map((x: any) => x.user_id)));
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, display_name, email, avatar_url")
+        .in("id", ids);
+      const byId = new Map((profs || []).map((p: any) => [p.id, p]));
+      hydrated = hydrated.map((x: any) => ({ ...x, profile: byId.get(x.user_id) || null }));
+    }
+    setMembers(hydrated);
     setTasks(ts || []);
     setApprovals(ap || []);
   };
@@ -279,21 +289,54 @@ export default function TeamWorkspace() {
     e.preventDefault();
     if (!selectedWorkspace) return;
     try {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-      const { error } = await supabase.from("workspace_invitations").insert({
-        workspace_id: selectedWorkspace,
-        email: inviteForm.email,
-        role: inviteForm.role,
-        invited_by: user!.id,
-        expires_at: expiresAt.toISOString(),
+      const { data, error } = await supabase.functions.invoke("send-workspace-invitation", {
+        body: {
+          workspaceId: selectedWorkspace,
+          email: inviteForm.email,
+          role: inviteForm.role,
+        },
       });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
       toast({ title: t("success"), description: t("team.inviteSent") });
       setShowInviteMember(false);
       setInviteForm({ email: "", role: "viewer" });
       if (isEnterprise) await updateWorkspaceSeats();
     } catch (error: any) {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const updateTaskStatus = async (taskId: string, status: "todo" | "in_progress" | "review" | "done") => {
+    const prev = tasks;
+    setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    const { error } = await supabase.from("content_tasks").update({ status }).eq("id", taskId);
+    if (error) {
+      setTasks(prev);
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    const prev = tasks;
+    setTasks(tasks.filter((t) => t.id !== taskId));
+    const { error } = await supabase.from("content_tasks").delete().eq("id", taskId);
+    if (error) {
+      setTasks(prev);
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const decideApproval = async (approvalId: string, decision: "approved" | "rejected") => {
+    if (!user) return;
+    const prev = approvals;
+    setApprovals(approvals.map((a) => (a.id === approvalId ? { ...a, status: decision } : a)));
+    const { error } = await supabase
+      .from("content_approvals")
+      .update({ status: decision, approver_id: user.id, approved_at: new Date().toISOString() })
+      .eq("id", approvalId);
+    if (error) {
+      setApprovals(prev);
       toast({ title: t("error"), description: error.message, variant: "destructive" });
     }
   };
@@ -583,7 +626,7 @@ export default function TeamWorkspace() {
                   eyebrow="Roster"
                   title={t("team.teamMembers")}
                   action={
-                    canManage && isEnterprise ? (
+                    canManage ? (
                       <Button
                         onClick={() => setShowInviteMember(true)}
                         className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
@@ -591,11 +634,6 @@ export default function TeamWorkspace() {
                         <Mail className="mr-2 h-4 w-4" />
                         {t("team.inviteMember")}
                       </Button>
-                    ) : canManage ? (
-                      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                        <Crown className="h-3 w-3 text-primary" />
-                        Enterprise required to invite
-                      </span>
                     ) : null
                   }
                 />
@@ -629,10 +667,14 @@ export default function TeamWorkspace() {
                           </div>
                           <div className="min-w-0">
                             <p className="truncate font-medium text-foreground">
-                              {member.user_id.slice(0, 8)}…{member.user_id.slice(-4)}
+                              {member.profile?.display_name
+                                || member.profile?.email
+                                || `${member.user_id.slice(0, 8)}…${member.user_id.slice(-4)}`}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              {t("team.joined")} · {relTime(member.joined_at)}
+                            <p className="truncate text-xs text-muted-foreground">
+                              {member.profile?.email
+                                ? `${member.profile.email} · ${t("team.joined")} ${relTime(member.joined_at)}`
+                                : `${t("team.joined")} · ${relTime(member.joined_at)}`}
                             </p>
                           </div>
                         </div>
@@ -711,18 +753,26 @@ export default function TeamWorkspace() {
                             key={tk.id}
                             className="group rounded-xl border border-primary/10 bg-background/60 p-3 transition hover:border-primary/30"
                           >
-                            <div className="flex items-start justify-between">
+                            <div className="flex items-start justify-between gap-2">
                               <p className="text-sm font-medium leading-snug text-foreground">
                                 {tk.title}
                               </p>
-                              <MoreHorizontal className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+                              {canManage && (
+                                <button
+                                  onClick={() => deleteTask(tk.id)}
+                                  className="opacity-0 transition group-hover:opacity-100"
+                                  aria-label="Delete task"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                                </button>
+                              )}
                             </div>
                             {tk.description && (
                               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                                 {tk.description}
                               </p>
                             )}
-                            <div className="mt-3 flex items-center justify-between">
+                            <div className="mt-3 flex items-center justify-between gap-2">
                               <Badge
                                 variant="outline"
                                 className={cn(
@@ -739,6 +789,22 @@ export default function TeamWorkspace() {
                                 </span>
                               )}
                             </div>
+                            {canManage && (
+                              <Select
+                                value={tk.status || "todo"}
+                                onValueChange={(v) => updateTaskStatus(tk.id, v as any)}
+                              >
+                                <SelectTrigger className="mt-3 h-7 border-primary/15 bg-background/60 text-[11px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="todo">Backlog</SelectItem>
+                                  <SelectItem value="in_progress">In Progress</SelectItem>
+                                  <SelectItem value="review">Review</SelectItem>
+                                  <SelectItem value="done">Done</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -777,17 +843,39 @@ export default function TeamWorkspace() {
                             </p>
                           </div>
                         </div>
-                        <Badge
-                          className={cn(
-                            "border",
-                            approval.status === "approved" && "border-primary/50 bg-primary/15 text-primary",
-                            approval.status === "rejected" && "border-destructive/50 bg-destructive/10 text-destructive",
-                            (approval.status === "pending" || !approval.status) &&
-                              "border-primary/20 bg-background/60 text-foreground",
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={cn(
+                              "border",
+                              approval.status === "approved" && "border-primary/50 bg-primary/15 text-primary",
+                              approval.status === "rejected" && "border-destructive/50 bg-destructive/10 text-destructive",
+                              (approval.status === "pending" || !approval.status) &&
+                                "border-primary/20 bg-background/60 text-foreground",
+                            )}
+                          >
+                            {approval.status === "pending" ? t("team.pending") : approval.status}
+                          </Badge>
+                          {canManage && (approval.status === "pending" || !approval.status) && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 rounded-full border-primary/30 text-primary hover:bg-primary/10"
+                                onClick={() => decideApproval(approval.id, "approved")}
+                              >
+                                <Check className="mr-1 h-3 w-3" /> {t("team.approve") || "Approve"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                                onClick={() => decideApproval(approval.id, "rejected")}
+                              >
+                                <X className="mr-1 h-3 w-3" /> {t("team.reject") || "Reject"}
+                              </Button>
+                            </>
                           )}
-                        >
-                          {approval.status === "pending" ? t("team.pending") : approval.status}
-                        </Badge>
+                        </div>
                       </div>
                     ))}
                   </div>

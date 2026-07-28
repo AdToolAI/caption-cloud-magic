@@ -129,7 +129,7 @@ const DeleteAccount = () => {
                 <Crown className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div className="text-sm text-muted-foreground">
                   <p className="font-medium text-primary mb-1">Sie verlieren Ihren Gründer-Status</p>
-                  <p>Mit der Löschung endet Ihre 24-Monats-Preisgarantie (14,99&nbsp;€) und der 20&nbsp;% Rabatt auf Video-Credits. Ihr Slot wird für einen neuen Nutzer freigegeben und kann nicht wiederhergestellt werden.</p>
+                  <p>Mit der Löschung endet Ihre 24-Monats-Preisgarantie (19,99&nbsp;€) und der 20&nbsp;% Rabatt auf Video-Credits. Ihr Slot wird für einen neuen Nutzer freigegeben und kann nicht wiederhergestellt werden.</p>
                 </div>
               </CardContent>
             </Card>

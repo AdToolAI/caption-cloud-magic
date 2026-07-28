@@ -65,11 +65,11 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'basic',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 14.99, USD: 14.99 },
+    price: { EUR: 19.99, USD: 19.99 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
-    productId: 'prod_TIRSoTyzmRpbpT',
+    priceId: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
+    productId: 'prod_UyE4edZ94ktyOt',
     checkoutUrl: '',
     features: {
       posting: true,
@@ -97,11 +97,11 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'pro',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 14.99, USD: 14.99 },
+    price: { EUR: 19.99, USD: 19.99 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
-    productId: 'prod_TIRSoTyzmRpbpT',
+    priceId: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
+    productId: 'prod_UyE4edZ94ktyOt',
     checkoutUrl: '',
     features: {
       posting: true,
@@ -125,11 +125,11 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'enterprise',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 14.99, USD: 14.99 },
+    price: { EUR: 19.99, USD: 19.99 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
-    productId: 'prod_TIRSoTyzmRpbpT',
+    priceId: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
+    productId: 'prod_UyE4edZ94ktyOt',
     checkoutUrl: '',
     features: {
       posting: true,
@@ -152,6 +152,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
   }
 } as const;
 
+
 // Feature Flags
 export const FEATURE_FLAGS = {
   ff_pricing_v21: true,
@@ -171,7 +172,8 @@ export type PlanType = PlanId;
 // plan (legacy Basic/Pro/Enterprise) is normalized to Beta-Basic so past
 // subscribers keep full access.
 const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
-  'prod_TIRSoTyzmRpbpT', // Basic (canonical)
+  'prod_UyE4edZ94ktyOt', // Beta-Basic 19,99 € (canonical)
+  'prod_TIRSoTyzmRpbpT', // legacy Beta-Basic 14,99 €
   'prod_TDoWFAZjKKUnA2', // legacy Basic
   'prod_TDoYdYP1nOOWsN', // legacy Pro
   'prod_TIRWOmhxlzFCwW', // legacy Pro
@@ -184,7 +186,7 @@ const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
   if (LEGACY_PAID_PRODUCT_IDS.has(productId)) {
-    return { name: 'Beta-Basic', price: 14.99, currency: '€' };
+    return { name: 'Beta-Basic', price: 19.99, currency: '€' };
   }
   return { name: 'Free', price: 0, currency: '€' };
 };
