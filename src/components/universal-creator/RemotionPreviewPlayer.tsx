@@ -107,8 +107,8 @@ export function RemotionPreviewPlayer({
   height = 1920,
   durationInFrames = 300,
   fps = 30,
-  loop: loopProp = false,
-  autoPlay = false,
+  loop: loopProp = true,
+  autoPlay = true,
   showControls = true,
   className,
 }: RemotionPreviewPlayerProps) {
@@ -152,6 +152,7 @@ export function RemotionPreviewPlayer({
     // via useOriginalAudio + per-scene overrides. previewMode enables SafeVideo's
     // 2s delayRender fallback so buffering doesn't cause a black screen.
     previewMode: true,
+    rawMediaMode: true,
     diag: {
       ...(customizations?.diag || {}),
       silentRender: true,
@@ -260,13 +261,11 @@ export function RemotionPreviewPlayer({
 
   useEffect(() => {
     if (!autoPlay || !playerRef.current) return;
-    setHasEverInteracted(true);
-    setIsMuted(false);
-    playerRef.current.unmute();
-    applyPlayerVolume();
+    // Autoplay muted — matches Step 3's <video muted autoPlay loop>.
+    // User can enable sound via mute toggle / volume slider (handlePlayClick unmutes on gesture).
+    try { playerRef.current.setVolume(0); } catch { /* noop */ }
     playerRef.current.play();
-    void playPreviewAudio();
-  }, [autoPlay, playPreviewAudio, applyPlayerVolume]);
+  }, [autoPlay]);
 
   useEffect(() => {
     const player = playerRef.current;
