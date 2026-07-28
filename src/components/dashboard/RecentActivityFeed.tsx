@@ -276,11 +276,12 @@ export function RecentActivityFeed() {
   const { language } = useTranslation();
   const [category, setCategory] = useState<Category>('all');
 
-  const { data: events = [], loading } = useCache(
+  const { data, loading } = useCache(
     'recent-events-signal',
     () => getRecentEvents(50),
     { ttl: 2 * 60 * 1000, staleWhileRevalidate: true },
   );
+  const events = data ?? [];
 
   const getLocale = useCallback(() => {
     switch (language) {
