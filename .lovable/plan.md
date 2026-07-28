@@ -1,40 +1,21 @@
 ## Problem
 
-Der Remotion-Preview-Player im Universal Content Creator wird bei Hoch-Formaten (9:16, 4:5) extrem in die Länge gezogen, weil sein Frame `w-full` + `aspectRatio` verwendet — ohne Höhen-Deckel. In der breiten Preview-Spalte wird die volle Breite genutzt und die Höhe wächst proportional (bei 9:16 auf ~1.7× die Breite), was den Player unnatürlich hoch macht.
+Der Preview-Player übernimmt aktuell das Composition-Format (9:16 Portrait), wodurch das Video den Frame komplett füllt und der Frame selbst extrem hoch wird. Der Nutzer will stattdessen einen **fest dimensionierten Player-Frame** (16:9-Fenster), in dem Portrait-Videos mit **schwarzen Balken oben/unten** (Letterbox) angezeigt werden — genau wie ein YouTube-/QuickTime-Player.
 
-Betroffene Aufrufe:
-- `src/pages/UniversalCreator/UniversalCreator.tsx:660` — kein `maxWidth`, kein `maxHeight`
-- `src/components/universal-creator/steps/PreviewExportStep.tsx:601` — hat zwar `previewMaxWidth`, aber immer noch keinen Höhen-Deckel bei sehr hohen Viewports
+## Fix — `src/components/universal-creator/RemotionPreviewPlayer.tsx`
 
-## Fix (rein Frontend/Presentation)
+1. Frame-Container **immer** auf ein festes Player-Fenster setzen — nicht mehr am Composition-Aspect ausrichten:
+   - `aspectRatio: 16 / 9`
+   - `width: '100%'`, `maxWidth: 'min(100%, 720px)'`, `maxHeight: '55vh'`
+   - `bg-black` (bleibt), zentriert via `mx-auto`.
+2. Remotion `<Player>` innerhalb dieses Fensters mit `style={{ width: '100%', height: '100%' }}` behalten — der Player skaliert die Composition selbst korrekt in seinen Container und erzeugt automatisch Letterbox-Balken, weil `compositionWidth/Height` (z. B. 1080×1920) vom Frame-Aspect (16:9) abweicht.
+3. `isPortrait`-Zweig entfernen — nicht mehr nötig.
 
-**`src/components/universal-creator/RemotionPreviewPlayer.tsx`** — Frame-Container so ändern, dass bei portrait-Formaten die Höhe der begrenzende Faktor ist, bei landscape die Breite:
+Effekt: Portrait 9:16 erscheint als schmales, zentriertes Video mit schwarzen Balken links/rechts im 16:9-Fenster; Landscape 16:9 füllt den Frame; 1:1 zeigt Balken links/rechts. Player + Controls passen zusammen in einen Viewport ohne Scroll.
 
-```tsx
-const isPortrait = height > width;
-// ...
-<div className="mx-auto flex items-center justify-center">
-  <div
-    className="relative overflow-hidden rounded-lg bg-black"
-    style={{
-      aspectRatio,
-      maxWidth: '100%',
-      maxHeight: '70vh',
-      ...(isPortrait
-        ? { height: 'min(70vh, calc(100vw * ' + aspectRatio + '))', width: 'auto' }
-        : { width: '100%', height: 'auto' }),
-    }}
-  >
-    <MemoizedPlayer ... />
-  </div>
-</div>
-```
-
-Vereinfachte, robuste Variante: nur `maxHeight: '70vh'` + `width: 'auto'` bei portrait, damit die Höhe nie 70% des Viewports übersteigt und die Breite automatisch aus dem `aspectRatio` folgt.
-
-Kein Backend-Change, keine Renderlogik-Änderung — nur die Wrapper-Größe.
+Rein Frontend, keine Änderung an Composition, Render-Payload oder Backend.
 
 ## Verifikation
 
-- Preview in Step 3/4 bei 9:16, 1:1 und 16:9 checken (Screenshot via Playwright, Viewport 1280×1800).
-- Bestätigen: Player-Höhe ≤ 70vh; keine Verzerrung; Aspect-Ratio korrekt.
+- Playwright-Screenshot in Step 4 mit 9:16-Format bei 1280×800: 16:9-Frame sichtbar, Video mittig mit schwarzen Balken links/rechts, Controls direkt darunter, alles ohne Scroll.
+- Kurzcheck 16:9 (Vollformat) und 1:1 (Balken links/rechts).
