@@ -2090,8 +2090,8 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   
   if (background.type === 'video' && background.videoUrl) {
     return (
-      <AbsoluteFill>
-        <SafeVideo src={background.videoUrl} sceneType={sceneType} primaryColor={primaryColor} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted={audioMuted} volume={audioVolume} previewMode={previewMode} />
+      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+        <SafeVideo src={background.videoUrl} sceneType={sceneType} primaryColor={primaryColor} style={{ width: '100%', height: '100%', objectFit: 'contain' }} muted={audioMuted} volume={audioVolume} previewMode={previewMode} />
       </AbsoluteFill>
     );
   }
@@ -2099,8 +2099,8 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   // Default: image with gradient fallback for invalid URLs
   if (safeImageUrl) {
     return (
-      <AbsoluteFill style={rawMediaMode ? undefined : { filter: 'saturate(1.15) contrast(1.05)' }}>
-        <SafeImg src={safeImageUrl} sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />
+      <AbsoluteFill style={{ backgroundColor: '#000', ...(rawMediaMode ? {} : { filter: 'saturate(1.15) contrast(1.05)' }) }}>
+        <SafeImg src={safeImageUrl} sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
       </AbsoluteFill>
     );
   }
