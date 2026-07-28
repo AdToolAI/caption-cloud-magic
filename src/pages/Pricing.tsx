@@ -20,6 +20,7 @@ import { AI_VIDEO_CREDIT_PACKS } from "@/config/aiVideoCredits";
 import { FoundersSlotBadge } from "@/components/pricing/FoundersSlotBadge";
 import { UDCPricingHighlight } from "@/components/pricing/UDCPricingHighlight";
 import { UDCComparisonTable } from "@/components/pricing/UDCComparisonTable";
+import { RefundPolicyMini } from "@/components/credits/RefundPolicyMini";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { useEffect } from "react";
 
@@ -381,6 +382,11 @@ const Pricing = () => {
                 zugestellt.
               </p>
             )}
+
+            <div className="max-w-3xl mx-auto mb-8">
+              <RefundPolicyMini />
+            </div>
+
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {Object.entries(AI_VIDEO_CREDIT_PACKS).map(([key, pack], idx) => {

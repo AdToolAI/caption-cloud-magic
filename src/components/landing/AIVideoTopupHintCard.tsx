@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Zap, ArrowRight } from "lucide-react";
+import { Zap, ArrowRight, ShieldCheck } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
 export const AIVideoTopupHintCard = () => {
@@ -35,6 +35,17 @@ export const AIVideoTopupHintCard = () => {
         {t("landing.pricing.topupCta")}
         <ArrowRight className="h-3 w-3" />
       </Link>
+
+      <div className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2">
+        <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Technische Fehler werden automatisch erstattet.{' '}
+          <Link to="/legal/ai-video-refund" className="text-primary hover:underline">
+            Refund-Policy
+          </Link>
+        </p>
+      </div>
     </motion.div>
   );
 };
+

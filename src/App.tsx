@@ -142,6 +142,7 @@ const MarketplaceBuyerTerms = lazy(() => import("./pages/legal/MarketplaceBuyerT
 const CharacterTakedownRequest = lazy(() => import("./pages/legal/CharacterTakedownRequest"));
 const Autopilot = lazy(() => import("./pages/Autopilot"));
 const AutopilotAUP = lazy(() => import("./pages/legal/AutopilotAUP"));
+const AIVideoRefundPolicy = lazy(() => import("./pages/legal/AIVideoRefundPolicy"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const MusicStudio = lazy(() => import("./pages/MusicStudio"));
@@ -218,6 +219,7 @@ function AppLayout() {
                     <Route path="/legal/marketplace-buyer-terms" element={<MarketplaceBuyerTerms />} />
                     <Route path="/legal/character-takedown-request" element={<CharacterTakedownRequest />} />
                     <Route path="/legal/autopilot-aup" element={<AutopilotAUP />} />
+                    <Route path="/legal/ai-video-refund" element={<AIVideoRefundPolicy />} />
                     <Route path="/legal/:page" element={<Legal />} />
                     {/* Direct public routes for TikTok OAuth compliance */}
                     <Route path="/privacy" element={<Legal />} />
