@@ -14091,6 +14091,27 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_webhook_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          payload_summary: Json | null
+          processed_at: string
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          payload_summary?: Json | null
+          processed_at?: string
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          payload_summary?: Json | null
+          processed_at?: string
+        }
+        Relationships: []
+      }
       studio_albums: {
         Row: {
           cover_image_url: string | null
@@ -18090,6 +18111,19 @@ export type Database = {
       can_edit_composer_project: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
+      }
+      check_and_increment_rate_limit: {
+        Args: {
+          p_endpoint: string
+          p_identifier: string
+          p_max: number
+          p_window_seconds: number
+        }
+        Returns: {
+          allowed: boolean
+          current_count: number
+          reset_at: string
+        }[]
       }
       claim_founders_slot: {
         Args: {

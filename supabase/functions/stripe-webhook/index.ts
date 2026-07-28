@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { isDuplicateStripeEvent } from "../_shared/stripeIdempotency.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,6 +68,14 @@ serve(withTelemetry('stripe-webhook', async (req) => {
     const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 
     console.log('[STRIPE-WEBHOOK] Event type:', event.type);
+
+    // Idempotency guard — Stripe retries deliver the same event.id.
+    if (await isDuplicateStripeEvent(event.id, event.type, { livemode: event.livemode })) {
+      return new Response(JSON.stringify({ received: true, duplicate: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
