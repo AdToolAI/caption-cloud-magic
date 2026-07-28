@@ -1,52 +1,71 @@
-## Ziel
-Jede einzelne Karte in der linken Sidebar (Hub-Detailseiten) bekommt ein **eigenes cinematisches Cover-Bild** im Bond-2028-Stil (Deep Black `#050816` + Gold `#F5C76A` + Cyan). Kein Hub-Cover mehr als Fallback für Karten mit eigenem Motiv.
+## Problem
 
-## Umfang — 39 Cover, aufgeteilt nach Hubs
+Die „Letzte Aktivitäten"-Karte zeigt echte, aber sehr alte Events an (`performance.account.disconnected`, `performance.synced` — alle „vor 3 Monaten"). Zwei Baustellen:
 
-**Planen (4):** Kalender · Content-Planer · Composer · Post-Time-Advisor
-**Optimieren (7):** Text-Studio · AI-Post-Generator · Image-Caption-Pairing · Coach · Comment-Manager · Template-Manager · Campaigns
-**Analysieren (5):** Analytics-Dashboard · PostHog · Usage Reports · Trend-Radar · AI Text Studio
-**Erstellen (18):** Media-Library · VoicePro · Music Studio · SFX Library · Stock Videos · Universal Content Creator · Universal Video Creator · Universal Director's Cut · AI Video Studio · Video Composer · Render-Queue · Cast & World Library · Creator Library · KI Picture Studio · Template Marketplace · Creator Studio · My Licenses · (Motion Studio bereits im Composer-Cover)
-**Team (4):** Team-Workspace · Brand Kit · White-Label · Community
-**Gaming (1):** Stream Dashboard
+1. **Inhaltlich**: Es fließen nur technische System-Events (`connections_tab`) rein, weil aktuell keine neuen Nutzer-Events entstehen. Zusätzlich fehlen für `performance.*` die freundlichen Labels — deshalb sieht der Nutzer den rohen Event-Key.
+2. **Visuell**: Der Feed ist eine einfache vertikale Liste mit gleichförmigen Kacheln — solide, aber nicht „AdTool-AI-würdig".
 
-**Summe: 39 neue Bild-Assets** unter `src/assets/hub-covers/<hub>/<slug>.jpg` (1280×720, JPG).
+## Fix Teil 1 — Datenqualität (klein, gezielt)
 
-## Design-Rezept (konsistent zu bestehenden Covers)
-- Palette: Deep Black `#050816`, Gold `#F5C76A`, Cyan-Akzent, weiches Bokeh.
-- Jedes Motiv **abstrakt, thematisch passend, ohne Text/Logo/Personen**.
-  - Analytics-Dashboard → holografische Chart-Wall
-  - PostHog → Event-Stream-Konsole mit Lichtimpulsen
-  - Trend-Radar → Radar-Sweep in Gold
-  - Music Studio → leuchtende 3D-Waveform
-  - Cast & World → Character-Loadout-Silhouette
-  - Video Composer → Timeline mit Fadenkreuz
-  - Coach → glühende Sprechblasen-Silhouette
-  - Kalender → holografisches Datumsraster
-  - usw. — 39 spezifische Prompts, alle im Bond-Grade.
-- Generierung: `imagegen--generate_image` (fast tier, 1280×720).
+`src/components/dashboard/RecentActivityFeed.tsx` + `src/lib/eventBus.ts`
 
-## Änderungen im Code
-### `src/config/hubConfig.ts`
-- Jedes der 39 Items bekommt ein `cover: <import>`-Feld.
-- ES-Imports oben in der Datei ergänzen (39 zusätzliche Imports).
+- `getRecentEvents(limit, sinceDays = 30)` erweitern: optional `occurred_at >= now() - interval` Filter.
+- Feed ruft mit `sinceDays: 30` auf. Wenn `< 3` Events → Fallback: die 10 neuesten ohne Zeitfilter, aber mit sichtbarem „Archiv"-Badge statt „Neu".
+- Friendly-Labels ergänzen für: `performance.synced`, `performance.account.disconnected`, `performance.account.connected`, `performance.token.expired`, `performance.insight.generated` (DE/EN/ES).
+- Zeit-Formatierung: bei Events älter als 14 Tage statt „vor 3 Monaten" das Datum („28. Apr. 2026") — wirkt weniger nach „tote Seite".
+- Leerer/veralteter Zustand bekommt CTA: „Verbinde einen Kanal → live Signale sehen" (Link zu `/performance-tracker?tab=connections`).
 
-### `src/config/hubCovers.ts`
-- Bleibt als Hub-Fallback (für zukünftige neue Items ohne eigenes Cover).
+## Fix Teil 2 — Visueller Redesign „Signal Log" (das, was noch keiner hat)
 
-### `src/pages/HubPage.tsx`
-- Keine Änderung — der Cover-Slot samt Fallback existiert bereits.
+Neuer Look statt der klassischen Timeline: eine **cinematische Oszilloskop-Zeitleiste** im Bond-Gold-Stil.
 
-## Ausführungs-Reihenfolge
-1. 39 Bilder generieren in parallelen Batches (~6–8 pro Batch, 5 Wellen).
-2. Nach jeder Welle Preview-Check der generierten Motive; bei Text-Bleed einzeln nachgenerieren mit „no text, no letters"-Härtung.
-3. `hubConfig.ts` mit allen 39 Cover-Imports patchen.
-4. `tsgo` + Preview-Check auf `/hub/erstellen`, `/hub/analysieren`, `/hub/optimieren`.
+```text
+┌──────────────────────────────────────────────────────────┐
+│  ● SIGNAL LOG          [30-Tage Puls Sparkline ▁▂▅▇▃▁▂]  │
+├──────────────────────────────────────────────────────────┤
+│  HEUTE ─────────────────────────────────────────────────  │
+│    ╱╲    ● Caption erstellt        · Instagram · 14:02   │
+│   ╱  ╲___● Post geplant            · LinkedIn · 11:20    │
+│  DIESE WOCHE ───────────────────────────────────────────  │
+│     ·────● Hook generiert          · TikTok · Mo         │
+│  ÄLTER ─────────────────────────────────────────────────  │
+│     ·────○ performance.synced      · 28. Apr.            │
+└──────────────────────────────────────────────────────────┘
+```
+
+Konkret gebaut:
+
+1. **Header-Sparkline**: 30-Tage Aktivitäts-Heatline (eigene Aggregation aus `app_events` per Tag), als goldener SVG-Path mit Glow. Live-Puls-Dot am rechten Ende.
+2. **Zeit-Buckets** statt flacher Liste: `Heute`, `Diese Woche`, `Diesen Monat`, `Archiv`. Jede Gruppe collapsible, mit Count-Badge.
+3. **Oszilloskop-Rail** links: geschwungene SVG-Kurve (keine gerade Linie), die zwischen den Event-Knoten oszilliert; Knoten-Amplitude reflektiert „Signal-Wichtigkeit" (Goal completed = hoher Ausschlag, Sync = flach).
+4. **Event-Karten**: horizontale Glass-Tiles mit
+   - Icon-Chip (bestehend)
+   - Titel + Plattform-Chip mit Plattform-Farbe (Instagram/LinkedIn/TikTok/YouTube/X/Facebook)
+   - Rechts: Uhrzeit für heute, Wochentag für Woche, Datum für älter
+   - Hover: sanfter Gold-Sweep (`hub-card-shimmer`-Klasse gibt's schon), Card lift `-y-0.5`
+5. **Newest-Event Hero-Zeile**: erstes Event doppelt so hoch, mit animiertem Puls-Ring um Icon und dezenter Waveform-Animation im Hintergrund.
+6. **Filter-Chips** oben rechts: `Alle · Content · Performance · Ziele` — filtern in-place.
+7. **Empty-/Stale-State**: statt Sparkles-Icon eine ruhig pulsierende Radarkreisen-SVG + „Verbinde Kanäle für Live-Signale" CTA-Button.
+
+### Technische Details
+
+- Neue Datei `src/components/dashboard/signal-log/`:
+  - `SignalLog.tsx` — Ersatz-Export für `RecentActivityFeed` (alter Import bleibt kompatibel via re-export in `RecentActivityFeed.tsx`).
+  - `SignalSparkline.tsx` — SVG 30-Tage Puls (nutzt `getDailyMetrics` bzw. aggregiert `app_events`).
+  - `SignalRail.tsx` — SVG-Oszilloskop-Kurve zwischen Knoten (framer-motion `path` draw-on).
+  - `SignalRow.tsx` — Einzelne Event-Zeile inkl. Plattform-Chip.
+  - `signalBuckets.ts` — Gruppierung nach Heute/Woche/Monat/Archiv (date-fns `isToday`, `isThisWeek`, `isThisMonth`).
+  - `platformStyles.ts` — Plattform → Farbe/Icon Mapping (Instagram-Pink, LinkedIn-Blau, TikTok-Cyan, YouTube-Rot, X-White, Facebook-Blau).
+- `friendlyEventLabels` in eigene Datei `src/lib/friendlyEventLabels.ts` extrahieren und um `performance.*`-Keys erweitern.
+- Kein Backend-Change, keine neue Tabelle. `app_events` bleibt Quelle.
+- Design-Tokens ausschließlich (`primary` = gold, `accent` = cyan, `card/50`, `white/10`). Keine hardcoded Farben außer Plattform-Brand-Chips.
 
 ## Nicht-Ziele
-- Keine Änderung an Karten-Labels, Routen, Sidebar-Struktur.
-- Keine Änderung am Layout (Karten-Höhe, Text-Clamps sind bereits final).
-- Keine Cover-Bilder für Admin-Hub (interne Seite).
 
-## Aufwand-Hinweis
-39 Bild-Generierungen kosten Credits und dauern ~5–10 Min über alle Wellen hinweg. Die Bilder werden zum Bundle-Size dazuaddiert (~40 × 100–200 KB = ~5–8 MB extra). Ohne CDN-Migration bleibt das im Repo; falls das ein Problem wird, kann ich sie in einem Folge-Schritt auf Lovable Assets CDN auslagern.
+- Keine Änderung am `app_events` Schema oder RLS.
+- Kein neuer Realtime-Channel (bereits über `useGoalCompletionListener` etc. abgedeckt; kann später ergänzt werden).
+- Keine Änderung an Performance-Tracker oder Analytics-Seiten.
+
+## Deliverable
+
+Home-Feed wirkt live, gruppiert und cinematisch; alte Events landen im Archiv-Bucket mit klarem Datum statt „vor 3 Monaten"; leere Konten sehen einen einladenden CTA statt technische Log-Zeilen.
