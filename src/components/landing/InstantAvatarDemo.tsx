@@ -233,7 +233,7 @@ export const InstantAvatarDemo = () => {
               <div
                 {...getRootProps()}
                 className={cn(
-                  "flex-1 min-h-[280px] rounded-xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center p-8",
+                  "aspect-[3/4] w-full rounded-xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center p-8",
                   isDragActive
                     ? "border-primary bg-primary/10"
                     : "border-primary/25 hover:border-primary/50 hover:bg-primary/5",
@@ -249,11 +249,11 @@ export const InstantAvatarDemo = () => {
                 </p>
               </div>
             ) : (
-              <div className="flex-1 min-h-[280px] rounded-xl overflow-hidden relative border border-primary/20">
+              <div className="aspect-[3/4] w-full rounded-xl overflow-hidden relative border border-primary/20 bg-[#050816]">
                 <img
                   src={sourceUrl}
                   alt="Dein hochgeladenes Foto"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
                 <button
                   onClick={handleReset}
