@@ -158,7 +158,7 @@ export function RemotionPreviewPlayer({
     },
   }), [customizations]);
 
-  const aspectRatio = width / height;
+  
 
   const getPreviewTime = useCallback(() => {
     const frame = playerRef.current?.getCurrentFrame?.() ?? lastSeekedFrameRef.current;
@@ -429,18 +429,19 @@ export function RemotionPreviewPlayer({
 
   const progressPercent = durationInFrames > 0 ? (currentFrame / durationInFrames) * 100 : 0;
 
-  const isPortrait = height > width;
+  
 
   return (
     <div className={className}>
       <div className="mx-auto flex items-center justify-center w-full">
         <div
           className="relative overflow-hidden rounded-lg bg-black"
-          style={
-            isPortrait
-              ? { aspectRatio, height: '70vh', maxHeight: '70vh', maxWidth: '100%', width: 'auto' }
-              : { aspectRatio, width: '100%', maxHeight: '70vh' }
-          }
+          style={{
+            aspectRatio: 16 / 9,
+            width: '100%',
+            maxWidth: 'min(100%, 720px)',
+            maxHeight: '55vh',
+          }}
         >
           <MemoizedPlayer
             playerRef={playerRef}
