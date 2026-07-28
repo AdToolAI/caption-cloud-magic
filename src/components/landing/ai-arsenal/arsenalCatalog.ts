@@ -24,6 +24,21 @@ import coverElevenTts from "@/assets/landing/ai-arsenal/gen/elevenlabs-tts.jpg";
 import coverVoiceClone from "@/assets/landing/ai-arsenal/gen/voice-clone.jpg";
 import coverBrandLock from "@/assets/landing/ai-arsenal/gen/brand-lock.jpg";
 import coverCastWorld from "@/assets/landing/ai-arsenal/gen/cast-world.jpg";
+import coverVeoFast from "@/assets/landing/ai-arsenal/gen/veo-fast.jpg";
+import coverVeoLite from "@/assets/landing/ai-arsenal/gen/veo-lite.jpg";
+import coverWanStandard from "@/assets/landing/ai-arsenal/gen/wan-standard.jpg";
+import coverSeedancePro from "@/assets/landing/ai-arsenal/gen/seedance-pro.jpg";
+import coverSeedanceMini from "@/assets/landing/ai-arsenal/gen/seedance-mini.jpg";
+import coverGrok from "@/assets/landing/ai-arsenal/gen/grok-imagine.jpg";
+import coverKling3 from "@/assets/landing/ai-arsenal/gen/kling-3.jpg";
+import coverKling26 from "@/assets/landing/ai-arsenal/gen/kling-2-6.jpg";
+import coverKling25Turbo from "@/assets/landing/ai-arsenal/gen/kling-2-5-turbo.jpg";
+import coverPikaStandard from "@/assets/landing/ai-arsenal/gen/pika-standard.jpg";
+import coverViduReference from "@/assets/landing/ai-arsenal/gen/vidu-reference.jpg";
+import coverViduI2V from "@/assets/landing/ai-arsenal/gen/vidu-i2v.jpg";
+import coverLtxPro from "@/assets/landing/ai-arsenal/gen/ltx-pro.jpg";
+import coverHappyHorse from "@/assets/landing/ai-arsenal/gen/happyhorse-pro.jpg";
+import coverStyleRef from "@/assets/landing/ai-arsenal/gen/style-reference.jpg";
 
 // -------- Animated flagship loops (asset.json pointers) --------
 import soraLoop from "@/assets/landing/ai-arsenal/gen/sora-loop.mp4.asset.json";
