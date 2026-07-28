@@ -20,6 +20,7 @@ import { AI_VIDEO_CREDIT_PACKS } from "@/config/aiVideoCredits";
 import { FoundersSlotBadge } from "@/components/pricing/FoundersSlotBadge";
 import { UDCPricingHighlight } from "@/components/pricing/UDCPricingHighlight";
 import { UDCComparisonTable } from "@/components/pricing/UDCComparisonTable";
+import { RefundPolicyMini } from "@/components/credits/RefundPolicyMini";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { useEffect } from "react";
 
