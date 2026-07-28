@@ -1,9 +1,6 @@
 import type { ComponentType } from "react";
 import type { Language } from "@/lib/translations";
 
-import castS1 from "@/assets/landing/storylines/cast/slide-1.jpg";
-import castS3 from "@/assets/landing/storylines/cast/slide-3.jpg";
-import castS6 from "@/assets/landing/storylines/cast/slide-6.jpg";
 import motionS1 from "@/assets/landing/storylines/motion/slide-1.jpg";
 import motionS3 from "@/assets/landing/storylines/motion/slide-3.jpg";
 import motionS6 from "@/assets/landing/storylines/motion/slide-6.jpg";
@@ -21,9 +18,6 @@ import voiceS3 from "@/assets/landing/storylines/voice/slide-3.jpg";
 import voiceS6 from "@/assets/landing/storylines/voice/slide-6.jpg";
 
 import {
-  CastLockVisual,
-  CastLooksVisual,
-  CastVoiceBindVisual,
   MotionTimelineVisual,
   MotionKlingVisual,
   MotionOneTakeVisual,
@@ -41,12 +35,22 @@ import {
   VoiceLibraryVisual,
 } from "./uiVisuals";
 
+import {
+  BriefTokensVisual,
+  AnchorMorphVisual,
+  IdentityLockVisual,
+  WardrobeCarouselVisual,
+  VoiceBindingVisual,
+  SceneCastDropVisual,
+} from "./castJourneyVisuals";
+
 export type StudioKey = "cast" | "motion" | "video" | "picture" | "music" | "voice";
 
 export type StorylineSlide = {
   kind: "cinematic" | "ui";
   imageSrc?: string;
   UIComponent?: ComponentType;
+  durationMs?: number;
   copy: Record<Language, { kicker: string; title: string; body: string }>;
 };
 
