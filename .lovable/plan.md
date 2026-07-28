@@ -1,68 +1,94 @@
 ## Ziel
-Der Bereich „Why this tool wins the game" (`MissionFeatures.tsx`) wird zum **Live-Metrik-Cockpit** im Bond-2028-Look — ohne erfundene Zahlen. Alle Werte sind qualitative Demo-Visualisierungen mit deutlich sichtbarem **„Beta Preview"**-Label.
+Der `FeatureGuideDialog` (öffnet sich bei „Mehr erfahren" auf den 3 Mission-Karten) wird in den **Bond-2028-Look** gehoben — deep black, gold, glassmorph, Playfair-Titel — statt der aktuellen generischen weiß-lila-Optik mit Emoji-Icons.
 
-## Neue Section-Struktur
+## Neuer Aufbau (gleiche Datenquelle, neue Präsentation)
 
 ```text
-[Warum AdTool • Beta Preview]
-  Why this tool wins the game
-  Drei Schritte … skalierbar.
-
-┌───────────────────────┐ ┌───────────────────────┐ ┌───────────────────────┐
-│ 01  📅 Plan Cockpit   │ │ 02  📊 Signal Cockpit │ │ 03  🚀 Scale Cockpit  │
-│                       │ │                       │ │                       │
-│ Mini-Kalender-Heatmap │ │ Live-Sparkline        │ │ Radiale Progress-Ringe│
-│ (7×4 pulsierende Slots│ │ + animierter Counter  │ │ + „Auto-Publish"-     │
-│  in Gold, „optimal"-  │ │ (Reach ▲, CTR ▲) mit  │ │ Ticker mit fließenden │
-│  Slots leuchten)      │ │ Rising-Bars           │ │ Kanälen (TikTok,      │
-│                       │ │                       │ │  Meta, YT, X)         │
-│ „Plane deinen Monat"  │ │ „Optimiere Performance│ │ „Skaliere Kampagnen"  │
-│  Beschreibung…        │ │  Beschreibung…        │ │  Beschreibung…        │
-│                       │ │                       │ │                       │
-│ [Beta Preview]  →     │ │ [Beta Preview]  →     │ │ [Beta Preview]  →     │
-└───────────────────────┘ └───────────────────────┘ └───────────────────────┘
-
-Untere Leiste: 4 Micro-Beweiskacheln (rein qualitativ):
-  ⚡ Multi-Provider  │  🎬 Cinematic Lip-Sync  │  🧠 Cast & World Lock  │  🔒 Beta-Preisgarantie
+╔══════════════════════════════════════════════╗
+║ ▚ HERO-BAND (Gold→Cyan Gradient, glass)      ║
+║   [Icon-Chip Gold]  01 · Kampagnen-Wizard   ║
+║   Kampagnen skalieren                        ║  ← Playfair, gold gradient
+║   Automatisiere wiederkehrende Aufgaben…     ║
+╠══════════════════════════════════════════════╣
+║  ▍ WAS IST DAS?  (Gold-Akzentbalken links)   ║
+║    Beschreibung in ruhigem Body-Text         ║
+╠══════════════════════════════════════════════╣
+║  EINRICHTUNG                                 ║
+║  ┌────────────────────────────────────────┐  ║
+║  │ 01 ─┐                                  │  ║  ← Vertikale Timeline
+║  │     │  Kampagnen-Wizard öffnen         │  ║     mit gold Connector-Line,
+║  │     │  Navigiere zur Sidebar…          │  ║     Step-Nummer in Playfair,
+║  │     │  → Zu Kampagnen                  │  ║     hover: Gold-Glow
+║  │ 02 ─┤                                  │  ║
+║  │     │  Kampagnenziel definieren        │  ║
+║  │     │  …                               │  ║
+║  └────────────────────────────────────────┘  ║
+╠══════════════════════════════════════════════╣
+║  ✧ PRO-TIPP  (dunkles Panel, gold border)    ║
+╠══════════════════════════════════════════════╣
+║  [Docs ansehen]              [Jetzt starten →]║  ← Gold Button (Bond)
+╚══════════════════════════════════════════════╝
 ```
 
-## Umsetzung (Frontend only, `MissionFeatures.tsx` + 3 neue Cockpit-Komponenten)
+## Umsetzung — nur `src/components/onboarding/FeatureGuideDialog.tsx`
 
-1. **Neue Komponenten** unter `src/components/landing/cockpits/`:
-   - `PlanCockpit.tsx` — 7×4 Grid pulsierender Zellen; goldene „optimal slots" leuchten in Wellen (framer-motion `staggerChildren` + Opazitäts-Loop). Keine Zahlen, nur Slots.
-   - `SignalCockpit.tsx` — SVG-Sparkline animiert per `pathLength`, darunter 4 kleine Rising-Bars. Ein weicher Counter (0 → „▲") ohne konkrete KPI-Zahl — stattdessen Labels „Reach", „CTR", „Watch-Time" mit ▲-Pfeil.
-   - `ScaleCockpit.tsx` — 4 kleine radiale Progress-Ringe (SVG `strokeDashoffset` Animation) für Kanäle (TikTok/Meta/YT/X) + darüber laufender „Auto-Publish"-Ticker mit `translateY`-Loop.
-   - Alle drei sind pure Presentational-Komponenten, respektieren `prefers-reduced-motion`, kein Data-Fetching, kein Netzwerk.
+1. **DialogContent Container**
+   - `max-w-2xl`, dunkler Bond-Hintergrund: `bg-gradient-to-b from-[hsl(var(--background))] via-card/60 to-[hsl(var(--background))]`
+   - `border-primary/20`, `shadow-[var(--shadow-glow-gold)]`, `backdrop-blur-2xl`
+   - Radial Gold-Glow oben (absolute pseudo-Ellipse mit `bg-primary/10 blur-3xl`)
+   - Custom Close-Button: rundes Icon, gold hover
+   - Scrollbar-Styling: dünn, gold thumb
 
-2. **`MissionFeatures.tsx` Refactor**:
-   - Karten werden höher, Cockpit-Visual sitzt oben (h ~180px), darunter Icon+Titel+Beschreibung.
-   - Hover: Bond-Goldrand-Glow (`shadow-glow-gold`), leichter 3D-Tilt via `whileHover={{ y: -4 }}`, Cockpit-Animation beschleunigt.
-   - Jede Karte bekommt ein kleines **„Beta Preview"**-Chip unten links (Cyan-Punkt + Text), damit klar ist: Visualisierung, keine echten KPIs.
-   - Step-Nummer (01/02/03) bleibt als große Ghost-Zahl im Hintergrund.
+2. **Hero-Band** (ersetzt DialogHeader)
+   - Kleine Kaps-Zeile in Cyan: `MISSION · 0X` (Step aus featureId ableiten: planMonth=01, optimizePerformance=02, scaleCampaigns=03)
+   - Großes Icon in vergoldeter Chip-Box (48×48, Gradient primary→gold-dark, subtle glow)
+   - Titel: `font-display` (Playfair), 2xl, mit Gold-Gradient auf zweitem Wort
+   - Description: `text-muted-foreground`, Serifen-freundlich
+   - Dünner Gold-Divider `bg-gradient-to-r from-transparent via-primary/50 to-transparent`
 
-3. **Untere Beweisleiste (neu, gleiche Section)**:
-   - 4 kleine Glas-Kacheln mit Icon + Kurz-Label (rein qualitativ, keine Zahlen). Fade-In bei Viewport-Sicht.
+3. **„Was ist das?" Sektion**
+   - Kein Box-Panel mehr — stattdessen linksseitige 2px gold Akzent-Bar + Serifen-Label „ÜBERSICHT" in Kaps
+   - Sauberer Body-Text, keine Farb-Backgrounds
 
-4. **Übersetzungen** in `src/lib/translations.ts`:
-   - Neue Keys (EN/DE/ES): `landing.mission.betaPreview`, `landing.mission.cockpit.plan.label`, `.signal.label`, `.scale.label`, `landing.mission.proof.multiProvider|lipSync|castLock|priceGuarantee`.
-   - Bestehende Titel/Beschreibungen unverändert.
+4. **Steps als Timeline**
+   - Vertikale Gold-Linie (`w-px bg-gradient-to-b from-primary/60 via-primary/30 to-transparent`) als Connector zwischen Steps
+   - Step-Nummer: 40×40 Kreis mit `border border-primary/40 bg-background/60 backdrop-blur`, Nummer in `font-display text-primary`
+   - Hover-State: Kreis bekommt goldenen Glow (`shadow-[0_0_20px_hsl(var(--primary)/0.4)]`) und Nummer skaliert leicht
+   - Step-Title: `font-semibold text-foreground`
+   - Action-Button: Custom Link mit gold underline animation (story-link Pattern), Pfeil translatiert bei hover
 
-5. **Design-Tokens**: Nur bestehende Tokens (`primary`, `gold-dark`, `accent`, `shadow-glow-gold`, `card`, `border`). Keine hartkodierten Farben.
+5. **Pro-Tipp**
+   - Dunkles Glas-Panel `bg-card/40 border-primary/30`
+   - Label „PRO-TIPP" in Cyan-Kaps mit Sparkle-Icon (nicht Emoji)
+   - Icon: `Sparkles` von lucide (klein, gold)
 
-6. **Motion-Regeln**: Alle Loops respektieren `useReducedMotion()` von framer-motion (freeze auf statisches Frame).
+6. **Footer**
+   - Border-top: gold-gradient statt plain border
+   - Primary CTA: Gold-Verlauf `bg-gradient-to-r from-primary to-gold-dark text-background`, `shadow-[var(--shadow-glow-gold)]`, hover: intensiverer Glow (ersetzt die bestehende brand-500/fuchsia/pink Palette, die nicht ins Bond-System passt)
+   - Secondary „Docs" Button: `variant="outline"` mit `border-primary/30 hover:border-primary/60 hover:bg-primary/5`
 
-## Ehrlichkeits-Guard
-- **Kein einziger konkreter Zahlenwert** (kein „+248%", kein „12.400 Reichweite"). Nur Pfeile (▲), Slot-Leuchten, Fortschrittsringe ohne %-Zahl.
-- **Beta-Preview-Chip** auf jeder Cockpit-Karte.
-- Beweisleiste zeigt nur Feature-Namen, keine Metriken.
+7. **Icons statt Emojis**
+   - Emoji `📋` → `ListChecks` (lucide) in gold
+   - Emoji `💡` → `Sparkles` in gold/cyan
+   - Feature-Emoji (🚀, 📅, 📊) im Hero bleibt bewusst als warmer Akzent im vergoldeten Chip — passt zum Rest der Landing (die Mission-Karten haben auch echte Icons; hier ist das Guide-Emoji das einzige Bindeglied zur Datenschicht in `translations.ts`, das wir NICHT anfassen).
+
+8. **Motion**
+   - Dialog-Content: sanfte `scale-in` + `fade-in` bei Open (bereits im Dialog primitive drin)
+   - Steps: `motion.div` mit `initial={{opacity:0, x:-10}} animate={{opacity:1, x:0}}` staggered per Index (delay: `0.05 * i`)
+   - Respektiert `useReducedMotion`
 
 ## Nicht enthalten
-- Kein Backend-Call, keine echten Nutzerdaten (per deiner Antwort ausgeschlossen).
-- Keine Änderung an Text der Section-Headline oder Subtitle.
-- Keine Änderung an anderen Landing-Sections.
+- Keine Textänderungen in `translations.ts` (Inhalte bleiben, nur Präsentation)
+- Keine Änderung an anderen Onboarding-Dialogen
+- Keine neuen Assets/Bilder — rein CSS/Tokens
 
-## Technische Details
-- Neue Dateien: `PlanCockpit.tsx`, `SignalCockpit.tsx`, `ScaleCockpit.tsx`.
-- Geänderte Dateien: `MissionFeatures.tsx`, `src/lib/translations.ts`.
-- Libraries: framer-motion (bereits im Projekt), keine neuen Deps.
-- Accessibility: `aria-hidden` auf reine Deko-SVGs, `role="img"` mit `aria-label` auf Cockpit-Container.
+## Design-Tokens
+Nur bestehende: `primary`, `gold-dark`, `accent` (cyan), `card`, `background`, `foreground`, `muted-foreground`, `border`, `shadow-glow-gold`, `font-display`. Keine hartkodierten Farben.
+
+## Datei
+- **Geändert**: `src/components/onboarding/FeatureGuideDialog.tsx`
+- **Neu**: keine
+
+## Verifikation
+- Typecheck via `tsgo`
+- Manuell: Dialog öffnen für alle 3 Missionen (planMonth / optimizePerformance / scaleCampaigns) und prüfen dass Struktur (6 Steps + Pro-Tipp + Docs-Link) korrekt rendert
