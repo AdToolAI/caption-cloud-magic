@@ -154,7 +154,8 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
       "Auf Geschwindigkeit optimiertes Veo für schnelle Iterationen.",
       "Veo optimizado para iteración rápida.",
     ],
-    [T2V, FAST, P1080]
+    [T2V, FAST, P1080],
+    { cover: coverVeoFast }
   ),
   m("wan-2-6-pro", "video",
     ["Wan 2.6 Pro", "Wan 2.6 Pro", "Wan 2.6 Pro"],
