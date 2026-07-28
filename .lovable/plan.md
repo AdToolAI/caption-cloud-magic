@@ -1,21 +1,31 @@
 ## Problem
 
-Der Preview-Player übernimmt aktuell das Composition-Format (9:16 Portrait), wodurch das Video den Frame komplett füllt und der Frame selbst extrem hoch wird. Der Nutzer will stattdessen einen **fest dimensionierten Player-Frame** (16:9-Fenster), in dem Portrait-Videos mit **schwarzen Balken oben/unten** (Letterbox) angezeigt werden — genau wie ein YouTube-/QuickTime-Player.
+Stufe 3 (Scenes) zeigt die Live-Preview über ein simples `<div>` mit `aspectRatio = formatConfig` und `object-contain` — das Portrait-Video erscheint korrekt im vollen 9:16-Rahmen. Ab Stufe 4 (Audio) übernimmt der `RemotionPreviewPlayer`, dessen Frame aktuell **hart auf 16:9 gepinnt** ist (`aspectRatio: 16/9`, `maxWidth: 720px`, `maxHeight: 55vh`). Dadurch schrumpft dasselbe 9:16-Video zu einem schmalen, letterboxten Streifen in der Mitte — der Nutzer nimmt das als „geschnitten" wahr.
 
 ## Fix — `src/components/universal-creator/RemotionPreviewPlayer.tsx`
 
-1. Frame-Container **immer** auf ein festes Player-Fenster setzen — nicht mehr am Composition-Aspect ausrichten:
-   - `aspectRatio: 16 / 9`
-   - `width: '100%'`, `maxWidth: 'min(100%, 720px)'`, `maxHeight: '55vh'`
-   - `bg-black` (bleibt), zentriert via `mx-auto`.
-2. Remotion `<Player>` innerhalb dieses Fensters mit `style={{ width: '100%', height: '100%' }}` behalten — der Player skaliert die Composition selbst korrekt in seinen Container und erzeugt automatisch Letterbox-Balken, weil `compositionWidth/Height` (z. B. 1080×1920) vom Frame-Aspect (16:9) abweicht.
-3. `isPortrait`-Zweig entfernen — nicht mehr nötig.
+Frame-Container wieder an das **Composition-Format** koppeln (wie in Stufe 3), aber mit vernünftiger Höhen-Deckelung, damit Portrait nicht die halbe Seite füllt:
 
-Effekt: Portrait 9:16 erscheint als schmales, zentriertes Video mit schwarzen Balken links/rechts im 16:9-Fenster; Landscape 16:9 füllt den Frame; 1:1 zeigt Balken links/rechts. Player + Controls passen zusammen in einen Viewport ohne Scroll.
+```tsx
+style={{
+  aspectRatio: `${width} / ${height}`,   // folgt 9:16 / 1:1 / 16:9
+  width: '100%',
+  maxHeight: '65vh',                     // verhindert überlange Portrait-Rahmen
+  marginInline: 'auto',
+}}
+```
 
-Rein Frontend, keine Änderung an Composition, Render-Payload oder Backend.
+Der Remotion `<Player>` bleibt bei `width: 100% / height: 100%` — er füllt den Frame ohne Letterbox, weil Frame- und Composition-Aspect nun identisch sind.
+
+Effekt:
+- 9:16 → hoher, schmaler Rahmen, Video füllt ihn komplett (identisch zu Stufe 3, kein „Cut").
+- 16:9 → breiter Rahmen, Video füllt ihn.
+- 1:1 → quadratischer Rahmen.
+- `maxHeight: 65vh` verhindert, dass das Portrait-Fenster die Viewport-Höhe sprengt.
+
+Rein Frontend, keine Änderung an Composition, Render-Payload oder Backend. Keine Änderung an den anderen Callern (`PreviewExportStep`), die schon per `previewMaxWidth`-Wrapper skalieren.
 
 ## Verifikation
 
-- Playwright-Screenshot in Step 4 mit 9:16-Format bei 1280×800: 16:9-Frame sichtbar, Video mittig mit schwarzen Balken links/rechts, Controls direkt darunter, alles ohne Scroll.
-- Kurzcheck 16:9 (Vollformat) und 1:1 (Balken links/rechts).
+- Playwright-Screenshot Stufen 3, 4, 5 mit 9:16 @ 1280×900: gleiche visuelle Größe des Video-Rahmens, keine Letterbox-Balken, kein Scroll.
+- Kurzcheck 16:9 und 1:1: Frame passt sich an, Video füllt ohne Balken.
