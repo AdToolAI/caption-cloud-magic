@@ -261,13 +261,11 @@ export function RemotionPreviewPlayer({
 
   useEffect(() => {
     if (!autoPlay || !playerRef.current) return;
-    setHasEverInteracted(true);
-    setIsMuted(false);
-    playerRef.current.unmute();
-    applyPlayerVolume();
+    // Autoplay muted — matches Step 3's <video muted autoPlay loop>.
+    // User can enable sound via mute toggle / volume slider (handlePlayClick unmutes on gesture).
+    try { playerRef.current.setVolume(0); } catch { /* noop */ }
     playerRef.current.play();
-    void playPreviewAudio();
-  }, [autoPlay, playPreviewAudio, applyPlayerVolume]);
+  }, [autoPlay]);
 
   useEffect(() => {
     const player = playerRef.current;
