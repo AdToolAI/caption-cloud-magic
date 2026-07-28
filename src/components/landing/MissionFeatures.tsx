@@ -134,7 +134,7 @@ export const MissionFeatures = () => {
           <div className="grid md:grid-cols-3 gap-8">
             {missions.map((mission, index) => (
               <motion.div
-                key={mission.featureId}
+                key={mission.outcomeKey}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -144,7 +144,7 @@ export const MissionFeatures = () => {
               >
                 <button
                   type="button"
-                  onClick={() => setSelectedMission(mission.featureId)}
+                  onClick={() => setSelectedOutcome(mission.outcomeKey)}
                   className="relative w-full text-left bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl p-6 h-full hover:border-primary/50 transition-all duration-500 hover:shadow-[var(--shadow-glow-gold)] overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 cursor-pointer"
                   aria-label={mission.title}
                 >
@@ -160,7 +160,6 @@ export const MissionFeatures = () => {
                     </div>
                   </div>
 
-                  {/* Live-Metric Cockpit */}
                   <div className="mb-5">
                     <mission.Cockpit />
                   </div>
@@ -192,7 +191,7 @@ export const MissionFeatures = () => {
           </div>
         </div>
 
-        {/* Qualitative proof strip */}
+        {/* Qualitative proof strip — clickable storylines */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -201,23 +200,29 @@ export const MissionFeatures = () => {
           className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3"
         >
           {proofs.map((p) => (
-            <div
+            <button
               key={p.label}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-card/40 backdrop-blur-md border border-border/40 hover:border-primary/40 transition-colors"
+              type="button"
+              onClick={() => setSelectedProof(p.studio)}
+              className="group flex items-center gap-3 px-4 py-3 rounded-xl bg-card/40 backdrop-blur-md border border-border/40 hover:border-primary/60 hover:bg-card/60 transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                 <p.icon className="h-4 w-4 text-primary" />
               </div>
-              <span className="text-sm text-foreground/90 font-medium">{p.label}</span>
-            </div>
+              <span className="text-sm text-foreground/90 font-medium flex-1">{p.label}</span>
+              <ArrowUpRight className="h-3.5 w-3.5 text-primary/60 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+            </button>
           ))}
         </motion.div>
       </div>
 
-      <FeatureGuideDialog
-        featureId={selectedMission}
-        open={selectedMission !== null}
-        onClose={() => setSelectedMission(null)}
+      <OutcomeStorylineDialog
+        outcome={selectedOutcome}
+        onOpenChange={(open) => !open && setSelectedOutcome(null)}
+      />
+      <StudioStorylineDialog
+        studio={selectedProof}
+        onOpenChange={(open) => !open && setSelectedProof(null)}
       />
     </section>
   );
