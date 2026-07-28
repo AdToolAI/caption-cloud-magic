@@ -236,19 +236,20 @@ export default function HubPage() {
         initial="hidden"
         animate="show"
         className={cn(
-          "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5",
+          "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 auto-rows-fr",
           isComingSoon && "opacity-60 pointer-events-none",
         )}
       >
         {hub.items.map((item) => {
           const ItemIcon = item.icon;
           const locked = isLocked(item);
+          const cover = item.cover ?? hubCovers[hub.key] ?? hubCovers.erstellen;
 
           return (
-            <motion.div key={item.route} variants={cardVariant}>
+            <motion.div key={item.route} variants={cardVariant} className="h-full">
               <Link
                 to={locked ? "#" : item.route}
-                className={`hub-card-shimmer group relative block rounded-2xl p-6 transition-all duration-300
+                className={`hub-card-shimmer group relative flex h-full flex-col overflow-hidden rounded-2xl transition-all duration-300
                   ${locked
                     ? "opacity-50 cursor-not-allowed bg-card/40 backdrop-blur-sm"
                     : "bg-card/60 backdrop-blur-md hover:-translate-y-2 hover:shadow-[0_0_40px_hsla(43,90%,68%,0.2),0_0_80px_hsla(187,84%,55%,0.1)]"
@@ -258,9 +259,6 @@ export default function HubPage() {
                     e.preventDefault();
                     return;
                   }
-                  // Arm the Motion Studio cinematic intro only when the user
-                  // enters via the "Erstellen" hub. Daily-throttled inside
-                  // StageWelcomeMoment.
                   if (hub.key === "erstellen" && item.route === "/video-composer") {
                     try {
                       window.sessionStorage.setItem("motion-studio:intro-trigger", "1");
@@ -270,39 +268,51 @@ export default function HubPage() {
                   }
                 }}
               >
-                {/* Hover glow overlay */}
-                {!locked && (
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/8 via-transparent to-accent/8 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-                )}
+                {/* ── Cinematic cover ── */}
+                <div className="relative aspect-video w-full overflow-hidden bg-black">
+                  <img
+                    src={cover}
+                    alt=""
+                    loading="lazy"
+                    width={1280}
+                    height={720}
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  {/* Depth + legibility overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                <div className="relative z-10">
-                  {/* Icon area with gradient bg */}
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="relative p-3 rounded-xl bg-muted/30 group-hover:bg-primary/15 transition-all duration-300">
-                      <ItemIcon className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors duration-300 group-hover:drop-shadow-[0_0_8px_hsla(43,90%,68%,0.6)]" />
-                    </div>
-                    {locked ? (
-                      <Lock className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <motion.div
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                        initial={false}
-                      >
-                        <ArrowRight className="h-4 w-4 text-primary" />
-                      </motion.div>
-                    )}
+                  {/* Icon chip */}
+                  <div className="absolute left-3 top-3 p-2 rounded-xl bg-black/50 backdrop-blur-md border border-white/10 group-hover:border-primary/40 transition-colors duration-300">
+                    <ItemIcon className="h-4 w-4 text-primary group-hover:drop-shadow-[0_0_8px_hsla(43,90%,68%,0.7)] transition-all duration-300" />
                   </div>
 
-                  <h3 className="font-semibold text-base mb-1.5 group-hover:text-primary transition-colors duration-200">
+                  {/* Lock / arrow indicator */}
+                  <div className="absolute right-3 top-3">
+                    {locked ? (
+                      <span className="flex items-center justify-center h-7 w-7 rounded-full bg-black/60 backdrop-blur-md border border-white/10">
+                        <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center h-7 w-7 rounded-full bg-black/60 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <ArrowRight className="h-3.5 w-3.5 text-primary" />
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Text block ── */}
+                <div className="relative z-10 flex flex-1 flex-col p-5">
+                  <h3 className="font-semibold text-base leading-snug mb-1.5 line-clamp-1 group-hover:text-primary transition-colors duration-200">
                     {t(item.titleKey)}
                   </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <p className="text-[13px] text-muted-foreground leading-snug line-clamp-2">
                     {t(item.descKey)}
                   </p>
 
                   {locked && (
                     <span
-                      className="inline-block mt-3 text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full"
+                      className="inline-block self-start mt-3 text-[11px] font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full"
                       style={{ animation: "pulse-bg 2s ease-in-out infinite" }}
                     >
                       {item.plan === "enterprise" ? "Enterprise" : "Pro"}
@@ -314,6 +324,7 @@ export default function HubPage() {
           );
         })}
       </motion.div>
+
     </PageWrapper>
   );
 }
