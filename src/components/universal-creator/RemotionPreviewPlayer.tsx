@@ -429,7 +429,7 @@ export function RemotionPreviewPlayer({
 
   const progressPercent = durationInFrames > 0 ? (currentFrame / durationInFrames) * 100 : 0;
 
-  const isPortrait = height > width;
+  
 
   return (
     <div className={className}>
