@@ -1,5 +1,12 @@
 import { motion } from "framer-motion";
-import { Lock, Sparkles, Mic, Film, User, Shirt } from "lucide-react";
+import { Lock, Sparkles, Mic, Film, User, Shirt, Zap, Palette, Waves, ScanFace } from "lucide-react";
+import characterSheetHero from "@/assets/landing/storylines/cast/cast-character-sheet-hero.jpg";
+import lookStudio from "@/assets/landing/storylines/cast/cast-look-studio.jpg";
+import lookStreet from "@/assets/landing/storylines/cast/cast-look-street.jpg";
+import lookExecutive from "@/assets/landing/storylines/cast/cast-look-executive.jpg";
+import lookEditorial from "@/assets/landing/storylines/cast/cast-look-editorial.jpg";
+import anchorPortrait from "@/assets/landing/storylines/cast/cast-anchor-portrait.jpg";
+import storyboardTile from "@/assets/landing/storylines/cast/cast-storyboard-tile.jpg";
 
 /* ─────────────────────────────────────────────────────────
    Cast & World — Character Creation Journey visuals
@@ -265,64 +272,228 @@ export const IdentityLockVisual = () => {
 
 /* ── 4. Wardrobe / Looks ───────────────────────────────── */
 export const WardrobeCarouselVisual = () => {
+/* ── 4. Wardrobe — Character Selection Screen (photo-driven) ─── */
+export const WardrobeCarouselVisual = () => {
   const looks = [
-    { name: "Studio", palette: ["#c9a24a", "#1a1208", "#f5eddc"] },
-    { name: "Street", palette: ["#3a5a7a", "#0a0f1a", "#c9a24a"] },
-    { name: "Executive", palette: ["#0a0a0a", "#c9a24a", "#e8e0cc"] },
-    { name: "Editorial", palette: ["#8a2a2a", "#1a0808", "#f5eddc"] },
+    { name: "Studio", src: lookStudio, palette: ["#c9a24a", "#1a1208", "#f5eddc"] },
+    { name: "Street", src: lookStreet, palette: ["#3a5a7a", "#0a0f1a", "#c9a24a"] },
+    { name: "Executive", src: lookExecutive, palette: ["#0a0a0a", "#c9a24a", "#e8e0cc"] },
+    { name: "Editorial", src: lookEditorial, palette: ["#8a2a2a", "#1a0808", "#f5eddc"] },
   ];
   return (
-    <Shell>
-      <StepBadge n="04" label="Wardrobe · Looks" />
-      <div className="absolute inset-0 flex items-center justify-center px-6">
-        <div className="grid grid-cols-4 gap-4 w-full max-w-3xl">
-          {looks.map((l, i) => (
-            <motion.div
-              key={l.name}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + i * 0.15, duration: 0.5 }}
-              className={`relative rounded-xl overflow-hidden border ${
-                i === 1 ? "border-primary shadow-[0_0_28px_hsl(var(--primary)/0.5)]" : "border-primary/25"
-              } bg-background/60`}
-            >
-              <div className="aspect-[3/4] relative">
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: `linear-gradient(160deg, ${l.palette[1]} 0%, ${l.palette[0]} 60%, ${l.palette[2]} 100%)`,
-                  }}
-                />
-                {/* silhouette */}
-                <svg viewBox="0 0 100 140" className="absolute inset-0 w-full h-full">
-                  <circle cx={50} cy={38} r={18} fill="hsl(var(--primary)/0.6)" />
-                  <path d="M20,140 Q50,70 80,140 Z" fill="hsl(var(--primary)/0.35)" />
-                </svg>
-                {i === 1 && (
-                  <motion.div
-                    className="absolute inset-0 border-2 border-primary rounded-xl"
-                    animate={{ opacity: [0.4, 1, 0.4] }}
-                    transition={{ duration: 1.8, repeat: Infinity }}
-                  />
-                )}
-                <div className="absolute top-2 left-2 text-[9px] uppercase tracking-widest text-primary/90 font-medium">
-                  Look 0{i + 1}
-                </div>
-              </div>
-              <div className="px-3 py-2 flex items-center gap-2">
-                <Shirt className="h-3 w-3 text-primary/80" />
-                <span className="text-[11px] text-foreground/90">{l.name}</span>
-              </div>
-              <div className="px-3 pb-2 flex gap-1">
-                {l.palette.map((c) => (
-                  <div key={c} className="w-3 h-3 rounded-full border border-white/10" style={{ background: c }} />
-                ))}
-              </div>
-            </motion.div>
-          ))}
+    <div className="relative w-full h-full bg-black overflow-hidden">
+      {/* full-bleed hero character sheet */}
+      <img
+        src={characterSheetHero}
+        alt=""
+        loading="lazy"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      {/* gold grid overlay */}
+      <div
+        className="absolute inset-0 opacity-[0.08] pointer-events-none"
+        style={{
+          backgroundImage:
+            "linear-gradient(hsl(var(--primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+      {/* vignette to lift bottom chrome */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent pointer-events-none" />
+
+      {/* HUD: step + status */}
+      <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-primary/85">
+        <div className="w-6 h-6 rounded-full border border-primary/60 flex items-center justify-center font-display text-primary">04</div>
+        <span>Wardrobe · Select Look</span>
+      </div>
+      <div className="absolute top-4 right-4 flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-primary/40 bg-background/70 backdrop-blur text-[9px] uppercase tracking-widest text-primary">
+          <ScanFace className="h-3 w-3" /> ID Lock · 98%
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-primary/40 bg-background/70 backdrop-blur text-[9px] uppercase tracking-widest text-primary">
+          <Lock className="h-3 w-3" /> Aurora Vale
         </div>
       </div>
-    </Shell>
+      {/* corner brackets */}
+      {[
+        "top-2 left-2 border-t-2 border-l-2",
+        "top-2 right-2 border-t-2 border-r-2",
+        "bottom-2 left-2 border-b-2 border-l-2",
+        "bottom-2 right-2 border-b-2 border-r-2",
+      ].map((cls) => (
+        <div key={cls} className={`absolute w-5 h-5 border-primary/70 ${cls} pointer-events-none`} />
+      ))}
+
+      {/* look slot strip (mirrors hero screen, animated) */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[92%] max-w-4xl">
+        <div className="grid grid-cols-4 gap-2 md:gap-3">
+          {looks.map((l, i) => {
+            const active = i === 1;
+            return (
+              <motion.div
+                key={l.name}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 + i * 0.12, duration: 0.5 }}
+                className={`relative rounded-lg overflow-hidden border ${
+                  active
+                    ? "border-primary shadow-[0_0_24px_hsl(var(--primary)/0.55)]"
+                    : "border-primary/25"
+                } bg-background/60 backdrop-blur-sm`}
+              >
+                <div className="aspect-[3/4] relative">
+                  <img
+                    src={l.src}
+                    alt={l.name}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
+                  {active && (
+                    <motion.div
+                      className="absolute inset-0 border-2 border-primary rounded-lg"
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 1.8, repeat: Infinity }}
+                    />
+                  )}
+                  <div className="absolute top-1.5 left-1.5 text-[8px] md:text-[9px] uppercase tracking-widest text-primary/90 font-medium">
+                    Look 0{i + 1}
+                  </div>
+                  {active && (
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-sm bg-primary/90 text-black flex items-center justify-center text-[9px] font-bold">
+                      ✓
+                    </div>
+                  )}
+                </div>
+                <div className="px-2 py-1.5 flex items-center justify-between bg-background/80">
+                  <div className="flex items-center gap-1.5">
+                    <Shirt className="h-2.5 w-2.5 text-primary/80" />
+                    <span className="text-[10px] text-foreground/90 font-medium">{l.name}</span>
+                  </div>
+                  <div className="flex gap-0.5">
+                    {l.palette.map((c) => (
+                      <div key={c} className="w-1.5 h-1.5 rounded-full border border-white/10" style={{ background: c }} />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ── 4b. Character Loadout — RPG-style stat sheet ─────── */
+export const CharacterLoadoutVisual = () => {
+  const stats = [
+    { label: "Identity Match", value: 98, icon: ScanFace },
+    { label: "Voice Bind", value: 96, icon: Waves },
+    { label: "Wardrobe Presets", value: 100, icon: Palette },
+    { label: "Scene Ready", value: 100, icon: Film },
+  ];
+  const slots = [
+    { label: "Face Lock", detail: "AWS Rekognition · 14 pts", icon: Lock },
+    { label: "Voice", detail: "ElevenLabs · Anna v2", icon: Mic },
+    { label: "Wardrobe", detail: "4 Looks locked", icon: Shirt },
+    { label: "Prompt Tokens", detail: "12 tags · frozen", icon: Sparkles },
+  ];
+  return (
+    <div className="relative w-full h-full bg-black overflow-hidden">
+      {/* character portrait full-bleed */}
+      <img
+        src={anchorPortrait}
+        alt=""
+        loading="lazy"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-black/80" />
+      <div
+        className="absolute inset-0 opacity-[0.06] pointer-events-none"
+        style={{
+          backgroundImage:
+            "linear-gradient(hsl(var(--primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      />
+
+      {/* header */}
+      <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-primary/85">
+        <div className="w-6 h-6 rounded-full border border-primary/60 flex items-center justify-center font-display text-primary">06</div>
+        <span>Character Loadout</span>
+      </div>
+      <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-primary/40 bg-background/70 backdrop-blur text-[9px] uppercase tracking-widest text-primary">
+        <Zap className="h-3 w-3" /> Ready
+      </div>
+
+      {/* left column — slot panels */}
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 space-y-2 w-[38%] max-w-[240px]">
+        {slots.map((s, i) => (
+          <motion.div
+            key={s.label}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 + i * 0.12, duration: 0.4 }}
+            className="rounded-lg border border-primary/35 bg-background/70 backdrop-blur px-3 py-2 flex items-center gap-2.5"
+          >
+            <div className="w-7 h-7 rounded-md bg-primary/15 border border-primary/40 flex items-center justify-center shrink-0">
+              <s.icon className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-widest text-primary/80 font-medium">{s.label}</div>
+              <div className="text-[10px] text-foreground/85 truncate">{s.detail}</div>
+            </div>
+            <Lock className="h-3 w-3 text-primary/70 ml-auto shrink-0" />
+          </motion.div>
+        ))}
+      </div>
+
+      {/* right column — stat bars */}
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 space-y-2.5 w-[38%] max-w-[240px]">
+        {stats.map((st, i) => (
+          <motion.div
+            key={st.label}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 + i * 0.12, duration: 0.4 }}
+            className="rounded-lg border border-primary/30 bg-background/70 backdrop-blur px-3 py-2"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-primary/85">
+                <st.icon className="h-3 w-3" />
+                {st.label}
+              </div>
+              <span className="text-[10px] font-mono text-primary">{st.value}%</span>
+            </div>
+            <div className="h-1 rounded-full bg-primary/15 overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-primary to-gold-dark"
+                initial={{ width: 0 }}
+                animate={{ width: `${st.value}%` }}
+                transition={{ delay: 0.5 + i * 0.12, duration: 0.9 }}
+              />
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* bottom name plate */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-center">
+        <div className="text-[9px] uppercase tracking-[0.4em] text-primary/70">Cast · World</div>
+        <div className="font-display text-lg md:text-xl text-foreground tracking-tight">Aurora Vale</div>
+      </div>
+
+      {/* corner brackets */}
+      {[
+        "top-2 left-2 border-t-2 border-l-2",
+        "top-2 right-2 border-t-2 border-r-2",
+        "bottom-2 left-2 border-b-2 border-l-2",
+        "bottom-2 right-2 border-b-2 border-r-2",
+      ].map((cls) => (
+        <div key={cls} className={`absolute w-5 h-5 border-primary/70 ${cls} pointer-events-none`} />
+      ))}
+    </div>
   );
 };
 

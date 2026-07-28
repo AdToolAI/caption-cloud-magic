@@ -40,6 +40,7 @@ import {
   AnchorMorphVisual,
   IdentityLockVisual,
   WardrobeCarouselVisual,
+  CharacterLoadoutVisual,
   VoiceBindingVisual,
   SceneCastDropVisual,
 } from "./castJourneyVisuals";
@@ -134,14 +135,14 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
     {
       kind: "ui",
       UIComponent: WardrobeCarouselVisual,
-      durationMs: 5500,
+      durationMs: 6500,
       copy: S(
         ["Schritt 04 · Wardrobe", "Step 04 · Wardrobe", "Paso 04 · Vestuario"],
-        ["Ein Cast. Vier Looks. Kein Reset.", "One cast. Four looks. No reset.", "Un cast. Cuatro looks. Sin reset."],
+        ["Ein Charakter. Vier Looks. Ein Klick.", "One character. Four looks. One click.", "Un personaje. Cuatro looks. Un clic."],
         [
-          "Studio, Street, Executive, Editorial — jeder Look wird als Preset gespeichert. Farbpalette, Outfit und Vibe wandern per Klick in jede Szene, ohne die Identität zu verlieren.",
-          "Studio, street, executive, editorial — every look is saved as a preset. Palette, outfit and vibe move into any scene with one click without losing identity.",
-          "Studio, street, executive, editorial — cada look se guarda como preset. Paleta, outfit y vibe entran en cualquier escena con un clic sin perder identidad.",
+          "Wie im Videospiel-Charakterbogen: Studio, Street, Executive, Editorial — jeder Look als Preset gespeichert. Ein Klick tauscht das Outfit, ohne dass sich Gesicht, Stimme oder Vibe verändern.",
+          "Like a video-game character sheet: Studio, Street, Executive, Editorial — each look saved as a preset. One click swaps the outfit while face, voice and vibe stay locked.",
+          "Como una hoja de personaje de videojuego: Studio, Street, Executive, Editorial — cada look guardado como preset. Un clic cambia el outfit sin tocar rostro, voz ni vibe.",
         ],
       ),
     },
@@ -153,9 +154,23 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Schritt 05 · Voice Binding", "Step 05 · Voice binding", "Paso 05 · Vinculación de voz"],
         ["Stimme fest an den Charakter geknüpft.", "Voice bound to the character.", "Voz vinculada al personaje."],
         [
-          "Klone die Stimme einmal via ElevenLabs und binde sie an den Charakter. Ab jetzt spricht Anna in Motion, AI-Video und Voice Studio automatisch in ihrer eigenen Stimme.",
-          "Clone the voice once via ElevenLabs and bind it to the character. From now on Anna speaks in Motion, AI-Video and Voice Studio in her own voice, automatically.",
-          "Clona la voz una vez con ElevenLabs y vincúlala al personaje. Desde ahora Anna hablará en Motion, AI-Video y Voice Studio con su propia voz.",
+          "Klone die Stimme einmal via ElevenLabs und binde sie an den Charakter. Ab jetzt spricht Aurora in Motion, AI-Video und Voice Studio automatisch in ihrer eigenen Stimme.",
+          "Clone the voice once via ElevenLabs and bind it to the character. From now on Aurora speaks in Motion, AI-Video and Voice Studio in her own voice, automatically.",
+          "Clona la voz una vez con ElevenLabs y vincúlala al personaje. Desde ahora Aurora hablará en Motion, AI-Video y Voice Studio con su propia voz.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: CharacterLoadoutVisual,
+      durationMs: 6500,
+      copy: S(
+        ["Schritt 06 · Character Loadout", "Step 06 · Character loadout", "Paso 06 · Loadout del personaje"],
+        ["Fünf Slots. Ein Loadout. Scene-Ready.", "Five slots. One loadout. Scene-ready.", "Cinco slots. Un loadout. Listo para escena."],
+        [
+          "Face Lock, Voice, Wardrobe, Prompt-Tokens und Scene-Ready-Status auf einem Blick — wie das Loadout eines Spielcharakters. 98 % Identity-Match, 96 % Voice-Bind, vier Looks im Preset. Alles verriegelt, alles reproduzierbar.",
+          "Face lock, voice, wardrobe, prompt tokens and scene-ready status in one view — like a game character's loadout. 98 % identity match, 96 % voice bind, four looks preset. All locked, all reproducible.",
+          "Face lock, voz, vestuario, tokens de prompt y estado listo-para-escena en una vista — como el loadout de un personaje de juego. 98 % match de identidad, 96 % de vinculación de voz, cuatro looks preset. Todo bloqueado, todo reproducible.",
         ],
       ),
     },
@@ -164,12 +179,12 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       UIComponent: SceneCastDropVisual,
       durationMs: 6000,
       copy: S(
-        ["Schritt 06 · Scene Cast", "Step 06 · Scene cast", "Paso 06 · Casting de escena"],
+        ["Schritt 07 · Scene Cast", "Step 07 · Scene cast", "Paso 07 · Casting de escena"],
         ["Ziehen. Ablegen. Drehen.", "Drag. Drop. Shoot.", "Arrastra. Suelta. Rueda."],
         [
-          "Der fertige Charakter wird per Drag & Drop in ein Storyboard gezogen. Motion Studio übernimmt Identität, Wardrobe und Stimme — und bringt Anna in jede Szene, ohne Neuanleitung.",
-          "The finished character drags into a storyboard. Motion Studio inherits identity, wardrobe and voice — and puts Anna in every scene, no re-brief needed.",
-          "El personaje terminado se arrastra a un storyboard. Motion Studio hereda identidad, vestuario y voz — y coloca a Anna en cada escena sin volver a briefar.",
+          "Der fertige Charakter wird per Drag & Drop in ein Storyboard gezogen. Motion Studio übernimmt Identität, Wardrobe und Stimme — und bringt Aurora in jede Szene, ohne Neuanleitung.",
+          "The finished character drags into a storyboard. Motion Studio inherits identity, wardrobe and voice — and puts Aurora in every scene, no re-brief needed.",
+          "El personaje terminado se arrastra a un storyboard. Motion Studio hereda identidad, vestuario y voz — y coloca a Aurora en cada escena sin volver a briefar.",
         ],
       ),
     },
