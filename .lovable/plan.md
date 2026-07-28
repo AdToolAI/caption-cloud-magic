@@ -1,55 +1,55 @@
-# Plan v287 — Outcome-Storylines & Proof-Strip Interaktion
+# Cast & World Storyline — Character-Showcase im Videospiel-Stil
 
-Zwei Baustellen im Abschnitt „Planen · Optimieren · Skalieren" auf `/` (Datei: `src/components/landing/MissionFeatures.tsx`):
+## Problem
+Die Storyline funktioniert erzählerisch, aber die Visuals sind zu abstrakt: Schritt 04 (Wardrobe) zeigt nur farbige Flächen mit „Studio · Street · Executive · Editorial"-Labels — man sieht keinen Charakter, keinen Look. Der Nutzer möchte mindestens einen Slide im Stil eines Videospiel-Character-Selection-Screens (Charakter mit sichtbarem Outfit).
 
-1. „Mehr erfahren" der 3 Cockpit-Karten öffnet aktuell den generischen `FeatureGuideDialog` (Timeline-Look). Der User will hier denselben Bond-Storyline-Effekt wie bei den Studio-Kacheln (`StudioStorylineDialog`) — animierte SVG-UI-Slides, 4-6 Sekunden Autoplay, Dots/Arrows, CTA.
-2. Die 4 Chips darunter (Multi-Provider Stack, Cinematic Lip-Sync, Cast & World Lock, Beta-Preisgarantie) sind pure `<div>`s ohne Interaktion. „Cast & World Lock" sollte die Cast-Storyline öffnen, die anderen drei jeweils passende Storylines/Ziele.
+## Lösung
 
-## Umsetzung
+### 1. Neuer Hero-Slide: „Character Sheet" (Videospiel-Stil)
+Ersetze den Wardrobe-Slide (Schritt 04) durch einen echten Character-Sheet-Visual — kein abstraktes SVG, sondern echtes generiertes Bildmaterial.
 
-### A) Outcome-Storylines (Plan · Optimize · Scale)
+**Visual-Konzept** (Character-Selection-Screen):
+- Zentral: ein Charakter (Halbporträt, gold-schwarzes Bond-Aesthetic) mit sichtbarem Outfit
+- Vier Outfit-Slots als Thumbnails unten (Studio / Street / Executive / Editorial) — jeweils **derselbe Charakter** in unterschiedlicher Kleidung, aktiver Slot mit Gold-Glow
+- HUD-Overlays: Identity-Match-Score (98%), Landmark-Punkte, Wardrobe-Preset-Name
+- Grid-Linien, Gold-Corner-Brackets, „SELECT LOOK"-Chrome
 
-- Neue Datei `src/components/landing/storylines/outcomeContent.ts`
-  - Typ `OutcomeKey = "planMonth" | "optimizePerformance" | "scaleCampaigns"`
-  - Je 5 Slides in DE/EN/ES, gleiches `StorylineSlide`-Schema wie `storylineContent.ts` (title, body, caption, visual, durationMs).
-- Neue Datei `src/components/landing/storylines/outcomeVisuals.tsx` — 15 animierte SVG-Komponenten im Bond-Gold-Stil:
-  - Plan: `HeatmapBuild`, `SlotAutoPick`, `ChannelMatrix`, `RecurrenceLoop`, `MonthLocked`
-  - Optimize: `SignalStream`, `CtrDeltaBar`, `WatchtimeCurve`, `ABDuel`, `InsightCards`
-  - Scale: `ChannelRingsFill`, `AutoPublishRail`, `CloneMultiplier`, `QueueRocket`, `GlobalReachMap`
-- Neue Datei `src/components/landing/OutcomeStorylineDialog.tsx`
-  - Kopiert die UX von `StudioStorylineDialog.tsx` (Glass, Playfair, Fortschritts-Dots, Pause/Play, „Studio öffnen"-CTA), nutzt aber `OUTCOMES` statt `STORYLINES` und einen dynamischen CTA (`href` + Label pro Outcome, z. B. Planer, Analytics, Publish-Queue).
-- `MissionFeatures.tsx`
-  - `FeatureGuideDialog` entfernen.
-  - State `selectedOutcome: OutcomeKey | null`.
-  - Cockpit-Buttons öffnen `OutcomeStorylineDialog` statt Guide.
+**Umsetzung**: 5 generierte Bilder (`imagegen premium`, 1920×1080, Bond-Aesthetic):
+- `cast-character-sheet-hero.jpg` — Character-Selection-Screen mit 4 Outfit-Thumbnails
+- `cast-look-studio.jpg`, `cast-look-street.jpg`, `cast-look-executive.jpg`, `cast-look-editorial.jpg` — 4 Outfit-Varianten desselben Charakters (Kacheln)
 
-### B) Proof-Strip klickbar mit Storylines
+Der Slide bekommt `kind: "cinematic"` (statt `"ui"`) mit dem Hero-Bild + zusätzlichem SVG-Overlay (Corner-Brackets, HUD-Chrome, aktiver Look-Indicator, Match-Score-Pill) für Interaktivitäts-Feel.
 
-- `storylineContent.ts` um zwei neue Studio-Keys erweitern: `multiProvider` und `priceGuarantee` (je 6 Slides DE/EN/ES).
-- `src/components/landing/storylines/proofVisuals.tsx` — 12 animierte SVG-Mockups:
-  - Multi-Provider: `ProviderConstellation`, `RouteBestPick`, `FallbackChain`, `CostGuardMeter`, `LatencyDuel`, `UnifiedOutput`
-  - Preisgarantie: `FoundersSeatCounter`, `PriceLock24m`, `DiscountShield`, `TimelineGuarantee`, `SeatMap1000`, `SavingsCurve`
-- Proof-Strip in `MissionFeatures.tsx` von `<div>` auf `<button>` umbauen (gleicher Bond-Gold-Hover), Zuordnung:
-  - Multi-Provider Stack → `StudioStorylineDialog` (studio="multiProvider", CTA → `/pricing` bzw. Arsenal-Section)
-  - Cinematic Lip-Sync → `StudioStorylineDialog` (studio="motion", CTA → `/motion-studio`)
-  - Cast & World Lock → `StudioStorylineDialog` (studio="cast", CTA → `/cast-and-world`)
-  - Beta-Preisgarantie → `StudioStorylineDialog` (studio="priceGuarantee", CTA → öffnet `FoundersBenefitsDialog` oder scrollt zu `#pricing`)
+### 2. Zusätzlicher neuer Slide: „Character Loadout" (Schritt 07)
+Neuer 7. Slide direkt vor Scene Cast — zeigt den Charakter im vollen „Loadout"-View wie in einem RPG:
+- Charakter zentral
+- Slot-Panels links/rechts (Face-Lock · Voice · Wardrobe · Prompt-Tokens · Scene-Ready)
+- Stat-Bars: Identity-Match, Voice-Match, Wardrobe-Presets, Scene-Count
+- Gold-Chrome, Bond-Glass
 
-### C) i18n
+Komponente: neuer `CharacterLoadoutVisual` in `castJourneyVisuals.tsx` — SVG-Layer über Charakterbild.
 
-- Keys `landing.mission.outcomeStory.*` (15 Slides × 3 Sprachen) in `useTranslation`-Quelle ergänzen.
-- Keys `landing.storyline.multiProvider.*` und `landing.storyline.priceGuarantee.*` (je 6 Slides × 3 Sprachen).
+### 3. Andere Cast-Slides visuell verdichten
+Kleine, gezielte Upgrades (keine kompletten Neubauten):
+- `AnchorMorphVisual` (Schritt 02): drei Anker-Portrait-Thumbnails mit echten generierten Face-Bildern statt reinem SVG-Kreis-Morph.
+- `IdentityLockVisual` (Schritt 03): Charakter-Portrait im Hintergrund mit Landmark-Punkten drüber statt abstrakter Landmarks.
+- `SceneCastDropVisual` (Schritt 06): echte Storyboard-Thumbnails + Drag-Ghost mit Charakterbild.
+
+Dafür 2 zusätzliche Bilder:
+- `cast-anchor-portrait.jpg` — Nahaufnahme Anker-Portrait
+- `cast-storyboard-tile.jpg` — Storyboard-Szenen-Kachel
+
+Gesamt: **7 neue Bilder** in `src/assets/landing/storylines/cast/`.
 
 ## Technische Details
 
-- Keine neuen Dependencies.
-- Wiederverwendung des bestehenden `StorylineSlide`-Schemas → Autoplay/Pause/Dots-Logik unverändert.
-- `OutcomeStorylineDialog` ist eine schlanke Kopie von `StudioStorylineDialog` mit separatem Content-Map, damit die bestehende Studio-Slideshow (CapabilityBento) unangetastet bleibt.
-- Kein Backend-, DB- oder Edge-Function-Change.
-- Bilder rein SVG/CSS-animiert (kein `imagegen` nötig, konsistent mit `castJourneyVisuals.tsx`).
+**Neue/geänderte Dateien:**
+- `src/assets/landing/storylines/cast/` (neu) — 7 generierte Cast-Assets
+- `src/components/landing/storylines/castJourneyVisuals.tsx` — neue `CharacterSheetVisual` + `CharacterLoadoutVisual`, Upgrade von `AnchorMorphVisual` / `IdentityLockVisual` / `SceneCastDropVisual` mit `<image>`-Layern
+- `src/components/landing/storylines/storylineContent.ts` — Wardrobe-Slide → CharacterSheet, +1 neuer Loadout-Slide (7 statt 6 Slides), DE/EN/ES-Copy angepasst
 
-## Nicht im Scope
-
-- Änderungen am AI-Arsenal, CommandDeck, CapabilityBento.
-- Neue Landingpage-Sektionen.
-- Änderungen an `FeatureGuideDialog` (bleibt für andere Aufrufer erhalten).
+**Design-Prinzipien:**
+- Bond-Aesthetic: `#050816` Background, `#F5C76A` Gold-Akzente, Playfair-Chrome
+- Bilder als Layer, SVG-Chrome/HUD drüber → wirkt wie interaktives Game-UI, nicht wie Marketing-Stock
+- Charakter bleibt derselbe (fiktive Frau „Anna", Mitte 30, professionell) — verstärkt die „One cast, many looks"-Story visuell
+- Keine echten Personen, keine IP — reine KI-Generierung mit generischer Beschreibung
