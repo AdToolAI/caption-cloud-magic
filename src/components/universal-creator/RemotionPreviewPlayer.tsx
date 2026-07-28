@@ -158,7 +158,7 @@ export function RemotionPreviewPlayer({
     },
   }), [customizations]);
 
-  const aspectRatio = width / height;
+  
 
   const getPreviewTime = useCallback(() => {
     const frame = playerRef.current?.getCurrentFrame?.() ?? lastSeekedFrameRef.current;
