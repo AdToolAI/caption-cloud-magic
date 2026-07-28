@@ -3969,7 +3969,17 @@ export const translations: Record<Language, any> = {
         optimizePerformanceDesc: "Real-time analytics and data-driven insights for continuous improvement.",
         scaleCampaigns: "Scale Campaigns",
         scaleCampaignsDesc: "Automate recurring tasks and multiply your output.",
-        learnMore: "Learn more"
+        learnMore: "Learn more",
+        betaPreview: "Beta Preview",
+        cockpit: {
+          signal: { reach: "Reach", ctr: "CTR", watch: "Watch-Time" }
+        },
+        proof: {
+          multiProvider: "Multi-Provider Stack",
+          lipSync: "Cinematic Lip-Sync",
+          castLock: "Cast & World Lock",
+          priceGuarantee: "Beta Price Guarantee"
+        }
       },
       aiModels: {
         badge: "Premium AI Stack",
@@ -8686,7 +8696,17 @@ export const translations: Record<Language, any> = {
         optimizePerformanceDesc: "Echtzeit-Analytics und datenbasierte Insights zur kontinuierlichen Verbesserung.",
         scaleCampaigns: "Skaliere Kampagnen",
         scaleCampaignsDesc: "Automatisiere wiederkehrende Aufgaben und multipliziere deinen Output.",
-        learnMore: "Mehr erfahren"
+        learnMore: "Mehr erfahren",
+        betaPreview: "Beta Vorschau",
+        cockpit: {
+          signal: { reach: "Reichweite", ctr: "CTR", watch: "Watch-Time" }
+        },
+        proof: {
+          multiProvider: "Multi-Provider Stack",
+          lipSync: "Cinematic Lip-Sync",
+          castLock: "Cast & World Lock",
+          priceGuarantee: "Beta-Preisgarantie"
+        }
       },
       aiModels: {
         badge: "Premium KI-Stack",
@@ -13188,7 +13208,17 @@ export const translations: Record<Language, any> = {
         optimizePerformanceDesc: "Analytics en tiempo real e insights basados en datos para mejora continua.",
         scaleCampaigns: "Escala Campañas",
         scaleCampaignsDesc: "Automatiza tareas recurrentes y multiplica tu producción.",
-        learnMore: "Saber más"
+        learnMore: "Saber más",
+        betaPreview: "Vista Beta",
+        cockpit: {
+          signal: { reach: "Alcance", ctr: "CTR", watch: "Tiempo de vista" }
+        },
+        proof: {
+          multiProvider: "Stack Multi-Proveedor",
+          lipSync: "Lip-Sync Cinematográfico",
+          castLock: "Cast & World Lock",
+          priceGuarantee: "Garantía de Precio Beta"
+        }
       },
       aiModels: {
         badge: "Stack IA Premium",
