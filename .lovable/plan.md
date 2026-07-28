@@ -1,66 +1,40 @@
-## Kurzbefund
+## Ziel
 
-Der Team Workspace ist **visuell fertig, funktional aber nur ~60 % verdrahtet**. UI, i18n, Tabs, KPIs, Kanban-Ansicht und Enterprise-Checkout laufen. Mehrere Kern-Flows sind aber Read-only Attrappen oder haben Schema-Mismatches, die im Live-Betrieb sofort auffallen würden. Zusätzlich wird der Beta-Basic-Preis von 14,99 € auf **19,99 €** angehoben.
+1. Redundante Feature-Kachel-Sektion („Alles was du brauchst für Social Media Erfolg") von der Startseite entfernen — der Rest der Landing (Hero, Mission Deck, AI Arsenal, UDC, Pricing etc.) zeigt bereits alles Wichtige.
+2. Eine belastbare **AI Video Refund Policy** als offizielle Legal-Page einführen, im Footer neben AGB verlinken und eine **kurze Version** direkt auf der Credit-Kauf/Top-Up-Seite anzeigen.
 
-## Was funktioniert (verifiziert)
+## Umsetzung
 
-- Alle Tabellen existieren: `workspaces`, `workspace_members`, `workspace_invitations`, `content_tasks`, `content_approvals`, `user_roles`.
-- Edge Functions vorhanden: `create-enterprise-checkout`, `update-workspace-seats`, `upgrade-to-enterprise`, `accept-invitation`.
-- Workspace anlegen, Workspace wechseln, KPI-Chips, Kanban-Anzeige, Task anlegen, Enterprise-Upgrade-Checkout, Rollen-Matrix (rein visuell).
+### 1. Startseite entschlacken
+- `src/pages/Index.tsx`: `<FeatureGrid />` (Zeile ~115) und den zugehörigen Import (Zeile 12) entfernen.
+- `src/components/landing/FeatureGrid.tsx`: Datei löschen (nur von Index.tsx benutzt; `src/pages/Home.tsx` nutzt eine separate Datei unter `components/home/FeatureGrid.tsx` — bleibt unangetastet).
 
-## Bestätigte Lücken / Bugs
+### 2. Neue Legal-Page: AI Video Refund Policy
+- Neue Datei `src/pages/legal/AIVideoRefundPolicy.tsx` mit den Kernregeln aus `docs/policies/refund-policy-v263.md` in kundenfreundlicher Sprache (DE, konsistent mit AutopilotAUP-Layout):
+  - **Automatischer Refund**: Provider-Timeout, 5xx, Sync/Mux-Fehler, Lambda-Crash, Watchdog-Kill, Content-Filter nach Bestätigung → volle Credit-Rückerstattung durch `credit-refund-automation`.
+  - **Kein automatischer Refund**: Ergebnisse, die der Nutzer im Anchor-Preview vor „Bestätigen & rendern" bereits gesehen hat (Identity-Drift, Framing, Style, Action-Interpretation) — analog Runway / Artlist / HeyGen.
+  - **Goodwill**: 1 Kulanz-Refund pro Nutzer alle 30 Tage über Support.
+  - **Preview-Re-Rolls**: kosten nur die Anchor-Compose-Credits (~1), keine Hailuo/Sync-Kosten.
+  - **Beta-Hinweis**: Während der Beta (bis Ende Beta-Zeitraum) gilt eine erweiterte 60-Tage-Legacy-Grace für Direkt-Render-Flows.
+  - Kontaktweg: Support-Formular / E-Mail.
+- Route in `src/App.tsx` registrieren: `/legal/ai-video-refund` → `AIVideoRefundPolicy`.
+- SEO/Helmet-Tags konsistent zu den anderen Legal-Pages.
 
-1. **Einladung verschickt keine E-Mail.** `inviteMember` schreibt nur eine Zeile in `workspace_invitations`. Es gibt keine `send-invitation` Function und keinen DB-Trigger → der Eingeladene erfährt nie davon. `accept-invitation` existiert, wird aber ohne Link nie erreicht.
-2. **Nicht-Enterprise-Owner können gar nicht einladen.** Der Invite-Button ist an `isEnterprise && canManage` gekoppelt. Solo-Plan-Kunden sehen nur den Upgrade-Prompt.
-3. **Approvals sind read-only.** Approve/Reject/Kommentar fehlen komplett — kein Update auf `status`, `reviewed_by`, `reviewed_at`, `rejection_reason`, obwohl die Spalten existieren.
-4. **Tasks lassen sich nach Anlage nicht bewegen.** Kein Statuswechsel (Backlog → In Progress → Review → Done), kein Löschen, kein Edit.
-5. **Mitglieder als User-ID-Hash angezeigt.** Kein Join auf `profiles` für Name/E-Mail/Avatar.
-6. **`RoleManager` Schema-Mismatch.** Component liest `user_roles` gefiltert nach `workspace_id`, doch dieselben Rollen leben schon in `workspace_members.role`. Doppelte Wahrheit, keine Sync-Logik → Tab bleibt in der Praxis leer.
-7. **Activity-Tab hat kein echtes Event-Log** — nur lokale Aggregation aus Members/Tasks/Approvals.
-8. **`updateWorkspaceSeats` triggert direkt nach Invite-Insert**, obwohl die Person noch nicht beigetreten ist → potenziell vorzeitige Seat-Abrechnung.
-9. **PermissionMatrix ist rein visuell** — die dargestellten Rechte (invite, approve, billing) werden im UI nur teilweise per `canManage` erzwungen.
+### 3. Footer-Verlinkung
+- `src/components/landing/BlackTieFooter.tsx`: in der Legal/Terms-Gruppe (neben „terms" und „avv") Eintrag „AI Video Refund Policy" → `/legal/ai-video-refund` hinzufügen.
+- Neuer i18n-Key `landing.footer.aiRefund` (DE/EN/ES) in `src/lib/translations.ts`.
 
-## Preis-Anpassung 14,99 € → 19,99 €
+### 4. Kurzversion auf der Credit-Kauf-Seite
+- Betroffene Screens:
+  - `src/pages/Pricing.tsx` Topup-Section (`#topups`).
+  - `src/components/landing/AIVideoTopupHintCard.tsx` (überall wo Media-Credits gekauft werden können; erscheint u. a. im Composer/Studio).
+- Neue Mini-Komponente `src/components/credits/RefundPolicyMini.tsx`:
+  - 3-Zeilen-Zusammenfassung (Icon + Text): „Technische Fehler → automatischer Refund. Vom Nutzer bestätigte Previews → kein Refund. Details siehe [AI Video Refund Policy]."
+  - Link auf die volle Legal-Page.
+- In Pricing-Topup-Section und `AIVideoTopupHintCard` einbinden.
 
-- `src/config/pricing.ts`: Alle drei Beta-Basic-Einträge (`price: { EUR: 14.99, USD: 14.99 }`) und `getPlanFromPriceId`-Fallback auf `19.99` setzen.
-- Neues Stripe-Price-Objekt für 19,99 € EUR/monatlich anlegen und `priceId` an allen drei Stellen tauschen (alter Price bleibt für Bestandskunden gültig).
-- Founders-Rabatt (20 %) und 24-Monats-Preisgarantie neu rechnen: garantierter Preis für die ersten 1 000 Nutzer = **15,99 €** (statt bisher 11,99 €). Text in `FoundersBenefitsDialog.tsx` und auf der Landing-Page (`Hero`, Beta-Banner, Pricing-Sektion) entsprechend anpassen.
-- Übersetzungen in `src/lib/translations.ts` (DE/EN/ES) für alle sichtbaren Preistexte aktualisieren.
-- Keine Migration bestehender Abos — läuft rein Stripe-seitig über den neuen Price für Neubuchungen.
+## Technische Notizen
 
-## Vorgeschlagener Fix-Umfang Team Workspace (kein Schema-Change)
-
-**A. Invitation-Loop schließen (kritisch für Live-Gang)**
-- Neue Edge Function `send-workspace-invitation` (Resend über bestehende E-Mail-Infra): schreibt Invitation + verschickt Mail mit Accept-Link `/accept-invitation?token=<id>`.
-- `TeamWorkspace.inviteMember` ruft diese Function statt Direkt-Insert auf.
-- `updateWorkspaceSeats` erst in `accept-invitation` triggern.
-- Invite-Button auch für Solo-Owner freischalten (Enterprise-Gate nur auf Bulk-Invite / harte Seat-Grenze).
-
-**B. Approvals interaktiv machen**
-- Inline-Approve / Reject Buttons für `pending`-Zeilen, sichtbar für `canManage`.
-- Update `status`, `reviewed_by=user.id`, `reviewed_at=now()`, optional `rejection_reason` aus Textarea.
-
-**C. Kanban voll bedienbar**
-- Status-Dropdown je Karte + Delete für `canManage`; `completed_at` setzen bei `done`.
-- Optional HTML5-Drag&Drop.
-
-**D. Mitglieder mit Profil-Join**
-- Zusätzlicher `profiles`-Query (email, display_name, avatar_url) für angezeigte Members.
-- Inline Rollenwechsel + Entfernen für Owner/Admin über `workspace_members`.
-
-**E. Roles-Tab entwirren**
-- `RoleManager` durch schlanke Ansicht ersetzen, die `workspace_members` liest/mutiert — eine Quelle der Wahrheit. `user_roles` bleibt der App-globalen Admin-Rolle vorbehalten.
-
-**F. Activity-Tab realistisch labeln**
-- Klare Beschriftung „Abgeleitete Signale (letzte 25)" statt „Signal Log". Echtes Audit-Log bleibt spätere Ausbaustufe.
-
-## Nicht enthalten
-
-- Neue Tabellen, RLS-Änderungen, neue Plan-Struktur.
-- Vollständiges Audit-Log-System.
-- Realtime-Subscriptions.
-- Migration bestehender 14,99 €-Abos auf den neuen Price.
-
-## Ergebnis nach dem Fix
-
-Ein Team-Workspace, in dem Owner tatsächlich einladen, Rollen ändern, Tasks durch den Kanban schieben und Approvals mit einem Klick freigeben — mit echten Namen statt IDs. Gleichzeitig läuft das Beta-Pricing sauber auf 19,99 € / Monat mit garantierten 15,99 € für die ersten 1 000 Founders über 24 Monate.
+- Keine Backend-Änderungen; `credit-refund-automation` existiert bereits und deckt die auto-Refund-Klassen ab.
+- i18n: nur die neuen Footer- und Mini-Card-Keys hinzufügen, Legal-Page-Text darf zunächst DE-only sein (analog `AutopilotAUP.tsx`).
+- Kein Impact auf `src/pages/Home.tsx` (interne App-Home), nur die öffentliche Landing (`Index.tsx`).
