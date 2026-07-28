@@ -1,122 +1,59 @@
-## Ziel
+## Plan v286 — Studio-Storyline-Slideshows
 
-Die Sektion „Why this tool wins the game" transformieren von 3 generischen Karten (Plan/Optimize/Scale) in ein **„Mission Command Deck"** — eine erlebbare Landkarte der gesamten Plattform-Power. Der Besucher soll in 20 Sekunden begreifen: *Das ist keine App. Das ist ein komplettes Media-Studio.*
+Jede Bento-Kachel (Cast, Motion, Video, Picture, Music, Voice) wird klickbar und öffnet ein Dialog-Modal mit 6-Slide-Autoplay-Storyline. Statt direkt zum Studio zu navigieren.
 
-## Warum die aktuelle Fassung nicht reicht
+### Slide-Struktur pro Studio (Use-Case-driven, 6 Slides)
 
-Plan/Optimize/Scale ist Standard-SaaS-Rhetorik. Sie versteckt die eigentlichen Waffen:
-- Persistente Charaktere (Cast & World)
-- 4-Sprecher Cinematic Lip-Sync in einer Einstellung
-- 32 KI-Modelle in einem Workflow (Nano Banana 2, Seedream 4, Gemini 3 Pro, Kling Omni, Hailuo, Sora, Suno v5, Udio v2, ElevenLabs Music v2, Stable Audio, Sync.so, AWS Rekognition)
-- Voice Cloning + Voice-Zuordnung zu Charakteren
-- Music Studio mit 4 Engines
-- Multi-Kanal Auto-Publish
-- Beta-Preisgarantie
+Jedes Studio bekommt 6 Slides mit je einem konkreten Anwendungsszenario:
 
-Diese Story muss die Sektion tragen.
+**Cast & World** — Wiederkehrender CEO · Produkt-Maskottchen · Sprecher-Ensemble · Look-Varianten · Voice-Binding · Multi-Studio-Reuse
+**Motion Studio** — 4-Sprecher-Dialog · Task-Blocking (Telefon/Drucker) · Emotions-Lippen-Sync · Kling Omni Native · Deutsche Stimmen-Lock · Ein-Take statt Schnitt
+**AI Video Studio** — Provider-Wechsel per Klick · Vertikal/Horizontal/Square · Vergleich zweier Engines · Style-Presets · Batch-Renders · Kosten-Transparenz
+**Picture Studio** — Produktshot · Editorial-Cover · Portrait-Serie · Brand-Anchor · Stilkonsistenz · Upscale/Retouch
+**Music Studio** — Werbe-Jingle · Podcast-Intro · Stems-Export · SFX-Layer · Genre-Switch · Rechte-Klarheit
+**Voice Studio** — Stimme klonen · Charakter-Binding · Deutsche VO · Emotion-Steuerung · Skript-Panel · Multi-Sprecher-Library
 
-## Struktur: „Mission Command Deck"
+### Bild-Mix pro Studio (3 Cinematic + 3 UI)
 
-Neue Section-Architektur, drei Ebenen:
+- **Slides 1, 3, 6** — Cinematic Bond-Gold-Renders (via `imagegen--generate_image`, `src/assets/landing/storylines/{studio}/`)
+- **Slides 2, 4, 5** — Studio-UI-Mockups (custom SVG-Kompositionen inline, im Stil der bestehenden CapabilityBento-Visuals — z.B. Timeline, Waveform, Card-Grid, Portrait-Chips)
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  ● WARUM ADTOOL                                             │
-│  Why this tool wins the game (Playfair, Gold-Split)         │
-│  Sub: "Nicht ein Tool. Ein komplettes Studio."              │
-└─────────────────────────────────────────────────────────────┘
+Insgesamt 18 generierte Cinematic-Bilder (3 pro Studio × 6 Studios), horizontal 16:9, dunkles Set mit Gold-Akzenten.
 
-╔══ EBENE 1 — HERO-COCKPIT (volle Breite) ══════════════════╗
-║  Live "Production Pipeline" Visualisierung:                ║
-║  Briefing → Cast → Script → Anchor → Motion → Music →      ║
-║  Publish. Gold-Linie animiert von links nach rechts,       ║
-║  jede Station mit pulsierendem Node + Mini-Icon.           ║
-║  Rechts: rotierende Kennzahl-Ticker (32 Modelle, 4         ║
-║  Sprecher, 3 Sprachen, ∞ Charaktere) — als "Capabilities", ║
-║  nicht als erfundene Nutzerzahlen.                         ║
-╚═══════════════════════════════════════════════════════════╝
+### Modal-Verhalten
 
-╔══ EBENE 2 — 6 CAPABILITY-KACHELN (Bento 3×2) ═════════════╗
-║ ┌──────────────┬──────────────┬──────────────┐            ║
-║ │ Cast & World │ Motion       │ AI Video     │            ║
-║ │ (Character   │ Studio       │ Studio       │            ║
-║ │  Lock Demo)  │ (4-Speaker   │ (Multi-      │            ║
-║ │              │  Lip-Sync)   │  Provider)   │            ║
-║ ├──────────────┼──────────────┼──────────────┤            ║
-║ │ Picture      │ Music        │ Voice        │            ║
-║ │ Studio       │ Studio       │ Studio       │            ║
-║ │ (Nano Banana │ (4 Engines)  │ (Klonen +    │            ║
-║ │  2 / Seedream│              │  Cast-Link)  │            ║
-║ └──────────────┴──────────────┴──────────────┘            ║
-╚═══════════════════════════════════════════════════════════╝
+- Autoplay 4 Sekunden pro Slide
+- Pause bei Hover / bei manueller Navigation
+- Pfeil-Buttons + Dot-Indikator + Fortschritts-Balken (goldene Linie füllt sich in 4s)
+- ESC schließt, Klick auf Overlay schließt
+- CTA-Button in Slide 6: "Studio öffnen →" (Link zur bestehenden `tile.href`)
+- Keyboard: ←/→ navigiert, Space pausiert
+- `useReducedMotion`: bei reduzierter Motion kein Autoplay, nur manuelle Navigation
 
-╔══ EBENE 3 — 3 WORKFLOW-COCKPITS (bestehend, überarbeitet)═╗
-║  Plan · Optimize · Scale (die aktuellen Cockpits bleiben, ║
-║  werden aber als "Outcome-Ebene" positioniert, nicht als  ║
-║  Kernnutzen)                                              ║
-╚═══════════════════════════════════════════════════════════╝
-
-╔══ EBENE 4 — PROOF-STRIP (bestehend, gekürzt) ═════════════╗
-║  Multi-Provider · Cinematic Lip-Sync · Cast Lock · Preis  ║
-╚═══════════════════════════════════════════════════════════╝
-```
-
-## Die 6 neuen Capability-Kacheln (Ebene 2)
-
-Jede Kachel: Bond-Glass, Playfair-Titel, ein Live-Visual, ein Satz Nutzen, Chip mit den beteiligten Modellen. **Keine erfundenen Zahlen.**
-
-1. **Cast & World — „Ein Cast. Unendlich Szenen."**
-   Visual: 3 Portrait-Chips in Gold-Ring, verbunden mit Linien zu 4 Miniatur-Szenen. Chip: "Nano Banana 2 · Seedream 4 · Gemini 3 Pro".
-
-2. **Motion Studio — „Vier Sprecher. Eine Einstellung."**
-   Visual: 4 animierte Mund-Wellenformen, synchron pulsierend über einer Timeline-Leiste. Chip: "Kling Omni · Hailuo · Sync.so · AWS Rekognition".
-
-3. **AI Video Studio — „Alle Engines. Ein Prompt."**
-   Visual: rotierendes Karussell mit Logo-Chips (Sora, Kling, Hailuo, Veo, Runway…) die in ein zentrales Play-Icon zusammenlaufen. Chip: "32 Modelle · 1 Interface".
-
-4. **Picture Studio — „Vom Briefing zum Frame."**
-   Visual: Vier Style-Frames in Bento (Editorial, Cinematic, Portrait, Product), Gold-Rahmen wandert. Chip: "Nano Banana 2 · Seedream 4 · Flux Ultra".
-
-5. **Music Studio — „Score auf Knopfdruck."**
-   Visual: animierte Gold-Waveform mit 4 Engine-Chips darunter, die aufleuchten. Chip: "Suno v5 · Udio v2 · ElevenLabs Music v2 · Stable Audio 2".
-
-6. **Voice Studio — „Deine Stimme. Dein Cast."**
-   Visual: Mikro-Icon → Waveform → 3 Character-Portraits (Voice-Link). Chip: "ElevenLabs · Cast-Binding".
-
-Alle Kacheln:
-- Hover: 3D-Tilt (bestehendes Muster aus `MissionFeatures.tsx`)
-- Gold-Glow im Hover, „BETA VORSCHAU"-Chip unten
-- Click → öffnet `FeatureGuideDialog` (bereits im Bond-Look v285) mit passendem Content pro Capability
-
-## Umsetzung (technisch)
+### Technische Umsetzung
 
 **Neue Dateien:**
-- `src/components/landing/CommandDeck.tsx` — Hero-Cockpit (Ebene 1) mit animierter Pipeline-SVG + Capability-Ticker
-- `src/components/landing/CapabilityBento.tsx` — 6-Kachel Bento-Grid (Ebene 2)
-- `src/components/landing/cockpits/CastLockVisual.tsx`
-- `src/components/landing/cockpits/LipSyncWaveVisual.tsx`
-- `src/components/landing/cockpits/EngineOrbitVisual.tsx`
-- `src/components/landing/cockpits/StyleFramesVisual.tsx`
-- `src/components/landing/cockpits/MusicWaveVisual.tsx`
-- `src/components/landing/cockpits/VoiceLinkVisual.tsx`
+- `src/components/landing/StudioStorylineDialog.tsx` — Modal-Container mit shadcn `Dialog`, Autoplay-Logik, Bond-Gold-Styling (deep black glass, gold accents, Playfair Titles)
+- `src/components/landing/storylines/storylineContent.ts` — Zentrale Definition aller 36 Slides (6 Studios × 6): `{ studio, slideIndex, kind: 'cinematic' | 'ui', imageSrc?, UIComponent?, kicker, title, body, tags[] }`
+- `src/components/landing/storylines/uiVisuals/` — 18 kleine SVG-UI-Mockup-Komponenten (3 pro Studio), im Stil der CapabilityBento-Visuals wiederverwendbar
+- 18 generierte Cinematic-Bilder unter `src/assets/landing/storylines/{cast,motion,video,picture,music,voice}/slide-{1,3,6}.jpg`
 
-**Angepasste Dateien:**
-- `src/components/landing/MissionFeatures.tsx` — Section-Wrapper reorganisieren: Hero-Cockpit → Bento → bestehende 3 Cockpits → Proof-Strip. Sub-Headline anpassen.
-- `src/lib/translations.ts` — neue Keys für 6 Kacheln, Hero-Cockpit-Labels, Pipeline-Stationen (DE/EN/ES)
-- `src/lib/featureGuideContent.ts` (falls existierend, sonst neu) — Guide-Content für die 6 neuen Capabilities
+**Änderungen:**
+- `src/components/landing/CapabilityBento.tsx` — `<Link>` durch `<button>` ersetzen, `onClick` öffnet `StudioStorylineDialog` mit `studio={tile.key}`. Bestehende Visual/Icon/Chip/Hover-Behandlung bleibt.
+- `src/i18n/translations.ts` — DE/EN/ES Übersetzungen für alle 36 Slides (Kicker, Title, Body) unter `landing.mission.bento.storylines.{studio}.slides[0..5]`, plus Modal-Chrome (`playPause`, `openStudio`, `slideOf`).
 
-**Design-Tokens:** Nur `bg-card`, `text-foreground`, `text-primary` (Gold), `border-primary/20`, `shadow-[0_0_...]` mit `hsl(var(--primary)/...)`. Keine Hex-Codes in Komponenten. Playfair (`font-display`) für Titel, Inter für Body. Keine erfundenen Nutzerzahlen — nur nachweisbare Capabilities.
+### Design-Details (Bond-Gold, konsistent zum Rest)
 
-**Motion:** Bestehende `motion/react` Muster aus `MissionFeatures.tsx` wiederverwenden (whileHover-Tilt, animierte SVG-Pfade via `strokeDasharray`).
+- Modal-Größe: `max-w-4xl`, `aspect-video` Bildbereich oben, Text-Panel unten
+- Backdrop: `bg-background/95 backdrop-blur-xl`
+- Border: `border-primary/30`, Shadow: `shadow-[0_0_60px_hsl(var(--primary)/0.25)]`
+- Titelfont: `font-display` (Playfair), Body: Inter
+- Fortschritts-Leiste: dünne goldene Linie oben im Modal, füllt sich smooth über 4s
+- Slide-Transition: Fade + slight scale (framer-motion `AnimatePresence`)
 
-**Ehrlichkeit / Beta-Rahmen:** Jede Kachel trägt „BETA VORSCHAU". Der Ticker im Hero zeigt Capabilities (32 Modelle, 3 Sprachen), keine Nutzer/Umsatz-Zahlen.
+### Nicht im Scope
 
-## Ergebnis für den Nutzer
-
-Statt „Plan / Optimize / Scale" sieht der Besucher:
-1. **Was passiert unter der Haube** (Pipeline-Cockpit)
-2. **Welche 6 Studios ihm gehören** (Bento)
-3. **Welche Outcomes er erreicht** (bestehende Cockpits)
-4. **Warum er es glauben kann** (Proof-Strip)
-
-Kein Wort zu viel, jede Kachel ein sichtbares Versprechen, alles im Bond-Gold-Look.
+- Keine Änderung am `MissionFeatures`-Layout oder anderen Landing-Sektionen
+- Keine Änderung an Studio-Seiten selbst
+- Keine neuen Übersetzungen für nicht angezeigte Sprachen
+- Keine Analytics/Tracking (kann später ergänzt werden)
