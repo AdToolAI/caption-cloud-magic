@@ -1,31 +1,32 @@
 ## Problem
 
-Stufe 3 (Scenes) zeigt die Live-Preview über ein simples `<div>` mit `aspectRatio = formatConfig` und `object-contain` — das Portrait-Video erscheint korrekt im vollen 9:16-Rahmen. Ab Stufe 4 (Audio) übernimmt der `RemotionPreviewPlayer`, dessen Frame aktuell **hart auf 16:9 gepinnt** ist (`aspectRatio: 16/9`, `maxWidth: 720px`, `maxHeight: 55vh`). Dadurch schrumpft dasselbe 9:16-Video zu einem schmalen, letterboxten Streifen in der Mitte — der Nutzer nimmt das als „geschnitten" wahr.
+Stufe 3 zeigt Hintergründe mit einem einfachen `<img/video className="object-contain">` in einem Container mit `aspectRatio: formatConfig.width / formatConfig.height` (UniversalCreator.tsx:640–645). Das Bild wird also **komplett** dargestellt — Landscape-Assets bekommen im 9:16-Rahmen schwarze Balken oben/unten (Screenshot 2).
 
-## Fix — `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+Ab Stufe 4 rendert der Remotion-`Player` dieselbe Szene über die `UniversalCreatorVideo`-Composition. Der Container ist bereits korrekt (`aspectRatio: width/height`, 65vh cap). **Aber**: Die Scene-Backgrounds innerhalb der Composition sind hart auf `objectFit: 'cover'` gesetzt (UniversalCreatorVideo.tsx:2094 Video, 2018/2070 als Default in SafeVideo/SafeImg). `cover` **beschneidet** das Landscape-Asset auf das Portrait-Frame → Screenshot 1 zeigt nur einen Ausschnitt des Originals. Genau die Diskrepanz, die der User meint.
 
-Frame-Container wieder an das **Composition-Format** koppeln (wie in Stufe 3), aber mit vernünftiger Höhen-Deckelung, damit Portrait nicht die halbe Seite füllt:
+## Fix — Scene-Background auf `contain` umstellen (Preview-Parität zu Stufe 3)
 
-```tsx
-style={{
-  aspectRatio: `${width} / ${height}`,   // folgt 9:16 / 1:1 / 16:9
-  width: '100%',
-  maxHeight: '65vh',                     // verhindert überlange Portrait-Rahmen
-  marginInline: 'auto',
-}}
-```
+Datei: `src/remotion/templates/UniversalCreatorVideo.tsx`
 
-Der Remotion `<Player>` bleibt bei `width: 100% / height: 100%` — er füllt den Frame ohne Letterbox, weil Frame- und Composition-Aspect nun identisch sind.
+Nur die **Scene-Background-Renderer** (Video + Bild) ändern:
 
-Effekt:
-- 9:16 → hoher, schmaler Rahmen, Video füllt ihn komplett (identisch zu Stufe 3, kein „Cut").
-- 16:9 → breiter Rahmen, Video füllt ihn.
-- 1:1 → quadratischer Rahmen.
-- `maxHeight: 65vh` verhindert, dass das Portrait-Fenster die Viewport-Höhe sprengt.
+1. Zeile 2091–2097 (Video-Background):
+   - `<AbsoluteFill>` → `<AbsoluteFill style={{ backgroundColor: '#000' }}>` (Letterbox-Balken).
+   - `SafeVideo` style: `objectFit: 'cover'` → `'contain'`.
+2. Zeile 2100–2106 (Image-Background):
+   - `<AbsoluteFill style={{ backgroundColor: '#000', ...(rawMediaMode ? {} : { filter: 'saturate(1.15) contrast(1.05)' }) }}>`.
+   - `SafeImg` explizit mit `style={{ width: '100%', height: '100%', objectFit: 'contain' }}` übergeben.
 
-Rein Frontend, keine Änderung an Composition, Render-Payload oder Backend. Keine Änderung an den anderen Callern (`PreviewExportStep`), die schon per `previewMaxWidth`-Wrapper skalieren.
+`SafeVideo`/`SafeImg` Defaults (Z. 2018, 2070) **nicht** ändern — sie werden auch von anderen Templates/Stellen genutzt und dort ist `cover` korrekt.
+
+## Effekt
+
+- Stufe 3 und Stufe 4+ zeigen exakt denselben Bildausschnitt (voller Frame, ggf. schwarze Balken oben/unten oder links/rechts je nach Asset-Aspect vs. Format-Aspect).
+- Kein Layout-Shift zwischen den Wizard-Stufen.
+- Gilt auch für den finalen Render — Landscape-Assets in Portrait-Format werden nicht mehr stumm zugeschnitten, was zur Preview passt (WYSIWYG).
 
 ## Verifikation
 
-- Playwright-Screenshot Stufen 3, 4, 5 mit 9:16 @ 1280×900: gleiche visuelle Größe des Video-Rahmens, keine Letterbox-Balken, kein Scroll.
-- Kurzcheck 16:9 und 1:1: Frame passt sich an, Video füllt ohne Balken.
+- Playwright: Screenshot Stufe 3 & Stufe 4 mit einem 16:9-Background in 9:16-Format — beide Frames identisch, gleiche Balken oben/unten.
+- Gegenprobe: 9:16-Background in 9:16-Format — kein Balken, Bild füllt komplett (contain = cover, wenn Aspects gleich).
+- Kein Anfassen von RemotionPreviewPlayer, PreviewExportStep, Composer, Render-Pipeline oder Backend.
