@@ -1,0 +1,550 @@
+import type { ComponentType } from "react";
+import type { Language } from "@/lib/translations";
+
+import castS1 from "@/assets/landing/storylines/cast/slide-1.jpg";
+import castS3 from "@/assets/landing/storylines/cast/slide-3.jpg";
+import castS6 from "@/assets/landing/storylines/cast/slide-6.jpg";
+import motionS1 from "@/assets/landing/storylines/motion/slide-1.jpg";
+import motionS3 from "@/assets/landing/storylines/motion/slide-3.jpg";
+import motionS6 from "@/assets/landing/storylines/motion/slide-6.jpg";
+import videoS1 from "@/assets/landing/storylines/video/slide-1.jpg";
+import videoS3 from "@/assets/landing/storylines/video/slide-3.jpg";
+import videoS6 from "@/assets/landing/storylines/video/slide-6.jpg";
+import pictureS1 from "@/assets/landing/storylines/picture/slide-1.jpg";
+import pictureS3 from "@/assets/landing/storylines/picture/slide-3.jpg";
+import pictureS6 from "@/assets/landing/storylines/picture/slide-6.jpg";
+import musicS1 from "@/assets/landing/storylines/music/slide-1.jpg";
+import musicS3 from "@/assets/landing/storylines/music/slide-3.jpg";
+import musicS6 from "@/assets/landing/storylines/music/slide-6.jpg";
+import voiceS1 from "@/assets/landing/storylines/voice/slide-1.jpg";
+import voiceS3 from "@/assets/landing/storylines/voice/slide-3.jpg";
+import voiceS6 from "@/assets/landing/storylines/voice/slide-6.jpg";
+
+import {
+  CastLockVisual,
+  CastLooksVisual,
+  CastVoiceBindVisual,
+  MotionTimelineVisual,
+  MotionKlingVisual,
+  MotionOneTakeVisual,
+  VideoProviderSwitchVisual,
+  VideoStylePresetsVisual,
+  VideoCostVisual,
+  PictureAnchorVisual,
+  PictureStyleGridVisual,
+  PictureUpscaleVisual,
+  MusicWaveformVisual,
+  MusicStemsVisual,
+  MusicGenreVisual,
+  VoiceCloneVisual,
+  VoiceEmotionVisual,
+  VoiceLibraryVisual,
+} from "./uiVisuals";
+
+export type StudioKey = "cast" | "motion" | "video" | "picture" | "music" | "voice";
+
+export type StorylineSlide = {
+  kind: "cinematic" | "ui";
+  imageSrc?: string;
+  UIComponent?: ComponentType;
+  copy: Record<Language, { kicker: string; title: string; body: string }>;
+};
+
+const S = (
+  kicker: [string, string, string],
+  title: [string, string, string],
+  body: [string, string, string],
+) => ({
+  de: { kicker: kicker[0], title: title[0], body: body[0] },
+  en: { kicker: kicker[1], title: title[1], body: body[1] },
+  es: { kicker: kicker[2], title: title[2], body: body[2] },
+});
+
+export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
+  cast: [
+    {
+      kind: "cinematic",
+      imageSrc: castS1,
+      copy: S(
+        ["Wiederkehrender CEO", "Recurring CEO", "CEO recurrente"],
+        ["Ein Gesicht. Jede Kampagne.", "One face. Every campaign.", "Un rostro. Cada campaña."],
+        [
+          "Definiere deinen CEO, Gründer oder Testimonial einmal — und rufe ihn in jeder Szene und jedem Studio wieder auf. Nie wieder ein anderes Gesicht auf einem neuen Clip.",
+          "Define your CEO, founder or testimonial once — recall them in every scene and every studio. Never a stranger's face on a new clip.",
+          "Define a tu CEO, fundador o testimonio una vez — y recupéralo en cada escena y cada estudio. Nunca un rostro distinto en un nuevo clip.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: CastLockVisual,
+      copy: S(
+        ["Character-Lock", "Character lock", "Bloqueo de personajes"],
+        ["Identität festnageln, nicht würfeln.", "Nail identity, don't gamble.", "Identidad fijada, no al azar."],
+        [
+          "Nano Banana 2, Seedream 4 und Gemini 3 Pro liefern Anker-Frames. Cast & World speichert sie als biometrischen Fingerabdruck — jede Szene startet vom gleichen Gesicht.",
+          "Nano Banana 2, Seedream 4 and Gemini 3 Pro deliver anchor frames. Cast & World stores them as a biometric fingerprint — every scene starts from the same face.",
+          "Nano Banana 2, Seedream 4 y Gemini 3 Pro generan frames ancla. Cast & World los guarda como huella biométrica — cada escena parte del mismo rostro.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: castS3,
+      copy: S(
+        ["Produkt-Maskottchen", "Product mascot", "Mascota de producto"],
+        ["Vom Icon zum Star.", "From icon to star.", "Del icono a la estrella."],
+        [
+          "Ein Maskottchen, drei Auftritte: Editorial, Cinematic, Portrait. Gleicher Charakter, drei Welten — für Social, Landing und Werbespot.",
+          "One mascot, three appearances: editorial, cinematic, portrait. Same character, three worlds — for social, landing and ad.",
+          "Una mascota, tres apariciones: editorial, cinematográfica, retrato. Mismo personaje, tres mundos — para social, landing y anuncio.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: CastLooksVisual,
+      copy: S(
+        ["Look-Varianten", "Look variants", "Variantes de look"],
+        ["Ein Cast. Viele Looks.", "One cast. Many looks.", "Un cast. Muchos looks."],
+        [
+          "Business-Suit, Casual, Uniform, Abendgarderobe — Looks werden pro Charakter gespeichert und sind mit einem Klick auf jede Szene anwendbar.",
+          "Business suit, casual, uniform, evening wear — looks are saved per character and applied to any scene with one click.",
+          "Traje, casual, uniforme, ropa de noche — los looks se guardan por personaje y se aplican a cualquier escena con un clic.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: CastVoiceBindVisual,
+      copy: S(
+        ["Voice-Binding", "Voice binding", "Vinculación de voz"],
+        ["Stimme fest an den Charakter geknüpft.", "Voice bound to the character.", "Voz vinculada al personaje."],
+        [
+          "Klone eine Stimme einmal und binde sie an einen Charakter. Ab dann spricht jede Szene automatisch in seinem Klang — kein manuelles Zuordnen mehr.",
+          "Clone a voice once and bind it to a character. From then on every scene speaks in that timbre — no manual mapping.",
+          "Clona una voz una vez y vincúlala a un personaje. Desde ahí cada escena hablará con ese timbre — sin asignación manual.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: castS6,
+      copy: S(
+        ["Multi-Studio-Reuse", "Multi-studio reuse", "Reutilización multi-estudio"],
+        ["Ein Login. Sechs Studios. Ein Cast.", "One login. Six studios. One cast.", "Un login. Seis estudios. Un cast."],
+        [
+          "Der gleiche Charakter läuft durch Motion, AI-Video, Picture, Music und Voice — ohne Reset, ohne Neuanleitung. Deine Marke bekommt endlich Konsistenz.",
+          "The same character flows through Motion, AI-Video, Picture, Music and Voice — no reset, no re-brief. Your brand finally gets consistency.",
+          "El mismo personaje fluye por Motion, AI-Video, Picture, Music y Voice — sin reset, sin volver a briefar. Tu marca por fin logra consistencia.",
+        ],
+      ),
+    },
+  ],
+  motion: [
+    {
+      kind: "cinematic",
+      imageSrc: motionS1,
+      copy: S(
+        ["4-Sprecher-Dialog", "4-speaker dialogue", "Diálogo a 4 voces"],
+        ["Vier Sprecher. Eine Einstellung.", "Four speakers. One shot.", "Cuatro voces. Un plano."],
+        [
+          "Ein durchgehender Take mit bis zu vier Charakteren — jeder mit eigener Stimme, eigener Emotion, eigenem Lip-Sync. Kein Schnitt, kein Trick.",
+          "One continuous take with up to four characters — each with their own voice, emotion and lip-sync. No cuts, no trickery.",
+          "Un take continuo con hasta cuatro personajes — cada uno con su voz, emoción y lip-sync. Sin cortes, sin trucos.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: MotionTimelineVisual,
+      copy: S(
+        ["Speaker-Timeline", "Speaker timeline", "Timeline de voces"],
+        ["Wer spricht wann — auf einen Blick.", "Who speaks when — at a glance.", "Quién habla cuándo — de un vistazo."],
+        [
+          "Weise Zeilen per Klick einem Sprecher zu. Emotionen, Pausen und Überlappungen wandern in eine Timeline, die Motion Studio direkt in eine Regieanweisung übersetzt.",
+          "Assign lines to a speaker with one click. Emotions, pauses and overlaps land on a timeline that Motion Studio translates straight into direction.",
+          "Asigna líneas a un hablante con un clic. Emociones, pausas y solapes se sitúan en una timeline que Motion Studio traduce a dirección.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: motionS3,
+      copy: S(
+        ["Task-Blocking", "Task blocking", "Blocking de tareas"],
+        ["Charaktere die wirklich etwas tun.", "Characters that actually do something.", "Personajes que realmente hacen algo."],
+        [
+          "Einer telefoniert, einer druckt, einer präsentiert — Cast-Actions machen aus Standbildern eine echte Büroszene. Bewegung als Regieanweisung, nicht als Zufall.",
+          "One on the phone, one at the printer, one presenting — Cast Actions turn stills into a real office scene. Movement as direction, not chance.",
+          "Uno al teléfono, otro en la impresora, otro presentando — las Cast Actions convierten estáticos en una escena real. Movimiento como dirección, no azar.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: MotionKlingVisual,
+      copy: S(
+        ["Kling Omni Native", "Kling Omni native", "Kling Omni nativo"],
+        ["Native Multi-Sprecher-Engine.", "Native multi-speaker engine.", "Motor multi-voz nativo."],
+        [
+          "Kling Omni rendert Dialog nativ mit mehreren Sprechern in einem Take. Sync.so und AWS Rekognition sichern Face-Slots ab, damit kein Lip-Sync verrutscht.",
+          "Kling Omni renders dialogue natively with multiple speakers in one take. Sync.so and AWS Rekognition lock face slots so no lip-sync drifts.",
+          "Kling Omni renderiza diálogo con múltiples voces nativas en un take. Sync.so y AWS Rekognition fijan los face-slots para que ningún lip-sync se desplace.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: MotionOneTakeVisual,
+      copy: S(
+        ["Ein-Take statt Schnitt", "One take, not cuts", "Un take, no cortes"],
+        ["Kein Schnitt. Kein Morph. Kein Bruch.", "No cut. No morph. No break.", "Sin corte. Sin morph. Sin ruptura."],
+        [
+          "Andere Tools schneiden zwischen Sprechern und verlieren Kontinuität. Motion Studio bleibt in einer Einstellung — Blickachsen, Licht und Identität halten von Anfang bis Ende.",
+          "Other tools cut between speakers and lose continuity. Motion Studio holds one shot — eyelines, light and identity survive from start to end.",
+          "Otras herramientas cortan entre voces y pierden continuidad. Motion Studio mantiene un plano — miradas, luz e identidad sobreviven de principio a fin.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: motionS6,
+      copy: S(
+        ["Emotionaler Lip-Sync", "Emotional lip-sync", "Lip-sync emocional"],
+        ["Lippen, die die Worte tatsächlich formen.", "Lips that actually form the words.", "Labios que realmente forman las palabras."],
+        [
+          "Deutsch, Englisch, Spanisch — Motion Studio zwingt die Engine auf die gewählte Sprache und synchronisiert jede Silbe. Keine Fantasiesprache, keine geschlossenen Münder.",
+          "German, English, Spanish — Motion Studio locks the engine to the chosen language and syncs every syllable. No gibberish, no closed mouths.",
+          "Alemán, inglés, español — Motion Studio bloquea el motor al idioma elegido y sincroniza cada sílaba. Sin idioma inventado, sin bocas cerradas.",
+        ],
+      ),
+    },
+  ],
+  video: [
+    {
+      kind: "cinematic",
+      imageSrc: videoS1,
+      copy: S(
+        ["Provider-Cockpit", "Provider cockpit", "Cockpit de proveedores"],
+        ["32 Engines. Eine Promptzeile.", "32 engines. One prompt bar.", "32 motores. Una barra de prompt."],
+        [
+          "Sora, Kling, Hailuo, Veo, Seedance, Luma, Wan — alle Top-Engines liegen unter einer Oberfläche. Wechseln, nicht wandern.",
+          "Sora, Kling, Hailuo, Veo, Seedance, Luma, Wan — every top engine under one surface. Switch, don't migrate.",
+          "Sora, Kling, Hailuo, Veo, Seedance, Luma, Wan — todos los motores top bajo una superficie. Cambiar, no migrar.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: VideoProviderSwitchVisual,
+      copy: S(
+        ["1-Klick-Provider-Wechsel", "1-click provider switch", "Cambio de motor con 1 clic"],
+        ["Same Prompt. Anderer Look.", "Same prompt. Different look.", "Mismo prompt. Otro look."],
+        [
+          "Ein Klick tauscht das Modell — Prompt, Cast, Musik bleiben. Vergleiche in Sekunden zwei Provider für denselben Shot und wähle den stärkeren.",
+          "One click swaps the model — prompt, cast, music stay. Compare two providers on the same shot in seconds and pick the stronger.",
+          "Un clic cambia el modelo — prompt, cast, música siguen. Compara dos motores en el mismo plano en segundos y elige el mejor.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: videoS3,
+      copy: S(
+        ["Format-Flex", "Format flex", "Formato flexible"],
+        ["Vertikal, Quadrat, Landscape.", "Vertical, square, landscape.", "Vertical, cuadrado, landscape."],
+        [
+          "9:16 für Reels, 1:1 für Feed, 16:9 für YouTube — dieselbe Idee, drei Formate, ein Render-Job. Kein Neu-Framing per Hand.",
+          "9:16 for reels, 1:1 for feed, 16:9 for YouTube — same idea, three formats, one render job. No manual re-framing.",
+          "9:16 para reels, 1:1 para feed, 16:9 para YouTube — misma idea, tres formatos, un solo render. Sin reencuadre manual.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: VideoStylePresetsVisual,
+      copy: S(
+        ["Style-Presets", "Style presets", "Presets de estilo"],
+        ["Editorial. Cinematic. Product. Ugc.", "Editorial. Cinematic. Product. UGC.", "Editorial. Cinemático. Producto. UGC."],
+        [
+          "Presets für Look, Kamera und Licht liegen bereit. Wähle einen — und die Engine bekommt den Regie-Rahmen, den sie braucht, um professionell aussehen zu können.",
+          "Presets for look, camera and light are ready. Pick one — the engine gets the direction it needs to actually look pro.",
+          "Presets de look, cámara y luz listos. Elige uno — el motor recibe la dirección que necesita para verse pro.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: VideoCostVisual,
+      copy: S(
+        ["Kosten-Transparenz", "Cost transparency", "Transparencia de costes"],
+        ["Preis vor dem Render, nicht danach.", "Cost shown before render, not after.", "Coste antes del render, no después."],
+        [
+          "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 14,99 € eingerechnet.",
+          "Every render shows how many media credits it costs — up front. No surprise burn, no hidden markup — beta price 14.99 € included.",
+          "Cada render muestra su coste en créditos — antes de lanzarlo. Sin sorpresas, sin recargos ocultos — precio beta 14,99 € incluido.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: videoS6,
+      copy: S(
+        ["Hero-Shot", "Hero shot", "Plano héroe"],
+        ["Vom Prompt zum Werbespot.", "From prompt to ad spot.", "Del prompt al spot."],
+        [
+          "Was früher einen Dreh brauchte, entsteht in Minuten: Ein Hero-Shot mit Cast, Musik, VO und Format — bereit für Meta, TikTok, YouTube.",
+          "What used to need a shoot now takes minutes: a hero shot with cast, music, VO and format — ready for Meta, TikTok, YouTube.",
+          "Lo que antes exigía un rodaje ahora sale en minutos: un plano héroe con cast, música, VO y formato — listo para Meta, TikTok, YouTube.",
+        ],
+      ),
+    },
+  ],
+  picture: [
+    {
+      kind: "cinematic",
+      imageSrc: pictureS1,
+      copy: S(
+        ["Produkt-Shot", "Product shot", "Plano de producto"],
+        ["Ein Produkt. Studio-Ergebnis.", "One product. Studio result.", "Un producto. Resultado de estudio."],
+        [
+          "Reflektierende Flächen, dramatisches Licht, saubere Kanten — Picture Studio erzeugt Produktshots, die aussehen wie aus einem 3.000 €-Fotostudio.",
+          "Reflective surfaces, dramatic light, clean edges — Picture Studio produces product shots that look like a €3,000 photo studio.",
+          "Superficies reflectantes, luz dramática, bordes limpios — Picture Studio genera planos de producto de estudio de 3.000 €.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: PictureAnchorVisual,
+      copy: S(
+        ["Brand-Anchor", "Brand anchor", "Ancla de marca"],
+        ["Farben, Font-Gefühl, Bildlogik gespeichert.", "Colors, typographic feel, visual logic saved.", "Colores, tipografía, lógica visual guardadas."],
+        [
+          "Definiere Anchor-Frames für deine Marke. Jedes neue Bild bleibt in derselben Palette, Kontrastkurve und Bildsprache — Konsistenz statt Zufall.",
+          "Define anchor frames for your brand. Every new image stays in the same palette, contrast and visual language — consistency, not luck.",
+          "Define frames ancla para tu marca. Cada nueva imagen conserva paleta, contraste y lenguaje — consistencia, no suerte.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: pictureS3,
+      copy: S(
+        ["Editorial-Cover", "Editorial cover", "Portada editorial"],
+        ["Cover-Qualität. In Minuten.", "Cover-grade. In minutes.", "Calidad portada. En minutos."],
+        [
+          "Portrait, Typografie-Gefühl, Farbe — Editorial-Cover in Vogue-Anmutung. Ideal für Landing-Hero, LinkedIn-Post oder Magazin-Mockup.",
+          "Portrait, typographic feel, color — editorial covers with a Vogue vibe. Ideal for landing hero, LinkedIn post or magazine mockup.",
+          "Retrato, sensación tipográfica, color — portadas editoriales con estética Vogue. Ideales para hero, LinkedIn o mockup.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: PictureStyleGridVisual,
+      copy: S(
+        ["Stil-Grid", "Style grid", "Grilla de estilos"],
+        ["Editorial · Cinematic · Portrait · Product.", "Editorial · Cinematic · Portrait · Product.", "Editorial · Cinemático · Retrato · Producto."],
+        [
+          "Vier Basis-Stile, sofort geladen. Kombiniere sie mit deinem Cast und einem einzigen Prompt — Serien-Assets ohne Serien-Aufwand.",
+          "Four base styles, instantly loaded. Combine them with your cast and a single prompt — series assets without series effort.",
+          "Cuatro estilos base, listos al instante. Combínalos con tu cast y un solo prompt — assets en serie sin esfuerzo en serie.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: PictureUpscaleVisual,
+      copy: S(
+        ["Upscale & Retouch", "Upscale & retouch", "Escalado y retoque"],
+        ["4K-Ready mit einem Klick.", "4K-ready with one click.", "Listo para 4K con un clic."],
+        [
+          "Nano Banana 2, Seedream 4, Flux Ultra liefern die Basis. Upscale und Retouch veredeln bis 4K — bereit für Print, OOH und großformatige Display-Ads.",
+          "Nano Banana 2, Seedream 4, Flux Ultra deliver the base. Upscale and retouch push to 4K — ready for print, OOH and large-format display.",
+          "Nano Banana 2, Seedream 4, Flux Ultra dan la base. Upscale y retoque llevan a 4K — listo para print, OOH y display grande.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: pictureS6,
+      copy: S(
+        ["Portrait-Serie", "Portrait series", "Serie de retratos"],
+        ["Ein Cast. Vier Auftritte.", "One cast. Four appearances.", "Un cast. Cuatro apariciones."],
+        [
+          "Vom Editorial-Portrait über den Bewerbungshead bis zum Kampagnen-Look — dieselbe Person, verlässlich, wiedererkennbar. Perfekt für Team-Pages und PR.",
+          "From editorial portrait to headshot to campaign look — same person, reliable, recognisable. Perfect for team pages and PR.",
+          "Del retrato editorial al headshot y al look de campaña — misma persona, fiable, reconocible. Perfecto para team pages y PR.",
+        ],
+      ),
+    },
+  ],
+  music: [
+    {
+      kind: "cinematic",
+      imageSrc: musicS1,
+      copy: S(
+        ["Werbe-Jingle", "Ad jingle", "Jingle publicitario"],
+        ["Ein Hook. Eine Marke. In Minuten.", "One hook. One brand. In minutes.", "Un gancho. Una marca. En minutos."],
+        [
+          "Beschreibe Stimmung und Länge — Suno v5 oder Udio v2 liefert einen Hook, den du direkt unter deinen Spot legen kannst. Rechtefrei, sofort einsatzbereit.",
+          "Describe mood and length — Suno v5 or Udio v2 delivers a hook you can drop straight under your spot. Rights-clear, instantly usable.",
+          "Describe mood y duración — Suno v5 o Udio v2 entrega un gancho listo para tu spot. Libre de derechos, listo al instante.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: MusicWaveformVisual,
+      copy: S(
+        ["4 Engines · 1 Waveform", "4 engines · 1 waveform", "4 motores · 1 waveform"],
+        ["Suno, Udio, ElevenLabs, Stable Audio.", "Suno, Udio, ElevenLabs, Stable Audio.", "Suno, Udio, ElevenLabs, Stable Audio."],
+        [
+          "Vier Scoring-Engines nebeneinander in einer Waveform-UI. Hör vergleichend rein, wähle die stärkste Version — ohne Datei-Chaos zwischen Tabs.",
+          "Four scoring engines side by side in one waveform UI. A/B them, pick the strongest — no file chaos across tabs.",
+          "Cuatro motores de scoring en una única waveform. Compáralos, elige el mejor — sin caos de archivos entre pestañas.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: musicS3,
+      copy: S(
+        ["Podcast-Intro", "Podcast intro", "Intro de podcast"],
+        ["Studio-Sound ohne Studio-Buchung.", "Studio sound, no studio booking.", "Sonido de estudio, sin reservar estudio."],
+        [
+          "Intro, Outro, Bumper, Transition — jeder Baustein deines Podcasts entsteht in Minuten mit klarer Klangfarbe und dauerhafter Wiedererkennbarkeit.",
+          "Intro, outro, bumper, transition — every podcast building block in minutes, with a clean tone and lasting recognition.",
+          "Intro, outro, bumper, transición — cada bloque del podcast en minutos, con timbre limpio y reconocimiento duradero.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: MusicStemsVisual,
+      copy: S(
+        ["Stems & SFX", "Stems & SFX", "Stems y SFX"],
+        ["Drums, Bass, Vocals — getrennt.", "Drums, bass, vocals — separated.", "Batería, bajo, voces — separados."],
+        [
+          "Export als voller Track oder als getrennte Stems: Drums, Bass, Vocals, FX. Für Mix, Ducking unter VO oder Reuse in weiteren Kampagnen.",
+          "Export as full track or split stems: drums, bass, vocals, FX. For mix, ducking under VO or reuse across campaigns.",
+          "Exporta track completo o stems separados: batería, bajo, voces, FX. Para mezcla, ducking bajo VO o reutilización.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: MusicGenreVisual,
+      copy: S(
+        ["Genre-Switch", "Genre switch", "Cambio de género"],
+        ["Cinematic Trailer, Lo-Fi, Corporate, Trap.", "Cinematic trailer, lo-fi, corporate, trap.", "Trailer cinematográfico, lo-fi, corporate, trap."],
+        [
+          "Ein Prompt, ein Genre-Chip — Musik switcht sofort das Terrain. Perfekt, um denselben Spot in drei Stimmungen zu testen und die stärkste zu wählen.",
+          "One prompt, one genre chip — music instantly changes terrain. Perfect to test the same spot in three moods and ship the strongest.",
+          "Un prompt, un chip de género — la música cambia de terreno al instante. Perfecto para testear el mismo spot en tres moods.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: musicS6,
+      copy: S(
+        ["Bühne", "On stage", "En escena"],
+        ["Musik, die deinen Spot trägt.", "Music that carries your spot.", "Música que sostiene tu spot."],
+        [
+          "Sound ist die Hälfte deiner Werbung. Music Studio liefert dir die Hälfte, die die meisten Tools vergessen — produktionsreif, in Minuten, ohne Rechte-Risiko.",
+          "Sound is half your ad. Music Studio delivers the half most tools forget — production-ready, in minutes, no rights risk.",
+          "El sonido es la mitad de tu anuncio. Music Studio entrega esa mitad — listo para producción, en minutos, sin riesgo de derechos.",
+        ],
+      ),
+    },
+  ],
+  voice: [
+    {
+      kind: "cinematic",
+      imageSrc: voiceS1,
+      copy: S(
+        ["Stimme klonen", "Clone a voice", "Clonar una voz"],
+        ["Deine Stimme. Als Asset.", "Your voice. As an asset.", "Tu voz. Como asset."],
+        [
+          "Nimm 60 Sekunden auf — Voice Studio klont Timbre, Sprechrhythmus und Akzent. Ab dann kannst du beliebige Skripte in deiner Stimme sprechen lassen.",
+          "Record 60 seconds — Voice Studio clones timbre, rhythm and accent. From then on any script can speak in your voice.",
+          "Graba 60 segundos — Voice Studio clona timbre, ritmo y acento. Desde ahí cualquier guion sonará con tu voz.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: VoiceCloneVisual,
+      copy: S(
+        ["Skript-Panel", "Script panel", "Panel de guion"],
+        ["Skript live vor dir während der Aufnahme.", "Script in front of you as you record.", "Guion delante mientras grabas."],
+        [
+          "Voice Studio zeigt das Skript groß und mitlaufend während der Aufnahme. Kein Vergessen, kein Umblättern — sofortige Wiederholung markierter Zeilen.",
+          "Voice Studio shows the script large and scrolling while you record. No forgetting, no page turns — instant re-take on marked lines.",
+          "Voice Studio muestra el guion grande y en scroll mientras grabas. Sin olvidos ni pases de página — re-take instantáneo por línea.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: voiceS3,
+      copy: S(
+        ["Charakter-Binding", "Character binding", "Vinculación al personaje"],
+        ["Deine Stimme trifft deinen Cast.", "Your voice meets your cast.", "Tu voz se une a tu cast."],
+        [
+          "Weise geklonte Stimmen einem Cast & World-Charakter zu. Ab jetzt spricht dieser Charakter in jedem Studio automatisch in dieser Stimme.",
+          "Assign cloned voices to a Cast & World character. From now on that character speaks in that voice in every studio.",
+          "Asigna voces clonadas a un personaje de Cast & World. Desde ahora hablará con esa voz en cada estudio.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: VoiceEmotionVisual,
+      copy: S(
+        ["Emotion-Steuerung", "Emotion control", "Control de emoción"],
+        ["Freundlich, dringlich, ruhig, energisch.", "Friendly, urgent, calm, energetic.", "Amable, urgente, tranquilo, enérgico."],
+        [
+          "Wähle eine Emotion pro Zeile. ElevenLabs überträgt sie in Betonung, Tempo und Atem — ohne dass du Regie am Mikro spielen musst.",
+          "Pick an emotion per line. ElevenLabs translates it into stress, tempo and breath — no directing at the mic needed.",
+          "Elige una emoción por línea. ElevenLabs la traduce en énfasis, tempo y respiración — sin dirigir al micro.",
+        ],
+      ),
+    },
+    {
+      kind: "ui",
+      UIComponent: VoiceLibraryVisual,
+      copy: S(
+        ["Meine Stimmen", "My voices", "Mis voces"],
+        ["Alle Stimmen an einem Ort.", "All voices in one place.", "Todas las voces en un lugar."],
+        [
+          "Persönlich geklont oder aus der ElevenLabs-Library gewählt — deine Stimmen sind zentral abgelegt und in Motion, AI-Video und Music sofort abrufbar.",
+          "Personally cloned or picked from the ElevenLabs library — your voices sit in one place and are ready in Motion, AI-Video and Music.",
+          "Clonadas o elegidas de la librería de ElevenLabs — tus voces viven en un lugar y están listas en Motion, AI-Video y Music.",
+        ],
+      ),
+    },
+    {
+      kind: "cinematic",
+      imageSrc: voiceS6,
+      copy: S(
+        ["Multi-Sprecher", "Multi-speaker", "Multi-voz"],
+        ["Vier Stimmen, ein Skript, eine Session.", "Four voices, one script, one session.", "Cuatro voces, un guion, una sesión."],
+        [
+          "Assign per-line: Sprecher 1, 2, 3, 4. Voice Studio rendert alle in einem Rutsch und liefert eine saubere, gemischte Dialogdatei — bereit für Motion Studio.",
+          "Assign per line: speaker 1, 2, 3, 4. Voice Studio renders them all in one pass and delivers a clean, mixed dialogue file — ready for Motion Studio.",
+          "Asigna por línea: hablante 1, 2, 3, 4. Voice Studio los renderiza en una pasada y entrega un archivo mezclado — listo para Motion Studio.",
+        ],
+      ),
+    },
+  ],
+};
+
+export const STORYLINE_CHROME: Record<Language, { slide: string; open: string; pause: string; play: string; close: string }> = {
+  de: { slide: "Slide", open: "Studio öffnen", pause: "Pause", play: "Abspielen", close: "Schließen" },
+  en: { slide: "Slide", open: "Open studio", pause: "Pause", play: "Play", close: "Close" },
+  es: { slide: "Slide", open: "Abrir estudio", pause: "Pausar", play: "Reproducir", close: "Cerrar" },
+};

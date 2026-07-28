@@ -1,5 +1,5 @@
-import { motion, useReducedMotion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   Users,
   MessagesSquare,
@@ -10,6 +10,8 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { StudioStorylineDialog } from "./StudioStorylineDialog";
+import type { StudioKey } from "./storylines/storylineContent";
 
 /* ────────────────────────────────────────────────────────────────
    Mini visuals — pure SVG / DOM, no external assets.
@@ -262,103 +264,79 @@ const VoiceLinkVisual = () => (
 
 export const CapabilityBento = () => {
   const { t } = useTranslation();
+  const [openStudio, setOpenStudio] = useState<StudioKey | null>(null);
 
   const tiles = [
-    {
-      key: "cast",
-      icon: Users,
-      href: "/brand-characters",
-      Visual: CastVisual,
-      chip: "Nano Banana 2 · Seedream 4 · Gemini 3 Pro",
-    },
-    {
-      key: "motion",
-      icon: MessagesSquare,
-      href: "/motion-studio",
-      Visual: MotionVisual,
-      chip: "Kling Omni · Hailuo · Sync.so · AWS Rekognition",
-    },
-    {
-      key: "video",
-      icon: Clapperboard,
-      href: "/ai-video-studio",
-      Visual: EngineOrbitVisual,
-      chip: "32 Models · 1 Interface",
-    },
-    {
-      key: "picture",
-      icon: Palette,
-      href: "/picture-studio",
-      Visual: StyleFramesVisual,
-      chip: "Nano Banana 2 · Seedream 4 · Flux Ultra",
-    },
-    {
-      key: "music",
-      icon: Music4,
-      href: "/music-studio",
-      Visual: MusicWaveVisual,
-      chip: "Suno v5 · Udio v2 · ElevenLabs · Stable Audio 2",
-    },
-    {
-      key: "voice",
-      icon: Mic,
-      href: "/audio-studio",
-      Visual: VoiceLinkVisual,
-      chip: "ElevenLabs · Cast-Binding",
-    },
-  ] as const;
+    { key: "cast" as const, icon: Users, href: "/brand-characters", Visual: CastVisual, chip: "Nano Banana 2 · Seedream 4 · Gemini 3 Pro" },
+    { key: "motion" as const, icon: MessagesSquare, href: "/motion-studio", Visual: MotionVisual, chip: "Kling Omni · Hailuo · Sync.so · AWS Rekognition" },
+    { key: "video" as const, icon: Clapperboard, href: "/ai-video-studio", Visual: EngineOrbitVisual, chip: "32 Models · 1 Interface" },
+    { key: "picture" as const, icon: Palette, href: "/picture-studio", Visual: StyleFramesVisual, chip: "Nano Banana 2 · Seedream 4 · Flux Ultra" },
+    { key: "music" as const, icon: Music4, href: "/music-studio", Visual: MusicWaveVisual, chip: "Suno v5 · Udio v2 · ElevenLabs · Stable Audio 2" },
+    { key: "voice" as const, icon: Mic, href: "/audio-studio", Visual: VoiceLinkVisual, chip: "ElevenLabs · Cast-Binding" },
+  ];
+
+  const active = tiles.find((tl) => tl.key === openStudio);
 
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-      {tiles.map((tile, i) => (
-        <motion.div
-          key={tile.key}
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
-          transition={{ duration: 0.5, delay: i * 0.06 }}
-          whileHover={{ y: -4 }}
-        >
-          <Link
-            to={tile.href}
-            className="group relative flex flex-col h-full rounded-2xl border border-border/50 bg-card/60 backdrop-blur-xl overflow-hidden hover:border-primary/50 hover:shadow-[0_0_30px_hsl(var(--primary)/0.25)] transition-all duration-500"
+    <>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {tiles.map((tile, i) => (
+          <motion.div
+            key={tile.key}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={{ duration: 0.5, delay: i * 0.06 }}
+            whileHover={{ y: -4 }}
           >
-            {/* accent underline on hover */}
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-gold-dark scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500" />
+            <button
+              type="button"
+              onClick={() => setOpenStudio(tile.key)}
+              className="group relative flex flex-col h-full w-full text-left rounded-2xl border border-border/50 bg-card/60 backdrop-blur-xl overflow-hidden hover:border-primary/50 hover:shadow-[0_0_30px_hsl(var(--primary)/0.25)] transition-all duration-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            >
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-gold-dark scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500" />
 
-            {/* Visual well */}
-            <div className="relative h-36 bg-gradient-to-b from-background/40 to-background/10 border-b border-primary/10 overflow-hidden">
-              <tile.Visual />
-              <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 text-[9px] uppercase tracking-[0.25em] text-accent/90">
-                <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
-                {t("landing.mission.betaPreview")}
-              </div>
-              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowUpRight className="h-4 w-4 text-primary" />
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="p-5 flex-1 flex flex-col">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center">
-                  <tile.icon className="h-4 w-4 text-primary" />
+              <div className="relative h-36 bg-gradient-to-b from-background/40 to-background/10 border-b border-primary/10 overflow-hidden">
+                <tile.Visual />
+                <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 text-[9px] uppercase tracking-[0.25em] text-accent/90">
+                  <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
+                  {t("landing.mission.betaPreview")}
                 </div>
-                <h4 className="font-display text-lg leading-tight text-foreground group-hover:text-primary transition-colors">
-                  {t(`landing.mission.bento.${tile.key}.title`)}
-                </h4>
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ArrowUpRight className="h-4 w-4 text-primary" />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-                {t(`landing.mission.bento.${tile.key}.desc`)}
-              </p>
-              <div className="mt-4 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-primary/70">
-                <span className="w-1 h-1 rounded-full bg-primary" />
-                {tile.chip}
+
+              <div className="p-5 flex-1 flex flex-col">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center">
+                    <tile.icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <h4 className="font-display text-lg leading-tight text-foreground group-hover:text-primary transition-colors">
+                    {t(`landing.mission.bento.${tile.key}.title`)}
+                  </h4>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                  {t(`landing.mission.bento.${tile.key}.desc`)}
+                </p>
+                <div className="mt-4 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-primary/70">
+                  <span className="w-1 h-1 rounded-full bg-primary" />
+                  {tile.chip}
+                </div>
               </div>
-            </div>
-          </Link>
-        </motion.div>
-      ))}
-    </div>
+            </button>
+          </motion.div>
+        ))}
+      </div>
+
+      <StudioStorylineDialog
+        studio={openStudio}
+        href={active?.href}
+        studioTitle={active ? t(`landing.mission.bento.${active.key}.title`) : undefined}
+        onOpenChange={(open) => {
+          if (!open) setOpenStudio(null);
+        }}
+      />
+    </>
   );
 };
