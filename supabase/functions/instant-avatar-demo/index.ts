@@ -48,7 +48,7 @@ async function generateAngle(
 ): Promise<string> {
   const suffix = STYLE_SUFFIX[style] ?? STYLE_SUFFIX.cinematic;
   const yawDirection = angle < 0 ? `${Math.abs(angle)}° to the left` : angle > 0 ? `${angle}° to the right` : "straight ahead";
-  const prompt = `Create a cinematic editorial portrait of the person in the reference photo. Preserve their facial identity exactly — same face, same skin tone, same hair, same age. Camera framing: shoulders-up medium shot, subject looking ${yawDirection} (yaw ${angle} degrees). Background: solid deep black (#050816) with a warm gold rim-light from behind-right (Bond-Gold cinematic style). Wardrobe/mood: ${suffix}. Same lighting and same wardrobe across the whole turnaround set. Sharp focus on the face, subtle film grain. No text, no watermark, no borders.`;
+  const prompt = `Create a cinematic editorial character portrait of the person in the reference photo. Preserve their facial identity exactly — same face, same skin tone, same hair, same age. Camera framing: full-body three-quarter shot from head to knees, subject standing upright, whole character visible edge-to-edge (Cast-&-World character portrait style), subject looking ${yawDirection} (yaw ${angle} degrees). Vertical 3:4 portrait orientation, subject centered with generous headroom and floor space. Background: solid deep black (#050816) with a warm gold rim-light from behind-right (Bond-Gold cinematic style). Wardrobe/mood: ${suffix}. Same lighting and same wardrobe across the whole turnaround set. Sharp focus, subtle film grain. No text, no watermark, no borders, no cropping of the body.`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
     method: "POST",

@@ -233,7 +233,7 @@ export const InstantAvatarDemo = () => {
               <div
                 {...getRootProps()}
                 className={cn(
-                  "flex-1 min-h-[280px] rounded-xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center p-8",
+                  "aspect-[3/4] w-full rounded-xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center p-8",
                   isDragActive
                     ? "border-primary bg-primary/10"
                     : "border-primary/25 hover:border-primary/50 hover:bg-primary/5",
@@ -249,11 +249,11 @@ export const InstantAvatarDemo = () => {
                 </p>
               </div>
             ) : (
-              <div className="flex-1 min-h-[280px] rounded-xl overflow-hidden relative border border-primary/20">
+              <div className="aspect-[3/4] w-full rounded-xl overflow-hidden relative border border-primary/20 bg-[#050816]">
                 <img
                   src={sourceUrl}
                   alt="Dein hochgeladenes Foto"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
                 <button
                   onClick={handleReset}
@@ -327,7 +327,7 @@ export const InstantAvatarDemo = () => {
 
           {/* RIGHT: Turntable */}
           <div className="rounded-2xl border border-primary/15 bg-card/40 backdrop-blur-xl p-6 flex flex-col">
-            <div className="relative flex-1 min-h-[380px] rounded-xl overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 border border-primary/10 flex items-center justify-center">
+            <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-[#050816] border border-primary/10 flex items-center justify-center">
               {isLoading && !hasResult ? (
                 <div className="flex flex-col items-center gap-4 text-center px-6">
                   <div className="relative">
@@ -347,7 +347,7 @@ export const InstantAvatarDemo = () => {
                   key={angleIdx}
                   src={`data:image/png;base64,${currentFrame.b64}`}
                   alt={`Avatar Winkel ${currentFrame.angle}°`}
-                  className="w-full h-full object-cover animate-fade-in"
+                  className="w-full h-full object-contain animate-fade-in"
                 />
               ) : (
                 <div className="text-center px-6">
