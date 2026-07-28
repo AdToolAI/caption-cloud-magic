@@ -270,8 +270,6 @@ export const IdentityLockVisual = () => {
   );
 };
 
-/* ── 4. Wardrobe / Looks ───────────────────────────────── */
-export const WardrobeCarouselVisual = () => {
 /* ── 4. Wardrobe — Character Selection Screen (photo-driven) ─── */
 export const WardrobeCarouselVisual = () => {
   const looks = [
