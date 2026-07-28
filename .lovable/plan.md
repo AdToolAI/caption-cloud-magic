@@ -1,39 +1,51 @@
 ## Ziel
 
-Der Live-Preview in Stufe 4 des Universal Content Creator soll:
-1. **Sich wie Stufe 3 verhalten** — Bilder werden im Format-Frame mit `object-contain` (Letterbox erlaubt) angezeigt.
-2. **Die gleiche Bildschärfe** wie Stufe 3 haben.
+Live-Preview ab Stufe 4 soll sich exakt wie der Player in Stufe 3 verhalten (Autoplay, Loop, `object-contain`, gleiche Bildschärfe), **aber zusätzlich Sound erlauben** (Voiceover, Musik, Original-Audio) über den bestehenden Volume/Mute-Control.
 
 ## Analyse
 
-- **Stufe 3** rendert das Hintergrundbild direkt via `<img … object-contain>` in einem Container mit `aspectRatio: formatConfig.width / formatConfig.height`. Native Auflösung, keine zusätzliche Skalierungsstufe.
-- **Stufe 4+** rendert über den Remotion-Player die `UniversalCreatorVideo`-Komposition. Der Frame stimmt zwar bereits mit dem Zielformat überein, aber intern gibt es zwei Schärfe-Killer:
-  - Wenn eine Szene-Animation `kenBurns` oder `parallax` aktiv ist, verwenden die entsprechenden Komponenten noch `objectFit: 'cover'` und zusätzlich `scale(1.15)`/`110%`-Vergrößerung → das Bild wird hochskaliert und beschnitten, wodurch der 1:1-Inhalt in einem 9:16-Frame gestreckt/unscharf wirkt.
-  - `SafeImg` rendert ohne explizite `image-rendering`-Hinweise; bei Downscaling im Player kann der Browser weichzeichnen.
+**Stufe 3** rendert roh:
+```tsx
+<video src={url} className="w-full h-full object-contain" loop muted autoPlay playsInline />
+<img  src={url} className="w-full h-full object-contain" />
+```
+→ automatisch, endlos, `object-contain`, keine Filter, keine Overlays.
+
+**Stufe 4** rendert die Remotion-Komposition `UniversalCreatorVideo` über `RemotionPreviewPlayer`. Aktuell wird `previewMode: true` gesetzt, aber **nicht** `rawMediaMode: true`. In `UniversalCreatorVideo.tsx` hängen alle qualitätsmindernden Layer an `rawMediaMode`:
+- `moodFilter` (CSS `filter` für Farb-/Kontrast-LUT)
+- `CinematicPostLayer` (Vignette + Film-Grain)
+- `styleOverlays` (semi-transparente Farb-/Muster-Layer)
+- `SceneTypeEffects` + `FloatingIcons`
+- Ken-Burns-/Parallax-Zoom (`animation = rawMediaMode ? 'none' : sceneAnimation`)
+
+Diese Layer machen den sichtbaren Unterschied (weicher, wärmer, körnig). Der Remotion-Player selbst skaliert Bilder korrekt — der Qualitätsverlust kommt aus dem Post-Processing.
+
+Zusätzlich: Player startet nicht automatisch und loopt nicht — Nutzer muss klicken.
+
+**Audio bleibt vollständig erhalten:** `rawMediaMode` betrifft nur visuelle Layer. `SafeVideo` (Original-Ton), `Audio`-Elements für Voiceover/Musik sowie der externe Mix in `RemotionPreviewPlayer` (VO/Music via HTMLAudio, Player-Volume für Scene-Video) laufen unabhängig davon.
 
 ## Änderungen
 
-### 1. `src/remotion/templates/UniversalCreatorVideo.tsx`
-- **KenBurnsBackground** (~Zeile 1436–1450): `objectFit` von `cover` → `contain`, `scale(1.15)`/Pan-Transform entfernen bzw. auf sanftes `scale(1.0 → 1.03)` reduzieren, damit kein Zuschnitt entsteht (identisches Verhalten wie Stufe 3).
-- **ParallaxBackground** (~Zeile 1466–1487): `objectFit: cover` → `contain`, `width/height: 110%` und `left/top: -5%` auf `100%` / `0` zurücksetzen. Parallax-Translate optional beibehalten, aber ohne Overflow-Zuschnitt.
-- Damit nutzt jede Animationsvariante dieselbe „einpassen ohne beschneiden"-Logik wie `renderBackgroundContent`.
+### 1. `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+- `inputProps` erweitern: zusätzlich `rawMediaMode: true` neben `previewMode: true`.
+- Default-Props: `loopProp = true`, `autoPlay = true`.
+- Autoplay-Effekt so anpassen, dass er **stumm startet** (kein `unmute()`, `setIsMuted(false)` entfernen) — genau wie `<video muted autoPlay loop>` in Stufe 3. Der Nutzer kann per bestehendem Mute-Button / Volume-Slider jederzeit Ton aktivieren; der komplette Audio-Mix (VO, Musik, Original-Audio) bleibt voll funktionsfähig.
 
-### 2. `src/components/universal-creator/RemotionPreviewPlayer.tsx`
-- Am Player-Container zusätzlich `imageRendering: 'high-quality'` und `WebkitBackfaceVisibility: 'hidden'` setzen, damit der Browser beim CSS-Downscaling nicht weichzeichnet.
-- `<MemoizedPlayer>` mit `style={{ width: '100%', height: '100%' }}` explizit ausfüllen (falls noch nicht geschehen), damit die Komposition nicht in einer kleineren inneren Box gerendert und dann per CSS erneut skaliert wird (Doppel-Downscaling).
+### 2. Kein Change an Export/Render
+- Export-Pfad (`render-*`) übergibt weiterhin `previewMode: false` / `rawMediaMode: false` → gerenderte MP4s behalten Cinematic-Look, Ken-Burns, Grain und Overlays.
 
-### 3. Kein UI-/Business-Logic-Change
-- Frame-Rahmen (`aspectRatio: formatConfig.width / formatConfig.height`, `maxHeight: 65vh`) bleibt.
-- Controls-Leiste bleibt unverändert.
-- Keine Änderungen am Export-Renderer (Lambda) — die betroffenen Komponenten werden zur Renderzeit ohnehin auf Zielauflösung gezeichnet, dort ist `contain` visuell identisch zu vorher (keine Beschneidung mehr, aber Konsistenz mit Preview gewünscht).
+### 3. Kein Change am Live-Preview-Panel in `UniversalCreator.tsx`
+- Defaults im Player reichen; Aufrufstelle bleibt unverändert.
 
 ## Technische Details
 
-- `SafeImg` unterstützt bereits alle `style`-Props → keine Signatur-Änderung nötig.
-- `objectFit: contain` in Ken-Burns/Parallax bedeutet: Ken-Burns-Zoom wird durch das leichte `scale`-Transform simuliert, ohne dass das Bild über den Frame hinausragt.
-- Keine Migrationen, keine Edge-Function-Änderungen.
+- `rawMediaMode` existiert bereits als Zod-Feld (`z.boolean().default(false)`) und ist konsequent als Gate implementiert — keine neuen Flags/Schalter nötig.
+- Autoplay-muted ist Browser-konform (Chrome/Safari-Autoplay-Policy).
+- Sound-Aktivierung erfolgt über den vorhandenen Mute-Toggle bzw. Play-Button-Handler (`handlePlayClick` ruft bereits `unmute()`), damit der User-Gesture-Requirement erfüllt ist.
 
 ## Verifikation
 
-- Preview-Vergleich Stufe 3 vs. Stufe 4 bei 9:16-Format mit 1:1-Szenenbild: identische Letterbox-Balken, identische Bildschärfe.
-- Bei Ken-Burns- und Parallax-Szenen keine gestauchten/beschnittenen Bilder mehr.
+- Stufe 3 ↔ Stufe 4: identischer Bildausschnitt, identische Schärfe, identisches `object-contain`-Verhalten.
+- Player läuft ab Stufe 4 automatisch, stumm, in Endlosschleife.
+- Klick auf Mute-Toggle / Volume-Slider aktiviert Voiceover + Musik + Original-Ton wie bisher.
+- Export-Download enthält weiterhin Cinematic-Post-Processing.
