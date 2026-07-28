@@ -226,7 +226,7 @@ serve(async (req) => {
           prompt: promptParts.join('. '),
           music_length_ms: Math.min(duration, 300) * 1000,
           force_instrumental: !!instrumental,
-          output_format: 'mp3_44100_128',
+          output_format: 'mp3_high_quality',
         };
         if (lyrics && lyrics.trim()) {
           (input as Record<string, unknown>).lyrics = lyrics.trim();
