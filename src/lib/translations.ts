@@ -8743,7 +8743,7 @@ export const translations: Record<Language, any> = {
         badge: "Warum AdTool",
         title1: "Why this tool ",
         title2: "wins the game",
-        subtitle: "Drei Schritte zu effektiverem Marketing – systematisch, datengetrieben, skalierbar.",
+        subtitle: "Kein Tool. Ein komplettes Media-Studio — vom Briefing bis zur Veröffentlichung, alles auf einer Leinwand.",
         planMonth: "Plane deinen Monat",
         planMonthDesc: "KI-gestützte Content-Planung mit automatischer Zeitoptimierung für maximale Reichweite.",
         optimizePerformance: "Optimiere Performance",
@@ -8752,6 +8752,60 @@ export const translations: Record<Language, any> = {
         scaleCampaignsDesc: "Automatisiere wiederkehrende Aufgaben und multipliziere deinen Output.",
         learnMore: "Mehr erfahren",
         betaPreview: "Beta Vorschau",
+        outcomeLabel: "Das Ergebnis",
+        outcomeTitle: "Planen · Optimieren · Skalieren",
+        deck: {
+          pipelineLabel: "Produktions-Pipeline",
+          title: "Eine Leinwand. Sieben Stationen. Null Kontextwechsel.",
+          subtitle: "Jede Etappe einer Kampagne — vom ersten Briefing bis zum letzten Post — läuft in einem einzigen durchgehenden Workflow.",
+          oneCanvas: "Eine Leinwand · Ein Cast · Ein Klick",
+          capLabel: "Plattform-Fähigkeiten",
+          capFootnote: "Heute verfügbare Fähigkeiten. Keine erfundenen Nutzerzahlen — wir sind in der Beta.",
+          stations: {
+            briefing: "Briefing",
+            cast: "Cast",
+            script: "Skript",
+            anchor: "Anchor",
+            motion: "Motion",
+            music: "Musik",
+            publish: "Publish"
+          },
+          cap: {
+            models: "KI-Modelle",
+            speakers: "Sprecher pro Szene",
+            languages: "Sprachen",
+            characters: "Persistente Charaktere"
+          }
+        },
+        bento: {
+          label: "Sechs Studios · Ein Login",
+          title1: "Dein ",
+          title2: "Media-Command-Deck",
+          cast: {
+            title: "Cast & World",
+            desc: "Charaktere einmal locken — in jeder Szene, in jedem Studio abrufbar. Persistente Identität, kein Roulette."
+          },
+          motion: {
+            title: "Motion Studio",
+            desc: "Vier Sprecher, eine durchgehende Einstellung, cinematischer Lip-Sync. Keine Schnitte, keine Morphs."
+          },
+          video: {
+            title: "AI Video Studio",
+            desc: "Alle Top-Engines unter einer Promptzeile. Provider wechseln, ohne die Leinwand zu verlassen."
+          },
+          picture: {
+            title: "Picture Studio",
+            desc: "Von Editorial über Produkt bis Portrait — Anchor-Frames genau im Stil deiner Marke."
+          },
+          music: {
+            title: "Music Studio",
+            desc: "Vier Scoring-Engines, eine Waveform. Tracks, Stems und SFX — produktionsreif in Minuten."
+          },
+          voice: {
+            title: "Voice Studio",
+            desc: "Stimme klonen, an einen Charakter binden — und jede künftige Szene spricht in der Klangfarbe deines Casts."
+          }
+        },
         cockpit: {
           signal: { reach: "Reichweite", ctr: "CTR", watch: "Watch-Time" }
         },
