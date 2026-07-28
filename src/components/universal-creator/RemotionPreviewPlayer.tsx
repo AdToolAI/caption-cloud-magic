@@ -440,7 +440,7 @@ export function RemotionPreviewPlayer({
             aspectRatio: `${width} / ${height}`,
             width: '100%',
             maxHeight: '65vh',
-            imageRendering: 'high-quality',
+            imageRendering: 'auto',
             WebkitBackfaceVisibility: 'hidden',
             backfaceVisibility: 'hidden',
             transform: 'translateZ(0)',
