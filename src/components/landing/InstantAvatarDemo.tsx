@@ -327,7 +327,7 @@ export const InstantAvatarDemo = () => {
 
           {/* RIGHT: Turntable */}
           <div className="rounded-2xl border border-primary/15 bg-card/40 backdrop-blur-xl p-6 flex flex-col">
-            <div className="relative flex-1 min-h-[380px] rounded-xl overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 border border-primary/10 flex items-center justify-center">
+            <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-[#050816] border border-primary/10 flex items-center justify-center">
               {isLoading && !hasResult ? (
                 <div className="flex flex-col items-center gap-4 text-center px-6">
                   <div className="relative">
@@ -347,7 +347,7 @@ export const InstantAvatarDemo = () => {
                   key={angleIdx}
                   src={`data:image/png;base64,${currentFrame.b64}`}
                   alt={`Avatar Winkel ${currentFrame.angle}°`}
-                  className="w-full h-full object-cover animate-fade-in"
+                  className="w-full h-full object-contain animate-fade-in"
                 />
               ) : (
                 <div className="text-center px-6">
