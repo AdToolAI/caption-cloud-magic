@@ -1,59 +1,52 @@
-## Plan v286 — Studio-Storyline-Slideshows
+## Ziel
 
-Jede Bento-Kachel (Cast, Motion, Video, Picture, Music, Voice) wird klickbar und öffnet ein Dialog-Modal mit 6-Slide-Autoplay-Storyline. Statt direkt zum Studio zu navigieren.
+1. Der Bereich **„Planen · Optimieren · Skalieren"** (3 Outcome-Cockpits) soll **komplett klickbar** werden – nicht nur der versteckte „Mehr erfahren"-Link.
+2. Die **Cast & World Storyline** im `StudioStorylineDialog` bekommt einen visuellen Deep-Dive: eine echte, animierte **Charakter-Erstellungs-Journey** statt statischer Slides.
 
-### Slide-Struktur pro Studio (Use-Case-driven, 6 Slides)
+---
 
-Jedes Studio bekommt 6 Slides mit je einem konkreten Anwendungsszenario:
+## Teil 1 — Outcome-Cockpits klickbar (MissionFeatures.tsx)
 
-**Cast & World** — Wiederkehrender CEO · Produkt-Maskottchen · Sprecher-Ensemble · Look-Varianten · Voice-Binding · Multi-Studio-Reuse
-**Motion Studio** — 4-Sprecher-Dialog · Task-Blocking (Telefon/Drucker) · Emotions-Lippen-Sync · Kling Omni Native · Deutsche Stimmen-Lock · Ein-Take statt Schnitt
-**AI Video Studio** — Provider-Wechsel per Klick · Vertikal/Horizontal/Square · Vergleich zweier Engines · Style-Presets · Batch-Renders · Kosten-Transparenz
-**Picture Studio** — Produktshot · Editorial-Cover · Portrait-Serie · Brand-Anchor · Stilkonsistenz · Upscale/Retouch
-**Music Studio** — Werbe-Jingle · Podcast-Intro · Stems-Export · SFX-Layer · Genre-Switch · Rechte-Klarheit
-**Voice Studio** — Stimme klonen · Charakter-Binding · Deutsche VO · Emotion-Steuerung · Skript-Panel · Multi-Sprecher-Library
+Aktuell öffnet nur der kleine „Mehr erfahren"-Button den `FeatureGuideDialog`, und das auch nur beim Hover sichtbar. Änderungen:
 
-### Bild-Mix pro Studio (3 Cinematic + 3 UI)
+- Die drei Karten (`Plane deinen Monat`, `Optimiere Performance`, `Skaliere Kampagnen`) werden zu vollflächigen `<button>`-Elementen (analog zum `CapabilityBento`-Pattern).
+- Die ganze Karte triggert `setSelectedMission(mission.featureId)`.
+- Cursor `pointer`, Fokus-Ring, dauerhaft sichtbarer `ArrowUpRight`-Indikator oben rechts (statt Opacity-0-Hover-Link unten).
+- Hover-States (Border-Glow, gold-Underline, `-translate-y-1`) bleiben; wirken jetzt auf die ganze Karte.
+- Keine Business-Logik-Änderungen — nur Präsentations-Layer.
 
-- **Slides 1, 3, 6** — Cinematic Bond-Gold-Renders (via `imagegen--generate_image`, `src/assets/landing/storylines/{studio}/`)
-- **Slides 2, 4, 5** — Studio-UI-Mockups (custom SVG-Kompositionen inline, im Stil der bestehenden CapabilityBento-Visuals — z.B. Timeline, Waveform, Card-Grid, Portrait-Chips)
+---
 
-Insgesamt 18 generierte Cinematic-Bilder (3 pro Studio × 6 Studios), horizontal 16:9, dunkles Set mit Gold-Akzenten.
+## Teil 2 — Cast & World Storyline: Charakter-Creation-Journey
 
-### Modal-Verhalten
+Momentan sind die 6 Slides für `cast` generische Text-Slides mit UI-Mockup-SVGs (`storylineContent.ts` + `uiVisuals.tsx`). Wir ersetzen die 6 Cast-Slides durch eine **narrative Journey**, die Schritt für Schritt zeigt, wie ein Charakter entsteht — mit echten, dedizierten Visuals.
 
-- Autoplay 4 Sekunden pro Slide
-- Pause bei Hover / bei manueller Navigation
-- Pfeil-Buttons + Dot-Indikator + Fortschritts-Balken (goldene Linie füllt sich in 4s)
-- ESC schließt, Klick auf Overlay schließt
-- CTA-Button in Slide 6: "Studio öffnen →" (Link zur bestehenden `tile.href`)
-- Keyboard: ←/→ navigiert, Space pausiert
-- `useReducedMotion`: bei reduzierter Motion kein Autoplay, nur manuelle Navigation
+### Neue 6-Slide-Journey (DE/EN/ES)
 
-### Technische Umsetzung
+| # | Titel | Was passiert im Visual |
+|---|-------|------------------------|
+| 1 | **Brief** | Textarea-Mockup fließt in Tokens („25, blond, warmes Lächeln, Berlin") — Tokens animieren nach unten in einen Charakter-Slot |
+| 2 | **Anchor Portrait** | Drei Provider-Chips (Nano Banana 2 · Seedream 4 · Gemini 3 Pro) rotieren, ein Porträt-Frame morpht in ein final gerendertes Face (Ken-Burns Reveal) |
+| 3 | **Identity Lock** | AWS-Rekognition-Landmark-Overlay (Punkte auf Augen/Mund/Nase) mit „Face-ID 98% match"-Badge, Lock-Animation |
+| 4 | **Wardrobe / Looks** | Karussell mit 4 Outfit-Cards („Look 01 – Studio", „Look 02 – Street" …), aktive Karte pulsiert in gold |
+| 5 | **Voice Binding** | Charakter-Avatar links, Waveform-Bar mittig, Voice-Chip rechts snappen mit Linie zusammen → „Voice locked" |
+| 6 | **Scene Cast** | Charakter-Chip wird in eine 3-Karten-Storyboard-Row gezogen; „Ready for Motion Studio"-CTA |
 
-**Neue Dateien:**
-- `src/components/landing/StudioStorylineDialog.tsx` — Modal-Container mit shadcn `Dialog`, Autoplay-Logik, Bond-Gold-Styling (deep black glass, gold accents, Playfair Titles)
-- `src/components/landing/storylines/storylineContent.ts` — Zentrale Definition aller 36 Slides (6 Studios × 6): `{ studio, slideIndex, kind: 'cinematic' | 'ui', imageSrc?, UIComponent?, kicker, title, body, tags[] }`
-- `src/components/landing/storylines/uiVisuals/` — 18 kleine SVG-UI-Mockup-Komponenten (3 pro Studio), im Stil der CapabilityBento-Visuals wiederverwendbar
-- 18 generierte Cinematic-Bilder unter `src/assets/landing/storylines/{cast,motion,video,picture,music,voice}/slide-{1,3,6}.jpg`
+### Dateien
 
-**Änderungen:**
-- `src/components/landing/CapabilityBento.tsx` — `<Link>` durch `<button>` ersetzen, `onClick` öffnet `StudioStorylineDialog` mit `studio={tile.key}`. Bestehende Visual/Icon/Chip/Hover-Behandlung bleibt.
-- `src/i18n/translations.ts` — DE/EN/ES Übersetzungen für alle 36 Slides (Kicker, Title, Body) unter `landing.mission.bento.storylines.{studio}.slides[0..5]`, plus Modal-Chrome (`playPause`, `openStudio`, `slideOf`).
+- `src/components/landing/storylines/castJourneyVisuals.tsx` **(neu)** — 6 dedizierte SVG/Motion-Komponenten (`BriefTokens`, `AnchorMorph`, `IdentityLock`, `WardrobeCarousel`, `VoiceBinding`, `SceneCastDrop`), reine SVG + Framer-Motion, keine externen Assets.
+- `src/components/landing/storylines/storylineContent.ts` — Cast-Slides (Slot `cast`) auf die 6 neuen Titel/Copies (DE/EN/ES) umstellen und pro Slide `visual: 'castJourney:brief' | 'castJourney:anchor' | …` referenzieren.
+- `src/components/landing/StudioStorylineDialog.tsx` — Visual-Renderer erweitern, sodass die neuen `castJourney:*`-Keys auf die entsprechenden Komponenten aus `castJourneyVisuals.tsx` mappen. Bestehende Studios (motion/video/picture/music/voice) unverändert.
+- `StudioStorylineDialog`: Autoplay bleibt 4s, aber pro Cast-Slide leicht länger (5.5s) damit die Journey-Animationen sichtbar durchlaufen; Progress-Ring passt sich der Dauer an.
 
-### Design-Details (Bond-Gold, konsistent zum Rest)
+### Optional (nice-to-have, im Scope)
 
-- Modal-Größe: `max-w-4xl`, `aspect-video` Bildbereich oben, Text-Panel unten
-- Backdrop: `bg-background/95 backdrop-blur-xl`
-- Border: `border-primary/30`, Shadow: `shadow-[0_0_60px_hsl(var(--primary)/0.25)]`
-- Titelfont: `font-display` (Playfair), Body: Inter
-- Fortschritts-Leiste: dünne goldene Linie oben im Modal, füllt sich smooth über 4s
-- Slide-Transition: Fade + slight scale (framer-motion `AnimatePresence`)
+- Kleine „Step X/6"-Timeline unten im Dialog nur für den Cast-Storyline-Modus (visualisiert die Journey-Struktur explizit).
 
-### Nicht im Scope
+---
 
-- Keine Änderung am `MissionFeatures`-Layout oder anderen Landing-Sektionen
-- Keine Änderung an Studio-Seiten selbst
-- Keine neuen Übersetzungen für nicht angezeigte Sprachen
-- Keine Analytics/Tracking (kann später ergänzt werden)
+## Nicht im Scope
+
+- Keine Änderungen an Backend, Edge Functions, Auth, Pricing.
+- Keine neuen Bild-Generierungen — reines SVG/Motion.
+- Motion/Video/Picture/Music/Voice-Storylines bleiben wie sie sind (können später gleich aufgewertet werden, falls gewünscht).
