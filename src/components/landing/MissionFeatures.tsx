@@ -6,6 +6,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { PlanCockpit } from "./cockpits/PlanCockpit";
 import { SignalCockpit } from "./cockpits/SignalCockpit";
 import { ScaleCockpit } from "./cockpits/ScaleCockpit";
+import { CommandDeck } from "./CommandDeck";
+import { CapabilityBento } from "./CapabilityBento";
 
 export const MissionFeatures = () => {
   const [selectedMission, setSelectedMission] = useState<string | null>(null);
@@ -71,6 +73,43 @@ export const MissionFeatures = () => {
             {t("landing.mission.subtitle")}
           </p>
         </motion.div>
+
+        {/* Ebene 1 — Hero Command Deck (Pipeline + Capabilities) */}
+        <div className="mb-14">
+          <CommandDeck />
+        </div>
+
+        {/* Ebene 2 — 6 Capability tiles (Bento) */}
+        <div className="mb-16">
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.25em] text-accent/90 font-medium mb-2 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                {t("landing.mission.bento.label")}
+              </div>
+              <h3 className="font-display text-2xl md:text-3xl">
+                <span className="text-foreground">{t("landing.mission.bento.title1")}</span>
+                <span className="bg-gradient-to-r from-primary to-gold-dark bg-clip-text text-transparent">
+                  {t("landing.mission.bento.title2")}
+                </span>
+              </h3>
+            </div>
+          </div>
+          <CapabilityBento />
+        </div>
+
+        {/* Ebene 3 — Outcome cockpits (Plan · Optimize · Scale) */}
+        <div className="mb-4">
+          <div className="text-center mb-8">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-accent/90 font-medium mb-2 flex items-center justify-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+              {t("landing.mission.outcomeLabel")}
+            </div>
+            <h3 className="font-display text-2xl md:text-3xl text-foreground">
+              {t("landing.mission.outcomeTitle")}
+            </h3>
+          </div>
+        </div>
 
         <div className="relative">
           <div className="hidden md:block absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent -translate-y-1/2" />
