@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users, Plus, Mail, CheckCircle, XCircle, ListTodo, Shield, Crown,
-  Sparkles, Activity, Clock, TrendingUp, Circle, MoreHorizontal, Radar,
+  Sparkles, Activity, Clock, TrendingUp, Circle, MoreHorizontal, Radar, Trash2, Check, X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -753,18 +753,26 @@ export default function TeamWorkspace() {
                             key={tk.id}
                             className="group rounded-xl border border-primary/10 bg-background/60 p-3 transition hover:border-primary/30"
                           >
-                            <div className="flex items-start justify-between">
+                            <div className="flex items-start justify-between gap-2">
                               <p className="text-sm font-medium leading-snug text-foreground">
                                 {tk.title}
                               </p>
-                              <MoreHorizontal className="h-4 w-4 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+                              {canManage && (
+                                <button
+                                  onClick={() => deleteTask(tk.id)}
+                                  className="opacity-0 transition group-hover:opacity-100"
+                                  aria-label="Delete task"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                                </button>
+                              )}
                             </div>
                             {tk.description && (
                               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                                 {tk.description}
                               </p>
                             )}
-                            <div className="mt-3 flex items-center justify-between">
+                            <div className="mt-3 flex items-center justify-between gap-2">
                               <Badge
                                 variant="outline"
                                 className={cn(
@@ -781,6 +789,22 @@ export default function TeamWorkspace() {
                                 </span>
                               )}
                             </div>
+                            {canManage && (
+                              <Select
+                                value={tk.status || "todo"}
+                                onValueChange={(v) => updateTaskStatus(tk.id, v as any)}
+                              >
+                                <SelectTrigger className="mt-3 h-7 border-primary/15 bg-background/60 text-[11px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="todo">Backlog</SelectItem>
+                                  <SelectItem value="in_progress">In Progress</SelectItem>
+                                  <SelectItem value="review">Review</SelectItem>
+                                  <SelectItem value="done">Done</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -819,7 +843,7 @@ export default function TeamWorkspace() {
                             </p>
                           </div>
                         </div>
-                        <Badge
+                      <Badge
                           className={cn(
                             "border",
                             approval.status === "approved" && "border-primary/50 bg-primary/15 text-primary",
@@ -830,6 +854,26 @@ export default function TeamWorkspace() {
                         >
                           {approval.status === "pending" ? t("team.pending") : approval.status}
                         </Badge>
+                        {canManage && (approval.status === "pending" || !approval.status) && (
+                          <div className="ml-3 flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 rounded-full border-primary/30 text-primary hover:bg-primary/10"
+                              onClick={() => decideApproval(approval.id, "approved")}
+                            >
+                              <Check className="mr-1 h-3 w-3" /> {t("team.approve") || "Approve"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                              onClick={() => decideApproval(approval.id, "rejected")}
+                            >
+                              <X className="mr-1 h-3 w-3" /> {t("team.reject") || "Reject"}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
