@@ -84,12 +84,12 @@ async function callFn(name: string, body: Record<string, unknown>): Promise<{
 export async function ensureShadowProject(admin: Admin, args: {
   productionId: string;
   userId: string;
-  title: string;
+  title?: string | null;
   language?: string | null;
 }): Promise<string | null> {
   const { data: prod } = await admin
     .from("autopilot_productions")
-    .select("composer_project_id")
+    .select("composer_project_id, brief")
     .eq("id", args.productionId)
     .maybeSingle();
 
@@ -100,7 +100,7 @@ export async function ensureShadowProject(admin: Admin, args: {
     .from("composer_projects")
     .insert({
       user_id: args.userId,
-      title: `Autopilot — ${args.title}`.slice(0, 120),
+      title: `Autopilot — ${(args.title ?? prod?.brief ?? "Produktion").toString().trim()}`.slice(0, 120),
       origin: "autopilot",
       language: args.language ?? "de",
       status: "draft",

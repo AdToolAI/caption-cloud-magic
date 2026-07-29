@@ -17,8 +17,14 @@ import {
   type AutopilotTurn,
   buildTurnTracks,
   checkAnchorFaces,
-  runLipSyncPasses,
 } from "../_shared/autopilotLipSync.ts";
+import {
+  composerLipsyncCredits,
+  creditsToEuros,
+  ensureShadowProject,
+  runComposerLipSync,
+  upsertBridgeScene,
+} from "../_shared/autopilotComposerBridge.ts";
 
 
 const corsHeaders = {
@@ -417,7 +423,7 @@ async function speakAndSync(
   args: {
     productionId: string;
     userId: string;
-    productionTitle: string;
+    productionTitle?: string | null;
     scene: SceneInput;
     videoUrl: string;
     anchorUrl?: string | null;
