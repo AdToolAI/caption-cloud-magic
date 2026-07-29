@@ -34,31 +34,35 @@ Deno.serve(async (req) => {
       throw new Error('Instagram credentials not configured');
     }
 
-    const { videoUrl, caption, hashtags, aspectRatio }: PublishRequest = await req.json();
+    const { videoUrl, caption, hashtags, aspectRatio, mediaType = 'REELS', coverUrl, shareToFeed = true }: PublishRequest = await req.json();
 
-    console.log('Publishing to Instagram:', { videoUrl, caption, aspectRatio });
+    console.log('Publishing to Instagram:', { videoUrl, mediaType, aspectRatio, hasCover: !!coverUrl });
 
-    // Build caption with hashtags
+    // Build caption with hashtags (Stories ignorieren caption in der API)
     let fullCaption = caption;
     if (hashtags && hashtags.length > 0) {
       fullCaption += '\n\n' + hashtags.map(tag => tag.startsWith('#') ? tag : `#${tag}`).join(' ');
     }
 
     // Step 1: Create media container
+    const containerBody: Record<string, unknown> = {
+      media_type: mediaType,
+      video_url: videoUrl,
+      access_token: accessToken,
+    };
+    if (mediaType === 'REELS') {
+      containerBody.caption = fullCaption;
+      containerBody.share_to_feed = shareToFeed;
+      if (coverUrl) containerBody.cover_url = coverUrl;
+    }
+    // STORIES: keine caption, kein share_to_feed — Story ist Story.
+
     const containerResponse = await fetch(
       `https://graph.facebook.com/v18.0/${pageId}/media`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          media_type: 'REELS',
-          video_url: videoUrl,
-          caption: fullCaption,
-          access_token: accessToken,
-          share_to_feed: true,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(containerBody),
       }
     );
 
