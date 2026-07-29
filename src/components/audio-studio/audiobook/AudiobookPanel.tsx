@@ -91,6 +91,17 @@ export function AudiobookPanel() {
     }
   };
 
+  if (!loading && !project) {
+    return (
+      <Card className="p-8 text-center bg-card/60 backdrop-blur-xl border-primary/20">
+        <BookOpen className="w-8 h-8 mx-auto mb-3 text-primary" />
+        <p className="text-sm text-muted-foreground">
+          Bitte melde dich an, um den Hörbuch-Modus zu nutzen.
+        </p>
+      </Card>
+    );
+  }
+
   if (loading || !project) {
     return (
       <Card className="p-10 flex items-center justify-center bg-card/60 backdrop-blur-xl">
