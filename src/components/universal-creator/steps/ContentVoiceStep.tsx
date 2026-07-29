@@ -377,10 +377,13 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
           {value?.voiceoverUrl && (() => {
             const voDur = Number(value.actualVoiceoverDuration ?? value.voiceoverDuration ?? 0) || 0;
             const scenesTotal = scenes && scenes.length > 0 ? scenes.reduce((a, s) => a + (s.duration || 0), 0) : 0;
-            const videoDur = Math.max(scenesTotal, voDur, 1);
-            const maxStart = Math.max(0, videoDur - voDur);
+            const baseDur = Math.max(scenesTotal, 1);
+            // The VO may start anywhere inside the scene timeline — if it runs
+            // past the scenes, the video is extended instead of cutting it off.
+            const maxStart = Math.max(0, baseDur - 0.1);
             const start = Math.min(maxStart, Math.max(0, Number(value.voiceoverStartTime) || 0));
-            const overflow = voDur > 0 && start + voDur > videoDur + 0.01;
+            const videoDur = Math.max(baseDur, start + voDur);
+            const extended = voDur > 0 && start + voDur > baseDur + 0.01;
             const setStart = (raw: number) => {
               const clamped = Math.max(0, Math.min(maxStart, Math.round(raw * 100) / 100));
               onChange({ ...value, voiceoverStartTime: clamped });
