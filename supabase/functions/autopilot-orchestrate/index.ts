@@ -65,8 +65,11 @@ interface SceneInput {
 interface Body {
   production_id: string;
   aspect_ratio?: string;
-  scenes: SceneInput[];
+  scenes?: SceneInput[];
+  /** v297: Wiederaufnahme durch den Watchdog — Szenenzeilen bleiben stehen. */
+  resume?: boolean;
 }
+
 
 /** Engine picked per scene length — Hailuo is the reliable i2v workhorse. */
 const MOTION_MODEL = "minimax/hailuo-2.3";
