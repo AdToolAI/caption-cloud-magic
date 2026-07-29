@@ -122,6 +122,7 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
   const durationSeconds = computeTotalDurationSeconds({
     voiceoverDuration: contentConfig?.voiceoverDuration,
     actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
+    voiceoverStartTime: contentConfig?.voiceoverStartTime,
     scenes: validScenes,
   });
 
