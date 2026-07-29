@@ -17,6 +17,7 @@ import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
+import { VoiceLanguageSelect } from '@/components/voices/VoiceLanguageSelect';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
 import type { Scene } from '@/types/scene';
 
