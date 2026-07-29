@@ -2028,11 +2028,16 @@ const SafeVideo: React.FC<{
   if (failed || !src) {
     return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
   }
+
+  // Export path: OffthreadVideo (ffmpeg-frame-exact, no Chromium blend/drift).
+  // Preview path: <Video> (OffthreadVideo cannot run in the browser).
+  const VideoComponent: any = previewMode ? Video : OffthreadVideo;
+
   return (
-    <Video
+    <VideoComponent
       src={src}
       style={style || { width: '100%', height: '100%', objectFit: 'cover' }}
-      loop
+      loop={previewMode}
       muted={muted}
       volume={muted ? 0 : Math.max(0, Math.min(1, volume))}
       pauseWhenBuffering
