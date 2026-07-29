@@ -24,6 +24,8 @@ const PRICE = {
   voicePerSecond: 0.012,
   /** Music bed, flat per film. */
   music: 0.18,
+  /** One generated audio layer — foley hit or room-tone bed. */
+  soundLayer: 0.05,
   /** Remotion Lambda final cut, per second of output. */
   renderPerSecond: 0.02,
 } as const;
@@ -91,8 +93,14 @@ export function estimateProductionCost(input: CostInput): CostEstimate {
   }
 
   if (input.musicEnabled !== false) {
-    lines.push(line('Musik & Ton', 'Musikbett, Ambience und Foley', PRICE.music));
+    lines.push(line('Musik', 'Musikbett für den ganzen Film', PRICE.music));
   }
+
+  // Room tone per scene plus a foley hit in roughly every second scene.
+  const soundLayers = scenes + Math.ceil(scenes / 2);
+  lines.push(
+    line('Ton-Design', `${soundLayers} Ebenen Raumton und Geräusche`, soundLayers * PRICE.soundLayer),
+  );
 
   lines.push(line('Endschnitt', `${Math.round(total)} Sekunden Render`, total * PRICE.renderPerSecond));
 
