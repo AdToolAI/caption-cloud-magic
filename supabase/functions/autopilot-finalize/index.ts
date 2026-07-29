@@ -83,9 +83,14 @@ async function finalize(admin: Admin, production: any, userId: string) {
       .eq("production_id", productionId)
       .order("scene_index", { ascending: true });
 
+    // v297: Szenen ohne Bewegtbild, die als Standbild gerettet wurden, zählen
+    // ebenfalls — sie halten Laufzeit und Schnittrhythmus des Films.
     const usable = (sceneRows ?? []).filter(
-      (s: any) => s.status === "completed" && (s.lipsync_url || s.video_url),
+      (s: any) =>
+        s.status === "completed" &&
+        (s.lipsync_url || s.video_url || (s.fallback_kind === "still" && s.anchor_url)),
     );
+
 
     if (usable.length === 0) {
       await fail(admin, productionId, userId, "Keine fertige Szene für den Endschnitt vorhanden.");
