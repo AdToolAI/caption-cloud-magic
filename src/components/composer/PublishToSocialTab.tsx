@@ -184,6 +184,74 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
         </Card>
       )}
 
+      {/* P2-Now: Extras */}
+      <Card className="p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-[#F5C76A]" />
+          <h3 className="text-lg font-semibold">Reichweiten-Booster</h3>
+        </div>
+
+        {anyIgFeed && (
+          <div>
+            <Label htmlFor="coverUrl" className="flex items-center gap-2">
+              <Camera className="h-4 w-4" /> Instagram Reels Cover-URL (optional)
+            </Label>
+            <Input
+              id="coverUrl"
+              value={coverUrl}
+              onChange={(e) => setCoverUrl(e.target.value)}
+              placeholder="https://…/cover.jpg"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Öffentlich erreichbares JPG/PNG. Leer lassen für Auto-Cover.
+            </p>
+          </div>
+        )}
+
+        {canFirstComment && (
+          <div>
+            <Label htmlFor="firstComment" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" /> Erster Kommentar (Instagram / LinkedIn)
+            </Label>
+            <Textarea
+              id="firstComment"
+              value={firstComment}
+              onChange={(e) => setFirstComment(e.target.value)}
+              placeholder="Hashtag-Wolke, Call-to-Action, Link…"
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Wird nach dem Post automatisch als eigener Kommentar veröffentlicht.
+            </p>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-[#F5C76A]" />
+            <div>
+              <div className="text-sm font-medium">UTM-Tracking automatisch anhängen</div>
+              <div className="text-xs text-muted-foreground">utm_source / utm_medium / utm_campaign pro Plattform</div>
+            </div>
+          </div>
+          <Switch checked={utmEnabled} onCheckedChange={setUtmEnabled} />
+        </div>
+
+        {utmEnabled && (
+          <div>
+            <Label htmlFor="utmCampaign">Kampagnen-Slug (optional)</Label>
+            <Input
+              id="utmCampaign"
+              value={utmCampaign}
+              onChange={(e) => setUtmCampaign(e.target.value)}
+              placeholder="beta-launch"
+            />
+          </div>
+        )}
+      </Card>
+
+
+
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">{t('composer.publication')}</h3>
         <div className="flex gap-4 mb-4">
