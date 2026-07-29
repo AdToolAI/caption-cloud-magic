@@ -1,50 +1,51 @@
-## Autopilot Stage 3 — Vom Szenen-Stapel zum fertigen Spot
+## Autopilot Stage 4 — Schnittrhythmus & Ton-Design
 
-Heute endet der Autopilot bei `scenes_ready`: einzelne Clips, kein Ton, kein Schnitt, keine Abrechnung. Stage 3 schließt die Kette bis zum abspielbaren MP4.
+Ziel: den „das ist KI"-Eindruck an den zwei Stellen entfernen, an denen er heute am hörbarsten/sichtbarsten ist — gleichförmiger Schnitt und tonlose Bilder.
 
-### 1. Echte Credit-Verrechnung (Reserve → Commit → Refund)
+### Ausgangslage (im Code geprüft)
 
-- Abgerechnet wird pro Stufe (Anchor, Motion, VO, Lip-Sync, Finalrender) gegen `ai_video_wallets` / `ai_video_transactions`, nicht als Pauschale am Anfang.
-- Neuer Shared-Helper `supabase/functions/_shared/autopilotCredits.ts`:
-  - `charge()` mit Idempotenz-Schlüssel `autopilot:{productionId}:{stage}:{sceneIndex}` in der Transaktions-Beschreibung — ein Retry bucht nie doppelt ab.
-  - `refund()` für abgebrochene oder fehlgeschlagene Stufen (Pflicht laut Credit-Reliability-Regel).
-- Vor dem Start prüft der Orchestrator die Gesamtschätzung aus `costEstimate.ts` gegen das Guthaben und bricht sauber ab, statt mitten in der Produktion stecken zu bleiben.
+- `src/lib/autopilot/rhythm.ts` und `src/lib/autopilot/soundDesign.ts` existieren vollständig, werden aber **nirgends importiert** — weder in `autopilot-treatment`, `autopilot-orchestrate` noch `autopilot-finalize`. Sie sind aktuell toter Code.
+- `autopilot-treatment/index.ts` setzt `durationSeconds: 0` mit dem Kommentar „the rhythm planner owns this" — es gibt aber keinen Aufrufer, der die Dauer danach setzt.
+- `autopilot-orchestrate/index.ts` rundet jede Szene auf **6s oder 10s** (`durationSeconds > 8 ? 10 : 6`) für Hailuo. Damit ist die geplante Rhythmik im Ergebnis egal.
+- `autopilot-finalize/index.ts` legt für jede Szene dieselbe Transition (`fade`, 0.4s) und kennt nur **einen** Audio-Layer neben VO: Musik (`backgroundMusicUrl`). Kein Foley, keine Ambience.
+- `UniversalCreatorVideo.tsx` hat im Schema nur `voiceover*`, `backgroundMusic*` und Szenen-Originalton — es gibt **keine** generische Zusatz-Audiospur. Ohne die geht Foley nicht in den Export.
+- `generate-scene-sfx` (ElevenLabs Sound Generation, `kind: ambient|sfx|foley`, max 22s) existiert bereits, bucht aber 5 Credits gegen die **alte** `wallets`-Tabelle.
 
-### 2. Ton: Voiceover, Musik, Foley
+---
 
-- **Voiceover**: `generate-video-voiceover` wird pro Szene mit dem Szenentext, der gewählten Stimme und der Sprache aufgerufen (Service-Role-Aufruf ist dort bereits unterstützt). Sprachvertrag der Plattform gilt: Deutsch bleibt Deutsch.
-- **Musik**: Auswahl über `search-stock-music` nach Stimmung des Treatments, danach Proxy in den eigenen Storage (Hotlink-Stabilität für Lambda) — dasselbe Muster wie im Universal Creator.
-- **Mix**: Musik auf 0.25–0.3 unter dem VO, Ein-/Ausblendung an den Rhythmus-Markern aus `rhythm.ts`.
-- Foley/Ambience bleibt in Stage 3 auf die Musik-/VO-Ebene beschränkt; Einzelsound-Layer folgt später.
+### Block 1 — Rhythmus wird wirksam
 
-### 3. Lip-Sync für Sprech-Szenen
+1. **Planer einhängen.** In `autopilot-treatment` nach dem Parsen der Szenen `applyRhythm(scenes, targetDuration)` und `diversifyCameraMoves(scenes)` anwenden (Logik als Deno-Kopie unter `supabase/functions/_shared/autopilotRhythm.ts`, damit Client und Server dieselben Gewichte nutzen). Ergebnis: Hook kurz, Proof/Emotion länger — statt heute 0.
+2. **Schnitt statt Raster.** Der 6/10s-Snap in `autopilot-orchestrate` bleibt für die Generierung (Hailuo kann nichts anderes), aber die geplante Dauer wird in `duration_seconds` erhalten. In `autopilot-finalize` wird jede Szene auf ihre Plan-Dauer **beschnitten** statt den Rohclip komplett zu verwenden — d.h. der Clip läuft 6s, im Film stehen 4,3s.
+   *Technisch:* der UCC-Szenen-Hintergrund braucht dafür `videoTrimStart`/`videoTrimEnd`. Falls das Schema das noch nicht führt, wird es in `UniversalCreatorVideo.tsx` ergänzt (siehe Block 3) — sonst bleibt der Rasterlook.
+3. **Musik-Beat-Snap.** Musik wird in `autopilot-finalize` **vor** dem Zusammenschnitt gewählt; aus BPM/Dauer der Trackmetadaten werden Beat-Zeiten abgeleitet und `snapCutsToBeats(durations, beatTimes, 0.25)` auf die Schnittpunkte angewandt. Verschiebungen über 0,25s werden verworfen — der Plan schlägt den Beat.
+4. **Transitions variieren.** Statt überall `fade 0.4s`: harter Schnitt am Hook, kurzer Cut zwischen Beats gleicher Szene, Fade nur an Kapitel-/Stimmungsgrenzen. Regel deterministisch aus dem Beat-Typ, kein Modellaufruf.
 
-- Szenen, die in der Grammatik als Sprech-Szene markiert sind, laufen nach dem Motion-Schritt durch die bestehende Lip-Sync-Strecke (`lip-sync-video`) mit dem Szenen-VO als Audio.
-- Ergebnis ersetzt die Clip-URL der Szene; bei Fehlschlag wird die Stufe erstattet und der stumme Clip behalten, statt die ganze Produktion zu killen.
+### Block 2 — Ton-Design entsteht wirklich
 
-### 4. Endschnitt: `autopilot-finalize`
+5. **Mix-Plan erzeugen.** In `autopilot-finalize` `planSoundDesign(scenes, genre)` aufrufen: pro Szene Ambience (aus dem Environment-Text abgeleitet) und Foley (aus `foleyHint`, den das Treatment bereits liefert), plus Musik-Gain und Duck-Level.
+6. **Audio erzeugen.** Pro Szene mit Prompt ein Aufruf an `generate-scene-sfx`. Abrechnung läuft über `_shared/autopilotCredits.ts` (`chargeStage` mit Stage `sfx`), **nicht** über die alte `wallets`-Buchung — die wird für den Autopilot-Pfad umgangen, damit nicht doppelt belastet wird. Fehlgeschlagene Layer werden refundet und still übersprungen; ohne Foley entsteht trotzdem ein Film.
+7. **Ducking.** Musik fällt unter Sprache auf `musicDuckTo` (0.18), Foley auf 0.22, Ambience auf 0.12 — Werte kommen aus `planSoundDesign`, jeder Wert läuft durch `clampGain` (verhindert den bekannten `IndexSizeError`).
 
-Neue Edge Function, die alle fertigen Szenen zu einem Film zusammensetzt:
+### Block 3 — Der Export muss es tragen
 
-- Baut ein Universal-Creator-kompatibles Payload (`scenes[].background = { type: 'video', videoUrl }`, `useAnimation`), strikt mit `rawMediaMode: true` — die Raw-Media-Invariante gilt auch hier, keine Cinematic-Filter außerhalb Director's Cut.
-- Legt Logo-/Produkt-Overlays aus `autopilot_assets` (Rolle „Logo"/„Produkt", Overlay-Variante) auf die geplanten Szenen.
-- Startet den Render über `render-with-remotion` per Service-Role mit `userId` im Body (dieser Pfad ist dort vorhanden, kein User-JWT nötig — löst das Token-Ablauf-Problem bei langen Läufen).
-- Pollt `video_renders` auf das Ergebnis und schreibt `final_video_url` in `autopilot_productions`; danach Ablage in der Mediathek nach der bestehenden Persistenz-Regel (Videos → `video_creations`).
+8. **Zusatz-Audiospuren im Template.** `UniversalCreatorVideo.tsx` bekommt ein optionales `extraAudioTracks: [{ url, startTime, duration, volume, loop, fadeIn, fadeOut }]` und rendert diese als eigene `<Sequence><Audio>`-Paare — respektiert `silentRender` und `r33_audioStripped` wie die bestehenden Spuren.
+9. **Szenen-Trim.** Falls nicht vorhanden, `videoTrimStart` am Szenen-Hintergrund ergänzen, damit Block 1.2 greift.
+10. **Raw-Media-Invariant bleibt unangetastet.** Es werden nur Audiospuren und Schnittzeiten ergänzt — kein Grading, kein Filter. `rawMediaMode` bleibt gesetzt.
 
-### 5. UI
+### Block 4 — Sichtbarkeit
 
-- `ProductionStage.tsx` bekommt die neuen Phasen: Ton → Lip-Sync → Endschnitt → fertig, jeweils mit Live-Log und Fehlerzustand pro Szene.
-- `DirectorsTable.tsx` bekommt vor dem Start einen Freigabedialog mit der konkreten Credit-Summe (Aufschlüsselung pro Stufe) und Bestätigung.
-- Am Ende: Player mit dem fertigen Film, Download und „In Director's Cut öffnen" für Feinschliff.
+11. Der Freigabedialog im Regietisch zeigt die Ton-Kosten getrennt aus (Ambience/Foley pro Szene), damit die Kostenvorschau ehrlich bleibt.
+12. `ProductionStage.tsx` bekommt in der Ton-Phase Einzelzeilen pro Layer („Szene 3: Café-Raumton"), damit sichtbar ist, wofür bezahlt wird.
 
-### Technische Details
+---
 
-- Migration ergänzt `autopilot_productions` um `voiceover_url`, `music_url`, `audio_mix jsonb`, `render_id`, `spent_credits`, und `autopilot_production_scenes` um `voiceover_url`, `voiceover_duration_seconds`, `lipsync_url`, `spent_credits`, `refunded` — inklusive GRANTs und RLS analog zu den bestehenden Autopilot-Tabellen.
-- `deduct_ai_video_credits` schreibt die Transaktion selbst; der Helper ergänzt Idempotenz-Prüfung und erstattet über einen `refund`-Eintrag.
-- Szenenlängen rasten weiterhin auf das Hailuo-Raster (6s/10s) ein; der Endschnitt gleicht die Abweichung über Szenen-Trims im Remotion-Payload aus, damit die Gesamtdauer der geplanten Länge entspricht (max. 180s).
-- Lange Läufe: Orchestrator arbeitet weiter szenenweise und schreibt Zwischenstände in die DB, damit ein Funktionstimeout keine Produktion verliert.
+### Was das bringt und was nicht
 
-### Nicht in diesem Schritt
+Der Film bekommt danach ungleiche, beat-nahe Schnitte und eine Tonebene unter jedem Bild. Das ist der größte verbleibende Sprung Richtung „nicht KI-typisch".
 
-- Separate Foley-Einzelspuren und automatische Farbkorrektur.
-- Parallelisierung der Motion-Generierung (bleibt sequentiell).
+Nicht enthalten: Best-of-2 auf Motion-Ebene und die Härtung der Lip-Sync-Strecke bei 3–4 Sprechern — beides bleibt offen und lohnt sich als eigener Schritt.
+
+### Kosten
+
+Pro Szene kommen ein bis zwei ElevenLabs-SFX-Clips dazu. Bei einem 30s-Spot mit 6 Szenen sind das etwa 0,10–0,20 € zusätzlich pro Film — im Verhältnis zu den Motion-Kosten vernachlässigbar.

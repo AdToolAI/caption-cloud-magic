@@ -248,11 +248,15 @@ export const UniversalCreatorVideoSchema = z.object({
   // Content Creator (preview + export). Only the Director's Cut render path may
   // pass `rawMediaMode: false` explicitly to opt into cinematic post-processing.
   rawMediaMode: z.boolean().default(true),
+  // Foley / room-tone layers laid on the absolute timeline. The autopilot fills
+  // these; without them a technically perfect clip still sounds "rendered".
   soundEffects: z.array(z.object({
     sceneId: z.string(),
     soundUrl: z.string(),
     volume: z.number(),
     startTime: z.number(),
+    durationSeconds: z.number().optional(),
+    loop: z.boolean().optional(),
   })).optional(),
   
   // Video settings
@@ -3124,6 +3128,31 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       })()}
 
       
+      {/* Sound design: foley + room tone, timed against the master timeline */}
+      {!diagToggles.silentRender && !diagToggles.r33_audioStripped &&
+        (soundEffects ?? [])
+          .filter((fx) => fx?.soundUrl && isValidRemoteUrl(fx.soundUrl))
+          .map((fx, fxIndex) => {
+            const from = Math.max(0, Math.round((fx.startTime || 0) * effectiveFps));
+            const span = fx.durationSeconds
+              ? Math.max(1, Math.round(fx.durationSeconds * effectiveFps))
+              : undefined;
+            return (
+              <Sequence
+                key={`sfx-${fx.sceneId}-${fxIndex}`}
+                from={from}
+                {...(span ? { durationInFrames: span } : {})}
+              >
+                <Audio
+                  src={fx.soundUrl}
+                  volume={Math.min(1, Math.max(0, fx.volume ?? 0.2))}
+                  loop={fx.loop === true}
+                  pauseWhenBuffering
+                />
+              </Sequence>
+            );
+          })}
+
       {/* Render scenes as sequences */}
       {sceneTimings.map((scene, index) => {
         const transitionType = rawMediaMode ? 'none' as const : (() => {

@@ -10,7 +10,7 @@
 // (`render-with-remotion`) bill and refund themselves against the media
 // wallet. They are deliberately NOT charged here to avoid double billing.
 
-export type AutopilotStage = "anchor" | "motion" | "voice" | "music";
+export type AutopilotStage = "anchor" | "motion" | "voice" | "music" | "sfx";
 
 interface ChargeArgs {
   userId: string;
@@ -174,4 +174,6 @@ export const AUTOPILOT_PRICE = {
   motionPerSecond: 0.23,
   voicePerSecond: 0.012,
   music: 0.18,
+  /** One generated audio layer (foley hit or ambience bed). */
+  sfxPerClip: 0.05,
 } as const;
