@@ -1,16 +1,12 @@
 /**
- * Sensor-Baseline-Grade — dezenter Micro-Contrast/Saturation, der bei ALLEN
- * Export-Renderpfaden auf Video-/Image-Backgrounds liegt.
+ * Sensor-Baseline-Grade — DEAKTIVIERT (Kundenentscheidung 29.07.2026).
  *
- * Zählt NICHT als Cinematic-FX (kein Mood/Grain/Vignette/KenBurns/Parallax/
- * Overlay/SceneFX) — sie ist Teil des Encode-Floors, damit UCC-Export und
- * Director's-Cut-Export nicht sichtbar auseinanderlaufen.
+ * Rohtreue hat Vorrang: UCC- und Director's-Cut-Export rendern pixelnah
+ * zum Upload. Grade/Filter greifen nur, wenn der Kunde sie im Director's
+ * Cut aktiv setzt (Mood/Grade/FX-Regler).
  *
- * Siehe:
- *   mem://architecture/render/global-export-quality-floor
- *   mem://architecture/video-composer/raw-media-invariant
- *
- * Preview: NICHT anwenden — die Live-Vorschau soll den echten Rohframe zeigen.
+ * Datei bleibt als History-Anker liegen. Nicht reaktivieren, ohne den
+ * Kunden explizit zu fragen.
  */
 export const SENSOR_BASELINE_GRADE_FILTER = 'contrast(1.03) saturate(1.05)';
 
