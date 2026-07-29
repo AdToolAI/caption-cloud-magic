@@ -41,8 +41,10 @@ import {
   computeDurationInFrames,
 } from '@/lib/universalCreatorDefaults';
 import { buildUniversalCreatorCustomizations, getUniversalCreatorDurationSeconds } from '@/lib/universalCreatorRenderPayload';
+import { markFreshStart, consumeFreshStart, clearFreshStart } from '@/lib/fresh-start-guard';
 
 const BACKUP_STORAGE_KEY = 'universal-creator-backup';
+const FRESH_START_KEY = 'universal-creator';
 const BACKUP_SCHEMA_VERSION = 2;
 const BACKUP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7d — long enough for multi-day sessions
 const AUTO_RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
