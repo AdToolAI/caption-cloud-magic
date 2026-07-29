@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import { AbsoluteFill, Video, OffthreadVideo, Audio, Sequence, Freeze, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
-import { prependSensorBaseline } from '../utils/sensorBaselineGrade';
+// Sensor-Baseline deaktiviert (29.07.2026) — Raw-Invariant gilt auch im DC.
+// Grade/Filter greifen nur, wenn der Kunde sie im Director's Cut aktiv setzt.
 import { resolveTransitions, findActiveTransition, type ResolvedTransition } from '../../utils/transitionResolver';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { safeFrame, safeDurationFrames, isValidRemoteMediaUrl } from '../utils/safeFrame';
