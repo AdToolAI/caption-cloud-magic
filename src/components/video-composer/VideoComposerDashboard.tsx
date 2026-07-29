@@ -1885,7 +1885,7 @@ export default function VideoComposerDashboard() {
             <AlertDialogTitle>{t('videoComposer.confirmResetTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
               {t('videoComposer.confirmResetDesc')}
-              {' '}Alle laufenden Renders und Lip-Sync-Jobs werden abgebrochen — bereits verbrauchte Credits werden nicht refundiert.
+              {' '}Das aktuelle Projekt wird endgültig gelöscht, alle laufenden Renders und Lip-Sync-Jobs werden abgebrochen — bereits verbrauchte Credits werden nicht refundiert.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
