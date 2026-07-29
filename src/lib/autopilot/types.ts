@@ -99,6 +99,7 @@ export interface SceneGrammar {
   /** Brand product/prop ids present in this scene. */
   propIds: string[];
 
+
   /** Spoken line (user language). Empty when the scene has no dialogue. */
   dialogue?: string;
   /** Speaker character id — required when `dialogue` is set. */
