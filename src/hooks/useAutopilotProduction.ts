@@ -32,7 +32,12 @@ export interface ProductionSceneRow {
   lipsync_url: string | null;
   voiceover_url: string | null;
   error_message: string | null;
+  /** v297: Anzahl der Produktionsanläufe für diese Szene (1 oder 2). */
+  attempt: number | null;
+  /** v297: 'still', wenn die Szene als Standbild gerettet wurde. */
+  fallback_kind: string | null;
 }
+
 
 export interface DirectorLogRow {
   id: string;
@@ -64,8 +69,9 @@ export function useAutopilotProduction(productionId: string | null, enabled: boo
       supabase
         .from('autopilot_production_scenes')
         .select(
-          'id, scene_index, beat, duration_seconds, status, anchor_url, anchor_score, anchor_attempts, video_url, lipsync_url, voiceover_url, error_message',
+          'id, scene_index, beat, duration_seconds, status, anchor_url, anchor_score, anchor_attempts, video_url, lipsync_url, voiceover_url, error_message, attempt, fallback_kind',
         )
+
         .eq('production_id', productionId)
         .order('scene_index', { ascending: true }),
       supabase

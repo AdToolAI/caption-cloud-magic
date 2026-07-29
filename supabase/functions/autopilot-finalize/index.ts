@@ -83,9 +83,14 @@ async function finalize(admin: Admin, production: any, userId: string) {
       .eq("production_id", productionId)
       .order("scene_index", { ascending: true });
 
+    // v297: Szenen ohne Bewegtbild, die als Standbild gerettet wurden, zählen
+    // ebenfalls — sie halten Laufzeit und Schnittrhythmus des Films.
     const usable = (sceneRows ?? []).filter(
-      (s: any) => s.status === "completed" && (s.lipsync_url || s.video_url),
+      (s: any) =>
+        s.status === "completed" &&
+        (s.lipsync_url || s.video_url || (s.fallback_kind === "still" && s.anchor_url)),
     );
+
 
     if (usable.length === 0) {
       await fail(admin, productionId, userId, "Keine fertige Szene für den Endschnitt vorhanden.");
@@ -326,6 +331,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
     // -------------------------------------------------------------- payload
     const scenes = usable.map((s: any, index: number) => {
       const clip = s.lipsync_url || s.video_url;
+      const still = !clip && s.anchor_url ? String(s.anchor_url) : null;
       const duration = Math.max(0.5, Math.min(60, Number(s.duration_seconds) || 6));
       return {
         id: `autopilot-${s.scene_index}`,
@@ -335,10 +341,13 @@ async function finalize(admin: Admin, production: any, userId: string) {
         duration,
         spokenText: s.dialogue?.text || "",
         visualDescription: "",
-        background: { type: "video", videoUrl: clip },
-        animatedVideoUrl: clip,
-        useAnimation: true,
-        animation: "none",
+        background: still
+          ? { type: "image", imageUrl: still }
+          : { type: "video", videoUrl: clip },
+        ...(still ? {} : { animatedVideoUrl: clip }),
+        useAnimation: !still,
+        // Standbild-Rettung: ein ruhiger Ken-Burns hält die Szene lebendig.
+        animation: still ? "kenburns" : "none",
         kenBurnsDirection: "in",
         transition: { type: index === 0 ? "none" : "fade", duration: 0.4 },
         textOverlay: { enabled: false, position: "center", fontSize: 64, fontColor: "#FFFFFF", animation: "none" },
@@ -349,6 +358,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
           ? { logoOverlay: { url: logoUrl, position: "bottom-right", scale: 0.18 } }
           : {}),
       };
+
     });
 
     const durationSeconds = scenes.reduce((acc, s) => acc + s.duration, 0);
