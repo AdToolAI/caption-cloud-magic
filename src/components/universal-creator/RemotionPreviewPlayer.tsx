@@ -268,10 +268,12 @@ export function RemotionPreviewPlayer({
     if (previewAudio.backgroundMusicUrl) {
       musicAudioRef.current = new Audio(previewAudio.backgroundMusicUrl);
       musicAudioRef.current.preload = 'auto';
-      musicAudioRef.current.loop = true;
+      // Native loop stays off — we manage looping manually so trimEnd is honored.
+      musicAudioRef.current.loop = false;
     } else {
       musicAudioRef.current = null;
     }
+
 
     applyPreviewAudioVolume();
 
@@ -382,16 +384,37 @@ export function RemotionPreviewPlayer({
         }
       }
 
-      if (music && !music.paused) {
-        const duration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
-        const expectedMusicTime = duration > 0 ? expected % duration : expected;
-        if (Math.abs(music.currentTime - expectedMusicTime) > 0.35) {
-          music.currentTime = expectedMusicTime;
+      if (music) {
+        const trimStart = previewAudio.musicTrimStart;
+        const rawTrimEnd = previewAudio.musicTrimEnd;
+        const srcDuration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
+        const trimEnd = rawTrimEnd > trimStart + 0.05
+          ? rawTrimEnd
+          : (srcDuration > 0 ? srcDuration : trimStart + 0.05);
+        const clipLen = Math.max(0.05, trimEnd - trimStart);
+        const offset = previewAudio.musicStartTime;
+        const localExpected = expected - offset;
+        if (localExpected < 0) {
+          if (!music.paused) music.pause();
+        } else if (!previewAudio.musicLoop && localExpected >= clipLen) {
+          if (!music.paused) music.pause();
+        } else {
+          const inClip = previewAudio.musicLoop
+            ? (localExpected % clipLen)
+            : Math.min(localExpected, clipLen - 0.02);
+          const targetTime = trimStart + inClip;
+          if (music.paused) {
+            void music.play().catch(() => { /* autoplay blocked */ });
+          }
+          if (Math.abs(music.currentTime - targetTime) > 0.35) {
+            try { music.currentTime = targetTime; } catch { /* noop */ }
+          }
         }
       }
 
       syncRafRef.current = requestAnimationFrame(sync);
     };
+
 
     syncRafRef.current = requestAnimationFrame(sync);
     return () => {
