@@ -138,6 +138,10 @@ export function RemotionPreviewPlayer({
     backgroundMusicVolume: clampAudioVolume(customizations?.backgroundMusicVolume ?? 0),
     masterVolume: clampAudioVolume(customizations?.masterVolume ?? 1),
     voiceoverStartTime: Math.max(0, Number(customizations?.voiceoverStartTime) || 0),
+    musicTrimStart: Math.max(0, Number(customizations?.backgroundMusicClip?.trimStart) || 0),
+    musicTrimEnd: Math.max(0, Number(customizations?.backgroundMusicClip?.trimEnd) || 0),
+    musicStartTime: Math.max(0, Number(customizations?.backgroundMusicClip?.startTime) || 0),
+    musicLoop: customizations?.backgroundMusicClip ? customizations.backgroundMusicClip.loop !== false : true,
   }), [
     customizations?.voiceoverUrl,
     customizations?.backgroundMusicUrl,
@@ -145,7 +149,12 @@ export function RemotionPreviewPlayer({
     customizations?.backgroundMusicVolume,
     customizations?.masterVolume,
     customizations?.voiceoverStartTime,
+    customizations?.backgroundMusicClip?.trimStart,
+    customizations?.backgroundMusicClip?.trimEnd,
+    customizations?.backgroundMusicClip?.startTime,
+    customizations?.backgroundMusicClip?.loop,
   ]);
+
 
   const inputProps: Record<string, any> = useMemo(() => ({
     ...customizations,
@@ -197,10 +206,24 @@ export function RemotionPreviewPlayer({
     }
 
     if (music) {
-      const duration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
-      music.currentTime = duration > 0 ? safeTime % duration : safeTime;
+      const trimStart = previewAudio.musicTrimStart;
+      const rawTrimEnd = previewAudio.musicTrimEnd;
+      const srcDuration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
+      const trimEnd = rawTrimEnd > trimStart + 0.05
+        ? rawTrimEnd
+        : (srcDuration > 0 ? srcDuration : trimStart + 0.05);
+      const clipLen = Math.max(0.05, trimEnd - trimStart);
+      const offset = previewAudio.musicStartTime;
+      const local = safeTime - offset;
+      if (local < 0) {
+        music.pause();
+        try { music.currentTime = trimStart; } catch { /* noop */ }
+      } else {
+        const inClip = previewAudio.musicLoop ? (local % clipLen) : Math.min(local, clipLen - 0.02);
+        try { music.currentTime = trimStart + inClip; } catch { /* noop */ }
+      }
     }
-  }, [previewAudio.voiceoverStartTime]);
+  }, [previewAudio.voiceoverStartTime, previewAudio.musicTrimStart, previewAudio.musicTrimEnd, previewAudio.musicStartTime, previewAudio.musicLoop]);
 
   const playPreviewAudio = useCallback(async () => {
     applyPreviewAudioVolume();
@@ -209,11 +232,14 @@ export function RemotionPreviewPlayer({
     const voice = voiceoverAudioRef.current;
     const music = musicAudioRef.current;
     const voiceReady = voice && now >= previewAudio.voiceoverStartTime;
+    const musicReady = music && now >= previewAudio.musicStartTime;
+
     await Promise.allSettled([
       voiceReady ? voice!.play() : Promise.resolve(),
-      music?.play(),
+      musicReady ? music!.play() : Promise.resolve(),
     ].filter(Boolean) as Promise<void>[]);
-  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio, previewAudio.voiceoverStartTime]);
+  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio, previewAudio.voiceoverStartTime, previewAudio.musicStartTime]);
+
 
   const pausePreviewAudio = useCallback(() => {
     voiceoverAudioRef.current?.pause();
@@ -242,10 +268,12 @@ export function RemotionPreviewPlayer({
     if (previewAudio.backgroundMusicUrl) {
       musicAudioRef.current = new Audio(previewAudio.backgroundMusicUrl);
       musicAudioRef.current.preload = 'auto';
-      musicAudioRef.current.loop = true;
+      // Native loop stays off — we manage looping manually so trimEnd is honored.
+      musicAudioRef.current.loop = false;
     } else {
       musicAudioRef.current = null;
     }
+
 
     applyPreviewAudioVolume();
 
@@ -356,23 +384,44 @@ export function RemotionPreviewPlayer({
         }
       }
 
-      if (music && !music.paused) {
-        const duration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
-        const expectedMusicTime = duration > 0 ? expected % duration : expected;
-        if (Math.abs(music.currentTime - expectedMusicTime) > 0.35) {
-          music.currentTime = expectedMusicTime;
+      if (music) {
+        const trimStart = previewAudio.musicTrimStart;
+        const rawTrimEnd = previewAudio.musicTrimEnd;
+        const srcDuration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
+        const trimEnd = rawTrimEnd > trimStart + 0.05
+          ? rawTrimEnd
+          : (srcDuration > 0 ? srcDuration : trimStart + 0.05);
+        const clipLen = Math.max(0.05, trimEnd - trimStart);
+        const offset = previewAudio.musicStartTime;
+        const localExpected = expected - offset;
+        if (localExpected < 0) {
+          if (!music.paused) music.pause();
+        } else if (!previewAudio.musicLoop && localExpected >= clipLen) {
+          if (!music.paused) music.pause();
+        } else {
+          const inClip = previewAudio.musicLoop
+            ? (localExpected % clipLen)
+            : Math.min(localExpected, clipLen - 0.02);
+          const targetTime = trimStart + inClip;
+          if (music.paused) {
+            void music.play().catch(() => { /* autoplay blocked */ });
+          }
+          if (Math.abs(music.currentTime - targetTime) > 0.35) {
+            try { music.currentTime = targetTime; } catch { /* noop */ }
+          }
         }
       }
 
       syncRafRef.current = requestAnimationFrame(sync);
     };
 
+
     syncRafRef.current = requestAnimationFrame(sync);
     return () => {
       if (syncRafRef.current !== null) cancelAnimationFrame(syncRafRef.current);
       syncRafRef.current = null;
     };
-  }, [getPreviewTime, isPlaying, previewAudio.voiceoverStartTime]);
+  }, [getPreviewTime, isPlaying, previewAudio.voiceoverStartTime, previewAudio.musicTrimStart, previewAudio.musicTrimEnd, previewAudio.musicStartTime, previewAudio.musicLoop]);
 
   useEffect(() => {
     if (!isDragging) return;

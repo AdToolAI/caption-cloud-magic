@@ -227,7 +227,17 @@ export const UniversalCreatorVideoSchema = z.object({
   voiceoverStartTime: z.number().min(0).default(0),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().default(0.35),
+  /** Optional trim/placement for the music track. */
+  backgroundMusicClip: z.object({
+    trimStart: z.number().min(0).default(0),
+    trimEnd: z.number().min(0).default(0),
+    startTime: z.number().min(0).default(0),
+    loop: z.boolean().default(true),
+    fadeIn: z.number().min(0).optional(),
+    fadeOut: z.number().min(0).optional(),
+  }).optional(),
   masterVolume: z.number().default(1.0),
+
   useOriginalAudio: z.boolean().default(false),
   originalAudioVolume: z.number().default(0.6),
   previewMode: z.boolean().default(false),
@@ -2708,8 +2718,10 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   voiceoverStartTime = 0,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.35,
+  backgroundMusicClip,
   masterVolume = 1.0,
   soundEffects,
+
   style = 'flat-design',
   primaryColor = '#F5C76A',
   secondaryColor = '#22d3ee',
@@ -3042,16 +3054,28 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         </Sequence>
       )}
       {/* r67: Background music rendered directly in Lambda — same as UniversalVideo.tsx */}
-      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && isValidRemoteUrl(backgroundMusicUrl) && (
-        <Audio
-          key="stable-background-music"
-          src={backgroundMusicUrl}
-          volume={effectiveBackgroundMusicVolume}
-          startFrom={0}
-          loop={true}
-          pauseWhenBuffering
-        />
-      )}
+      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && isValidRemoteUrl(backgroundMusicUrl) && (() => {
+        const clip = backgroundMusicClip;
+        const hasTrim = clip && clip.trimEnd > clip.trimStart + 0.05;
+        const trimStartFrames = hasTrim ? Math.max(0, Math.round(clip!.trimStart * effectiveFps)) : 0;
+        const trimEndFrames = hasTrim ? Math.max(trimStartFrames + 1, Math.round(clip!.trimEnd * effectiveFps)) : undefined;
+        const offsetFrames = clip ? Math.max(0, Math.round((clip.startTime || 0) * effectiveFps)) : 0;
+        const loop = clip ? clip.loop !== false : true;
+        return (
+          <Sequence key="music-sequence" from={offsetFrames}>
+            <Audio
+              key="stable-background-music"
+              src={backgroundMusicUrl}
+              volume={effectiveBackgroundMusicVolume}
+              startFrom={trimStartFrames}
+              endAt={trimEndFrames}
+              loop={loop}
+              pauseWhenBuffering
+            />
+          </Sequence>
+        );
+      })()}
+
       
       {/* Render scenes as sequences */}
       {sceneTimings.map((scene, index) => {

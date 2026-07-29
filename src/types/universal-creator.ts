@@ -28,11 +28,28 @@ export interface ContentConfig {
   voiceoverStartTime?: number;
   backgroundMusicUrl?: string;
   backgroundMusicVolume?: number;
+  /**
+   * Optional trim/placement for background music. Field names mirror
+   * `AudioClip` (src/types/timeline.ts) so a UCC project imported into
+   * Director's Cut keeps its trim values without a mapping layer.
+   *   trimStart / trimEnd  — seconds inside the SOURCE track
+   *   startTime            — seconds on the video timeline (offset from 0)
+   *   loop                 — repeat until video end when true
+   */
+  backgroundMusicClip?: {
+    trimStart: number;
+    trimEnd: number;
+    startTime: number;
+    loop: boolean;
+    fadeIn?: number;
+    fadeOut?: number;
+  };
   /** Global toggle to include original scene-video audio. Default false. */
   useOriginalAudio?: boolean;
   /** Global volume for original scene-video audio when useOriginalAudio=true. 0..1, default 0.6. */
   originalAudioVolume?: number;
 }
+
 
 export interface SubtitleWord {
   text: string;
