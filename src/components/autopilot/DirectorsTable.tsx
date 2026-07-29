@@ -96,6 +96,19 @@ export function DirectorsTable() {
 
   const blockers = preflight ? blockingFindings(preflight) : [];
 
+  /** Distinct room tones across the film — shown as a one-line sound summary. */
+  const ambienceCues = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (mixPlan?.layers ?? [])
+            .map((layer) => layer.ambiencePrompt)
+            .filter((cue): cue is string => Boolean(cue)),
+        ),
+      ),
+    [mixPlan],
+  );
+
   const handleDevelop = async () => {
     if (brief.trim().length < 8) {
       toast({
