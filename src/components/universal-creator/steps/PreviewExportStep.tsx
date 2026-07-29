@@ -395,6 +395,7 @@ export function PreviewExportStep({
     const calculatedDuration = computeTotalDurationSeconds({
       voiceoverDuration: contentConfig.voiceoverDuration,
       actualVoiceoverDuration: contentConfig.actualVoiceoverDuration,
+      voiceoverStartTime: contentConfig.voiceoverStartTime,
       scenes: validatedScenes,
     });
     return { sharedCustomizations, validatedScenes, calculatedDuration };
