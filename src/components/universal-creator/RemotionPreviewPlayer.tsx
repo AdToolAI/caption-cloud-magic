@@ -206,10 +206,24 @@ export function RemotionPreviewPlayer({
     }
 
     if (music) {
-      const duration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
-      music.currentTime = duration > 0 ? safeTime % duration : safeTime;
+      const trimStart = previewAudio.musicTrimStart;
+      const rawTrimEnd = previewAudio.musicTrimEnd;
+      const srcDuration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
+      const trimEnd = rawTrimEnd > trimStart + 0.05
+        ? rawTrimEnd
+        : (srcDuration > 0 ? srcDuration : trimStart + 0.05);
+      const clipLen = Math.max(0.05, trimEnd - trimStart);
+      const offset = previewAudio.musicStartTime;
+      const local = safeTime - offset;
+      if (local < 0) {
+        music.pause();
+        try { music.currentTime = trimStart; } catch { /* noop */ }
+      } else {
+        const inClip = previewAudio.musicLoop ? (local % clipLen) : Math.min(local, clipLen - 0.02);
+        try { music.currentTime = trimStart + inClip; } catch { /* noop */ }
+      }
     }
-  }, [previewAudio.voiceoverStartTime]);
+  }, [previewAudio.voiceoverStartTime, previewAudio.musicTrimStart, previewAudio.musicTrimEnd, previewAudio.musicStartTime, previewAudio.musicLoop]);
 
   const playPreviewAudio = useCallback(async () => {
     applyPreviewAudioVolume();
@@ -218,6 +232,8 @@ export function RemotionPreviewPlayer({
     const voice = voiceoverAudioRef.current;
     const music = musicAudioRef.current;
     const voiceReady = voice && now >= previewAudio.voiceoverStartTime;
+    const musicReady = music && now >= previewAudio.musicStartTime;
+
     await Promise.allSettled([
       voiceReady ? voice!.play() : Promise.resolve(),
       music?.play(),
