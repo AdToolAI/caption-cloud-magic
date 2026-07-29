@@ -1,58 +1,75 @@
-## Kontext
+## Diagnose (verifiziert)
 
-AWS-Quota bestätigt auf 100. Noch keine User → keine echten Peak-Daten, kein Grund zu aggressiver Verteilung. Wir wollen nur die **Launch-Klippe** absichern: falls Tag 1 durch einen viralen Post 30–80 Renders parallel reinkommen, sollen sie durchlaufen statt 429 zu werfen. Alles andere (Tier-Caps, distributed λ, Stability-Split) bleibt konservativ, bis echte Nutzungsdaten aus `LambdaHealth` vorliegen.
+Der wahrgenommene Qualitätsunterschied zwischen UCC- und DC-Export ist real, aber **nicht** ein Encoder-Problem (crf 16 / 10 M / jpeg 95 sind seit dem Quality-Floor identisch). Beim Lesen beider Templates habe ich zwei echte Ursachen gefunden:
 
-## Änderungen (Minimal-Variante)
+### 1) Chromiums `<Video>` in Lambda (betrifft UCC **und** DC)
+Beide Templates nutzen `<Video>` aus `remotion`. In Lambda dekodiert Chromium den Stream frameweise über das HTML-Video-Element → bekannte Nebeneffekte: leichtes Frame-Blending, yuv↔rgb-Farbdrift, weichere Kanten. Remotions offizielle Empfehlung für vorgerenderte Video-Backgrounds in Lambda ist `<OffthreadVideo>`, das per ffmpeg exakt den benötigten Frame extrahiert. DC ist davon genauso betroffen wie UCC — nur maskiert dort Punkt 2 den Effekt.
 
-### 1. `supabase/functions/_shared/render-concurrency.ts`
-- `RENDER_SLOT_BUDGET_DEFAULT`: 60 → **80**
-- `FOUNDER_RESERVE_HIGH_WATER`: 50 → **68** (letzte 12 Slots founders-only, ~85 %)
-- Kommentar-Header oben aktualisieren (AWS-Quota 100 bestätigt, 80 Render / 20 Edge+Burst)
+### 2) DC hat immer einen Sensor-Baseline-Grade, UCC im `rawMediaMode` gar keinen
+`DirectorsCutVideo.tsx` legt auf jeden Frame per Default:
+- `SharpnessFilter` (SVG-Unsharp-Mask, Zeile 1307)
+- Brightness/Contrast/Saturation/Temperature-Baseline aus `filterString`
 
-### 2. `src/hooks/useRenderSystemLoad.ts` (Frontend „System-Last"-Pill)
-- `SLOT_BUDGET_DEFAULT`: 60 → **80**
-- `HIGH_WATER`: 50 → **68**
-- DB-Override-Logik (`system_config.render_queue_slot_budget`) bleibt.
+UCC's `rawMediaMode: true` (Invariant) schaltet korrekt alle Cinematic-FX ab — hat aber gleichzeitig auch die harmlose Sensor-Baseline entfernt. Der UCC-Frame ist damit "physikalisch näher am Original", wirkt neben DC aber flau, weil DC eine dezente Kontrast-/Schärfe-Kosmetik draufpackt.
 
-### 3. DB-Config
-```sql
-insert into public.system_config (key, value)
-values ('render_queue_slot_budget', '80')
-on conflict (key) do update set value = excluded.value;
+---
+
+## Plan — saubere Lösung, kein Rewrite
+
+### Fix A — `<OffthreadVideo>` im Export für Video-Backgrounds
+Infrastruktur-Hygiene, betrifft **beide** Templates:
+
+**`src/remotion/templates/UniversalCreatorVideo.tsx` — `SafeVideo`:**
+- Export (`previewMode === false`) → `OffthreadVideo` aus `remotion`.
+- Preview (`previewMode === true`) → weiter `<Video>` (OffthreadVideo funktioniert im Browser nicht).
+- `delayRender`-Timeout / `onError` / Fallback-Logik unverändert.
+
+**`src/remotion/templates/DirectorsCutVideo.tsx` — `SceneVideo`:**
+- Gleiche Regel: `previewMode` (bereits als Prop vorhanden, Zeile 1353 auf `false` für Export) entscheidet zwischen `OffthreadVideo` und `<Video>`.
+- `startFrom` / `playbackRate` / `pauseWhenBuffering` bleiben — `OffthreadVideo` unterstützt dieselben Props.
+
+Kein Payload-Change, kein Preisimpact, kein Change an `render-with-remotion` / `render-directors-cut`.
+
+### Fix B — geteilte Sensor-Baseline-Grade-Konstante
+Neuer Wert an einer Stelle, damit UCC und DC nicht wieder auseinanderlaufen:
+
+**Neu: `src/remotion/utils/sensorBaselineGrade.ts`**
+```ts
+/**
+ * Sensor-Baseline-Grade — dezenter Micro-Contrast/Saturation, der bei ALLEN
+ * Export-Renderpfaden auf Video-/Image-Backgrounds liegt.
+ * Zählt NICHT als Cinematic-FX (kein Mood/Grain/Vignette/KenBurns/Parallax).
+ * Ist Teil des Encode-Floors, siehe mem://architecture/render/global-export-quality-floor.
+ */
+export const SENSOR_BASELINE_GRADE_FILTER = 'contrast(1.03) saturate(1.05)';
 ```
-Ausführung via `supabase--insert` im Build-Schritt.
 
-### 4. Memory
-Neue Datei `mem://infrastructure/aws-lambda/quota-100-launch-distribution.md`:
-- AWS-Quota 100 bestätigt (eu-central-1)
-- Launch-Verteilung: 80 Render-Pool / 20 Edge+Burst-Reserve
-- Founder-Reserve ab 68/80
-- Tier-Caps + `TARGET_MAX_LAMBDAS=5` bewusst NICHT erhöht — erst wenn `LambdaHealth` peak > 60 an ≥ 3 Tagen zeigt.
-- Nächster Ausbauschritt: AWS-Ticket auf 250 sobald peak > 70 dauerhaft, danach zweite Runde.
+**UCC (`renderBackgroundContent`):**
+- Auf Video- und Image-Background im Export (`previewMode === false`) den Baseline-Filter aufsetzen — auch im `rawMediaMode`.
+- Nicht auf Color/Gradient (kein Sinn).
+- Preview bleibt neutral (User sieht in Step 4 den echten Rohframe, wie bisher).
 
-Referenz in `mem://index.md#Core`:
-„AWS-Lambda-Quota 100 → Render-Pool 80 (Founder-Reserve ab 68). Tier-Caps unverändert bis reale Peak-Daten vorliegen."
+**DC (`SceneVideo`, Zeile ~624 `finalFilter`):**
+- Baseline-Filter vor allen weiteren DC-Filtern in den `filter:`-String einreihen, damit DC dieselbe Baseline nutzt statt sie zufällig aus seiner Filterkette zu produzieren.
+- Bestehende DC-Grades (brightness/contrast/saturation/temperature-Slider) bleiben additiv unverändert wirksam.
 
-## Was NICHT geändert wird
+### Fix C — Memory & Invariant aktualisieren
+- **`mem/architecture/render/global-export-quality-floor.md`** um Abschnitt "Sensor Baseline Grade" ergänzen: Wert + Begründung + wo referenziert.
+- **`mem://architecture/video-composer/raw-media-invariant`** (bzw. der Kommentar in `universalCreatorRenderPayload.ts`) um einen Satz erweitern: *Sensor-Baseline-Grade zählt nicht als Cinematic-FX — sie ist Teil des Encode-Floors und darf im rawMediaMode aktiv sein.*
+- Bestehender Regressionstest `universalCreatorRenderPayload.test.ts` (rawMediaMode-Invariante) bleibt grün.
 
-- `pickRenderTier` (short=3, standard=5, long=8, export=12)
-- `TARGET_MAX_LAMBDAS = 5` in `remotion-payload.ts`
-- Stability-Tiers, `framesPerLambda`-Boden 270
-- Timeout 600 s, RAM 3008 MB
-- Encode-Quality-Floor (JPEG 95 / CRF 16 / preset slow)
-- Lip-Sync-Mux, Sync.so-Concurrency, Retry-/Circuit-Breaker
+### Nicht angefasst
+- `crf`, `jpegQuality`, `x264Preset`, `videoBitrate`, `audioBitrate` — am Floor, kein Change.
+- `objectFit: 'contain'` — bleibt (kein ungewollter Crop).
+- Cinematic-Post-Layer, KenBurns, Parallax, Mood-Filter, Overlays, SceneFX — bleiben DC-exklusiv, weiter über `rawMediaMode` gesperrt.
+- Motion Studio / AI Video Studio / Composer / Lip-Sync-Mux — kein Change (nutzen eigene Pfade und sind bereits am Floor).
+- `remotion.config.ts` — unverändert.
 
-## Verifikation nach Deploy
+### Verifikation
+1. `tsgo` — Typcheck grün.
+2. `bunx vitest run src/lib/__tests__/universalCreatorRenderPayload.test.ts` — rawMediaMode-Invariant grün.
+3. Kurzer Playwright-Smoketest auf `/universal-creator` Step 4, dass die Preview weiter lädt und keine `OffthreadVideo`-Warnung wirft.
+4. Optional (empfohlen vor Launch): einen echten Testrender in UCC + DC mit demselben Source-Clip laufen lassen und Frame-Screenshot vergleichen — dann ist der Fix objektiv belegt, nicht nur theoretisch.
 
-1. `LambdaHealth`-Dashboard: „Normal max" zeigt 80.
-2. Frontend „System-Last"-Pill zeigt Budget 80.
-3. `system_config`-Row `render_queue_slot_budget = 80` per `supabase--read_query` prüfen.
-4. Test-Render eines Standard-Videos läuft normal durch (kein Verhalten geändert bei niedriger Last).
-
-## Nächster Schritt (nicht jetzt)
-
-Wenn nach Launch peak concurrency in `LambdaHealth` an ≥ 3 Tagen > 60 zeigt:
-- AWS Support Case auf 250 concurrency stellen
-- Danach zweite Plan-Runde: Tier-Caps + `TARGET_MAX_LAMBDAS` hoch, Render-Pool auf ~200.
-
-Sag Bescheid, dann setze ich es um.
+## Was der Kunde danach sieht
+UCC-Export ist **schärfer** (echte Verbesserung via OffthreadVideo, keine Chromium-Frame-Blends mehr) und liegt **optisch auf DC-Niveau** (geteilte Sensor-Baseline). DC bekommt denselben OffthreadVideo-Vorteil dazu. Der Raw-Media-Charakter von UCC bleibt erhalten (keine Mood/Grain/Vignette/etc.), Kosten und Renderzeit ändern sich nicht messbar.
