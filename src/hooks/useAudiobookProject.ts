@@ -114,7 +114,7 @@ export function useAudiobookProject() {
         title: next.title,
         author: next.author,
         language: next.language,
-        cast_config: next.cast_config as unknown as Record<string, unknown>,
+        cast_config: JSON.parse(JSON.stringify(next.cast_config)),
         paragraph_gap_ms: next.paragraph_gap_ms,
         chapter_gap_ms: next.chapter_gap_ms,
       })
