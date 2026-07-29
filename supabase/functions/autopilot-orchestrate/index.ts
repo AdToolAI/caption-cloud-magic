@@ -174,153 +174,247 @@ Deno.serve(async (req) => {
 
 // ------------------------------------------------------------------ the loop
 
+/**
+ * v297 — Belastbarkeit für lange Filme.
+ *
+ * Drei Änderungen gegenüber der seriellen Schleife von vorher:
+ *
+ *  1. Jede Szene bekommt bis zu zwei Anläufe, der zweite mit repariertem
+ *     Prompt. Scheitert auch der, wird die Szene aus dem freigegebenen Anker
+ *     als Standbild gefüllt — die Laufzeit bleibt erhalten, statt still zu
+ *     schrumpfen.
+ *  2. Bis zu drei Szenen laufen gleichzeitig. Lip-Sync-Szenen werden dabei
+ *     serialisiert, weil die Sync.so-Slots knapp sind.
+ *  3. Nach jeder Szene wird ein Heartbeat geschrieben, damit
+ *     `autopilot-watchdog` eine tote Background-Task erkennt und fortsetzt.
+ */
+const SCENE_CONCURRENCY = 3;
+
 async function runProduction(
   admin: ReturnType<typeof createClient>,
   productionId: string,
   userId: string,
   aspect: string,
   scenes: SceneInput[],
+  resume = false,
 ) {
   const replicateKey = Deno.env.get("REPLICATE_API_KEY");
   const total = scenes.length;
-  let done = 0;
-  let failed = 0;
+  const counters = { done: 0, failed: 0, stills: 0 };
+  /** Wird gesetzt, sobald das Guthaben leer ist — dann startet nichts Neues mehr. */
+  let outOfCredits = false;
+  /** Sync.so verträgt keine parallelen Autopilot-Passes. */
+  let lipsyncLock: Promise<void> = Promise.resolve();
 
-  for (const scene of scenes) {
-    const started = Date.now();
+  // Resume: bereits fertige Szenen nicht erneut produzieren.
+  let skipIndices = new Set<number>();
+  if (resume) {
+    const { data: existing } = await admin
+      .from("autopilot_production_scenes")
+      .select("scene_index, status")
+      .eq("production_id", productionId);
+    skipIndices = new Set(
+      (existing ?? [])
+        .filter((row: Record<string, unknown>) => row.status === "completed")
+        .map((row: Record<string, unknown>) => Number(row.scene_index)),
+    );
+    counters.done = skipIndices.size;
+  }
+
+  const pending = scenes.filter((scene) => !skipIndices.has(scene.orderIndex));
+
+  const heartbeat = async () => {
+    await admin
+      .from("autopilot_productions")
+      .update({
+        heartbeat_at: new Date().toISOString(),
+        progress: 25 +
+          Math.round(((counters.done + counters.failed) / Math.max(1, total)) * 70),
+      })
+      .eq("id", productionId);
+  };
+
+  const withLipsyncLock = async <T>(fn: () => Promise<T>): Promise<T> => {
+    const previous = lipsyncLock;
+    let release!: () => void;
+    lipsyncLock = new Promise<void>((resolve) => (release = resolve));
+    await previous.catch(() => {});
     try {
-      await setSceneStatus(admin, productionId, scene.orderIndex, { status: "anchor" });
+      return await fn();
+    } finally {
+      release();
+    }
+  };
 
-      // --- Stage 1: prove the frame for cents ------------------------------
-      const anchor = await callAnchorGate({
-        sceneId: scene.id,
-        productionId,
-        prompt: scene.anchorPrompt,
-        aspect,
-        portraitUrls: scene.portraitUrls ?? [],
-        characterNames: scene.characterNames ?? [],
-      });
+  const produceScene = async (scene: SceneInput) => {
+    if (outOfCredits) return;
+    const started = Date.now();
 
-      if (!anchor?.anchor_url) {
-        failed++;
+    let anchorUrl: string | null = null;
+    let anchorScore = 0;
+    let lastError = "unbekannt";
+
+    for (let attempt = 1; attempt <= MAX_SCENE_ATTEMPTS; attempt++) {
+      if (outOfCredits) return;
+      try {
         await setSceneStatus(admin, productionId, scene.orderIndex, {
-          status: "failed",
-          error_message: "Kein brauchbares Ankerbild — Szene übersprungen.",
+          status: "anchor",
+          attempt,
+          error_message: null,
         });
-        await log(admin, productionId, userId, {
-          stage: "anchors",
-          role: "dp",
-          severity: "error",
-          scene_index: scene.orderIndex,
-          message: `Szene ${scene.orderIndex + 1}: Bildfreigabe gescheitert — keine Motion-Credits ausgegeben.`,
-        });
-        continue;
-      }
 
-      // Bill the still only once it actually delivered.
-      const anchorEuros = Math.max(1, anchor.attempts ?? 1) * AUTOPILOT_PRICE.anchorImage;
-      await chargeStage(admin, {
-        userId,
-        productionId,
-        stage: "anchor",
-        sceneIndex: scene.orderIndex,
-        euros: anchorEuros,
-        label: `Bildfreigabe Szene ${scene.orderIndex + 1}`,
-      });
+        // --- Stage 1: prove the frame for cents --------------------------
+        const anchorPrompt = attempt === 1
+          ? scene.anchorPrompt
+          : repairAnchorPrompt(scene.anchorPrompt);
 
-      await setSceneStatus(admin, productionId, scene.orderIndex, {
-        status: "motion",
-        anchor_url: anchor.anchor_url,
-        anchor_score: Math.round(anchor.score ?? 0),
-        anchor_attempts: anchor.attempts ?? 1,
-        anchor_verdicts: anchor.verdicts ?? [],
-      });
+        const anchor = anchorUrl
+          // Ein bereits freigegebener Anker wird nicht neu bezahlt.
+          ? { anchor_url: anchorUrl, score: anchorScore, attempts: 1, verdicts: [] }
+          : await callAnchorGate({
+            sceneId: scene.id,
+            productionId,
+            prompt: anchorPrompt,
+            aspect,
+            portraitUrls: scene.portraitUrls ?? [],
+            characterNames: scene.characterNames ?? [],
+          });
 
-      await log(admin, productionId, userId, {
-        stage: "anchors",
-        role: "dp",
-        scene_index: scene.orderIndex,
-        duration_ms: Date.now() - started,
-        message: `Szene ${scene.orderIndex + 1}: Bild freigegeben (Score ${Math.round(anchor.score ?? 0)}${
-          anchor.attempts > 1 ? `, ${anchor.attempts} Anläufe` : ""
-        }).`,
-        meta: { anchor_url: anchor.anchor_url },
-      });
+        if (!anchor?.anchor_url) {
+          lastError = "Kein brauchbares Ankerbild.";
+          await log(admin, productionId, userId, {
+            stage: "anchors",
+            role: "dp",
+            severity: attempt < MAX_SCENE_ATTEMPTS ? "warn" : "error",
+            scene_index: scene.orderIndex,
+            message: attempt < MAX_SCENE_ATTEMPTS
+              ? `Szene ${scene.orderIndex + 1}: Bildfreigabe gescheitert — zweiter Anlauf mit vereinfachter Bildidee.`
+              : `Szene ${scene.orderIndex + 1}: Bildfreigabe endgültig gescheitert — keine Motion-Credits ausgegeben.`,
+          });
+          continue;
+        }
 
-      // --- Stage 2: only now do we spend motion credits --------------------
-      if (!replicateKey) throw new Error("REPLICATE_API_KEY fehlt");
+        if (!anchorUrl) {
+          // Bill the still only once it actually delivered.
+          const anchorEuros = Math.max(1, anchor.attempts ?? 1) * AUTOPILOT_PRICE.anchorImage;
+          await chargeStage(admin, {
+            userId,
+            productionId,
+            stage: "anchor",
+            sceneIndex: scene.orderIndex,
+            euros: anchorEuros,
+            label: `Bildfreigabe Szene ${scene.orderIndex + 1}`,
+          });
+          anchorUrl = anchor.anchor_url;
+          anchorScore = Math.round(anchor.score ?? 0);
 
-      const motionEuros = Math.max(1, scene.durationSeconds) * AUTOPILOT_PRICE.motionPerSecond;
-      const motionCharge = await chargeStage(admin, {
-        userId,
-        productionId,
-        stage: "motion",
-        sceneIndex: scene.orderIndex,
-        euros: motionEuros,
-        label: `Bewegtbild Szene ${scene.orderIndex + 1}`,
-      });
+          await log(admin, productionId, userId, {
+            stage: "anchors",
+            role: "dp",
+            scene_index: scene.orderIndex,
+            duration_ms: Date.now() - started,
+            message: `Szene ${scene.orderIndex + 1}: Bild freigegeben (Score ${anchorScore}${
+              (anchor.attempts ?? 1) > 1 ? `, ${anchor.attempts} Anläufe` : ""
+            }).`,
+            meta: { anchor_url: anchor.anchor_url },
+          });
+        }
 
-      if (!motionCharge.charged && motionCharge.reason === "insufficient") {
-        failed++;
         await setSceneStatus(admin, productionId, scene.orderIndex, {
-          status: "failed",
-          error_message: "Guthaben reicht für diese Szene nicht aus.",
+          status: "motion",
+          anchor_url: anchor.anchor_url,
+          anchor_score: anchorScore,
+          anchor_attempts: anchor.attempts ?? 1,
+          anchor_verdicts: anchor.verdicts ?? [],
         });
-        await log(admin, productionId, userId, {
-          stage: "motion",
-          role: "producer",
-          severity: "error",
-          scene_index: scene.orderIndex,
-          message: `Szene ${scene.orderIndex + 1}: Guthaben aufgebraucht — Produktion gestoppt.`,
-        });
-        break;
-      }
 
-      const videoUrl = await animate({
-        apiKey: replicateKey,
-        imageUrl: anchor.anchor_url,
-        prompt: scene.motionPrompt,
-        durationSeconds: scene.durationSeconds,
-      });
+        // --- Stage 2: only now do we spend motion credits ----------------
+        if (!replicateKey) throw new Error("REPLICATE_API_KEY fehlt");
 
-      if (!videoUrl) {
-        failed++;
-        await refundStage(admin, {
+        const motionEuros = Math.max(1, scene.durationSeconds) * AUTOPILOT_PRICE.motionPerSecond;
+        const motionCharge = await chargeStage(admin, {
           userId,
           productionId,
           stage: "motion",
           sceneIndex: scene.orderIndex,
           euros: motionEuros,
-          label: `Bewegtbild Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+          label: `Bewegtbild Szene ${scene.orderIndex + 1}`,
         });
-        await setSceneStatus(admin, productionId, scene.orderIndex, {
-          status: "failed",
-          error_message: "Animation lieferte kein Video.",
+
+        if (!motionCharge.charged && motionCharge.reason === "insufficient") {
+          outOfCredits = true;
+          counters.failed++;
+          await setSceneStatus(admin, productionId, scene.orderIndex, {
+            status: "failed",
+            error_message: "Guthaben reicht für diese Szene nicht aus.",
+          });
+          await log(admin, productionId, userId, {
+            stage: "motion",
+            role: "producer",
+            severity: "error",
+            scene_index: scene.orderIndex,
+            message: `Szene ${scene.orderIndex + 1}: Guthaben aufgebraucht — Produktion gestoppt.`,
+          });
+          return;
+        }
+
+        const motionPrompt = attempt === 1
+          ? scene.motionPrompt
+          : repairMotionPrompt(scene.motionPrompt, {
+            faceFocus: isFramingFailure(lastError) ||
+              (scene.turns?.length ?? 0) > 0 ||
+              (scene.dialogue ?? "").trim().length > 1,
+          });
+
+        const videoUrl = await animate({
+          apiKey: replicateKey,
+          imageUrl: anchor.anchor_url,
+          prompt: motionPrompt,
+          durationSeconds: scene.durationSeconds,
         });
-        await log(admin, productionId, userId, {
-          stage: "motion",
-          role: "editor",
-          severity: "error",
-          scene_index: scene.orderIndex,
-          message: `Szene ${scene.orderIndex + 1}: Animation fehlgeschlagen.`,
-        });
-      } else {
-        done++;
+
+        if (!videoUrl) {
+          lastError = "Animation lieferte kein Video.";
+          await refundStage(admin, {
+            userId,
+            productionId,
+            stage: "motion",
+            sceneIndex: scene.orderIndex,
+            euros: motionEuros,
+            label: `Bewegtbild Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+          });
+          await log(admin, productionId, userId, {
+            stage: "motion",
+            role: "editor",
+            severity: attempt < MAX_SCENE_ATTEMPTS ? "warn" : "error",
+            scene_index: scene.orderIndex,
+            message: attempt < MAX_SCENE_ATTEMPTS
+              ? `Szene ${scene.orderIndex + 1}: Animation fehlgeschlagen — zweiter Anlauf mit ruhigerem Framing.`
+              : `Szene ${scene.orderIndex + 1}: Animation endgültig fehlgeschlagen.`,
+          });
+          continue;
+        }
+
+        counters.done++;
         await setSceneStatus(admin, productionId, scene.orderIndex, {
           status: "completed",
           video_url: videoUrl,
           engine: MOTION_MODEL,
+          fallback_kind: null,
+          error_message: null,
         });
 
-        // --- Stage 3: speaking scenes get voice + lip-sync -----------------
+        // --- Stage 3: speaking scenes get voice + lip-sync ---------------
         if ((scene.turns?.length ?? 0) > 0 || (scene.dialogue ?? "").trim().length > 1) {
-          await speakAndSync(admin, {
-            productionId,
-            userId,
-            scene,
-            videoUrl,
-            anchorUrl: anchor.anchor_url,
-          });
+          await withLipsyncLock(() =>
+            speakAndSync(admin, {
+              productionId,
+              userId,
+              scene,
+              videoUrl,
+              anchorUrl: anchor.anchor_url,
+            })
+          );
         }
 
         await log(admin, productionId, userId, {
@@ -328,32 +422,66 @@ async function runProduction(
           role: "editor",
           scene_index: scene.orderIndex,
           duration_ms: Date.now() - started,
-          message: `Szene ${scene.orderIndex + 1}: Clip fertig (${scene.durationSeconds.toFixed(1)}s).`,
+          message: `Szene ${scene.orderIndex + 1}: Clip fertig (${scene.durationSeconds.toFixed(1)}s${
+            attempt > 1 ? ", 2. Anlauf" : ""
+          }).`,
           meta: { video_url: videoUrl },
         });
+        return;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : "unknown";
+        console.error("[autopilot-orchestrate] scene attempt failed", scene.orderIndex, attempt, lastError);
+        if (attempt >= MAX_SCENE_ATTEMPTS) break;
       }
-    } catch (err) {
-      failed++;
-      const message = err instanceof Error ? err.message : "unknown";
-      console.error("[autopilot-orchestrate] scene failed", scene.orderIndex, message);
+    }
+
+    // --- Beide Anläufe verbraucht: Standbild statt Loch --------------------
+    if (anchorUrl) {
+      counters.stills++;
+      counters.done++;
       await setSceneStatus(admin, productionId, scene.orderIndex, {
-        status: "failed",
-        error_message: message,
+        status: "completed",
+        video_url: null,
+        fallback_kind: FALLBACK_STILL,
+        error_message: null,
       });
       await log(admin, productionId, userId, {
         stage: "motion",
         role: "editor",
-        severity: "error",
+        severity: "warn",
         scene_index: scene.orderIndex,
-        message: `Szene ${scene.orderIndex + 1}: ${message}`,
+        message:
+          `Szene ${scene.orderIndex + 1}: Bewegtbild nicht zustande gekommen (${lastError}) — als Standbild in den Schnitt genommen, keine Motion-Credits berechnet.`,
       });
+      return;
     }
 
-    await admin
-      .from("autopilot_productions")
-      .update({ progress: 25 + Math.round(((done + failed) / total) * 70) })
-      .eq("id", productionId);
-  }
+    counters.failed++;
+    await setSceneStatus(admin, productionId, scene.orderIndex, {
+      status: "failed",
+      fallback_kind: null,
+      error_message: lastError,
+    });
+  };
+
+  // --- Worker-Pool: drei Szenen gleichzeitig -----------------------------
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      if (outOfCredits) return;
+      const index = cursor++;
+      if (index >= pending.length) return;
+      await produceScene(pending[index]);
+      await heartbeat();
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(SCENE_CONCURRENCY, Math.max(1, pending.length)) }, worker),
+  );
+
+  const { done, failed, stills } = counters;
+
 
   const allFailed = done === 0;
   await admin
