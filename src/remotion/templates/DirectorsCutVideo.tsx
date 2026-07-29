@@ -622,9 +622,13 @@ const SceneVideo: React.FC<{
     return transforms.length > 0 ? transforms.join(' ') : undefined;
   }, [kenBurnsTransform, transitionEffects.transform]);
 
-  const finalFilter = transitionEffects.additionalFilter 
+  const baseFilter = transitionEffects.additionalFilter 
     ? `${filterString} ${transitionEffects.additionalFilter}` 
     : filterString;
+  // Shared Sensor-Baseline (only in export). Preview stays neutral so the
+  // editor shows an honest frame while tuning grade sliders.
+  const finalFilter = previewMode ? baseFilter : prependSensorBaseline(baseFilter);
+
 
   const chromaKeyStyle = chromaKey?.enabled ? { mixBlendMode: 'multiply' as const } : {};
 
