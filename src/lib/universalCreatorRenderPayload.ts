@@ -159,7 +159,23 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
     ...(selectedMusicUrl && {
       backgroundMusicUrl: selectedMusicUrl,
       backgroundMusicVolume: getEffectiveBackgroundMusicVolume(rawMusicVolume, hasVoiceover),
+      backgroundMusicClip: (() => {
+        const raw = contentConfig?.backgroundMusicClip;
+        if (!raw) return undefined;
+        const trimStart = Math.max(0, Number(raw.trimStart) || 0);
+        const trimEnd = Math.max(trimStart + 0.2, Number(raw.trimEnd) || trimStart + 0.2);
+        const startTime = Math.max(0, Math.min(durationSeconds, Number(raw.startTime) || 0));
+        return {
+          trimStart,
+          trimEnd,
+          startTime,
+          loop: raw.loop !== false,
+          ...(typeof raw.fadeIn === 'number' ? { fadeIn: Math.max(0, raw.fadeIn) } : {}),
+          ...(typeof raw.fadeOut === 'number' ? { fadeOut: Math.max(0, raw.fadeOut) } : {}),
+        };
+      })(),
     }),
+
     // Original scene-video audio (global settings; per-scene overrides live on scene.originalAudio)
     useOriginalAudio,
     originalAudioVolume,
