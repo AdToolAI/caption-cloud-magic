@@ -174,9 +174,15 @@ export function UniversalVideoWizard() {
     setShowDraftDialog(false);
   };
 
-  const handleStartFresh = () => {
+  const handleStartFresh = async () => {
+    freshStartRef.current = true;
+    markFreshStart(FRESH_START_KEY);
+    dbFallbackAttempted.current = false;
+    generationStartedAtRef.current = null;
+    sessionStartedAtRef.current = new Date().toISOString();
     clearAllDrafts();
     setShowDraftDialog(false);
+    await purgeServerDrafts();
   };
 
   // Persist wizard state to localStorage
