@@ -183,24 +183,37 @@ export function RemotionPreviewPlayer({
     const voice = voiceoverAudioRef.current;
     const music = musicAudioRef.current;
 
-    if (voice && Number.isFinite(voice.duration)) {
-      voice.currentTime = Math.min(safeTime, Math.max(0, voice.duration - 0.05));
+    if (voice) {
+      const startAt = previewAudio.voiceoverStartTime;
+      const localTime = safeTime - startAt;
+      if (localTime < 0) {
+        voice.pause();
+        try { voice.currentTime = 0; } catch { /* noop */ }
+      } else if (Number.isFinite(voice.duration)) {
+        voice.currentTime = Math.min(localTime, Math.max(0, voice.duration - 0.05));
+      } else {
+        try { voice.currentTime = localTime; } catch { /* noop */ }
+      }
     }
 
     if (music) {
       const duration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
       music.currentTime = duration > 0 ? safeTime % duration : safeTime;
     }
-  }, []);
+  }, [previewAudio.voiceoverStartTime]);
 
   const playPreviewAudio = useCallback(async () => {
     applyPreviewAudioVolume();
-    seekPreviewAudio(getPreviewTime());
+    const now = getPreviewTime();
+    seekPreviewAudio(now);
+    const voice = voiceoverAudioRef.current;
+    const music = musicAudioRef.current;
+    const voiceReady = voice && now >= previewAudio.voiceoverStartTime;
     await Promise.allSettled([
-      voiceoverAudioRef.current?.play(),
-      musicAudioRef.current?.play(),
+      voiceReady ? voice!.play() : Promise.resolve(),
+      music?.play(),
     ].filter(Boolean) as Promise<void>[]);
-  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio]);
+  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio, previewAudio.voiceoverStartTime]);
 
   const pausePreviewAudio = useCallback(() => {
     voiceoverAudioRef.current?.pause();
