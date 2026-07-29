@@ -447,6 +447,8 @@ export function UniversalVideoWizard() {
       activeProgressIdRef.current = null;
       generationStartedAtRef.current = new Date().toISOString();
       dbFallbackAttempted.current = false;
+      freshStartRef.current = false;
+      clearFreshStart(FRESH_START_KEY);
       
       setIsAutoGenerating(true);
       // Find the generating step
