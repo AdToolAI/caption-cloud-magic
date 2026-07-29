@@ -168,6 +168,82 @@ export function DirectorsTable() {
     }
   };
 
+  /**
+   * Approval hands the compiled grammar to the orchestrator. Prompts are
+   * compiled here so the client's storyboard and the server's render can never
+   * drift apart — there is exactly one grammar implementation.
+   */
+  const handleStartProduction = async () => {
+    if (!plannedTreatment || !productionId) return;
+    setStarting(true);
+    try {
+      const characterIds = Array.from(
+        new Set(plannedTreatment.scenes.flatMap((scene) => scene.characterIds ?? [])),
+      );
+
+      const portraitById = new Map<string, { url: string | null; name: string }>();
+      if (characterIds.length) {
+        const { data } = await supabase
+          .from('brand_characters')
+          .select('id, name, portrait_url, reference_image_url')
+          .in('id', characterIds);
+        for (const row of data ?? []) {
+          portraitById.set(row.id, {
+            url: row.portrait_url ?? row.reference_image_url ?? null,
+            name: row.name ?? '',
+          });
+        }
+      }
+
+      const { data, error } = await supabase.functions.invoke('autopilot-orchestrate', {
+        body: {
+          production_id: productionId,
+          aspect_ratio: plannedTreatment.aspect,
+          scenes: plannedTreatment.scenes.map((scene) => {
+            const cast = (scene.characterIds ?? [])
+              .map((id) => portraitById.get(id))
+              .filter(Boolean) as Array<{ url: string | null; name: string }>;
+            return {
+              id: scene.id,
+              orderIndex: scene.orderIndex,
+              beat: scene.beat,
+              durationSeconds: scene.durationSeconds,
+              anchorPrompt: clampPromptWords(compileAnchorPrompt(scene)),
+              motionPrompt: clampPromptWords(compileMotionPrompt(scene, { hasAnchor: true }), 60),
+              dialogue: scene.dialogue ?? null,
+              speakerCharacterId: scene.speakerCharacterId ?? null,
+              voiceId: scene.voiceId ?? null,
+              voiceLanguage: scene.voiceLanguage ?? plannedTreatment.language,
+              characterIds: scene.characterIds ?? [],
+              portraitUrls: cast.map((entry) => entry.url).filter(Boolean),
+              characterNames: cast.map((entry) => entry.name).filter(Boolean),
+              soundDesign: { foleyHint: scene.foleyHint ?? null },
+              grammar: scene as unknown as Record<string, unknown>,
+            };
+          }),
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setApproved(true);
+      toast({
+        title: 'Produktion läuft',
+        description:
+          'Jede Szene wird erst als Standbild geprüft und nur dann animiert — du kannst live zuschauen.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Produktion konnte nicht starten',
+        description: err instanceof Error ? err.message : 'Unbekannter Fehler',
+        variant: 'destructive',
+      });
+    } finally {
+      setStarting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ---------------------------------------------------------- Briefing */}
