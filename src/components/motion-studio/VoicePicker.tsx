@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
+import { toPickerLanguage } from '@/lib/voice-languages';
 
 interface VoicePickerProps {
   /** ElevenLabs voice id (or null to clear). */
