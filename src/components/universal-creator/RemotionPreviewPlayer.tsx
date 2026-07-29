@@ -372,7 +372,7 @@ export function RemotionPreviewPlayer({
       if (syncRafRef.current !== null) cancelAnimationFrame(syncRafRef.current);
       syncRafRef.current = null;
     };
-  }, [getPreviewTime, isPlaying]);
+  }, [getPreviewTime, isPlaying, previewAudio.voiceoverStartTime]);
 
   useEffect(() => {
     if (!isDragging) return;
