@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, Freeze, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
+import { AbsoluteFill, Video, OffthreadVideo, Audio, Sequence, Freeze, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
+import { prependSensorBaseline } from '../utils/sensorBaselineGrade';
 import { resolveTransitions, findActiveTransition, type ResolvedTransition } from '../../utils/transitionResolver';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { safeFrame, safeDurationFrames, isValidRemoteMediaUrl } from '../utils/safeFrame';
