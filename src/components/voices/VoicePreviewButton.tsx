@@ -11,12 +11,6 @@ interface VoicePreviewButtonProps {
   className?: string;
 }
 
-const SAMPLES: Record<string, string> = {
-  de: 'Hallo, so klingt meine Stimme. Ich freue mich darauf, deinen Text vorzulesen.',
-  en: 'Hello, this is how my voice sounds. I look forward to reading your text.',
-  es: 'Hola, así suena mi voz. Tengo muchas ganas de leer tu texto.',
-};
-
 /** Tiny 5-second voice preview button using the `preview-voice` edge function. */
 export function VoicePreviewButton({ voiceId, language = 'de', size = 'icon', className }: VoicePreviewButtonProps) {
   const [loading, setLoading] = useState(false);
@@ -35,9 +29,14 @@ export function VoicePreviewButton({ voiceId, language = 'de', size = 'icon', cl
     if (playing) { stop(); return; }
     setLoading(true);
     try {
-      const sample = SAMPLES[language] || SAMPLES.en;
+      const sample = voicePreviewSample(language);
       const { data, error } = await supabase.functions.invoke('preview-voice', {
-        body: { text: sample, voiceId, speed: 1.0 },
+        body: {
+          text: sample,
+          voiceId,
+          speed: 1.0,
+          language: normalizeVoiceLanguage(language) ?? undefined,
+        },
       });
       if (error) throw error;
       if (!data?.audioContent) throw new Error('No audio received');
