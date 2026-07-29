@@ -743,7 +743,7 @@ serve(async (req) => {
       // EVERY frame, which showed up as slight blur and a contrast/saturation
       // shift versus the raw upload. PNG frames remove that stage entirely.
       codec: format === 'mp4' ? 'h264' : 'gif',
-      imageFormat: format === 'mp4' ? 'png' : 'png',
+      imageFormat: 'png',
       crf: 16,
       x264Preset: 'slow',
       videoBitrate: '10M',
@@ -751,7 +751,6 @@ serve(async (req) => {
       // (and the raw upload) displays the source. Without this Remotion falls
       // back to the legacy BT.601 matrix, which visibly shifts contrast/saturation.
       colorSpace: 'bt709',
-      pixelFormat: 'yuv420p',
 
       // r61: Enable audio rendering for voiceover/music
       muted: false,
