@@ -200,6 +200,7 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
         <AvatarVoicePicker
           value={avatar.default_voice_id ?? null}
           provider={(avatar.default_voice_provider as any) ?? null}
+          language={(avatar as any).default_voice_language ?? null}
           onChange={handleVoiceChange}
           disabled={saving}
         />
