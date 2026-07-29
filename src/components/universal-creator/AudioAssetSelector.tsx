@@ -32,6 +32,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+import { MusicClipPanel, type MusicClip } from './MusicClipPanel';
+
 interface AudioAssetSelectorProps {
   selectedMusicId?: string | null;
   musicVolume?: number;
@@ -39,7 +41,13 @@ interface AudioAssetSelectorProps {
   onMusicVolumeChange: (volume: number) => void;
   /** Optional: also receive the resolved public URL so the renderer can play it. */
   onMusicUrlChange?: (url: string | null) => void;
+  /** Optional trim/placement panel wiring. When provided, the panel renders below the selected track. */
+  musicClip?: MusicClip | null;
+  onMusicClipChange?: (clip: MusicClip) => void;
+  /** Total video duration in seconds — needed to compute the max offset. */
+  videoDurationSeconds?: number;
 }
+
 
 export const AudioAssetSelector = ({
   selectedMusicId,
@@ -47,7 +55,11 @@ export const AudioAssetSelector = ({
   onMusicSelect,
   onMusicVolumeChange,
   onMusicUrlChange,
+  musicClip,
+  onMusicClipChange,
+  videoDurationSeconds = 30,
 }: AudioAssetSelectorProps) => {
+
   // Wrapper: keep id + url in lockstep so the render pipeline actually
   // receives a backgroundMusicUrl (parent state used to stay null).
   const selectMusic = (id: string | null, url: string | null) => {
@@ -450,6 +462,23 @@ export const AudioAssetSelector = ({
                 })()}
               </Card>
             )}
+
+            {/* Trim & placement panel — only when a track is selected and wiring is provided */}
+            {selectedMusicId && onMusicClipChange && (() => {
+              const sel = musicTracks.find((t) => t.id === selectedMusicId);
+              if (!sel?.url) return null;
+              return (
+                <MusicClipPanel
+                  audioUrl={sel.url}
+                  videoDuration={videoDurationSeconds}
+                  value={musicClip}
+                  onChange={onMusicClipChange}
+                  resolveUrl={(u) => getProxiedUrl(u) || u}
+                />
+              );
+            })()}
+
+
           
             {/* Upload Area */}
             <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
