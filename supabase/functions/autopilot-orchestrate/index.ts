@@ -342,8 +342,145 @@ async function runProduction(
     severity: allFailed ? "error" : "info",
     message: allFailed
       ? "Produktion abgebrochen — keine Szene bestand die Prüfung."
-      : `Produktion abgeschlossen: ${done} von ${total} Szenen im Kasten${failed ? `, ${failed} übersprungen` : ""}.`,
+      : `Szenen im Kasten: ${done} von ${total}${failed ? `, ${failed} übersprungen` : ""}. Endschnitt startet.`,
   });
+
+  if (allFailed) return;
+
+  // Hand over to the final cut: audio mix, overlays, Lambda render.
+  try {
+    const resp = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/autopilot-finalize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify({ production_id: productionId, user_id: userId }),
+    });
+    if (!resp.ok) {
+      throw new Error(`finalize ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+    }
+  } catch (err) {
+    console.error("[autopilot-orchestrate] finalize handoff failed", err);
+    await admin
+      .from("autopilot_productions")
+      .update({
+        stage: "scenes_ready",
+        status: "completed",
+        progress: 95,
+        error_message: "Endschnitt konnte nicht gestartet werden — die Szenen sind gesichert.",
+      })
+      .eq("id", productionId);
+  }
+}
+
+/**
+ * Speaking scene: record the line, then lip-sync the clip to it.
+ *
+ * Voice is billed here (ai_video_wallets, refunded on failure); lip-sync bills
+ * and refunds itself inside `lip-sync-video`. A failure never kills the scene —
+ * the silent clip stays usable for the final cut.
+ */
+async function speakAndSync(
+  admin: ReturnType<typeof createClient>,
+  args: { productionId: string; userId: string; scene: SceneInput; videoUrl: string },
+) {
+  const { productionId, userId, scene, videoUrl } = args;
+  const text = (scene.dialogue ?? "").trim();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const voiceEuros = Math.max(1, scene.durationSeconds) * AUTOPILOT_PRICE.voicePerSecond;
+  const charge = await chargeStage(admin, {
+    userId,
+    productionId,
+    stage: "voice",
+    sceneIndex: scene.orderIndex,
+    euros: voiceEuros,
+    label: `Sprachaufnahme Szene ${scene.orderIndex + 1}`,
+  });
+  if (!charge.charged && charge.reason === "insufficient") return;
+
+  let audioUrl: string | null = null;
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/generate-video-voiceover`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({
+        scriptText: text,
+        voice: scene.voiceId ?? undefined,
+        language: scene.voiceLanguage ?? "de",
+      }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      audioUrl = data.audioUrl ?? null;
+      if (audioUrl) {
+        await setSceneStatus(admin, productionId, scene.orderIndex, {
+          voiceover_url: audioUrl,
+          voiceover_duration_seconds: Number(data.durationSeconds ?? 0) || null,
+        });
+      }
+    } else {
+      console.warn("[autopilot-orchestrate] voice failed", resp.status);
+    }
+  } catch (err) {
+    console.warn("[autopilot-orchestrate] voice error", err);
+  }
+
+  if (!audioUrl) {
+    await refundStage(admin, {
+      userId,
+      productionId,
+      stage: "voice",
+      sceneIndex: scene.orderIndex,
+      euros: voiceEuros,
+      label: `Sprachaufnahme Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+    });
+    await log(admin, productionId, userId, {
+      stage: "audio",
+      role: "sound",
+      severity: "warn",
+      scene_index: scene.orderIndex,
+      message: `Szene ${scene.orderIndex + 1}: Sprachaufnahme fehlgeschlagen — Credits erstattet.`,
+    });
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/lip-sync-video`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({
+        video_url: videoUrl,
+        audio_url: audioUrl,
+        user_id: userId,
+        duration_seconds: scene.durationSeconds,
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    const synced = data?.video_url ?? data?.output_url ?? data?.url ?? null;
+
+    if (resp.ok && synced) {
+      await setSceneStatus(admin, productionId, scene.orderIndex, { lipsync_url: synced });
+      await log(admin, productionId, userId, {
+        stage: "lipsync",
+        role: "sound",
+        scene_index: scene.orderIndex,
+        message: `Szene ${scene.orderIndex + 1}: Lip-Sync sitzt.`,
+      });
+    } else {
+      await log(admin, productionId, userId, {
+        stage: "lipsync",
+        role: "sound",
+        severity: "warn",
+        scene_index: scene.orderIndex,
+        message: `Szene ${scene.orderIndex + 1}: Lip-Sync nicht möglich (${data?.error ?? resp.status}) — Clip bleibt stumm.`,
+      });
+    }
+  } catch (err) {
+    console.warn("[autopilot-orchestrate] lipsync error", err);
+  }
 }
 
 // ------------------------------------------------------------------- helpers
