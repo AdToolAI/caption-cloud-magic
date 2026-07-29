@@ -154,9 +154,12 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
     // Original scene-video audio (global settings; per-scene overrides live on scene.originalAudio)
     useOriginalAudio,
     originalAudioVolume,
-    // Universal Creator is a clean media assembler: keep user media visually raw.
-    // Director's-Cut-style grading/vignettes/effects must not leak into Step 4/export.
-    rawMediaMode: true,
+    // Universal Creator is a clean media assembler: user media stays visually raw
+    // in BOTH preview and export. Cinematic-Post (mood/grain/vignette/KenBurns/
+    // parallax/overlays/scene-fx/transitions/drawOn) lives EXCLUSIVELY in the
+    // Director's Cut and only when the customer explicitly enables it there.
+    // This is a constant — never make it configurable from UCC call sites.
+    rawMediaMode: true as const,
     // Subtitles
     subtitles: subtitleConfig?.segments || [],
     subtitleStyle: subtitleConfig?.style || DEFAULT_SUBTITLE_STYLE,
