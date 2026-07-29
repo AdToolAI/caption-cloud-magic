@@ -12,6 +12,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { AUTOPILOT_PRICE, chargeStage, refundStage } from "../_shared/autopilotCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -187,6 +188,17 @@ async function runProduction(
         continue;
       }
 
+      // Bill the still only once it actually delivered.
+      const anchorEuros = Math.max(1, anchor.attempts ?? 1) * AUTOPILOT_PRICE.anchorImage;
+      await chargeStage(admin, {
+        userId,
+        productionId,
+        stage: "anchor",
+        sceneIndex: scene.orderIndex,
+        euros: anchorEuros,
+        label: `Bildfreigabe Szene ${scene.orderIndex + 1}`,
+      });
+
       await setSceneStatus(admin, productionId, scene.orderIndex, {
         status: "motion",
         anchor_url: anchor.anchor_url,
@@ -209,6 +221,32 @@ async function runProduction(
       // --- Stage 2: only now do we spend motion credits --------------------
       if (!replicateKey) throw new Error("REPLICATE_API_KEY fehlt");
 
+      const motionEuros = Math.max(1, scene.durationSeconds) * AUTOPILOT_PRICE.motionPerSecond;
+      const motionCharge = await chargeStage(admin, {
+        userId,
+        productionId,
+        stage: "motion",
+        sceneIndex: scene.orderIndex,
+        euros: motionEuros,
+        label: `Bewegtbild Szene ${scene.orderIndex + 1}`,
+      });
+
+      if (!motionCharge.charged && motionCharge.reason === "insufficient") {
+        failed++;
+        await setSceneStatus(admin, productionId, scene.orderIndex, {
+          status: "failed",
+          error_message: "Guthaben reicht für diese Szene nicht aus.",
+        });
+        await log(admin, productionId, userId, {
+          stage: "motion",
+          role: "producer",
+          severity: "error",
+          scene_index: scene.orderIndex,
+          message: `Szene ${scene.orderIndex + 1}: Guthaben aufgebraucht — Produktion gestoppt.`,
+        });
+        break;
+      }
+
       const videoUrl = await animate({
         apiKey: replicateKey,
         imageUrl: anchor.anchor_url,
@@ -218,6 +256,14 @@ async function runProduction(
 
       if (!videoUrl) {
         failed++;
+        await refundStage(admin, {
+          userId,
+          productionId,
+          stage: "motion",
+          sceneIndex: scene.orderIndex,
+          euros: motionEuros,
+          label: `Bewegtbild Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+        });
         await setSceneStatus(admin, productionId, scene.orderIndex, {
           status: "failed",
           error_message: "Animation lieferte kein Video.",
@@ -236,6 +282,16 @@ async function runProduction(
           video_url: videoUrl,
           engine: MOTION_MODEL,
         });
+
+        // --- Stage 3: speaking scenes get voice + lip-sync -----------------
+        if (scene.dialogue && scene.dialogue.trim().length > 1) {
+          await speakAndSync(admin, {
+            productionId,
+            userId,
+            scene,
+            videoUrl,
+          });
+        }
         await log(admin, productionId, userId, {
           stage: "motion",
           role: "editor",
@@ -273,8 +329,8 @@ async function runProduction(
     .from("autopilot_productions")
     .update({
       stage: allFailed ? "failed" : "scenes_ready",
-      status: allFailed ? "failed" : "completed",
-      progress: allFailed ? 100 : 95,
+      status: allFailed ? "failed" : "running",
+      progress: allFailed ? 100 : 78,
       error_message: allFailed ? "Keine Szene konnte produziert werden." : null,
       completed_at: new Date().toISOString(),
     })
