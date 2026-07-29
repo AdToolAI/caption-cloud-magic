@@ -145,7 +145,7 @@ export function UniversalVideoWizard() {
         .from('universal_video_progress')
         .delete()
         .eq('user_id', user.id)
-        .in('status', ['completed', 'failed', 'pending', 'processing']);
+        .in('status', ['completed', 'failed']);
     } catch (err) {
       console.warn('[UniversalVideoWizard] Could not purge progress rows:', err);
     }
