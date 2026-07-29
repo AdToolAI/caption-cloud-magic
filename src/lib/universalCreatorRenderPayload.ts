@@ -17,6 +17,7 @@ import {
   DEFAULT_MUSIC_VOLUME,
   DEFAULT_VOICEOVER_VOLUME,
   computeTotalDurationSeconds,
+  computeMaxVoiceoverStart,
 } from '@/lib/universalCreatorDefaults';
 
 export interface BuildCustomizationsInput {
@@ -122,9 +123,15 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
   const durationSeconds = computeTotalDurationSeconds({
     voiceoverDuration: contentConfig?.voiceoverDuration,
     actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
-    voiceoverStartTime: contentConfig?.voiceoverStartTime,
     scenes: validScenes,
   });
+
+  const maxVoiceoverStart = computeMaxVoiceoverStart({
+    voiceoverDuration: contentConfig?.voiceoverDuration,
+    actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
+    scenes: validScenes,
+  });
+
 
   const rawMusicVolume = clampAudioVolume(
     typeof musicVolume === 'number' ? musicVolume : DEFAULT_MUSIC_VOLUME,
@@ -146,13 +153,12 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
       voiceoverVolume: clampAudioVolume(
         contentConfig?.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME,
       ),
-      // The timeline already grew to fit voStart + voDuration, so we only clamp
-      // against the very last frame — never against the pre-offset duration
-      // (that used to push a late VO onto the final frame = silence).
+      // A delayed VO must NEVER extend the video: clamp the offset so the
+      // voice-over ends with the timeline at the very latest.
       voiceoverStartTime: Math.max(
         0,
         Math.min(
-          Math.max(0, durationSeconds - 0.1),
+          maxVoiceoverStart,
           Number.isFinite(Number(contentConfig?.voiceoverStartTime))
             ? Number(contentConfig?.voiceoverStartTime)
             : 0,
@@ -205,7 +211,6 @@ export function getUniversalCreatorDurationSeconds(input: BuildCustomizationsInp
   return computeTotalDurationSeconds({
     voiceoverDuration: input.contentConfig?.voiceoverDuration,
     actualVoiceoverDuration: input.contentConfig?.actualVoiceoverDuration,
-    voiceoverStartTime: input.contentConfig?.voiceoverStartTime,
     scenes: normalizeScenesForUniversalCreatorVideo(input.scenes),
   });
 }

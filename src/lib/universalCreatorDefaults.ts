@@ -27,14 +27,13 @@ export const MIN_TOTAL_DURATION_SECONDS = 5;
  * Computes the total video duration in seconds from voice-over and scenes.
  * Kept in one place so preview and render always agree on the timeline length.
  *
- * The voice-over offset (`voiceoverStartTime`) MUST be part of the equation —
- * otherwise a VO placed late on the timeline gets truncated (or drops out
- * entirely when the offset lands on/after the last frame).
+ * IMPORTANT: the voice-over offset (`voiceoverStartTime`) is deliberately NOT
+ * part of the equation — a delayed VO must never extend the video. Instead the
+ * offset itself is capped via `computeMaxVoiceoverStart()`.
  */
 export function computeTotalDurationSeconds(input: {
   voiceoverDuration?: number | null;
   actualVoiceoverDuration?: number | null;
-  voiceoverStartTime?: number | null;
   scenes?: Array<{ duration?: number | null }> | null;
 }): number {
   const scenesSum = Array.isArray(input.scenes)
@@ -47,15 +46,28 @@ export function computeTotalDurationSeconds(input: {
   const voRaw = Number(input.actualVoiceoverDuration ?? input.voiceoverDuration ?? 0);
   const vo = Number.isFinite(voRaw) && voRaw > 0 ? voRaw : 0;
 
-  const startRaw = Number(input.voiceoverStartTime ?? 0);
-  const voStart = Number.isFinite(startRaw) && startRaw > 0 ? startRaw : 0;
-  const voEnd = vo > 0 ? voStart + vo : 0;
+  return Math.max(vo, scenesSum, MIN_TOTAL_DURATION_SECONDS);
+}
 
-  return Math.max(voEnd, scenesSum, MIN_TOTAL_DURATION_SECONDS);
+/**
+ * Maximum allowed voice-over start offset: the VO must always END exactly with
+ * the video at the latest. Single source of truth for UI slider bounds, the
+ * render payload clamp and the server-side sanitizer.
+ */
+export function computeMaxVoiceoverStart(input: {
+  voiceoverDuration?: number | null;
+  actualVoiceoverDuration?: number | null;
+  scenes?: Array<{ duration?: number | null }> | null;
+}): number {
+  const total = computeTotalDurationSeconds(input);
+  const voRaw = Number(input.actualVoiceoverDuration ?? input.voiceoverDuration ?? 0);
+  const vo = Number.isFinite(voRaw) && voRaw > 0 ? voRaw : 0;
+  return Math.max(0, Math.round((total - vo) * 100) / 100);
 }
 
 export function computeDurationInFrames(input: Parameters<typeof computeTotalDurationSeconds>[0], fps = 30): number {
   const seconds = computeTotalDurationSeconds(input);
   return Math.max(1, Math.ceil(seconds * fps));
 }
+
 

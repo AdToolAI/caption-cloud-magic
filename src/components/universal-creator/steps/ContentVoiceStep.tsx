@@ -377,18 +377,17 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
           {value?.voiceoverUrl && (() => {
             const voDur = Number(value.actualVoiceoverDuration ?? value.voiceoverDuration ?? 0) || 0;
             const scenesTotal = scenes && scenes.length > 0 ? scenes.reduce((a, s) => a + (s.duration || 0), 0) : 0;
-            const baseDur = Math.max(scenesTotal, 1);
-            // The VO may start anywhere inside the scene timeline — if it runs
-            // past the scenes, the video is extended instead of cutting it off.
-            const maxStart = Math.max(0, baseDur - 0.1);
+            const videoDur = Math.max(scenesTotal, voDur, 5);
+            // Das Voiceover darf das Video NIE verlängern: der Start ist hart
+            // auf (Videolänge − VO-Dauer) begrenzt.
+            const maxStart = Math.max(0, Math.round((videoDur - voDur) * 100) / 100);
             const start = Math.min(maxStart, Math.max(0, Number(value.voiceoverStartTime) || 0));
-            const videoDur = Math.max(baseDur, start + voDur);
-            const extended = voDur > 0 && start + voDur > baseDur + 0.01;
             const setStart = (raw: number) => {
               const clamped = Math.max(0, Math.min(maxStart, Math.round(raw * 100) / 100));
               onChange({ ...value, voiceoverStartTime: clamped });
             };
             const fmt = (s: number) => `${s.toFixed(2)}s`;
+
             return (
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">{t('uc.audioPreview')}</h3>
@@ -454,15 +453,13 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                       ? `El VO se reproduce de ${fmt(start)} a ${fmt(start + voDur)} (video ${fmt(videoDur)}).`
                       : `VO plays from ${fmt(start)} to ${fmt(start + voDur)} (video ${fmt(videoDur)}).`}
                   </p>
-                  {extended && (
-                    <p className="text-xs text-primary">
-                      {language === 'de'
-                        ? `ℹ️ Video wird auf ${fmt(start + voDur)} verlängert, damit das Voiceover vollständig läuft.`
-                        : language === 'es'
-                        ? `ℹ️ El video se extiende a ${fmt(start + voDur)} para reproducir el voiceover completo.`
-                        : `ℹ️ Video is extended to ${fmt(start + voDur)} so the voiceover plays in full.`}
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'de'
+                      ? `Max. Start: ${fmt(maxStart)} — das Voiceover endet spätestens mit dem Video, die Videolänge bleibt unverändert.`
+                      : language === 'es'
+                      ? `Inicio máx.: ${fmt(maxStart)} — el voiceover termina como máximo con el video; la duración no cambia.`
+                      : `Max start: ${fmt(maxStart)} — the voice-over ends with the video at the latest; video length never changes.`}
+                  </p>
                 </div>
 
                 <div className="p-4 bg-muted/50 rounded-lg">
