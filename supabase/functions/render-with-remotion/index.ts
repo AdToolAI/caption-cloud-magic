@@ -657,8 +657,14 @@ serve(async (req) => {
       ? sanitizedCustomizations.scenes.reduce((sum: number, s: any) => sum + Number(s.duration || 0), 0)
       : 0;
     const sanitizedVoiceoverDuration = Number(sanitizedCustomizations.voiceoverDuration) || 0;
+    // Client may send the authoritative timeline length; it already accounts for
+    // scenes + VO and never includes the VO offset.
+    const clientDurationSeconds = Number((sanitizedCustomizations as any).durationSeconds);
+    const hasClientDuration = Number.isFinite(clientDurationSeconds) && clientDurationSeconds > 0;
     // A delayed voice-over must NEVER extend the video length.
-    const totalDurationSeconds = Math.max(sceneDurationSum, sanitizedVoiceoverDuration, 5);
+    const totalDurationSeconds = hasClientDuration
+      ? Math.max(clientDurationSeconds, 5)
+      : Math.max(sceneDurationSum, sanitizedVoiceoverDuration, 5);
     // Clamp the offset so the VO always ends with the video at the latest.
     const maxVoiceoverStart = Math.max(0, totalDurationSeconds - sanitizedVoiceoverDuration);
     const sanitizedVoiceoverStart = Math.max(

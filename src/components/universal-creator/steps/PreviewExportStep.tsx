@@ -309,7 +309,10 @@ export function PreviewExportStep({
         quality: videoQuality,
         customizations: {
           ...sharedCustomizations,
-          voiceoverDuration: calculatedDuration,
+          // NEVER overwrite `voiceoverDuration` with the timeline length —
+          // the server derives maxVoiceoverStart = total − voDuration from it
+          // and would clamp a delayed voice-over back to 0.
+          durationSeconds: calculatedDuration,
         },
         format: 'mp4',
         aspect_ratio: job.format.aspectRatio,
