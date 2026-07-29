@@ -182,8 +182,9 @@ function AutopilotReal() {
           )}
 
           {/* Tabs */}
-          <Tabs defaultValue={inboxBadge > 0 ? 'inbox' : 'calendar'}>
+          <Tabs defaultValue={inboxBadge > 0 ? 'inbox' : 'director'}>
             <TabsList className="mb-4">
+              <TabsTrigger value="director" className="gap-1.5"><Clapperboard className="h-3.5 w-3.5" /> Regietisch</TabsTrigger>
               <TabsTrigger value="calendar" className="gap-1.5"><Calendar className="h-3.5 w-3.5" /> Wochenplan</TabsTrigger>
               <TabsTrigger value="inbox" className="gap-1.5 relative">
                 <Inbox className="h-3.5 w-3.5" /> Inbox
