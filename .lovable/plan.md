@@ -1,55 +1,50 @@
-## Ziel
+## Autopilot Stage 3 — Vom Szenen-Stapel zum fertigen Spot
 
-Der Autopilot endet heute mit einzelnen Clips (`stage: scenes_ready`). Diese Stufe schließt die Lücke bis zum fertigen Spot: Ton drunter, Logo drauf, ein Video raus — und die Kosten werden echt verrechnet statt nur angezeigt.
+Heute endet der Autopilot bei `scenes_ready`: einzelne Clips, kein Ton, kein Schnitt, keine Abrechnung. Stage 3 schließt die Kette bis zum abspielbaren MP4.
 
----
+### 1. Echte Credit-Verrechnung (Reserve → Commit → Refund)
 
-## 1. Credits: von der Vorschau zur Abbuchung
+- Abgerechnet wird pro Stufe (Anchor, Motion, VO, Lip-Sync, Finalrender) gegen `ai_video_wallets` / `ai_video_transactions`, nicht als Pauschale am Anfang.
+- Neuer Shared-Helper `supabase/functions/_shared/autopilotCredits.ts`:
+  - `charge()` mit Idempotenz-Schlüssel `autopilot:{productionId}:{stage}:{sceneIndex}` in der Transaktions-Beschreibung — ein Retry bucht nie doppelt ab.
+  - `refund()` für abgebrochene oder fehlgeschlagene Stufen (Pflicht laut Credit-Reliability-Regel).
+- Vor dem Start prüft der Orchestrator die Gesamtschätzung aus `costEstimate.ts` gegen das Guthaben und bricht sauber ab, statt mitten in der Produktion stecken zu bleiben.
 
-Heute zeigt `costEstimate.ts` eine Summe, die niemand einzieht. Der Lauf bekommt dieselbe Reserve-/Commit-/Refund-Mechanik wie der Rest der Plattform (`credit-preflight`, `credit-reserve`, `credit-commit`, `credit-refund`).
+### 2. Ton: Voiceover, Musik, Foley
 
-- Vor dem Start: Preflight gegen die Kostenvorschau, Reservierung über die geschätzte Summe. Reicht das Guthaben nicht, startet der Lauf gar nicht erst.
-- Nach jeder Stufe (Anchor, Motion, VO, Lip-Sync, Render) wird der tatsächliche Verbrauch committed.
-- Jede fehlgeschlagene Szene und jeder Provider-Abbruch löst eine idempotente Rückerstattung aus — nach dem bestehenden Refund-Muster, Schlüssel ist `production_id` + Szenenindex, damit ein Watchdog-Retry nicht doppelt zurückbucht.
-- Bricht der Lauf komplett ab, wird die Reservierung vollständig aufgelöst.
+- **Voiceover**: `generate-video-voiceover` wird pro Szene mit dem Szenentext, der gewählten Stimme und der Sprache aufgerufen (Service-Role-Aufruf ist dort bereits unterstützt). Sprachvertrag der Plattform gilt: Deutsch bleibt Deutsch.
+- **Musik**: Auswahl über `search-stock-music` nach Stimmung des Treatments, danach Proxy in den eigenen Storage (Hotlink-Stabilität für Lambda) — dasselbe Muster wie im Universal Creator.
+- **Mix**: Musik auf 0.25–0.3 unter dem VO, Ein-/Ausblendung an den Rhythmus-Markern aus `rhythm.ts`.
+- Foley/Ambience bleibt in Stage 3 auf die Musik-/VO-Ebene beschränkt; Einzelsound-Layer folgt später.
 
-## 2. Ton: Voiceover, Musik, Foley
+### 3. Lip-Sync für Sprech-Szenen
 
-Die Optionen sind in der UI wählbar, im Lauf passiert damit bisher nichts.
+- Szenen, die in der Grammatik als Sprech-Szene markiert sind, laufen nach dem Motion-Schritt durch die bestehende Lip-Sync-Strecke (`lip-sync-video`) mit dem Szenen-VO als Audio.
+- Ergebnis ersetzt die Clip-URL der Szene; bei Fehlschlag wird die Stufe erstattet und der stumme Clip behalten, statt die ganze Produktion zu killen.
 
-- **Voiceover**: pro Szene aus dem Treatment-Text, über `generate-video-voiceover` mit der Sprache aus den Launcher-Optionen und harter Sprach-Sperre. Die Stimme kommt aus der Voice-Bibliothek (Charakterzuordnung, sonst Erzählerstimme). Start-Offsets werden aus den Szenenlängen berechnet, nie über die Filmlänge hinaus.
-- **Musik**: ein Bett passend zur `musicMood` aus dem Treatment, gesucht über die vorhandene Musik-Strecke; Lautstärke unter Sprache abgesenkt.
-- **Foley/Ambience**: `soundDesign.ts` liefert bereits die Cues — sie werden als leise Zusatzspuren gelegt.
+### 4. Endschnitt: `autopilot-finalize`
 
-## 3. Lip-Sync im Autopilot-Pfad
+Neue Edge Function, die alle fertigen Szenen zu einem Film zusammensetzt:
 
-Szenen, die das Treatment als Sprechszene markiert hat, laufen nach dem Motion-Schritt über die bestehende Kling-Omni-Strecke mit Deutsch-Hard-Lock und den etablierten Schutzmechanismen (Face-Share-Floor, Motion-Probe-Watchdog, Refund bei Nichttreffer). Szenen ohne Sprecher überspringen den Schritt komplett.
+- Baut ein Universal-Creator-kompatibles Payload (`scenes[].background = { type: 'video', videoUrl }`, `useAnimation`), strikt mit `rawMediaMode: true` — die Raw-Media-Invariante gilt auch hier, keine Cinematic-Filter außerhalb Director's Cut.
+- Legt Logo-/Produkt-Overlays aus `autopilot_assets` (Rolle „Logo"/„Produkt", Overlay-Variante) auf die geplanten Szenen.
+- Startet den Render über `render-with-remotion` per Service-Role mit `userId` im Body (dieser Pfad ist dort vorhanden, kein User-JWT nötig — löst das Token-Ablauf-Problem bei langen Läufen).
+- Pollt `video_renders` auf das Ergebnis und schreibt `final_video_url` in `autopilot_productions`; danach Ablage in der Mediathek nach der bestehenden Persistenz-Regel (Videos → `video_creations`).
 
-## 4. Endschnitt `autopilot-finalize`
+### 5. UI
 
-Neue Edge Function, die nach `scenes_ready` übernimmt:
+- `ProductionStage.tsx` bekommt die neuen Phasen: Ton → Lip-Sync → Endschnitt → fertig, jeweils mit Live-Log und Fehlerzustand pro Szene.
+- `DirectorsTable.tsx` bekommt vor dem Start einen Freigabedialog mit der konkreten Credit-Summe (Aufschlüsselung pro Stufe) und Bestätigung.
+- Am Ende: Player mit dem fertigen Film, Download und „In Director's Cut öffnen" für Feinschliff.
 
-- Clips in Szenenreihenfolge aneinandersetzen, Schnittpunkte nach dem Rhythmus-Plan aus `rhythm.ts` (Kapitel-Modus ab 90 s).
-- Tonspuren (VO, Musik, Foley) mit korrekten Offsets darunterlegen.
-- Logo-Assets als sauberes Overlay einblenden — nie generiert, wie in `assetRoles.ts` festgelegt.
-- Render über die bestehende Remotion-Lambda-Strecke; `rawMediaMode` bleibt aktiv, keine cinematischen Filter.
-- Ergebnis nach `autopilot_productions.final_video_url`, Stufe wird `final_cut` → `completed`.
-- Fehlgeschlagene Szenen werden ausgelassen statt den Film zu blockieren; der Regie-Log nennt sie beim Namen.
+### Technische Details
 
-## 5. UI
+- Migration ergänzt `autopilot_productions` um `voiceover_url`, `music_url`, `audio_mix jsonb`, `render_id`, `spent_credits`, und `autopilot_production_scenes` um `voiceover_url`, `voiceover_duration_seconds`, `lipsync_url`, `spent_credits`, `refunded` — inklusive GRANTs und RLS analog zu den bestehenden Autopilot-Tabellen.
+- `deduct_ai_video_credits` schreibt die Transaktion selbst; der Helper ergänzt Idempotenz-Prüfung und erstattet über einen `refund`-Eintrag.
+- Szenenlängen rasten weiterhin auf das Hailuo-Raster (6s/10s) ein; der Endschnitt gleicht die Abweichung über Szenen-Trims im Remotion-Payload aus, damit die Gesamtdauer der geplanten Länge entspricht (max. 180s).
+- Lange Läufe: Orchestrator arbeitet weiter szenenweise und schreibt Zwischenstände in die DB, damit ein Funktionstimeout keine Produktion verliert.
 
-- `ProductionStage.tsx` bekommt die neuen Stufen (Ton, Lip-Sync, Endschnitt) in der Fortschrittsanzeige.
-- Ein Freigabe-Dialog vor dem Start zeigt die Kostenvorschau und bucht erst nach Bestätigung.
-- Am Ende: Player mit dem fertigen Spot, Download, und Übergabe in die Mediathek.
+### Nicht in diesem Schritt
 
----
-
-## Technische Details
-
-- Neu: `supabase/functions/autopilot-finalize/index.ts`
-- Neu: `supabase/functions/_shared/autopilotCredits.ts` (Reserve/Commit/Refund-Wrapper mit Idempotenzschlüssel)
-- Erweitert: `autopilot-orchestrate` — Credit-Klammer, VO-/Musik-/Foley-Erzeugung, Lip-Sync-Abzweig für Sprechszenen, Aufruf von `autopilot-finalize`, neue Stufen `audio` · `lipsync` · `final_cut`
-- Erweitert: `autopilot-treatment` — markiert Sprechszenen und Sprecherzuordnung explizit pro Szene
-- Erweitert: `ProductionStage.tsx`, `DirectorsTable.tsx` (Freigabe-Dialog), `useAutopilotProduction.ts` (neue Stufen)
-- Migration: Spalten für Audio-URLs und Credit-Ledger-Referenz auf `autopilot_productions` / `autopilot_production_scenes`
-- Wiederverwendet, nicht neu gebaut: `generate-video-voiceover`, Musik-Suche, Kling-Omni-Lip-Sync, `lipsync-watchdog`, `render-with-remotion`, `credit-*`
+- Separate Foley-Einzelspuren und automatische Farbkorrektur.
+- Parallelisierung der Motion-Generierung (bleibt sequentiell).
