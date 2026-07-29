@@ -28,7 +28,14 @@ import { GENRE_LIST, getRecipe } from '@/lib/autopilot/genres';
 import { applyRhythm, diversifyCameraMoves } from '@/lib/autopilot/rhythm';
 import { preflightTreatment, blockingFindings } from '@/lib/autopilot/preflight';
 import { planSoundDesign } from '@/lib/autopilot/soundDesign';
-import { describeScene } from '@/lib/autopilot/promptGrammar';
+import {
+  describeScene,
+  compileAnchorPrompt,
+  compileMotionPrompt,
+  clampPromptWords,
+} from '@/lib/autopilot/promptGrammar';
+import { useAutopilotProduction } from '@/hooks/useAutopilotProduction';
+import { ProductionStage } from '@/components/autopilot/ProductionStage';
 import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/autopilot/types';
 import { cn } from '@/lib/utils';
 
@@ -65,8 +72,15 @@ export function DirectorsTable() {
   const [duration, setDuration] = useState(20);
 
   const [loading, setLoading] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [approved, setApproved] = useState(false);
   const [productionId, setProductionId] = useState<string | null>(null);
   const [treatment, setTreatment] = useState<AutopilotTreatment | null>(null);
+
+  const { production, scenes: producedScenes, log } = useAutopilotProduction(
+    productionId,
+    approved,
+  );
 
   /**
    * The model delivers structure; the planner owns time and camera variety.
@@ -151,6 +165,82 @@ export function DirectorsTable() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Approval hands the compiled grammar to the orchestrator. Prompts are
+   * compiled here so the client's storyboard and the server's render can never
+   * drift apart — there is exactly one grammar implementation.
+   */
+  const handleStartProduction = async () => {
+    if (!plannedTreatment || !productionId) return;
+    setStarting(true);
+    try {
+      const characterIds = Array.from(
+        new Set(plannedTreatment.scenes.flatMap((scene) => scene.characterIds ?? [])),
+      );
+
+      const portraitById = new Map<string, { url: string | null; name: string }>();
+      if (characterIds.length) {
+        const { data } = await supabase
+          .from('brand_characters')
+          .select('id, name, portrait_url, reference_image_url')
+          .in('id', characterIds);
+        for (const row of data ?? []) {
+          portraitById.set(row.id, {
+            url: row.portrait_url ?? row.reference_image_url ?? null,
+            name: row.name ?? '',
+          });
+        }
+      }
+
+      const { data, error } = await supabase.functions.invoke('autopilot-orchestrate', {
+        body: {
+          production_id: productionId,
+          aspect_ratio: plannedTreatment.aspect,
+          scenes: plannedTreatment.scenes.map((scene) => {
+            const cast = (scene.characterIds ?? [])
+              .map((id) => portraitById.get(id))
+              .filter(Boolean) as Array<{ url: string | null; name: string }>;
+            return {
+              id: scene.id,
+              orderIndex: scene.orderIndex,
+              beat: scene.beat,
+              durationSeconds: scene.durationSeconds,
+              anchorPrompt: clampPromptWords(compileAnchorPrompt(scene)),
+              motionPrompt: clampPromptWords(compileMotionPrompt(scene, { hasAnchor: true }), 60),
+              dialogue: scene.dialogue ?? null,
+              speakerCharacterId: scene.speakerCharacterId ?? null,
+              voiceId: scene.voiceId ?? null,
+              voiceLanguage: scene.voiceLanguage ?? plannedTreatment.language,
+              characterIds: scene.characterIds ?? [],
+              portraitUrls: cast.map((entry) => entry.url).filter(Boolean),
+              characterNames: cast.map((entry) => entry.name).filter(Boolean),
+              soundDesign: { foleyHint: scene.foleyHint ?? null },
+              grammar: scene as unknown as Record<string, unknown>,
+            };
+          }),
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setApproved(true);
+      toast({
+        title: 'Produktion läuft',
+        description:
+          'Jede Szene wird erst als Standbild geprüft und nur dann animiert — du kannst live zuschauen.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Produktion konnte nicht starten',
+        description: err instanceof Error ? err.message : 'Unbekannter Fehler',
+        variant: 'destructive',
+      });
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -349,24 +439,38 @@ export function DirectorsTable() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Button
               size="lg"
-              disabled={blockers.length > 0 || !productionId}
-              onClick={() =>
-                toast({
-                  title: 'Treatment freigegeben',
-                  description:
-                    'Die Produktion startet mit der Bildfreigabe — jede Szene wird als Standbild geprüft, bevor sie animiert wird.',
-                })
-              }
+              disabled={blockers.length > 0 || !productionId || starting || approved}
+              onClick={handleStartProduction}
             >
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Freigeben und produzieren
+              {starting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Produktion startet …
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Freigeben und produzieren
+                </>
+              )}
             </Button>
-            <Button size="lg" variant="outline" onClick={handleDevelop} disabled={loading}>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleDevelop}
+              disabled={loading || starting || approved}
+            >
               Neu entwickeln
             </Button>
           </div>
         </Card>
       )}
+
+      {/* ------------------------------------------------------- Produktion */}
+      {approved && production && (
+        <ProductionStage production={production} scenes={producedScenes} log={log} />
+      )}
     </div>
   );
 }
+
