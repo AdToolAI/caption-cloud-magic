@@ -59,3 +59,34 @@ export function voiceLanguageLabel(code?: string | null): string {
 export const NATIVE_SENSITIVE_LANGUAGES = new Set([
   'de', 'es', 'fr', 'it', 'pt', 'nl', 'pl', 'tr', 'sv', 'fi', 'ru', 'uk', 'ar', 'hi', 'ja', 'ko', 'zh',
 ]);
+
+/** Short native sample sentences used for voice previews. */
+export const VOICE_PREVIEW_SAMPLES: Record<string, string> = {
+  de: 'Hallo, so klingt meine Stimme. Ich freue mich darauf, deinen Text vorzulesen.',
+  en: 'Hello, this is how my voice sounds. I look forward to reading your text.',
+  es: 'Hola, así suena mi voz. Tengo muchas ganas de leer tu texto.',
+  fr: 'Bonjour, voici à quoi ressemble ma voix. J’ai hâte de lire votre texte.',
+  it: 'Ciao, ecco come suona la mia voce. Non vedo l’ora di leggere il tuo testo.',
+  pt: 'Olá, é assim que soa a minha voz. Mal posso esperar para ler o seu texto.',
+  nl: 'Hallo, zo klinkt mijn stem. Ik lees graag jouw tekst voor.',
+  pl: 'Cześć, tak brzmi mój głos. Chętnie przeczytam twój tekst.',
+  tr: 'Merhaba, sesim böyle geliyor. Metnini okumak için sabırsızlanıyorum.',
+  sv: 'Hej, så här låter min röst. Jag ser fram emot att läsa din text.',
+  fi: 'Hei, tältä ääneni kuulostaa. Odotan innolla tekstisi lukemista.',
+  ru: 'Здравствуйте, так звучит мой голос. С радостью прочитаю ваш текст.',
+  uk: 'Вітаю, так звучить мій голос. Залюбки прочитаю ваш текст.',
+  ar: 'مرحباً، هكذا يبدو صوتي. يسعدني أن أقرأ نصك.',
+  hi: 'नमस्ते, मेरी आवाज़ ऐसी लगती है। मुझे आपका पाठ पढ़कर खुशी होगी।',
+  ta: 'வணக்கம், என் குரல் இப்படித்தான் ஒலிக்கும். உங்கள் உரையை வாசிக்க ஆவலாக உள்ளேன்.',
+  id: 'Halo, beginilah suara saya. Saya senang membacakan teks Anda.',
+  vi: 'Xin chào, đây là giọng nói của tôi. Tôi rất mong được đọc văn bản của bạn.',
+  ja: 'こんにちは、これが私の声です。あなたのテキストを読むのを楽しみにしています。',
+  ko: '안녕하세요, 제 목소리는 이렇습니다. 당신의 글을 읽어드릴 수 있어 기쁩니다.',
+  zh: '你好，这就是我的声音。我很期待为你朗读文本。',
+};
+
+export function voicePreviewSample(code?: string | null): string {
+  const norm = normalizeVoiceLanguage(code);
+  return (norm && VOICE_PREVIEW_SAMPLES[norm]) || VOICE_PREVIEW_SAMPLES.en;
+}
+
