@@ -1,0 +1,33 @@
+# AdTool AI
+
+> KI-gestützter Social-Media- und Video-Content-Manager. Erstelle Captions, Kurzvideos, Voiceovers und Musik in Sekunden — mit lippensynchronen Sprechern, Marken-Charakteren und automatisiertem Posting.
+
+AdTool AI ist eine Beta-Plattform (Launch 2026) für Creator, Agenturen und Marken. Kernfeatures: AI Video Studio (Motion + Cinematic-Sync Lip-Sync), Picture Studio, Music Studio, Universal Content Creator, Director's Cut Timeline-Editor, Cast & World Charakter-Bibliothek. Preise ab 14,99 €/Monat im Founders-Deal.
+
+## Pages
+
+- [Home](/): Übersicht, Live-Demos und Founders-Deal.
+- [Preise](/pricing): Beta-Basic 19,99 €/Monat, Founders-Rabatt 15,99 €/Monat für 24 Monate.
+- [FAQ](/faq): Häufige Fragen zu Features, Credits und Beta-Programm.
+- [Status](/status): Live-Status der Plattform-Services.
+- [Support](/support): Kontakt, Bug-Reports und Hilfe.
+
+## Hubs
+
+- [Planen](/hub/planen): Content-Kalender, Kampagnen, Auto-Posting.
+- [Erstellen](/hub/erstellen): KI-Studios für Video, Bild, Musik und Text.
+- [Optimieren](/hub/optimieren): Caption-Rewriter, Hooks, Brand Voice.
+- [Analysieren](/hub/analysieren): Performance-Tracking, Trend-Radar, News-Hub.
+- [Team](/hub/team): Kollaborations-Workspace mit Kanban und Rollen.
+
+## Rechtliches
+
+- [AGB](/legal/terms): Allgemeine Geschäftsbedingungen.
+- [Datenschutz](/legal/privacy): DSGVO-konforme Datenschutzerklärung.
+- [Impressum](/legal/imprint): Anbieter- und Kontaktinformationen.
+- [AI-Video-Refund-Policy](/legal/ai-video-refund): Erstattungsregeln für misslungene KI-Renderings.
+- [Character-Takedown](/legal/character-takedown-request): Formular für Marken-/Persönlichkeits-Rechteinhaber.
+
+## Optional
+
+- [Coming Soon](/coming-soon): Features in Entwicklung.
