@@ -43,6 +43,11 @@ Arbeitsregeln:
 6. Variiere Einstellungsgrößen und Kamerabewegungen. Zweimal hintereinander dieselbe
    Bewegung wirkt maschinell.
 7. Die Dauer der einzelnen Szenen setzt du NICHT — das übernimmt der Rhythmus-Planer.
+8. Sprechen in einer Szene mehrere Personen, füllst du "turns" (ein Eintrag pro Redebeitrag,
+   in der richtigen Reihenfolge, jeweils mit der Charakter-ID des Sprechers). "dialogue"
+   lässt du dann leer. Sprechen alle Turns zusammen, dürfen sie die Szene nicht sprengen:
+   rechne mit rund 2,6 Wörtern pro Sekunde.
+
 
 Antworte ausschließlich über den Tool-Call.`;
 
