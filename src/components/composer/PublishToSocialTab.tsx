@@ -13,7 +13,7 @@ import { useScheduledPublishing } from '@/hooks/useScheduledPublishing';
 import { usePlatformCredentials } from '@/hooks/usePlatformCredentials';
 import { PlatformOptimizationHelper } from '@/components/publishing/PlatformOptimizationHelper';
 import { CrossPostMagicPanel } from './CrossPostMagicPanel';
-import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon, Sparkles } from 'lucide-react';
+import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon, Sparkles, Camera, MessageSquare, Link2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { es } from 'date-fns/locale';
