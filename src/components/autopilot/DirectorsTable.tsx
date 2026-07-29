@@ -154,6 +154,8 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           aspect_ratio: aspect,
           language,
           target_duration_seconds: duration,
+          characters: briefing?.characters ?? [],
+
         },
       });
 
