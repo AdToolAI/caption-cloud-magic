@@ -1,17 +1,23 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 /**
- * Refreshes the `voice_library_cache` table from ElevenLabs Shared Voice Library.
- * Meant to run daily via pg_cron. Also callable manually by an admin.
+ * Ingests the ElevenLabs Shared Voice Library into `public.voice_library_cache`.
  *
- * Strategy:
- *   1. For each target language (de, en, es) fetch pages of /v1/shared-voices
- *      filtered by featured=true + category=professional (highest quality tier).
- *   2. Normalize + upsert into public.voice_library_cache.
- *   3. Track supported_languages across languages so a bilingual voice
- *      appears in DE and EN filters.
+ * Runs nightly via pg_cron; also callable manually (admin / debug).
+ *
+ * Design notes (v295):
+ *  - No `featured=true` hard filter: it collapsed the catalog to ~0 usable rows.
+ *  - `category` is NOT used as a hard filter either; quality is stored as a
+ *    ranking signal (`quality`) so professional voices float to the top.
+ *  - Paging continues until `has_more === false` or MAX_PAGES is reached.
+ *  - Every run is recorded in `voice_library_sync_runs`.
  */
 
 interface SharedVoice {
@@ -21,6 +27,8 @@ interface SharedVoice {
   gender?: string;
   age?: string;
   language?: string;
+  locale?: string;
+  descriptive?: string;
   use_case?: string;
   description?: string;
   preview_url?: string;
@@ -32,9 +40,9 @@ interface SharedVoice {
   featured?: boolean;
 }
 
-const LANGUAGES = ['de', 'en', 'es'] as const;
+const DEFAULT_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'nl', 'pl', 'tr'];
 const PAGE_SIZE = 100;
-const MAX_PAGES_PER_LANG = 5; // → up to 500 professional voices per language
+const DEFAULT_MAX_PAGES = 15; // up to 1500 voices per language
 
 const NON_NATIVE_ACCENTS_FOR_DE_ES = new Set([
   'american', 'british', 'australian', 'canadian',
@@ -46,11 +54,13 @@ function isAccentNativeFor(language: string, accent?: string | null): boolean {
   const a = accent.toLowerCase().trim();
   if (language === 'de') {
     if (NON_NATIVE_ACCENTS_FOR_DE_ES.has(a)) return false;
-    return a.includes('german') || a.includes('austrian') || a.includes('swiss') || a === 'native' || a === 'neutral' || a === '';
+    return a.includes('german') || a.includes('austrian') || a.includes('swiss') ||
+      a === 'native' || a === 'neutral' || a === 'standard' || a === '';
   }
   if (language === 'es') {
     if (NON_NATIVE_ACCENTS_FOR_DE_ES.has(a)) return false;
-    return a.includes('spanish') || a.includes('mexican') || a.includes('castilian') || a.includes('latin') || a === 'native' || a === 'neutral' || a === '';
+    return a.includes('spanish') || a.includes('mexican') || a.includes('castilian') ||
+      a.includes('latin') || a === 'native' || a === 'neutral' || a === 'standard' || a === '';
   }
   return true;
 }
@@ -64,64 +74,109 @@ function normalizeLangCode(raw?: string | null): string | null {
   if (['fr', 'fra', 'french', 'français'].includes(s)) return 'fr';
   if (['it', 'ita', 'italian'].includes(s)) return 'it';
   if (['pt', 'por', 'portuguese'].includes(s)) return 'pt';
-  if (['nl', 'dutch'].includes(s)) return 'nl';
+  if (['nl', 'dutch', 'nld'].includes(s)) return 'nl';
+  if (['pl', 'pol', 'polish'].includes(s)) return 'pl';
+  if (['tr', 'tur', 'turkish'].includes(s)) return 'tr';
   return s.slice(0, 2);
+}
+
+/** Quality weight so professional voices outrank generic ones. */
+function qualityBoost(category?: string | null): number {
+  const c = (category || '').toLowerCase();
+  if (c === 'professional') return 5_000_000;
+  if (c === 'high_quality') return 2_000_000;
+  return 0;
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+  const body = await req.json().catch(() => ({} as Record<string, unknown>));
+  const languages: string[] = Array.isArray(body.languages) && body.languages.length
+    ? (body.languages as string[]).map((l) => String(l).toLowerCase().slice(0, 2))
+    : DEFAULT_LANGUAGES;
+  const maxPages: number = Math.min(50, Math.max(1, Number(body.maxPages) || DEFAULT_MAX_PAGES));
+  const triggerSource = String(body.trigger ?? 'manual');
+  // Wall-clock budget so the worker never hits the platform resource limit.
+  const budgetMs: number = Math.min(220_000, Math.max(20_000, Number(body.budgetMs) || 120_000));
+  const startedAt = Date.now();
+  const outOfBudget = () => Date.now() - startedAt > budgetMs;
+
+
+  let runId: string | null = null;
+  try {
+    const { data: run } = await admin
+      .from('voice_library_sync_runs')
+      .insert({ languages, trigger_source: triggerSource, status: 'running' })
+      .select('id')
+      .single();
+    runId = run?.id ?? null;
+  } catch (_) { /* non-fatal */ }
+
+  const finish = async (
+    status: string,
+    fetched: number,
+    upserted: number,
+    error?: string,
+  ) => {
+    if (!runId) return;
+    try {
+      await admin.from('voice_library_sync_runs')
+        .update({ status, fetched, upserted, error: error ?? null, finished_at: new Date().toISOString() })
+        .eq('id', runId);
+    } catch (_) { /* non-fatal */ }
+  };
+
+  const seen = new Set<string>();
+  let totalFetched = 0;
+  let upserted = 0;
+  const errors: string[] = [];
+
+
   try {
     const apiKey = Deno.env.get('ELEVENLABS_API_KEY');
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     if (!apiKey) throw new Error('ELEVENLABS_API_KEY not configured');
 
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+    for (const targetLang of languages) {
+      if (outOfBudget()) { errors.push('time budget reached'); break; }
+      for (let page = 0; page < maxPages; page++) {
+        if (outOfBudget()) { errors.push('time budget reached'); break; }
 
-    // voice_id → normalized cache row (deduped across per-language fetches)
-    const byId = new Map<string, {
-      voice_id: string;
-      name: string;
-      language: string;
-      supported_languages: string[];
-      accent: string | null;
-      gender: string | null;
-      age: string | null;
-      use_case: string | null;
-      description: string | null;
-      preview_url: string | null;
-      is_native: boolean;
-      popularity: number;
-      tier: string;
-      category: string | null;
-      labels: Record<string, unknown>;
-    }>();
-
-    let totalFetched = 0;
-
-    for (const targetLang of LANGUAGES) {
-      for (let page = 0; page < MAX_PAGES_PER_LANG; page++) {
         const url = new URL('https://api.elevenlabs.io/v1/shared-voices');
         url.searchParams.set('language', targetLang);
         url.searchParams.set('page_size', String(PAGE_SIZE));
         url.searchParams.set('page', String(page));
-        url.searchParams.set('featured', 'true');
-        url.searchParams.set('category', 'professional');
 
-        const res = await fetch(url.toString(), { headers: { 'xi-api-key': apiKey } });
+        let res: Response;
+        try {
+          res = await fetch(url.toString(), { headers: { 'xi-api-key': apiKey } });
+        } catch (e) {
+          errors.push(`${targetLang} p${page}: fetch failed ${e}`);
+          break;
+        }
         if (!res.ok) {
-          console.warn(`[refresh-voice-library] ${targetLang} page ${page} → ${res.status}: ${await res.text()}`);
+          const txt = await res.text();
+          console.warn(`[refresh-voice-library] ${targetLang} p${page} → ${res.status}: ${txt.slice(0, 200)}`);
+          errors.push(`${targetLang} p${page}: HTTP ${res.status}`);
           break;
         }
         const json = await res.json();
         const voices: SharedVoice[] = json.voices || [];
         if (voices.length === 0) break;
 
+        const pageRows: Record<string, unknown>[] = [];
         for (const v of voices) {
           totalFetched++;
+          if (seen.has(v.voice_id)) continue;
+          seen.add(v.voice_id);
+
           const accent = v.accent ?? v.labels?.accent ?? null;
-          const isNative = isAccentNativeFor(targetLang, accent);
+          const primary = normalizeLangCode(v.language) ?? targetLang;
+          const isNative = isAccentNativeFor(primary, accent);
 
           const supported = new Set<string>();
           if (v.verified_languages?.length) {
@@ -130,60 +185,71 @@ serve(async (req) => {
               if (n) supported.add(n);
             }
           }
-          if (supported.size === 0) supported.add(targetLang);
-          else supported.add(targetLang);
+          supported.add(primary);
+          supported.add(targetLang);
 
-          const existing = byId.get(v.voice_id);
-          const popularity = (v.usage_character_count_1y ?? 0) + (v.cloned_by_count ?? 0) * 100;
+          const popularity =
+            (v.usage_character_count_1y ?? 0) +
+            (v.cloned_by_count ?? 0) * 100 +
+            qualityBoost(v.category) +
+            (v.featured ? 1_000_000 : 0);
 
-          if (existing) {
-            for (const l of supported) if (!existing.supported_languages.includes(l)) existing.supported_languages.push(l);
-            existing.is_native = existing.is_native || isNative;
-            existing.popularity = Math.max(existing.popularity, popularity);
+          pageRows.push({
+            voice_id: v.voice_id,
+            name: v.name,
+            language: primary,
+            supported_languages: Array.from(supported),
+            accent,
+            gender: v.gender ?? v.labels?.gender ?? null,
+            age: v.age ?? v.labels?.age ?? null,
+            use_case: v.use_case ?? v.labels?.use_case ?? null,
+            descriptive: v.descriptive ?? v.labels?.descriptive ?? null,
+            locale: v.locale ?? null,
+            quality: v.category ?? null,
+            description: v.description ?? null,
+            preview_url: v.preview_url ?? null,
+            is_native: isNative,
+            popularity,
+            tier: 'community',
+            category: v.category ?? null,
+            labels: v.labels ?? {},
+            updated_at: new Date().toISOString(),
+          });
+        }
+
+        // Stream-upsert page by page to stay inside the worker memory budget.
+        if (pageRows.length > 0) {
+          const { error } = await admin
+            .from('voice_library_cache')
+            .upsert(pageRows, { onConflict: 'voice_id' });
+          if (error) {
+            console.error('[refresh-voice-library] upsert error:', error.message);
+            if (errors.length < 10) errors.push(`upsert: ${error.message}`);
           } else {
-            byId.set(v.voice_id, {
-              voice_id: v.voice_id,
-              name: v.name,
-              language: targetLang,
-              supported_languages: Array.from(supported),
-              accent,
-              gender: v.gender ?? v.labels?.gender ?? null,
-              age: v.age ?? v.labels?.age ?? null,
-              use_case: v.use_case ?? v.labels?.use_case ?? null,
-              description: v.description ?? null,
-              preview_url: v.preview_url ?? null,
-              is_native: isNative,
-              popularity,
-              tier: 'community',
-              category: v.category ?? null,
-              labels: v.labels ?? {},
-            });
+            upserted += pageRows.length;
           }
         }
 
-        if (voices.length < PAGE_SIZE) break;
+        if (json.has_more === false || voices.length < PAGE_SIZE) break;
       }
     }
 
-    const rows = Array.from(byId.values());
-    console.log(`[refresh-voice-library] fetched=${totalFetched} unique=${rows.length}`);
+    console.log(`[refresh-voice-library] fetched=${totalFetched} upserted=${upserted} errors=${errors.length}`);
 
-    // Chunked upsert
-    const CHUNK = 200;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK).map((r) => ({ ...r, updated_at: new Date().toISOString() }));
-      const { error } = await admin.from('voice_library_cache').upsert(chunk, { onConflict: 'voice_id' });
-      if (error) throw error;
-    }
+
+    const status = upserted === 0 ? 'failed' : errors.length ? 'partial' : 'ok';
+    await finish(status, totalFetched, upserted, errors.slice(0, 5).join(' | ') || undefined);
 
     return new Response(
-      JSON.stringify({ ok: true, fetched: totalFetched, upserted: rows.length }),
+      JSON.stringify({ ok: upserted > 0, fetched: totalFetched, upserted, errors: errors.slice(0, 5) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
-    console.error('[refresh-voice-library] error:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[refresh-voice-library] error:', msg);
+    await finish('failed', totalFetched, upserted, msg);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }

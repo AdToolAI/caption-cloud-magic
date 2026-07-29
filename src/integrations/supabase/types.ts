@@ -17220,19 +17220,50 @@ export type Database = {
           },
         ]
       }
+      voice_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          language: string | null
+          user_id: string
+          voice_id: string
+          voice_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          language?: string | null
+          user_id: string
+          voice_id: string
+          voice_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          language?: string | null
+          user_id?: string
+          voice_id?: string
+          voice_name?: string | null
+        }
+        Relationships: []
+      }
       voice_library_cache: {
         Row: {
           accent: string | null
           age: string | null
           category: string | null
           description: string | null
+          descriptive: string | null
           gender: string | null
           is_native: boolean
           labels: Json
           language: string
+          locale: string | null
           name: string
           popularity: number
           preview_url: string | null
+          quality: string | null
+          search_tsv: unknown
           supported_languages: string[]
           tier: string
           updated_at: string
@@ -17244,13 +17275,17 @@ export type Database = {
           age?: string | null
           category?: string | null
           description?: string | null
+          descriptive?: string | null
           gender?: string | null
           is_native?: boolean
           labels?: Json
           language: string
+          locale?: string | null
           name: string
           popularity?: number
           preview_url?: string | null
+          quality?: string | null
+          search_tsv?: unknown
           supported_languages?: string[]
           tier?: string
           updated_at?: string
@@ -17262,18 +17297,58 @@ export type Database = {
           age?: string | null
           category?: string | null
           description?: string | null
+          descriptive?: string | null
           gender?: string | null
           is_native?: boolean
           labels?: Json
           language?: string
+          locale?: string | null
           name?: string
           popularity?: number
           preview_url?: string | null
+          quality?: string | null
+          search_tsv?: unknown
           supported_languages?: string[]
           tier?: string
           updated_at?: string
           use_case?: string | null
           voice_id?: string
+        }
+        Relationships: []
+      }
+      voice_library_sync_runs: {
+        Row: {
+          error: string | null
+          fetched: number
+          finished_at: string | null
+          id: string
+          languages: string[]
+          started_at: string
+          status: string
+          trigger_source: string | null
+          upserted: number
+        }
+        Insert: {
+          error?: string | null
+          fetched?: number
+          finished_at?: string | null
+          id?: string
+          languages?: string[]
+          started_at?: string
+          status?: string
+          trigger_source?: string | null
+          upserted?: number
+        }
+        Update: {
+          error?: string | null
+          fetched?: number
+          finished_at?: string | null
+          id?: string
+          languages?: string[]
+          started_at?: string
+          status?: string
+          trigger_source?: string | null
+          upserted?: number
         }
         Relationships: []
       }
