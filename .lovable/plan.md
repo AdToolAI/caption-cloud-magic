@@ -1,39 +1,47 @@
-## Befund vorab (geprüft)
+## Antwort: Ja — dasselbe Muster steckt in zwei weiteren Features
 
-Der Upload im Universal Content Creator verändert das Video **nicht**:
+Ich habe alle Wizards/Studios mit Entwurfs-Persistenz durchgesehen. Ergebnis:
 
-- `BackgroundAssetSelector.tsx:148-193` lädt die Datei 1:1 per Storage-Upload hoch, holt `getPublicUrl()` **ohne** Transform-Parameter und speichert genau diese Original-URL.
-- Kein Canvas/ffmpeg/WebCodecs, keine Kompression, kein Proxy im Upload-Pfad.
-- `compress-video` und `media-upload-complete` existieren als Edge Functions, werden aber von **keiner** Frontend-Datei aufgerufen.
-- Die Original-URL wandert unverändert bis in die Remotion-Lambda-Payload (`background.videoUrl`), `rawMediaMode: true` ist gesetzt.
+| Feature | Verhalten bei "Neu starten" + F5 | Status |
+|---|---|---|
+| Universal Content Creator | Nur State + localStorage geleert; DB-Draft bleibt, Silent-Auto-Resume holt ihn zurück | **Bug (bestätigt)** |
+| Universal Video Creator (Wizard) | `handleStartFresh` löscht nur die localStorage-Drafts; DB-Recovery holt danach den neuesten Eintrag zurück | **Gleicher Bug** |
+| Video Composer | `handleReset` stoppt Jobs + löscht Local-Draft, aber die alte `composer_projects`-Zeile samt Szenen bleibt in der DB liegen | **Teil-Bug (verwaiste Projekte)** |
+| Director's Cut | Hat bereits einen expliziten Reload-Reset über `directors-cut-draft.ts` | OK |
+| Picture Studio | Nur In-Memory-Cache, keine Persistenz über Reload | OK |
 
-Der Unterschied entsteht also **nicht beim Upload**. Was noch nicht bewiesen ist: wo genau er dann entsteht. Zwei realistische Kandidaten, beide noch unbestätigt: (a) Skalierung, weil die Remotion-Komposition eine feste Zielauflösung/FPS hat, die nicht der Quelle entspricht (4K/60fps-Quelle → 1080p/30fps-Export), und (b) die H.264-Neucodierung im Lambda selbst (CRF/Bitrate/Farbraum).
+### Details zu den Fundstellen
 
-## Schritt 1 — Ursache beweisen (zuerst, ohne Codeänderung)
+**1. Universal Content Creator** — `src/pages/UniversalCreator/UniversalCreator.tsx`
+`handleNewProject` (Z. 168–191) setzt nur State zurück und entfernt `?project=`. Der Mount-Effekt (Z. 370–402) sucht danach den neuesten `content_projects`-Draft (`content_type='universal'`, `status='draft'`, <7 Tage) und hydratisiert ihn — deshalb ist nach F5 das alte Projekt wieder da.
 
-1. Storage-Datei mit der Originaldatei byte-/hash-vergleichen → schließt den Upload endgültig aus.
-2. `ffprobe` auf Original vs. exportiertes MP4: Auflösung, FPS, Bitrate, Pixel-Format (`yuv420p`), Farbprimaries/Transfer (`bt709` vs. unmarkiert) und Farbbereich (`tv` vs. `full`) gegenüberstellen.
-3. Einen identischen Frame aus beiden Dateien extrahieren und numerisch vergleichen (mittlere Differenz + Histogramm), statt nach Augenmaß.
+**2. Universal Video Creator** — `src/components/universal-video-creator/UniversalVideoWizard.tsx` + `src/lib/universal-video-draft.ts`
+`handleStartFresh` ruft nur `clearAllDrafts()` (localStorage). Der DB-Fallback-Effekt (Z. ~197–235) lädt den neuesten `universal_video_progress`-Eintrag mit `status='completed'`. Der Zeitfilter `generationStartedAtRef` ist nach einem Reload leer, d. h. der Filter greift nicht und ein altes Ergebnis kann wieder in den Wizard laufen.
 
-Ergebnis dieses Schritts entscheidet, welcher der folgenden Fixes greift.
+**3. Video Composer** — `src/components/video-composer/VideoComposerDashboard.tsx`
+`handleReset` (Z. 692–727) canceled laufende Jobs und löscht den Local-Draft, entfernt die alte Projektzeile aber nicht. Nach F5 startet der Composer zwar sauber, in der Datenbank sammeln sich aber verwaiste Projekte + Szenen an (Storage- und Quota-relevant, `useStorageQuota` zählt Drafts mit).
 
-## Schritt 2 — Fix je nach Befund
+## Umsetzung
 
-**Fall A: Downscale/FPS-Konvertierung**
-Zielauflösung und FPS der UCC-Komposition an die Quelle koppeln, wenn nur ein einzelnes Video-Asset ohne Format-Änderung verwendet wird — statt fest auf das Preset-Format zu rendern. Bei bewusst gewähltem Format (z.B. 9:16 aus 16:9) bleibt Skalierung natürlich nötig; dann hochwertiges Resampling erzwingen.
+### A) Universal Content Creator
+1. `handleNewProject` wird `async` und löscht die aktuelle Projektzeile hart: `content_projects.delete().eq('id', projectId).eq('user_id', user.id)`.
+2. Falls keine `projectId` im State liegt, zusätzlich den neuesten eigenen `universal`-Draft löschen, damit Auto-Resume ins Leere läuft.
+3. Fresh-Start-Sperre: Ein localStorage-Flag (`universal-creator-fresh-start`) wird beim Reset gesetzt; der Mount-Effekt überspringt bei gesetztem Flag sowohl Auto-Resume als auch `restoreFromLocalStorage`. Das Flag fällt weg, sobald `saveProgress` eine neue `projectId` anlegt. So bleibt der Neustart auch dann sauber, wenn das Delete an RLS/Offline scheitert.
+4. Dialogtext ergänzen: der aktuelle Entwurf wird endgültig gelöscht (DE/EN/ES in `src/lib/translations.ts`).
 
-**Fall B: Farbraum-/Range-Shift**
-Das ist die typische Ursache für „gleicher Inhalt, anderer Kontrast": Quelle ist `full range`/unmarkiert, Export schreibt `tv range`/`bt709`. Fix: Farb-Metadaten beim Encode explizit an die Quelle angleichen.
+### B) Universal Video Creator
+1. `handleStartFresh` löscht zusätzlich die zugehörigen `universal_video_progress`-Zeilen des Users (bzw. markiert sie als konsumiert) und setzt `dbFallbackAttempted`/`generationStartedAtRef` zurück.
+2. Ein gemeinsames Fresh-Start-Flag (gleiche Hilfsfunktion wie in A, ausgelagert nach `src/lib/fresh-start-guard.ts`) verhindert die DB-Recovery nach einem bewussten Neustart.
+3. Der DB-Fallback bekommt zusätzlich eine harte Zeitschranke: nur Einträge, die nach dem Mount-Zeitpunkt der aktuellen Session erzeugt wurden, dürfen wiederhergestellt werden.
 
-**Fall C: Encoder-Verlust**
-Falls Auflösung und Farbraum identisch sind und nur Detailschärfe fehlt: Qualitätsboden im Export weiter anheben (CRF/jpegQuality) bzw. für Einzel-Video-Assets ohne Overlays einen Stream-Copy-Pfad prüfen, der gar nicht neu codiert.
+### C) Video Composer
+1. `handleReset` löscht nach dem Cancel die alte Projektzeile (`composer_projects.delete()` mit `user_id`-Guard; Szenen hängen per Cascade dran) — mit Fehler-Toast, aber ohne den Reset zu blockieren.
+2. Bestätigungsdialog-Text auf "wird endgültig gelöscht" anpassen.
 
-## Technische Details
+## Neue Datei
 
-- Betroffene Dateien voraussichtlich: `src/lib/universalCreatorRenderPayload.ts` (Format-/FPS-Ableitung), `src/remotion/templates/UniversalCreatorVideo.tsx`, `supabase/functions/render-with-remotion/index.ts` (Encoder-Parameter, `colorSpace`).
-- Die Raw-Media-Invariante (kein Grade, keine Filter außer explizit im Director's Cut) bleibt unangetastet.
-- Keine Änderung am Upload-Pfad — der ist nachweislich verlustfrei.
+- `src/lib/fresh-start-guard.ts` — `markFreshStart(key)`, `consumeFreshStart(key)`, gemeinsam von UCC und UVC genutzt.
 
-## Was du dafür brauchst
+## Verifikation
 
-Für Schritt 1 brauche ich die **Originaldatei und das exportierte MP4** desselben Projekts (beide als Upload), sonst kann ich nur raten statt messen.
+Für jedes der drei Features: Neustart auslösen → F5 → Wizard startet leer auf Schritt 1, keine `?project=`-URL, alte Zeile ist per DB-Query nicht mehr auffindbar.

@@ -41,8 +41,10 @@ import {
   computeDurationInFrames,
 } from '@/lib/universalCreatorDefaults';
 import { buildUniversalCreatorCustomizations, getUniversalCreatorDurationSeconds } from '@/lib/universalCreatorRenderPayload';
+import { markFreshStart, consumeFreshStart, clearFreshStart } from '@/lib/fresh-start-guard';
 
 const BACKUP_STORAGE_KEY = 'universal-creator-backup';
+const FRESH_START_KEY = 'universal-creator';
 const BACKUP_SCHEMA_VERSION = 2;
 const BACKUP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7d — long enough for multi-day sessions
 const AUTO_RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -165,8 +167,46 @@ export function UniversalCreator() {
     }
   };
 
-  const handleNewProject = () => {
+  const handleNewProject = async () => {
+    // Suppress silent auto-resume on the next mount / reload, even if the
+    // delete below fails (offline, RLS, race).
+    markFreshStart(FRESH_START_KEY);
     localStorage.removeItem(BACKUP_STORAGE_KEY);
+
+    // Hard-delete the previous draft so a reload can never resurrect it.
+    try {
+      if (user) {
+        if (projectId) {
+          await supabase
+            .from('content_projects')
+            .delete()
+            .eq('id', projectId)
+            .eq('user_id', user.id);
+        } else {
+          // No id in state — remove the newest universal draft so the
+          // auto-resume lookup finds nothing.
+          const { data } = await supabase
+            .from('content_projects')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('content_type', 'universal')
+            .eq('status', 'draft')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data?.id) {
+            await supabase
+              .from('content_projects')
+              .delete()
+              .eq('id', data.id)
+              .eq('user_id', user.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[UniversalCreator] Could not delete previous draft:', err);
+    }
+
     hydratedRef.current = false;
     setProjectId(undefined);
     setFormatConfig(null);
@@ -215,6 +255,8 @@ export function UniversalCreator() {
           .select()
           .single();
         if (error) throw error;
+        // A real new draft exists again — the fresh-start guard is obsolete.
+        clearFreshStart(FRESH_START_KEY);
         setProjectId(data.id);
         // Publish new projectId to the URL so reload / share resumes exactly this draft
         const next = new URLSearchParams(searchParams);
@@ -363,6 +405,13 @@ export function UniversalCreator() {
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
+    // Explicit "new project" was requested — never resurrect anything,
+    // not even after a browser reload.
+    if (consumeFreshStart(FRESH_START_KEY)) {
+      localStorage.removeItem(BACKUP_STORAGE_KEY);
+      setIsHydrating(false);
+      return;
+    }
     if (urlProjectId) {
       void hydrateFromDb(urlProjectId);
       return;
@@ -572,7 +621,7 @@ export function UniversalCreator() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Neues Projekt starten?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Der aktuelle Fortschritt wird verworfen. Diese Aktion kann nicht rückgängig gemacht werden.
+                  Der aktuelle Entwurf wird endgültig gelöscht — auch nach einem Reload (F5) kommt er nicht zurück. Diese Aktion kann nicht rückgängig gemacht werden.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
