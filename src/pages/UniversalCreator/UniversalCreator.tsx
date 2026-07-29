@@ -502,7 +502,17 @@ export function UniversalCreator() {
             onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
             onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
             onMusicUrlChange={setSelectedMusicUrl}
+            musicClip={contentConfig?.backgroundMusicClip ?? null}
+            onMusicClipChange={(clip) => setContentConfig(prev => ({
+              ...(prev || {} as ContentConfig),
+              backgroundMusicClip: clip,
+            }))}
+            videoDurationSeconds={getUniversalCreatorDurationSeconds({
+              contentConfig,
+              scenes,
+            })}
           />
+
           <OriginalAudioMixPanel
             enabled={contentConfig?.useOriginalAudio === true}
             volume={typeof contentConfig?.originalAudioVolume === 'number' ? contentConfig!.originalAudioVolume! : 0.6}
