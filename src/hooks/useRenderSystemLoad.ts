@@ -10,8 +10,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const SLOT_BUDGET_DEFAULT = 60;
-const HIGH_WATER = 50;
+const SLOT_BUDGET_DEFAULT = 80;
+const HIGH_WATER = 68;
 
 export type LoadState = 'idle' | 'busy' | 'founder_reserve' | 'saturated';
 

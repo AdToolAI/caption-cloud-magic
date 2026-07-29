@@ -1,14 +1,15 @@
-// Render Concurrency Policy — Beta-Launch v1 (AWS Lambda quota = 100)
+// Render Concurrency Policy — Launch v2 (AWS Lambda quota = 100, confirmed)
 //
-// Global slot budget (100 total Lambdas):
-//   - 30 reserved for edge functions (auth, DB, generate-*, etc.)
-//   - 10 burst reserve (never touched by scheduler)
-//   - 60 render pool (this module governs it)
+// Global slot budget (100 total Lambdas, eu-central-1):
+//   - 80 render pool (this module governs it)
+//   - 20 edge functions + burst reserve
 //
-// Per-render worker cap is tiered by frame count so many users can render in
-// parallel instead of one user monopolising the pool.
+// Founder-Reserve ab 68/80 (letzte 12 Slots founders-only, ~85 %).
+// Per-render worker cap tiers unverändert — erst anheben, wenn LambdaHealth
+// peak > 60 an ≥ 3 Tagen zeigt. Siehe
+// mem://infrastructure/aws-lambda/quota-100-launch-distribution.md
 
-export const RENDER_SLOT_BUDGET_DEFAULT = 60;
+export const RENDER_SLOT_BUDGET_DEFAULT = 80;
 export const FRAMES_PER_LAMBDA_DEFAULT = 200;
 export const FRAMES_PER_LAMBDA_MIN = 120;
 
@@ -60,9 +61,9 @@ export function pickPriority(isFounder: boolean, override?: number | null): numb
 /**
  * Founders reserve band: when >= this share of the slot budget is in use,
  * only Founders are admitted. Non-founders get a 429 with a retry hint.
- * Default: at 50/60 slots (~83%) reserve the last 10 for Founders.
+ * Default: at 68/80 slots (~85%) reserve the last 12 for Founders.
  */
-export const FOUNDER_RESERVE_HIGH_WATER = 50;
+export const FOUNDER_RESERVE_HIGH_WATER = 68;
 
 export interface AdmissionResult {
   admitted: boolean;
