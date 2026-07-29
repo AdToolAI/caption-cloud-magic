@@ -84,18 +84,28 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
       publishAt.setHours(parseInt(hours), parseInt(minutes));
       await Promise.all(selectedPlatforms.map(platform => schedulePublication({ platform: toBase(platform), videoUrl, caption, title, description, hashtags: hashtagArray, publishAt })));
     } else {
-      await publishToMultiplePlatforms({ videoUrl, caption, title, description, hashtags: hashtagArray }, selectedPlatforms);
+      const extras = {
+        coverUrl: coverUrl || undefined,
+        firstComment: canFirstComment && firstComment.trim() ? firstComment : undefined,
+        utm: { enabled: utmEnabled, campaign: utmCampaign || undefined, content: videoId },
+      };
+      await publishToMultiplePlatforms({ videoUrl, caption, title, description, hashtags: hashtagArray, ...extras }, selectedPlatforms);
     }
     onPublished?.();
   };
 
   const handleMagicPublishAll = async (perChannel: Record<Platform, { caption: string; hashtags: string[]; title?: string; description?: string; tags?: string[] }>) => {
     if (selectedPlatforms.length === 0) return;
+    const extras = {
+      coverUrl: coverUrl || undefined,
+      firstComment: canFirstComment && firstComment.trim() ? firstComment : undefined,
+      utm: { enabled: utmEnabled, campaign: utmCampaign || undefined, content: videoId },
+    };
     await publishToMultiplePlatforms(
-      { videoUrl, caption, title, description, hashtags: [] },
+      { videoUrl, caption, title, description, hashtags: [], ...extras },
       selectedPlatforms,
       Object.fromEntries(
-        selectedPlatforms.map((p) => [p, { ...perChannel[p], videoUrl }])
+        selectedPlatforms.map((p) => [p, { ...perChannel[p], videoUrl, ...extras }])
       ) as Partial<Record<Platform, { videoUrl: string; caption: string; hashtags: string[]; title?: string; description?: string; tags?: string[] }>>,
     );
     onPublished?.();
