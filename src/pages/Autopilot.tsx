@@ -209,8 +209,9 @@ function AutopilotReal() {
             </TabsList>
 
             <TabsContent value="director">
-              <DirectorsTable />
+              <AutopilotStudio />
             </TabsContent>
+
 
             <TabsContent value="calendar">
               <AutopilotCalendarGrid
