@@ -284,14 +284,16 @@ async function runProduction(
         });
 
         // --- Stage 3: speaking scenes get voice + lip-sync -----------------
-        if (scene.dialogue && scene.dialogue.trim().length > 1) {
+        if ((scene.turns?.length ?? 0) > 0 || (scene.dialogue ?? "").trim().length > 1) {
           await speakAndSync(admin, {
             productionId,
             userId,
             scene,
             videoUrl,
+            anchorUrl: anchor.anchor_url,
           });
         }
+
         await log(admin, productionId, userId, {
           stage: "motion",
           role: "editor",
