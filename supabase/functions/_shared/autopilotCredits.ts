@@ -176,4 +176,7 @@ export const AUTOPILOT_PRICE = {
   music: 0.18,
   /** One generated audio layer (foley hit or ambience bed). */
   sfxPerClip: 0.05,
+  /** One Sync.so pass (= one speaker) per second of clip. */
+  lipsyncPerSecondPerSpeaker: 0.16,
 } as const;
+
