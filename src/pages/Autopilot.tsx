@@ -27,7 +27,7 @@ import type { AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
 
 import { ComingSoonScreen } from '@/components/common/ComingSoonScreen';
-import { DirectorsTable } from '@/components/autopilot/DirectorsTable';
+import { AutopilotStudio } from '@/components/autopilot/AutopilotStudio';
 
 import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
 
