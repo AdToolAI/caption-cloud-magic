@@ -153,13 +153,12 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
       voiceoverVolume: clampAudioVolume(
         contentConfig?.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME,
       ),
-      // The timeline already grew to fit voStart + voDuration, so we only clamp
-      // against the very last frame — never against the pre-offset duration
-      // (that used to push a late VO onto the final frame = silence).
+      // A delayed VO must NEVER extend the video: clamp the offset so the
+      // voice-over ends with the timeline at the very latest.
       voiceoverStartTime: Math.max(
         0,
         Math.min(
-          Math.max(0, durationSeconds - 0.1),
+          maxVoiceoverStart,
           Number.isFinite(Number(contentConfig?.voiceoverStartTime))
             ? Number(contentConfig?.voiceoverStartTime)
             : 0,
