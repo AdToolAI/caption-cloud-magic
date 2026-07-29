@@ -137,12 +137,14 @@ export function RemotionPreviewPlayer({
     voiceoverVolume: clampAudioVolume(customizations?.voiceoverVolume ?? 1),
     backgroundMusicVolume: clampAudioVolume(customizations?.backgroundMusicVolume ?? 0),
     masterVolume: clampAudioVolume(customizations?.masterVolume ?? 1),
+    voiceoverStartTime: Math.max(0, Number(customizations?.voiceoverStartTime) || 0),
   }), [
     customizations?.voiceoverUrl,
     customizations?.backgroundMusicUrl,
     customizations?.voiceoverVolume,
     customizations?.backgroundMusicVolume,
     customizations?.masterVolume,
+    customizations?.voiceoverStartTime,
   ]);
 
   const inputProps: Record<string, any> = useMemo(() => ({
