@@ -1,66 +1,55 @@
 ## Ziel
 
-Der Kunde sagt in einem Satz, was er will — und bekommt zurück, was sonst eine Werbeagentur nach zwei Wochen liefert: **5 durchdachte Werbeideen**, jede mit Hook, Erzählwinkel und Begründung. Er wählt eine aus. Danach übernimmt die KI alles: Drehbuch, Casting, Bildsprache, Schnittrhythmus, Ton, Stimme — bis zum fertigen Spot.
-
-Vorhanden: Szenen-Grammatik, Prompt-Compiler, Rhythmus/Sound, Treatment-Funktion, Anchor-Gate, Orchestrator, Regietisch, Produktionspanel.
-Fehlt: die Ideen-Stufe davor, der Bild-Upload und der Endschnitt danach.
+Der Autopilot endet heute mit einzelnen Clips (`stage: scenes_ready`). Diese Stufe schließt die Lücke bis zum fertigen Spot: Ton drunter, Logo drauf, ein Video raus — und die Kosten werden echt verrechnet statt nur angezeigt.
 
 ---
 
-## 1. Die Ideen-Runde — Agenturqualität statt Prompt-Echo
+## 1. Credits: von der Vorschau zur Abbuchung
 
-Neue Edge Function `autopilot-ideas`. Der Unterschied zu "5 Vorschläge generieren" liegt im Verfahren:
+Heute zeigt `costEstimate.ts` eine Summe, die niemand einzieht. Der Lauf bekommt dieselbe Reserve-/Commit-/Refund-Mechanik wie der Rest der Plattform (`credit-preflight`, `credit-reserve`, `credit-commit`, `credit-refund`).
 
-**Strategie zuerst.** Bevor eine Idee entsteht, leitet das Modell aus dem Briefing ein Mini-Strategiepapier ab: Zielgruppe, konkreter Nutzen, Kaufhemmnis, Tonalität, was der Zuschauer nach 3 Sekunden gedacht haben soll. Das ist der Rahmen, an dem sich alle Ideen messen lassen.
+- Vor dem Start: Preflight gegen die Kostenvorschau, Reservierung über die geschätzte Summe. Reicht das Guthaben nicht, startet der Lauf gar nicht erst.
+- Nach jeder Stufe (Anchor, Motion, VO, Lip-Sync, Render) wird der tatsächliche Verbrauch committed.
+- Jede fehlgeschlagene Szene und jeder Provider-Abbruch löst eine idempotente Rückerstattung aus — nach dem bestehenden Refund-Muster, Schlüssel ist `production_id` + Szenenindex, damit ein Watchdog-Retry nicht doppelt zurückbucht.
+- Bricht der Lauf komplett ab, wird die Reservierung vollständig aufgelöst.
 
-**Fünf bewusst getrennte Winkel.** Jede Idee bekommt einen anderen Erzählmechanismus zugewiesen — Problem→Lösung, Testimonial, visuelle Metapher, Mikro-Story mit Wendung, Produkt-Poesie. Damit kommen nie fünf Varianten derselben Idee heraus.
+## 2. Ton: Voiceover, Musik, Foley
 
-**Jede Karte begründet sich.** Titel, Hook der ersten Sekunde, Logline, Beat-Abfolge, Bildwelt — plus ein Satz "Warum das funktioniert" und wo die hochgeladenen Bilder vorkommen.
+Die Optionen sind in der UI wählbar, im Lauf passiert damit bisher nichts.
 
-**Machbarkeits-Filter.** Deterministische Regeln prüfen jede Idee gegen das, was die Pipeline zuverlässig kann: Personen pro Bild, Sprechszenen nur mit vorhandenem Cast, keine Menschenmengen, keine Schrift im KI-Bild, Szenenlängen im Modell-Limit. Was durchfällt, wird entschärft oder ersetzt, bis fünf saubere Konzepte stehen. Sichtbarer Machbarkeits-Score pro Karte — kein Konzept, das später scheitert.
+- **Voiceover**: pro Szene aus dem Treatment-Text, über `generate-video-voiceover` mit der Sprache aus den Launcher-Optionen und harter Sprach-Sperre. Die Stimme kommt aus der Voice-Bibliothek (Charakterzuordnung, sonst Erzählerstimme). Start-Offsets werden aus den Szenenlängen berechnet, nie über die Filmlänge hinaus.
+- **Musik**: ein Bett passend zur `musicMood` aus dem Treatment, gesucht über die vorhandene Musik-Strecke; Lautstärke unter Sprache abgesenkt.
+- **Foley/Ambience**: `soundDesign.ts` liefert bereits die Cues — sie werden als leise Zusatzspuren gelegt.
 
-## 2. Eigene Bilder — mehrere, mit Rolle
+## 3. Lip-Sync im Autopilot-Pfad
 
-Bis zu **8 Bilder**, je max. 10 MB. Mehrere sind klar besser, weil Logo, Produkt und Umgebung technisch völlig unterschiedlich verarbeitet werden.
+Szenen, die das Treatment als Sprechszene markiert hat, laufen nach dem Motion-Schritt über die bestehende Kling-Omni-Strecke mit Deutsch-Hard-Lock und den etablierten Schutzmechanismen (Face-Share-Floor, Motion-Probe-Watchdog, Refund bei Nichttreffer). Szenen ohne Sprecher überspringen den Schritt komplett.
 
-Pro Bild: **Rolle** (Logo · Produkt · Person · Ort · Stil-Referenz) und ein **Freitext** ("soll am Ende erscheinen", "Produkt steht auf dem Tisch", "diese Farbwelt übernehmen").
+## 4. Endschnitt `autopilot-finalize`
 
-| Rolle | Verwendung |
-|---|---|
-| Logo | nie ins KI-Bild (Modelle verzerren Schrift) — sauberes Overlay im Endschnitt |
-| Produkt | Referenz für die Anchor-Generierung, damit das echte Produkt im Bild steht |
-| Person | Charakter-Referenz, optional als Cast-&-World-Charakter übernehmen |
-| Ort | Referenz für Kulisse und Lichtstimmung |
-| Stil | steuert nur Farbwelt, Licht und Look, nie den Bildinhalt |
+Neue Edge Function, die nach `scenes_ready` übernimmt:
 
-Eine Bildanalyse beschreibt jedes Bild einmal englisch für die Modelle und meldet unbrauchbare Uploads sofort zurück.
+- Clips in Szenenreihenfolge aneinandersetzen, Schnittpunkte nach dem Rhythmus-Plan aus `rhythm.ts` (Kapitel-Modus ab 90 s).
+- Tonspuren (VO, Musik, Foley) mit korrekten Offsets darunterlegen.
+- Logo-Assets als sauberes Overlay einblenden — nie generiert, wie in `assetRoles.ts` festgelegt.
+- Render über die bestehende Remotion-Lambda-Strecke; `rawMediaMode` bleibt aktiv, keine cinematischen Filter.
+- Ergebnis nach `autopilot_productions.final_video_url`, Stufe wird `final_cut` → `completed`.
+- Fehlgeschlagene Szenen werden ausgelassen statt den Film zu blockieren; der Regie-Log nennt sie beim Namen.
 
-## 3. Ein-Feld-Einstieg
+## 5. UI
 
-`AutopilotIdeaLauncher.tsx`: großes Briefing-Feld, Drag-&-Drop-Zone mit Rollen- und Beschreibungsfeld je Bild, kompakte Optionsleiste — Cast (Cast & World), Länge, Voiceover an/aus mit Sprache, Lip-Sync an/aus mit Sprecherzahl (1–4), Format. Alles andere entscheidet die KI.
-`IdeaGallery.tsx`: 5 Karten mit Hook, Logline, Beat-Vorschau, Begründung, Score, Kostenschätzung; "Diese Idee verfilmen" oder "Neue Ideen".
-
-## 4. Länge: maximal 180 Sekunden
-
-Harte Obergrenze, durchgesetzt in UI, Ideen-Engine, Treatment und Orchestrator. Presets 15 · 30 · 60 · 90 · 120 · 180 s. Ab 90 s warnt die Kostenvorschau deutlich, und der Rhythmus-Planer wechselt in einen Kapitel-Modus, damit lange Filme nicht in gleichförmige Schnitte zerfallen.
-
-## 5. Idee → Treatment → Produktion → Endschnitt
-
-Die gewählte Idee geht als Vorgabe in `autopilot-treatment` (Winkel, Beats, Cast-Zuweisung, Sprecherzahl, Asset-Platzierung), das nur noch die Szenen-Grammatik füllt. Von dort läuft der bestehende Weg: Anchor-Gate → Motion → Regietisch.
-
-Neu `autopilot-finalize`: setzt die freigegebenen Clips in Reihenfolge, legt Voiceover (bestehende Stimmen-Bibliothek, korrekter Start-Offset), Musik und Foley darunter, blendet Logo-Overlays ein, wendet den Rhythmus-Plan auf die Schnittpunkte an und rendert über die bestehende Remotion-Lambda-Strecke. Lip-Sync-Szenen laufen davor über die Kling-Omni-Strecke mit hartem Deutsch-Lock.
-
-## 6. Kosten und Sicherheit
-
-Kostenvorschau vor dem Start (Anchor + Motion + VO + Lip-Sync + Render) mit Freigabe-Dialog; stufenweise Abbuchung, Rückerstattung bei Provider-Fehlern nach bestehendem Refund-Muster. Cast bleibt hart auf Cast & World gesperrt.
+- `ProductionStage.tsx` bekommt die neuen Stufen (Ton, Lip-Sync, Endschnitt) in der Fortschrittsanzeige.
+- Ein Freigabe-Dialog vor dem Start zeigt die Kostenvorschau und bucht erst nach Bestätigung.
+- Am Ende: Player mit dem fertigen Spot, Download, und Übergabe in die Mediathek.
 
 ---
 
 ## Technische Details
 
-- Neu: `supabase/functions/autopilot-ideas/index.ts`, `autopilot-finalize/index.ts`, `autopilot-analyze-asset/index.ts`
-- Neu: `src/lib/autopilot/ideaFeasibility.ts`, `costEstimate.ts`, `assetRoles.ts`, `strategy.ts`
-- Neu: `src/components/autopilot/AutopilotIdeaLauncher.tsx`, `IdeaGallery.tsx`, `AutopilotAssetDropzone.tsx`
-- Erweitert: `autopilot-treatment` (Idee + Assets als Eingabe), `autopilot-orchestrate` (Asset-Referenzen, VO/Lip-Sync/Finalize-Kette), `types.ts`, `Autopilot.tsx`
-- Migration: `autopilot_ideas` (Strategie- und Konzept-JSON, Score, gewählt) und `autopilot_assets` (Rolle, Beschreibung, Analyse-JSON, Storage-Pfad) inkl. GRANTs und nutzer-eigener Zugriffsregeln; privater Bucket `autopilot-assets` mit User-ID als erstem Pfadsegment
-- Modelle: `google/gemini-3.1-pro-preview` für Strategie und Ideenrunde (Qualität zählt hier mehr als Latenz), `google/gemini-3.6-flash` für Bildanalysen, Pro-Vision bleibt im Anchor-Gate
+- Neu: `supabase/functions/autopilot-finalize/index.ts`
+- Neu: `supabase/functions/_shared/autopilotCredits.ts` (Reserve/Commit/Refund-Wrapper mit Idempotenzschlüssel)
+- Erweitert: `autopilot-orchestrate` — Credit-Klammer, VO-/Musik-/Foley-Erzeugung, Lip-Sync-Abzweig für Sprechszenen, Aufruf von `autopilot-finalize`, neue Stufen `audio` · `lipsync` · `final_cut`
+- Erweitert: `autopilot-treatment` — markiert Sprechszenen und Sprecherzuordnung explizit pro Szene
+- Erweitert: `ProductionStage.tsx`, `DirectorsTable.tsx` (Freigabe-Dialog), `useAutopilotProduction.ts` (neue Stufen)
+- Migration: Spalten für Audio-URLs und Credit-Ledger-Referenz auf `autopilot_productions` / `autopilot_production_scenes`
+- Wiederverwendet, nicht neu gebaut: `generate-video-voiceover`, Musik-Suche, Kling-Omni-Lip-Sync, `lipsync-watchdog`, `render-with-remotion`, `credit-*`
