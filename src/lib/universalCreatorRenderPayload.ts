@@ -17,6 +17,7 @@ import {
   DEFAULT_MUSIC_VOLUME,
   DEFAULT_VOICEOVER_VOLUME,
   computeTotalDurationSeconds,
+  computeMaxVoiceoverStart,
 } from '@/lib/universalCreatorDefaults';
 
 export interface BuildCustomizationsInput {
