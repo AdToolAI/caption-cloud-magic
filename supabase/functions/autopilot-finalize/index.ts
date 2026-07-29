@@ -14,6 +14,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { AUTOPILOT_PRICE, chargeStage, refundStage } from "../_shared/autopilotCredits.ts";
+import { clampGain, describeLayer, generateSfx, planSceneAudio } from "../_shared/autopilotSound.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -363,6 +364,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
       originalAudioVolume: 1,
       subtitles: [],
       source: "autopilot",
+      ...(sfxTracks.length ? { soundEffects: sfxTracks } : {}),
       ...(voiceoverUrl
         ? {
             voiceoverUrl,
