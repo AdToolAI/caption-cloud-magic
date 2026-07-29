@@ -110,7 +110,19 @@ Deno.serve(async (req) => {
         grammar: scene.grammar ?? {},
         anchor_prompt: scene.anchorPrompt,
         motion_prompt: scene.motionPrompt,
-        dialogue: scene.dialogue
+        dialogue: (scene.turns?.length ?? 0) > 0
+          ? {
+              text: (scene.turns ?? []).map((t) => t.text).join(" "),
+              turns: (scene.turns ?? []).map((t, i) => ({
+                id: t.id || `${scene.id}:${i}`,
+                text: t.text,
+                speaker_character_id: t.speakerCharacterId ?? null,
+                speaker_name: t.speakerName ?? null,
+                voice_id: t.voiceId ?? null,
+                language: t.language ?? scene.voiceLanguage ?? null,
+              })),
+            }
+          : scene.dialogue
           ? {
               text: scene.dialogue,
               speaker_character_id: scene.speakerCharacterId ?? null,
@@ -118,6 +130,7 @@ Deno.serve(async (req) => {
               language: scene.voiceLanguage ?? null,
             }
           : {},
+
         sound_design: scene.soundDesign ?? {},
         status: "pending",
       })),
