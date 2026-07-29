@@ -2317,48 +2317,49 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                     </SelectContent>
                   </Select>
 
-                  {/* Voice selector — list depends on engine */}
-                  <Select
-                    value={cfg?.voiceId ?? ''}
-                    onValueChange={(voiceId) => {
-                      if (isHume) {
+                  {/* Voice selector — Hume: Liste, ElevenLabs: volle Bibliothek */}
+                  {isHume ? (
+                    <Select
+                      value={cfg?.voiceId ?? ''}
+                      onValueChange={(voiceId) => {
                         const v = humeVoices.find((x) => x.name === voiceId);
                         updateSpeakerVoice(sp.id, {
                           voiceId,
                           voiceName: v?.label ?? voiceId,
                           provider: v?.provider ?? 'HUME_AI',
                         });
-                      } else {
-                        const v = elPickerEntries.find((x) => x.id === voiceId);
-                        updateSpeakerVoice(sp.id, {
-                          voiceId,
-                          voiceName: v?.name ?? voiceId,
-                          isCustom: v?.isCustom ?? false,
-                          elevenlabsVoiceId: v?.elevenlabsVoiceId,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-7 text-xs">
-                      <SelectValue placeholder={t.pickVoice} />
-                    </SelectTrigger>
-                    <SelectContent className="z-[60] max-h-[320px]">
-                      {isHume
-                        ? humeVoices.map((v) => (
-                            <SelectItem key={v.id} value={v.name} className="text-xs">
-                              <div className="flex flex-col">
-                                <span>{v.label}</span>
-                                <span className="text-[10px] text-muted-foreground">{v.description}</span>
-                              </div>
-                            </SelectItem>
-                          ))
-                        : elPickerEntries.map((v) => (
-                            <SelectItem key={v.id} value={v.id} className="text-xs">
-                              {v.name}
-                            </SelectItem>
-                          ))}
-                    </SelectContent>
-                  </Select>
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue placeholder={t.pickVoice} />
+                      </SelectTrigger>
+                      <SelectContent className="z-[60] max-h-[320px]">
+                        {humeVoices.map((v) => (
+                          <SelectItem key={v.id} value={v.name} className="text-xs">
+                            <div className="flex flex-col">
+                              <span>{v.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{v.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-7 justify-start px-2 text-xs font-normal min-w-0"
+                      onClick={() => setLibraryFor(sp.id)}
+                    >
+                      <Library className="h-3 w-3 mr-1.5 text-primary shrink-0" />
+                      <span className="truncate">
+                        {cfg?.voiceName ||
+                          elPickerEntries.find((x) => x.id === cfg?.voiceId)?.name ||
+                          t.pickVoice}
+                      </span>
+                    </Button>
+                  )}
+
 
                   {/* Preview */}
                   <Button
