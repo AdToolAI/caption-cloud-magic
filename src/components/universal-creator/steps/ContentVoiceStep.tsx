@@ -377,10 +377,13 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
           {value?.voiceoverUrl && (() => {
             const voDur = Number(value.actualVoiceoverDuration ?? value.voiceoverDuration ?? 0) || 0;
             const scenesTotal = scenes && scenes.length > 0 ? scenes.reduce((a, s) => a + (s.duration || 0), 0) : 0;
-            const videoDur = Math.max(scenesTotal, voDur, 1);
-            const maxStart = Math.max(0, videoDur - voDur);
+            const baseDur = Math.max(scenesTotal, 1);
+            // The VO may start anywhere inside the scene timeline — if it runs
+            // past the scenes, the video is extended instead of cutting it off.
+            const maxStart = Math.max(0, baseDur - 0.1);
             const start = Math.min(maxStart, Math.max(0, Number(value.voiceoverStartTime) || 0));
-            const overflow = voDur > 0 && start + voDur > videoDur + 0.01;
+            const videoDur = Math.max(baseDur, start + voDur);
+            const extended = voDur > 0 && start + voDur > baseDur + 0.01;
             const setStart = (raw: number) => {
               const clamped = Math.max(0, Math.min(maxStart, Math.round(raw * 100) / 100));
               onChange({ ...value, voiceoverStartTime: clamped });
@@ -451,13 +454,13 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                       ? `El VO se reproduce de ${fmt(start)} a ${fmt(start + voDur)} (video ${fmt(videoDur)}).`
                       : `VO plays from ${fmt(start)} to ${fmt(start + voDur)} (video ${fmt(videoDur)}).`}
                   </p>
-                  {overflow && (
-                    <p className="text-xs text-amber-500">
+                  {extended && (
+                    <p className="text-xs text-primary">
                       {language === 'de'
-                        ? '⚠️ Voiceover würde über das Videoende hinausgehen und wird abgeschnitten.'
+                        ? `ℹ️ Video wird auf ${fmt(start + voDur)} verlängert, damit das Voiceover vollständig läuft.`
                         : language === 'es'
-                        ? '⚠️ El voiceover se extenderá más allá del final del video y se cortará.'
-                        : '⚠️ Voiceover would extend past the video end and will be cut off.'}
+                        ? `ℹ️ El video se extiende a ${fmt(start + voDur)} para reproducir el voiceover completo.`
+                        : `ℹ️ Video is extended to ${fmt(start + voDur)} so the voiceover plays in full.`}
                     </p>
                   )}
                 </div>
