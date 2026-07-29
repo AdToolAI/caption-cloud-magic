@@ -72,8 +72,15 @@ export function DirectorsTable() {
   const [duration, setDuration] = useState(20);
 
   const [loading, setLoading] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [approved, setApproved] = useState(false);
   const [productionId, setProductionId] = useState<string | null>(null);
   const [treatment, setTreatment] = useState<AutopilotTreatment | null>(null);
+
+  const { production, scenes: producedScenes, log } = useAutopilotProduction(
+    productionId,
+    approved,
+  );
 
   /**
    * The model delivers structure; the planner owns time and camera variety.
