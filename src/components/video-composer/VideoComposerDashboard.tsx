@@ -718,6 +718,27 @@ export default function VideoComposerDashboard() {
       } finally {
         setIsResetting(false);
       }
+
+      // Hard-delete the old project so no orphan draft (and no resurrect
+      // path) remains. Scenes are removed via cascade.
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const uid = authData?.user?.id;
+        if (uid) {
+          const { error: delErr } = await supabase
+            .from('composer_projects')
+            .delete()
+            .eq('id', oldId)
+            .eq('user_id', uid);
+          if (delErr) throw delErr;
+        }
+      } catch (e) {
+        toast({
+          title: 'Altes Projekt konnte nicht gelöscht werden',
+          description: e instanceof Error ? e.message : String(e),
+          variant: 'destructive',
+        });
+      }
     }
     clearDraft();
     setProject({ ...defaultProject, id: '' });
