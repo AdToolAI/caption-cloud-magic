@@ -737,12 +737,21 @@ serve(async (req) => {
       // See mem://architecture/render/global-export-quality-floor.md
       // Preview renders bypass Lambda entirely (browser Remotion Player), so
       // this floor is safe to apply unconditionally to all export invocations.
+      //
+      // Raw-Media-Invariant (29.07.2026): frame intermediates MUST be lossless.
+      // JPEG q95 intermediates applied 4:2:0 chroma subsampling + DCT loss to
+      // EVERY frame, which showed up as slight blur and a contrast/saturation
+      // shift versus the raw upload. PNG frames remove that stage entirely.
       codec: format === 'mp4' ? 'h264' : 'gif',
-      imageFormat: 'jpeg',
-      jpegQuality: 95,
+      imageFormat: format === 'mp4' ? 'png' : 'png',
       crf: 16,
       x264Preset: 'slow',
       videoBitrate: '10M',
+      // Tag/encode in BT.709 so the exported MP4 matches how the browser
+      // (and the raw upload) displays the source. Without this Remotion falls
+      // back to the legacy BT.601 matrix, which visibly shifts contrast/saturation.
+      colorSpace: 'bt709',
+      pixelFormat: 'yuv420p',
 
       // r61: Enable audio rendering for voiceover/music
       muted: false,
