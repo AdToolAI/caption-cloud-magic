@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { useVoiceLibrary, type VoiceLibraryFilters } from '@/hooks/useVoiceLibrary';
 import { VoicePreviewButton } from './VoicePreviewButton';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
-import { VOICE_LANGUAGES, NATIVE_SENSITIVE_LANGUAGES, toPickerLanguage } from '@/lib/voice-languages';
+import { VOICE_LANGUAGES, NATIVE_SENSITIVE_LANGUAGES, toPickerLanguage, voiceLanguageLabel } from '@/lib/voice-languages';
 
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;
