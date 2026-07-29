@@ -138,14 +138,26 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   const cost = useMemo(() => {
     if (!plannedTreatment) return null;
     const scenes = plannedTreatment.scenes ?? [];
-    const speakingScenes = scenes.filter((scene) => !!scene.dialogue);
+    const speakingScenes = scenes.filter(
+      (scene) => !!scene.dialogue || (scene.turns?.length ?? 0) > 0,
+    );
     const totalSeconds = scenes.reduce((acc, scene) => acc + (scene.durationSeconds || 0), 0);
+    // One Sync.so pass per speaker: count distinct speakers across all turns.
+    const speakerIds = new Set<string>();
+    for (const scene of speakingScenes) {
+      if (scene.turns?.length) {
+        for (const turn of scene.turns) speakerIds.add(turn.speakerCharacterId ?? turn.id);
+      } else {
+        speakerIds.add(scene.speakerCharacterId ?? 'x');
+      }
+    }
     return estimateProductionCost({
       sceneCount: scenes.length,
       totalDurationSeconds: totalSeconds,
       voiceoverEnabled: speakingScenes.length > 0,
       lipSyncEnabled: speakingScenes.length > 0,
-      lipSyncSpeakers: new Set(speakingScenes.map((scene) => scene.speakerCharacterId ?? 'x')).size,
+      lipSyncSpeakers: speakerIds.size,
+
       speakingSeconds: speakingScenes.reduce((acc, scene) => acc + (scene.durationSeconds || 0), 0),
       musicEnabled: true,
     });
