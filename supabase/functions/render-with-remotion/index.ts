@@ -657,12 +657,15 @@ serve(async (req) => {
       ? sanitizedCustomizations.scenes.reduce((sum: number, s: any) => sum + Number(s.duration || 0), 0)
       : 0;
     const sanitizedVoiceoverDuration = Number(sanitizedCustomizations.voiceoverDuration) || 0;
-    // Voice-over offset must extend the timeline — otherwise a late VO is cut off.
-    const sanitizedVoiceoverStart = Math.max(0, Number(sanitizedCustomizations.voiceoverStartTime) || 0);
-    const voiceoverEndSeconds = sanitizedVoiceoverDuration > 0
-      ? sanitizedVoiceoverStart + sanitizedVoiceoverDuration
-      : 0;
-    const totalDurationSeconds = Math.max(sceneDurationSum, voiceoverEndSeconds, 5);
+    // A delayed voice-over must NEVER extend the video length.
+    const totalDurationSeconds = Math.max(sceneDurationSum, sanitizedVoiceoverDuration, 5);
+    // Clamp the offset so the VO always ends with the video at the latest.
+    const maxVoiceoverStart = Math.max(0, totalDurationSeconds - sanitizedVoiceoverDuration);
+    const sanitizedVoiceoverStart = Math.max(
+      0,
+      Math.min(maxVoiceoverStart, Number(sanitizedCustomizations.voiceoverStartTime) || 0),
+    );
+    sanitizedCustomizations.voiceoverStartTime = sanitizedVoiceoverStart;
     
     // Ensure durationInFrames is a safe, finite positive integer
     const rawFrames = Math.ceil(totalDurationSeconds * fps);
