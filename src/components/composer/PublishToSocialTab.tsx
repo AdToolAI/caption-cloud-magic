@@ -42,6 +42,12 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
   const [scheduledTime, setScheduledTime] = useState('12:00');
   const [magicMode, setMagicMode] = useState<boolean>(Boolean(briefingPlan || briefingText));
 
+  // P2-Now Ausbauten
+  const [coverUrl, setCoverUrl] = useState<string>('');
+  const [firstComment, setFirstComment] = useState<string>('');
+  const [utmEnabled, setUtmEnabled] = useState<boolean>(true);
+  const [utmCampaign, setUtmCampaign] = useState<string>('');
+
   const { publishToMultiplePlatforms, publishing } = useSocialPublishing();
   const { schedulePublication, loading: scheduling } = useScheduledPublishing();
   const { isConnected } = usePlatformCredentials();
