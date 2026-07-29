@@ -158,8 +158,9 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         videoId: uploadData.id,
-        message: 'Successfully published to YouTube',
-        url: `https://www.youtube.com/watch?v=${uploadData.id}`
+        message: meta.isShort ? 'Successfully published to YouTube Shorts' : 'Successfully published to YouTube',
+        url: `https://www.youtube.com/watch?v=${uploadData.id}`,
+        isShort: meta.isShort,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
