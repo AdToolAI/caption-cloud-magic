@@ -160,6 +160,21 @@ export function ProductionStage({ production, scenes, log }: Props) {
                 {scene.lipsync_url && <Mic className="h-3.5 w-3.5 text-primary" />}
                 <span className="ml-auto">{Number(scene.duration_seconds).toFixed(1)}s</span>
               </div>
+              {(scene.fallback_kind === 'still' || (scene.attempt ?? 1) > 1) && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {(scene.attempt ?? 1) > 1 && (
+                    <Badge variant="outline" className="text-[10px]">
+                      2. Anlauf
+                    </Badge>
+                  )}
+                  {scene.fallback_kind === 'still' && (
+                    <Badge variant="outline" className="text-[10px]">
+                      <ImageIcon className="mr-1 h-3 w-3" />
+                      Als Standbild gerettet
+                    </Badge>
+                  )}
+                </div>
+              )}
               {scene.lipsync_url || scene.video_url ? (
                 <video
                   src={scene.lipsync_url || scene.video_url || undefined}
@@ -167,11 +182,19 @@ export function ProductionStage({ production, scenes, log }: Props) {
                   playsInline
                   className="mt-2 w-full rounded-md"
                 />
+              ) : scene.fallback_kind === 'still' && scene.anchor_url ? (
+                <img
+                  src={scene.anchor_url}
+                  alt={`Szene ${scene.scene_index + 1} als Standbild`}
+                  loading="lazy"
+                  className="mt-2 w-full rounded-md"
+                />
               ) : (
                 scene.error_message && (
                   <p className="mt-1 text-xs text-destructive">{scene.error_message}</p>
                 )
               )}
+
             </div>
           </div>
         ))}
