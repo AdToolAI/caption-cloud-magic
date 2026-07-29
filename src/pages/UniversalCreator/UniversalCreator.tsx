@@ -167,8 +167,46 @@ export function UniversalCreator() {
     }
   };
 
-  const handleNewProject = () => {
+  const handleNewProject = async () => {
+    // Suppress silent auto-resume on the next mount / reload, even if the
+    // delete below fails (offline, RLS, race).
+    markFreshStart(FRESH_START_KEY);
     localStorage.removeItem(BACKUP_STORAGE_KEY);
+
+    // Hard-delete the previous draft so a reload can never resurrect it.
+    try {
+      if (user) {
+        if (projectId) {
+          await supabase
+            .from('content_projects')
+            .delete()
+            .eq('id', projectId)
+            .eq('user_id', user.id);
+        } else {
+          // No id in state — remove the newest universal draft so the
+          // auto-resume lookup finds nothing.
+          const { data } = await supabase
+            .from('content_projects')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('content_type', 'universal')
+            .eq('status', 'draft')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data?.id) {
+            await supabase
+              .from('content_projects')
+              .delete()
+              .eq('id', data.id)
+              .eq('user_id', user.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[UniversalCreator] Could not delete previous draft:', err);
+    }
+
     hydratedRef.current = false;
     setProjectId(undefined);
     setFormatConfig(null);
