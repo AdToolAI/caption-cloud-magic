@@ -13,7 +13,8 @@ import {
   delayRender,
   continueRender,
 } from 'remotion';
-import { SENSOR_BASELINE_GRADE_FILTER } from '../utils/sensorBaselineGrade';
+// UCC-Export bleibt bewusst OHNE Sensor-Baseline-Grade: 100% Rohtreue zum
+// Upload. Director's Cut nutzt den Grade weiterhin (siehe DirectorsCutVideo.tsx).
 import { safeInterpolate as interpolate, safeDuration, safeSpring as spring, logRemotionDebug } from '../utils/safeInterpolate';
 import { z } from 'zod';
 
@@ -2134,9 +2135,9 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            // Sensor-Baseline (export only) — matches Director's Cut baseline so UCC
-            // and DC exports stay visually aligned. Preview stays neutral.
-            filter: previewMode ? undefined : SENSOR_BASELINE_GRADE_FILTER,
+            // UCC: kein CSS-Filter auf Video-Layer (Preview UND Export) — 100%
+            // Rohtreue zum hochgeladenen Frame. DC bleibt cinematic-graded.
+            filter: undefined,
           }}
           muted={audioMuted}
           volume={audioVolume}
@@ -2150,7 +2151,7 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   if (safeImageUrl) {
     const imgFilterParts: string[] = [];
     if (!rawMediaMode) imgFilterParts.push('saturate(1.15) contrast(1.05)');
-    if (!previewMode) imgFilterParts.push(SENSOR_BASELINE_GRADE_FILTER);
+    // Kein Sensor-Baseline-Grade im UCC-Export: rawMediaMode bleibt pixelnah.
     const imgFilter = imgFilterParts.join(' ') || undefined;
     return (
       <AbsoluteFill style={{ backgroundColor: '#000' }}>
