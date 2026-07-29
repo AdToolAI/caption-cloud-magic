@@ -119,14 +119,37 @@ export function UniversalVideoWizard() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isAutoGenerating]);
 
+  const FRESH_START_KEY = 'universal-video-wizard';
+
   // Check for draft on mount — show dialog if meaningful draft exists
   useEffect(() => {
     if (draftChecked) return;
     setDraftChecked(true);
+    // Explicit new project (possibly followed by an F5): never resurrect.
+    if (consumeFreshStart(FRESH_START_KEY)) {
+      freshStartRef.current = true;
+      clearAllDrafts();
+      return;
+    }
     if (hasMeaningfulDraft()) {
       setShowDraftDialog(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftChecked]);
+
+  /** Hard-deletes recoverable server-side leftovers of the previous run. */
+  const purgeServerDrafts = async () => {
+    if (!user) return;
+    try {
+      await supabase
+        .from('universal_video_progress')
+        .delete()
+        .eq('user_id', user.id)
+        .in('status', ['completed', 'failed', 'pending', 'processing']);
+    } catch (err) {
+      console.warn('[UniversalVideoWizard] Could not purge progress rows:', err);
+    }
+  };
 
   const handleResumeDraft = () => {
     const draft = getWizardDraft();
