@@ -211,7 +211,6 @@ export function getUniversalCreatorDurationSeconds(input: BuildCustomizationsInp
   return computeTotalDurationSeconds({
     voiceoverDuration: input.contentConfig?.voiceoverDuration,
     actualVoiceoverDuration: input.contentConfig?.actualVoiceoverDuration,
-    actualVoiceoverDuration: input.contentConfig?.actualVoiceoverDuration,
     scenes: normalizeScenesForUniversalCreatorVideo(input.scenes),
   });
 }
