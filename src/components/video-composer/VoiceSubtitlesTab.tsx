@@ -760,6 +760,7 @@ export default function VoiceSubtitlesTab({
                 <SpeakerMappingBar
                   script={voiceover.script}
                   elevenLabsVoices={voices}
+                  language={voiceLangTab}
                   speakerMap={voiceover.speakerMap || {}}
                   onChange={(speakerMap) =>
                     onUpdateAssembly({
