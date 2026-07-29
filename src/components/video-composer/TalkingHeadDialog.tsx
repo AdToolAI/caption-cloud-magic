@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { VoiceSlot } from '@/components/voices/VoiceSlot';
 import { Card } from '@/components/ui/card';
 import { Upload, Mic, Sparkles, ImageIcon, Loader2, AlertCircle, Check, User, Library, Plus } from 'lucide-react';
 import { useTalkingHead } from '@/hooks/useTalkingHead';
@@ -79,6 +80,8 @@ export default function TalkingHeadDialog({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [script, setScript] = useState('');
   const [voiceId, setVoiceId] = useState(PRESET_VOICES[0].id);
+  const [voiceName, setVoiceName] = useState<string>(PRESET_VOICES[0].name);
+  const [voiceLanguage, setVoiceLanguage] = useState<string>('de');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16');
   const [resolution, setResolution] = useState<'480p' | '720p'>('720p');
   const [targetSceneId, setTargetSceneId] = useState<string>('__none__');
@@ -514,25 +517,17 @@ export default function TalkingHeadDialog({
 
             <div>
               <Label>Stimme</Label>
-              <Select value={voiceId} onValueChange={setVoiceId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Presets</div>
-                  {PRESET_VOICES.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                  ))}
-                  {customVoices.length > 0 && (
-                    <>
-                      <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">Deine Voices</div>
-                      {customVoices.filter((v) => v.is_active).map((v) => (
-                        <SelectItem key={v.id} value={v.id}>⭐ {v.name}</SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+              <VoiceSlot
+                voiceId={voiceId}
+                voiceName={voiceName}
+                language={voiceLanguage}
+                category="characters"
+                onChange={({ voiceId: id, voiceName: name, language: lang }) => {
+                  setVoiceId(id);
+                  setVoiceName(name);
+                  setVoiceLanguage(lang);
+                }}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
