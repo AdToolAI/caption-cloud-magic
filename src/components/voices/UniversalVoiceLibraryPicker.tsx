@@ -189,7 +189,13 @@ export function UniversalVoiceLibraryPicker({
                 return (
                   <button
                     key={v.id}
-                    onClick={() => { onSelect(v); onOpenChange(false); }}
+                    onClick={() => {
+                      const resolved = language !== 'all'
+                        ? language
+                        : (typeof v.language === 'string' ? v.language : 'en');
+                      onSelect(v, resolved);
+                      onOpenChange(false);
+                    }}
                     className={cn(
                       'text-left rounded-lg border p-3 transition-all group',
                       'bg-white/[0.02] hover:bg-white/[0.05]',
