@@ -1402,6 +1402,56 @@ export type Database = {
         }
         Relationships: []
       }
+      autopilot_director_log: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          id: string
+          message: string
+          meta: Json
+          production_id: string
+          role: string
+          scene_index: number | null
+          severity: string
+          stage: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          message: string
+          meta?: Json
+          production_id: string
+          role?: string
+          scene_index?: number | null
+          severity?: string
+          stage: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          message?: string
+          meta?: Json
+          production_id?: string
+          role?: string
+          scene_index?: number | null
+          severity?: string
+          stage?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_director_log_production_id_fkey"
+            columns: ["production_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_productions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       autopilot_performance_insights: {
         Row: {
           analyzed_until: string
@@ -1460,6 +1510,164 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      autopilot_production_scenes: {
+        Row: {
+          anchor_attempts: number
+          anchor_prompt: string | null
+          anchor_score: number | null
+          anchor_url: string | null
+          anchor_verdicts: Json
+          beat: string
+          created_at: string
+          dialogue: Json
+          duration_seconds: number
+          engine: string | null
+          error_message: string | null
+          grammar: Json
+          id: string
+          motion_prompt: string | null
+          production_id: string
+          scene_index: number
+          sound_design: Json
+          status: string
+          updated_at: string
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          anchor_attempts?: number
+          anchor_prompt?: string | null
+          anchor_score?: number | null
+          anchor_url?: string | null
+          anchor_verdicts?: Json
+          beat?: string
+          created_at?: string
+          dialogue?: Json
+          duration_seconds?: number
+          engine?: string | null
+          error_message?: string | null
+          grammar?: Json
+          id?: string
+          motion_prompt?: string | null
+          production_id: string
+          scene_index: number
+          sound_design?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          anchor_attempts?: number
+          anchor_prompt?: string | null
+          anchor_score?: number | null
+          anchor_url?: string | null
+          anchor_verdicts?: Json
+          beat?: string
+          created_at?: string
+          dialogue?: Json
+          duration_seconds?: number
+          engine?: string | null
+          error_message?: string | null
+          grammar?: Json
+          id?: string
+          motion_prompt?: string | null
+          production_id?: string
+          scene_index?: number
+          sound_design?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_production_scenes_production_id_fkey"
+            columns: ["production_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_productions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autopilot_productions: {
+        Row: {
+          approved_at: string | null
+          aspect_ratio: string
+          brand_kit_id: string | null
+          brief: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          estimated_credits: number
+          final_video_url: string | null
+          genre: string
+          id: string
+          language: string
+          platform: string
+          progress: number
+          research: Json
+          sound_design: Json
+          spent_credits: number
+          stage: string
+          status: string
+          target_duration_seconds: number
+          treatment: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          aspect_ratio?: string
+          brand_kit_id?: string | null
+          brief: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          estimated_credits?: number
+          final_video_url?: string | null
+          genre?: string
+          id?: string
+          language?: string
+          platform?: string
+          progress?: number
+          research?: Json
+          sound_design?: Json
+          spent_credits?: number
+          stage?: string
+          status?: string
+          target_duration_seconds?: number
+          treatment?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          aspect_ratio?: string
+          brand_kit_id?: string | null
+          brief?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          estimated_credits?: number
+          final_video_url?: string | null
+          genre?: string
+          id?: string
+          language?: string
+          platform?: string
+          progress?: number
+          research?: Json
+          sound_design?: Json
+          spent_credits?: number
+          stage?: string
+          status?: string
+          target_duration_seconds?: number
+          treatment?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       autopilot_queue: {
         Row: {
