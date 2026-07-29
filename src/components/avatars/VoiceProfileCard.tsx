@@ -108,7 +108,7 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
   };
 
   const handleVoiceChange = async (
-    v: { voiceId: string; provider: 'elevenlabs' | 'custom'; name: string } | null,
+    v: { voiceId: string; provider: 'elevenlabs' | 'custom'; name: string; language: string } | null,
   ) => {
     setSaving(true);
     try {
@@ -118,6 +118,7 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
           default_voice_id: v?.voiceId ?? null,
           default_voice_provider: v?.provider ?? null,
           default_voice_name: v?.name ?? null,
+          default_voice_language: v?.language ?? null,
         } as any)
         .eq('id', avatarId);
       if (error) throw error;
