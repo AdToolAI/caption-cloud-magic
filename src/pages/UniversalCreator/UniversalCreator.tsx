@@ -731,7 +731,7 @@ export function UniversalCreator() {
                 durationInFrames={computeDurationInFrames({
                   voiceoverDuration: contentConfig?.voiceoverDuration,
                   actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
-                  voiceoverStartTime: contentConfig?.voiceoverStartTime,
+                  
                   scenes,
                 }, 30)}
               />
