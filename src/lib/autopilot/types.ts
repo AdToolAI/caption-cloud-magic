@@ -67,10 +67,25 @@ export type LightingKey =
   | 'candle_warm'
   | 'clinical_white';
 
+/** One spoken turn inside a scene. Canonical id — never match by name. */
+export interface SceneDialogueTurn {
+  id: string;
+  text: string;
+  /** Cast & World character id speaking this turn. */
+  speakerCharacterId?: string;
+  /** Display name, used in the director log only. */
+  speakerName?: string;
+  /** ElevenLabs voice id. */
+  voiceId?: string;
+  /** BCP-47-ish language code, e.g. "de". */
+  language?: string;
+}
+
 /**
  * The canonical scene description. Agents fill these fields — they never write
  * the final prompt string themselves.
  */
+
 export interface SceneGrammar {
   /** Stable id, used to correlate anchor → clip → audio. */
   id: string;
