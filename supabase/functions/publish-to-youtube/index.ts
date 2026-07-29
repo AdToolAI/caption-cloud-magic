@@ -5,6 +5,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
+interface ChapterEntry {
+  timestamp: string; // "0:00"
+  label: string;
+}
+
 interface PublishRequest {
   videoUrl: string;
   title: string;
@@ -12,6 +17,53 @@ interface PublishRequest {
   tags?: string[];
   privacyStatus?: 'public' | 'private' | 'unlisted';
   categoryId?: string;
+  aspectRatio?: string; // "9:16" | "1:1" | "16:9"
+  durationSec?: number;
+  chapters?: ChapterEntry[]; // strukturierte Chapters
+  enableShorts?: boolean; // Override der Auto-Detection
+}
+
+const YT_MAX_TITLE = 100;
+
+function isShortFormat(aspectRatio?: string, durationSec?: number, override?: boolean): boolean {
+  if (typeof override === 'boolean') return override;
+  const vertical = aspectRatio === '9:16' || aspectRatio === 'vertical';
+  const short = !durationSec || durationSec <= 60;
+  return vertical && short;
+}
+
+function formatChapters(chapters: ChapterEntry[] | undefined): string {
+  if (!chapters || chapters.length < 3) return '';
+  const first = chapters[0].timestamp;
+  if (first !== '0:00' && first !== '00:00') return '';
+  return chapters.map((c) => `${c.timestamp} ${c.label}`).join('\n');
+}
+
+function applyShortsMetadata(req: PublishRequest) {
+  const isShort = isShortFormat(req.aspectRatio, req.durationSec, req.enableShorts);
+  let title = (req.title ?? '').trim();
+  let description = (req.description ?? '').trim();
+  const chapterBlock = formatChapters(req.chapters);
+  if (chapterBlock) description = `${description}\n\n${chapterBlock}`.trim();
+  if (isShort) {
+    if (!/#shorts/i.test(title)) {
+      const max = YT_MAX_TITLE - ' #Shorts'.length;
+      if (title.length > max) title = title.slice(0, max - 1).trimEnd() + '…';
+      title = `${title} #Shorts`;
+    }
+    if (!/#shorts/i.test(description)) description = `${description}\n\n#Shorts`.trim();
+  }
+  const tagSet = new Set((req.tags ?? []).map((t) => t.replace(/^#/, '').toLowerCase()));
+  if (isShort) {
+    tagSet.add('shorts');
+    tagSet.add('shortvideo');
+  }
+  return {
+    title: title.slice(0, YT_MAX_TITLE),
+    description,
+    tags: Array.from(tagSet).slice(0, 15),
+    isShort,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -30,16 +82,15 @@ Deno.serve(async (req) => {
       throw new Error('YouTube credentials not configured');
     }
 
-    const { 
-      videoUrl, 
-      title, 
-      description, 
-      tags = [], 
+    const body: PublishRequest = await req.json();
+    const {
+      videoUrl,
       privacyStatus = 'public',
-      categoryId = '22' // Default: People & Blogs
-    }: PublishRequest = await req.json();
+      categoryId = '22',
+    } = body;
+    const meta = applyShortsMetadata(body);
 
-    console.log('Publishing to YouTube:', { title, privacyStatus });
+    console.log('Publishing to YouTube:', { title: meta.title, privacyStatus, isShort: meta.isShort });
 
     // Fetch video file
     const videoResponse = await fetch(videoUrl);
@@ -58,9 +109,9 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           snippet: {
-            title: title.substring(0, 100), // YouTube max title length
-            description: description,
-            tags: tags,
+            title: meta.title,
+            description: meta.description,
+            tags: meta.tags,
             categoryId: categoryId,
           },
           status: {
@@ -107,8 +158,9 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         videoId: uploadData.id,
-        message: 'Successfully published to YouTube',
-        url: `https://www.youtube.com/watch?v=${uploadData.id}`
+        message: meta.isShort ? 'Successfully published to YouTube Shorts' : 'Successfully published to YouTube',
+        url: `https://www.youtube.com/watch?v=${uploadData.id}`,
+        isShort: meta.isShort,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
