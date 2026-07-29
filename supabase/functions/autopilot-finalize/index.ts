@@ -353,11 +353,19 @@ async function finalize(admin: Admin, production: any, userId: string) {
     // Videos live in `video_creations` — platform persistence rule.
     await admin.from("video_creations").insert({
       user_id: userId,
-      title: (production.brief ?? "Autopilot-Spot").slice(0, 120),
-      video_url: finalUrl,
-      duration_seconds: Math.round(durationSeconds),
-      source: "autopilot",
-      metadata: { production_id: productionId, render_id: renderId },
+      render_id: renderId ?? null,
+      output_url: finalUrl,
+      status: "completed",
+      format: "mp4",
+      quality: "hd",
+      aspect_ratio: production.aspect_ratio || "9:16",
+      customizations: { source: "autopilot", production_id: productionId },
+      metadata: {
+        source: "autopilot",
+        production_id: productionId,
+        title: (production.brief ?? "Autopilot-Spot").slice(0, 120),
+        duration_seconds: Math.round(durationSeconds),
+      },
     }).then(
       () => undefined,
       (err: unknown) => console.warn("[autopilot-finalize] library insert failed", err),
@@ -404,11 +412,11 @@ async function waitForRender(admin: Admin, renderId: string): Promise<string | n
     await new Promise((r) => setTimeout(r, 8000));
     const { data } = await admin
       .from("video_renders")
-      .select("status, output_url, error_message")
+      .select("status, video_url, error_message")
       .eq("render_id", renderId)
       .maybeSingle();
     if (!data) continue;
-    if (data.status === "completed" && data.output_url) return data.output_url;
+    if (data.status === "completed" && data.video_url) return data.video_url;
     if (data.status === "failed") return null;
   }
   return null;
