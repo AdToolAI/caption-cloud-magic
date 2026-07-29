@@ -211,10 +211,95 @@ async function finalize(admin: Admin, production: any, userId: string) {
       }
     }
 
+    // --- Sound design: foley + room tone per scene ------------------------
+    // Music alone leaves the film sterile. Each scene gets its own room tone
+    // and, where the treatment asked for it, one foley hit. Distinct prompts
+    // are generated once and reused, so a five-scene café spot pays for one
+    // café bed, not five.
+    const audioPlan = planSceneAudio(usable);
+    const sfxTracks: Array<{
+      sceneId: string;
+      soundUrl: string;
+      volume: number;
+      startTime: number;
+      durationSeconds: number;
+      loop: boolean;
+    }> = [];
+    const generated = new Map<string, string | null>();
+
+    for (const plan of audioPlan) {
+      const jobs: Array<{ prompt: string; kind: "foley" | "ambience"; gain: number; loop: boolean }> = [];
+      if (plan.ambiencePrompt) {
+        jobs.push({ prompt: plan.ambiencePrompt, kind: "ambience", gain: plan.ambienceGain, loop: true });
+      }
+      if (plan.foleyPrompt) {
+        jobs.push({ prompt: plan.foleyPrompt, kind: "foley", gain: plan.foleyGain, loop: false });
+      }
+
+      for (const job of jobs) {
+        const cacheKey = `${job.kind}:${job.prompt}`;
+        let url = generated.get(cacheKey) ?? null;
+
+        if (!generated.has(cacheKey)) {
+          const charge = await chargeStage(admin, {
+            userId,
+            productionId,
+            stage: "sfx",
+            sceneIndex: plan.sceneIndex,
+            euros: AUTOPILOT_PRICE.sfxPerClip,
+            label: `${job.kind === "ambience" ? "Raumton" : "Geräusch"} Szene ${plan.sceneIndex + 1}`,
+          });
+          if (!charge.charged && charge.reason === "insufficient") {
+            generated.set(cacheKey, null);
+          } else {
+            url = await generateSfx({
+              admin,
+              userId,
+              prompt: job.prompt,
+              durationSeconds: job.kind === "ambience" ? plan.durationSeconds : Math.min(4, plan.durationSeconds),
+              kind: job.kind,
+            });
+            generated.set(cacheKey, url);
+
+            if (!url) {
+              await refundStage(admin, {
+                userId,
+                productionId,
+                stage: "sfx",
+                sceneIndex: plan.sceneIndex,
+                euros: AUTOPILOT_PRICE.sfxPerClip,
+                label: `Tonebene Szene ${plan.sceneIndex + 1} fehlgeschlagen`,
+              });
+            } else {
+              await log(admin, productionId, userId, {
+                stage: "audio",
+                role: "sound",
+                scene_index: plan.sceneIndex,
+                message: `Szene ${plan.sceneIndex + 1}: ${describeLayer(job.prompt)}`,
+              });
+            }
+          }
+        }
+
+        if (url) {
+          sfxTracks.push({
+            sceneId: `autopilot-${plan.sceneIndex}`,
+            soundUrl: url,
+            volume: clampGain(job.gain),
+            startTime: plan.startTime,
+            durationSeconds: plan.durationSeconds,
+            loop: job.loop,
+          });
+        }
+      }
+    }
+
     const audioMix = {
       musicVolume: voiceoverUrl ? 0.25 : 0.4,
       voiceoverVolume: 0.95,
+      sfxLayers: sfxTracks.length,
     };
+
 
     await admin
       .from("autopilot_productions")
