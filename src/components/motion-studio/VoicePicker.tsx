@@ -29,8 +29,12 @@ const PREVIEW_TEXT_FALLBACK =
  * every existing caller (CharacterEditor, VoiceProfileCard-adapters, ...) keeps
  * working without changes.
  */
-export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) {
+export function VoicePicker({ value, onChange, previewText, language }: VoicePickerProps) {
   const { voices: customVoices } = useCustomVoices();
+  const { language: uiLang } = useTranslation();
+  const targetLanguage = toPickerLanguage(language) !== 'all'
+    ? toPickerLanguage(language)
+    : toPickerLanguage(uiLang);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [pickedMeta, setPickedMeta] = useState<VoiceMeta | null>(null);
   const [previewing, setPreviewing] = useState(false);
