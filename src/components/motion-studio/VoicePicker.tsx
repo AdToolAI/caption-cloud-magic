@@ -86,6 +86,7 @@ export function VoicePicker({ value, onChange, previewText, language }: VoicePic
         body: {
           text: previewText?.trim() || PREVIEW_TEXT_FALLBACK,
           voiceId: value,
+          language: targetLanguage !== 'all' ? targetLanguage : undefined,
         },
       });
       if (error) throw error;
