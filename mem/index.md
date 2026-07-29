@@ -32,6 +32,7 @@ Updated: today
 - **Hailuo Lip-Sync Duration Lock**: Read `mem://architecture/video-composer/hailuo-lipsync-duration-lock` before editing duration/audio probing logic. Hailuo + Lip-Sync must preserve the user's selected 6s/10s bucket; never auto-extend from VO length or probed MP4/container duration.
 - **Cinematic-Sync Anchor Invariant (v195)**: cinematic-sync/sync-segments Szenen ohne `reference_image_url` failen hart in `compose-video-clips` vor dem Provider-Dispatch. `composer.silent_speaker_pass_v194 = false` — v194 Silent-Speaker-Pass abgeschaltet, zurück zum v169-Flow. Siehe [Anchor Invariant + v194 off](mem://architecture/video-composer/anchor-invariant-and-v194-off).
 - **Export Quality Floor**: All Lambda exports use JPEG 95 / CRF 16 / preset `slow` / 10M / 256k. Mux path uses preset `medium`. Preview unaffected. See [Global Export Quality Floor](mem://architecture/render/global-export-quality-floor).
+- **AWS Lambda Quota**: 100 (eu-central-1) → Render-Pool 80 (Founder-Reserve ab 68), 20 für Edge+Burst. Tier-Caps unverändert bis LambdaHealth peak > 60 an ≥ 3 Tagen. Siehe [Quota 100 Launch Distribution](mem://infrastructure/aws-lambda/quota-100-launch-distribution).
 
 ## Memories
 - [v209 Risky Provider Consent](mem://architecture/lipsync/v209-risky-provider-consent) — Kling ignoriert Plate-Prompt bei N≥2 → Ghost-Mouthing. Kein Auto-Migrate. In-Dialog Warn-Block + Consent-Checkbox + Persistenz in `composer_scenes.scene_assets.risky_provider_consent`; Refund-Ausschluss nur für Lipsync-Artefakte. `LIPSYNC_SAFE_PROVIDERS = [hailuo, happyhorse]`.
