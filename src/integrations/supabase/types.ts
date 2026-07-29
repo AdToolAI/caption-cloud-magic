@@ -1255,6 +1255,75 @@ export type Database = {
           },
         ]
       }
+      autopilot_assets: {
+        Row: {
+          analysis: Json
+          created_at: string
+          file_name: string | null
+          file_size: number | null
+          id: string
+          idea_id: string | null
+          mime_type: string | null
+          production_id: string | null
+          public_url: string | null
+          role: string
+          storage_path: string
+          updated_at: string
+          usable: boolean
+          user_id: string
+          user_note: string | null
+        }
+        Insert: {
+          analysis?: Json
+          created_at?: string
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          idea_id?: string | null
+          mime_type?: string | null
+          production_id?: string | null
+          public_url?: string | null
+          role?: string
+          storage_path: string
+          updated_at?: string
+          usable?: boolean
+          user_id: string
+          user_note?: string | null
+        }
+        Update: {
+          analysis?: Json
+          created_at?: string
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          idea_id?: string | null
+          mime_type?: string | null
+          production_id?: string | null
+          public_url?: string | null
+          role?: string
+          storage_path?: string
+          updated_at?: string
+          usable?: boolean
+          user_id?: string
+          user_note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_assets_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autopilot_assets_production_id_fkey"
+            columns: ["production_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_productions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       autopilot_briefs: {
         Row: {
           activated_at: string | null
@@ -1445,6 +1514,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "autopilot_director_log_production_id_fkey"
+            columns: ["production_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_productions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autopilot_ideas: {
+        Row: {
+          aspect_ratio: string
+          brief: string
+          concepts: Json
+          created_at: string
+          genre: string | null
+          id: string
+          language: string
+          options: Json
+          production_id: string | null
+          selected_index: number | null
+          strategy: Json
+          target_duration_seconds: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio?: string
+          brief: string
+          concepts?: Json
+          created_at?: string
+          genre?: string | null
+          id?: string
+          language?: string
+          options?: Json
+          production_id?: string | null
+          selected_index?: number | null
+          strategy?: Json
+          target_duration_seconds?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string
+          brief?: string
+          concepts?: Json
+          created_at?: string
+          genre?: string | null
+          id?: string
+          language?: string
+          options?: Json
+          production_id?: string | null
+          selected_index?: number | null
+          strategy?: Json
+          target_duration_seconds?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_ideas_production_id_fkey"
             columns: ["production_id"]
             isOneToOne: false
             referencedRelation: "autopilot_productions"
