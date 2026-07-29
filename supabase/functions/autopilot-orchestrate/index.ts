@@ -25,6 +25,14 @@ import {
   runComposerLipSync,
   upsertBridgeScene,
 } from "../_shared/autopilotComposerBridge.ts";
+import {
+  FALLBACK_STILL,
+  isFramingFailure,
+  MAX_SCENE_ATTEMPTS,
+  repairAnchorPrompt,
+  repairMotionPrompt,
+} from "../_shared/autopilotRetry.ts";
+
 
 
 const corsHeaders = {
