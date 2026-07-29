@@ -266,9 +266,18 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               anchorPrompt: clampPromptWords(compileAnchorPrompt(scene)),
               motionPrompt: clampPromptWords(compileMotionPrompt(scene, { hasAnchor: true }), 60),
               dialogue: scene.dialogue ?? null,
+              turns: (scene.turns ?? []).map((turn, i) => ({
+                id: turn.id || `${scene.id}:${i}`,
+                text: turn.text,
+                speakerCharacterId: turn.speakerCharacterId ?? null,
+                speakerName: turn.speakerName ?? null,
+                voiceId: turn.voiceId ?? null,
+                language: turn.language ?? scene.voiceLanguage ?? plannedTreatment.language,
+              })),
               speakerCharacterId: scene.speakerCharacterId ?? null,
               voiceId: scene.voiceId ?? null,
               voiceLanguage: scene.voiceLanguage ?? plannedTreatment.language,
+
               characterIds: scene.characterIds ?? [],
               portraitUrls: cast.map((entry) => entry.url).filter(Boolean),
               characterNames: cast.map((entry) => entry.name).filter(Boolean),
