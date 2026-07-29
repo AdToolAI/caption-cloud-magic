@@ -82,16 +82,15 @@ Deno.serve(async (req) => {
       throw new Error('YouTube credentials not configured');
     }
 
-    const { 
-      videoUrl, 
-      title, 
-      description, 
-      tags = [], 
+    const body: PublishRequest = await req.json();
+    const {
+      videoUrl,
       privacyStatus = 'public',
-      categoryId = '22' // Default: People & Blogs
-    }: PublishRequest = await req.json();
+      categoryId = '22',
+    } = body;
+    const meta = applyShortsMetadata(body);
 
-    console.log('Publishing to YouTube:', { title, privacyStatus });
+    console.log('Publishing to YouTube:', { title: meta.title, privacyStatus, isShort: meta.isShort });
 
     // Fetch video file
     const videoResponse = await fetch(videoUrl);
@@ -110,9 +109,9 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           snippet: {
-            title: title.substring(0, 100), // YouTube max title length
-            description: description,
-            tags: tags,
+            title: meta.title,
+            description: meta.description,
+            tags: meta.tags,
             categoryId: categoryId,
           },
           status: {
