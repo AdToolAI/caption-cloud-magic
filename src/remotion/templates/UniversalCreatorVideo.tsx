@@ -2112,16 +2112,41 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   if (background.type === 'video' && background.videoUrl) {
     return (
       <AbsoluteFill style={{ backgroundColor: '#000' }}>
-        <SafeVideo src={background.videoUrl} sceneType={sceneType} primaryColor={primaryColor} style={{ width: '100%', height: '100%', objectFit: 'contain' }} muted={audioMuted} volume={audioVolume} previewMode={previewMode} />
+        <SafeVideo
+          src={background.videoUrl}
+          sceneType={sceneType}
+          primaryColor={primaryColor}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            // Sensor-Baseline (export only) — matches Director's Cut baseline so UCC
+            // and DC exports stay visually aligned. Preview stays neutral.
+            filter: previewMode ? undefined : SENSOR_BASELINE_GRADE_FILTER,
+          }}
+          muted={audioMuted}
+          volume={audioVolume}
+          previewMode={previewMode}
+        />
       </AbsoluteFill>
     );
   }
   
   // Default: image with gradient fallback for invalid URLs
   if (safeImageUrl) {
+    const imgFilterParts: string[] = [];
+    if (!rawMediaMode) imgFilterParts.push('saturate(1.15) contrast(1.05)');
+    if (!previewMode) imgFilterParts.push(SENSOR_BASELINE_GRADE_FILTER);
+    const imgFilter = imgFilterParts.join(' ') || undefined;
     return (
-      <AbsoluteFill style={{ backgroundColor: '#000', ...(rawMediaMode ? {} : { filter: 'saturate(1.15) contrast(1.05)' }) }}>
-        <SafeImg src={safeImageUrl} sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+        <SafeImg
+          src={safeImageUrl}
+          sceneType={sceneType}
+          primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', filter: imgFilter }}
+        />
       </AbsoluteFill>
     );
   }
