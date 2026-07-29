@@ -15,7 +15,7 @@
 
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X, Lock, AlertCircle } from 'lucide-react';
+import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X, Lock, AlertCircle, Library } from 'lucide-react';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -612,6 +612,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     (scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {},
   );
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const [libraryFor, setLibraryFor] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genStage, setGenStage] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
