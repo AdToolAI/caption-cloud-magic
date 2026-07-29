@@ -116,6 +116,7 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
           <AvatarVoicePicker
             value={character.default_voice_id}
             provider={character.default_voice_provider}
+            language={(character as { default_voice_language?: string | null }).default_voice_language ?? null}
             onChange={(v) => {
               if (!v) {
                 updateAvatar.mutate({
@@ -123,14 +124,16 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
                   default_voice_id: null,
                   default_voice_provider: null,
                   default_voice_name: null,
-                });
+                  default_voice_language: null,
+                } as any);
               } else {
                 updateAvatar.mutate({
                   id: character.id,
                   default_voice_id: v.voiceId,
                   default_voice_provider: v.provider,
                   default_voice_name: v.name,
-                });
+                  default_voice_language: v.language,
+                } as any);
               }
             }}
           />
