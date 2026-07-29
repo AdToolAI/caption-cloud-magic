@@ -733,14 +733,21 @@ serve(async (req) => {
       width: dimensions.width,
       height: dimensions.height,
       
-      // Codec and format
+      // Codec and format — visually-lossless export floor.
+      // See mem://architecture/render/global-export-quality-floor.md
+      // Preview renders bypass Lambda entirely (browser Remotion Player), so
+      // this floor is safe to apply unconditionally to all export invocations.
       codec: format === 'mp4' ? 'h264' : 'gif',
       imageFormat: 'jpeg',
-      jpegQuality: 80,
-      
+      jpegQuality: 95,
+      crf: 16,
+      x264Preset: 'slow',
+      videoBitrate: '10M',
+
       // r61: Enable audio rendering for voiceover/music
       muted: false,
       audioCodec: 'aac',
+      audioBitrate: '256k',
 
       // r71: Scene-aware scheduling.
       // External MP4 backgrounds (Pixabay etc.) need many small parallel chunks
