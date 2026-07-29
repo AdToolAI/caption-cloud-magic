@@ -71,7 +71,48 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     );
   }
 
-  if (scene.dialogue?.trim()) {
+  const turns = scene.turns ?? [];
+
+  if (turns.length > 0) {
+    // Multi-speaker: every turn needs a cast speaker and a voice of its own,
+    // otherwise the Sync.so pass for that speaker has nothing to animate.
+    turns.forEach((turn, i) => {
+      const label = turn.speakerName ?? `Sprecher ${i + 1}`;
+      if (!turn.speakerCharacterId) {
+        findings.push(block('turn_no_speaker', `Redebeitrag ${i + 1} ohne Sprecher.`, id));
+      } else if (
+        scene.characterIds.length > 0 &&
+        !scene.characterIds.includes(turn.speakerCharacterId)
+      ) {
+        findings.push(
+          block('turn_speaker_not_in_scene', `${label} kommt in dieser Szene gar nicht vor.`, id),
+        );
+      }
+      if (!turn.voiceId) {
+        findings.push(block('turn_no_voice', `${label}: Stimme fehlt.`, id));
+      }
+    });
+    if (turns.length > 4) {
+      findings.push(
+        warn(
+          'turns_too_many',
+          `${turns.length} Sprecher in einer Szene — ab 5 wird der Lip-Sync unzuverlässig.`,
+          id,
+        ),
+      );
+    }
+    const turnWords = turns.reduce((acc, turn) => acc + turn.text.trim().split(/\s+/).length, 0);
+    const turnNeeded = turnWords / 2.6 + Math.max(0, turns.length - 1) * 0.25;
+    if (turnNeeded > scene.durationSeconds + 0.75) {
+      findings.push(
+        warn(
+          'dialogue_too_long',
+          `Die Redebeiträge brauchen ca. ${turnNeeded.toFixed(1)}s, Szene ist nur ${scene.durationSeconds}s lang.`,
+          id,
+        ),
+      );
+    }
+  } else if (scene.dialogue?.trim()) {
     if (!scene.speakerCharacterId) {
       findings.push(block('dialogue_no_speaker', 'Dialog ohne zugeordneten Sprecher.', id));
     }
@@ -101,6 +142,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
       );
     }
   }
+
 
   const uniqueChars = new Set(scene.characterIds);
   if (uniqueChars.size !== scene.characterIds.length) {

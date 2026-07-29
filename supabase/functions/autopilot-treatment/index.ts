@@ -43,6 +43,11 @@ Arbeitsregeln:
 6. Variiere Einstellungsgrößen und Kamerabewegungen. Zweimal hintereinander dieselbe
    Bewegung wirkt maschinell.
 7. Die Dauer der einzelnen Szenen setzt du NICHT — das übernimmt der Rhythmus-Planer.
+8. Sprechen in einer Szene mehrere Personen, füllst du "turns" (ein Eintrag pro Redebeitrag,
+   in der richtigen Reihenfolge, jeweils mit der Charakter-ID des Sprechers). "dialogue"
+   lässt du dann leer. Sprechen alle Turns zusammen, dürfen sie die Szene nicht sprengen:
+   rechne mit rund 2,6 Wörtern pro Sekunde.
+
 
 Antworte ausschließlich über den Tool-Call.`;
 
@@ -61,6 +66,18 @@ const SCENE_SCHEMA = {
     characterIds: { type: "array", items: { type: "string" } },
     dialogue: { type: "string" },
     speakerCharacterId: { type: "string" },
+    turns: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          speakerCharacterId: { type: "string" },
+          text: { type: "string" },
+        },
+        required: ["speakerCharacterId", "text"],
+        additionalProperties: false,
+      },
+    },
     foleyHint: { type: "string" },
   },
   required: [
@@ -172,8 +189,21 @@ Deno.serve(async (req) => {
     const validIds = new Set(characters.map((c) => c.id));
 
     const scenes = (Array.isArray(parsed.scenes) ? parsed.scenes : []).map(
-      (scene: Record<string, unknown>, index: number) => ({
-        id: crypto.randomUUID(),
+      (scene: Record<string, unknown>, index: number) => {
+      const sceneId = crypto.randomUUID();
+      // Multi-speaker turns. Only cast members survive the id lock; voices are
+      // assigned later in the Director's Table, never invented by the model.
+      const turns = (Array.isArray(scene.turns) ? scene.turns : [])
+        .map((t: Record<string, unknown>, i: number) => ({
+          id: `${sceneId}:${i}`,
+          text: String(t?.text ?? "").trim(),
+          speakerCharacterId: validIds.has(String(t?.speakerCharacterId ?? ""))
+            ? String(t.speakerCharacterId)
+            : undefined,
+        }))
+        .filter((t) => t.text.length > 1 && !!t.speakerCharacterId);
+      return ({
+        id: sceneId,
         orderIndex: index,
         beat: String(scene.beat ?? "body"),
         durationSeconds: 0, // the rhythm planner owns this
@@ -190,13 +220,19 @@ Deno.serve(async (req) => {
           .map(String)
           .filter((id) => validIds.has(id)),
         propIds: [],
-        dialogue: String(scene.dialogue ?? "").trim() || undefined,
-        speakerCharacterId: validIds.has(String(scene.speakerCharacterId ?? ""))
+        turns: turns.length > 0 ? turns : undefined,
+        dialogue: turns.length > 0
+          ? turns.map((t) => t.text).join(" ")
+          : String(scene.dialogue ?? "").trim() || undefined,
+        speakerCharacterId: turns.length > 0
+          ? turns[0].speakerCharacterId
+          : validIds.has(String(scene.speakerCharacterId ?? ""))
           ? String(scene.speakerCharacterId)
           : undefined,
         voiceLanguage: language,
         foleyHint: String(scene.foleyHint ?? "").trim() || undefined,
-      }),
+      });
+      },
     );
 
     if (scenes.length === 0) return json({ error: "treatment_no_scenes" }, 502);

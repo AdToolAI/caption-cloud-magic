@@ -7,7 +7,7 @@
  * a storyboard, not a machine.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
@@ -107,6 +107,38 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   );
 
   /**
+   * Voices are never invented by the model — they come from the voice a
+   * character carries in Cast & World. Without this map every speaking scene
+   * would fail preflight with "Stimme fehlt".
+   */
+  const [voiceByCharacter, setVoiceByCharacter] = useState<
+    Record<string, { voiceId: string | null; name: string }>
+  >({});
+
+  useEffect(() => {
+    const ids = Array.from(
+      new Set((treatment?.scenes ?? []).flatMap((scene) => scene.characterIds ?? [])),
+    );
+    if (ids.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from('brand_characters')
+        .select('id, name, default_voice_id')
+        .in('id', ids);
+      if (cancelled) return;
+      const map: Record<string, { voiceId: string | null; name: string }> = {};
+      for (const row of data ?? []) {
+        map[row.id] = { voiceId: row.default_voice_id ?? null, name: row.name ?? '' };
+      }
+      setVoiceByCharacter(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [treatment]);
+
+  /**
    * The model delivers structure; the planner owns time and camera variety.
    * Doing this on the client keeps the storyboard instantly re-plannable when
    * the user drags the duration slider after approval.
@@ -115,9 +147,28 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     if (!treatment) return null;
     const scenes = diversifyCameraMoves(
       applyRhythm(treatment.scenes, treatment.totalDurationSeconds),
-    );
+    ).map((scene) => {
+      const turns = (scene.turns ?? []).map((turn) => {
+        const cast = turn.speakerCharacterId ? voiceByCharacter[turn.speakerCharacterId] : undefined;
+        return {
+          ...turn,
+          speakerName: turn.speakerName ?? cast?.name,
+          voiceId: turn.voiceId ?? cast?.voiceId ?? undefined,
+          language: turn.language ?? scene.voiceLanguage ?? treatment.language,
+        };
+      });
+      const soloVoice = scene.speakerCharacterId
+        ? voiceByCharacter[scene.speakerCharacterId]?.voiceId ?? undefined
+        : undefined;
+      return {
+        ...scene,
+        turns: turns.length > 0 ? turns : undefined,
+        voiceId: scene.voiceId ?? (turns.length > 0 ? turns[0].voiceId : soloVoice),
+      };
+    });
     return { ...treatment, scenes };
-  }, [treatment]);
+  }, [treatment, voiceByCharacter]);
+
 
   const preflight = useMemo(
     () => (plannedTreatment ? preflightTreatment(plannedTreatment) : null),
@@ -138,14 +189,26 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   const cost = useMemo(() => {
     if (!plannedTreatment) return null;
     const scenes = plannedTreatment.scenes ?? [];
-    const speakingScenes = scenes.filter((scene) => !!scene.dialogue);
+    const speakingScenes = scenes.filter(
+      (scene) => !!scene.dialogue || (scene.turns?.length ?? 0) > 0,
+    );
     const totalSeconds = scenes.reduce((acc, scene) => acc + (scene.durationSeconds || 0), 0);
+    // One Sync.so pass per speaker: count distinct speakers across all turns.
+    const speakerIds = new Set<string>();
+    for (const scene of speakingScenes) {
+      if (scene.turns?.length) {
+        for (const turn of scene.turns) speakerIds.add(turn.speakerCharacterId ?? turn.id);
+      } else {
+        speakerIds.add(scene.speakerCharacterId ?? 'x');
+      }
+    }
     return estimateProductionCost({
       sceneCount: scenes.length,
       totalDurationSeconds: totalSeconds,
       voiceoverEnabled: speakingScenes.length > 0,
       lipSyncEnabled: speakingScenes.length > 0,
-      lipSyncSpeakers: new Set(speakingScenes.map((scene) => scene.speakerCharacterId ?? 'x')).size,
+      lipSyncSpeakers: speakerIds.size,
+
       speakingSeconds: speakingScenes.reduce((acc, scene) => acc + (scene.durationSeconds || 0), 0),
       musicEnabled: true,
     });
@@ -266,9 +329,18 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               anchorPrompt: clampPromptWords(compileAnchorPrompt(scene)),
               motionPrompt: clampPromptWords(compileMotionPrompt(scene, { hasAnchor: true }), 60),
               dialogue: scene.dialogue ?? null,
+              turns: (scene.turns ?? []).map((turn, i) => ({
+                id: turn.id || `${scene.id}:${i}`,
+                text: turn.text,
+                speakerCharacterId: turn.speakerCharacterId ?? null,
+                speakerName: turn.speakerName ?? null,
+                voiceId: turn.voiceId ?? null,
+                language: turn.language ?? scene.voiceLanguage ?? plannedTreatment.language,
+              })),
               speakerCharacterId: scene.speakerCharacterId ?? null,
               voiceId: scene.voiceId ?? null,
               voiceLanguage: scene.voiceLanguage ?? plannedTreatment.language,
+
               characterIds: scene.characterIds ?? [],
               portraitUrls: cast.map((entry) => entry.url).filter(Boolean),
               characterNames: cast.map((entry) => entry.name).filter(Boolean),
@@ -474,11 +546,26 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                 <p className="mt-2 text-sm">{scene.action}</p>
                 <p className="text-xs text-muted-foreground">{scene.environment}</p>
 
-                {scene.dialogue && (
+                {(scene.turns?.length ?? 0) > 0 ? (
+                  <div className="mt-2 space-y-1.5 border-l-2 border-primary/40 pl-3">
+                    {scene.turns!.map((turn, turnIndex) => (
+                      <p key={turn.id} className="text-sm">
+                        <span className="mr-2 font-medium text-primary">
+                          {turn.speakerName ?? `Sprecher ${turnIndex + 1}`}
+                        </span>
+                        <span className="italic">„{turn.text}“</span>
+                        {!turn.voiceId && (
+                          <span className="ml-2 text-xs text-destructive">Stimme fehlt</span>
+                        )}
+                      </p>
+                    ))}
+                  </div>
+                ) : scene.dialogue ? (
                   <p className="mt-2 border-l-2 border-primary/40 pl-3 text-sm italic">
                     „{scene.dialogue}“
                   </p>
-                )}
+                ) : null}
+
               </div>
             ))}
           </div>

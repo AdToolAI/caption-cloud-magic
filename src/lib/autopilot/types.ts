@@ -67,10 +67,25 @@ export type LightingKey =
   | 'candle_warm'
   | 'clinical_white';
 
+/** One spoken turn inside a scene. Canonical id — never match by name. */
+export interface SceneDialogueTurn {
+  id: string;
+  text: string;
+  /** Cast & World character id speaking this turn. */
+  speakerCharacterId?: string;
+  /** Display name, used in the director log only. */
+  speakerName?: string;
+  /** ElevenLabs voice id. */
+  voiceId?: string;
+  /** BCP-47-ish language code, e.g. "de". */
+  language?: string;
+}
+
 /**
  * The canonical scene description. Agents fill these fields — they never write
  * the final prompt string themselves.
  */
+
 export interface SceneGrammar {
   /** Stable id, used to correlate anchor → clip → audio. */
   id: string;
@@ -99,6 +114,7 @@ export interface SceneGrammar {
   /** Brand product/prop ids present in this scene. */
   propIds: string[];
 
+
   /** Spoken line (user language). Empty when the scene has no dialogue. */
   dialogue?: string;
   /** Speaker character id — required when `dialogue` is set. */
@@ -107,6 +123,13 @@ export interface SceneGrammar {
   voiceId?: string;
   /** BCP-47-ish language code for TTS, e.g. "de", "en", "es". */
   voiceLanguage?: string;
+  /**
+   * Multi-speaker dialogue. When present it is the source of truth and
+   * `dialogue`/`voiceId` above only describe the first turn. Each turn gets its
+   * own voice track and its own Sync.so pass on the same clip.
+   */
+  turns?: SceneDialogueTurn[];
+
 
   /** Extra negatives on top of the global clause. English. */
   negatives?: string[];
