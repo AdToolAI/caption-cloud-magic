@@ -12,24 +12,32 @@ import { isHumeVoiceId } from '@/lib/voice-studio/humeVoices';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 import type { MultiSpeakerVoiceCfg } from '@/types/video-composer';
+import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
+import { toPickerLanguage, voicePreviewSample } from '@/lib/voice-languages';
 
 interface SpeakerMappingBarProps {
   script: string;
   elevenLabsVoices: VoiceMeta[];
   speakerMap: Record<string, MultiSpeakerVoiceCfg>;
   onChange: (next: Record<string, MultiSpeakerVoiceCfg>) => void;
+  /** Target language (ISO-639-1) — pins the voice library and previews. */
+  language?: string;
 }
 
-const PREVIEW_TEXT = 'Hi, this is a quick voice preview. The quick brown fox jumps over the lazy dog.';
+
 
 export function SpeakerMappingBar({
   script,
   elevenLabsVoices,
   speakerMap,
   onChange,
+  language,
 }: SpeakerMappingBarProps) {
   const speakers = useMemo(() => uniqueSpeakers(parseSpeakerScript(script)), [script]);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const [libraryFor, setLibraryFor] = useState<string | null>(null);
+  const targetLanguage = toPickerLanguage(language);
+  const previewText = voicePreviewSample(targetLanguage);
   const { voices: humeVoices, isLoading: humeLoading } = useHumeVoices();
 
   // Auto-seed missing speakers with sensible defaults (ElevenLabs Aria + alternates).
@@ -94,8 +102,12 @@ export function SpeakerMappingBar({
     try {
       const fn = cfg.engine === 'hume' ? 'preview-voice-hume' : 'preview-voice';
       const body = cfg.engine === 'hume'
-        ? { text: PREVIEW_TEXT, voiceName: cfg.voiceId, provider: cfg.provider || 'HUME_AI' }
-        : { text: PREVIEW_TEXT, voiceId: cfg.voiceId };
+        ? { text: previewText, voiceName: cfg.voiceId, provider: cfg.provider || 'HUME_AI' }
+        : {
+            text: previewText,
+            voiceId: cfg.voiceId,
+            language: targetLanguage !== 'all' ? targetLanguage : undefined,
+          };
       const { data, error } = await supabase.functions.invoke(fn, { body });
       if (error) throw error;
       if (!data?.audioContent) throw new Error('No audio returned');
@@ -162,49 +174,44 @@ export function SpeakerMappingBar({
                 </SelectContent>
               </Select>
 
-              <Select
-                value={cfg?.voiceId ?? ''}
-                onValueChange={(voiceId) => {
-                  if (isHume) {
+              {isHume ? (
+                <Select
+                  value={cfg?.voiceId ?? ''}
+                  onValueChange={(voiceId) => {
                     const v = humeVoices.find((x) => x.name === voiceId);
                     setSpeakerCfg(s.speakerId, {
                       voiceId,
                       voiceName: v?.label ?? voiceId,
                       provider: v?.provider ?? 'HUME_AI',
                     });
-                  } else {
-                    const v = elevenLabsVoices.find((x) => x.id === voiceId);
-                    setSpeakerCfg(s.speakerId, { voiceId, voiceName: v?.name ?? voiceId });
-                  }
-                }}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Stimme wählen" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[320px]">
-                  {isHume
-                    ? humeVoices.map((v) => (
-                        <SelectItem key={v.id} value={v.name}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{v.label}</span>
-                            <span className="text-[11px] text-muted-foreground">{v.description}</span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    : elevenLabsVoices.map((v) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{v.name}</span>
-                            {v.gender && (
-                              <Badge variant="outline" className="text-[10px] capitalize">
-                                {v.gender}
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                </SelectContent>
-              </Select>
+                  }}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Stimme wählen" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[320px]">
+                    {humeVoices.map((v) => (
+                      <SelectItem key={v.id} value={v.name}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{v.label}</span>
+                          <span className="text-[11px] text-muted-foreground">{v.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="h-9 justify-start font-normal"
+                  onClick={() => setLibraryFor(s.speakerId)}
+                >
+                  <Mic className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                  <span className="truncate">
+                    {cfg?.voiceName || 'Stimme aus Bibliothek wählen…'}
+                  </span>
+                </Button>
+              )}
 
               <Button
                 size="sm"
@@ -222,6 +229,19 @@ export function SpeakerMappingBar({
           );
         })}
       </CardContent>
+
+      <UniversalVoiceLibraryPicker
+        open={!!libraryFor}
+        onOpenChange={(o) => !o && setLibraryFor(null)}
+        onSelect={(voice) => {
+          if (!libraryFor) return;
+          setSpeakerCfg(libraryFor, { voiceId: voice.id, voiceName: voice.name });
+          setLibraryFor(null);
+        }}
+        language={targetLanguage}
+        currentVoiceId={libraryFor ? speakerMap[libraryFor]?.voiceId : undefined}
+        title="Stimme für Sprecher wählen"
+      />
     </Card>
   );
 }
