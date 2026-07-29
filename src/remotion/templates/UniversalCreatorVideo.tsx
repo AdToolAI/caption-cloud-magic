@@ -3,6 +3,7 @@ import {
   AbsoluteFill, 
   Audio,
   Video,
+  OffthreadVideo,
   Img, 
   Sequence, 
   useCurrentFrame, 
@@ -12,6 +13,7 @@ import {
   delayRender,
   continueRender,
 } from 'remotion';
+import { SENSOR_BASELINE_GRADE_FILTER } from '../utils/sensorBaselineGrade';
 import { safeInterpolate as interpolate, safeDuration, safeSpring as spring, logRemotionDebug } from '../utils/safeInterpolate';
 import { z } from 'zod';
 
@@ -2026,11 +2028,16 @@ const SafeVideo: React.FC<{
   if (failed || !src) {
     return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
   }
+
+  // Export path: OffthreadVideo (ffmpeg-frame-exact, no Chromium blend/drift).
+  // Preview path: <Video> (OffthreadVideo cannot run in the browser).
+  const VideoComponent: any = previewMode ? Video : OffthreadVideo;
+
   return (
-    <Video
+    <VideoComponent
       src={src}
       style={style || { width: '100%', height: '100%', objectFit: 'cover' }}
-      loop
+      loop={previewMode}
       muted={muted}
       volume={muted ? 0 : Math.max(0, Math.min(1, volume))}
       pauseWhenBuffering
@@ -2105,16 +2112,41 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   if (background.type === 'video' && background.videoUrl) {
     return (
       <AbsoluteFill style={{ backgroundColor: '#000' }}>
-        <SafeVideo src={background.videoUrl} sceneType={sceneType} primaryColor={primaryColor} style={{ width: '100%', height: '100%', objectFit: 'contain' }} muted={audioMuted} volume={audioVolume} previewMode={previewMode} />
+        <SafeVideo
+          src={background.videoUrl}
+          sceneType={sceneType}
+          primaryColor={primaryColor}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            // Sensor-Baseline (export only) — matches Director's Cut baseline so UCC
+            // and DC exports stay visually aligned. Preview stays neutral.
+            filter: previewMode ? undefined : SENSOR_BASELINE_GRADE_FILTER,
+          }}
+          muted={audioMuted}
+          volume={audioVolume}
+          previewMode={previewMode}
+        />
       </AbsoluteFill>
     );
   }
   
   // Default: image with gradient fallback for invalid URLs
   if (safeImageUrl) {
+    const imgFilterParts: string[] = [];
+    if (!rawMediaMode) imgFilterParts.push('saturate(1.15) contrast(1.05)');
+    if (!previewMode) imgFilterParts.push(SENSOR_BASELINE_GRADE_FILTER);
+    const imgFilter = imgFilterParts.join(' ') || undefined;
     return (
-      <AbsoluteFill style={{ backgroundColor: '#000', ...(rawMediaMode ? {} : { filter: 'saturate(1.15) contrast(1.05)' }) }}>
-        <SafeImg src={safeImageUrl} sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+        <SafeImg
+          src={safeImageUrl}
+          sceneType={sceneType}
+          primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', filter: imgFilter }}
+        />
       </AbsoluteFill>
     );
   }

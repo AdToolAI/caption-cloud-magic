@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, Freeze, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
+import { AbsoluteFill, Video, OffthreadVideo, Audio, Sequence, Freeze, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
+import { prependSensorBaseline } from '../utils/sensorBaselineGrade';
 import { resolveTransitions, findActiveTransition, type ResolvedTransition } from '../../utils/transitionResolver';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { safeFrame, safeDurationFrames, isValidRemoteMediaUrl } from '../utils/safeFrame';
@@ -621,9 +622,13 @@ const SceneVideo: React.FC<{
     return transforms.length > 0 ? transforms.join(' ') : undefined;
   }, [kenBurnsTransform, transitionEffects.transform]);
 
-  const finalFilter = transitionEffects.additionalFilter 
+  const baseFilter = transitionEffects.additionalFilter 
     ? `${filterString} ${transitionEffects.additionalFilter}` 
     : filterString;
+  // Shared Sensor-Baseline (only in export). Preview stays neutral so the
+  // editor shows an honest frame while tuning grade sliders.
+  const finalFilter = previewMode ? baseFilter : prependSensorBaseline(baseFilter);
+
 
   const chromaKeyStyle = chromaKey?.enabled ? { mixBlendMode: 'multiply' as const } : {};
 
@@ -653,24 +658,47 @@ const SceneVideo: React.FC<{
         />
       ) : isValidRemoteMediaUrl(mediaUrl) ? (
         // Render video (original source or additionalMedia video)
-        <Video
-          src={mediaUrl}
-          startFrom={sourceStartFrame}
-          playbackRate={playbackRate}
-          pauseWhenBuffering={!previewMode}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            filter: finalFilter,
-            opacity: transitionEffects.opacity,
-            transform: combinedTransform,
-            transformOrigin: 'center center',
-            clipPath: transitionEffects.clipPath || undefined,
-            ...chromaKeyStyle,
-          }}
-          volume={0}
-        />
+        // Export: OffthreadVideo (ffmpeg-exact frames, no Chromium blend/drift).
+        // Preview: <Video> (OffthreadVideo cannot run in the browser).
+        previewMode ? (
+          <Video
+            src={mediaUrl}
+            startFrom={sourceStartFrame}
+            playbackRate={playbackRate}
+            pauseWhenBuffering={false}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              filter: finalFilter,
+              opacity: transitionEffects.opacity,
+              transform: combinedTransform,
+              transformOrigin: 'center center',
+              clipPath: transitionEffects.clipPath || undefined,
+              ...chromaKeyStyle,
+            }}
+            volume={0}
+          />
+        ) : (
+          <OffthreadVideo
+            src={mediaUrl}
+            startFrom={sourceStartFrame}
+            playbackRate={playbackRate}
+            pauseWhenBuffering
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              filter: finalFilter,
+              opacity: transitionEffects.opacity,
+              transform: combinedTransform,
+              transformOrigin: 'center center',
+              clipPath: transitionEffects.clipPath || undefined,
+              ...chromaKeyStyle,
+            }}
+            volume={0}
+          />
+        )
       ) : (
         // Bug 3 fallback: invalid/missing video URL → render black frame
         // instead of crashing Chromium with MEDIA_ERR Code 4.

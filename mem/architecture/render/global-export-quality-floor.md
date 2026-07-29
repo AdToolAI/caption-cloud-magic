@@ -28,6 +28,40 @@ default CRF 18 + `x264Preset=medium`.
   UCC, Director's Cut, Motion Studio, AI Video Studio, Composer exports.
 - `supabase/functions/render-sync-segments-audio-mux/index.ts` — Lip-Sync mux.
 - `remotion.config.ts` — mirror values so local/CI renders match Lambda.
+- `src/remotion/utils/sensorBaselineGrade.ts` — shared Sensor-Baseline-Grade
+  applied on export-only to video/image backgrounds in both UCC
+  (`UniversalCreatorVideo.tsx`) and DC (`DirectorsCutVideo.tsx`).
+
+## Sensor Baseline Grade
+
+Value: `contrast(1.03) saturate(1.05)` — exported from
+`src/remotion/utils/sensorBaselineGrade.ts` as `SENSOR_BASELINE_GRADE_FILTER`.
+
+Applied on the outgoing frame of every Lambda export render, on video and
+image backgrounds only (never on solid color / gradient fills, never in the
+in-browser Preview player). It exists so that UCC's `rawMediaMode: true`
+export does not look visibly flatter than Director's Cut export, which had
+always shipped with a similar micro-contrast baseline via its
+`SharpnessFilter` + default color-grade chain.
+
+The baseline is **not** cinematic post-processing (no mood, no grain, no
+vignette, no Ken Burns, no parallax, no overlays, no scene-fx). The
+UCC Raw-Media-Invariant still holds — see the `raw-media-invariant` memory
+and `src/lib/__tests__/universalCreatorRenderPayload.test.ts`.
+
+Do not change this value without a side-by-side frame comparison of UCC vs
+DC export from the same source clip.
+
+## OffthreadVideo in export
+
+Both `UniversalCreatorVideo.tsx` (`SafeVideo`) and `DirectorsCutVideo.tsx`
+(`SceneVideo`) render video backgrounds through Remotion's `OffthreadVideo`
+in export (`previewMode === false`) and through classic `<Video>` in preview
+(OffthreadVideo cannot run in the browser). This eliminates Chromium
+video-element frame blending and yuv↔rgb color drift that were the residual
+softness under the CRF-16 encode floor.
+
+
 
 ## Exceptions
 
