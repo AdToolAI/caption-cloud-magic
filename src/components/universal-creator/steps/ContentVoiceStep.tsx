@@ -60,14 +60,30 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
   const [useVoiceover, setUseVoiceover] = useState(value?.useVoiceover !== false);
   const [libraryOpen, setLibraryOpen] = useState(false);
 
-  const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>({
+  const DEFAULT_VOICE_CONFIG: VoiceoverConfig = {
     voiceId: '9BWtsMINqrJLrRacOk9x',
     voiceName: 'Aria',
     modelId: 'eleven_turbo_v2_5',
     stability: 0.5,
     similarityBoost: 0.75,
     speed: 1.0,
-  });
+  };
+
+  // Hydrate from the persisted project config so the picker keeps showing the
+  // voice the user actually chose after navigating away and back.
+  const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>(
+    () => value?.voiceoverConfig ?? DEFAULT_VOICE_CONFIG,
+  );
+  const userTouchedVoiceRef = useRef(false);
+
+  // Re-hydrate once when the project draft loads asynchronously.
+  useEffect(() => {
+    const persisted = value?.voiceoverConfig;
+    if (!persisted?.voiceId) return;
+    if (userTouchedVoiceRef.current) return;
+    setVoiceConfig((prev) => (prev.voiceId === persisted.voiceId ? prev : persisted));
+  }, [value?.voiceoverConfig]);
+
 
   const handleVoiceoverToggle = (enabled: boolean) => {
     setUseVoiceover(enabled);
