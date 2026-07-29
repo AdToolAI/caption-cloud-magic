@@ -137,12 +137,14 @@ export function RemotionPreviewPlayer({
     voiceoverVolume: clampAudioVolume(customizations?.voiceoverVolume ?? 1),
     backgroundMusicVolume: clampAudioVolume(customizations?.backgroundMusicVolume ?? 0),
     masterVolume: clampAudioVolume(customizations?.masterVolume ?? 1),
+    voiceoverStartTime: Math.max(0, Number(customizations?.voiceoverStartTime) || 0),
   }), [
     customizations?.voiceoverUrl,
     customizations?.backgroundMusicUrl,
     customizations?.voiceoverVolume,
     customizations?.backgroundMusicVolume,
     customizations?.masterVolume,
+    customizations?.voiceoverStartTime,
   ]);
 
   const inputProps: Record<string, any> = useMemo(() => ({
@@ -181,24 +183,37 @@ export function RemotionPreviewPlayer({
     const voice = voiceoverAudioRef.current;
     const music = musicAudioRef.current;
 
-    if (voice && Number.isFinite(voice.duration)) {
-      voice.currentTime = Math.min(safeTime, Math.max(0, voice.duration - 0.05));
+    if (voice) {
+      const startAt = previewAudio.voiceoverStartTime;
+      const localTime = safeTime - startAt;
+      if (localTime < 0) {
+        voice.pause();
+        try { voice.currentTime = 0; } catch { /* noop */ }
+      } else if (Number.isFinite(voice.duration)) {
+        voice.currentTime = Math.min(localTime, Math.max(0, voice.duration - 0.05));
+      } else {
+        try { voice.currentTime = localTime; } catch { /* noop */ }
+      }
     }
 
     if (music) {
       const duration = Number.isFinite(music.duration) && music.duration > 0 ? music.duration : 0;
       music.currentTime = duration > 0 ? safeTime % duration : safeTime;
     }
-  }, []);
+  }, [previewAudio.voiceoverStartTime]);
 
   const playPreviewAudio = useCallback(async () => {
     applyPreviewAudioVolume();
-    seekPreviewAudio(getPreviewTime());
+    const now = getPreviewTime();
+    seekPreviewAudio(now);
+    const voice = voiceoverAudioRef.current;
+    const music = musicAudioRef.current;
+    const voiceReady = voice && now >= previewAudio.voiceoverStartTime;
     await Promise.allSettled([
-      voiceoverAudioRef.current?.play(),
-      musicAudioRef.current?.play(),
+      voiceReady ? voice!.play() : Promise.resolve(),
+      music?.play(),
     ].filter(Boolean) as Promise<void>[]);
-  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio]);
+  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio, previewAudio.voiceoverStartTime]);
 
   const pausePreviewAudio = useCallback(() => {
     voiceoverAudioRef.current?.pause();
@@ -319,8 +334,26 @@ export function RemotionPreviewPlayer({
       const voice = voiceoverAudioRef.current;
       const music = musicAudioRef.current;
 
-      if (voice && !voice.paused && Math.abs(voice.currentTime - expected) > 0.22) {
-        voice.currentTime = Math.min(expected, Number.isFinite(voice.duration) ? Math.max(0, voice.duration - 0.05) : expected);
+      if (voice) {
+        const startAt = previewAudio.voiceoverStartTime;
+        const localExpected = expected - startAt;
+        if (localExpected < 0) {
+          // VO has not started yet on the timeline.
+          if (!voice.paused) voice.pause();
+          if (voice.currentTime > 0.001) {
+            try { voice.currentTime = 0; } catch { /* noop */ }
+          }
+        } else {
+          if (voice.paused) {
+            void voice.play().catch(() => { /* autoplay blocked, ignore */ });
+          }
+          if (Math.abs(voice.currentTime - localExpected) > 0.22) {
+            voice.currentTime = Math.min(
+              localExpected,
+              Number.isFinite(voice.duration) ? Math.max(0, voice.duration - 0.05) : localExpected,
+            );
+          }
+        }
       }
 
       if (music && !music.paused) {
@@ -339,7 +372,7 @@ export function RemotionPreviewPlayer({
       if (syncRafRef.current !== null) cancelAnimationFrame(syncRafRef.current);
       syncRafRef.current = null;
     };
-  }, [getPreviewTime, isPlaying]);
+  }, [getPreviewTime, isPlaying, previewAudio.voiceoverStartTime]);
 
   useEffect(() => {
     if (!isDragging) return;

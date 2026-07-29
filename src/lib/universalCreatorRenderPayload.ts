@@ -145,6 +145,15 @@ export function buildUniversalCreatorCustomizations(input: BuildCustomizationsIn
       voiceoverVolume: clampAudioVolume(
         contentConfig?.voiceoverVolume ?? DEFAULT_VOICEOVER_VOLUME,
       ),
+      voiceoverStartTime: Math.max(
+        0,
+        Math.min(
+          durationSeconds,
+          Number.isFinite(Number(contentConfig?.voiceoverStartTime))
+            ? Number(contentConfig?.voiceoverStartTime)
+            : 0,
+        ),
+      ),
     }),
     // Music
     ...(selectedMusicUrl && {

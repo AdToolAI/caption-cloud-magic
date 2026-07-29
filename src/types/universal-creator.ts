@@ -24,6 +24,8 @@ export interface ContentConfig {
   actualVoiceoverDuration?: number; // Actual duration from audio metadata
   useVoiceover?: boolean; // Flag to enable/disable voiceover
   voiceoverVolume?: number; // 0–1, default 1.0
+  /** Startzeit des Voiceovers auf der Video-Timeline in Sekunden (Float, ms-genau). Default 0. */
+  voiceoverStartTime?: number;
   backgroundMusicUrl?: string;
   backgroundMusicVolume?: number;
   /** Global toggle to include original scene-video audio. Default false. */

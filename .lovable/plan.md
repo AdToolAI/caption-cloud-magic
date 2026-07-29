@@ -1,33 +1,46 @@
 ## Ziel
-Universal Content Creator (UCC) liefert **immer** Raw-Media — sowohl im Preview (Stufe 4) als auch im finalen Export. Cinematic-Post (Mood-Filter, Grain, Vignette, KenBurns, Parallax, Style-Overlays, Scene-FX, Floating-Icons, Transitions, DrawOn) bleibt exklusiv dem Director's Cut vorbehalten und wird dort nur auf ausdrücklichen Kundenwunsch aktiviert.
+Voiceover im Universal Content Creator wird **frei auf der Timeline platzierbar**: ein Eingabefeld + Slider im Voiceover-Bereich bestimmt, ab welcher Sekunde/Millisekunde das VO startet. Gilt für **alle Voiceover-Quellen** (ElevenLabs, geklonte Stimmen, hochgeladene MP3s) — der Offset lebt zentral im Payload, nicht am Modell.
 
-## Befund (verifiziert)
-- `src/lib/universalCreatorRenderPayload.ts:159` setzt bereits `rawMediaMode: true` für den **Export-Payload** — der finale MP4-Render aus dem UCC läuft also faktisch schon ohne Cinematic-Post.
-- `src/components/universal-creator/RemotionPreviewPlayer.tsx:155` setzt `rawMediaMode: true` für das **Preview** (Stufe 4).
-- `src/remotion/templates/UniversalCreatorVideo.tsx` schaltet bei `rawMediaMode` alle FX-Pfade konsistent ab (Zeilen 1789–3096).
+## Änderungen
 
-Ergebnis: Die vom Kunden geäußerte Sorge („Export wird schlechter als das, was ich in Stufe 3 sehe") ist **bereits gelöst**. Es gibt keinen Pfad im UCC, der Cinematic-Post in den finalen Export einschleust.
+### 1) Datenmodell — Startzeit im ContentConfig
+`src/types/universal-creator.ts` → `ContentConfig`:
+- `voiceoverStartTime?: number` — Sekunden (Float, ms-genau), default `0`.
 
-## Änderungen — minimal, nur zur Absicherung
+### 2) UI — Timing-Control im Voiceover-Bereich
+Direkt unter Lautstärke/Stimme im bestehenden Voiceover-Panel (ContentVoiceStep bzw. Audio-Step):
+- Nummern-Input „Start bei" mit Sekunden (Float, Schritt `0.01`, Suffix „s") — für ms-genaue Eingabe.
+- Slider `0` … `max(0, videoDuration - voDuration)` in `0.05s`-Schritten.
+- Drei Presets: **Am Anfang** (0s) · **Mitte** (`(videoDuration - voDuration)/2`) · **Am Ende** (`videoDuration - voDuration`).
+- Live-Anzeige: „VO läuft von 4.20s bis 12.70s (Video 20.00s)".
+- Warnhinweis wenn `start + voDuration > videoDuration` (VO wird abgeschnitten).
+- Feld ist deaktiviert, solange kein VO vorhanden ist.
 
-### 1) UCC-Export-Payload gegen Regressionen sperren
-`src/lib/universalCreatorRenderPayload.ts`
-- `rawMediaMode: true` wird zur **Konstanten** (nicht mehr überschreibbar via optionalem Input). Kommentar präzisieren: „UCC ist ein Clean-Media-Assembler. Cinematic-Post lebt ausschließlich im Director's Cut und nur wenn dort vom Kunden aktiviert."
+### 3) Preview-Player synchron
+`src/components/universal-creator/RemotionPreviewPlayer.tsx`:
+- `voiceoverStartTime` aus `customizations` in `previewAudio` übernehmen.
+- Im Timeupdate-Loop: VO-`<audio>` erst starten wenn `playerTime >= startTime`; davor `pause()` + `currentTime = 0`. Bei Seek: `audio.currentTime = max(0, playerTime - startTime)`.
 
-### 2) Template-Default hart machen
-`src/remotion/templates/UniversalCreatorVideo.tsx`
-- Zod-Schema (Zeile 233): `rawMediaMode: z.boolean().default(true)` (bisher `.default(false)`). Damit ist der Default für jeden UCC-Aufruf raw, auch wenn ein zukünftiger Call-Site das Feld vergisst.
-- Kommentar oben am Schema: „Nur der Director's Cut darf explizit `rawMediaMode: false` setzen."
+### 4) Render-Payload — eine Quelle der Wahrheit
+`src/lib/universalCreatorRenderPayload.ts`:
+- `voiceoverStartTime` aus `contentConfig` in den Payload übernehmen, geclamped auf `[0, videoDuration]`, default `0`. Gilt automatisch für jede VO-Quelle, weil alle über dasselbe Feld laufen.
 
-### 3) Sanity-Test
-- Kurzer Vitest-Check, der `buildUniversalCreatorRenderPayload(...)` mit typischen Inputs aufruft und asserted, dass `rawMediaMode === true` bleibt (verhindert versehentliche Regression durch spätere Refactors).
+### 5) Remotion-Template — Offset zentral anwenden
+`src/remotion/templates/UniversalCreatorVideo.tsx`:
+- Zod: `voiceoverStartTime: z.number().min(0).default(0)`.
+- Beide bestehenden `<Audio src={voiceoverUrl} …>`-Stellen in `<Sequence from={Math.round(voiceoverStartTime * fps)}>…</Sequence>` wrappen. Damit ist der Offset für Preview und finalen MP4-Export identisch, unabhängig vom TTS-Provider. Raw-Media-Invariante bleibt unberührt.
 
-### 4) Was NICHT geändert wird
-- **Director's Cut bleibt unangetastet.** Filter, Grain, KenBurns, Parallax, Overlays, Transitions, DrawOn stehen dort weiter zur Verfügung — nur, wenn der Kunde sie im DC-UI explizit einschaltet.
-- Kein neuer UI-Toggle im UCC. UCC = 1:1 raw, keine versteckten Regler.
-- Keine Änderung am Preview (läuft bereits raw + Loop + Mute-Toggle).
+### 6) Backwards-Compat
+- Fehlt das Feld (alte Projekte/Payloads), gilt `0` → identisches Verhalten wie heute.
+
+## Nicht Teil dieses Plans
+- Mehrere VO-Clips auf einer Timeline (bleibt Director's Cut).
+- Fade-In/Out fürs VO (separater Plan, falls gewünscht).
+- Änderungen am Director's Cut oder an TTS-Edge-Functions.
 
 ## Verifikation
-- Stufe-3-Preview, Stufe-4-Preview und finaler MP4-Download aus dem UCC sind visuell identisch (gleiche Schärfe, keine Mood-Verschiebung, keine Vignette, keine Zoom-Bewegung auf Standbildern).
-- Director's Cut mit aktivierten Filtern rendert weiterhin mit voller Cinematic-Post-Kette.
-- Vitest grün: Payload-Builder liefert `rawMediaMode: true` für alle geprüften UCC-Inputs.
+- Eingabe `3.25s` → Preview startet VO exakt bei 3.25s, auch nach Seek.
+- Presets „Anfang/Mitte/Ende" setzen korrekte Werte, Overflow-Warnung erscheint bei zu spätem Start.
+- Finaler MP4-Export platziert VO an derselben Position wie das Preview.
+- Verhalten identisch für ElevenLabs-VO, geklonte Stimme und hochgeladene MP3.
+- Alte Projekte ohne `voiceoverStartTime` laufen unverändert (Start bei 0).
