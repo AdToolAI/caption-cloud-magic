@@ -120,7 +120,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
               </a>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <a href="/directors-cut">
+              <a href="/universal-directors-cut">
                 <Scissors className="mr-2 h-4 w-4" />
                 In Director's Cut öffnen
               </a>
