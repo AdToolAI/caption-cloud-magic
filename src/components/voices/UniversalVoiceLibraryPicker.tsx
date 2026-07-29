@@ -16,12 +16,15 @@ import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (voice: VoiceMeta) => void;
-  language?: 'de' | 'en' | 'es' | 'all';
+  onSelect: (voice: VoiceMeta, language: string) => void;
+  /** ISO-639-1 code (`de`, `en`, `es`, `fr`, …) or `all`. Pre-selects the language filter. */
+  language?: string;
   currentVoiceId?: string;
   title?: string;
   /** If false, native-only defaults off (useful for EN-only workflows like Kling Omni). */
   enforceNative?: boolean;
+  /** If false, the language dropdown is hidden and the prop language is locked. */
+  allowLanguageChange?: boolean;
 }
 
 const TIER_LABEL: Record<string, { label: string; className: string }> = {
@@ -36,20 +39,29 @@ export function UniversalVoiceLibraryPicker({
   open,
   onOpenChange,
   onSelect,
-  language = 'all',
+  language: languageProp = 'all',
   currentVoiceId,
   title = 'Voice-Bibliothek',
   enforceNative = true,
+  allowLanguageChange = true,
 }: UniversalVoiceLibraryPickerProps) {
   const [search, setSearch] = useState('');
+  const [language, setLanguage] = useState<string>(toPickerLanguage(languageProp) || 'all');
   const [gender, setGender] = useState<'all' | 'male' | 'female' | 'neutral'>('all');
   const [age, setAge] = useState<'all' | 'young' | 'middle_aged' | 'old'>('all');
   const [useCase, setUseCase] = useState<'all' | 'narration' | 'conversational' | 'characters' | 'social_media' | 'news'>('all');
-  const [nativeOnly, setNativeOnly] = useState<boolean>(enforceNative && (language === 'de' || language === 'es'));
+  const nativeSensitive = NATIVE_SENSITIVE_LANGUAGES.has(language);
+  const [nativeOnly, setNativeOnly] = useState<boolean>(enforceNative && nativeSensitive);
   const [sort, setSort] = useState<'popularity' | 'name'>('popularity');
 
+  // Keep in sync when the caller changes the target language (e.g. project language switch).
   useEffect(() => {
-    setNativeOnly(enforceNative && (language === 'de' || language === 'es'));
+    const next = languageProp === 'all' ? 'all' : (toPickerLanguage(languageProp) || 'all');
+    setLanguage(next);
+  }, [languageProp]);
+
+  useEffect(() => {
+    setNativeOnly(enforceNative && NATIVE_SENSITIVE_LANGUAGES.has(language));
   }, [language, enforceNative]);
 
   const filters: VoiceLibraryFilters = useMemo(() => ({
