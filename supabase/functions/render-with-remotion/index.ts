@@ -657,7 +657,12 @@ serve(async (req) => {
       ? sanitizedCustomizations.scenes.reduce((sum: number, s: any) => sum + Number(s.duration || 0), 0)
       : 0;
     const sanitizedVoiceoverDuration = Number(sanitizedCustomizations.voiceoverDuration) || 0;
-    const totalDurationSeconds = Math.max(sceneDurationSum, sanitizedVoiceoverDuration, 5);
+    // Voice-over offset must extend the timeline — otherwise a late VO is cut off.
+    const sanitizedVoiceoverStart = Math.max(0, Number(sanitizedCustomizations.voiceoverStartTime) || 0);
+    const voiceoverEndSeconds = sanitizedVoiceoverDuration > 0
+      ? sanitizedVoiceoverStart + sanitizedVoiceoverDuration
+      : 0;
+    const totalDurationSeconds = Math.max(sceneDurationSum, voiceoverEndSeconds, 5);
     
     // Ensure durationInFrames is a safe, finite positive integer
     const rawFrames = Math.ceil(totalDurationSeconds * fps);
