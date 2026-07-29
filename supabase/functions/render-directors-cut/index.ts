@@ -777,7 +777,13 @@ serve(async (req) => {
           composition: 'DirectorsCutVideo',
           inputProps: serializedInputProps,
           codec: format === 'webm' ? 'vp8' : 'h264',
-          imageFormat: 'jpeg',
+          // Raw-Media-Invariant: lossless PNG frame intermediates (no JPEG
+          // chroma-subsampling loss) + BT.709 tagging to match the source.
+          imageFormat: 'png',
+          colorSpace: 'bt709',
+          crf: 16,
+          x264Preset: 'slow',
+          videoBitrate: '10M',
           maxRetries: 1,
           ...(effectiveFpl ? { framesPerLambda: effectiveFpl } : {}),
           privacy: 'public',
