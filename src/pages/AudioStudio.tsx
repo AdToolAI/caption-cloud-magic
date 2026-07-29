@@ -192,6 +192,23 @@ export default function AudioStudio() {
                 onSendToBeatSync={handleSendToBeatSync}
               />
             </motion.div>
+          ) : showAudiobook ? (
+            <motion.div
+              key="audiobook-standalone"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-8 space-y-4"
+            >
+              <Button
+                variant="ghost"
+                onClick={() => setShowAudiobook(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ← Zurück zum Audio Studio
+              </Button>
+              <AudiobookPanel />
+            </motion.div>
           ) : showMusicGen ? (
             <motion.div
               key="music-gen-standalone"
@@ -249,6 +266,33 @@ export default function AudioStudio() {
                   <Button className="bg-gradient-to-r from-cyan-500 to-primary hover:opacity-90 shrink-0 hidden sm:flex">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Auto-Match starten
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Hörbuch Teaser */}
+              <Card
+                onClick={() => setShowAudiobook(true)}
+                className="relative overflow-hidden cursor-pointer backdrop-blur-xl bg-gradient-to-br from-primary/10 via-card/60 to-amber-500/10 border-primary/30 hover:border-primary/60 hover:shadow-[0_0_40px_rgba(245,199,106,0.25)] transition-all p-5 group"
+              >
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/15 rounded-full blur-[60px] pointer-events-none" />
+                <div className="relative flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-7 h-7 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
+                      <h3 className="text-lg font-bold">Hörbuch-Modus</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">9 Sprachen</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Manuskript einfügen → Kapitel &amp; Figuren erkennen → Erzähler- und Charakterstimmen aus der Bibliothek → MP3-Export.
+                    </p>
+                  </div>
+                  <Button className="bg-gradient-to-r from-primary to-amber-500 hover:opacity-90 shrink-0 hidden sm:flex">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Hörbuch starten
                   </Button>
                 </div>
               </Card>
