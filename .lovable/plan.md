@@ -1,46 +1,86 @@
-## Ziel
-Voiceover im Universal Content Creator wird **frei auf der Timeline platzierbar**: ein Eingabefeld + Slider im Voiceover-Bereich bestimmt, ab welcher Sekunde/Millisekunde das VO startet. Gilt für **alle Voiceover-Quellen** (ElevenLabs, geklonte Stimmen, hochgeladene MP3s) — der Offset lebt zentral im Payload, nicht am Modell.
+# Music-Trim & Placement — sauber integriert, kein neues Modul
 
-## Änderungen
+## Wo es lebt (keine Extra-Seite, keine neue "App")
+Ein einziges wiederverwendbares Panel **`MusicClipPanel`** wird überall dort eingesetzt, wo Hintergrundmusik konfigurierbar ist:
 
-### 1) Datenmodell — Startzeit im ContentConfig
+1. **Universal Content Creator** — `ContentVoiceStep.tsx` / Audio-Step (Musik-Sektion neben VO).
+2. **Motion Studio** — im bestehenden Musik-Auswahlblock.
+3. **AI Video Studio** — im bestehenden Musik-Auswahlblock.
+4. **Picture Studio** (falls Musik unter Slideshow-Export läuft) — gleiches Panel.
+5. **Director's Cut** — **nicht** ersetzt. UDC ist eingefroren (siehe `.lovable/UDC-FEATURE-FREEZE.md`) und hat bereits seine eigene Timeline mit `AudioClipComponent` (Trim + Fades + Drag). Das bleibt so. Wir spiegeln nur die Datenwerte, damit ein UCC-Projekt beim "Zu Director's Cut wechseln" seine Trim-Werte behält.
+
+Der Editor ist also **eine** Komponente, **eine** Datenshape, überall gleich — kein neues Feature-Silo.
+
+## Was der Nutzer sieht (kompakt, direkt im jeweiligen Player)
+
+```text
+┌─ Hintergrundmusik ─────────────────────────────────┐
+│ 🎵 Neon Sunrise · 0:47                    [wechseln]│
+│ ┌────────────────────────────────────────────────┐ │
+│ │ ░░▓▓▓█████▓▓▓░░▓▓█████▓▓░░░░ waveform          │ │
+│ │      │◄──── Auswahl 15.5s ────►│               │ │
+│ └────────────────────────────────────────────────┘ │
+│ Von [00:12.400]   Bis [00:27.900]   [Beat finden ▸]│
+│                                                    │
+│ Start im Video [00:00.000] ▬▬●▬▬▬▬▬▬▬▬  Lautst. 30%│
+│ ☑ Bis Video-Ende loopen                            │
+└────────────────────────────────────────────────────┘
+```
+
+Bewusst zurückhaltend: 2 Handles + 2 ms-genaue Zahlenfelder + Start-im-Video + Loop. Waveform per `wavesurfer.js` (bereits im Projekt via `StudioWaveform`).
+
+## Datenshape — angelehnt an bestehende `AudioClip` in `src/types/timeline.ts`
+Bereits vorhanden: `trimStart`, `trimEnd`, `startTime`, `volume`, `fadeIn`, `fadeOut`. Wir übernehmen diese Namen 1:1 für den UCC-Payload, damit UCC ↔ UDC verlustfrei bleibt.
+
 `src/types/universal-creator.ts` → `ContentConfig`:
-- `voiceoverStartTime?: number` — Sekunden (Float, ms-genau), default `0`.
+```
+backgroundMusicClip?: {
+  trimStart: number     // s in Quelle
+  trimEnd: number       // s in Quelle
+  startTime: number     // s ab Video-Start (analog voiceoverStartTime)
+  loop: boolean
+  fadeIn?: number       // optional, default 0.5
+  fadeOut?: number      // optional, default 0.8
+}
+```
+`backgroundMusicVolume` bleibt wie heute.
 
-### 2) UI — Timing-Control im Voiceover-Bereich
-Direkt unter Lautstärke/Stimme im bestehenden Voiceover-Panel (ContentVoiceStep bzw. Audio-Step):
-- Nummern-Input „Start bei" mit Sekunden (Float, Schritt `0.01`, Suffix „s") — für ms-genaue Eingabe.
-- Slider `0` … `max(0, videoDuration - voDuration)` in `0.05s`-Schritten.
-- Drei Presets: **Am Anfang** (0s) · **Mitte** (`(videoDuration - voDuration)/2`) · **Am Ende** (`videoDuration - voDuration`).
-- Live-Anzeige: „VO läuft von 4.20s bis 12.70s (Video 20.00s)".
-- Warnhinweis wenn `start + voDuration > videoDuration` (VO wird abgeschnitten).
-- Feld ist deaktiviert, solange kein VO vorhanden ist.
+## Zentrale Verdrahtung (eine Quelle der Wahrheit)
 
-### 3) Preview-Player synchron
-`src/components/universal-creator/RemotionPreviewPlayer.tsx`:
-- `voiceoverStartTime` aus `customizations` in `previewAudio` übernehmen.
-- Im Timeupdate-Loop: VO-`<audio>` erst starten wenn `playerTime >= startTime`; davor `pause()` + `currentTime = 0`. Bei Seek: `audio.currentTime = max(0, playerTime - startTime)`.
+### Payload-Clamping — `src/lib/universalCreatorRenderPayload.ts`
+- `trimStart` ≥ 0, `trimEnd` ≤ trackDuration, Mindestlänge 200 ms
+- `startTime` ∈ [0, videoDuration]
+- Wenn `startTime + (trimEnd−trimStart) > videoDuration` und `loop=false` → Overflow-Warnung im UI, Musik läuft nur bis Video-Ende
+- Raw-Media-Invariante bleibt (`rawMediaMode: true`, siehe Regression-Test)
 
-### 4) Render-Payload — eine Quelle der Wahrheit
-`src/lib/universalCreatorRenderPayload.ts`:
-- `voiceoverStartTime` aus `contentConfig` in den Payload übernehmen, geclamped auf `[0, videoDuration]`, default `0`. Gilt automatisch für jede VO-Quelle, weil alle über dasselbe Feld laufen.
+### Remotion — `src/remotion/templates/UniversalCreatorVideo.tsx`
+Bestehendes Music-`<Audio>` wird zu:
+```
+<Sequence from={Math.round(startTime * fps)}
+          durationInFrames={Math.round((trimEnd - trimStart) * fps)}>
+  <Audio src={musicUrl}
+         startFrom={Math.round(trimStart * fps)}
+         endAt={Math.round(trimEnd * fps)}
+         loop={loop}
+         volume={backgroundMusicVolume} />
+</Sequence>
+```
+Frame-genau, nativ, kein Custom-Sync-Code.
 
-### 5) Remotion-Template — Offset zentral anwenden
-`src/remotion/templates/UniversalCreatorVideo.tsx`:
-- Zod: `voiceoverStartTime: z.number().min(0).default(0)`.
-- Beide bestehenden `<Audio src={voiceoverUrl} …>`-Stellen in `<Sequence from={Math.round(voiceoverStartTime * fps)}>…</Sequence>` wrappen. Damit ist der Offset für Preview und finalen MP4-Export identisch, unabhängig vom TTS-Provider. Raw-Media-Invariante bleibt unberührt.
+### Preview-Player — `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+Bestehende VO-Offset-Logik wird generalisiert auf Tracks: bei Zeitpunkt `t` gilt pro Track
+`audio.currentTime = trimStart + ((t − startTime) mod clipLen)` wenn `loop`, sonst pause außerhalb. Selbe Mechanik wie beim VO-Offset — Preview & Export bleiben bit-genau synchron.
 
-### 6) Backwards-Compat
-- Fehlt das Feld (alte Projekte/Payloads), gilt `0` → identisches Verhalten wie heute.
+### Motion Studio / AI Video Studio Player
+Dieselbe `MusicClipPanel`-Komponente + derselbe Payload-Slice; die jeweiligen Player-Wrapper konsumieren `backgroundMusicClip` über einen kleinen Hook `useMusicClipSync(audioEl, clip, currentTime, playing)`. Damit ist "in allen Playern professionell integriert" trivial und einheitlich.
 
-## Nicht Teil dieses Plans
-- Mehrere VO-Clips auf einer Timeline (bleibt Director's Cut).
-- Fade-In/Out fürs VO (separater Plan, falls gewünscht).
-- Änderungen am Director's Cut oder an TTS-Edge-Functions.
+### Director's Cut Kompatibilität
+Beim Import eines UCC-Projekts in UDC: `backgroundMusicClip` wird direkt in einen `AudioClip` auf `track-music` gemapped (Namen sind bereits identisch). Kein UDC-Code-Change nötig → Freeze respektiert.
 
-## Verifikation
-- Eingabe `3.25s` → Preview startet VO exakt bei 3.25s, auch nach Seek.
-- Presets „Anfang/Mitte/Ende" setzen korrekte Werte, Overflow-Warnung erscheint bei zu spätem Start.
-- Finaler MP4-Export platziert VO an derselben Position wie das Preview.
-- Verhalten identisch für ElevenLabs-VO, geklonte Stimme und hochgeladene MP3.
-- Alte Projekte ohne `voiceoverStartTime` laufen unverändert (Start bei 0).
+## Bewusst nicht enthalten
+- **Mehrere Musik-Clips pro Video** in UCC → bleibt Director's Cut exklusiv.
+- **Ducking** (Musik leiser wenn VO spricht) → separater Plan, wenn gewünscht.
+- **Neue Seite oder neuer Menüpunkt** → nein, es ist eine Komponente im bestehenden Musik-Panel.
+
+## Ergebnis
+Ein einziges, kleines Panel, überall dasselbe Verhalten, dieselben Feldnamen wie UDC — professionell, wiedererkennbar, wartungsarm. Keine neue "App", kein UDC-Unfreeze.
