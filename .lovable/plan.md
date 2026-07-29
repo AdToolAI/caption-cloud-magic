@@ -1,74 +1,58 @@
-## Ziel
+## Kontext
 
-Export-Qualität auf **visuell verlustfrei** anheben für ALLE finalen Renders (UCC, Director's Cut, Motion Studio, AI Video Studio, Lip-Sync Mux, Composer). Preview bleibt schnell/leicht.
+AWS-Quota bestätigt auf 100. Noch keine User → keine echten Peak-Daten, kein Grund zu aggressiver Verteilung. Wir wollen nur die **Launch-Klippe** absichern: falls Tag 1 durch einen viralen Post 30–80 Renders parallel reinkommen, sollen sie durchlaufen statt 429 zu werfen. Alles andere (Tier-Caps, distributed λ, Stability-Split) bleibt konservativ, bis echte Nutzungsdaten aus `LambdaHealth` vorliegen.
 
-## Ursachenanalyse (bestätigt)
+## Änderungen (Minimal-Variante)
 
-`supabase/functions/render-with-remotion/index.ts` (globaler Entry-Point aller Export-Renders) nutzt aktuell:
-- `jpegQuality: 80` (Zeile 739) — Remotion-Default, sichtbar weich bei Foto-/Kamera-Material
-- kein explizites `crf` → Fallback CRF 18
-- kein `x264Preset` → Fallback `medium`
-- kein `videoBitrate`-Floor
+### 1. `supabase/functions/_shared/render-concurrency.ts`
+- `RENDER_SLOT_BUDGET_DEFAULT`: 60 → **80**
+- `FOUNDER_RESERVE_HIGH_WATER`: 50 → **68** (letzte 12 Slots founders-only, ~85 %)
+- Kommentar-Header oben aktualisieren (AWS-Quota 100 bestätigt, 80 Render / 20 Edge+Burst)
 
-`rawMediaMode: true` in `src/lib/universalCreatorRenderPayload.ts` ist bereits korrekt und schaltet Farb-/Kontrastfilter im UCC ab — Kontrastdrift kommt **nicht** vom Filter, sondern vom Encode-Loss.
+### 2. `src/hooks/useRenderSystemLoad.ts` (Frontend „System-Last"-Pill)
+- `SLOT_BUDGET_DEFAULT`: 60 → **80**
+- `HIGH_WATER`: 50 → **68**
+- DB-Override-Logik (`system_config.render_queue_slot_budget`) bleibt.
 
-## Änderungen
-
-### 1. `supabase/functions/render-with-remotion/index.ts`
-Neue konstante `HIGH_QUALITY_ENCODE`:
+### 3. DB-Config
+```sql
+insert into public.system_config (key, value)
+values ('render_queue_slot_budget', '80')
+on conflict (key) do update set value = excluded.value;
 ```
-jpegQuality: 95
-crf: 16                 // visuell verlustfrei, Standard „prosumer"
-x264Preset: 'slow'      // ~20% bessere Kompression bei gleicher Qualität
-videoBitrate: '10M'     // Floor für 1080p, verhindert Bitrate-Sparen bei ruhigen Szenen
-audioBitrate: '256k'    // AAC, up von Default 128k
-```
-Anwendung: unabhängig von Composition / Payload-Typ auf ALLE Export-Renders.
+Ausführung via `supabase--insert` im Build-Schritt.
 
-Ausnahme: Wenn `inputProps.previewMode === true` → alte Werte behalten (nur Studio-Preview-Renders, keine Kundenausgabe).
+### 4. Memory
+Neue Datei `mem://infrastructure/aws-lambda/quota-100-launch-distribution.md`:
+- AWS-Quota 100 bestätigt (eu-central-1)
+- Launch-Verteilung: 80 Render-Pool / 20 Edge+Burst-Reserve
+- Founder-Reserve ab 68/80
+- Tier-Caps + `TARGET_MAX_LAMBDAS=5` bewusst NICHT erhöht — erst wenn `LambdaHealth` peak > 60 an ≥ 3 Tagen zeigt.
+- Nächster Ausbauschritt: AWS-Ticket auf 250 sobald peak > 70 dauerhaft, danach zweite Runde.
 
-### 2. `supabase/functions/render-sync-segments-audio-mux/index.ts`
-Gleiches Preset, aber `x264Preset: 'medium'` statt `slow` — der Mux-Pfad liegt am engsten am 600 s Lambda-Limit (v205-Mux, 4 Sprecher). `crf: 16` und `jpegQuality: 95` übernehmen wir hier trotzdem.
-
-### 3. `remotion.config.ts`
-```
-Config.setJpegQuality(95)
-Config.setCrf(16)
-Config.setAudioBitrate('256k')
-```
-Damit lokale/CI-Renders (Tests, Debug) identisch zur Lambda aussehen.
-
-### 4. Preview-Bypass sicherstellen
-`src/components/universal-creator/RemotionPreviewPlayer.tsx` und Motion-Studio-Preview: expliziter Check, dass keine dieser Preview-Pfade `render-with-remotion` mit den High-Quality-Werten aufruft — sie nutzen ohnehin Remotion Player im Browser (kein Lambda-Encode), also kein Handlungsbedarf. Nur verifizieren.
-
-### 5. Memory
-Neue Memory `mem://architecture/render/global-export-quality-floor.md` mit:
-- exakten Werten (JPEG 95 / CRF 16 / preset slow / 10M / 256k)
-- Ausnahme für Mux-Pfad (preset medium)
-- Ausnahme für Preview
-- Kostenimpact (+0,2–0,8 ¢/Video, im Rauschen bei 3× Marge)
-- Verbot, diese Werte ohne Load-Test wieder zu senken.
-
-Referenz in `mem://index.md#Core`: „Export = CRF 16 / JPEG 95 / preset slow. Mux = preset medium. Preview unverändert."
+Referenz in `mem://index.md#Core`:
+„AWS-Lambda-Quota 100 → Render-Pool 80 (Founder-Reserve ab 68). Tier-Caps unverändert bis reale Peak-Daten vorliegen."
 
 ## Was NICHT geändert wird
 
-- Keine Änderung an `rawMediaMode`, `objectFit`, Scene-Composition, Cinematic-Filter-Kette, Voice-/Musik-Pipeline, Lip-Sync-Logik, Tier-Scheduling, framesPerLambda.
-- Keine Änderung an Preview-Playern (Browser-Rendering, kein Lambda-Encode).
-- Keine Anhebung von Lambda-RAM oder Timeout — die aktuellen 3008 MB / 600 s reichen laut Tier-Config auch für preset `slow` bei ≤ 90 s Videos.
+- `pickRenderTier` (short=3, standard=5, long=8, export=12)
+- `TARGET_MAX_LAMBDAS = 5` in `remotion-payload.ts`
+- Stability-Tiers, `framesPerLambda`-Boden 270
+- Timeout 600 s, RAM 3008 MB
+- Encode-Quality-Floor (JPEG 95 / CRF 16 / preset slow)
+- Lip-Sync-Mux, Sync.so-Concurrency, Retry-/Circuit-Breaker
 
 ## Verifikation nach Deploy
 
-1. Test-Render deines 4-Sprecher-Videos aus dem UCC.
-2. `ffmpeg -i upload.mp4 -i export.mp4 -filter_complex ssim -f null -` → Ziel SSIM > 0,97 (aktuell schätzungsweise ~0,92).
-3. Lambda-Duration im Log prüfen — muss unter Tier-Limit bleiben.
-4. Ein Lip-Sync-Mux-Render mit 4 Sprechern → muss weiterhin < 480 s bleiben (Safety-Margin zum 600 s Timeout).
+1. `LambdaHealth`-Dashboard: „Normal max" zeigt 80.
+2. Frontend „System-Last"-Pill zeigt Budget 80.
+3. `system_config`-Row `render_queue_slot_budget = 80` per `supabase--read_query` prüfen.
+4. Test-Render eines Standard-Videos läuft normal durch (kein Verhalten geändert bei niedriger Last).
 
-## Technische Details Kosten
+## Nächster Schritt (nicht jetzt)
 
-- Lambda GB-Sekunden bei 3008 MB, 15 s Video @ 1080p30: ~90 s → ~110 s Rendertime (+22%). Kosten pro Render: 0,00001667 $/GB-s × 3 GB × 20 s Delta = **~0,1 ¢ extra**.
-- S3-Egress: +12 MB × 0,09 $/GB = **~0,1 ¢ extra**.
-- Gesamt pro 15 s Kunden-Video: **~0,2 ¢ zusätzlich**. Bei 10 000 Videos/Monat = 20 €.
-- Bei aktueller Video-Credit-Marge (3×) neutralisiert der erste verkaufte Videoloop diese Mehrkosten für ~500 folgende Renders.
+Wenn nach Launch peak concurrency in `LambdaHealth` an ≥ 3 Tagen > 60 zeigt:
+- AWS Support Case auf 250 concurrency stellen
+- Danach zweite Plan-Runde: Tier-Caps + `TARGET_MAX_LAMBDAS` hoch, Render-Pool auf ~200.
 
 Sag Bescheid, dann setze ich es um.
