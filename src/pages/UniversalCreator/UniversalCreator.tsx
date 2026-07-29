@@ -255,6 +255,8 @@ export function UniversalCreator() {
           .select()
           .single();
         if (error) throw error;
+        // A real new draft exists again — the fresh-start guard is obsolete.
+        clearFreshStart(FRESH_START_KEY);
         setProjectId(data.id);
         // Publish new projectId to the URL so reload / share resumes exactly this draft
         const next = new URLSearchParams(searchParams);
