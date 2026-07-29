@@ -349,7 +349,19 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
             </div>
           </Card>
 
-          {value?.voiceoverUrl && (
+          {value?.voiceoverUrl && (() => {
+            const voDur = Number(value.actualVoiceoverDuration ?? value.voiceoverDuration ?? 0) || 0;
+            const scenesTotal = scenes && scenes.length > 0 ? scenes.reduce((a, s) => a + (s.duration || 0), 0) : 0;
+            const videoDur = Math.max(scenesTotal, voDur, 1);
+            const maxStart = Math.max(0, videoDur - voDur);
+            const start = Math.min(maxStart, Math.max(0, Number(value.voiceoverStartTime) || 0));
+            const overflow = voDur > 0 && start + voDur > videoDur + 0.01;
+            const setStart = (raw: number) => {
+              const clamped = Math.max(0, Math.min(maxStart, Math.round(raw * 100) / 100));
+              onChange({ ...value, voiceoverStartTime: clamped });
+            };
+            const fmt = (s: number) => `${s.toFixed(2)}s`;
+            return (
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">{t('uc.audioPreview')}</h3>
               <div className="space-y-4">
@@ -369,13 +381,70 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                   </div>
                   <Slider value={[Math.round((value.voiceoverVolume ?? 1) * 100)]} onValueChange={([v]) => { const vol = v / 100; onChange({ ...value, voiceoverVolume: vol }); if (audio) audio.volume = vol; }} min={0} max={100} step={1} />
                 </div>
+
+                {/* Voiceover-Startzeit auf der Video-Timeline */}
+                <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label className="text-sm">
+                      {language === 'de' ? 'Voiceover-Start' : language === 'es' ? 'Inicio del voiceover' : 'Voiceover start'}
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={maxStart}
+                        step={0.01}
+                        value={start}
+                        onChange={(e) => setStart(parseFloat(e.target.value || '0'))}
+                        className="w-24 h-8 rounded-md border border-input bg-background px-2 text-sm text-right"
+                      />
+                      <span className="text-xs text-muted-foreground">s</span>
+                    </div>
+                  </div>
+                  <Slider
+                    value={[start]}
+                    onValueChange={([v]) => setStart(v)}
+                    min={0}
+                    max={Math.max(maxStart, 0.05)}
+                    step={0.05}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => setStart(0)}>
+                      {language === 'de' ? 'Am Anfang' : language === 'es' ? 'Al inicio' : 'At start'}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => setStart(maxStart / 2)}>
+                      {language === 'de' ? 'Mitte' : language === 'es' ? 'Medio' : 'Middle'}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => setStart(maxStart)}>
+                      {language === 'de' ? 'Am Ende' : language === 'es' ? 'Al final' : 'At end'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'de'
+                      ? `VO läuft von ${fmt(start)} bis ${fmt(start + voDur)} (Video ${fmt(videoDur)}).`
+                      : language === 'es'
+                      ? `El VO se reproduce de ${fmt(start)} a ${fmt(start + voDur)} (video ${fmt(videoDur)}).`
+                      : `VO plays from ${fmt(start)} to ${fmt(start + voDur)} (video ${fmt(videoDur)}).`}
+                  </p>
+                  {overflow && (
+                    <p className="text-xs text-amber-500">
+                      {language === 'de'
+                        ? '⚠️ Voiceover würde über das Videoende hinausgehen und wird abgeschnitten.'
+                        : language === 'es'
+                        ? '⚠️ El voiceover se extenderá más allá del final del video y se cortará.'
+                        : '⚠️ Voiceover would extend past the video end and will be cut off.'}
+                    </p>
+                  )}
+                </div>
+
                 <div className="p-4 bg-muted/50 rounded-lg">
                   <audio src={value.voiceoverUrl} preload="metadata" />
                   <p className="text-xs text-muted-foreground">Audio URL: {value.voiceoverUrl.substring(0, 50)}...</p>
                 </div>
               </div>
             </Card>
-          )}
+            );
+          })()}
 
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">{t('uc.orUploadAudio')}</h3>
