@@ -2006,22 +2006,20 @@ const SafeVideo: React.FC<{
 }> = ({ src, sceneType, primaryColor, secondaryColor, style, muted = true, volume = 1, previewMode = false }) => {
   const [failed, setFailed] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
-  const [handle] = React.useState(() => delayRender('SafeVideo: ' + (src?.slice(0, 40) || 'unknown')));
+  // delayRender only for the preview <Video> path — OffthreadVideo manages
+  // its own frame loading via ffmpeg and never fires onLoadedData, which
+  // caused the Lambda export to time out into the GradientFallback.
+  const [handle] = React.useState(() =>
+    previewMode ? delayRender('SafeVideo: ' + (src?.slice(0, 40) || 'unknown')) : null
+  );
 
   React.useEffect(() => {
+    if (!previewMode || handle === null) return;
     if (loaded || failed) return;
-    const timeoutMs = previewMode ? 2000 : 20000;
     const timer = setTimeout(() => {
-      if (previewMode) {
-        // Preview: release handle silently so the composition keeps rendering.
-        // The <Video> keeps loading and appears as soon as data arrives.
-        try { continueRender(handle); } catch (_) {}
-      } else if (!loaded && !failed) {
-        console.warn(`[SafeVideo] Timeout: video not loaded after 20s, forcing fallback for ${src?.slice(0, 60)}`);
-        setFailed(true);
-        try { continueRender(handle); } catch (_) {}
-      }
-    }, timeoutMs);
+      // Preview: release handle silently so the composition keeps rendering.
+      try { continueRender(handle); } catch (_) {}
+    }, 2000);
     return () => clearTimeout(timer);
   }, [src, loaded, failed, handle, previewMode]);
 
@@ -2029,31 +2027,47 @@ const SafeVideo: React.FC<{
     return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
   }
 
-  // Export path: OffthreadVideo (ffmpeg-frame-exact, no Chromium blend/drift).
-  // Preview path: <Video> (OffthreadVideo cannot run in the browser).
-  const VideoComponent: any = previewMode ? Video : OffthreadVideo;
+  const resolvedStyle = style || { width: '100%', height: '100%', objectFit: 'cover' };
+  const clampedVolume = muted ? 0 : Math.max(0, Math.min(1, volume));
 
+  // Export path: OffthreadVideo direct — ffmpeg-frame-exact, no HTMLMediaElement
+  // events, no delayRender wrapping. onError falls back to gradient.
+  if (!previewMode) {
+    return (
+      <OffthreadVideo
+        src={src}
+        style={resolvedStyle}
+        muted={muted}
+        volume={clampedVolume}
+        pauseWhenBuffering
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  // Preview path: classic <Video> with delayRender + onLoadedData.
   return (
-    <VideoComponent
+    <Video
       src={src}
-      style={style || { width: '100%', height: '100%', objectFit: 'cover' }}
-      loop={previewMode}
+      style={resolvedStyle}
+      loop
       muted={muted}
-      volume={muted ? 0 : Math.max(0, Math.min(1, volume))}
+      volume={clampedVolume}
       pauseWhenBuffering
       onLoadedData={() => {
         if (!loaded) {
           setLoaded(true);
-          try { continueRender(handle); } catch (_) {}
+          if (handle !== null) { try { continueRender(handle); } catch (_) {} }
         }
       }}
       onError={() => {
         setFailed(true);
-        try { continueRender(handle); } catch (_) {}
+        if (handle !== null) { try { continueRender(handle); } catch (_) {} }
       }}
     />
   );
 };
+
 
 // r46: SafeImg with delayRender + 15s timeout for Lambda stability
 const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string; secondaryColor?: string; style?: React.CSSProperties }> = ({ src, sceneType, primaryColor, secondaryColor, style }) => {
