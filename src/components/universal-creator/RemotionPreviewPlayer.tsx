@@ -236,9 +236,10 @@ export function RemotionPreviewPlayer({
 
     await Promise.allSettled([
       voiceReady ? voice!.play() : Promise.resolve(),
-      music?.play(),
+      musicReady ? music!.play() : Promise.resolve(),
     ].filter(Boolean) as Promise<void>[]);
-  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio, previewAudio.voiceoverStartTime]);
+  }, [applyPreviewAudioVolume, getPreviewTime, seekPreviewAudio, previewAudio.voiceoverStartTime, previewAudio.musicStartTime]);
+
 
   const pausePreviewAudio = useCallback(() => {
     voiceoverAudioRef.current?.pause();
