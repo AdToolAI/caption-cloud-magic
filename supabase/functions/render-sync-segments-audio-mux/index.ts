@@ -813,6 +813,15 @@ serve(async (req) => {
       },
       codec: "h264",
       imageFormat: "jpeg",
+      // Visually-lossless floor (mem://architecture/render/global-export-quality-floor.md)
+      // Mux path uses preset=medium (not slow) to keep 600s Lambda timeout safe
+      // for 4-speaker v205 muxes; jpeg/crf/bitrate match global floor.
+      jpegQuality: 95,
+      crf: 16,
+      x264Preset: "medium",
+      videoBitrate: "10M",
+      audioCodec: "aac",
+      audioBitrate: "256k",
       maxRetries: 1,
       privacy: "public",
       logLevel: "warn",
