@@ -15300,6 +15300,8 @@ translations.es.uc = {
   myGradients: "Mis Gradientes",
   uploadVideo: "Subir video",
   videoFormats: "MP4, MOV, máx 100MB",
+  chooseFromLibrary: "Elegir de la biblioteca",
+  chooseFromLibraryDesc: "Reutiliza vídeos ya creados",
   myVideos: "Mis Videos",
   uploadImages: "Subir imagen(es)",
   imageFormats: "JPG, PNG, máx 10MB por imagen, hasta 10 imágenes",
