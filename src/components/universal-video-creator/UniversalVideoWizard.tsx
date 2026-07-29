@@ -391,6 +391,11 @@ export function UniversalVideoWizard() {
     if (isAutoGenerating) {
       toast.info(t('uvc.toastBackgroundGeneration'), { duration: 8000 });
     }
+    freshStartRef.current = true;
+    markFreshStart(FRESH_START_KEY);
+    dbFallbackAttempted.current = false;
+    generationStartedAtRef.current = null;
+    sessionStartedAtRef.current = new Date().toISOString();
     setSelectedCategory(null);
     setGenerationMode(null);
     setMoodConfig(null);
@@ -402,6 +407,8 @@ export function UniversalVideoWizard() {
     setConsultationResult(null);
     clearAllDrafts();
     setShowResetConfirm(false);
+    // Only purge finished runs — an active background generation stays alive.
+    if (!isAutoGenerating) void purgeServerDrafts();
   };
 
   const handleMinimizeToBackground = () => {
