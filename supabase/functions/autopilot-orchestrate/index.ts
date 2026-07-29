@@ -90,14 +90,25 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "unauthorized" }, 401);
 
     const body = (await req.json()) as Body;
-    if (!body?.production_id || !Array.isArray(body.scenes) || body.scenes.length === 0) {
-      return json({ error: "production_id and scenes are required" }, 400);
-    }
+    const resume = body?.resume === true;
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Der Watchdog ruft mit dem Service-Key an — nur für die Wiederaufnahme.
+    const isServiceCall = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+    const { data: userData } = isServiceCall
+      ? { data: { user: null } }
+      : await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user && !(isServiceCall && resume)) return json({ error: "unauthorized" }, 401);
+
+    if (!body?.production_id) return json({ error: "production_id is required" }, 400);
+    if (!resume && (!Array.isArray(body.scenes) || body.scenes.length === 0)) {
+      return json({ error: "scenes are required" }, 400);
+    }
 
     // Ownership check — never orchestrate somebody else's production.
     const { data: production } = await admin
@@ -106,75 +117,121 @@ Deno.serve(async (req) => {
       .eq("id", body.production_id)
       .maybeSingle();
 
-    if (!production || production.user_id !== user.id) {
+    if (!production || (user && production.user_id !== user.id)) {
       return json({ error: "not_found" }, 404);
     }
-    if (production.status === "running") {
+    if (production.status === "running" && !resume) {
       return json({ ok: true, already_running: true });
     }
 
+    const ownerId = production.user_id as string;
     const aspect = body.aspect_ratio ?? production.aspect_ratio ?? "9:16";
 
-    // Fresh scene rows for this run.
-    await admin.from("autopilot_production_scenes").delete().eq("production_id", production.id);
-    await admin.from("autopilot_production_scenes").insert(
-      body.scenes.map((scene) => ({
-        production_id: production.id,
-        user_id: user.id,
-        scene_index: scene.orderIndex,
-        beat: scene.beat,
-        duration_seconds: scene.durationSeconds,
-        grammar: scene.grammar ?? {},
-        anchor_prompt: scene.anchorPrompt,
-        motion_prompt: scene.motionPrompt,
-        dialogue: (scene.turns?.length ?? 0) > 0
-          ? {
-              text: (scene.turns ?? []).map((t) => t.text).join(" "),
-              turns: (scene.turns ?? []).map((t, i) => ({
-                id: t.id || `${scene.id}:${i}`,
-                text: t.text,
-                speaker_character_id: t.speakerCharacterId ?? null,
-                speaker_name: t.speakerName ?? null,
-                voice_id: t.voiceId ?? null,
-                language: t.language ?? scene.voiceLanguage ?? null,
-              })),
-            }
-          : scene.dialogue
-          ? {
-              text: scene.dialogue,
-              speaker_character_id: scene.speakerCharacterId ?? null,
-              voice_id: scene.voiceId ?? null,
-              language: scene.voiceLanguage ?? null,
-            }
-          : {},
+    let scenes: SceneInput[] = body.scenes ?? [];
 
-        sound_design: scene.soundDesign ?? {},
-        status: "pending",
-      })),
-    );
+    if (resume) {
+      // Wiederaufnahme: Szenen aus der Datenbank rekonstruieren, Zeilen bleiben.
+      const { data: rows } = await admin
+        .from("autopilot_production_scenes")
+        .select("*")
+        .eq("production_id", production.id)
+        .order("scene_index", { ascending: true });
+      scenes = (rows ?? []).map((row: Record<string, any>) => ({
+        id: `${production.id}:${row.scene_index}`,
+        orderIndex: Number(row.scene_index),
+        beat: row.beat ?? "content",
+        durationSeconds: Number(row.duration_seconds) || 6,
+        anchorPrompt: row.anchor_prompt ?? "",
+        motionPrompt: row.motion_prompt ?? "",
+        dialogue: row.dialogue?.text ?? null,
+        turns: Array.isArray(row.dialogue?.turns)
+          ? row.dialogue.turns.map((t: Record<string, any>, i: number) => ({
+            id: t.id ?? `${production.id}:${row.scene_index}:${i}`,
+            text: t.text ?? "",
+            speakerCharacterId: t.speaker_character_id ?? null,
+            speakerName: t.speaker_name ?? null,
+            voiceId: t.voice_id ?? null,
+            language: t.language ?? null,
+          }))
+          : undefined,
+        speakerCharacterId: row.dialogue?.speaker_character_id ?? null,
+        voiceId: row.dialogue?.voice_id ?? null,
+        voiceLanguage: row.dialogue?.language ?? null,
+        characterIds: (row.grammar?.characterIds as string[]) ?? [],
+        portraitUrls: (row.grammar?.portraitUrls as string[]) ?? [],
+        characterNames: (row.grammar?.characterNames as string[]) ?? [],
+        soundDesign: row.sound_design ?? {},
+        grammar: row.grammar ?? {},
+      }));
+
+      if (scenes.length === 0) return json({ error: "no_scenes_to_resume" }, 400);
+    } else {
+      // Fresh scene rows for this run.
+      await admin.from("autopilot_production_scenes").delete().eq("production_id", production.id);
+      await admin.from("autopilot_production_scenes").insert(
+        scenes.map((scene) => ({
+          production_id: production.id,
+          user_id: ownerId,
+          scene_index: scene.orderIndex,
+          beat: scene.beat,
+          duration_seconds: scene.durationSeconds,
+          grammar: scene.grammar ?? {},
+          anchor_prompt: scene.anchorPrompt,
+          motion_prompt: scene.motionPrompt,
+          dialogue: (scene.turns?.length ?? 0) > 0
+            ? {
+                text: (scene.turns ?? []).map((t) => t.text).join(" "),
+                turns: (scene.turns ?? []).map((t, i) => ({
+                  id: t.id || `${scene.id}:${i}`,
+                  text: t.text,
+                  speaker_character_id: t.speakerCharacterId ?? null,
+                  speaker_name: t.speakerName ?? null,
+                  voice_id: t.voiceId ?? null,
+                  language: t.language ?? scene.voiceLanguage ?? null,
+                })),
+              }
+            : scene.dialogue
+            ? {
+                text: scene.dialogue,
+                speaker_character_id: scene.speakerCharacterId ?? null,
+                voice_id: scene.voiceId ?? null,
+                language: scene.voiceLanguage ?? null,
+              }
+            : {},
+
+          sound_design: scene.soundDesign ?? {},
+          status: "pending",
+        })),
+      );
+    }
 
     await admin
       .from("autopilot_productions")
       .update({
         stage: "anchors",
         status: "running",
-        progress: 25,
-        approved_at: new Date().toISOString(),
+        progress: resume ? undefined : 25,
+        heartbeat_at: new Date().toISOString(),
+        ...(resume ? {} : { approved_at: new Date().toISOString() }),
         error_message: null,
       })
       .eq("id", production.id);
 
-    await log(admin, production.id, user.id, {
+    await log(admin, production.id, ownerId, {
       stage: "anchors",
       role: "director",
-      message: `Freigabe erteilt — Produktion mit ${body.scenes.length} Szenen gestartet.`,
+      message: resume
+        ? `Produktion wieder aufgenommen — offene Szenen werden zu Ende gebracht.`
+        : `Freigabe erteilt — Produktion mit ${scenes.length} Szenen gestartet.`,
     });
 
     // Hand the long work to the background; the client polls from here on.
-    const task = runProduction(admin, production.id, user.id, aspect, body.scenes);
+    const task = runProduction(admin, production.id, ownerId, aspect, scenes, resume);
     // @ts-ignore EdgeRuntime is provided by the Supabase runtime
     if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(task);
     else void task;
+
+
 
     return json({ ok: true, production_id: production.id, scenes: body.scenes.length });
   } catch (err) {
