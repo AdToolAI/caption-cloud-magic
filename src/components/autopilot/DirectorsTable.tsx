@@ -546,11 +546,26 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                 <p className="mt-2 text-sm">{scene.action}</p>
                 <p className="text-xs text-muted-foreground">{scene.environment}</p>
 
-                {scene.dialogue && (
+                {(scene.turns?.length ?? 0) > 0 ? (
+                  <div className="mt-2 space-y-1.5 border-l-2 border-primary/40 pl-3">
+                    {scene.turns!.map((turn, turnIndex) => (
+                      <p key={turn.id} className="text-sm">
+                        <span className="mr-2 font-medium text-primary">
+                          {turn.speakerName ?? `Sprecher ${turnIndex + 1}`}
+                        </span>
+                        <span className="italic">„{turn.text}“</span>
+                        {!turn.voiceId && (
+                          <span className="ml-2 text-xs text-destructive">Stimme fehlt</span>
+                        )}
+                      </p>
+                    ))}
+                  </div>
+                ) : scene.dialogue ? (
                   <p className="mt-2 border-l-2 border-primary/40 pl-3 text-sm italic">
                     „{scene.dialogue}“
                   </p>
-                )}
+                ) : null}
+
               </div>
             ))}
           </div>
