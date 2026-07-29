@@ -175,7 +175,7 @@ export function UniversalVoiceLibraryPicker({
               </SelectContent>
             </Select>
 
-            {(language === 'de' || language === 'es') && (
+            {nativeSensitive && (
               <div className="flex items-center gap-2 px-3 rounded-md bg-white/[0.03] border border-white/10">
                 <ShieldCheck className="h-4 w-4 text-[#F5C76A]" />
                 <Label htmlFor="native-only" className="text-xs flex-1 cursor-pointer">Nur nativ</Label>
