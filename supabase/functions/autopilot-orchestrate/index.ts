@@ -35,9 +35,12 @@ interface SceneInput {
   anchorPrompt: string;
   motionPrompt: string;
   dialogue?: string | null;
+  /** Multi-speaker: canonical turn array. Wins over `dialogue` when present. */
+  turns?: AutopilotTurn[];
   speakerCharacterId?: string | null;
   voiceId?: string | null;
   voiceLanguage?: string | null;
+
   characterIds?: string[];
   portraitUrls?: string[];
   characterNames?: string[];
