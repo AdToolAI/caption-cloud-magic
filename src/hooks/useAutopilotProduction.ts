@@ -32,7 +32,12 @@ export interface ProductionSceneRow {
   lipsync_url: string | null;
   voiceover_url: string | null;
   error_message: string | null;
+  /** v297: Anzahl der Produktionsanläufe für diese Szene (1 oder 2). */
+  attempt: number | null;
+  /** v297: 'still', wenn die Szene als Standbild gerettet wurde. */
+  fallback_kind: string | null;
 }
+
 
 export interface DirectorLogRow {
   id: string;
