@@ -107,6 +107,38 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   );
 
   /**
+   * Voices are never invented by the model — they come from the voice a
+   * character carries in Cast & World. Without this map every speaking scene
+   * would fail preflight with "Stimme fehlt".
+   */
+  const [voiceByCharacter, setVoiceByCharacter] = useState<
+    Record<string, { voiceId: string | null; name: string }>
+  >({});
+
+  useEffect(() => {
+    const ids = Array.from(
+      new Set((treatment?.scenes ?? []).flatMap((scene) => scene.characterIds ?? [])),
+    );
+    if (ids.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from('brand_characters')
+        .select('id, name, default_voice_id')
+        .in('id', ids);
+      if (cancelled) return;
+      const map: Record<string, { voiceId: string | null; name: string }> = {};
+      for (const row of data ?? []) {
+        map[row.id] = { voiceId: row.default_voice_id ?? null, name: row.name ?? '' };
+      }
+      setVoiceByCharacter(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [treatment]);
+
+  /**
    * The model delivers structure; the planner owns time and camera variety.
    * Doing this on the client keeps the storyboard instantly re-plannable when
    * the user drags the duration slider after approval.
@@ -115,9 +147,28 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     if (!treatment) return null;
     const scenes = diversifyCameraMoves(
       applyRhythm(treatment.scenes, treatment.totalDurationSeconds),
-    );
+    ).map((scene) => {
+      const turns = (scene.turns ?? []).map((turn) => {
+        const cast = turn.speakerCharacterId ? voiceByCharacter[turn.speakerCharacterId] : undefined;
+        return {
+          ...turn,
+          speakerName: turn.speakerName ?? cast?.name,
+          voiceId: turn.voiceId ?? cast?.voiceId ?? undefined,
+          language: turn.language ?? scene.voiceLanguage ?? treatment.language,
+        };
+      });
+      const soloVoice = scene.speakerCharacterId
+        ? voiceByCharacter[scene.speakerCharacterId]?.voiceId ?? undefined
+        : undefined;
+      return {
+        ...scene,
+        turns: turns.length > 0 ? turns : undefined,
+        voiceId: scene.voiceId ?? (turns.length > 0 ? turns[0].voiceId : soloVoice),
+      };
+    });
     return { ...treatment, scenes };
-  }, [treatment]);
+  }, [treatment, voiceByCharacter]);
+
 
   const preflight = useMemo(
     () => (plannedTreatment ? preflightTreatment(plannedTreatment) : null),
