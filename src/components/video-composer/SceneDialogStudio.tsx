@@ -2543,7 +2543,27 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           })()}
         </Button>
       </div>
+
+      <UniversalVoiceLibraryPicker
+        open={!!libraryFor}
+        onOpenChange={(o) => !o && setLibraryFor(null)}
+        language={language}
+        category="characters"
+        currentVoiceId={libraryFor ? speakerVoices[libraryFor]?.voiceId : undefined}
+        title={t.pickVoice}
+        onSelect={(voice) => {
+          if (!libraryFor) return;
+          updateSpeakerVoice(libraryFor, {
+            voiceId: voice.id,
+            voiceName: voice.name,
+            isCustom: false,
+            elevenlabsVoiceId: voice.id,
+          });
+          setLibraryFor(null);
+        }}
+      />
     </Card>
+
   );
 });
 
