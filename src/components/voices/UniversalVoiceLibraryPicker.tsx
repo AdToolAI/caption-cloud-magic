@@ -300,6 +300,7 @@ export function UniversalVoiceLibraryPicker({
                       const resolved = language !== 'all'
                         ? language
                         : (typeof v.language === 'string' ? v.language : 'en');
+                      pushRecentVoice({ id: v.id, name: v.name, language: resolved });
                       onSelect(v, resolved);
                       onOpenChange(false);
                     }}
