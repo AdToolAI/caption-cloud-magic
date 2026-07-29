@@ -15004,6 +15004,8 @@ translations.de.uc = {
   myGradients: "Meine Gradients",
   uploadVideo: "Video hochladen",
   videoFormats: "MP4, MOV, max 100MB",
+  chooseFromLibrary: "Aus Mediathek wählen",
+  chooseFromLibraryDesc: "Bereits erstellte Videos wiederverwenden",
   myVideos: "Meine Videos",
   uploadImages: "Bild(er) hochladen",
   imageFormats: "JPG, PNG, max 10MB pro Bild, bis zu 10 Bilder",
