@@ -334,8 +334,26 @@ export function RemotionPreviewPlayer({
       const voice = voiceoverAudioRef.current;
       const music = musicAudioRef.current;
 
-      if (voice && !voice.paused && Math.abs(voice.currentTime - expected) > 0.22) {
-        voice.currentTime = Math.min(expected, Number.isFinite(voice.duration) ? Math.max(0, voice.duration - 0.05) : expected);
+      if (voice) {
+        const startAt = previewAudio.voiceoverStartTime;
+        const localExpected = expected - startAt;
+        if (localExpected < 0) {
+          // VO has not started yet on the timeline.
+          if (!voice.paused) voice.pause();
+          if (voice.currentTime > 0.001) {
+            try { voice.currentTime = 0; } catch { /* noop */ }
+          }
+        } else {
+          if (voice.paused) {
+            void voice.play().catch(() => { /* autoplay blocked, ignore */ });
+          }
+          if (Math.abs(voice.currentTime - localExpected) > 0.22) {
+            voice.currentTime = Math.min(
+              localExpected,
+              Number.isFinite(voice.duration) ? Math.max(0, voice.duration - 0.05) : localExpected,
+            );
+          }
+        }
       }
 
       if (music && !music.paused) {
