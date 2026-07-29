@@ -444,11 +444,19 @@ async function processHeyGenJob(opts: {
 
           let finalUrl = poll.videoUrl;
           if (!upErr) {
-            const { data: { publicUrl } } = admin.storage.from('talking-head-renders').getPublicUrl(path);
-            finalUrl = publicUrl;
+            // Bucket is private — issue long-lived signed URL (7 days) for playback.
+            const { data: signed, error: signErr } = await admin.storage
+              .from('talking-head-renders')
+              .createSignedUrl(path, 60 * 60 * 24 * 7);
+            if (signErr || !signed?.signedUrl) {
+              console.warn(`[talking-head] Signed URL failed, falling back to HeyGen CDN: ${signErr?.message}`);
+            } else {
+              finalUrl = signed.signedUrl;
+            }
           } else {
             console.warn(`[talking-head] Re-upload failed (using HeyGen CDN url): ${upErr.message}`);
           }
+
 
           if (opts.sceneId) {
             await admin.from('composer_scenes').update({
