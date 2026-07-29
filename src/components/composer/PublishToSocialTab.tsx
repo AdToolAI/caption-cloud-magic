@@ -13,7 +13,7 @@ import { useScheduledPublishing } from '@/hooks/useScheduledPublishing';
 import { usePlatformCredentials } from '@/hooks/usePlatformCredentials';
 import { PlatformOptimizationHelper } from '@/components/publishing/PlatformOptimizationHelper';
 import { CrossPostMagicPanel } from './CrossPostMagicPanel';
-import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon, Sparkles } from 'lucide-react';
+import { Instagram, Music, Linkedin, Youtube, Clock, Send, CalendarIcon, Sparkles, Camera, MessageSquare, Link2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { es } from 'date-fns/locale';
@@ -42,6 +42,12 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
   const [scheduledTime, setScheduledTime] = useState('12:00');
   const [magicMode, setMagicMode] = useState<boolean>(Boolean(briefingPlan || briefingText));
 
+  // P2-Now Ausbauten
+  const [coverUrl, setCoverUrl] = useState<string>('');
+  const [firstComment, setFirstComment] = useState<string>('');
+  const [utmEnabled, setUtmEnabled] = useState<boolean>(true);
+  const [utmCampaign, setUtmCampaign] = useState<string>('');
+
   const { publishToMultiplePlatforms, publishing } = useSocialPublishing();
   const { schedulePublication, loading: scheduling } = useScheduledPublishing();
   const { isConnected } = usePlatformCredentials();
@@ -50,10 +56,15 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
 
   const platforms = [
     { id: 'instagram' as Platform, name: 'Instagram', icon: Instagram, color: 'text-pink-500' },
+    { id: 'instagram-story' as Platform, name: 'IG Story', icon: Camera, color: 'text-pink-400' },
     { id: 'tiktok' as Platform, name: 'TikTok', icon: Music, color: 'text-black dark:text-white' },
     { id: 'linkedin' as Platform, name: 'LinkedIn', icon: Linkedin, color: 'text-blue-600' },
     { id: 'youtube' as Platform, name: 'YouTube', icon: Youtube, color: 'text-red-600' },
   ];
+
+  const anyIgFeed = selectedPlatforms.includes('instagram');
+  const anyLinkedIn = selectedPlatforms.includes('linkedin');
+  const canFirstComment = anyIgFeed || anyLinkedIn;
 
   const togglePlatform = (platform: Platform) => {
     setSelectedPlatforms(prev => prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]);
@@ -73,18 +84,28 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
       publishAt.setHours(parseInt(hours), parseInt(minutes));
       await Promise.all(selectedPlatforms.map(platform => schedulePublication({ platform: toBase(platform), videoUrl, caption, title, description, hashtags: hashtagArray, publishAt })));
     } else {
-      await publishToMultiplePlatforms({ videoUrl, caption, title, description, hashtags: hashtagArray }, selectedPlatforms);
+      const extras = {
+        coverUrl: coverUrl || undefined,
+        firstComment: canFirstComment && firstComment.trim() ? firstComment : undefined,
+        utm: { enabled: utmEnabled, campaign: utmCampaign || undefined, content: videoId },
+      };
+      await publishToMultiplePlatforms({ videoUrl, caption, title, description, hashtags: hashtagArray, ...extras }, selectedPlatforms);
     }
     onPublished?.();
   };
 
   const handleMagicPublishAll = async (perChannel: Record<Platform, { caption: string; hashtags: string[]; title?: string; description?: string; tags?: string[] }>) => {
     if (selectedPlatforms.length === 0) return;
+    const extras = {
+      coverUrl: coverUrl || undefined,
+      firstComment: canFirstComment && firstComment.trim() ? firstComment : undefined,
+      utm: { enabled: utmEnabled, campaign: utmCampaign || undefined, content: videoId },
+    };
     await publishToMultiplePlatforms(
-      { videoUrl, caption, title, description, hashtags: [] },
+      { videoUrl, caption, title, description, hashtags: [], ...extras },
       selectedPlatforms,
       Object.fromEntries(
-        selectedPlatforms.map((p) => [p, { ...perChannel[p], videoUrl }])
+        selectedPlatforms.map((p) => [p, { ...perChannel[p], videoUrl, ...extras }])
       ) as Partial<Record<Platform, { videoUrl: string; caption: string; hashtags: string[]; title?: string; description?: string; tags?: string[] }>>,
     );
     onPublished?.();
@@ -162,6 +183,74 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
           </div>
         </Card>
       )}
+
+      {/* P2-Now: Extras */}
+      <Card className="p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-[#F5C76A]" />
+          <h3 className="text-lg font-semibold">Reichweiten-Booster</h3>
+        </div>
+
+        {anyIgFeed && (
+          <div>
+            <Label htmlFor="coverUrl" className="flex items-center gap-2">
+              <Camera className="h-4 w-4" /> Instagram Reels Cover-URL (optional)
+            </Label>
+            <Input
+              id="coverUrl"
+              value={coverUrl}
+              onChange={(e) => setCoverUrl(e.target.value)}
+              placeholder="https://…/cover.jpg"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Öffentlich erreichbares JPG/PNG. Leer lassen für Auto-Cover.
+            </p>
+          </div>
+        )}
+
+        {canFirstComment && (
+          <div>
+            <Label htmlFor="firstComment" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" /> Erster Kommentar (Instagram / LinkedIn)
+            </Label>
+            <Textarea
+              id="firstComment"
+              value={firstComment}
+              onChange={(e) => setFirstComment(e.target.value)}
+              placeholder="Hashtag-Wolke, Call-to-Action, Link…"
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Wird nach dem Post automatisch als eigener Kommentar veröffentlicht.
+            </p>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-[#F5C76A]" />
+            <div>
+              <div className="text-sm font-medium">UTM-Tracking automatisch anhängen</div>
+              <div className="text-xs text-muted-foreground">utm_source / utm_medium / utm_campaign pro Plattform</div>
+            </div>
+          </div>
+          <Switch checked={utmEnabled} onCheckedChange={setUtmEnabled} />
+        </div>
+
+        {utmEnabled && (
+          <div>
+            <Label htmlFor="utmCampaign">Kampagnen-Slug (optional)</Label>
+            <Input
+              id="utmCampaign"
+              value={utmCampaign}
+              onChange={(e) => setUtmCampaign(e.target.value)}
+              placeholder="beta-launch"
+            />
+          </div>
+        )}
+      </Card>
+
+
 
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">{t('composer.publication')}</h3>
