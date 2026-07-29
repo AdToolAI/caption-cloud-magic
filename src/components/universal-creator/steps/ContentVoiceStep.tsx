@@ -60,14 +60,38 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
   const [useVoiceover, setUseVoiceover] = useState(value?.useVoiceover !== false);
   const [libraryOpen, setLibraryOpen] = useState(false);
 
-  const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>({
+  const DEFAULT_VOICE_CONFIG: VoiceoverConfig = {
     voiceId: '9BWtsMINqrJLrRacOk9x',
     voiceName: 'Aria',
     modelId: 'eleven_turbo_v2_5',
     stability: 0.5,
     similarityBoost: 0.75,
     speed: 1.0,
-  });
+  };
+
+  // Hydrate from the persisted project config so the picker keeps showing the
+  // voice the user actually chose after navigating away and back.
+  const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>(
+    () => value?.voiceoverConfig ?? DEFAULT_VOICE_CONFIG,
+  );
+  const userTouchedVoiceRef = useRef(false);
+
+  // Re-hydrate once when the project draft loads asynchronously.
+  useEffect(() => {
+    const persisted = value?.voiceoverConfig;
+    if (!persisted?.voiceId) return;
+    if (userTouchedVoiceRef.current) return;
+    setVoiceConfig((prev) => (prev.voiceId === persisted.voiceId ? prev : persisted));
+  }, [value?.voiceoverConfig]);
+
+
+  const resolvedVoiceName = (() => {
+    const custom = customVoices.find((c) => c.elevenlabs_voice_id === voiceConfig.voiceId);
+    if (custom?.name) return custom.name;
+    const known = voices.find((v) => v.id === voiceConfig.voiceId);
+    if (known?.name) return known.name;
+    return voiceConfig.voiceName || 'Voice';
+  })();
 
   const handleVoiceoverToggle = (enabled: boolean) => {
     setUseVoiceover(enabled);
@@ -256,6 +280,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                         stability: voice?.recommended_settings?.stability ?? voiceConfig.stability,
                         similarityBoost: voice?.recommended_settings?.similarity_boost ?? voiceConfig.similarityBoost,
                       };
+                      userTouchedVoiceRef.current = true;
                       setVoiceConfig(newCfg);
                     }}
                     disabled={loadingVoices || (filteredVoices.length === 0 && customVoices.length === 0)}
@@ -370,7 +395,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                     {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 ml-1" />}
                   </Button>
                   <div className="flex-1">
-                    <p className="text-sm font-medium">{voiceConfig.voiceName} • {voiceConfig.modelId}</p>
+                    <p className="text-sm font-medium">{resolvedVoiceName} • {voiceConfig.modelId}</p>
                     <p className="text-xs text-muted-foreground">{t('uc.duration')}: {value.voiceoverDuration}s</p>
                   </div>
                 </div>
@@ -476,6 +501,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
             onSelect={(voice) => {
               setVoices((prev) => (prev.find((v) => v.id === voice.id) ? prev : [voice as unknown as Voice, ...prev]));
               const custom = customVoices.find((c) => c.elevenlabs_voice_id === voice.id);
+              userTouchedVoiceRef.current = true;
               setVoiceConfig({
                 ...voiceConfig,
                 voiceId: voice.id,
