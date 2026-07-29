@@ -16,6 +16,8 @@ interface VoicePickerProps {
   onChange: (voiceId: string | null) => void;
   /** Optional preview text for test-synthesis. */
   previewText?: string;
+  /** Target language for the voice library (ISO-639-1) — defaults to the UI language. */
+  language?: string;
 }
 
 const PREVIEW_TEXT_FALLBACK =
