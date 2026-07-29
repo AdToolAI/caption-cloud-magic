@@ -1042,6 +1042,107 @@ export type Database = {
           },
         ]
       }
+      audiobook_chapters: {
+        Row: {
+          audio_url: string | null
+          body: string
+          chapter_index: number
+          char_count: number
+          created_at: string
+          duration_seconds: number | null
+          error_message: string | null
+          id: string
+          project_id: string
+          render_progress: number
+          render_status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audio_url?: string | null
+          body?: string
+          chapter_index?: number
+          char_count?: number
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          project_id: string
+          render_progress?: number
+          render_status?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audio_url?: string | null
+          body?: string
+          chapter_index?: number
+          char_count?: number
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          project_id?: string
+          render_progress?: number
+          render_status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audiobook_chapters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "audiobook_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audiobook_projects: {
+        Row: {
+          author: string | null
+          cast_config: Json
+          chapter_gap_ms: number
+          created_at: string
+          id: string
+          language: string
+          paragraph_gap_ms: number
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author?: string | null
+          cast_config?: Json
+          chapter_gap_ms?: number
+          created_at?: string
+          id?: string
+          language?: string
+          paragraph_gap_ms?: number
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author?: string | null
+          cast_config?: Json
+          chapter_gap_ms?: number
+          created_at?: string
+          id?: string
+          language?: string
+          paragraph_gap_ms?: number
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       auto_post_queue: {
         Row: {
           alt_text: string | null
