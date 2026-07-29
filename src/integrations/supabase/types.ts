@@ -1646,6 +1646,7 @@ export type Database = {
           anchor_score: number | null
           anchor_url: string | null
           anchor_verdicts: Json
+          attempt: number
           beat: string
           composer_scene_id: string | null
           created_at: string
@@ -1653,6 +1654,7 @@ export type Database = {
           duration_seconds: number
           engine: string | null
           error_message: string | null
+          fallback_kind: string | null
           grammar: Json
           id: string
           lipsync_url: string | null
@@ -1675,6 +1677,7 @@ export type Database = {
           anchor_score?: number | null
           anchor_url?: string | null
           anchor_verdicts?: Json
+          attempt?: number
           beat?: string
           composer_scene_id?: string | null
           created_at?: string
@@ -1682,6 +1685,7 @@ export type Database = {
           duration_seconds?: number
           engine?: string | null
           error_message?: string | null
+          fallback_kind?: string | null
           grammar?: Json
           id?: string
           lipsync_url?: string | null
@@ -1704,6 +1708,7 @@ export type Database = {
           anchor_score?: number | null
           anchor_url?: string | null
           anchor_verdicts?: Json
+          attempt?: number
           beat?: string
           composer_scene_id?: string | null
           created_at?: string
@@ -1711,6 +1716,7 @@ export type Database = {
           duration_seconds?: number
           engine?: string | null
           error_message?: string | null
+          fallback_kind?: string | null
           grammar?: Json
           id?: string
           lipsync_url?: string | null
@@ -1751,6 +1757,7 @@ export type Database = {
           estimated_credits: number
           final_video_url: string | null
           genre: string
+          heartbeat_at: string | null
           id: string
           language: string
           music_url: string | null
@@ -1759,6 +1766,7 @@ export type Database = {
           refunded_credits: number
           render_id: string | null
           research: Json
+          resume_attempts: number
           sound_design: Json
           spent_credits: number
           stage: string
@@ -1782,6 +1790,7 @@ export type Database = {
           estimated_credits?: number
           final_video_url?: string | null
           genre?: string
+          heartbeat_at?: string | null
           id?: string
           language?: string
           music_url?: string | null
@@ -1790,6 +1799,7 @@ export type Database = {
           refunded_credits?: number
           render_id?: string | null
           research?: Json
+          resume_attempts?: number
           sound_design?: Json
           spent_credits?: number
           stage?: string
@@ -1813,6 +1823,7 @@ export type Database = {
           estimated_credits?: number
           final_video_url?: string | null
           genre?: string
+          heartbeat_at?: string | null
           id?: string
           language?: string
           music_url?: string | null
@@ -1821,6 +1832,7 @@ export type Database = {
           refunded_credits?: number
           render_id?: string | null
           research?: Json
+          resume_attempts?: number
           sound_design?: Json
           spent_credits?: number
           stage?: string
