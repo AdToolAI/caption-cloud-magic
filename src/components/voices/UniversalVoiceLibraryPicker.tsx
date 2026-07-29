@@ -229,7 +229,56 @@ export function UniversalVoiceLibraryPicker({
               </div>
             )}
           </div>
+
+          {/* Kategorien */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+            {VOICE_CATEGORIES.map((c) => {
+              const active = c.id === category;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  title={c.hint}
+                  onClick={() => setCategory(c.id)}
+                  className={cn(
+                    'shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors',
+                    active
+                      ? 'bg-[#F5C76A]/15 border-[#F5C76A]/50 text-[#F5C76A]'
+                      : 'bg-white/[0.03] border-white/10 text-white/60 hover:text-white hover:bg-white/[0.06]',
+                  )}
+                >
+                  <span className="mr-1">{c.icon}</span>
+                  {c.label}
+                  {c.id === 'mine' && myVoices.length > 0 && (
+                    <span className="ml-1 text-white/40">({myVoices.length})</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Zuletzt verwendet */}
+          {recent.length > 0 && category !== 'mine' && !search.trim() && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+              <span className="shrink-0 text-[10px] uppercase tracking-wider text-white/35 pr-1">Zuletzt</span>
+              {recent.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => {
+                    pushRecentVoice(r);
+                    onSelect({ id: r.id, name: r.name, language: r.language } as unknown as VoiceMeta, r.language);
+                    onOpenChange(false);
+                  }}
+                  className="shrink-0 rounded-full border border-white/10 bg-white/[0.02] px-2.5 py-1 text-[11px] text-white/70 hover:bg-white/[0.06]"
+                >
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
 
         {/* List */}
         <ScrollArea className="flex-1 -mx-6 px-6">
