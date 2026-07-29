@@ -107,6 +107,13 @@ export interface SceneGrammar {
   voiceId?: string;
   /** BCP-47-ish language code for TTS, e.g. "de", "en", "es". */
   voiceLanguage?: string;
+  /**
+   * Multi-speaker dialogue. When present it is the source of truth and
+   * `dialogue`/`voiceId` above only describe the first turn. Each turn gets its
+   * own voice track and its own Sync.so pass on the same clip.
+   */
+  turns?: SceneDialogueTurn[];
+
 
   /** Extra negatives on top of the global clause. English. */
   negatives?: string[];
