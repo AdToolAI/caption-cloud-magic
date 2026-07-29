@@ -621,7 +621,7 @@ export function UniversalCreator() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Neues Projekt starten?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Der aktuelle Fortschritt wird verworfen. Diese Aktion kann nicht rückgängig gemacht werden.
+                  Der aktuelle Entwurf wird endgültig gelöscht — auch nach einem Reload (F5) kommt er nicht zurück. Diese Aktion kann nicht rückgängig gemacht werden.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
