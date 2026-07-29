@@ -134,7 +134,10 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         postId: publishData.id,
-        message: 'Successfully published to Instagram'
+        mediaType,
+        message: mediaType === 'STORIES'
+          ? 'Successfully published Instagram Story'
+          : 'Successfully published to Instagram'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
