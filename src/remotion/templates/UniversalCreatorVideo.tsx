@@ -224,6 +224,7 @@ export const UniversalCreatorVideoSchema = z.object({
   voiceoverUrl: z.string().optional(),
   voiceoverDuration: z.number().optional(),
   voiceoverVolume: z.number().default(1.0),
+  voiceoverStartTime: z.number().min(0).default(0),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().default(0.35),
   masterVolume: z.number().default(1.0),
@@ -2704,6 +2705,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   subtitles,
   voiceoverUrl,
   voiceoverVolume = 1.0,
+  voiceoverStartTime = 0,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.35,
   masterVolume = 1.0,
@@ -2965,14 +2967,16 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
       {!diagToggles.silentRender && voiceoverUrl && (
-          <Audio
-            key="stable-voiceover-audio"
-            src={voiceoverUrl}
-            volume={effectiveVoiceoverVolume}
-            startFrom={0}
-            loop={false}
-            pauseWhenBuffering
-          />
+          <Sequence from={Math.max(0, Math.round((voiceoverStartTime || 0) * effectiveFps))}>
+            <Audio
+              key="stable-voiceover-audio"
+              src={voiceoverUrl}
+              volume={effectiveVoiceoverVolume}
+              startFrom={0}
+              loop={false}
+              pauseWhenBuffering
+            />
+          </Sequence>
         )}
         {/* r64: Background music removed from template — added post-render via mux-audio-to-video */}
         
@@ -3026,14 +3030,16 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         * Music: only plays when not stripped by audio-corruption recovery
         * ============================================================ */}
       {!diagToggles.silentRender && voiceoverUrl && (
-        <Audio
-          key="stable-voiceover-audio"
-          src={voiceoverUrl}
-          volume={effectiveVoiceoverVolume}
-          startFrom={0}
-          loop={false}
-          pauseWhenBuffering
-        />
+        <Sequence from={Math.max(0, Math.round((voiceoverStartTime || 0) * effectiveFps))}>
+          <Audio
+            key="stable-voiceover-audio"
+            src={voiceoverUrl}
+            volume={effectiveVoiceoverVolume}
+            startFrom={0}
+            loop={false}
+            pauseWhenBuffering
+          />
+        </Sequence>
       )}
       {/* r67: Background music rendered directly in Lambda — same as UniversalVideo.tsx */}
       {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && isValidRemoteUrl(backgroundMusicUrl) && (
