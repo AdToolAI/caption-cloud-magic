@@ -6,11 +6,14 @@
 // never bill twice. Failed stages are refunded — the platform's credit
 // reliability rule applies to the autopilot path as well.
 //
-// Note: lip-sync (`lip-sync-video`) and the final Lambda render
-// (`render-with-remotion`) bill and refund themselves against the media
-// wallet. They are deliberately NOT charged here to avoid double billing.
+// Note: the final Lambda render (`render-with-remotion`) bills and refunds
+// itself against the media wallet and is deliberately NOT charged here.
+// Lip-sync IS charged here (stage "lipsync") because the autopilot drives
+// Sync.so directly via `_shared/autopilotLipSync.ts` instead of going through
+// `lip-sync-video` — one charge per speaker pass, refunded on failure.
 
-export type AutopilotStage = "anchor" | "motion" | "voice" | "music" | "sfx";
+export type AutopilotStage = "anchor" | "motion" | "voice" | "music" | "sfx" | "lipsync";
+
 
 interface ChargeArgs {
   userId: string;
