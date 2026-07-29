@@ -138,6 +138,10 @@ export function RemotionPreviewPlayer({
     backgroundMusicVolume: clampAudioVolume(customizations?.backgroundMusicVolume ?? 0),
     masterVolume: clampAudioVolume(customizations?.masterVolume ?? 1),
     voiceoverStartTime: Math.max(0, Number(customizations?.voiceoverStartTime) || 0),
+    musicTrimStart: Math.max(0, Number(customizations?.backgroundMusicClip?.trimStart) || 0),
+    musicTrimEnd: Math.max(0, Number(customizations?.backgroundMusicClip?.trimEnd) || 0),
+    musicStartTime: Math.max(0, Number(customizations?.backgroundMusicClip?.startTime) || 0),
+    musicLoop: customizations?.backgroundMusicClip ? customizations.backgroundMusicClip.loop !== false : true,
   }), [
     customizations?.voiceoverUrl,
     customizations?.backgroundMusicUrl,
@@ -145,7 +149,12 @@ export function RemotionPreviewPlayer({
     customizations?.backgroundMusicVolume,
     customizations?.masterVolume,
     customizations?.voiceoverStartTime,
+    customizations?.backgroundMusicClip?.trimStart,
+    customizations?.backgroundMusicClip?.trimEnd,
+    customizations?.backgroundMusicClip?.startTime,
+    customizations?.backgroundMusicClip?.loop,
   ]);
+
 
   const inputProps: Record<string, any> = useMemo(() => ({
     ...customizations,
