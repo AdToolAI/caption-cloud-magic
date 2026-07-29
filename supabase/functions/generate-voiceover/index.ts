@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { getPremiumVoiceById, getDefaultSettingsForVoice, getDefaultModelForVoice } from "../_shared/premium-voices.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { withTtsLanguage } from "../_shared/tts-language.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -18,6 +19,8 @@ interface VoiceoverRequest {
   style?: number;
   useSpeakerBoost?: boolean;
   speed?: number;
+  /** ISO-639-1 target language — pins ElevenLabs to that language. */
+  language?: string;
   projectId: string;
 }
 
@@ -74,9 +77,8 @@ serve(async (req) => {
     });
 
     const DEFAULT_FALLBACK_VOICE_ID = '9BWtsMINqrJLrRacOk9x'; // Aria — universal default
-    const ttsPayload = {
+    const ttsPayload = withTtsLanguage({
       text,
-      model_id: modelId,
       voice_settings: {
         stability,
         similarity_boost: similarityBoost,
@@ -84,7 +86,7 @@ serve(async (req) => {
         use_speaker_boost: useSpeakerBoost,
         speed,
       },
-    };
+    }, requestBody.language, modelId);
 
     const callElevenLabs = async (vid: string) => {
       const url = `https://api.elevenlabs.io/v1/text-to-speech/${vid}?output_format=mp3_44100_128&optimize_streaming_latency=2`;

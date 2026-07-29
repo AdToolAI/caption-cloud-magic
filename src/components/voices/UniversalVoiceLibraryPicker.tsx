@@ -12,16 +12,20 @@ import { cn } from '@/lib/utils';
 import { useVoiceLibrary, type VoiceLibraryFilters } from '@/hooks/useVoiceLibrary';
 import { VoicePreviewButton } from './VoicePreviewButton';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
+import { VOICE_LANGUAGES, NATIVE_SENSITIVE_LANGUAGES, toPickerLanguage, voiceLanguageLabel } from '@/lib/voice-languages';
 
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (voice: VoiceMeta) => void;
-  language?: 'de' | 'en' | 'es' | 'all';
+  onSelect: (voice: VoiceMeta, language: string) => void;
+  /** ISO-639-1 code (`de`, `en`, `es`, `fr`, …) or `all`. Pre-selects the language filter. */
+  language?: string;
   currentVoiceId?: string;
   title?: string;
   /** If false, native-only defaults off (useful for EN-only workflows like Kling Omni). */
   enforceNative?: boolean;
+  /** If false, the language dropdown is hidden and the prop language is locked. */
+  allowLanguageChange?: boolean;
 }
 
 const TIER_LABEL: Record<string, { label: string; className: string }> = {
@@ -36,20 +40,29 @@ export function UniversalVoiceLibraryPicker({
   open,
   onOpenChange,
   onSelect,
-  language = 'all',
+  language: languageProp = 'all',
   currentVoiceId,
   title = 'Voice-Bibliothek',
   enforceNative = true,
+  allowLanguageChange = true,
 }: UniversalVoiceLibraryPickerProps) {
   const [search, setSearch] = useState('');
+  const [language, setLanguage] = useState<string>(toPickerLanguage(languageProp) || 'all');
   const [gender, setGender] = useState<'all' | 'male' | 'female' | 'neutral'>('all');
   const [age, setAge] = useState<'all' | 'young' | 'middle_aged' | 'old'>('all');
   const [useCase, setUseCase] = useState<'all' | 'narration' | 'conversational' | 'characters' | 'social_media' | 'news'>('all');
-  const [nativeOnly, setNativeOnly] = useState<boolean>(enforceNative && (language === 'de' || language === 'es'));
+  const nativeSensitive = NATIVE_SENSITIVE_LANGUAGES.has(language);
+  const [nativeOnly, setNativeOnly] = useState<boolean>(enforceNative && nativeSensitive);
   const [sort, setSort] = useState<'popularity' | 'name'>('popularity');
 
+  // Keep in sync when the caller changes the target language (e.g. project language switch).
   useEffect(() => {
-    setNativeOnly(enforceNative && (language === 'de' || language === 'es'));
+    const next = languageProp === 'all' ? 'all' : (toPickerLanguage(languageProp) || 'all');
+    setLanguage(next);
+  }, [languageProp]);
+
+  useEffect(() => {
+    setNativeOnly(enforceNative && NATIVE_SENSITIVE_LANGUAGES.has(language));
   }, [language, enforceNative]);
 
   const filters: VoiceLibraryFilters = useMemo(() => ({
@@ -92,8 +105,8 @@ export function UniversalVoiceLibraryPicker({
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl text-[#F5C76A]">{title}</DialogTitle>
           <DialogDescription className="text-white/50">
-            {total.toLocaleString('de-DE')} Stimmen{language !== 'all' && ` in ${language.toUpperCase()}`}
-            {(language === 'de' || language === 'es') && ` · ${nativeCount.toLocaleString('de-DE')} nativ`}
+            {total.toLocaleString('de-DE')} Stimmen{language !== 'all' && ` in ${voiceLanguageLabel(language)}`}
+            {nativeSensitive && nativeOnly && ` · nur native Sprecher`}
           </DialogDescription>
         </DialogHeader>
 
@@ -109,7 +122,19 @@ export function UniversalVoiceLibraryPicker({
             />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+            {allowLanguageChange && (
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger className="bg-white/[0.03] border-white/10"><SelectValue placeholder="Sprache" /></SelectTrigger>
+                <SelectContent className="max-h-[320px]">
+                  <SelectItem value="all">🌍 Alle Sprachen</SelectItem>
+                  {VOICE_LANGUAGES.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>{l.flag} {l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             <Select value={gender} onValueChange={(v) => setGender(v as typeof gender)}>
               <SelectTrigger className="bg-white/[0.03] border-white/10"><SelectValue placeholder="Geschlecht" /></SelectTrigger>
               <SelectContent>
@@ -150,7 +175,7 @@ export function UniversalVoiceLibraryPicker({
               </SelectContent>
             </Select>
 
-            {(language === 'de' || language === 'es') && (
+            {nativeSensitive && (
               <div className="flex items-center gap-2 px-3 rounded-md bg-white/[0.03] border border-white/10">
                 <ShieldCheck className="h-4 w-4 text-[#F5C76A]" />
                 <Label htmlFor="native-only" className="text-xs flex-1 cursor-pointer">Nur nativ</Label>
@@ -176,7 +201,13 @@ export function UniversalVoiceLibraryPicker({
                 return (
                   <button
                     key={v.id}
-                    onClick={() => { onSelect(v); onOpenChange(false); }}
+                    onClick={() => {
+                      const resolved = language !== 'all'
+                        ? language
+                        : (typeof v.language === 'string' ? v.language : 'en');
+                      onSelect(v, resolved);
+                      onOpenChange(false);
+                    }}
                     className={cn(
                       'text-left rounded-lg border p-3 transition-all group',
                       'bg-white/[0.02] hover:bg-white/[0.05]',

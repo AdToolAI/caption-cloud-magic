@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
+import { toPickerLanguage } from '@/lib/voice-languages';
 
 interface VoicePickerProps {
   /** ElevenLabs voice id (or null to clear). */
@@ -16,6 +18,8 @@ interface VoicePickerProps {
   onChange: (voiceId: string | null) => void;
   /** Optional preview text for test-synthesis. */
   previewText?: string;
+  /** Target language for the voice library (ISO-639-1) — defaults to the UI language. */
+  language?: string;
 }
 
 const PREVIEW_TEXT_FALLBACK =
@@ -27,8 +31,12 @@ const PREVIEW_TEXT_FALLBACK =
  * every existing caller (CharacterEditor, VoiceProfileCard-adapters, ...) keeps
  * working without changes.
  */
-export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) {
+export function VoicePicker({ value, onChange, previewText, language }: VoicePickerProps) {
   const { voices: customVoices } = useCustomVoices();
+  const { language: uiLang } = useTranslation();
+  const targetLanguage = toPickerLanguage(language) !== 'all'
+    ? toPickerLanguage(language)
+    : toPickerLanguage(uiLang);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [pickedMeta, setPickedMeta] = useState<VoiceMeta | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -78,6 +86,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
         body: {
           text: previewText?.trim() || PREVIEW_TEXT_FALLBACK,
           voiceId: value,
+          language: targetLanguage !== 'all' ? targetLanguage : undefined,
         },
       });
       if (error) throw error;
@@ -171,7 +180,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
         open={libraryOpen}
         onOpenChange={setLibraryOpen}
         onSelect={handlePickerSelect}
-        language="all"
+        language={targetLanguage}
         currentVoiceId={value ?? undefined}
         title="Stimme für Charakter wählen"
       />

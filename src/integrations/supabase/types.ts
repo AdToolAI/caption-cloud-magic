@@ -2352,6 +2352,7 @@ export type Database = {
           default_language: string | null
           default_performance: Json | null
           default_voice_id: string | null
+          default_voice_language: string | null
           default_voice_name: string | null
           default_voice_provider: string | null
           description: string | null
@@ -2398,6 +2399,7 @@ export type Database = {
           default_language?: string | null
           default_performance?: Json | null
           default_voice_id?: string | null
+          default_voice_language?: string | null
           default_voice_name?: string | null
           default_voice_provider?: string | null
           description?: string | null
@@ -2444,6 +2446,7 @@ export type Database = {
           default_language?: string | null
           default_performance?: Json | null
           default_voice_id?: string | null
+          default_voice_language?: string | null
           default_voice_name?: string | null
           default_voice_provider?: string | null
           description?: string | null

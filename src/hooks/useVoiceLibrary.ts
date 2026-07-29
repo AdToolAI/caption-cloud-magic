@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 
 export interface VoiceLibraryFilters {
-  language?: 'de' | 'en' | 'es' | 'all';
+  /** ISO-639-1 code (`de`, `en`, `es`, `fr`, …) or `all`. */
+  language?: string;
   gender?: 'male' | 'female' | 'neutral' | null;
   accent?: string | null;
   age?: string | null;

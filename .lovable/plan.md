@@ -1,54 +1,30 @@
-## Antwort vorab: Ja, stimmlich geht das schon heute
+## Ist-Stand (geprüft)
 
-Der Katalog trägt Kinderhörbücher bereits (verifiziert per Query):
+**Sprache korrekt verdrahtet (Bibliothek + Sprachfilter):**
+- Universal Content Creator (`ContentVoiceStep`) — Picker mit `language={selectedLanguage}`
+- Director's Cut (`AIVoiceOver`) — Sprach-Tabs + Picker
+- Hörbuch (`AudiobookCastPanel`) — Picker mit Projektsprache, Server sendet `language_code`
 
-| Sprache | Stimmen gesamt | `narrative_story` | `characters_animation` |
-|---|---|---|---|
-| EN | 3.093 | — | — |
-| ES | 1.303 | — | — |
-| DE | 843 | 341 | 92 |
+**Nicht verdrahtet:**
+- **Cast & World** (`AvatarVoicePicker`): feste Liste von 9 englischen ElevenLabs-Stimmen, kein Sprachfilter, kein Zugriff auf die 8.477er-Bibliothek.
+- **Motion Studio** (`VoicePicker`): nutzt zwar die Bibliothek, ist aber hart auf `language="all"` gesetzt — keine Projektsprache.
+- **Video Composer Sprecher-Mapping** (`SpeakerMappingBar`): eigene Kurzliste + Hume-Fallback-ID, unabhängig von der Sprachwahl.
+- **Legacy** `VoiceOverEditor` / `VoiceProfileCard` / Companion: fixe Voice-Styles.
+- **Serverseitig:** nur `render-audiobook` sendet `language_code`. `generate-voiceover`, `preview-voice`, `director-cut-voice-over`, `generate-video-voiceover`, `generate-multi-speaker-vo` schicken nur `eleven_multilingual_v2` ohne Sprach-Pin → genau das Muster, das früher zu Englisch-/Fantasiesprache-Drift geführt hat.
+- **Bibliothek** kann 9 Sprachen, der Picker-Typ erlaubt aber nur `de | en | es | all`.
 
-Dazu FR 489, TR 677, PT 431, PL 233, IT 205, NL 123. Erzähler- und Charakterstimmen sind also reichlich da, `preview_url` liefert kostenlose Vorschau.
+## Umsetzungsplan
 
-Was fehlt, ist **nicht** die Stimme, sondern der Langform-Workflow: heute geht Text nur als einzelner Voiceover-Call (ElevenLabs-Limit ~5.000 Zeichen), es gibt keine Kapitel, keine Sprecherzuordnung pro Figur und keinen MP3/Hörbuch-Export.
-
-## Plan: „Hörbuch"-Tab im Audio Studio
-
-Kein neuer Bereich in der Navigation. `src/pages/AudioStudio.tsx` hat bereits eine Tab-Leiste (`enhance | transcript | voices | music | …`) — dort kommt genau **ein** neuer Tab `audiobook` dazu. Alles Weitere lebt in `src/components/audio-studio/audiobook/`.
-
-### 1. Manuskript & Kapitel
-- Texteingabe (Einfügen oder `.txt`/`.md`-Upload) mit automatischer Kapitel-Erkennung an Überschriften/Leerzeilen.
-- Kapitelliste links, Editor rechts; Kapitel umbenennen, sortieren, löschen.
-- Zeichen- und Laufzeitschätzung pro Kapitel und gesamt.
-
-### 2. Sprecher-Besetzung
-- **Erzähler** (Pflicht) + beliebig viele **Figuren**, jede mit eigener Stimme aus der Bibliothek.
-- Stimmenauswahl über den bestehenden `UniversalVoiceLibraryPicker` mit Vorfilter `use_case = narrative_story | characters_animation` und der gewählten Sprache.
-- Dialogzeilen werden per `Figur:`-Präfix erkannt und automatisch der Figurenstimme zugeordnet; manuelle Korrektur pro Absatz möglich.
-- Kinder-Preset: Stability 0.5 / Similarity 0.75 / Style 0.35, Tempo 0.95 (ruhigeres Vorlesen).
-
-### 3. Rendering (Chunking + Stitching)
-- Neue Edge Function `render-audiobook`: teilt jedes Kapitel an Satzgrenzen in Blöcke ≤ 4.000 Zeichen, ruft ElevenLabs mit `previous_text`/`next_text` auf (Request Stitching → keine Prosodie-Brüche an den Nähten), `eleven_multilingual_v2`.
-- Blöcke werden parallel (Limit 4 gleichzeitig) erzeugt, in Reihenfolge zusammengefügt, Pausen zwischen Absätzen/Kapiteln konfigurierbar (0,4 s / 1,2 s).
-- Fortschritt pro Kapitel in einer Job-Tabelle; Wiederaufnahme nach Abbruch ohne erneute Kosten für fertige Blöcke.
-- Fehlschlag eines Blocks → automatische Gutschrift gemäß bestehender Refund-Regel.
-
-### 4. Export
-- Pro Kapitel eine MP3 plus optional eine zusammengefügte Gesamtdatei; ZIP-Download.
-- Titel/Autor/Cover als ID3-Metadaten, Kapitelnamen als Dateinamen mit Nummerierung.
-- Ablage in der Media Library (`content_items`) wie bei anderen Audio-Assets.
-
-### 5. Alle 9 Sprachen
-DE, EN, ES, FR, IT, PT, NL, PL, TR — Sprachumschalter filtert Katalog und setzt das Modell; UI-Texte bleiben DE/EN/ES.
+1. **Picker-Sprachen erweitern**: `UniversalVoiceLibraryPicker`/`useVoiceLibrary` von `de|en|es|all` auf den vollen Sprachcode-Satz der Bibliothek öffnen (String-Typ + Sprach-Dropdown mit den tatsächlich vorhandenen Sprachen aus `list-voices`).
+2. **Cast & World**: `AvatarVoicePicker` auf den Universal-Picker umstellen (feste 9er-Liste entfällt), Sprache aus Brand-/UI-Sprache vorbelegen, gewählte Sprache zusammen mit `default_voice_id` am Charakter speichern.
+3. **Motion Studio**: `VoicePicker` bekommt eine `language`-Prop; Aufrufer (CharacterEditor etc.) geben die Projektsprache durch statt `all`.
+4. **Video Composer**: `SpeakerMappingBar` auf den Universal-Picker + Projektsprache umstellen, Fallback-Voice sprachabhängig statt fester ID.
+5. **Serverseitiger Sprach-Pin** (zentral): gemeinsamer Helper in `supabase/functions/_shared/`, der bei jedem ElevenLabs-TTS-Call `language_code` setzt und bei gesetzter Sprache automatisch auf ein sprachfähiges Modell (`eleven_turbo_v2_5`/`eleven_v3`) wechselt, sonst `eleven_multilingual_v2` behält. Eingebaut in `generate-voiceover`, `preview-voice`, `director-cut-voice-over`, `generate-video-voiceover`, `generate-multi-speaker-vo`, `companion-speak`.
+6. **Clients senden `language`** bei jedem dieser Aufrufe mit (UCC, DC, Composer, Motion Studio, Cast-Preview, Companion).
+7. **Legacy-Pfade** `VoiceOverEditor` / `VoiceProfileCard`: entweder auf den Universal-Picker heben oder — falls ungenutzt — entfernen; ich prüfe die Referenzen und entscheide pro Datei.
 
 ## Technische Details
 
-- Neue Tabellen `audiobook_projects` (Titel, Sprache, Besetzung als JSONB, Sprache, Status) und `audiobook_chapters` (Projekt-Ref, Index, Titel, Text, Audio-URL, Renderstatus) — RLS auf `auth.uid()`, GRANTs für `authenticated` + `service_role`.
-- Storage-Pfad `audio-studio/{user_id}/audiobooks/{project}/…` (User-ID als erstes Segment, wie von der Storage-RLS gefordert).
-- Kosten: Abrechnung über die bestehenden Media Credits, pro 1.000 Zeichen, mit Kostenvorschau vor dem Rendern (analog Szenen-Render-Dialog).
-- Vorschau einzelner Absätze nutzt `preview-voice`, nicht den vollen Render.
-
-## Offene Punkte
-
-- Zeichen-Preis pro 1.000 Zeichen lege ich nach der 3,00×-Margenregel fest; sag Bescheid, falls du einen anderen Faktor willst.
-- Hintergrundmusik/Ambience fürs Hörbuch lasse ich erstmal weg — der bestehende Music-Tab kann das nachträglich untermischen.
+- Kein Schema-Wechsel nötig, außer optional einer Spalte `default_voice_language` auf `brand_characters` (Migration), damit Cast-Stimmen beim erneuten Öffnen mit richtiger Sprache vorgefiltert werden.
+- `language_code` wird nur gesetzt, wenn die Stimme laut `supported_languages` die Zielsprache kann; sonst Warnung im Picker („nicht nativ").
+- Prüfung nach dem Umbau: Preview je Sprache in Cast & World, Motion Studio und Composer.

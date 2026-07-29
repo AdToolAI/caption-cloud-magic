@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Play, Square } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { voicePreviewSample, normalizeVoiceLanguage } from '@/lib/voice-languages';
 
 interface VoicePreviewButtonProps {
   voiceId: string;
@@ -10,12 +11,6 @@ interface VoicePreviewButtonProps {
   size?: 'sm' | 'icon';
   className?: string;
 }
-
-const SAMPLES: Record<string, string> = {
-  de: 'Hallo, so klingt meine Stimme. Ich freue mich darauf, deinen Text vorzulesen.',
-  en: 'Hello, this is how my voice sounds. I look forward to reading your text.',
-  es: 'Hola, así suena mi voz. Tengo muchas ganas de leer tu texto.',
-};
 
 /** Tiny 5-second voice preview button using the `preview-voice` edge function. */
 export function VoicePreviewButton({ voiceId, language = 'de', size = 'icon', className }: VoicePreviewButtonProps) {
@@ -35,9 +30,14 @@ export function VoicePreviewButton({ voiceId, language = 'de', size = 'icon', cl
     if (playing) { stop(); return; }
     setLoading(true);
     try {
-      const sample = SAMPLES[language] || SAMPLES.en;
+      const sample = voicePreviewSample(language);
       const { data, error } = await supabase.functions.invoke('preview-voice', {
-        body: { text: sample, voiceId, speed: 1.0 },
+        body: {
+          text: sample,
+          voiceId,
+          speed: 1.0,
+          language: normalizeVoiceLanguage(language) ?? undefined,
+        },
       });
       if (error) throw error;
       if (!data?.audioContent) throw new Error('No audio received');
