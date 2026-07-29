@@ -34,6 +34,17 @@ import {
   compileMotionPrompt,
   clampPromptWords,
 } from '@/lib/autopilot/promptGrammar';
+import { estimateProductionCost, formatEuro } from '@/lib/autopilot/costEstimate';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAutopilotProduction } from '@/hooks/useAutopilotProduction';
 import { ProductionStage } from '@/components/autopilot/ProductionStage';
 import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/autopilot/types';
@@ -87,6 +98,8 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   const [approved, setApproved] = useState(false);
   const [productionId, setProductionId] = useState<string | null>(null);
   const [treatment, setTreatment] = useState<AutopilotTreatment | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [walletEuros, setWalletEuros] = useState<number | null>(null);
 
   const { production, scenes: producedScenes, log } = useAutopilotProduction(
     productionId,
@@ -120,6 +133,35 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   );
 
   const blockers = preflight ? blockingFindings(preflight) : [];
+
+  /** Cost preview — same price table the billing path uses. */
+  const cost = useMemo(() => {
+    if (!plannedTreatment) return null;
+    const scenes = plannedTreatment.scenes ?? [];
+    const speakingScenes = scenes.filter((scene) => !!scene.dialogue);
+    const totalSeconds = scenes.reduce((acc, scene) => acc + (scene.durationSeconds || 0), 0);
+    return estimateProductionCost({
+      sceneCount: scenes.length,
+      totalDurationSeconds: totalSeconds,
+      voiceoverEnabled: speakingScenes.length > 0,
+      lipSyncEnabled: speakingScenes.length > 0,
+      lipSyncSpeakers: new Set(speakingScenes.map((scene) => scene.speakerCharacterId ?? 'x')).size,
+      speakingSeconds: speakingScenes.reduce((acc, scene) => acc + (scene.durationSeconds || 0), 0),
+      musicEnabled: true,
+    });
+  }, [plannedTreatment]);
+
+  const openConfirm = async () => {
+    setConfirmOpen(true);
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) return;
+    const { data } = await supabase
+      .from('ai_video_wallets')
+      .select('balance_euros')
+      .eq('user_id', auth.user.id)
+      .maybeSingle();
+    setWalletEuros(Number(data?.balance_euros ?? 0));
+  };
 
   /** Distinct room tones across the film — shown as a one-line sound summary. */
   const ambienceCues = useMemo(
@@ -453,7 +495,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             <Button
               size="lg"
               disabled={blockers.length > 0 || !productionId || starting || approved}
-              onClick={handleStartProduction}
+              onClick={openConfirm}
             >
               {starting ? (
                 <>
@@ -478,6 +520,62 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           </div>
         </Card>
       )}
+
+      {/* --------------------------------------------------- Freigabedialog */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Produktion freigeben</AlertDialogTitle>
+            <AlertDialogDescription>
+              Abgerechnet wird stufenweise. Was nicht geliefert wird, bekommst du automatisch
+              zurück.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {cost && (
+            <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-4 text-sm">
+              {cost.lines.map((entry) => (
+                <div key={entry.label} className="flex items-baseline justify-between gap-4">
+                  <span>
+                    {entry.label}
+                    <span className="ml-2 text-xs text-muted-foreground">{entry.detail}</span>
+                  </span>
+                  <span className="font-mono">{formatEuro(entry.euros)}</span>
+                </div>
+              ))}
+              <div className="flex items-baseline justify-between border-t border-border/50 pt-2 font-medium">
+                <span>Gesamt</span>
+                <span className="font-mono">
+                  {formatEuro(cost.totalEuros)} · {cost.totalCredits} Cr
+                </span>
+              </div>
+              {walletEuros !== null && (
+                <p
+                  className={cn(
+                    'text-xs',
+                    walletEuros < cost.totalEuros ? 'text-destructive' : 'text-muted-foreground',
+                  )}
+                >
+                  Guthaben: {formatEuro(walletEuros)}
+                  {walletEuros < cost.totalEuros && ' — reicht nicht für den kompletten Film.'}
+                </p>
+              )}
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                void handleStartProduction();
+              }}
+            >
+              Kostenpflichtig produzieren
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ------------------------------------------------------- Produktion */}
       {approved && production && (
