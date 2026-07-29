@@ -495,7 +495,8 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
           <UniversalVoiceLibraryPicker
             open={libraryOpen}
             onOpenChange={setLibraryOpen}
-            language={(selectedLanguage as 'de' | 'en' | 'es') || 'all'}
+            language={selectedLanguage || 'all'}
+            category="ads"
             currentVoiceId={voiceConfig.voiceId}
             title={language === 'de' ? 'Voice-Bibliothek – Content Creator' : "Voice Library – Content Creator"}
             enforceNative
