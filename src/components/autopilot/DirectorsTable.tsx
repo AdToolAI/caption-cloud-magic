@@ -329,9 +329,7 @@ export function DirectorsTable() {
             <div className="mt-5 rounded-lg border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Sounddesign: </span>
               {plannedTreatment.musicMood || getRecipe(plannedTreatment.genre).musicMood}
-              {mixPlan.ambienceCues?.length
-                ? ` · Atmo: ${mixPlan.ambienceCues.slice(0, 3).join(', ')}`
-                : ''}
+              {ambienceCues.length ? ` · Atmo: ${ambienceCues.slice(0, 3).join(', ')}` : ''}
             </div>
           )}
 
