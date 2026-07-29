@@ -405,6 +405,13 @@ export function UniversalCreator() {
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
+    // Explicit "new project" was requested — never resurrect anything,
+    // not even after a browser reload.
+    if (consumeFreshStart(FRESH_START_KEY)) {
+      localStorage.removeItem(BACKUP_STORAGE_KEY);
+      setIsHydrating(false);
+      return;
+    }
     if (urlProjectId) {
       void hydrateFromDb(urlProjectId);
       return;
