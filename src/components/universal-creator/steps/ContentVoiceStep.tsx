@@ -255,14 +255,14 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
 
               <div className="space-y-2">
                 <Label>{t('uc.languageLabel')}</Label>
-                <Tabs value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="de" disabled={loadingVoices}>🇩🇪 DE {!loadingVoices && `(${voices.filter(v => v.language === 'de' || (v.supportedLanguages || []).includes('de')).length})`}</TabsTrigger>
-                    <TabsTrigger value="en" disabled={loadingVoices}>🇬🇧 EN {!loadingVoices && `(${voices.filter(v => v.language === 'en' || (v.supportedLanguages || []).includes('en')).length})`}</TabsTrigger>
-                    <TabsTrigger value="es" disabled={loadingVoices}>🇪🇸 ES {!loadingVoices && `(${voices.filter(v => v.language === 'es' || (v.supportedLanguages || []).includes('es')).length})`}</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <VoiceLanguageSelect
+                  value={selectedLanguage}
+                  onChange={setSelectedLanguage}
+                  disabled={loadingVoices}
+                  className="w-full"
+                />
               </div>
+
 
               <div className="space-y-2">
                 <Label>{t('uc.selectVoice')}</Label>
