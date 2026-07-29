@@ -614,7 +614,6 @@ export function PreviewExportStep({
               durationInFrames={computeDurationInFrames({
                 voiceoverDuration: contentConfig?.voiceoverDuration,
                 actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
-                actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
                 scenes,
               }, formatConfig.fps || 30)}
               fps={formatConfig.fps || 30}
