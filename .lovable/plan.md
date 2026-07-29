@@ -1,36 +1,17 @@
-## Ziel
+## Zwei kleine Fixes
 
-Jedes exportierte Video (UCC **und** Director's Cut) bleibt pixelnah zum Upload. Farb-/Kontrastanpassungen greifen ausschließlich, wenn der Kunde im Director's Cut aktiv einen Filter, Mood-Grade oder Effekt hinzufügt.
+### 1. Fortschrittsleiste im Export-Schritt läuft von allein
+`RemotionPreviewPlayer` hat die Defaults `autoPlay = true` und `loop = true`, und `PreviewExportStep.tsx` (ca. Zeile 601) übergibt keine eigenen Werte. Der Player wird also beim Betreten von Schritt 4 stumm gestartet und läuft im Dauerloop. Der `autoPlay`-Effekt ruft `player.play()` direkt auf, ohne dass der interne `isPlaying`-State/das Play-Icon umschaltet — sichtbar ist dann nur, wie die Leiste durchläuft und am Loop-Ende zurückspringt, während das Bild statisch/dunkel bleibt.
 
-## Aktueller Stand (verifiziert)
+Fix: Im Export-Schritt `autoPlay={false}` übergeben. Damit bleibt der Player bei Frame 0 stehen, die Leiste bewegt sich erst, wenn der Kunde Play drückt. Der Loop-Toggle bleibt unverändert erhalten und greift dann beim manuellen Abspielen.
 
-- `src/remotion/templates/UniversalCreatorVideo.tsx` — Baseline bereits entfernt (letzter Turn).
-- `src/remotion/templates/DirectorsCutVideo.tsx` Zeile 630 wendet `prependSensorBaseline(baseFilter)` **immer** im Export an, unabhängig davon, ob der Kunde einen Filter/Mood gesetzt hat. Das ist die Quelle für den Rest-Drift.
-- `filterString` (Zeile 625) enthält bereits alle vom Kunden bewusst gewählten Grade-/Mood-/Effekt-Filter — die bleiben unangetastet.
+### 2. „uc.chooseFromLibrary“ im Schritt 3
+`BackgroundAssetSelector.tsx` nutzt `t('uc.chooseFromLibrary')` und `t('uc.chooseFromLibraryDesc')`. Diese Keys existieren nur im `calendar`-Namespace, nicht unter `uc` — deshalb wird der rohe Key angezeigt (der `|| 'Aus Mediathek wählen'`-Fallback greift nicht, weil `t()` den Key-String zurückgibt, also truthy ist).
 
-## Änderung
+Fix: In `src/lib/translations.ts` im `uc`-Block für EN/DE/ES ergänzen:
+- `chooseFromLibrary`: „Choose from Library“ / „Aus Mediathek wählen“ / „Elegir de la biblioteca“
+- `chooseFromLibraryDesc`: „Reuse videos you already created“ / „Bereits erstellte Videos wiederverwenden“ / „Reutiliza vídeos ya creados“
 
-**Datei:** `src/remotion/templates/DirectorsCutVideo.tsx`
-
-- Zeile 628–630: `prependSensorBaseline`-Aufruf entfernen. `finalFilter` = `baseFilter` in Preview **und** Export.
-- Import `prependSensorBaseline` (Zeile 3) entfernen, wenn danach ungenutzt.
-
-**Datei:** `src/remotion/utils/sensorBaselineGrade.ts`
-
-- Datei bleibt liegen (keine weiteren Referenzen), Kopfkommentar aktualisieren: „Deaktiviert per Kundenentscheidung 29.07.2026 — Rohtreue hat Vorrang. Nur reaktivieren, wenn ausdrücklich gewünscht."
-
-## Nicht angefasst
-
-- User-Filter, Mood-Grade, KenBurns, Grain, Vignette, Overlays, SceneFX, Transitions → bleiben exakt wie vom Kunden im Director's Cut konfiguriert.
-- UCC-Renderpfad → schon roh, unverändert.
-- Qualitäts-Floor (`jpegQuality 95`, `crf 16`, `OffthreadVideo`) → bleibt.
-
-## Verifikation nach Build
-
-1. DC-Export einer Szene **ohne** aktiven Filter/Mood → frame-genau identisch zum Upload (Screenshot-Vergleich wie beim letzten Roundtrip).
-2. DC-Export mit aktivem Mood-Grade → Grade sichtbar wie eingestellt, kein zusätzlicher Baseline-Boost darüber.
-3. UCC-Export → unverändert roh.
-
-## Memory-Update
-
-`mem://architecture/render/global-export-quality-floor` und `mem://architecture/video-composer/raw-media-invariant` erweitern: Sensor-Baseline ist projektweit deaktiviert; Raw-Invariant gilt jetzt auch für Director's Cut, außer der Kunde aktiviert explizit Filter/Effekte.
+### Betroffene Dateien
+- `src/components/universal-creator/steps/PreviewExportStep.tsx`
+- `src/lib/translations.ts`
