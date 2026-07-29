@@ -402,20 +402,22 @@ async function runProduction(
 /**
  * Speaking scene: record every turn, then lip-sync the clip speaker by speaker.
  *
- * Hardened path (v295): Sync.so is driven directly here — with codec preflight,
- * circuit-breaker, anchor face-gate and one pass per speaker. Sync.so is
- * audio-driven, so German ElevenLabs audio passes through untouched; Kling Omni
- * is deliberately not used because it synthesises its own (non-German) voice.
+ * v296 — Composer-Brücke: statt einer zweiten Lip-Sync-Pipeline schiebt der
+ * Autopilot die Szene als versteckte `composer_scenes`-Zeile in die bereits
+ * gehärtete Motion-Studio-Strecke (`compose-twoshot-audio` →
+ * `compose-dialog-segments`). Damit gelten hier automatisch Preclip-Isolation,
+ * Codec-Preflight, Face-Gate, Slot-Routing, Retry-Matrix, Circuit-Breaker und
+ * der Watchdog. Am Composer-Code wird nichts geändert.
  *
- * Voice and lip-sync are billed per stage against `ai_video_wallets` and
- * refunded on failure. A failure never kills the scene — the silent clip stays
- * usable for the final cut.
+ * Fällt die Brücke aus (kein Guthaben, Gesichts-Check, Fehler), bleibt die
+ * Sprachspur erhalten — die Szene ist nie verloren, nur stumm gelippt.
  */
 async function speakAndSync(
   admin: ReturnType<typeof createClient>,
   args: {
     productionId: string;
     userId: string;
+    productionTitle: string;
     scene: SceneInput;
     videoUrl: string;
     anchorUrl?: string | null;
@@ -439,7 +441,11 @@ async function speakAndSync(
 
   if (turns.length === 0) return;
 
-  const speakerCount = turns.length;
+  const speakerCount = new Set(
+    turns.map((t, i) => t.speakerCharacterId ?? `anon:${i}`),
+  ).size;
+  const language = scene.voiceLanguage ?? "de";
+
   const voiceEuros = Math.max(1, scene.durationSeconds) * AUTOPILOT_PRICE.voicePerSecond *
     speakerCount;
   const voiceCharge = await chargeStage(admin, {
@@ -452,65 +458,59 @@ async function speakAndSync(
   });
   if (!voiceCharge.charged && voiceCharge.reason === "insufficient") return;
 
-  const built = await buildTurnTracks({
-    admin,
-    userId,
-    productionId,
-    sceneIndex: scene.orderIndex,
-    turns,
-    sceneDurationSec: scene.durationSeconds,
-    defaultLanguage: scene.voiceLanguage ?? "de",
-  });
-
-  if (!built.ok || !built.masterUrl) {
-    await refundStage(admin, {
+  /** Rückfallebene: nur Sprachspur, kein Lip-Sync. Szene bleibt nutzbar. */
+  const voiceOnly = async (message: string, severity: "info" | "warn" = "warn") => {
+    const built = await buildTurnTracks({
+      admin,
       userId,
       productionId,
-      stage: "voice",
       sceneIndex: scene.orderIndex,
-      euros: voiceEuros,
-      label: `Sprachaufnahme Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+      turns,
+      sceneDurationSec: scene.durationSeconds,
+      defaultLanguage: language,
     });
+    if (built.ok && built.masterUrl) {
+      await setSceneStatus(admin, productionId, scene.orderIndex, {
+        voiceover_url: built.masterUrl,
+        voiceover_duration_seconds: Math.round(built.totalSec * 100) / 100,
+      });
+    } else {
+      await refundStage(admin, {
+        userId,
+        productionId,
+        stage: "voice",
+        sceneIndex: scene.orderIndex,
+        euros: voiceEuros,
+        label: `Sprachaufnahme Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+      });
+    }
     await log(admin, productionId, userId, {
-      stage: "audio",
+      stage: "lipsync",
       role: "sound",
-      severity: "warn",
+      severity,
       scene_index: scene.orderIndex,
-      message: `Szene ${scene.orderIndex + 1}: Sprachaufnahme fehlgeschlagen (${
-        built.reason ?? "unbekannt"
-      }) — Credits erstattet.`,
+      message,
     });
-    return;
-  }
-
-  await setSceneStatus(admin, productionId, scene.orderIndex, {
-    voiceover_url: built.masterUrl,
-    voiceover_duration_seconds: Math.round(built.totalSec * 100) / 100,
-  });
+  };
 
   // Face-gate on the anchor (the i2v input = the clip's geometry). A missing or
-  // tiny face means Sync.so would burn credits on an unanimatable mouth.
-  let boxes: Array<{ x: number; y: number; w: number; h: number }> = [];
+  // tiny face means the Sync-Strecke would burn credits on an unanimatable mouth.
   if (args.anchorUrl) {
     const gate = await checkAnchorFaces({
       anchorUrl: args.anchorUrl,
       expectedSpeakers: speakerCount,
     });
-    boxes = gate.boxes;
     if (!gate.ok) {
-      await log(admin, productionId, userId, {
-        stage: "lipsync",
-        role: "dp",
-        severity: "warn",
-        scene_index: scene.orderIndex,
-        message: `Szene ${scene.orderIndex + 1}: Gesichts-Check nicht bestanden (${gate.reason}) — Lip-Sync übersprungen, Ton bleibt erhalten.`,
-      });
+      await voiceOnly(
+        `Szene ${scene.orderIndex + 1}: Gesichts-Check nicht bestanden (${gate.reason}) — Lip-Sync übersprungen, Ton bleibt erhalten.`,
+      );
       return;
     }
   }
 
-  const lipsyncEuros = Math.max(1, scene.durationSeconds) *
-    AUTOPILOT_PRICE.lipsyncPerSecondPerSpeaker * speakerCount;
+  // Kostenschätzung = exakt die Credits, die der Composer gleich abbucht.
+  const estimatedCredits = composerLipsyncCredits(scene.durationSeconds, speakerCount);
+  const lipsyncEuros = creditsToEuros(estimatedCredits);
   const syncCharge = await chargeStage(admin, {
     userId,
     productionId,
@@ -520,27 +520,60 @@ async function speakAndSync(
     label: `Lip-Sync Szene ${scene.orderIndex + 1}`,
   });
   if (!syncCharge.charged && syncCharge.reason === "insufficient") {
-    await log(admin, productionId, userId, {
-      stage: "lipsync",
-      role: "producer",
-      severity: "warn",
-      scene_index: scene.orderIndex,
-      message: `Szene ${scene.orderIndex + 1}: Guthaben reicht nicht für Lip-Sync — Clip bleibt stumm.`,
-    });
+    await voiceOnly(
+      `Szene ${scene.orderIndex + 1}: Guthaben reicht nicht für Lip-Sync — Sprachspur bleibt, Clip bleibt stumm gelippt.`,
+    );
     return;
   }
 
-  const result = await runLipSyncPasses({
-    admin,
-    clipUrl: videoUrl,
-    durationSec: built.totalSec,
-    passes: built.tracks.map((track, i) => ({
-      trackUrl: track.url,
-      startSec: track.startSec,
-      box: boxes[i] ?? null,
-      speakerName: track.turn.speakerName ?? `Sprecher ${i + 1}`,
-    })),
+  // Brücke: versteckte Composer-Arbeitsmappe + Szenenzeile.
+  const projectId = await ensureShadowProject(admin, {
+    productionId,
+    userId,
+    title: args.productionTitle,
+    language,
   });
+  const sceneId = projectId
+    ? await upsertBridgeScene(admin, {
+      projectId,
+      productionId,
+      sceneIndex: scene.orderIndex,
+      clipUrl: videoUrl,
+      anchorUrl: args.anchorUrl ?? null,
+      durationSeconds: scene.durationSeconds,
+      turns,
+      language,
+    })
+    : null;
+
+  if (!sceneId) {
+    await refundStage(admin, {
+      userId,
+      productionId,
+      stage: "lipsync",
+      sceneIndex: scene.orderIndex,
+      euros: lipsyncEuros,
+      label: `Lip-Sync Szene ${scene.orderIndex + 1} nicht gestartet`,
+    });
+    await voiceOnly(
+      `Szene ${scene.orderIndex + 1}: Lip-Sync-Strecke nicht erreichbar — Sprachspur bleibt erhalten.`,
+    );
+    return;
+  }
+
+  const result = await runComposerLipSync(admin, {
+    sceneId,
+    userId,
+    durationSeconds: scene.durationSeconds,
+    speakerCount,
+  });
+
+  if (result.masterAudioUrl) {
+    await setSceneStatus(admin, productionId, scene.orderIndex, {
+      voiceover_url: result.masterAudioUrl,
+      voiceover_duration_seconds: Math.round(scene.durationSeconds * 100) / 100,
+    });
+  }
 
   if (result.ok && result.outputUrl) {
     await setSceneStatus(admin, productionId, scene.orderIndex, {
@@ -550,36 +583,46 @@ async function speakAndSync(
       stage: "lipsync",
       role: "sound",
       scene_index: scene.orderIndex,
-      message: `Szene ${scene.orderIndex + 1}: Lip-Sync sitzt (${result.passesDone} von ${speakerCount} Sprechern).`,
+      message: `Szene ${scene.orderIndex + 1}: Lip-Sync sitzt (${speakerCount} ${
+        speakerCount === 1 ? "Sprecher" : "Sprecher"
+      }, Motion-Studio-Strecke).`,
+      meta: { composer_scene_id: sceneId },
     });
     return;
   }
 
-  // Partial success keeps what we got, but only the unfinished passes are refunded.
-  const failedPasses = Math.max(1, speakerCount - result.passesDone);
-  await refundStage(admin, {
-    userId,
-    productionId,
-    stage: "lipsync",
-    sceneIndex: scene.orderIndex,
-    euros: Math.round((lipsyncEuros * failedPasses / speakerCount) * 100) / 100,
-    label: `Lip-Sync Szene ${scene.orderIndex + 1} fehlgeschlagen`,
-  });
-  if (result.outputUrl) {
-    await setSceneStatus(admin, productionId, scene.orderIndex, {
-      lipsync_url: result.outputUrl,
+  // Fehlschlag: Der Composer erstattet seine Credits selbst — dann geben wir
+  // auch die Euro-Stufe zurück. Hat er sie verbraucht, bleibt die Buchung.
+  if (result.composerRefunded || result.grantedCredits === 0) {
+    await refundStage(admin, {
+      userId,
+      productionId,
+      stage: "lipsync",
+      sceneIndex: scene.orderIndex,
+      euros: lipsyncEuros,
+      label: `Lip-Sync Szene ${scene.orderIndex + 1} fehlgeschlagen`,
     });
   }
+
+  if (!result.masterAudioUrl) {
+    await voiceOnly(
+      `Szene ${scene.orderIndex + 1}: Lip-Sync fehlgeschlagen (${result.reason ?? "unbekannt"}).`,
+    );
+    return;
+  }
+
   await log(admin, productionId, userId, {
     stage: "lipsync",
     role: "sound",
     severity: "warn",
     scene_index: scene.orderIndex,
-    message: `Szene ${scene.orderIndex + 1}: Lip-Sync unvollständig (${
+    message: `Szene ${scene.orderIndex + 1}: Lip-Sync fehlgeschlagen (${
       result.reason ?? "unbekannt"
-    }) — anteilig erstattet.`,
+    }) — Sprachspur bleibt, ${result.composerRefunded ? "Credits erstattet" : "Verbrauch verbucht"}.`,
+    meta: { composer_scene_id: sceneId, clip_error: result.clipError ?? null },
   });
 }
+
 
 
 // ------------------------------------------------------------------- helpers
