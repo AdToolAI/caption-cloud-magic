@@ -626,9 +626,9 @@ const SceneVideo: React.FC<{
   const baseFilter = transitionEffects.additionalFilter 
     ? `${filterString} ${transitionEffects.additionalFilter}` 
     : filterString;
-  // Shared Sensor-Baseline (only in export). Preview stays neutral so the
-  // editor shows an honest frame while tuning grade sliders.
-  const finalFilter = previewMode ? baseFilter : prependSensorBaseline(baseFilter);
+  // Raw-Invariant: keine Sensor-Baseline mehr. Nur Filter, die der Kunde
+  // im Director's Cut aktiv gesetzt hat (Mood/Grade/FX), landen im Export.
+  const finalFilter = baseFilter;
 
 
   const chromaKeyStyle = chromaKey?.enabled ? { mixBlendMode: 'multiply' as const } : {};
