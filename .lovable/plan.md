@@ -1,51 +1,43 @@
+# Plan v293 — Stufe-4-Player-Parität mit Stufe 3
+
 ## Ziel
+Stufe-4-Preview (Remotion) sichtbar so scharf wie Stufe 3 (natives `<video>`) — bei erhaltener Timeline-, Audio- und Loop-Funktion.
 
-Live-Preview ab Stufe 4 soll sich exakt wie der Player in Stufe 3 verhalten (Autoplay, Loop, `object-contain`, gleiche Bildschärfe), **aber zusätzlich Sound erlauben** (Voiceover, Musik, Original-Audio) über den bestehenden Volume/Mute-Control.
+## Befund (bereits geprüft)
+`rawMediaMode: true` schaltet in `UniversalCreatorVideo.tsx` bereits ab:
+- KenBurns-Wrapper für Image-Szenen (Zeile 1832 → `renderBackgroundContent` statt `KenBurnsImage`)
+- Parallax-Wrapper (Zeile 1854 → `renderBackgroundContent` statt `ParallaxBackground`)
+- Mood-Filter, Cinematic-Post, Style-Overlays, Scene-FX, Floating-Icons
+- Transitions (Zeile 3049) und DrawOn-Effekte (Zeile 3059)
+- Image-Saturation/Contrast-Filter im Fallback (Zeile 2102)
 
-## Analyse
-
-**Stufe 3** rendert roh:
-```tsx
-<video src={url} className="w-full h-full object-contain" loop muted autoPlay playsInline />
-<img  src={url} className="w-full h-full object-contain" />
-```
-→ automatisch, endlos, `object-contain`, keine Filter, keine Overlays.
-
-**Stufe 4** rendert die Remotion-Komposition `UniversalCreatorVideo` über `RemotionPreviewPlayer`. Aktuell wird `previewMode: true` gesetzt, aber **nicht** `rawMediaMode: true`. In `UniversalCreatorVideo.tsx` hängen alle qualitätsmindernden Layer an `rawMediaMode`:
-- `moodFilter` (CSS `filter` für Farb-/Kontrast-LUT)
-- `CinematicPostLayer` (Vignette + Film-Grain)
-- `styleOverlays` (semi-transparente Farb-/Muster-Layer)
-- `SceneTypeEffects` + `FloatingIcons`
-- Ken-Burns-/Parallax-Zoom (`animation = rawMediaMode ? 'none' : sceneAnimation`)
-
-Diese Layer machen den sichtbaren Unterschied (weicher, wärmer, körnig). Der Remotion-Player selbst skaliert Bilder korrekt — der Qualitätsverlust kommt aus dem Post-Processing.
-
-Zusätzlich: Player startet nicht automatisch und loopt nicht — Nutzer muss klicken.
-
-**Audio bleibt vollständig erhalten:** `rawMediaMode` betrifft nur visuelle Layer. `SafeVideo` (Original-Ton), `Audio`-Elements für Voiceover/Musik sowie der externe Mix in `RemotionPreviewPlayer` (VO/Music via HTMLAudio, Player-Volume für Scene-Video) laufen unabhängig davon.
+Verbleibende Ursachen für weichere Optik:
+1. Remotion-Player rendert die Komposition intern auf voller Format-Auflösung (z. B. 1080×1920) und skaliert die Canvas per CSS-Transform auf die Sidebar-Breite (~380 px). Native `<video>` in Stufe 3 skaliert ohne Zwischenebene.
+2. Container in `RemotionPreviewPlayer` hat `maxHeight: 65vh` und `width: 100%` — die Layout-Breite kann bei kleinen Sidebars stärker abweichen als in Stufe 3.
 
 ## Änderungen
 
-### 1. `src/components/universal-creator/RemotionPreviewPlayer.tsx`
-- `inputProps` erweitern: zusätzlich `rawMediaMode: true` neben `previewMode: true`.
-- Default-Props: `loopProp = true`, `autoPlay = true`.
-- Autoplay-Effekt so anpassen, dass er **stumm startet** (kein `unmute()`, `setIsMuted(false)` entfernen) — genau wie `<video muted autoPlay loop>` in Stufe 3. Der Nutzer kann per bestehendem Mute-Button / Volume-Slider jederzeit Ton aktivieren; der komplette Audio-Mix (VO, Musik, Original-Audio) bleibt voll funktionsfähig.
+### 1) `src/components/universal-creator/RemotionPreviewPlayer.tsx`
+- Container-Style so anpassen, dass er sich exakt wie der Stufe-3-Container verhält:
+  - `aspectRatio: width / height` beibehalten
+  - `width: '100%'` beibehalten
+  - `maxHeight: 65vh` **entfernen** (Stufe 3 hat keine Kappung)
+  - `imageRendering: 'auto'` und `transform: 'translateZ(0)'` bleiben (GPU-Kompositing hilft Scharfstellen)
+  - Zusätzlich `contain: 'layout paint'` als CSS-Hinweis (verhindert Sub-Pixel-Blur beim Downscale)
+- Keine Änderung am Audio-Mix, Autoplay, Loop, Mute-Toggle.
 
-### 2. Kein Change an Export/Render
-- Export-Pfad (`render-*`) übergibt weiterhin `previewMode: false` / `rawMediaMode: false` → gerenderte MP4s behalten Cinematic-Look, Ken-Burns, Grain und Overlays.
+### 2) `src/remotion/templates/UniversalCreatorVideo.tsx`
+- Sicherstellen, dass `rawMediaMode` auch für **Video-Szenen** die Ken-Burns/Parallax-Pfade komplett umgeht (bereits über `renderBackgroundContent`-Zweige erledigt) — kein Code-Change, nur Verifikation.
+- **Kein** neuer Gate, **kein** Export-Pfad-Change (`rawMediaMode` bleibt für gerenderte MP4s auf `false`).
 
-### 3. Kein Change am Live-Preview-Panel in `UniversalCreator.tsx`
-- Defaults im Player reichen; Aufrufstelle bleibt unverändert.
-
-## Technische Details
-
-- `rawMediaMode` existiert bereits als Zod-Feld (`z.boolean().default(false)`) und ist konsequent als Gate implementiert — keine neuen Flags/Schalter nötig.
-- Autoplay-muted ist Browser-konform (Chrome/Safari-Autoplay-Policy).
-- Sound-Aktivierung erfolgt über den vorhandenen Mute-Toggle bzw. Play-Button-Handler (`handlePlayClick` ruft bereits `unmute()`), damit der User-Gesture-Requirement erfüllt ist.
+## Was bewusst NICHT geändert wird
+- Kein Rückfall auf natives `<video>` in Stufe 4 — Multi-Szenen-Timeline + Audio-Mix bleiben erhalten.
+- Kein Downscale der Composition-Auflösung (würde Export beeinträchtigen, wenn versehentlich weitergereicht).
+- Export-Pfad (`render-*`) unverändert — Renders behalten volles Cinematic-Post-Processing.
 
 ## Verifikation
-
-- Stufe 3 ↔ Stufe 4: identischer Bildausschnitt, identische Schärfe, identisches `object-contain`-Verhalten.
-- Player läuft ab Stufe 4 automatisch, stumm, in Endlosschleife.
-- Klick auf Mute-Toggle / Volume-Slider aktiviert Voiceover + Musik + Original-Ton wie bisher.
-- Export-Download enthält weiterhin Cinematic-Post-Processing.
+- Stufe 3 ↔ Stufe 4: gleiche Container-Höhe in der Sidebar (kein 65vh-Cap-Sprung).
+- Video-Szenen in Stufe 4 sichtbar so scharf wie das Raw-Video in Stufe 3.
+- Bild-Szenen ohne Zoom-Bewegung (KenBurns aus) — statisches Bild wie in Stufe 3.
+- Loop läuft nahtlos, Ton per Mute-Toggle aktivierbar, Timeline zeigt weiterhin alle Szenen.
+- Exportierter MP4-Download enthält weiterhin Ken-Burns, Parallax, Grain, Mood-Filter.
