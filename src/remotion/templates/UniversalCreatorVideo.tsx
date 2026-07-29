@@ -3,6 +3,7 @@ import {
   AbsoluteFill, 
   Audio,
   Video,
+  OffthreadVideo,
   Img, 
   Sequence, 
   useCurrentFrame, 
@@ -12,6 +13,7 @@ import {
   delayRender,
   continueRender,
 } from 'remotion';
+import { SENSOR_BASELINE_GRADE_FILTER } from '../utils/sensorBaselineGrade';
 import { safeInterpolate as interpolate, safeDuration, safeSpring as spring, logRemotionDebug } from '../utils/safeInterpolate';
 import { z } from 'zod';
 
