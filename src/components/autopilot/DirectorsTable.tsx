@@ -62,14 +62,25 @@ const BEAT_LABEL: Record<string, string> = {
   cta: 'Abbinder',
 };
 
-export function DirectorsTable() {
+export interface DirectorsTableBriefing {
+  brief: string;
+  genre?: AutopilotGenre;
+  aspect?: AutopilotAspect;
+  language?: string;
+  duration?: number;
+  /** Cast & World characters the idea was built around — hard lock. */
+  characters?: Array<{ id: string; name: string; description?: string }>;
+}
+
+export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing } = {}) {
   const { toast } = useToast();
 
-  const [brief, setBrief] = useState('');
-  const [genre, setGenre] = useState<AutopilotGenre | 'auto'>('auto');
-  const [aspect, setAspect] = useState<AutopilotAspect>('9:16');
-  const [language, setLanguage] = useState('de');
-  const [duration, setDuration] = useState(20);
+  const [brief, setBrief] = useState(briefing?.brief ?? '');
+  const [genre, setGenre] = useState<AutopilotGenre | 'auto'>(briefing?.genre ?? 'auto');
+  const [aspect, setAspect] = useState<AutopilotAspect>(briefing?.aspect ?? '9:16');
+  const [language, setLanguage] = useState(briefing?.language ?? 'de');
+  const [duration, setDuration] = useState(briefing?.duration ?? 20);
+
 
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
