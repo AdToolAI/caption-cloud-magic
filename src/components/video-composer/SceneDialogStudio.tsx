@@ -47,6 +47,7 @@ import {
   type VoiceTuning,
 } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import {
   AUTO_VOICE_OPTIONS,
@@ -2549,7 +2550,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         onOpenChange={(o) => !o && setLibraryFor(null)}
         language={language}
         category="characters"
-        currentVoiceId={libraryFor ? speakerVoices[libraryFor]?.voiceId : undefined}
+        currentVoiceId={libraryFor ? voicePerSpeaker[libraryFor]?.voiceId : undefined}
         title={t.pickVoice}
         onSelect={(voice) => {
           if (!libraryFor) return;
