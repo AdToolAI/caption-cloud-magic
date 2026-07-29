@@ -439,24 +439,38 @@ export function DirectorsTable() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Button
               size="lg"
-              disabled={blockers.length > 0 || !productionId}
-              onClick={() =>
-                toast({
-                  title: 'Treatment freigegeben',
-                  description:
-                    'Die Produktion startet mit der Bildfreigabe — jede Szene wird als Standbild geprüft, bevor sie animiert wird.',
-                })
-              }
+              disabled={blockers.length > 0 || !productionId || starting || approved}
+              onClick={handleStartProduction}
             >
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Freigeben und produzieren
+              {starting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Produktion startet …
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Freigeben und produzieren
+                </>
+              )}
             </Button>
-            <Button size="lg" variant="outline" onClick={handleDevelop} disabled={loading}>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleDevelop}
+              disabled={loading || starting || approved}
+            >
               Neu entwickeln
             </Button>
           </div>
         </Card>
       )}
+
+      {/* ------------------------------------------------------- Produktion */}
+      {approved && production && (
+        <ProductionStage production={production} scenes={producedScenes} log={log} />
+      )}
     </div>
   );
 }
+
