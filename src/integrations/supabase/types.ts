@@ -1647,6 +1647,7 @@ export type Database = {
           anchor_url: string | null
           anchor_verdicts: Json
           beat: string
+          composer_scene_id: string | null
           created_at: string
           dialogue: Json
           duration_seconds: number
@@ -1675,6 +1676,7 @@ export type Database = {
           anchor_url?: string | null
           anchor_verdicts?: Json
           beat?: string
+          composer_scene_id?: string | null
           created_at?: string
           dialogue?: Json
           duration_seconds?: number
@@ -1703,6 +1705,7 @@ export type Database = {
           anchor_url?: string | null
           anchor_verdicts?: Json
           beat?: string
+          composer_scene_id?: string | null
           created_at?: string
           dialogue?: Json
           duration_seconds?: number
@@ -1742,6 +1745,7 @@ export type Database = {
           brand_kit_id: string | null
           brief: string
           completed_at: string | null
+          composer_project_id: string | null
           created_at: string
           error_message: string | null
           estimated_credits: number
@@ -1772,6 +1776,7 @@ export type Database = {
           brand_kit_id?: string | null
           brief: string
           completed_at?: string | null
+          composer_project_id?: string | null
           created_at?: string
           error_message?: string | null
           estimated_credits?: number
@@ -1802,6 +1807,7 @@ export type Database = {
           brand_kit_id?: string | null
           brief?: string
           completed_at?: string | null
+          composer_project_id?: string | null
           created_at?: string
           error_message?: string | null
           estimated_credits?: number
@@ -6126,6 +6132,7 @@ export type Database = {
           id: string
           is_test_run: boolean
           language: string
+          origin: string
           output_url: string | null
           parent_project_id: string | null
           smart_reframe_enabled: boolean
@@ -6158,6 +6165,7 @@ export type Database = {
           id?: string
           is_test_run?: boolean
           language?: string
+          origin?: string
           output_url?: string | null
           parent_project_id?: string | null
           smart_reframe_enabled?: boolean
@@ -6190,6 +6198,7 @@ export type Database = {
           id?: string
           is_test_run?: boolean
           language?: string
+          origin?: string
           output_url?: string | null
           parent_project_id?: string | null
           smart_reframe_enabled?: boolean

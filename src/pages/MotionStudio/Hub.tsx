@@ -138,6 +138,8 @@ export default function MotionStudioHub() {
       const { data, error } = await supabase
         .from('composer_projects')
         .select('id, title, status, updated_at, category')
+        // Autopilot-Schattenprojekte gehören nicht in die Projektliste.
+        .eq('origin', 'composer')
         .order('updated_at', { ascending: false })
         .limit(5);
       if (!cancelled) {
