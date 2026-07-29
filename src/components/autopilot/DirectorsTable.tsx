@@ -28,7 +28,14 @@ import { GENRE_LIST, getRecipe } from '@/lib/autopilot/genres';
 import { applyRhythm, diversifyCameraMoves } from '@/lib/autopilot/rhythm';
 import { preflightTreatment, blockingFindings } from '@/lib/autopilot/preflight';
 import { planSoundDesign } from '@/lib/autopilot/soundDesign';
-import { describeScene } from '@/lib/autopilot/promptGrammar';
+import {
+  describeScene,
+  compileAnchorPrompt,
+  compileMotionPrompt,
+  clampPromptWords,
+} from '@/lib/autopilot/promptGrammar';
+import { useAutopilotProduction } from '@/hooks/useAutopilotProduction';
+import { ProductionStage } from '@/components/autopilot/ProductionStage';
 import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/autopilot/types';
 import { cn } from '@/lib/utils';
 
