@@ -15,6 +15,8 @@ export interface ProductionRow {
   progress: number;
   final_video_url: string | null;
   error_message: string | null;
+  spent_credits: number | null;
+  refunded_credits: number | null;
 }
 
 export interface ProductionSceneRow {
@@ -27,6 +29,8 @@ export interface ProductionSceneRow {
   anchor_score: number | null;
   anchor_attempts: number;
   video_url: string | null;
+  lipsync_url: string | null;
+  voiceover_url: string | null;
   error_message: string | null;
 }
 
@@ -54,13 +58,13 @@ export function useAutopilotProduction(productionId: string | null, enabled: boo
     const [prod, sceneRows, logRows] = await Promise.all([
       supabase
         .from('autopilot_productions')
-        .select('id, stage, status, progress, final_video_url, error_message')
+        .select('id, stage, status, progress, final_video_url, error_message, spent_credits, refunded_credits')
         .eq('id', productionId)
         .maybeSingle(),
       supabase
         .from('autopilot_production_scenes')
         .select(
-          'id, scene_index, beat, duration_seconds, status, anchor_url, anchor_score, anchor_attempts, video_url, error_message',
+          'id, scene_index, beat, duration_seconds, status, anchor_url, anchor_score, anchor_attempts, video_url, lipsync_url, voiceover_url, error_message',
         )
         .eq('production_id', productionId)
         .order('scene_index', { ascending: true }),

@@ -1654,14 +1654,19 @@ export type Database = {
           error_message: string | null
           grammar: Json
           id: string
+          lipsync_url: string | null
           motion_prompt: string | null
           production_id: string
+          refunded: boolean
           scene_index: number
           sound_design: Json
+          spent_credits: number
           status: string
           updated_at: string
           user_id: string
           video_url: string | null
+          voiceover_duration_seconds: number | null
+          voiceover_url: string | null
         }
         Insert: {
           anchor_attempts?: number
@@ -1677,14 +1682,19 @@ export type Database = {
           error_message?: string | null
           grammar?: Json
           id?: string
+          lipsync_url?: string | null
           motion_prompt?: string | null
           production_id: string
+          refunded?: boolean
           scene_index: number
           sound_design?: Json
+          spent_credits?: number
           status?: string
           updated_at?: string
           user_id: string
           video_url?: string | null
+          voiceover_duration_seconds?: number | null
+          voiceover_url?: string | null
         }
         Update: {
           anchor_attempts?: number
@@ -1700,14 +1710,19 @@ export type Database = {
           error_message?: string | null
           grammar?: Json
           id?: string
+          lipsync_url?: string | null
           motion_prompt?: string | null
           production_id?: string
+          refunded?: boolean
           scene_index?: number
           sound_design?: Json
+          spent_credits?: number
           status?: string
           updated_at?: string
           user_id?: string
           video_url?: string | null
+          voiceover_duration_seconds?: number | null
+          voiceover_url?: string | null
         }
         Relationships: [
           {
@@ -1723,6 +1738,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           aspect_ratio: string
+          audio_mix: Json
           brand_kit_id: string | null
           brief: string
           completed_at: string | null
@@ -1733,8 +1749,11 @@ export type Database = {
           genre: string
           id: string
           language: string
+          music_url: string | null
           platform: string
           progress: number
+          refunded_credits: number
+          render_id: string | null
           research: Json
           sound_design: Json
           spent_credits: number
@@ -1744,10 +1763,12 @@ export type Database = {
           treatment: Json
           updated_at: string
           user_id: string
+          voiceover_url: string | null
         }
         Insert: {
           approved_at?: string | null
           aspect_ratio?: string
+          audio_mix?: Json
           brand_kit_id?: string | null
           brief: string
           completed_at?: string | null
@@ -1758,8 +1779,11 @@ export type Database = {
           genre?: string
           id?: string
           language?: string
+          music_url?: string | null
           platform?: string
           progress?: number
+          refunded_credits?: number
+          render_id?: string | null
           research?: Json
           sound_design?: Json
           spent_credits?: number
@@ -1769,10 +1793,12 @@ export type Database = {
           treatment?: Json
           updated_at?: string
           user_id: string
+          voiceover_url?: string | null
         }
         Update: {
           approved_at?: string | null
           aspect_ratio?: string
+          audio_mix?: Json
           brand_kit_id?: string | null
           brief?: string
           completed_at?: string | null
@@ -1783,8 +1809,11 @@ export type Database = {
           genre?: string
           id?: string
           language?: string
+          music_url?: string | null
           platform?: string
           progress?: number
+          refunded_credits?: number
+          render_id?: string | null
           research?: Json
           sound_design?: Json
           spent_credits?: number
@@ -1794,6 +1823,7 @@ export type Database = {
           treatment?: Json
           updated_at?: string
           user_id?: string
+          voiceover_url?: string | null
         }
         Relationships: []
       }
