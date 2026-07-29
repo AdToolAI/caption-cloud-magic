@@ -179,7 +179,7 @@ export function VoicePicker({ value, onChange, previewText, language }: VoicePic
         open={libraryOpen}
         onOpenChange={setLibraryOpen}
         onSelect={handlePickerSelect}
-        language="all"
+        language={targetLanguage}
         currentVoiceId={value ?? undefined}
         title="Stimme für Charakter wählen"
       />
