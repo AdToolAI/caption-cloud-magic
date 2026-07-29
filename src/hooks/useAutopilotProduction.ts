@@ -69,8 +69,9 @@ export function useAutopilotProduction(productionId: string | null, enabled: boo
       supabase
         .from('autopilot_production_scenes')
         .select(
-          'id, scene_index, beat, duration_seconds, status, anchor_url, anchor_score, anchor_attempts, video_url, lipsync_url, voiceover_url, error_message',
+          'id, scene_index, beat, duration_seconds, status, anchor_url, anchor_score, anchor_attempts, video_url, lipsync_url, voiceover_url, error_message, attempt, fallback_kind',
         )
+
         .eq('production_id', productionId)
         .order('scene_index', { ascending: true }),
       supabase
