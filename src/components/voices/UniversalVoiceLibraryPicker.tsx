@@ -13,6 +13,14 @@ import { useVoiceLibrary, type VoiceLibraryFilters } from '@/hooks/useVoiceLibra
 import { VoicePreviewButton } from './VoicePreviewButton';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 import { VOICE_LANGUAGES, NATIVE_SENSITIVE_LANGUAGES, toPickerLanguage, voiceLanguageLabel } from '@/lib/voice-languages';
+import {
+  VOICE_CATEGORIES,
+  getVoiceCategory,
+  pushRecentVoice,
+  readRecentVoices,
+  type VoiceCategoryId,
+} from '@/lib/voice-categories';
+import { useCustomVoices } from '@/hooks/useCustomVoices';
 
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;
@@ -26,7 +34,10 @@ interface UniversalVoiceLibraryPickerProps {
   enforceNative?: boolean;
   /** If false, the language dropdown is hidden and the prop language is locked. */
   allowLanguageChange?: boolean;
+  /** Vorbelegte Kategorie („Empfohlen für diesen Kontext"). */
+  category?: VoiceCategoryId;
 }
+
 
 const TIER_LABEL: Record<string, { label: string; className: string }> = {
   cloned:    { label: 'Meine Stimme',      className: 'bg-[#F5C76A]/20 text-[#F5C76A] border-[#F5C76A]/40' },
