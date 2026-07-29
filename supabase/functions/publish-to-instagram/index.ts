@@ -12,6 +12,9 @@ interface PublishRequest {
   caption: string;
   hashtags?: string[];
   aspectRatio?: string; // e.g., "9:16", "1:1", "16:9"
+  mediaType?: 'REELS' | 'STORIES'; // Default: REELS
+  coverUrl?: string; // Optional Reels-Cover (Thumbnail)
+  shareToFeed?: boolean; // Default: true bei REELS
 }
 
 Deno.serve(async (req) => {
