@@ -501,7 +501,10 @@ async function runProduction(
     severity: allFailed ? "error" : "info",
     message: allFailed
       ? "Produktion abgebrochen — keine Szene bestand die Prüfung."
-      : `Szenen im Kasten: ${done} von ${total}${failed ? `, ${failed} übersprungen` : ""}. Endschnitt startet.`,
+      : `Szenen im Kasten: ${done} von ${total}${
+        stills ? `, davon ${stills} als Standbild gerettet` : ""
+      }${failed ? `, ${failed} übersprungen` : ""}. Endschnitt startet.`,
+
   });
 
   if (allFailed) return;
