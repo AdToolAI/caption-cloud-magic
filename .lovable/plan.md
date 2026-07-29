@@ -1,51 +1,74 @@
-## Was ohne neuen Plattform-Review geht
+## Ziel
 
-Ich bin die 6 Punkte durchgegangen und nach Freigabe-Bedarf sortiert.
+Export-Qualität auf **visuell verlustfrei** anheben für ALLE finalen Renders (UCC, Director's Cut, Motion Studio, AI Video Studio, Lip-Sync Mux, Composer). Preview bleibt schnell/leicht.
 
-### ✅ **Sofort machbar (kein neuer Review)**
+## Ursachenanalyse (bestätigt)
 
-**1. UTM-Tracking-Layer**  
-Reine Client-Logik — wir hängen `?utm_source=instagram&utm_medium=social&utm_campaign=...` an alle Links in Captions/Bios. Braucht null Plattform-Freigabe.
+`supabase/functions/render-with-remotion/index.ts` (globaler Entry-Point aller Export-Renders) nutzt aktuell:
+- `jpegQuality: 80` (Zeile 739) — Remotion-Default, sichtbar weich bei Foto-/Kamera-Material
+- kein explizites `crf` → Fallback CRF 18
+- kein `x264Preset` → Fallback `medium`
+- kein `videoBitrate`-Floor
 
-**2. YouTube Shorts-Metadaten**  
-Nutzt denselben `youtube.upload`-Scope, den wir schon haben. Wir bauen:
-- Automatisches `#Shorts` in Title/Description bei 9:16 & ≤60s
-- **Chapters** = formatierte Description-Zeilen (`0:00 Intro\n0:15 Hook…`) — YT parst das automatisch
-- Category-ID + Tags-Autofill
+`rawMediaMode: true` in `src/lib/universalCreatorRenderPayload.ts` ist bereits korrekt und schaltet Farb-/Kontrastfilter im UCC ab — Kontrastdrift kommt **nicht** vom Filter, sondern vom Encode-Loss.
 
-**3. Instagram Reels-Cover**  
-Nur ein zusätzliches `cover_url`-Param am bestehenden `/media`-Endpoint. Kein neuer Scope, kein Review.
+## Änderungen
 
-**4. Instagram Stories**  
-Läuft über denselben `instagram_content_publish`-Scope wie unser Feed-Publish — App-Type `STORIES` statt `REELS`/`VIDEO`. **Wenn** unser aktuelles Meta-App-Review dieses Permission-Bundle enthält (was Standard ist wenn Reels läuft), kein neuer Review nötig. Falls nicht: es wäre nur eine Scope-Erweiterung im bestehenden Review, kein neuer Antrag.
+### 1. `supabase/functions/render-with-remotion/index.ts`
+Neue konstante `HIGH_QUALITY_ENCODE`:
+```
+jpegQuality: 95
+crf: 16                 // visuell verlustfrei, Standard „prosumer"
+x264Preset: 'slow'      // ~20% bessere Kompression bei gleicher Qualität
+videoBitrate: '10M'     // Floor für 1080p, verhindert Bitrate-Sparen bei ruhigen Szenen
+audioBitrate: '256k'    // AAC, up von Default 128k
+```
+Anwendung: unabhängig von Composition / Payload-Typ auf ALLE Export-Renders.
 
-### ⚠️ **Grauzone (hängt vom aktuellen Scope-Set ab)**
+Ausnahme: Wenn `inputProps.previewMode === true` → alte Werte behalten (nur Studio-Preview-Renders, keine Kundenausgabe).
 
-**5. Best-First-Comment**  
-- **Instagram**: braucht `instagram_manage_comments` — meist im selben Review-Bundle wie Publish. Wenn ja: sofort machbar.
-- **LinkedIn**: `w_member_social` (das wir schon haben) erlaubt Posts + Kommentare am eigenen Post. Sollte **ohne** neuen Review gehen.
+### 2. `supabase/functions/render-sync-segments-audio-mux/index.ts`
+Gleiches Preset, aber `x264Preset: 'medium'` statt `slow` — der Mux-Pfad liegt am engsten am 600 s Lambda-Limit (v205-Mux, 4 Sprecher). `crf: 16` und `jpegQuality: 95` übernehmen wir hier trotzdem.
 
-Ich prüfe live gegen die Connector-Config sobald wir bauen und fallback-brake sauber ab falls ein Scope fehlt.
+### 3. `remotion.config.ts`
+```
+Config.setJpegQuality(95)
+Config.setCrf(16)
+Config.setAudioBitrate('256k')
+```
+Damit lokale/CI-Renders (Tests, Debug) identisch zur Lambda aussehen.
 
-### ❌ **Braucht neuen Review — später**
+### 4. Preview-Bypass sicherstellen
+`src/components/universal-creator/RemotionPreviewPlayer.tsx` und Motion-Studio-Preview: expliziter Check, dass keine dieser Preview-Pfade `render-with-remotion` mit den High-Quality-Werten aufruft — sie nutzen ohnehin Remotion Player im Browser (kein Lambda-Encode), also kein Handlungsbedarf. Nur verifizieren.
 
-**6. Threads**  
-Ist eine **eigene API** mit eigenen Scopes (`threads_basic`, `threads_content_publish`) und eigenem App-Review, obwohl Meta-Infrastruktur drunter läuft. Nicht "gratis dabei".
+### 5. Memory
+Neue Memory `mem://architecture/render/global-export-quality-floor.md` mit:
+- exakten Werten (JPEG 95 / CRF 16 / preset slow / 10M / 256k)
+- Ausnahme für Mux-Pfad (preset medium)
+- Ausnahme für Preview
+- Kostenimpact (+0,2–0,8 ¢/Video, im Rauschen bei 3× Marge)
+- Verbot, diese Werte ohne Load-Test wieder zu senken.
 
-**7. LinkedIn Company Pages**  
-Braucht `w_organization_social` → **Marketing Developer Platform**-Freigabe von LinkedIn. Kein Automatismus, dauert 2–6 Wochen.
+Referenz in `mem://index.md#Core`: „Export = CRF 16 / JPEG 95 / preset slow. Mux = preset medium. Preview unverändert."
 
----
+## Was NICHT geändert wird
 
-## Vorschlag: Sprint P2-Now
+- Keine Änderung an `rawMediaMode`, `objectFit`, Scene-Composition, Cinematic-Filter-Kette, Voice-/Musik-Pipeline, Lip-Sync-Logik, Tier-Scheduling, framesPerLambda.
+- Keine Änderung an Preview-Playern (Browser-Rendering, kein Lambda-Encode).
+- Keine Anhebung von Lambda-RAM oder Timeout — die aktuellen 3008 MB / 600 s reichen laut Tier-Config auch für preset `slow` bei ≤ 90 s Videos.
 
-Setze in einer Runde um:
-1. **UTM-Layer** in `PublishToSocialTab` + `useSocialPublishing` — plattform-spezifische Presets, User kann Campaign-Name überschreiben
-2. **YouTube Shorts-Metadaten** in `publish-to-youtube` — `#Shorts`, Chapters, Category, Tags
-3. **IG Reels-Cover-Upload** — neues Cover-Preview-Panel im Composer, Frame-Extraktor bei 0.5s als Default
-4. **IG Stories** als 5. Publish-Ziel (mit Auto-Fallback: falls Scope fehlt → Toast + Link zu Reconnect)
-5. **First-Comment** als Toggle im Composer — `firstComment: string` wird für IG/LinkedIn nach Post-Success in einer separaten Function-Chain gepostet
+## Verifikation nach Deploy
 
-Threads und LinkedIn Company Pages parken wir mit einem Review-Kickoff-Doc — sobald du willst reiche ich dir die Meta/LinkedIn-Antragsformulare aufbereitet zurück (Use-Case-Text, App-Video-Skript, Test-Accounts).
+1. Test-Render deines 4-Sprecher-Videos aus dem UCC.
+2. `ffmpeg -i upload.mp4 -i export.mp4 -filter_complex ssim -f null -` → Ziel SSIM > 0,97 (aktuell schätzungsweise ~0,92).
+3. Lambda-Duration im Log prüfen — muss unter Tier-Limit bleiben.
+4. Ein Lip-Sync-Mux-Render mit 4 Sprechern → muss weiterhin < 480 s bleiben (Safety-Margin zum 600 s Timeout).
 
-**Freigabe**: Sprint P2-Now (Punkte 1–5) so umsetzen? Oder nur einzelne davon (bitte Nummern nennen)?
+## Technische Details Kosten
+
+- Lambda GB-Sekunden bei 3008 MB, 15 s Video @ 1080p30: ~90 s → ~110 s Rendertime (+22%). Kosten pro Render: 0,00001667 $/GB-s × 3 GB × 20 s Delta = **~0,1 ¢ extra**.
+- S3-Egress: +12 MB × 0,09 $/GB = **~0,1 ¢ extra**.
+- Gesamt pro 15 s Kunden-Video: **~0,2 ¢ zusätzlich**. Bei 10 000 Videos/Monat = 20 €.
+- Bei aktueller Video-Credit-Marge (3×) neutralisiert der erste verkaufte Videoloop diese Mehrkosten für ~500 folgende Renders.
+
+Sag Bescheid, dann setze ich es um.
