@@ -122,7 +122,19 @@ export function UniversalVoiceLibraryPicker({
             />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+            {allowLanguageChange && (
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger className="bg-white/[0.03] border-white/10"><SelectValue placeholder="Sprache" /></SelectTrigger>
+                <SelectContent className="max-h-[320px]">
+                  <SelectItem value="all">🌍 Alle Sprachen</SelectItem>
+                  {VOICE_LANGUAGES.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>{l.flag} {l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             <Select value={gender} onValueChange={(v) => setGender(v as typeof gender)}>
               <SelectTrigger className="bg-white/[0.03] border-white/10"><SelectValue placeholder="Geschlecht" /></SelectTrigger>
               <SelectContent>
