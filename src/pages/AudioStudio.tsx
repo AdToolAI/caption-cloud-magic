@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers, MessageCircle, FileText } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers, MessageCircle, FileText, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -19,6 +19,7 @@ import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
 import { StemMixerPanel } from '@/components/audio-studio/StemMixerPanel';
 import { FinalMixPanel } from '@/components/audio-studio/FinalMixPanel';
 import { VoiceStudioDialog } from '@/components/voice/studio/VoiceStudioDialog';
+import { AudiobookPanel } from '@/components/audio-studio/audiobook/AudiobookPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,11 +35,12 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match' | 'stems' | 'final-mix'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'audiobook' | 'music' | 'auto-match' | 'stems' | 'final-mix'>('enhance');
   const [stemSet, setStemSet] = useState<{ sourceTitle: string; stems: Array<{ type: 'vocals' | 'drums' | 'bass' | 'other'; url: string; assetId?: string }> } | null>(null);
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [showAutoMatch, setShowAutoMatch] = useState(false);
   const [showVoiceStudio, setShowVoiceStudio] = useState(false);
+  const [showAudiobook, setShowAudiobook] = useState(false);
   const [musicGenPrefill, setMusicGenPrefill] = useState<{
     prompt: string; genre: string; mood: string; bpm: number; duration: number;
   } | null>(null);
@@ -190,6 +192,23 @@ export default function AudioStudio() {
                 onSendToBeatSync={handleSendToBeatSync}
               />
             </motion.div>
+          ) : showAudiobook ? (
+            <motion.div
+              key="audiobook-standalone"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-8 space-y-4"
+            >
+              <Button
+                variant="ghost"
+                onClick={() => setShowAudiobook(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ← Zurück zum Audio Studio
+              </Button>
+              <AudiobookPanel />
+            </motion.div>
           ) : showMusicGen ? (
             <motion.div
               key="music-gen-standalone"
@@ -247,6 +266,33 @@ export default function AudioStudio() {
                   <Button className="bg-gradient-to-r from-cyan-500 to-primary hover:opacity-90 shrink-0 hidden sm:flex">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Auto-Match starten
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Hörbuch Teaser */}
+              <Card
+                onClick={() => setShowAudiobook(true)}
+                className="relative overflow-hidden cursor-pointer backdrop-blur-xl bg-gradient-to-br from-primary/10 via-card/60 to-amber-500/10 border-primary/30 hover:border-primary/60 hover:shadow-[0_0_40px_rgba(245,199,106,0.25)] transition-all p-5 group"
+              >
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/15 rounded-full blur-[60px] pointer-events-none" />
+                <div className="relative flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-7 h-7 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
+                      <h3 className="text-lg font-bold">Hörbuch-Modus</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">9 Sprachen</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Manuskript einfügen → Kapitel &amp; Figuren erkennen → Erzähler- und Charakterstimmen aus der Bibliothek → MP3-Export.
+                    </p>
+                  </div>
+                  <Button className="bg-gradient-to-r from-primary to-amber-500 hover:opacity-90 shrink-0 hidden sm:flex">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Hörbuch starten
                   </Button>
                 </div>
               </Card>
@@ -442,7 +488,8 @@ export default function AudioStudio() {
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
                       { id: 'filler', label: 'Filler-Wörter', icon: Volume2 },
                       { id: 'library', label: 'Bibliothek', icon: Library },
-                      { id: 'voices', label: 'Custom Voices', icon: Mic, badge: 'NEU' }
+                      { id: 'voices', label: 'Custom Voices', icon: Mic, badge: 'NEU' },
+                      { id: 'audiobook', label: 'Hörbuch', icon: BookOpen, badge: 'NEU' }
                     ].map((tab) => (
                       <Button
                         key={tab.id}
@@ -639,6 +686,17 @@ export default function AudioStudio() {
                       </motion.div>
                     )}
 
+                    {activeTab === 'audiobook' && (
+                      <motion.div
+                        key="audiobook"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <AudiobookPanel />
+                      </motion.div>
+                    )}
+
                     {activeTab === 'music' && (
                       <motion.div
                         key="music"
@@ -705,7 +763,7 @@ export default function AudioStudio() {
                 </div>
 
                 {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking/auto-match tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && activeTab !== 'auto-match' && activeTab !== 'final-mix' && activeTab !== 'stems' && (
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'audiobook' && activeTab !== 'music' && activeTab !== 'ducking' && activeTab !== 'auto-match' && activeTab !== 'final-mix' && activeTab !== 'stems' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
