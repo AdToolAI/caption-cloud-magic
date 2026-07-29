@@ -13,6 +13,13 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { AUTOPILOT_PRICE, chargeStage, refundStage } from "../_shared/autopilotCredits.ts";
+import {
+  type AutopilotTurn,
+  buildTurnTracks,
+  checkAnchorFaces,
+  runLipSyncPasses,
+} from "../_shared/autopilotLipSync.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
