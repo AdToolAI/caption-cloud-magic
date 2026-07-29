@@ -105,8 +105,8 @@ export function UniversalVoiceLibraryPicker({
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl text-[#F5C76A]">{title}</DialogTitle>
           <DialogDescription className="text-white/50">
-            {total.toLocaleString('de-DE')} Stimmen{language !== 'all' && ` in ${language.toUpperCase()}`}
-            {(language === 'de' || language === 'es') && ` · ${nativeCount.toLocaleString('de-DE')} nativ`}
+            {total.toLocaleString('de-DE')} Stimmen{language !== 'all' && ` in ${voiceLanguageLabel(language)}`}
+            {nativeSensitive && nativeOnly && ` · nur native Sprecher`}
           </DialogDescription>
         </DialogHeader>
 
