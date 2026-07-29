@@ -100,7 +100,7 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {platforms.map(platform => {
             const Icon = platform.icon;
-            const connected = isConnected(platform.id);
+            const connected = isConnected((platform.id === 'instagram-story' ? 'instagram' : platform.id) as 'instagram' | 'tiktok' | 'linkedin' | 'youtube');
             return (
               <div key={platform.id} className={`relative p-4 rounded-lg border-2 transition-all cursor-pointer ${selectedPlatforms.includes(platform.id) ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'} ${!connected ? 'opacity-50' : ''}`} onClick={() => connected && togglePlatform(platform.id)}>
                 <div className="flex items-center gap-3">
