@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { withTtsLanguage } from "../_shared/tts-language.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -26,6 +27,7 @@ serve(async (req) => {
       similarityBoost = 0.75,
       style = 0.0,
       useSpeakerBoost = true,
+      language = null,
     } = body ?? {};
     const speed = Math.max(0.7, Math.min(1.2, Number(rawSpeed) || 1.0));
 
@@ -47,9 +49,8 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'xi-api-key': elevenLabsApiKey,
         },
-        body: JSON.stringify({
+        body: JSON.stringify(withTtsLanguage({
           text: text.substring(0, 500),
-          model_id: 'eleven_multilingual_v2',
           voice_settings: {
             stability: Math.max(0, Math.min(1, Number(stability))),
             similarity_boost: Math.max(0, Math.min(1, Number(similarityBoost))),
@@ -57,7 +58,7 @@ serve(async (req) => {
             use_speaker_boost: !!useSpeakerBoost,
             speed,
           },
-        }),
+        }, language)),
       }
     );
 
