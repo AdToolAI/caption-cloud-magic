@@ -56,10 +56,15 @@ export function PublishToSocialTab({ videoUrl, videoId, briefingPlan, briefingTe
 
   const platforms = [
     { id: 'instagram' as Platform, name: 'Instagram', icon: Instagram, color: 'text-pink-500' },
+    { id: 'instagram-story' as Platform, name: 'IG Story', icon: Camera, color: 'text-pink-400' },
     { id: 'tiktok' as Platform, name: 'TikTok', icon: Music, color: 'text-black dark:text-white' },
     { id: 'linkedin' as Platform, name: 'LinkedIn', icon: Linkedin, color: 'text-blue-600' },
     { id: 'youtube' as Platform, name: 'YouTube', icon: Youtube, color: 'text-red-600' },
   ];
+
+  const anyIgFeed = selectedPlatforms.includes('instagram');
+  const anyLinkedIn = selectedPlatforms.includes('linkedin');
+  const canFirstComment = anyIgFeed || anyLinkedIn;
 
   const togglePlatform = (platform: Platform) => {
     setSelectedPlatforms(prev => prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]);
