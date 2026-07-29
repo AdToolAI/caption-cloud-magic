@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers, MessageCircle, FileText } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers, MessageCircle, FileText, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -19,6 +19,7 @@ import { AudioDuckingPanel } from '@/components/audio-studio/AudioDuckingPanel';
 import { StemMixerPanel } from '@/components/audio-studio/StemMixerPanel';
 import { FinalMixPanel } from '@/components/audio-studio/FinalMixPanel';
 import { VoiceStudioDialog } from '@/components/voice/studio/VoiceStudioDialog';
+import { AudiobookPanel } from '@/components/audio-studio/audiobook/AudiobookPanel';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,11 +35,12 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'music' | 'auto-match' | 'stems' | 'final-mix'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'ducking' | 'filler' | 'compare' | 'library' | 'voices' | 'audiobook' | 'music' | 'auto-match' | 'stems' | 'final-mix'>('enhance');
   const [stemSet, setStemSet] = useState<{ sourceTitle: string; stems: Array<{ type: 'vocals' | 'drums' | 'bass' | 'other'; url: string; assetId?: string }> } | null>(null);
   const [showMusicGen, setShowMusicGen] = useState(false);
   const [showAutoMatch, setShowAutoMatch] = useState(false);
   const [showVoiceStudio, setShowVoiceStudio] = useState(false);
+  const [showAudiobook, setShowAudiobook] = useState(false);
   const [musicGenPrefill, setMusicGenPrefill] = useState<{
     prompt: string; genre: string; mood: string; bpm: number; duration: number;
   } | null>(null);
@@ -442,7 +444,8 @@ export default function AudioStudio() {
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
                       { id: 'filler', label: 'Filler-Wörter', icon: Volume2 },
                       { id: 'library', label: 'Bibliothek', icon: Library },
-                      { id: 'voices', label: 'Custom Voices', icon: Mic, badge: 'NEU' }
+                      { id: 'voices', label: 'Custom Voices', icon: Mic, badge: 'NEU' },
+                      { id: 'audiobook', label: 'Hörbuch', icon: BookOpen, badge: 'NEU' }
                     ].map((tab) => (
                       <Button
                         key={tab.id}
@@ -639,6 +642,17 @@ export default function AudioStudio() {
                       </motion.div>
                     )}
 
+                    {activeTab === 'audiobook' && (
+                      <motion.div
+                        key="audiobook"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <AudiobookPanel />
+                      </motion.div>
+                    )}
+
                     {activeTab === 'music' && (
                       <motion.div
                         key="music"
@@ -705,7 +719,7 @@ export default function AudioStudio() {
                 </div>
 
                 {/* Right: AI Sidebar (only when not in enhance/compare/library/voices/music/ducking/auto-match tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'music' && activeTab !== 'ducking' && activeTab !== 'auto-match' && activeTab !== 'final-mix' && activeTab !== 'stems' && (
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && activeTab !== 'voices' && activeTab !== 'audiobook' && activeTab !== 'music' && activeTab !== 'ducking' && activeTab !== 'auto-match' && activeTab !== 'final-mix' && activeTab !== 'stems' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
