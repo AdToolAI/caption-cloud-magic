@@ -18541,6 +18541,10 @@ export type Database = {
           source_provider: string
         }[]
       }
+      voice_library_facets: {
+        Args: { _language?: string; _native_only?: boolean; _search?: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_event_type:
