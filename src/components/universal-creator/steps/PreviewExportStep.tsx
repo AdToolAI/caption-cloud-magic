@@ -616,6 +616,7 @@ export function PreviewExportStep({
                 scenes,
               }, formatConfig.fps || 30)}
               fps={formatConfig.fps || 30}
+              autoPlay={false}
               className="w-full"
             />
           </div>
