@@ -12,6 +12,7 @@ import { isHumeVoiceId } from '@/lib/voice-studio/humeVoices';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 import type { MultiSpeakerVoiceCfg } from '@/types/video-composer';
+import { VoiceSlot } from '@/components/voices/VoiceSlot';
 import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
 import { toPickerLanguage, voicePreviewSample } from '@/lib/voice-languages';
 
@@ -201,16 +202,16 @@ export function SpeakerMappingBar({
                   </SelectContent>
                 </Select>
               ) : (
-                <Button
-                  variant="outline"
-                  className="h-9 justify-start font-normal"
-                  onClick={() => setLibraryFor(s.speakerId)}
-                >
-                  <Mic className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                  <span className="truncate">
-                    {cfg?.voiceName || 'Stimme aus Bibliothek wählen…'}
-                  </span>
-                </Button>
+                <VoiceSlot
+                  voiceId={cfg?.voiceId}
+                  voiceName={cfg?.voiceName}
+                  language={targetLanguage}
+                  category="characters"
+                  pickerTitle={`Stimme für ${s.speakerName}`}
+                  onChange={({ voiceId, voiceName }) =>
+                    setSpeakerCfg(s.speakerId, { voiceId, voiceName })
+                  }
+                />
               )}
 
               <Button

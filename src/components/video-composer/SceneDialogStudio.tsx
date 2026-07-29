@@ -15,7 +15,7 @@
 
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X, Lock, AlertCircle } from 'lucide-react';
+import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X, Lock, AlertCircle, Library } from 'lucide-react';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ import {
   type VoiceTuning,
 } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import {
   AUTO_VOICE_OPTIONS,
@@ -612,6 +613,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     (scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {},
   );
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const [libraryFor, setLibraryFor] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genStage, setGenStage] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
@@ -2317,48 +2319,49 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                     </SelectContent>
                   </Select>
 
-                  {/* Voice selector — list depends on engine */}
-                  <Select
-                    value={cfg?.voiceId ?? ''}
-                    onValueChange={(voiceId) => {
-                      if (isHume) {
+                  {/* Voice selector — Hume: Liste, ElevenLabs: volle Bibliothek */}
+                  {isHume ? (
+                    <Select
+                      value={cfg?.voiceId ?? ''}
+                      onValueChange={(voiceId) => {
                         const v = humeVoices.find((x) => x.name === voiceId);
                         updateSpeakerVoice(sp.id, {
                           voiceId,
                           voiceName: v?.label ?? voiceId,
                           provider: v?.provider ?? 'HUME_AI',
                         });
-                      } else {
-                        const v = elPickerEntries.find((x) => x.id === voiceId);
-                        updateSpeakerVoice(sp.id, {
-                          voiceId,
-                          voiceName: v?.name ?? voiceId,
-                          isCustom: v?.isCustom ?? false,
-                          elevenlabsVoiceId: v?.elevenlabsVoiceId,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-7 text-xs">
-                      <SelectValue placeholder={t.pickVoice} />
-                    </SelectTrigger>
-                    <SelectContent className="z-[60] max-h-[320px]">
-                      {isHume
-                        ? humeVoices.map((v) => (
-                            <SelectItem key={v.id} value={v.name} className="text-xs">
-                              <div className="flex flex-col">
-                                <span>{v.label}</span>
-                                <span className="text-[10px] text-muted-foreground">{v.description}</span>
-                              </div>
-                            </SelectItem>
-                          ))
-                        : elPickerEntries.map((v) => (
-                            <SelectItem key={v.id} value={v.id} className="text-xs">
-                              {v.name}
-                            </SelectItem>
-                          ))}
-                    </SelectContent>
-                  </Select>
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue placeholder={t.pickVoice} />
+                      </SelectTrigger>
+                      <SelectContent className="z-[60] max-h-[320px]">
+                        {humeVoices.map((v) => (
+                          <SelectItem key={v.id} value={v.name} className="text-xs">
+                            <div className="flex flex-col">
+                              <span>{v.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{v.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-7 justify-start px-2 text-xs font-normal min-w-0"
+                      onClick={() => setLibraryFor(sp.id)}
+                    >
+                      <Library className="h-3 w-3 mr-1.5 text-primary shrink-0" />
+                      <span className="truncate">
+                        {cfg?.voiceName ||
+                          elPickerEntries.find((x) => x.id === cfg?.voiceId)?.name ||
+                          t.pickVoice}
+                      </span>
+                    </Button>
+                  )}
+
 
                   {/* Preview */}
                   <Button
@@ -2541,7 +2544,27 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           })()}
         </Button>
       </div>
+
+      <UniversalVoiceLibraryPicker
+        open={!!libraryFor}
+        onOpenChange={(o) => !o && setLibraryFor(null)}
+        language={language}
+        category="characters"
+        currentVoiceId={libraryFor ? voicePerSpeaker[libraryFor]?.voiceId : undefined}
+        title={t.pickVoice}
+        onSelect={(voice) => {
+          if (!libraryFor) return;
+          updateSpeakerVoice(libraryFor, {
+            voiceId: voice.id,
+            voiceName: voice.name,
+            isCustom: false,
+            elevenlabsVoiceId: voice.id,
+          });
+          setLibraryFor(null);
+        }}
+      />
     </Card>
+
   );
 });
 

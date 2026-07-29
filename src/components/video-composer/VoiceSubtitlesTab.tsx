@@ -20,6 +20,7 @@ import {
   Wand2, Film, Mic, Loader2, Info, Edit2, Trash2, Check, X,
 } from 'lucide-react';
 import ComposerSequencePreview from './ComposerSequencePreview';
+import { VoiceSlot } from '@/components/voices/VoiceSlot';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
 import { AdvancedVoiceSettings, type VoiceSettings } from '@/components/video/AdvancedVoiceSettings';
@@ -95,7 +96,7 @@ export default function VoiceSubtitlesTab({
   const [voices, setVoices] = useState<VoiceMeta[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(true);
   const initialLang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
-  const [voiceLangTab, setVoiceLangTab] = useState<'de' | 'en' | 'es'>(initialLang);
+  const [voiceLangTab, setVoiceLangTab] = useState<string>(initialLang);
 
   useEffect(() => {
     (async () => {
@@ -638,56 +639,17 @@ export default function VoiceSubtitlesTab({
               <span>{t('videoComposer.voHint')}</span>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t('videoComposer.voLanguage')}</Label>
-              <Tabs value={voiceLangTab} onValueChange={(v) => setVoiceLangTab(v as 'de' | 'en' | 'es')}>
-                <TabsList className="grid w-full grid-cols-3 h-8">
-                  <TabsTrigger value="de" className="text-xs">🇩🇪 DE</TabsTrigger>
-                  <TabsTrigger value="en" className="text-xs">🇬🇧 EN</TabsTrigger>
-                  <TabsTrigger value="es" className="text-xs">🇪🇸 ES</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs">
-                {t('videoComposer.voVoice')}
-                <span className="text-muted-foreground ml-1.5 font-normal">({voicesForTab.length} {t('videoComposer.voicesAvailable')})</span>
-              </Label>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={voiceover.voiceId}
-                  onValueChange={(v) => {
-                    const voice = voices.find((vo) => vo.id === v);
-                    onUpdateAssembly({ voiceover: { ...voiceover, voiceId: v, voiceName: voice?.name || '' } });
-                  }}
-                  disabled={loadingVoices}
-                >
-                  <SelectTrigger className="bg-background/50 flex-1">
-                    <SelectValue placeholder={loadingVoices ? t('videoComposer.loadingVoices') : t('videoComposer.chooseVoice')} />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    {voicesForTab.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        <span className="flex items-center gap-2">
-                          {v.tier === 'premium' && (
-                            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">
-                              Premium
-                            </Badge>
-                          )}
-                          <span>{v.name}</span>
-                          {v.gender && <span className="text-xs text-muted-foreground">({v.gender})</span>}
-                          {v.accent && <span className="text-[10px] text-muted-foreground">— {v.accent}</span>}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {voiceover.voiceId && (
-                  <VoicePreviewButton voiceId={voiceover.voiceId} language={voiceLangTab} size="sm" className="shrink-0" />
-                )}
-              </div>
-            </div>
+            <VoiceSlot
+              label={t('videoComposer.voVoice')}
+              voiceId={voiceover.voiceId}
+              voiceName={voiceover.voiceName}
+              language={voiceLangTab}
+              category="ads"
+              onChange={({ voiceId, voiceName, language }) => {
+                setVoiceLangTab(language);
+                onUpdateAssembly({ voiceover: { ...voiceover, voiceId, voiceName } });
+              }}
+            />
 
             {/* ── VOICE TUNING ──────────────────────────── */}
             <div className="space-y-3 p-3 rounded-lg border border-border/40 bg-background/30">

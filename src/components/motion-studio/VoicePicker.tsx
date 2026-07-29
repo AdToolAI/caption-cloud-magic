@@ -179,6 +179,7 @@ export function VoicePicker({ value, onChange, previewText, language }: VoicePic
       <UniversalVoiceLibraryPicker
         open={libraryOpen}
         onOpenChange={setLibraryOpen}
+        category="characters"
         onSelect={handlePickerSelect}
         language={targetLanguage}
         currentVoiceId={value ?? undefined}

@@ -17,6 +17,7 @@ import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { UniversalVoiceLibraryPicker } from '@/components/voices/UniversalVoiceLibraryPicker';
+import { VoiceLanguageSelect } from '@/components/voices/VoiceLanguageSelect';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
 import type { Scene } from '@/types/scene';
 
@@ -255,14 +256,14 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
 
               <div className="space-y-2">
                 <Label>{t('uc.languageLabel')}</Label>
-                <Tabs value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="de" disabled={loadingVoices}>🇩🇪 DE {!loadingVoices && `(${voices.filter(v => v.language === 'de' || (v.supportedLanguages || []).includes('de')).length})`}</TabsTrigger>
-                    <TabsTrigger value="en" disabled={loadingVoices}>🇬🇧 EN {!loadingVoices && `(${voices.filter(v => v.language === 'en' || (v.supportedLanguages || []).includes('en')).length})`}</TabsTrigger>
-                    <TabsTrigger value="es" disabled={loadingVoices}>🇪🇸 ES {!loadingVoices && `(${voices.filter(v => v.language === 'es' || (v.supportedLanguages || []).includes('es')).length})`}</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <VoiceLanguageSelect
+                  value={selectedLanguage}
+                  onChange={setSelectedLanguage}
+                  disabled={loadingVoices}
+                  className="w-full"
+                />
               </div>
+
 
               <div className="space-y-2">
                 <Label>{t('uc.selectVoice')}</Label>
@@ -494,7 +495,8 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
           <UniversalVoiceLibraryPicker
             open={libraryOpen}
             onOpenChange={setLibraryOpen}
-            language={(selectedLanguage as 'de' | 'en' | 'es') || 'all'}
+            language={selectedLanguage || 'all'}
+            category="ads"
             currentVoiceId={voiceConfig.voiceId}
             title={language === 'de' ? 'Voice-Bibliothek – Content Creator' : "Voice Library – Content Creator"}
             enforceNative

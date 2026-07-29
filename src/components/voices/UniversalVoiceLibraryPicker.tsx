@@ -13,6 +13,14 @@ import { useVoiceLibrary, type VoiceLibraryFilters } from '@/hooks/useVoiceLibra
 import { VoicePreviewButton } from './VoicePreviewButton';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 import { VOICE_LANGUAGES, NATIVE_SENSITIVE_LANGUAGES, toPickerLanguage, voiceLanguageLabel } from '@/lib/voice-languages';
+import {
+  VOICE_CATEGORIES,
+  getVoiceCategory,
+  pushRecentVoice,
+  readRecentVoices,
+  type VoiceCategoryId,
+} from '@/lib/voice-categories';
+import { useCustomVoices } from '@/hooks/useCustomVoices';
 
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;
@@ -26,7 +34,10 @@ interface UniversalVoiceLibraryPickerProps {
   enforceNative?: boolean;
   /** If false, the language dropdown is hidden and the prop language is locked. */
   allowLanguageChange?: boolean;
+  /** Vorbelegte Kategorie („Empfohlen für diesen Kontext"). */
+  category?: VoiceCategoryId;
 }
+
 
 const TIER_LABEL: Record<string, { label: string; className: string }> = {
   cloned:    { label: 'Meine Stimme',      className: 'bg-[#F5C76A]/20 text-[#F5C76A] border-[#F5C76A]/40' },
@@ -45,15 +56,19 @@ export function UniversalVoiceLibraryPicker({
   title = 'Voice-Bibliothek',
   enforceNative = true,
   allowLanguageChange = true,
+  category: categoryProp = 'all',
 }: UniversalVoiceLibraryPickerProps) {
   const [search, setSearch] = useState('');
   const [language, setLanguage] = useState<string>(toPickerLanguage(languageProp) || 'all');
+  const [category, setCategory] = useState<VoiceCategoryId>(categoryProp);
   const [gender, setGender] = useState<'all' | 'male' | 'female' | 'neutral'>('all');
   const [age, setAge] = useState<'all' | 'young' | 'middle_aged' | 'old'>('all');
   const [useCase, setUseCase] = useState<'all' | 'narration' | 'conversational' | 'characters' | 'social_media' | 'news'>('all');
   const nativeSensitive = NATIVE_SENSITIVE_LANGUAGES.has(language);
   const [nativeOnly, setNativeOnly] = useState<boolean>(enforceNative && nativeSensitive);
   const [sort, setSort] = useState<'popularity' | 'name'>('popularity');
+  const { voices: customVoices } = useCustomVoices();
+  const [recent, setRecent] = useState(() => readRecentVoices());
 
   // Keep in sync when the caller changes the target language (e.g. project language switch).
   useEffect(() => {
@@ -65,16 +80,26 @@ export function UniversalVoiceLibraryPicker({
     setNativeOnly(enforceNative && NATIVE_SENSITIVE_LANGUAGES.has(language));
   }, [language, enforceNative]);
 
+  // Kategorie beim Öffnen auf die Kontext-Empfehlung zurücksetzen.
+  useEffect(() => {
+    if (open) {
+      setCategory(categoryProp);
+      setRecent(readRecentVoices());
+    }
+  }, [open, categoryProp]);
+
+  const categoryFacets = useMemo(() => getVoiceCategory(category).facets, [category]);
+
   const filters: VoiceLibraryFilters = useMemo(() => ({
     language,
-    gender: gender === 'all' ? null : gender,
-    age: age === 'all' ? null : age,
-    use_case: useCase === 'all' ? null : useCase,
+    gender: gender === 'all' ? (categoryFacets.gender ?? null) : gender,
+    age: age === 'all' ? (categoryFacets.age ?? null) : age,
+    use_case: useCase === 'all' ? (categoryFacets.use_case ?? null) : useCase,
     search: search.trim(),
     nativeOnly,
     sort,
     pageSize: 60,
-  }), [language, gender, age, useCase, search, nativeOnly, sort]);
+  }), [language, gender, age, useCase, search, nativeOnly, sort, categoryFacets]);
 
   const {
     data,
@@ -82,11 +107,32 @@ export function UniversalVoiceLibraryPicker({
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
-  } = useVoiceLibrary(filters);
+  } = useVoiceLibrary({ ...filters, ...(category === 'mine' ? { pageSize: 10 } : {}) });
 
-  const voices = useMemo(() => data?.pages.flatMap((p) => p.voices) ?? [], [data]);
-  const total = data?.pages[0]?.total ?? 0;
+  const myVoices = useMemo<VoiceMeta[]>(
+    () =>
+      (customVoices ?? [])
+        .filter((c) => c.is_active !== false && c.elevenlabs_voice_id)
+        .filter((c) => !search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase()))
+        .map((c) => ({
+          id: c.elevenlabs_voice_id!,
+          name: c.name || 'Meine Stimme',
+          language: c.language || language,
+          tier: 'cloned',
+          description: 'Eigener Voice-Clone',
+        } as unknown as VoiceMeta)),
+    [customVoices, search, language],
+  );
+
+  const libraryVoices = useMemo(() => data?.pages.flatMap((p) => p.voices) ?? [], [data]);
+  const voices = useMemo<VoiceMeta[]>(() => {
+    if (category === 'mine') return myVoices;
+    const ids = new Set(myVoices.map((v) => v.id));
+    return [...myVoices.filter(() => search.trim().length > 0), ...libraryVoices.filter((v) => !ids.has(v.id))];
+  }, [category, myVoices, libraryVoices, search]);
+  const total = category === 'mine' ? myVoices.length : (data?.pages[0]?.total ?? 0);
   const nativeCount = data?.pages[0]?.nativeCount ?? 0;
+
 
   // Infinite scroll sentinel
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -183,7 +229,56 @@ export function UniversalVoiceLibraryPicker({
               </div>
             )}
           </div>
+
+          {/* Kategorien */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+            {VOICE_CATEGORIES.map((c) => {
+              const active = c.id === category;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  title={c.hint}
+                  onClick={() => setCategory(c.id)}
+                  className={cn(
+                    'shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors',
+                    active
+                      ? 'bg-[#F5C76A]/15 border-[#F5C76A]/50 text-[#F5C76A]'
+                      : 'bg-white/[0.03] border-white/10 text-white/60 hover:text-white hover:bg-white/[0.06]',
+                  )}
+                >
+                  <span className="mr-1">{c.icon}</span>
+                  {c.label}
+                  {c.id === 'mine' && myVoices.length > 0 && (
+                    <span className="ml-1 text-white/40">({myVoices.length})</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Zuletzt verwendet */}
+          {recent.length > 0 && category !== 'mine' && !search.trim() && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+              <span className="shrink-0 text-[10px] uppercase tracking-wider text-white/35 pr-1">Zuletzt</span>
+              {recent.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => {
+                    pushRecentVoice(r);
+                    onSelect({ id: r.id, name: r.name, language: r.language } as unknown as VoiceMeta, r.language);
+                    onOpenChange(false);
+                  }}
+                  className="shrink-0 rounded-full border border-white/10 bg-white/[0.02] px-2.5 py-1 text-[11px] text-white/70 hover:bg-white/[0.06]"
+                >
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
 
         {/* List */}
         <ScrollArea className="flex-1 -mx-6 px-6">
@@ -205,6 +300,7 @@ export function UniversalVoiceLibraryPicker({
                       const resolved = language !== 'all'
                         ? language
                         : (typeof v.language === 'string' ? v.language : 'en');
+                      pushRecentVoice({ id: v.id, name: v.name, language: resolved });
                       onSelect(v, resolved);
                       onOpenChange(false);
                     }}
