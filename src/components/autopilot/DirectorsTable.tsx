@@ -537,6 +537,9 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               </>
             )}
           </Button>
+
+          {loading && <StageProgressBar label={TREATMENT_PHASES[phase]} />}
+
         </div>
       </Card>
 
