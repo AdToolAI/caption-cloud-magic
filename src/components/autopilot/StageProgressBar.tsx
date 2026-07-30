@@ -45,7 +45,7 @@ export function StageProgressBar({ value, label, hint, className, compact }: Pro
             compact ? 'h-1' : 'h-2',
           )}
         >
-          <div className="absolute inset-y-0 w-1/3 animate-[autopilot-sweep_1.4s_ease-in-out_infinite] rounded-full bg-primary/70" />
+          <div className="absolute inset-y-0 w-1/3 animate-autopilot-sweep rounded-full bg-primary/70" />
         </div>
       ) : (
         <Progress value={value as number} className={compact ? 'h-1' : 'h-2'} />
