@@ -47,6 +47,10 @@ const TIER_LABEL: Record<string, { label: string; className: string }> = {
   community: { label: 'Community',          className: 'bg-white/5 text-white/60 border-white/10' },
 };
 
+/** Glas-Pille für alle Filter-Dropdowns (Cinematic Glass Noir). */
+const FILTER_TRIGGER =
+  'h-9 text-xs font-medium bg-white/5 border-white/10 hover:border-gold/30 transition-colors';
+
 export function UniversalVoiceLibraryPicker({
   open,
   onOpenChange,
