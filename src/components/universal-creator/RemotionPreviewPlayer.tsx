@@ -485,20 +485,38 @@ export function RemotionPreviewPlayer({
   }, [durationInFrames, fps, seekPreviewAudio]);
 
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
-    if (!playerRef.current) return;
+    const player = playerRef.current;
+    if (!player) return;
     if (!hasEverInteracted) setHasEverInteracted(true);
-    playerRef.current.unmute();
+    player.unmute();
     setIsMuted(false);
     // Player volume drives scene <Video> original audio; keep it in sync with master.
-    try { playerRef.current.setVolume(clampAudioVolume(volume)); } catch { /* noop */ }
-    playerRef.current.play(e);
+    try { player.setVolume(clampAudioVolume(volume)); } catch { /* noop */ }
+    player.play(e);
+    setIsPlaying(true);
     void playPreviewAudio();
   }, [hasEverInteracted, playPreviewAudio, volume]);
 
   const handlePauseClick = useCallback(() => {
     playerRef.current?.pause();
     pausePreviewAudio();
+    setIsPlaying(false);
   }, [pausePreviewAudio]);
+
+  // Always derive the action from the real player state — never from a stale
+  // React state — so the button can't get stuck on "play" while it's running.
+  const handleTogglePlay = useCallback((e: React.MouseEvent) => {
+    const player = playerRef.current;
+    if (!player) return;
+    let running = isPlaying;
+    try { running = player.isPlaying(); } catch { /* noop */ }
+    if (running) {
+      handlePauseClick();
+    } else {
+      handlePlayClick(e);
+    }
+  }, [handlePauseClick, handlePlayClick, isPlaying]);
+
 
   const toggleMute = useCallback(() => {
     if (isMuted) {
