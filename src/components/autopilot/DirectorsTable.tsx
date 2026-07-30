@@ -420,43 +420,66 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
         }
       }
 
+      // Ein Look für den ganzen Film — verhindert Ausreißer wie Anime-Szenen.
+      const styleBible = deriveStyleBible({
+        genre: plannedTreatment.genre,
+        scenes: plannedTreatment.scenes as unknown as Parameters<typeof deriveStyleBible>[0]['scenes'],
+      });
+
       const { data, error } = await supabase.functions.invoke('autopilot-orchestrate', {
         body: {
           production_id: productionId,
           aspect_ratio: plannedTreatment.aspect,
+          lip_sync: lipSyncWanted,
+          style_guide: styleBible,
           scenes: plannedTreatment.scenes.map((scene) => {
             const cast = (scene.characterIds ?? [])
               .map((id) => portraitById.get(id))
               .filter(Boolean) as Array<{ url: string | null; name: string }>;
+            const names = cast.map((entry) => entry.name).filter(Boolean);
             return {
               id: scene.id,
               orderIndex: scene.orderIndex,
               beat: scene.beat,
               durationSeconds: scene.durationSeconds,
-              anchorPrompt: clampPromptWords(compileAnchorPrompt(scene)),
-              motionPrompt: clampPromptWords(compileMotionPrompt(scene, { hasAnchor: true }), 60),
+              anchorPrompt: clampPromptWords(
+                compileAnchorPrompt(scene, { styleBible, characterNames: names }),
+              ),
+              motionPrompt: clampPromptWords(
+                compileMotionPrompt(scene, {
+                  hasAnchor: true,
+                  styleBible,
+                  characterNames: names,
+                  silentMouth: !lipSyncWanted,
+                }),
+                60,
+              ),
+              lipSync: lipSyncWanted,
               dialogue: scene.dialogue ?? null,
-              turns: (scene.turns ?? []).map((turn, i) => ({
-                id: turn.id || `${scene.id}:${i}`,
-                text: turn.text,
-                speakerCharacterId: turn.speakerCharacterId ?? null,
-                speakerName: turn.speakerName ?? null,
-                voiceId: turn.voiceId ?? null,
-                language: turn.language ?? scene.voiceLanguage ?? plannedTreatment.language,
-              })),
-              speakerCharacterId: scene.speakerCharacterId ?? null,
+              turns: lipSyncWanted
+                ? (scene.turns ?? []).map((turn, i) => ({
+                    id: turn.id || `${scene.id}:${i}`,
+                    text: turn.text,
+                    speakerCharacterId: turn.speakerCharacterId ?? null,
+                    speakerName: turn.speakerName ?? null,
+                    voiceId: turn.voiceId ?? null,
+                    language: turn.language ?? scene.voiceLanguage ?? plannedTreatment.language,
+                  }))
+                : [],
+              speakerCharacterId: lipSyncWanted ? scene.speakerCharacterId ?? null : null,
               voiceId: scene.voiceId ?? null,
               voiceLanguage: scene.voiceLanguage ?? plannedTreatment.language,
 
               characterIds: scene.characterIds ?? [],
               portraitUrls: cast.map((entry) => entry.url).filter(Boolean),
-              characterNames: cast.map((entry) => entry.name).filter(Boolean),
+              characterNames: names,
               soundDesign: { foleyHint: scene.foleyHint ?? null },
               grammar: scene as unknown as Record<string, unknown>,
             };
           }),
         },
       });
+
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
