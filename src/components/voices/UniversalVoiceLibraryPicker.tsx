@@ -217,7 +217,7 @@ export function UniversalVoiceLibraryPicker({
             </Select>
 
             <Select value={useCase} onValueChange={(v) => setUseCase(v as typeof useCase)}>
-              <SelectTrigger className="bg-white/[0.03] border-white/10"><SelectValue placeholder="Einsatz" /></SelectTrigger>
+              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Einsatz" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle Einsätze</SelectItem>
                 <SelectItem value="narration">Narration</SelectItem>
