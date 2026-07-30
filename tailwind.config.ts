@@ -109,10 +109,15 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
+        "autopilot-sweep": {
+          "0%": { transform: "translateX(-120%)" },
+          "100%": { transform: "translateX(420%)" },
+        },
         marquee: {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
+
         scanline: {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(400%)" },
