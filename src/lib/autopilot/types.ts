@@ -79,6 +79,10 @@ export interface SceneDialogueTurn {
   voiceId?: string;
   /** BCP-47-ish language code, e.g. "de". */
   language?: string;
+  /** True when the system cast this speaker / picked this voice. */
+  autoCast?: boolean;
+  autoVoice?: boolean;
+  voiceName?: string;
 }
 
 /**
@@ -123,6 +127,11 @@ export interface SceneGrammar {
   voiceId?: string;
   /** BCP-47-ish language code for TTS, e.g. "de", "en", "es". */
   voiceLanguage?: string;
+  /** No cast available — the line is narrator voiceover, no lip-sync. */
+  narratorOnly?: boolean;
+  /** True when the system picked speaker/voice instead of the user. */
+  autoCast?: boolean;
+  autoVoiceName?: string;
   /**
    * Multi-speaker dialogue. When present it is the source of truth and
    * `dialogue`/`voiceId` above only describe the first turn. Each turn gets its
