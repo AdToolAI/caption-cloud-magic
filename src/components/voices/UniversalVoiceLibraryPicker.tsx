@@ -197,7 +197,7 @@ export function UniversalVoiceLibraryPicker({
             )}
 
             <Select value={gender} onValueChange={(v) => setGender(v as typeof gender)}>
-              <SelectTrigger className="bg-white/[0.03] border-white/10"><SelectValue placeholder="Geschlecht" /></SelectTrigger>
+              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Geschlecht" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle Geschlechter</SelectItem>
                 <SelectItem value="female">Weiblich</SelectItem>
