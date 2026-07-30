@@ -12,7 +12,13 @@ import { cn } from '@/lib/utils';
 import { useVoiceLibrary, type VoiceLibraryFilters } from '@/hooks/useVoiceLibrary';
 import { VoicePreviewButton } from './VoicePreviewButton';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
-import { VOICE_LANGUAGES, NATIVE_SENSITIVE_LANGUAGES, toPickerLanguage, voiceLanguageLabel } from '@/lib/voice-languages';
+import {
+  VOICE_LANGUAGES,
+  NATIVE_SENSITIVE_LANGUAGES,
+  normalizeVoiceLanguage,
+  toPickerLanguage,
+  voiceLanguageLabel,
+} from '@/lib/voice-languages';
 import {
   VOICE_CATEGORIES,
   getVoiceCategory,
@@ -117,6 +123,7 @@ export function UniversalVoiceLibraryPicker({
     () =>
       (customVoices ?? [])
         .filter((c) => c.is_active !== false && c.elevenlabs_voice_id)
+        .filter((c) => language === 'all' || normalizeVoiceLanguage(c.language) === language)
         .filter((c) => !search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase()))
         .map((c) => ({
           id: c.elevenlabs_voice_id!,
@@ -128,7 +135,15 @@ export function UniversalVoiceLibraryPicker({
     [customVoices, search, language],
   );
 
-  const libraryVoices = useMemo(() => data?.pages.flatMap((p) => p.voices) ?? [], [data]);
+  const libraryVoices = useMemo(
+    () => (data?.pages.flatMap((p) => p.voices) ?? [])
+      .filter((voice) => language === 'all' || normalizeVoiceLanguage(voice.language) === language),
+    [data, language],
+  );
+  const visibleRecent = useMemo(
+    () => recent.filter((voice) => language === 'all' || normalizeVoiceLanguage(voice.language) === language),
+    [recent, language],
+  );
   const voices = useMemo<VoiceMeta[]>(() => {
     if (category === 'mine') return myVoices;
     const ids = new Set(myVoices.map((v) => v.id));
@@ -278,10 +293,10 @@ export function UniversalVoiceLibraryPicker({
 
 
           {/* Zuletzt verwendet */}
-          {recent.length > 0 && category !== 'mine' && !search.trim() && (
+          {visibleRecent.length > 0 && category !== 'mine' && !search.trim() && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
               <span className="shrink-0 text-[10px] uppercase tracking-wider text-white/35 pr-1">Zuletzt</span>
-              {recent.map((r) => (
+              {visibleRecent.map((r) => (
                 <button
                   key={r.id}
                   type="button"

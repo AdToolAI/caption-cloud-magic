@@ -109,7 +109,10 @@ serve(async (req) => {
         { count: 'exact' },
       );
 
-    if (language !== 'all') q = q.contains('supported_languages', [language]);
+    // The picker language is a strict catalogue filter. `supported_languages`
+    // only describes what a multilingual model can technically pronounce and
+    // must not allow voices whose primary language differs from the selection.
+    if (language !== 'all') q = q.eq('language', language);
     if (nativeOnly) q = q.eq('is_native', true);
     if (gender) q = q.eq('gender', gender);
     if (accent) q = q.ilike('accent', `%${accent}%`);

@@ -1,47 +1,20 @@
-## Ziel
+## Plan v301 — Strikter Sprachfilter der Voice-Bibliothek
 
-Die Voice-Bibliothek (`UniversalVoiceLibraryPicker`) bekommt die gewählte Richtung **Cinematic Glass Noir**. Rein visuell — Filter, Kategorien, Suche, Infinite Scroll und Auswahl-Logik bleiben unverändert.
+### Bestätigte Ursache
+Die Oberfläche sendet `de` korrekt an `list-voices`. Die Backend-Abfrage filtert aktuell jedoch über `supported_languages enthält de` statt über die eigentliche Hauptsprache der Stimme. Dadurch erscheinen mehrsprachige englische, spanische oder indische Stimmen, sobald sie Deutsch technisch unterstützen. Die Daten bestätigen genau dieses Verhalten: Unter dem deutschen Filter befinden sich Datensätze mit `language = en/es/fr/...` und lediglich `de` in `supported_languages`.
 
-## Was sich ändert
+### Umsetzung
+1. **Backend-Filter korrigieren**
+   - Bei einer gewählten Sprache ausschließlich `voice_library_cache.language = ausgewählte Sprache` zulassen.
+   - `supported_languages` weiterhin als technische Information behalten, aber nicht mehr zur Auswahl der Bibliotheksstimmen verwenden.
+   - `nativeOnly` nur innerhalb der bereits korrekt gewählten Hauptsprache anwenden.
 
-**Dialograhmen**
-- Breiterer Dialog (max-w-5xl), `rounded-2xl`, dünner heller Rand auf tiefem Schwarz, kräftiger Schatten.
-- Kopf-, Filter- und Fußbereich bleiben fixiert (`shrink-0`), Liste scrollt weiterhin (der `min-h-0`-Fix bleibt erhalten).
+2. **Frontend gegen Fremdsprachen absichern**
+   - Bibliotheks-, eigene und zuletzt verwendete Stimmen vor der Anzeige nochmals gegen die aktive Sprache prüfen.
+   - Fremdsprachige „Zuletzt verwendet“-Einträge bei aktivem Sprachfilter ausblenden, damit sie den Filter nicht umgehen können.
+   - Beim Wechsel der Sprache bereits geladene Ergebnisse nicht weiter anzeigen; der Query-Key lädt den passenden Datensatz neu.
 
-**Header**
-- Playfair-Display-Titel, größer, mit feinem Trenner und kursivem Kontextteil („Voice-Bibliothek | Content Creator").
-- Untertitel als kleine Versalzeile mit Sperrung; die Trefferzahl und die Sprache werden farblich hervorgehoben (Cyan).
-
-**Suche & Filter**
-- Suchfeld höher, Lupe wechselt beim Fokus auf Gold, goldener Fokusring.
-- Filter-Dropdowns kompakter, einheitlich als Glas-Pillen mit goldenem Hover-Rand.
-- „Nur nativ" als eigener Glas-Block rechts mit Versal-Label.
-
-**Kategorie-Chips**
-- Aktiver Chip: gefülltes Gold mit dunkler Schrift und weichem Glow.
-- Inaktive Chips: Glas mit goldenem Hover-Rand. Horizontale Scrollleiste wird ausgeblendet (kein grauer Balken mehr wie im Screenshot), stattdessen sanftes Auslaufen am Rand.
-
-**Stimmen-Karten**
-- Zweispaltiges Raster, luftigere Innenabstände.
-- Hover: leichte Anhebung, goldener Rand, goldener Titel, Play-Button skaliert.
-- Tags neu typisiert: Premium in Cyan, Nativ in Gold, Rest neutral — kleine Versalien.
-- Beschreibung kursiv, zweizeilig gekappt.
-- Ausgewählte/spielende Karte: goldener Rand, goldener Play-Button, pulsierender Punkt oben rechts.
-
-**Scroll & Footer**
-- Schmale goldene Scrollbar statt des unsichtbaren Standard-Thumbs.
-- Footer als abgesetzte dunkle Leiste; „Weitere Stimmen laden" und der Zähler („60 von 3.405") bleiben, bekommen aber den Glas-Button-Stil.
-
-## Technische Details
-
-- Alle Farben kommen als semantische Tokens; wo Gold/Cyan im Prototyp hart kodiert sind, nutze ich die vorhandenen Tokens bzw. ergänze fehlende in `index.css` und `tailwind.config.ts` (kein `text-white`/`bg-[#...]` in Komponenten).
-- Utility-Klassen `.no-scrollbar` und die goldene Scrollbar werden einmalig in `index.css` definiert, damit sie auch anderswo nutzbar sind.
-- Die Karten werden in eine kleine Unterkomponente `VoiceCard` innerhalb des Pickers ausgelagert, damit die Datei lesbar bleibt.
-
-## Betroffene Dateien
-
-- `src/components/voices/UniversalVoiceLibraryPicker.tsx` (Layout, Header, Filter, Chips, Karten, Footer)
-- `src/index.css` (Scrollbar-Utilities, evtl. neue Tokens)
-- `tailwind.config.ts` (nur falls ein Token fehlt)
-
-Keine Änderungen an `list-voices`, `useVoiceLibrary` oder der Auswahl-/Persistenz-Logik.
+3. **Regressionstests und Live-Prüfung**
+   - Die Backend-Funktion mit Deutsch testen und verifizieren, dass jede zurückgegebene Stimme `language = de` besitzt.
+   - Zusätzlich Englisch und eine weitere Sprache prüfen.
+   - Im Voice-Dialog testen, dass Sprache, Karten, Vorschau und Auswahl konsistent bleiben und bei „Alle Sprachen“ weiterhin der vollständige Katalog erscheint.
