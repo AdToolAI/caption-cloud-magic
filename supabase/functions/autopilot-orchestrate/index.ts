@@ -558,7 +558,10 @@ async function runProduction(
       status: allFailed ? "failed" : "running",
       progress: allFailed ? 100 : 78,
       error_message: allFailed ? "Keine Szene konnte produziert werden." : null,
-      completed_at: new Date().toISOString(),
+      heartbeat_at: new Date().toISOString(),
+      // v298: `completed_at` gehört zum echten Abschluss — hier steht erst der Schnitt an.
+      ...(allFailed ? { completed_at: new Date().toISOString() } : {}),
+
     })
     .eq("id", productionId);
 
