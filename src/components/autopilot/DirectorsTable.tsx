@@ -46,7 +46,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAutopilotProduction } from '@/hooks/useAutopilotProduction';
-import { ProductionStage } from '@/components/autopilot/ProductionStage';
+import { ProductionLounge } from '@/components/autopilot/ProductionLounge';
 import { StageProgressBar } from '@/components/autopilot/StageProgressBar';
 import {
   loadCast,
@@ -733,7 +733,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
       {/* ------------------------------------------------------- Produktion */}
       {approved && production && (
-        <ProductionStage production={production} scenes={producedScenes} log={log} />
+        <ProductionLounge production={production} scenes={producedScenes} log={log} />
       )}
     </div>
   );
