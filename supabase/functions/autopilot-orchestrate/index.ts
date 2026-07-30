@@ -220,7 +220,14 @@ Deno.serve(async (req) => {
           status: "pending",
         })),
       );
+      // Wunsch & Look auch im Speicher führen, nicht nur in der Zeile.
+      scenes = scenes.map((scene) => ({
+        ...scene,
+        lipSync: scene.lipSync ?? body.lip_sync ?? true,
+        styleGuide: body.style_guide ?? scene.styleGuide,
+      }));
     }
+
 
     await admin
       .from("autopilot_productions")
