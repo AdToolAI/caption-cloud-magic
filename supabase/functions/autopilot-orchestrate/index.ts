@@ -84,6 +84,10 @@ interface Body {
 /** Engine picked per scene length — Hailuo is the reliable i2v workhorse. */
 const MOTION_MODEL = "minimax/hailuo-2.3";
 
+/** Bildfreigabe darf pro Szene höchstens 6 Minuten kosten. */
+const ANCHOR_DEADLINE_MS = 6 * 60 * 1000;
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "autopilot-orchestrate", ok: true });
