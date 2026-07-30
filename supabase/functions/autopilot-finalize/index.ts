@@ -55,9 +55,23 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!production || production.user_id !== userId) return json({ error: "not_found" }, 404);
-    if (production.stage === "finalizing") return json({ ok: true, already_running: true });
+
+    // v298 — Anspruchs-Claim: ein zweiter Aufruf (Watchdog) darf keinen
+    // zweiten Lambda-Render und keine zweite Ton-Abrechnung auslösen, solange
+    // der laufende Endschnitt noch atmet.
+    const beat = production.heartbeat_at ? Date.parse(production.heartbeat_at) : 0;
+    const alive = Number.isFinite(beat) && Date.now() - beat < FINALIZE_STALE_MS;
+    if (FINAL_STAGES.has(String(production.stage)) && alive) {
+      return json({ ok: true, already_finalizing: true });
+    }
+
+    await admin
+      .from("autopilot_productions")
+      .update({ heartbeat_at: new Date().toISOString() })
+      .eq("id", productionId);
 
     const task = finalize(admin, production, userId);
+
     // @ts-ignore EdgeRuntime is provided by the Supabase runtime
     if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(task);
     else await task;
