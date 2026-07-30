@@ -33,6 +33,8 @@ import {
   compileAnchorPrompt,
   compileMotionPrompt,
   clampPromptWords,
+  deriveStyleBible,
+
 } from '@/lib/autopilot/promptGrammar';
 import { estimateProductionCost, formatEuro } from '@/lib/autopilot/costEstimate';
 import {
