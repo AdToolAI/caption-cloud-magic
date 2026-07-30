@@ -386,7 +386,11 @@ async function runProduction(
             aspect,
             portraitUrls: scene.portraitUrls ?? [],
             characterNames: scene.characterNames ?? [],
+            styleGuide: scene.styleGuide ?? styleGuide,
+            styleReferenceUrl,
+            deadlineMs: ANCHOR_DEADLINE_MS,
           });
+
 
         if (!anchor?.anchor_url) {
           lastError = "Kein brauchbares Ankerbild.";
