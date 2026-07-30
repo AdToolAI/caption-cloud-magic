@@ -206,20 +206,60 @@ Deno.serve(async (req) => {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const validIds = new Set(characters.map((c) => c.id));
 
+    const castIds = characters.map((c) => c.id);
+    // Round-robin cursor so auto-cast dialogue does not always land on the same
+    // character across the film.
+    let castCursor = 0;
+    const nextCastId = (prefer: string[]): string | undefined => {
+      const pool = prefer.length > 0 ? prefer : castIds;
+      if (pool.length === 0) return undefined;
+      const pick = pool[castCursor % pool.length];
+      castCursor += 1;
+      return pick;
+    };
+
     const scenes = (Array.isArray(parsed.scenes) ? parsed.scenes : []).map(
       (scene: Record<string, unknown>, index: number) => {
       const sceneId = crypto.randomUUID();
-      // Multi-speaker turns. Only cast members survive the id lock; voices are
-      // assigned later in the Director's Table, never invented by the model.
+
+      // Hard character lock — anything the model invented is dropped here.
+      const characterIds = (Array.isArray(scene.characterIds) ? scene.characterIds : [])
+        .map(String)
+        .filter((id) => validIds.has(id));
+
+      // Multi-speaker turns. A turn is never dropped for a missing speaker —
+      // the system casts one instead, so no "Dialog ohne Sprecher" can survive.
       const turns = (Array.isArray(scene.turns) ? scene.turns : [])
-        .map((t: Record<string, unknown>, i: number) => ({
-          id: `${sceneId}:${i}`,
-          text: String(t?.text ?? "").trim(),
-          speakerCharacterId: validIds.has(String(t?.speakerCharacterId ?? ""))
-            ? String(t.speakerCharacterId)
-            : undefined,
-        }))
-        .filter((t) => t.text.length > 1 && !!t.speakerCharacterId);
+        .map((t: Record<string, unknown>, i: number) => {
+          const claimed = String(t?.speakerCharacterId ?? "");
+          const speakerCharacterId = validIds.has(claimed)
+            ? claimed
+            : nextCastId(characterIds);
+          return {
+            id: `${sceneId}:${i}`,
+            text: String(t?.text ?? "").trim(),
+            speakerCharacterId,
+            autoCast: !validIds.has(claimed) && !!speakerCharacterId,
+          };
+        })
+        .filter((t) => t.text.length > 1);
+
+      // Speakers always belong to their scene — otherwise the anchor never
+      // renders the face the lip-sync pass needs.
+      for (const turn of turns) {
+        if (turn.speakerCharacterId && !characterIds.includes(turn.speakerCharacterId)) {
+          characterIds.push(turn.speakerCharacterId);
+        }
+      }
+
+      const soloDialogue = String(scene.dialogue ?? "").trim();
+      const claimedSolo = String(scene.speakerCharacterId ?? "");
+      let soloSpeaker = validIds.has(claimedSolo) ? claimedSolo : undefined;
+      if (!soloSpeaker && turns.length === 0 && soloDialogue) {
+        soloSpeaker = nextCastId(characterIds);
+        if (soloSpeaker && !characterIds.includes(soloSpeaker)) characterIds.push(soloSpeaker);
+      }
+
       return ({
         id: sceneId,
         orderIndex: index,
@@ -233,25 +273,21 @@ Deno.serve(async (req) => {
         lens: String(scene.lens ?? "35mm"),
         lighting: String(scene.lighting ?? "soft_window"),
         mood: String(scene.mood ?? ""),
-        // Hard character lock — anything the model invented is dropped here.
-        characterIds: (Array.isArray(scene.characterIds) ? scene.characterIds : [])
-          .map(String)
-          .filter((id) => validIds.has(id)),
+        characterIds,
         propIds: [],
         turns: turns.length > 0 ? turns : undefined,
         dialogue: turns.length > 0
           ? turns.map((t) => t.text).join(" ")
-          : String(scene.dialogue ?? "").trim() || undefined,
-        speakerCharacterId: turns.length > 0
-          ? turns[0].speakerCharacterId
-          : validIds.has(String(scene.speakerCharacterId ?? ""))
-          ? String(scene.speakerCharacterId)
-          : undefined,
+          : soloDialogue || undefined,
+        speakerCharacterId: turns.length > 0 ? turns[0].speakerCharacterId : soloSpeaker,
+        // No cast at all → the line becomes narrator voiceover, never a blocker.
+        narratorOnly: castIds.length === 0 && (turns.length > 0 || !!soloDialogue),
         voiceLanguage: language,
         foleyHint: String(scene.foleyHint ?? "").trim() || undefined,
       });
       },
     );
+
 
     if (scenes.length === 0) return json({ error: "treatment_no_scenes" }, 502);
 
