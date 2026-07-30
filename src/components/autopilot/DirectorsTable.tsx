@@ -563,6 +563,12 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             {plannedTreatment.logline}
           </p>
 
+          {castingBusy && (
+            <div className="mt-4">
+              <StageProgressBar label="Besetzung und Stimmen werden zugeordnet …" />
+            </div>
+          )}
+
           {blockers.length > 0 && (
             <div className="mt-4 space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
               {blockers.map((finding, index) => (
@@ -573,6 +579,8 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               ))}
             </div>
           )}
+
+
 
           <div className="mt-6 space-y-3">
             {plannedTreatment.scenes.map((scene, index) => (
