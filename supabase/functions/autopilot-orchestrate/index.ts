@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
 
 
 
-    return json({ ok: true, production_id: production.id, scenes: body.scenes.length });
+    return json({ ok: true, production_id: production.id, scenes: scenes.length, resume });
   } catch (err) {
     console.error("[autopilot-orchestrate] fatal", err);
     return json({ error: err instanceof Error ? err.message : "unknown" }, 500);
