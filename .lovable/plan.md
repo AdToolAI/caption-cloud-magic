@@ -1,25 +1,43 @@
-## Befund (verifiziert im Code)
+## Ziel
 
-Beides hat dieselbe Ursache in `src/components/universal-creator/RemotionPreviewPlayer.tsx`:
+Im Regietisch (KI Autopilot) darf es keine Zustände „Dialog ohne zugeordneten Sprecher“ / „Dialog ohne Stimme“ mehr geben. Wenn der Kunde nichts auswählt, entscheidet die KI. Zusätzlich bekommt jeder Warteprozess einen sichtbaren Ladebalken.
 
-- Der Autoplay-Effekt (Zeile 305–311) startet den Player **bevor** der Effekt registriert wird, der die `play`/`pause`/`ended`-Events abhört (Zeile 313–351). Das `play`-Event feuert also ins Leere, `isPlaying` bleibt dauerhaft `false`.
-- Folge 1: Der Button zeigt weiter das Play-Symbol (siehe Screenshot: Video läuft, Icon = ▶) und ruft `handlePlayClick` statt `handlePauseClick` auf → Pausieren unmöglich, das Video wirkt wie eine Endlosschleife. Erst ein Klick in die Zeitleiste bringt den Zustand durcheinander/wieder in Gang.
-- Folge 2: Autoplay startet bewusst stumm (`setVolume(0)`, `initiallyMuted`). Entstummt wird nur in `handlePlayClick`. In Schritt 4 läuft der Player per Autoplay – dieser Pfad wird nie durchlaufen, also kein Voiceover. In Schritt 5 ist `autoPlay={false}` (PreviewExportStep Zeile 622), dort klickt der Nutzer aktiv auf Play → VO hörbar. Genau das beschriebene Verhalten.
+## 1. Auto-Casting (Sprecher wird nie leer)
 
-## Änderungen
+Serverseitig in `autopilot-treatment`:
+- Nach dem ID-Lock: Szenen mit Dialog/Turns ohne gültigen Sprecher bekommen automatisch einen zugewiesen — bevorzugt aus den in der Szene vorkommenden Charakteren, sonst aus dem gesamten Cast des Nutzers (Round-Robin, damit nicht immer derselbe spricht).
+- Hat der Nutzer gar keine Charaktere hinterlegt: Cast & World des Nutzers wird geladen und die KI-Auswahl trifft daraus die Besetzung (passend zu Beat/Stimmung). Existiert überhaupt kein Charakter, wird der Dialog als reines Voiceover (Erzählerstimme, kein Lip-Sync) markiert statt als Fehler.
+- Turns, deren Sprecher nicht in `characterIds` steht, werden künftig in die Szene aufgenommen statt verworfen.
 
-**1. `src/components/universal-creator/RemotionPreviewPlayer.tsx`**
-- Event-Listener-Effekt vor den Autoplay-Effekt ziehen, damit `play`/`pause`/`ended` nie verloren gehen.
-- Beim Registrieren den echten Zustand übernehmen: `setIsPlaying(player.isPlaying())` statt blind `false`.
-- Listener über Refs stabil halten (Handler in `useRef` gespiegelt), damit das Ab-/Anmelden nicht bei jedem `isPlaying`/`isDragging`-Wechsel passiert und dabei Events verschluckt werden.
-- Play/Pause-Button als echten Toggle absichern: bei Klick immer den tatsächlichen Player-Status (`player.isPlaying()`) auswerten, nicht nur den React-State.
-- `handlePauseClick` zusätzlich robust: Player pausieren, Preview-Audio pausieren, `isPlaying` sofort auf `false` setzen (optimistisch), damit das Icon nicht hängt.
-- Beim Umschalten von stumm auf laut während laufender Wiedergabe VO/Musik korrekt einsetzen (funktioniert automatisch, sobald `isPlaying` stimmt).
+## 2. Auto-Stimme (Stimme wird nie leer)
 
-**2. Voiceover ab Schritt 4**
-- Ein automatisches, unstummes Abspielen ist im Browser nicht erlaubt (Autoplay-Policy). Deshalb: das Live-Preview-Panel in `src/pages/UniversalCreator/UniversalCreator.tsx` (Zeile 718–738) mit `autoPlay={false}` betreiben – identisch zu Schritt 5. Damit startet der Nutzer die Vorschau bewusst per Play und hört Voiceover + Musik ab Schritt 4 genauso wie in Schritt 5, statt eine stumme Dauerschleife zu sehen.
+Neue Datei `src/lib/autopilot/autoVoice.ts`:
+- Löst für jeden Charakter die Stimme in dieser Reihenfolge auf: `brand_characters.default_voice_id` → automatische Auswahl aus der Voice-Bibliothek passend zu Projektsprache, Geschlecht und Alter des Charakters → globale Fallback-Stimme der Sprache.
+- Innerhalb einer Szene wird sichergestellt, dass zwei Sprecher nie dieselbe Stimme bekommen.
+- Die automatisch gewählte Stimme wird im Storyboard sichtbar als „automatisch gewählt“ markiert und bleibt manuell überschreibbar.
 
-## Prüfung
-- Schritt 4 öffnen: Vorschau steht still, Klick auf Play → Bild + Voiceover laufen synchron, Icon wechselt zu Pause, Klick auf Pause stoppt sofort.
-- Loop-Button, Mute-Toggle, Lautstärke und Zeitleisten-Seek weiterhin korrekt.
-- Schritt 5 unverändert.
+## 3. Preflight entschärfen
+
+In `src/lib/autopilot/preflight.ts`:
+- `dialogue_no_speaker`, `turn_no_speaker`, `dialogue_no_voice`, `turn_no_voice` werden von `block` zu `warn` — sie können nach der Auto-Zuweisung nur noch auftreten, wenn wirklich nichts auflösbar war, und dürfen die Freigabe nicht mehr blockieren.
+- `speaker_not_in_scene` wird automatisch geheilt (Sprecher wird der Szene hinzugefügt) statt zu blockieren.
+- Der rote Fehlerkasten im Storyboard zeigt Warnungen künftig dezent gelb mit Klartext („Stimme automatisch gewählt“) statt als Blocker.
+
+## 4. Anzeigefehler „undefined · undefined · undefined“
+
+`describeScene()` in `promptGrammar.ts` gibt `undefined` aus, sobald das LLM einen Wert außerhalb der bekannten Listen liefert (z. B. `shotSize: "extreme wide"`). Fix: Normalisierung mit Fallback auf Standardwerte, sodass immer eine lesbare Kamera-Zeile erscheint.
+
+## 5. Ladebalken für jeden Warteprozess
+
+Neue kleine Komponente `src/components/autopilot/StageProgressBar.tsx` (unbestimmter Gold-Sweep + optionaler Prozentwert, Design-Tokens, kein hartkodiertes Weiß/Gold):
+- **Treatment entwickeln**: Balken mit Phasentext („Konzept … Szenen … Dialoge“) statt nur Spinner-Button.
+- **Produktion startet**: Balken während des Orchestrator-Calls.
+- **Pro Szene** in `ProductionStage`: schmaler Fortschrittsbalken je Karte, gespeist aus dem Szenenstatus (Bild 33 % → Bewegung 66 % → Lip-Sync 85 % → fertig 100 %), inklusive Pulsanimation bei laufenden Schritten.
+- **Endschnitt/Finalisierung**: eigener Balken mit Zeitschätzung, damit die Phase nicht „hängend“ wirkt.
+- **Kostendialog/Wallet-Abfrage**: Skeleton-Balken statt leerem Bereich.
+
+## Technische Details
+
+- Betroffene Dateien: `supabase/functions/autopilot-treatment/index.ts`, `src/lib/autopilot/preflight.ts`, `src/lib/autopilot/promptGrammar.ts`, neu `src/lib/autopilot/autoVoice.ts`, `src/components/autopilot/DirectorsTable.tsx`, `src/components/autopilot/ProductionStage.tsx`, neu `StageProgressBar.tsx`.
+- Voice-Auswahl nutzt die bestehende `list-voices` Edge Function inkl. strikter Sprachfilterung und `voice-languages.ts`.
+- Keine Änderung an Abrechnung, Orchestrator-Logik oder Render-Pfad.

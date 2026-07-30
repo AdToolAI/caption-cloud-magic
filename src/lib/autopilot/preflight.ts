@@ -79,17 +79,17 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     turns.forEach((turn, i) => {
       const label = turn.speakerName ?? `Sprecher ${i + 1}`;
       if (!turn.speakerCharacterId) {
-        findings.push(block('turn_no_speaker', `Redebeitrag ${i + 1} ohne Sprecher.`, id));
+        findings.push(warn('turn_no_speaker', `Redebeitrag ${i + 1}: Sprecher wird automatisch besetzt.`, id));
       } else if (
         scene.characterIds.length > 0 &&
         !scene.characterIds.includes(turn.speakerCharacterId)
       ) {
         findings.push(
-          block('turn_speaker_not_in_scene', `${label} kommt in dieser Szene gar nicht vor.`, id),
+          warn('turn_speaker_not_in_scene', `${label} wird der Szene automatisch hinzugefügt.`, id),
         );
       }
       if (!turn.voiceId) {
-        findings.push(block('turn_no_voice', `${label}: Stimme fehlt.`, id));
+        findings.push(warn('turn_no_voice', `${label}: Stimme wird automatisch gewählt.`, id));
       }
     });
     if (turns.length > 4) {
@@ -114,10 +114,10 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     }
   } else if (scene.dialogue?.trim()) {
     if (!scene.speakerCharacterId) {
-      findings.push(block('dialogue_no_speaker', 'Dialog ohne zugeordneten Sprecher.', id));
+      findings.push(warn('dialogue_no_speaker', 'Sprecher wird automatisch besetzt.', id));
     }
     if (!scene.voiceId) {
-      findings.push(block('dialogue_no_voice', 'Dialog ohne Stimme — bitte Stimme zuweisen.', id));
+      findings.push(warn('dialogue_no_voice', 'Stimme wird automatisch gewählt.', id));
     }
     if (!scene.voiceLanguage) {
       findings.push(warn('dialogue_no_language', 'Dialog ohne Sprachcode — nutze Projektsprache.', id));
@@ -125,7 +125,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     if (scene.characterIds.length > 0 && scene.speakerCharacterId) {
       if (!scene.characterIds.includes(scene.speakerCharacterId)) {
         findings.push(
-          block('speaker_not_in_scene', 'Der Sprecher kommt in dieser Szene gar nicht vor.', id),
+          warn('speaker_not_in_scene', 'Der Sprecher wird der Szene automatisch hinzugefügt.', id),
         );
       }
     }

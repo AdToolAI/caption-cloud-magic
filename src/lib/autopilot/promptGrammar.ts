@@ -63,11 +63,36 @@ const RISKY_MOVES: CameraMove[] = ['whip_pan', 'orbit', 'crane_down'];
 
 const MIN_SECONDS_FOR_RISKY_MOVE = 5;
 
+/**
+ * The LLM occasionally answers with a label outside our enum ("extreme wide",
+ * "Close Up", "dolly in"). Without coercion the label lookup returns undefined
+ * and the storyboard renders "undefined · undefined · undefined".
+ */
+function coerceKey<T extends string>(raw: unknown, allowed: readonly T[], fallback: T): T {
+  const key = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  if ((allowed as readonly string[]).includes(key)) return key as T;
+  // Tolerate near misses: "extreme_wide_shot" → "extreme_wide".
+  const hit = allowed.find((a) => key.startsWith(a) || a.startsWith(key));
+  return (hit ?? fallback) as T;
+}
+
+export function sceneShotSize(scene: SceneGrammar): ShotSize {
+  return coerceKey(scene.shotSize, Object.keys(SHOT_SIZE_EN) as ShotSize[], 'medium');
+}
+
+export function sceneLighting(scene: SceneGrammar): LightingKey {
+  return coerceKey(scene.lighting, Object.keys(LIGHTING_EN) as LightingKey[], 'soft_window');
+}
+
 function normalizeMove(scene: SceneGrammar): CameraMove {
-  if (RISKY_MOVES.includes(scene.cameraMove) && scene.durationSeconds < MIN_SECONDS_FOR_RISKY_MOVE) {
-    return scene.cameraMove === 'whip_pan' ? 'pan_right' : 'slow_push_in';
+  const move = coerceKey(scene.cameraMove, Object.keys(CAMERA_MOVE_EN) as CameraMove[], 'static');
+  if (RISKY_MOVES.includes(move) && scene.durationSeconds < MIN_SECONDS_FOR_RISKY_MOVE) {
+    return move === 'whip_pan' ? 'pan_right' : 'slow_push_in';
   }
-  return scene.cameraMove;
+  return move;
 }
 
 function joinNegatives(scene: SceneGrammar): string {
@@ -76,8 +101,9 @@ function joinNegatives(scene: SceneGrammar): string {
 }
 
 function cleanClause(value: string): string {
-  return value.trim().replace(/\s+/g, ' ').replace(/[.,;]+$/, '');
+  return String(value ?? '').trim().replace(/\s+/g, ' ').replace(/[.,;]+$/, '');
 }
+
 
 /**
  * Prompt for the ANCHOR still. Deliberately omits camera movement — a still has
@@ -85,12 +111,12 @@ function cleanClause(value: string): string {
  */
 export function compileAnchorPrompt(scene: SceneGrammar): string {
   const parts = [
-    SHOT_SIZE_EN[scene.shotSize],
+    SHOT_SIZE_EN[sceneShotSize(scene)],
     cleanClause(scene.subject),
     cleanClause(scene.action),
     `in ${cleanClause(scene.environment)}`,
     `shot on ${cleanClause(scene.lens)} lens`,
-    LIGHTING_EN[scene.lighting],
+    LIGHTING_EN[sceneLighting(scene)],
     `${cleanClause(scene.mood)} mood`,
     'photorealistic, cinematic color grading, sharp focus on the subject',
   ];
@@ -106,13 +132,13 @@ export function compileMotionPrompt(scene: SceneGrammar, opts?: { hasAnchor?: bo
   if (opts?.hasAnchor === false) {
     // Text-to-video fallback: the frame has to be described in full.
     const parts = [
-      SHOT_SIZE_EN[scene.shotSize],
+      SHOT_SIZE_EN[sceneShotSize(scene)],
       cleanClause(scene.subject),
       cleanClause(scene.action),
       `in ${cleanClause(scene.environment)}`,
       move,
       `shot on ${cleanClause(scene.lens)} lens`,
-      LIGHTING_EN[scene.lighting],
+      LIGHTING_EN[sceneLighting(scene)],
       `${cleanClause(scene.mood)} mood`,
     ];
     return `${parts.join(', ')}. Avoid: ${joinNegatives(scene)}.`;
@@ -128,7 +154,7 @@ export function compileMotionPrompt(scene: SceneGrammar, opts?: { hasAnchor?: bo
 
 /** Human-readable one-liner for the production log / storyboard card. */
 export function describeScene(scene: SceneGrammar): string {
-  return `${SHOT_SIZE_EN[scene.shotSize]} · ${CAMERA_MOVE_EN[normalizeMove(scene)]} · ${LIGHTING_EN[scene.lighting]}`;
+  return `${SHOT_SIZE_EN[sceneShotSize(scene)]} · ${CAMERA_MOVE_EN[normalizeMove(scene)]} · ${LIGHTING_EN[sceneLighting(scene)]}`;
 }
 
 /**

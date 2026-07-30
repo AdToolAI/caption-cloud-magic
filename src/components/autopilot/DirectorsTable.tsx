@@ -47,6 +47,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAutopilotProduction } from '@/hooks/useAutopilotProduction';
 import { ProductionStage } from '@/components/autopilot/ProductionStage';
+import { StageProgressBar } from '@/components/autopilot/StageProgressBar';
+import {
+  loadCast,
+  resolveVoices,
+  resolveNarratorVoice,
+  type CastMember,
+  type ResolvedVoice,
+} from '@/lib/autopilot/autoVoice';
 import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/autopilot/types';
 import { cn } from '@/lib/utils';
 
@@ -61,6 +69,14 @@ const LANGUAGES = [
   { value: 'de', label: 'Deutsch' },
   { value: 'en', label: 'Englisch' },
   { value: 'es', label: 'Spanisch' },
+];
+
+const TREATMENT_PHASES = [
+  'Briefing wird gelesen …',
+  'Konzept und Dramaturgie …',
+  'Szenen werden gebaut …',
+  'Dialoge und Besetzung …',
+  'Letzter Feinschliff …',
 ];
 
 const BEAT_LABEL: Record<string, string> = {
@@ -95,6 +111,18 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
+  /** Phase text shown next to the loading bar while the treatment is written. */
+  const [phase, setPhase] = useState(0);
+
+  useEffect(() => {
+    if (!loading) {
+      setPhase(0);
+      return;
+    }
+    const id = window.setInterval(() => setPhase((p) => (p + 1) % TREATMENT_PHASES.length), 2600);
+    return () => window.clearInterval(id);
+  }, [loading]);
+
   const [approved, setApproved] = useState(false);
   const [productionId, setProductionId] = useState<string | null>(null);
   const [treatment, setTreatment] = useState<AutopilotTreatment | null>(null);
@@ -107,31 +135,40 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   );
 
   /**
-   * Voices are never invented by the model — they come from the voice a
-   * character carries in Cast & World. Without this map every speaking scene
-   * would fail preflight with "Stimme fehlt".
+   * Casting & voices are resolved automatically: the character's Cast & World
+   * voice first, then a library voice matching language and gender. The
+   * customer never has to assign anything — "keine Zuordnung" cannot happen.
    */
-  const [voiceByCharacter, setVoiceByCharacter] = useState<
-    Record<string, { voiceId: string | null; name: string }>
-  >({});
+  const [castById, setCastById] = useState<Record<string, CastMember>>({});
+  const [voiceByCharacter, setVoiceByCharacter] = useState<Record<string, ResolvedVoice>>({});
+  const [narratorVoice, setNarratorVoice] = useState<ResolvedVoice | null>(null);
+  const [castingBusy, setCastingBusy] = useState(false);
 
   useEffect(() => {
+    if (!treatment) return;
     const ids = Array.from(
-      new Set((treatment?.scenes ?? []).flatMap((scene) => scene.characterIds ?? [])),
+      new Set((treatment.scenes ?? []).flatMap((scene) => scene.characterIds ?? [])),
     );
-    if (ids.length === 0) return;
     let cancelled = false;
+    setCastingBusy(true);
     void (async () => {
-      const { data } = await supabase
-        .from('brand_characters')
-        .select('id, name, default_voice_id')
-        .in('id', ids);
-      if (cancelled) return;
-      const map: Record<string, { voiceId: string | null; name: string }> = {};
-      for (const row of data ?? []) {
-        map[row.id] = { voiceId: row.default_voice_id ?? null, name: row.name ?? '' };
+      try {
+        const cast = ids.length > 0 ? await loadCast(ids) : {};
+        const members = Object.values(cast);
+        const voices = members.length > 0
+          ? await resolveVoices(members, treatment.language)
+          : {};
+        const needsNarrator =
+          members.length === 0 &&
+          (treatment.scenes ?? []).some((s) => !!s.dialogue || (s.turns?.length ?? 0) > 0);
+        const narrator = needsNarrator ? await resolveNarratorVoice(treatment.language) : null;
+        if (cancelled) return;
+        setCastById(cast);
+        setVoiceByCharacter(voices);
+        setNarratorVoice(narrator);
+      } finally {
+        if (!cancelled) setCastingBusy(false);
       }
-      setVoiceByCharacter(map);
     })();
     return () => {
       cancelled = true;
@@ -148,26 +185,42 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     const scenes = diversifyCameraMoves(
       applyRhythm(treatment.scenes, treatment.totalDurationSeconds),
     ).map((scene) => {
+      const characterIds = [...(scene.characterIds ?? [])];
       const turns = (scene.turns ?? []).map((turn) => {
-        const cast = turn.speakerCharacterId ? voiceByCharacter[turn.speakerCharacterId] : undefined;
+        const speakerId = turn.speakerCharacterId;
+        if (speakerId && !characterIds.includes(speakerId)) characterIds.push(speakerId);
+        const cast = speakerId ? castById[speakerId] : undefined;
+        const resolved = speakerId ? voiceByCharacter[speakerId] : undefined;
+        const voice = resolved ?? narratorVoice ?? undefined;
         return {
           ...turn,
-          speakerName: turn.speakerName ?? cast?.name,
-          voiceId: turn.voiceId ?? cast?.voiceId ?? undefined,
+          speakerName: turn.speakerName ?? cast?.name ?? 'Erzähler',
+          voiceId: turn.voiceId ?? voice?.voiceId,
+          voiceName: voice?.voiceName,
+          autoVoice: !turn.voiceId && (voice?.auto ?? false),
           language: turn.language ?? scene.voiceLanguage ?? treatment.language,
         };
       });
-      const soloVoice = scene.speakerCharacterId
-        ? voiceByCharacter[scene.speakerCharacterId]?.voiceId ?? undefined
-        : undefined;
+      const soloId = scene.speakerCharacterId;
+      if (soloId && !characterIds.includes(soloId)) characterIds.push(soloId);
+      const soloVoice = (soloId ? voiceByCharacter[soloId] : undefined) ?? narratorVoice ?? undefined;
       return {
         ...scene,
+        characterIds,
         turns: turns.length > 0 ? turns : undefined,
-        voiceId: scene.voiceId ?? (turns.length > 0 ? turns[0].voiceId : soloVoice),
+        voiceId:
+          scene.voiceId ?? (turns.length > 0 ? turns[0].voiceId : soloVoice?.voiceId),
+        autoVoiceName:
+          turns.length > 0
+            ? undefined
+            : !scene.voiceId && soloVoice?.auto
+              ? soloVoice.voiceName
+              : undefined,
       };
     });
     return { ...treatment, scenes };
-  }, [treatment, voiceByCharacter]);
+  }, [treatment, castById, voiceByCharacter, narratorVoice]);
+
 
 
   const preflight = useMemo(
@@ -484,6 +537,9 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               </>
             )}
           </Button>
+
+          {loading && <StageProgressBar label={TREATMENT_PHASES[phase]} />}
+
         </div>
       </Card>
 
@@ -507,6 +563,12 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             {plannedTreatment.logline}
           </p>
 
+          {castingBusy && (
+            <div className="mt-4">
+              <StageProgressBar label="Besetzung und Stimmen werden zugeordnet …" />
+            </div>
+          )}
+
           {blockers.length > 0 && (
             <div className="mt-4 space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
               {blockers.map((finding, index) => (
@@ -517,6 +579,8 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               ))}
             </div>
           )}
+
+
 
           <div className="mt-6 space-y-3">
             {plannedTreatment.scenes.map((scene, index) => (
@@ -605,6 +669,9 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               Neu entwickeln
             </Button>
           </div>
+
+          {starting && <StageProgressBar label="Produktion wird gestartet …" />}
+
         </Card>
       )}
 

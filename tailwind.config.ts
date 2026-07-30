@@ -109,10 +109,15 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
+        "autopilot-sweep": {
+          "0%": { transform: "translateX(-120%)" },
+          "100%": { transform: "translateX(420%)" },
+        },
         marquee: {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
+
         scanline: {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(400%)" },
@@ -145,7 +150,9 @@ export default {
         },
       },
       animation: {
+        "autopilot-sweep": "autopilot-sweep 1.4s ease-in-out infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
+
         "accordion-up": "accordion-up 0.2s ease-out",
         "slide-up": "slideUp 0.3s ease-out",
         "pulse-slow": "pulse 8s cubic-bezier(0.4,0,0.6,1) infinite",
