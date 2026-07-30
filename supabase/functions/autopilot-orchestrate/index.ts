@@ -866,29 +866,47 @@ async function callAnchorGate(args: {
   aspect: string;
   portraitUrls: string[];
   characterNames: string[];
+  styleGuide?: string | null;
+  styleReferenceUrl?: string | null;
+  /** Harte Obergrenze; danach liefert das Gate den besten Frame zurück. */
+  deadlineMs?: number;
 }): Promise<{ anchor_url: string | null; score: number; attempts: number; verdicts: unknown } | null> {
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/autopilot-anchor-gate`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-    },
-    body: JSON.stringify({
-      production_id: args.productionId,
-      scene_id: args.sceneId,
-      anchor_prompt: args.prompt,
-      aspect_ratio: args.aspect,
-      portrait_urls: args.portraitUrls,
-      character_names: args.characterNames,
-    }),
-  });
+  // Ohne clientseitiges Timeout bleibt die Szene für immer auf "Bild wird geprüft".
+  const budget = args.deadlineMs ?? ANCHOR_DEADLINE_MS;
+  const abort = AbortSignal.timeout(budget + 20_000);
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      signal: abort,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify({
+        production_id: args.productionId,
+        scene_id: args.sceneId,
+        anchor_prompt: args.prompt,
+        aspect_ratio: args.aspect,
+        portrait_urls: args.portraitUrls,
+        character_names: args.characterNames,
+        style_guide: args.styleGuide ?? undefined,
+        style_reference_url: args.styleReferenceUrl ?? undefined,
+        deadline_ms: budget,
+      }),
+    });
+  } catch (err) {
+    console.error("[autopilot-orchestrate] anchor gate timeout", String(err));
+    return null;
+  }
   if (!resp.ok) {
     console.error("[autopilot-orchestrate] anchor gate", resp.status, (await resp.text()).slice(0, 300));
     return null;
   }
   return await resp.json();
 }
+
 
 async function animate(args: {
   apiKey: string;
