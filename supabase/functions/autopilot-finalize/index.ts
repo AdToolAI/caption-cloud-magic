@@ -535,11 +535,24 @@ async function pickMusic(admin: Admin, mood: string): Promise<string | null> {
   }
 }
 
-/** Poll `video_renders` for up to ~14 minutes. */
-async function waitForRender(admin: Admin, renderId: string): Promise<string | null> {
+/** Poll `video_renders` for up to ~14 minutes; keeps the heartbeat alive (v298). */
+async function waitForRender(
+  admin: Admin,
+  renderId: string,
+  productionId?: string,
+): Promise<string | null> {
   const deadline = Date.now() + 14 * 60_000;
+  let lastBeat = 0;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 8000));
+    if (productionId && Date.now() - lastBeat > 60_000) {
+      lastBeat = Date.now();
+      await admin
+        .from("autopilot_productions")
+        .update({ heartbeat_at: new Date().toISOString() })
+        .eq("id", productionId);
+    }
+
     const { data } = await admin
       .from("video_renders")
       .select("status, video_url, error_message")
