@@ -62,6 +62,9 @@ interface SceneInput {
   grammar?: Record<string, unknown>;
   /** `false` = kein sichtbares Sprechen, kein Sync-Pass für diese Szene. */
   lipSync?: boolean;
+  /** Produktionsweiter Look-Block (englisch). */
+  styleGuide?: string;
+
 }
 
 interface Body {
