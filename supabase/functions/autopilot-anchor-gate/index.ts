@@ -292,9 +292,13 @@ async function judge(args: {
   hasPortraits: boolean;
   characterNames: string[];
   mustContain: string[];
+  styleGuide?: string;
 }): Promise<Verdict> {
   const userText = [
     `Geplante Szene (englischer Prompt):\n${args.prompt}`,
+    args.styleGuide
+      ? `Verbindlicher Look des Films (für style_match):\n${args.styleGuide}\nJede Abweichung in Richtung Anime, Illustration, Cartoon, 3D-Render oder Gemälde ist ein harter Durchfall.`
+      : "Keine gesonderte Stilvorgabe — style_match mit 100 bewerten, sofern der Frame fotorealistisch ist.",
     args.hasPortraits
       ? `Im Bild erwartete Personen: ${args.characterNames.join(", ") || "(unbenannt)"} — genau ${args.characterNames.length || "diese"} Person(en), keine weiteren.`
       : "Keine Referenzpersonen — identity_fidelity mit 100 bewerten.",
@@ -302,6 +306,7 @@ async function judge(args: {
   ]
     .filter(Boolean)
     .join("\n\n");
+
 
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
