@@ -16,17 +16,24 @@ import { cn } from '@/lib/utils';
 const Solitaire = lazy(() => import('@/components/autopilot/lounge/games/Solitaire'));
 const ChessGame = lazy(() => import('@/components/autopilot/lounge/games/ChessGame'));
 const Game2048 = lazy(() => import('@/components/autopilot/lounge/games/Game2048'));
+const Minesweeper = lazy(() => import('@/components/autopilot/lounge/games/Minesweeper'));
+const MemoryGame = lazy(() => import('@/components/autopilot/lounge/games/MemoryGame'));
+const SnakeGame = lazy(() => import('@/components/autopilot/lounge/games/SnakeGame'));
 
 const TAB_KEY = 'autopilot.lounge.tab';
 const GAME_KEY = 'autopilot.lounge.game';
 
-type GameId = 'solitaire' | 'chess' | '2048';
+type GameId = 'solitaire' | 'chess' | '2048' | 'minesweeper' | 'memory' | 'snake';
 
 const GAMES: Array<{ id: GameId; label: string }> = [
   { id: 'solitaire', label: 'Solitär' },
   { id: 'chess', label: 'Schach' },
   { id: '2048', label: '2048' },
+  { id: 'minesweeper', label: 'Minesweeper' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'snake', label: 'Snake' },
 ];
+
 
 interface Props {
   brandKitId?: string | null;
