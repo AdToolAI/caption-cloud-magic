@@ -147,8 +147,8 @@ export function UniversalVoiceLibraryPicker({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col bg-[#050816] border-white/10 text-white">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl h-[min(90vh,850px)] max-h-[90vh] flex flex-col overflow-hidden bg-[#050816] border-white/10 text-white">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="font-serif text-2xl text-[#F5C76A]">{title}</DialogTitle>
           <DialogDescription className="text-white/50">
             {total.toLocaleString('de-DE')} Stimmen{language !== 'all' && ` in ${voiceLanguageLabel(language)}`}
@@ -157,7 +157,7 @@ export function UniversalVoiceLibraryPicker({
         </DialogHeader>
 
         {/* Filter bar */}
-        <div className="space-y-3 border-b border-white/5 pb-3">
+        <div className="shrink-0 space-y-3 border-b border-white/5 pb-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
             <Input
@@ -281,7 +281,7 @@ export function UniversalVoiceLibraryPicker({
 
 
         {/* List */}
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea type="always" className="min-h-0 h-full flex-1 -mx-6 px-6 [&_[data-radix-scroll-area-thumb]]:bg-white/35">
           {isLoading ? (
             <div className="flex items-center justify-center py-16 text-white/50">
               <Loader2 className="h-5 w-5 animate-spin mr-2" /> Lade Stimmen…
@@ -334,16 +334,25 @@ export function UniversalVoiceLibraryPicker({
                   </button>
                 );
               })}
-              {hasNextPage && (
-                <div ref={sentinelRef} className="col-span-full flex items-center justify-center py-4 text-white/40 text-xs">
-                  {isFetchingNextPage ? <><Loader2 className="h-3 w-3 animate-spin mr-2" />Lade weitere…</> : 'Scrolle für mehr'}
-                </div>
-              )}
+              <div ref={sentinelRef} className="col-span-full flex flex-col items-center justify-center gap-2 py-4 text-white/50 text-xs">
+                <span>{voices.length.toLocaleString('de-DE')} von {total.toLocaleString('de-DE')} geladen</span>
+                {hasNextPage && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isFetchingNextPage}
+                    onClick={() => fetchNextPage()}
+                  >
+                    {isFetchingNextPage ? <><Loader2 className="h-3 w-3 animate-spin mr-2" />Lade weitere…</> : 'Weitere Stimmen laden'}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </ScrollArea>
 
-        <div className="flex justify-end pt-2 border-t border-white/5">
+        <div className="shrink-0 flex justify-end pt-2 border-t border-white/5">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Schließen</Button>
         </div>
       </DialogContent>

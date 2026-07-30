@@ -8,7 +8,7 @@ export interface VoiceLibraryFilters {
   gender?: 'male' | 'female' | 'neutral' | null;
   accent?: string | null;
   age?: string | null;
-  use_case?: string | null;
+  use_case?: string | string[] | null;
   search?: string;
   /** DE/ES default to true; override with false to also see accent voices. */
   nativeOnly?: boolean;
