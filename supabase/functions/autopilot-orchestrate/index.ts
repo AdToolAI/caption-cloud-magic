@@ -755,9 +755,19 @@ async function speakAndSync(
     });
   };
 
+  // Nutzerwunsch "kein Lip-Sync": nur Erzählerspur, kein Sync-Pass.
+  if (scene.lipSync === false) {
+    await voiceOnly(
+      `Szene ${scene.orderIndex + 1}: Ohne Lip-Sync gewünscht — Text läuft als Erzählerspur.`,
+      "info",
+    );
+    return;
+  }
+
   // Face-gate on the anchor (the i2v input = the clip's geometry). A missing or
   // tiny face means the Sync-Strecke would burn credits on an unanimatable mouth.
   if (args.anchorUrl) {
+
     const gate = await checkAnchorFaces({
       anchorUrl: args.anchorUrl,
       expectedSpeakers: speakerCount,
