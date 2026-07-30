@@ -69,6 +69,7 @@
     "@vitest/ui": "^3.2.4",
     "@wavesurfer/react": "^1.0.11",
     "canvas-confetti": "^1.9.4",
+    "chess.js": "^1.4.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
