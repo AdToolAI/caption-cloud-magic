@@ -97,7 +97,13 @@ export interface DirectorsTableBriefing {
   duration?: number;
   /** Cast & World characters the idea was built around — hard lock. */
   characters?: Array<{ id: string; name: string; description?: string }>;
+  /**
+   * Nutzerwunsch aus dem Launcher. `false` heißt: niemand spricht sichtbar in
+   * die Kamera — Text wird zu Voiceover, es läuft kein Sync-Pass.
+   */
+  lipSync?: boolean;
 }
+
 
 export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing } = {}) {
   const { toast } = useToast();
