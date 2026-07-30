@@ -35,6 +35,15 @@ interface Body {
   pass_score?: number;
   /** Hard cap on generation attempts (1 = generate once, judge, no repair). */
   max_attempts?: number;
+  /**
+   * Produktionsweiter Stilblock (englisch). Jede Szene desselben Films bekommt
+   * denselben Block — ohne ihn driftet der Look (Anime-Ausreißer).
+   */
+  style_guide?: string;
+  /** Freigegebener Anker der ersten Szene — Look-Referenz, nicht Inhalt. */
+  style_reference_url?: string;
+  /** Gesamtbudget in ms; danach wird der beste bisherige Frame zurückgegeben. */
+  deadline_ms?: number;
 }
 
 /** Fixed rubric. Calibrate this, not the prompt of the day. */
@@ -42,7 +51,7 @@ const JUDGE_RULES = `Du bist Bildkritiker in einer Werbeproduktion. Du bewertest
 das gleich als erster Frame eines Videoclips animiert wird. Fehler, die du jetzt durchwinkst,
 kosten später ein Vielfaches.
 
-Bewerte streng und unabhängig in sechs Achsen, je 0–100:
+Bewerte streng und unabhängig in sieben Achsen, je 0–100:
 - identity_fidelity: Stimmen Gesichter mit den Referenzportraits überein? Keine Doppelgänger,
   keine zusätzlichen Personen, keine vertauschten Identitäten. Ohne Referenzportraits: 100.
 - product_fidelity: Ist das Produkt korrekt und unverzerrt dargestellt? Ohne Produkt: 100.
@@ -51,8 +60,11 @@ Bewerte streng und unabhängig in sechs Achsen, je 0–100:
 - text_artifacts: 100 = gar kein Text im Bild. Jede Fantasieschrift, jedes verzerrte Logo
   und jedes Wasserzeichen zieht stark ab.
 - brand_fit: Passen Licht, Farbwelt und Stimmung zur beschriebenen Szene?
+- style_match: Entspricht der Frame exakt dem vorgegebenen Look des Films (Fotorealismus,
+  Filmstock, Farbwelt)? Jede Stilabweichung — Anime, Illustration, Cartoon, 3D-Render,
+  Gemälde, Comic — ist ein harter Durchfall (unter 30). Ohne Stilvorgabe: 100.
 
-Der Gesamtscore ist das MINIMUM aller sechs Achsen, nicht der Durchschnitt — ein einziger
+Der Gesamtscore ist das MINIMUM aller sieben Achsen, nicht der Durchschnitt — ein einziger
 grober Fehler macht den Frame unbrauchbar.
 
 Wenn der Frame durchfällt, formuliere in "repair_instruction" eine kurze, konkrete englische
@@ -60,6 +72,7 @@ Korrekturanweisung, die nur den Fehler adressiert (z. B. "the left hand has six 
 both hands relaxed and partially out of frame"). Erfinde keine neue Bildidee.
 
 Antworte NUR über den Tool-Call.`;
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -84,17 +97,33 @@ Deno.serve(async (req) => {
     const maxAttempts = clampInt(body.max_attempts ?? 4, 1, 6);
     const portraits = (body.portrait_urls ?? []).filter(Boolean).slice(0, 4);
     const props = (body.prop_urls ?? []).filter(Boolean).slice(0, 3);
+    const styleGuide = String(body.style_guide ?? "").trim();
+    const styleRef = String(body.style_reference_url ?? "").trim();
+    // Hartes Zeitbudget: nach Ablauf wird nicht neu generiert, sondern der
+    // beste bisherige Frame zurückgegeben — sonst hängt die Szene ewig auf
+    // "Bild wird geprüft".
+    const deadline = Date.now() + clampInt(body.deadline_ms ?? 360_000, 60_000, 540_000);
 
     const verdicts: unknown[] = [];
     let prompt = body.anchor_prompt;
     let best: { url: string; score: number } | null = null;
+    let usedAttempts = 0;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (Date.now() > deadline) {
+        verdicts.push({ attempt, error: "deadline_reached" });
+        break;
+      }
+      usedAttempts = attempt;
+
       const image = await generateAnchor({
         apiKey: LOVABLE_API_KEY,
         prompt,
         aspect,
         refs: [...portraits, ...props],
+        styleGuide,
+        styleRefUrl: styleRef,
+        portraitCount: portraits.length,
       });
 
       if (!image) {
@@ -115,6 +144,7 @@ Deno.serve(async (req) => {
         hasPortraits: portraits.length > 0,
         characterNames: body.character_names ?? [],
         mustContain: body.must_contain ?? [],
+        styleGuide,
       });
 
       verdicts.push({ attempt, url, ...verdict });
@@ -144,10 +174,11 @@ Deno.serve(async (req) => {
       ok: Boolean(best),
       anchor_url: best?.url ?? null,
       score: best?.score ?? 0,
-      attempts: maxAttempts,
+      attempts: Math.max(1, usedAttempts),
       below_threshold: true,
       verdicts,
     });
+
   } catch (err) {
     console.error("[autopilot-anchor-gate] fatal", err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
@@ -161,18 +192,37 @@ async function generateAnchor(args: {
   prompt: string;
   aspect: string;
   refs: string[];
+  styleGuide?: string;
+  styleRefUrl?: string;
+  portraitCount?: number;
 }): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> {
+  const portraitCount = args.portraitCount ?? args.refs.length;
+  const hasStyleRef = Boolean(args.styleRefUrl);
+
   const content: Array<Record<string, unknown>> = [
     {
       type: "text",
-      text:
-        `${args.prompt}\n\nRender a single photorealistic still frame in ${args.aspect} aspect ratio.` +
-        (args.refs.length
-          ? " The attached reference images define the exact identity of the people and the exact appearance of the products. Reproduce them faithfully."
-          : ""),
+      text: [
+        args.prompt,
+        args.styleGuide
+          ? `FILM LOOK (identical for every shot of this film, never deviate): ${args.styleGuide}`
+          : "",
+        `Render a single photorealistic still frame in ${args.aspect} aspect ratio.`,
+        args.refs.length
+          ? `The first ${portraitCount} attached reference image(s) define the exact identity of the people and the exact appearance of the products. Reproduce them faithfully.`
+          : "",
+        hasStyleRef
+          ? "The LAST attached image is a look reference from an earlier shot of the same film: match its film stock, color grading, contrast and lighting quality — do NOT copy its content, framing or people."
+          : "",
+        "Strictly forbidden: anime, manga, illustration, cartoon, comic, painting, 3d render, CGI look, stylised filters.",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
     },
   ];
   for (const url of args.refs) content.push({ type: "image_url", image_url: { url } });
+  if (hasStyleRef) content.push({ type: "image_url", image_url: { url: args.styleRefUrl } });
+
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 90_000);
@@ -242,9 +292,13 @@ async function judge(args: {
   hasPortraits: boolean;
   characterNames: string[];
   mustContain: string[];
+  styleGuide?: string;
 }): Promise<Verdict> {
   const userText = [
     `Geplante Szene (englischer Prompt):\n${args.prompt}`,
+    args.styleGuide
+      ? `Verbindlicher Look des Films (für style_match):\n${args.styleGuide}\nJede Abweichung in Richtung Anime, Illustration, Cartoon, 3D-Render oder Gemälde ist ein harter Durchfall.`
+      : "Keine gesonderte Stilvorgabe — style_match mit 100 bewerten, sofern der Frame fotorealistisch ist.",
     args.hasPortraits
       ? `Im Bild erwartete Personen: ${args.characterNames.join(", ") || "(unbenannt)"} — genau ${args.characterNames.length || "diese"} Person(en), keine weiteren.`
       : "Keine Referenzpersonen — identity_fidelity mit 100 bewerten.",
@@ -252,6 +306,7 @@ async function judge(args: {
   ]
     .filter(Boolean)
     .join("\n\n");
+
 
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -284,6 +339,7 @@ async function judge(args: {
                   composition: { type: "integer" },
                   text_artifacts: { type: "integer" },
                   brand_fit: { type: "integer" },
+                  style_match: { type: "integer" },
                   repair_instruction: { type: "string" },
                   summary: { type: "string" },
                 },
@@ -294,9 +350,11 @@ async function judge(args: {
                   "composition",
                   "text_artifacts",
                   "brand_fit",
+                  "style_match",
                   "summary",
                 ],
                 additionalProperties: false,
+
               },
             },
           },
@@ -324,8 +382,12 @@ async function judge(args: {
       "composition",
       "text_artifacts",
       "brand_fit",
+      "style_match",
     ]) {
-      axes[key] = clampInt(Number(parsed[key] ?? 0), 0, 100);
+
+      // Fehlende Achse darf den Frame nicht killen (Score = Minimum).
+      axes[key] = clampInt(Number(parsed[key] ?? 100), 0, 100);
+
     }
 
     // Minimum, not average: one broken axis ruins the frame.

@@ -1,12 +1,18 @@
 /**
- * 2048 — Tastatur + Wisch, Highscore lokal. Reiner Zeitvertreib.
+ * 2048 — Tastatur + Wisch, Highscore lokal.
+ *
+ * Der gesamte Zustand läuft über einen puren Reducer. Vorher wurden `setScore`
+ * und `setBest` innerhalb des `setGrid`-Updaters aufgerufen — unter StrictMode
+ * läuft ein Updater doppelt, dadurch wurden Punkte doppelt gezählt und pro Zug
+ * zwei Kacheln gesetzt. Ein Zug = eine Aktion, keine Seiteneffekte im Updater.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 type Grid = number[][];
+type Dir = 'left' | 'right' | 'up' | 'down';
 
 const SIZE = 4;
 const STORAGE_KEY = 'autopilot.lounge.2048.best';
@@ -46,11 +52,12 @@ function slideRow(row: number[]): { row: number[]; gained: number } {
   return { row: out, gained };
 }
 
+/** Dreht das Brett um 90° im Uhrzeigersinn. */
 function rotate(grid: Grid): Grid {
   return grid[0].map((_, c) => grid.map((row) => row[c]).reverse());
 }
 
-function move(grid: Grid, dir: 'left' | 'right' | 'up' | 'down') {
+function move(grid: Grid, dir: Dir) {
   let work = grid.map((row) => [...row]);
   const turns = { left: 0, up: 1, right: 2, down: 3 }[dir];
   for (let i = 0; i < turns; i += 1) work = rotate(work);
@@ -71,6 +78,27 @@ function isDead(grid: Grid): boolean {
   return (['left', 'right', 'up', 'down'] as const).every((dir) => !move(grid, dir).moved);
 }
 
+interface State {
+  grid: Grid;
+  score: number;
+  best: number;
+}
+
+type Action = { type: 'move'; dir: Dir } | { type: 'reset' };
+
+function init(): State {
+  return { grid: newGame(), score: 0, best: Number(localStorage.getItem(STORAGE_KEY) ?? 0) };
+}
+
+function reducer(state: State, action: Action): State {
+  if (action.type === 'reset') return { ...state, grid: newGame(), score: 0 };
+
+  const res = move(state.grid, action.dir);
+  if (!res.moved) return state;
+  const score = state.score + res.gained;
+  return { grid: addTile(res.grid), score, best: Math.max(state.best, score) };
+}
+
 const TILE_STYLE: Record<number, string> = {
   0: 'bg-white/5 text-transparent',
   2: 'bg-amber-200/15 text-amber-100',
@@ -87,33 +115,18 @@ const TILE_STYLE: Record<number, string> = {
 };
 
 export default function Game2048() {
-  const [grid, setGrid] = useState<Grid>(newGame);
-  const [score, setScore] = useState(0);
-  const [best, setBest] = useState<number>(() => Number(localStorage.getItem(STORAGE_KEY) ?? 0));
+  const [state, dispatch] = useReducer(reducer, undefined, init);
   const touch = useRef<{ x: number; y: number } | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
 
-  const apply = useCallback((dir: 'left' | 'right' | 'up' | 'down') => {
-    setGrid((current) => {
-      const res = move(current, dir);
-      if (!res.moved) return current;
-      setScore((s) => {
-        const next = s + res.gained;
-        setBest((b) => {
-          if (next > b) {
-            localStorage.setItem(STORAGE_KEY, String(next));
-            return next;
-          }
-          return b;
-        });
-        return next;
-      });
-      return addTile(res.grid);
-    });
-  }, []);
+  // Bestwert nur persistieren, nie im Reducer schreiben.
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, String(state.best));
+  }, [state.best]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const map: Record<string, 'left' | 'right' | 'up' | 'down'> = {
+      const map: Record<string, Dir> = {
         ArrowLeft: 'left',
         ArrowRight: 'right',
         ArrowUp: 'up',
@@ -121,38 +134,36 @@ export default function Game2048() {
       };
       const dir = map[event.key];
       if (!dir) return;
+      // Nur greifen, wenn das Brett wirklich sichtbar ist — sonst blockieren
+      // wir das Scrollen der Produktionsansicht.
+      const box = boardRef.current?.getBoundingClientRect();
+      if (!box || box.bottom < 0 || box.top > window.innerHeight) return;
       event.preventDefault();
-      apply(dir);
+      dispatch({ type: 'move', dir });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [apply]);
+  }, []);
 
-  const dead = isDead(grid);
+  const dead = isDead(state.grid);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          Punkte <span className="font-mono text-foreground">{score}</span>
+          Punkte <span className="font-mono text-foreground">{state.score}</span>
         </span>
         <span>
-          Bestwert <span className="font-mono text-foreground">{best}</span>
+          Bestwert <span className="font-mono text-foreground">{state.best}</span>
         </span>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setGrid(newGame());
-            setScore(0);
-          }}
-        >
+        <Button size="sm" variant="outline" onClick={() => dispatch({ type: 'reset' })}>
           Neu
         </Button>
       </div>
 
       <div
-        className="grid select-none grid-cols-4 gap-2 rounded-2xl border border-primary/20 bg-black/40 p-2"
+        ref={boardRef}
+        className="grid select-none grid-cols-4 gap-2 rounded-2xl border border-primary/20 bg-black/40 p-2 touch-none"
         onTouchStart={(e) => {
           touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         }}
@@ -161,12 +172,15 @@ export default function Game2048() {
           if (!start) return;
           const dx = e.changedTouches[0].clientX - start.x;
           const dy = e.changedTouches[0].clientY - start.y;
-          if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
-          apply(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
           touch.current = null;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+          dispatch({
+            type: 'move',
+            dir: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up',
+          });
         }}
       >
-        {grid.flatMap((row, r) =>
+        {state.grid.flatMap((row, r) =>
           row.map((value, c) => (
             <div
               key={`${r}-${c}`}
@@ -181,8 +195,23 @@ export default function Game2048() {
         )}
       </div>
 
+      <div className="flex items-center justify-center gap-1.5 sm:hidden">
+        {(
+          [
+            ['left', '←'],
+            ['up', '↑'],
+            ['down', '↓'],
+            ['right', '→'],
+          ] as Array<[Dir, string]>
+        ).map(([dir, glyph]) => (
+          <Button key={dir} size="sm" variant="outline" onClick={() => dispatch({ type: 'move', dir })}>
+            {glyph}
+          </Button>
+        ))}
+      </div>
+
       <p className="text-center text-xs text-muted-foreground">
-        {dead ? 'Kein Zug mehr möglich — neu starten.' : 'Pfeiltasten oder wischen.'}
+        {dead ? 'Kein Zug mehr möglich — neu starten.' : 'Pfeiltasten, Wischen oder Buttons.'}
       </p>
     </div>
   );

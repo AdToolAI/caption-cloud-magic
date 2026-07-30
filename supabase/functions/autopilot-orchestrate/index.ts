@@ -60,19 +60,33 @@ interface SceneInput {
   characterNames?: string[];
   soundDesign?: Record<string, unknown> | null;
   grammar?: Record<string, unknown>;
+  /** `false` = kein sichtbares Sprechen, kein Sync-Pass für diese Szene. */
+  lipSync?: boolean;
+  /** Produktionsweiter Look-Block (englisch). */
+  styleGuide?: string;
+
 }
 
 interface Body {
   production_id: string;
   aspect_ratio?: string;
   scenes?: SceneInput[];
+  /** Produktionsweiter Look — jede Szene wird dagegen geprüft. */
+  style_guide?: string;
+  /** Globaler Nutzerwunsch; `false` deaktiviert Lip-Sync komplett. */
+  lip_sync?: boolean;
   /** v297: Wiederaufnahme durch den Watchdog — Szenenzeilen bleiben stehen. */
   resume?: boolean;
 }
 
 
+
 /** Engine picked per scene length — Hailuo is the reliable i2v workhorse. */
 const MOTION_MODEL = "minimax/hailuo-2.3";
+
+/** Bildfreigabe darf pro Szene höchstens 6 Minuten kosten. */
+const ANCHOR_DEADLINE_MS = 6 * 60 * 1000;
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -159,6 +173,9 @@ Deno.serve(async (req) => {
         characterIds: (row.grammar?.characterIds as string[]) ?? [],
         portraitUrls: (row.grammar?.portraitUrls as string[]) ?? [],
         characterNames: (row.grammar?.characterNames as string[]) ?? [],
+        // Wunsch & Look überleben den Neustart nur über die grammar-Spalte.
+        lipSync: row.grammar?.lipSync !== false,
+        styleGuide: (row.grammar?.styleGuide as string) ?? undefined,
         soundDesign: row.sound_design ?? {},
         grammar: row.grammar ?? {},
       }));
@@ -174,9 +191,14 @@ Deno.serve(async (req) => {
           scene_index: scene.orderIndex,
           beat: scene.beat,
           duration_seconds: scene.durationSeconds,
-          grammar: scene.grammar ?? {},
+          grammar: {
+            ...(scene.grammar ?? {}),
+            lipSync: scene.lipSync ?? body.lip_sync ?? true,
+            styleGuide: body.style_guide ?? null,
+          },
           anchor_prompt: scene.anchorPrompt,
           motion_prompt: scene.motionPrompt,
+
           dialogue: (scene.turns?.length ?? 0) > 0
             ? {
                 text: (scene.turns ?? []).map((t) => t.text).join(" "),
@@ -202,7 +224,14 @@ Deno.serve(async (req) => {
           status: "pending",
         })),
       );
+      // Wunsch & Look auch im Speicher führen, nicht nur in der Zeile.
+      scenes = scenes.map((scene) => ({
+        ...scene,
+        lipSync: scene.lipSync ?? body.lip_sync ?? true,
+        styleGuide: body.style_guide ?? scene.styleGuide,
+      }));
     }
+
 
     await admin
       .from("autopilot_productions")
@@ -290,6 +319,11 @@ async function runProduction(
 
   const pending = scenes.filter((scene) => !skipIndices.has(scene.orderIndex));
 
+  /** Produktionsweiter Look — identisch für jede Szene. */
+  const styleGuide = scenes.find((s) => s.styleGuide)?.styleGuide ?? null;
+  /** Erster freigegebener Anker dient allen folgenden Szenen als Look-Referenz. */
+  let styleReferenceUrl: string | null = null;
+
   const heartbeat = async () => {
     await admin
       .from("autopilot_productions")
@@ -300,6 +334,13 @@ async function runProduction(
       })
       .eq("id", productionId);
   };
+
+  // Auch während langer Renderphasen muss der Puls schlagen, sonst greift
+  // der Watchdog und startet eine bereits laufende Produktion neu.
+  const heartbeatTimer = setInterval(() => {
+    void heartbeat().catch(() => {});
+  }, 60_000);
+
 
   const withLipsyncLock = async <T>(fn: () => Promise<T>): Promise<T> => {
     const previous = lipsyncLock;
@@ -345,7 +386,11 @@ async function runProduction(
             aspect,
             portraitUrls: scene.portraitUrls ?? [],
             characterNames: scene.characterNames ?? [],
+            styleGuide: scene.styleGuide ?? styleGuide,
+            styleReferenceUrl,
+            deadlineMs: ANCHOR_DEADLINE_MS,
           });
+
 
         if (!anchor?.anchor_url) {
           lastError = "Kein brauchbares Ankerbild.";
@@ -374,6 +419,9 @@ async function runProduction(
           });
           anchorUrl = anchor.anchor_url;
           anchorScore = Math.round(anchor.score ?? 0);
+          // Erster freigegebener Frame setzt den Look für den Rest des Films.
+          if (!styleReferenceUrl) styleReferenceUrl = anchorUrl;
+
 
           await log(admin, productionId, userId, {
             stage: "anchors",
@@ -472,6 +520,8 @@ async function runProduction(
         });
 
         // --- Stage 3: speaking scenes get voice + lip-sync ---------------
+        // `lipSync === false` ist ein Nutzerwunsch, kein Vorschlag: es läuft
+        // dann nur die Sprachspur, kein Sync-Pass und keine Sync-Credits.
         if ((scene.turns?.length ?? 0) > 0 || (scene.dialogue ?? "").trim().length > 1) {
           await withLipsyncLock(() =>
             speakAndSync(admin, {
@@ -483,6 +533,8 @@ async function runProduction(
             })
           );
         }
+
+
 
         await log(admin, productionId, userId, {
           stage: "motion",
@@ -543,9 +595,14 @@ async function runProduction(
     }
   };
 
-  await Promise.all(
-    Array.from({ length: Math.min(SCENE_CONCURRENCY, Math.max(1, pending.length)) }, worker),
-  );
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(SCENE_CONCURRENCY, Math.max(1, pending.length)) }, worker),
+    );
+  } finally {
+    clearInterval(heartbeatTimer);
+  }
+
 
   const { done, failed, stills } = counters;
 
@@ -700,9 +757,19 @@ async function speakAndSync(
     });
   };
 
+  // Nutzerwunsch "kein Lip-Sync": nur Erzählerspur, kein Sync-Pass.
+  if (scene.lipSync === false) {
+    await voiceOnly(
+      `Szene ${scene.orderIndex + 1}: Ohne Lip-Sync gewünscht — Text läuft als Erzählerspur.`,
+      "info",
+    );
+    return;
+  }
+
   // Face-gate on the anchor (the i2v input = the clip's geometry). A missing or
   // tiny face means the Sync-Strecke would burn credits on an unanimatable mouth.
   if (args.anchorUrl) {
+
     const gate = await checkAnchorFaces({
       anchorUrl: args.anchorUrl,
       expectedSpeakers: speakerCount,
@@ -841,29 +908,47 @@ async function callAnchorGate(args: {
   aspect: string;
   portraitUrls: string[];
   characterNames: string[];
+  styleGuide?: string | null;
+  styleReferenceUrl?: string | null;
+  /** Harte Obergrenze; danach liefert das Gate den besten Frame zurück. */
+  deadlineMs?: number;
 }): Promise<{ anchor_url: string | null; score: number; attempts: number; verdicts: unknown } | null> {
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/autopilot-anchor-gate`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-    },
-    body: JSON.stringify({
-      production_id: args.productionId,
-      scene_id: args.sceneId,
-      anchor_prompt: args.prompt,
-      aspect_ratio: args.aspect,
-      portrait_urls: args.portraitUrls,
-      character_names: args.characterNames,
-    }),
-  });
+  // Ohne clientseitiges Timeout bleibt die Szene für immer auf "Bild wird geprüft".
+  const budget = args.deadlineMs ?? ANCHOR_DEADLINE_MS;
+  const abort = AbortSignal.timeout(budget + 20_000);
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      signal: abort,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify({
+        production_id: args.productionId,
+        scene_id: args.sceneId,
+        anchor_prompt: args.prompt,
+        aspect_ratio: args.aspect,
+        portrait_urls: args.portraitUrls,
+        character_names: args.characterNames,
+        style_guide: args.styleGuide ?? undefined,
+        style_reference_url: args.styleReferenceUrl ?? undefined,
+        deadline_ms: budget,
+      }),
+    });
+  } catch (err) {
+    console.error("[autopilot-orchestrate] anchor gate timeout", String(err));
+    return null;
+  }
   if (!resp.ok) {
     console.error("[autopilot-orchestrate] anchor gate", resp.status, (await resp.text()).slice(0, 300));
     return null;
   }
   return await resp.json();
 }
+
 
 async function animate(args: {
   apiKey: string;

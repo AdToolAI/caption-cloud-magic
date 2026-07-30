@@ -16,17 +16,24 @@ import { cn } from '@/lib/utils';
 const Solitaire = lazy(() => import('@/components/autopilot/lounge/games/Solitaire'));
 const ChessGame = lazy(() => import('@/components/autopilot/lounge/games/ChessGame'));
 const Game2048 = lazy(() => import('@/components/autopilot/lounge/games/Game2048'));
+const Minesweeper = lazy(() => import('@/components/autopilot/lounge/games/Minesweeper'));
+const MemoryGame = lazy(() => import('@/components/autopilot/lounge/games/MemoryGame'));
+const SnakeGame = lazy(() => import('@/components/autopilot/lounge/games/SnakeGame'));
 
 const TAB_KEY = 'autopilot.lounge.tab';
 const GAME_KEY = 'autopilot.lounge.game';
 
-type GameId = 'solitaire' | 'chess' | '2048';
+type GameId = 'solitaire' | 'chess' | '2048' | 'minesweeper' | 'memory' | 'snake';
 
 const GAMES: Array<{ id: GameId; label: string }> = [
   { id: 'solitaire', label: 'Solitär' },
   { id: 'chess', label: 'Schach' },
   { id: '2048', label: '2048' },
+  { id: 'minesweeper', label: 'Minesweeper' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'snake', label: 'Snake' },
 ];
+
 
 interface Props {
   brandKitId?: string | null;
@@ -71,7 +78,7 @@ export function LoungePanel({ brandKitId, language }: Props) {
 
         {/* forceMount: das Spiel darf beim Tab-Wechsel nicht verloren gehen. */}
         <TabsContent value="spiele" forceMount className={cn('mt-3', tab !== 'spiele' && 'hidden')}>
-          <div className="mb-3 flex gap-1.5">
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {GAMES.map((entry) => (
               <button
                 key={entry.id}
@@ -96,7 +103,11 @@ export function LoungePanel({ brandKitId, language }: Props) {
             {game === 'solitaire' && <Solitaire />}
             {game === 'chess' && <ChessGame />}
             {game === '2048' && <Game2048 />}
+            {game === 'minesweeper' && <Minesweeper />}
+            {game === 'memory' && <MemoryGame />}
+            {game === 'snake' && <SnakeGame />}
           </Suspense>
+
         </TabsContent>
       </Tabs>
     </Card>

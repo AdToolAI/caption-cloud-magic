@@ -114,7 +114,9 @@ export function AutopilotStudio() {
             genre: (idea.genre as AutopilotGenre) || undefined,
             aspect: round.options.aspect as AutopilotAspect,
             language: round.options.language,
+            lipSync: round.options.lipSync,
             duration: Math.round(idea.beats.reduce((acc, b) => acc + b.seconds, 0)),
+
             characters: characters
               .filter((c) => round.options.characterIds.includes(c.id))
               .map((c) => ({ id: c.id, name: c.name, description: c.description ?? undefined })),

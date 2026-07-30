@@ -33,6 +33,8 @@ import {
   compileAnchorPrompt,
   compileMotionPrompt,
   clampPromptWords,
+  deriveStyleBible,
+
 } from '@/lib/autopilot/promptGrammar';
 import { estimateProductionCost, formatEuro } from '@/lib/autopilot/costEstimate';
 import {
@@ -97,7 +99,13 @@ export interface DirectorsTableBriefing {
   duration?: number;
   /** Cast & World characters the idea was built around — hard lock. */
   characters?: Array<{ id: string; name: string; description?: string }>;
+  /**
+   * Nutzerwunsch aus dem Launcher. `false` heißt: niemand spricht sichtbar in
+   * die Kamera — Text wird zu Voiceover, es läuft kein Sync-Pass.
+   */
+  lipSync?: boolean;
 }
+
 
 export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing } = {}) {
   const { toast } = useToast();
@@ -144,6 +152,9 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   const [narratorVoice, setNarratorVoice] = useState<ResolvedVoice | null>(null);
   const [castingBusy, setCastingBusy] = useState(false);
 
+  /** `false` = niemand spricht sichtbar; Dialog wird zu Erzähler-Voiceover. */
+  const lipSyncWanted = briefing?.lipSync ?? true;
+
   useEffect(() => {
     if (!treatment) return;
     const ids = Array.from(
@@ -158,9 +169,11 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
         const voices = members.length > 0
           ? await resolveVoices(members, treatment.language)
           : {};
-        const needsNarrator =
-          members.length === 0 &&
-          (treatment.scenes ?? []).some((s) => !!s.dialogue || (s.turns?.length ?? 0) > 0);
+        const hasSpokenText = (treatment.scenes ?? []).some(
+          (s) => !!s.dialogue || (s.turns?.length ?? 0) > 0,
+        );
+        // Ohne Lip-Sync spricht immer der Erzähler — auch wenn Cast vorhanden ist.
+        const needsNarrator = hasSpokenText && (members.length === 0 || !lipSyncWanted);
         const narrator = needsNarrator ? await resolveNarratorVoice(treatment.language) : null;
         if (cancelled) return;
         setCastById(cast);
@@ -173,7 +186,19 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     return () => {
       cancelled = true;
     };
-  }, [treatment]);
+  }, [treatment, lipSyncWanted]);
+
+
+  /**
+   * Ausdrücklich gewählte Figuren aus dem Launcher. Sie sind gesetzt — eine
+   * Szene ohne Besetzung erbt die Hauptfigur, sonst rendert das Bildmodell
+   * fremde Gesichter (der "Sarah taucht nie auf"-Fehler).
+   */
+  const lockedCharacterIds = useMemo(
+    () => (briefing?.characters ?? []).map((c) => c.id).filter(Boolean),
+    [briefing?.characters],
+  );
+
 
   /**
    * The model delivers structure; the planner owns time and camera variety.
@@ -184,7 +209,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     if (!treatment) return null;
     const scenes = diversifyCameraMoves(
       applyRhythm(treatment.scenes, treatment.totalDurationSeconds),
-    ).map((scene) => {
+    ).map((scene, sceneIdx) => {
       const characterIds = [...(scene.characterIds ?? [])];
       const turns = (scene.turns ?? []).map((turn) => {
         const speakerId = turn.speakerCharacterId;
@@ -204,6 +229,34 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
       const soloId = scene.speakerCharacterId;
       if (soloId && !characterIds.includes(soloId)) characterIds.push(soloId);
       const soloVoice = (soloId ? voiceByCharacter[soloId] : undefined) ?? narratorVoice ?? undefined;
+
+      // Besetzungs-Garantie: gewählte Figuren dürfen nicht durchfallen.
+      if (lockedCharacterIds.length > 0) {
+        const kept = characterIds.filter((id) => lockedCharacterIds.includes(id));
+        if (kept.length === 0) {
+          kept.push(lockedCharacterIds[sceneIdx % lockedCharacterIds.length]);
+        }
+        characterIds.length = 0;
+        characterIds.push(...kept);
+      }
+
+      if (!lipSyncWanted) {
+        // Kein sichtbares Sprechen: alle Zeilen werden zu einer Erzählerspur.
+        const spoken = turns.length > 0
+          ? turns.map((t) => t.text).filter(Boolean).join(' ')
+          : (scene.dialogue ?? '');
+        return {
+          ...scene,
+          characterIds,
+          turns: undefined,
+          dialogue: spoken || undefined,
+          speakerCharacterId: undefined,
+          narratorOnly: true,
+          voiceId: narratorVoice?.voiceId,
+          autoVoiceName: narratorVoice?.auto ? narratorVoice.voiceName : undefined,
+        };
+      }
+
       return {
         ...scene,
         characterIds,
@@ -219,7 +272,8 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
       };
     });
     return { ...treatment, scenes };
-  }, [treatment, castById, voiceByCharacter, narratorVoice]);
+  }, [treatment, castById, voiceByCharacter, narratorVoice, lockedCharacterIds, lipSyncWanted]);
+
 
 
 
@@ -259,13 +313,15 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
       sceneCount: scenes.length,
       totalDurationSeconds: totalSeconds,
       voiceoverEnabled: speakingScenes.length > 0,
-      lipSyncEnabled: speakingScenes.length > 0,
-      lipSyncSpeakers: speakerIds.size,
+      // Ohne Lip-Sync-Wunsch fällt der Sync-Pass komplett weg — auch im Preis.
+      lipSyncEnabled: lipSyncWanted && speakingScenes.length > 0,
+      lipSyncSpeakers: lipSyncWanted ? speakerIds.size : 0,
 
       speakingSeconds: speakingScenes.reduce((acc, scene) => acc + (scene.durationSeconds || 0), 0),
       musicEnabled: true,
     });
-  }, [plannedTreatment]);
+  }, [plannedTreatment, lipSyncWanted]);
+
 
   const openConfirm = async () => {
     setConfirmOpen(true);
@@ -366,43 +422,66 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
         }
       }
 
+      // Ein Look für den ganzen Film — verhindert Ausreißer wie Anime-Szenen.
+      const styleBible = deriveStyleBible({
+        genre: plannedTreatment.genre,
+        scenes: plannedTreatment.scenes as unknown as Parameters<typeof deriveStyleBible>[0]['scenes'],
+      });
+
       const { data, error } = await supabase.functions.invoke('autopilot-orchestrate', {
         body: {
           production_id: productionId,
           aspect_ratio: plannedTreatment.aspect,
+          lip_sync: lipSyncWanted,
+          style_guide: styleBible,
           scenes: plannedTreatment.scenes.map((scene) => {
             const cast = (scene.characterIds ?? [])
               .map((id) => portraitById.get(id))
               .filter(Boolean) as Array<{ url: string | null; name: string }>;
+            const names = cast.map((entry) => entry.name).filter(Boolean);
             return {
               id: scene.id,
               orderIndex: scene.orderIndex,
               beat: scene.beat,
               durationSeconds: scene.durationSeconds,
-              anchorPrompt: clampPromptWords(compileAnchorPrompt(scene)),
-              motionPrompt: clampPromptWords(compileMotionPrompt(scene, { hasAnchor: true }), 60),
+              anchorPrompt: clampPromptWords(
+                compileAnchorPrompt(scene, { styleBible, characterNames: names }),
+              ),
+              motionPrompt: clampPromptWords(
+                compileMotionPrompt(scene, {
+                  hasAnchor: true,
+                  styleBible,
+                  characterNames: names,
+                  silentMouth: !lipSyncWanted,
+                }),
+                60,
+              ),
+              lipSync: lipSyncWanted,
               dialogue: scene.dialogue ?? null,
-              turns: (scene.turns ?? []).map((turn, i) => ({
-                id: turn.id || `${scene.id}:${i}`,
-                text: turn.text,
-                speakerCharacterId: turn.speakerCharacterId ?? null,
-                speakerName: turn.speakerName ?? null,
-                voiceId: turn.voiceId ?? null,
-                language: turn.language ?? scene.voiceLanguage ?? plannedTreatment.language,
-              })),
-              speakerCharacterId: scene.speakerCharacterId ?? null,
+              turns: lipSyncWanted
+                ? (scene.turns ?? []).map((turn, i) => ({
+                    id: turn.id || `${scene.id}:${i}`,
+                    text: turn.text,
+                    speakerCharacterId: turn.speakerCharacterId ?? null,
+                    speakerName: turn.speakerName ?? null,
+                    voiceId: turn.voiceId ?? null,
+                    language: turn.language ?? scene.voiceLanguage ?? plannedTreatment.language,
+                  }))
+                : [],
+              speakerCharacterId: lipSyncWanted ? scene.speakerCharacterId ?? null : null,
               voiceId: scene.voiceId ?? null,
               voiceLanguage: scene.voiceLanguage ?? plannedTreatment.language,
 
               characterIds: scene.characterIds ?? [],
               portraitUrls: cast.map((entry) => entry.url).filter(Boolean),
-              characterNames: cast.map((entry) => entry.name).filter(Boolean),
+              characterNames: names,
               soundDesign: { foleyHint: scene.foleyHint ?? null },
               grammar: scene as unknown as Record<string, unknown>,
             };
           }),
         },
       });
+
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

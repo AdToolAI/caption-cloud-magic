@@ -1,42 +1,49 @@
 ## Ziel
 
-Die ~20 Minuten Wartezeit im KI-Autopilot werden zu einer bewussten "Warte-Lounge": links sieht der Kunde jederzeit exakt, wo die KI steht (inkl. Restzeit-Schätzung), rechts kann er zwischen **Infos** (tagesaktuell, auf seine Brand zugeschnitten) und **Spielen** (leichte Klassiker) wählen.
+Vier Produktionsfehler beheben (kein Zusammenhang zwischen Szenen, falscher/fehlender Charakter, ungewolltes und schlechtes Lip-Sync, Produktion bleibt bei Szene 4 hängen) und die Warte-Lounge um funktionierende Spiele erweitern.
 
-## 1. Fortschritt sichtbar machen (wie im Content Creator)
+## 1. Lounge: 2048 reparieren + 3 Spiele mehr
 
-Neue Komponente `src/components/autopilot/ProductionLounge.tsx`, die die bestehende `ProductionStage` als linke Spalte aufnimmt (2/3 Breite) und rechts das Lounge-Panel setzt. Ergänzungen an der Fortschrittsseite:
+- `Game2048.tsx`: Der Zug-Handler ruft `setScore`/`setBest` **innerhalb** des `setGrid`-Updaters auf. Unter React StrictMode läuft der Updater doppelt, dadurch springt das Brett unkontrolliert bzw. reagiert nicht sauber. Umbau auf einen puren Reducer (`useReducer`) mit Zustand `{grid, score, best}`, ein Zug = eine Aktion. Zusätzlich Fokus-/Scroll-Handling: Pfeiltasten nur abfangen, wenn das Board im Viewport/aktiv ist.
+- Neue Spiele im gleichen Stil (leichtgewichtig, kein neues Paket, Partie überlebt Status-Updates):
+  - **Minesweeper** (9×9, Flaggen per Rechtsklick/Long-Press)
+  - **Memory / Pairs** (Bond-Gold-Kartenrücken, Zug- und Zeitzähler)
+  - **Snake** (Tastatur + Wisch, lokaler Highscore)
+- `LoungePanel.tsx`: Spieleauswahl von 3 auf 6 Einträge, umbrechende Chip-Leiste.
 
-- **ETA-Berechnung** (`src/lib/autopilot/eta.ts`): Restzeit aus Szenenanzahl × Phasen-Durchschnitt (Anchor / Motion / Lip-Sync / Endschnitt) und bereits abgeschlossenen Szenen. Anzeige als „noch ca. 12 Min." mit Unschärfe-Formulierung, nie als exakte Sekunde.
-- **Phasen-Ticker**: kompakte Zeile „Was gerade passiert" mit der letzten Director-Log-Meldung in Klartext (Technik-Jargon wird gefiltert, wie bei `planDisplayFilter`).
-- Alle Wartezustände nutzen die vorhandene `StageProgressBar` (Gold-Sweep), damit nichts „hängt".
-- Browser-Benachrichtigung + Toast, wenn der Clip fertig ist (Opt-in beim Start), damit man wirklich weggehen kann. Titel-Tab zeigt `(fertig)`.
+## 2. Look-Konsistenz über alle Szenen (Anime-Ausreißer)
 
-## 2. Entertainment-Panel
+Ursache: `compileAnchorPrompt` baut jeden Anker isoliert; es gibt keine produktionsweite Stilvorgabe, und das Ankerbild jeder Szene wird ohne Bezug zu den vorherigen erzeugt.
 
-Neue Komponente `src/components/autopilot/lounge/LoungePanel.tsx` mit zwei Tabs, Auswahl bleibt in `localStorage` gemerkt. Das Panel läuft komplett unabhängig vom Polling — kein Re-Mount bei Statusupdates, damit ein laufendes Spiel nicht zurückgesetzt wird (State liegt oberhalb des Poll-Renders bzw. in einem Context).
+- **Style-Bible**: Aus Idee/Treatment einmal pro Produktion ein englischer Stil-Block ableiten (Filmstock, Farbwelt, Licht, Objektiv, Grading) und in `promptGrammar.compileAnchorPrompt`/`compileMotionPrompt` in **jede** Szene einsetzen, plus harte Negativliste (`anime, illustration, cartoon, 3d render, CGI, painting`).
+- **Look-Anker**: Die freigegebene Ankergrafik der ersten Szene wird als zusätzliche Referenzbild-URL an `autopilot-anchor-gate` aller Folgeszenen übergeben („match this film's look, not its content").
+- **Judge-Achse**: `autopilot-anchor-gate` bekommt eine siebte Achse `style_match` (Abweichung vom Stilblock = Durchfall), damit Anime-Frames gar nicht erst freigegeben werden.
 
-### Tab „Infos" — brandrelevant und tagesaktuell
-- Neue Edge Function `autopilot-lounge-feed`: kombiniert vorhandene Quellen (`news_hub_articles`, `brand_trends_cache`, `fetch-news-radar`) und rankt sie per Lovable AI gegen das aktive Brand-Kit (Branche, Zielgruppe, Tonalität) — kurze Begründung pro Karte („relevant für dich, weil …").
-- Ergebnis wird pro Brand-Kit + Tag gecacht (24 h), Refresh-Button erzwingt Neuberechnung. Sprache folgt der UI-Sprache (DE/EN/ES).
-- Kartenformat: Headline, 2-Zeilen-Insight, konkreter Handlungsimpuls, Quelle. Optional „Als Idee übernehmen" → legt direkt eine Autopilot-Idee an.
+## 3. Cast-Identität (Sarah Dusatko taucht in keinem Clip auf)
 
-### Tab „Spiele" — leicht, offline, keine Konten
-Drei bewusst simple Titel, alle rein clientseitig, Zustand nur lokal:
-- **Solitär (Klondike)** — Drag/Klick-Steuerung, Auto-Ablage, Neu-Spiel.
-- **Schach** — Brett + Regelwerk über `chess.js`, Gegner über eine schlanke Engine mit drei Stufen (leicht/mittel/schwer). Nur als Zeitvertreib, kein Ranking.
-- **2048** — Tastatur + Swipe, Highscore lokal.
+- **Durchreichen prüfen und erzwingen**: `DirectorsTable` baut `portraitUrls` nur aus `scene.characterIds`. Wenn das Treatment einer Szene keine IDs zuweist, läuft die Szene ohne Portrait. Fix: Bei ausdrücklich gewählten Charakteren (Launcher-Auswahl) wird jede Szene mit mindestens einem dieser Charaktere besetzt; Szenen ohne Cast erben den Hauptcharakter.
+- **Namentliche Bindung im Prompt**: Anker-Prompt nennt den Charakter explizit als Subjekt („<Name>, identical to reference portrait 1") statt einer generischen Beschreibung.
+- **Identitäts-Gate scharf**: Fehlt `identity_fidelity` (Score unter Schwelle) trotz Portraits, wird repariert statt akzeptiert — `pass_score` für Szenen mit Portraits von 78 auf 82.
+- Charaktere ohne `portrait_url`/`reference_image_url` werden vor dem Start in der Director's Table sichtbar gewarnt (sonst ist Identitätstreue technisch unmöglich).
 
-Spiele werden per `React.lazy` geladen, damit sie das Autopilot-Bundle nicht belasten. Optik im Bond-Gold-Stil: Deep Black, Glas, goldene Akzente, keine Fremd-UI.
+## 4. „Kein Lip-Sync" respektieren
 
-## 3. Sauberkeit / Grenzen
+Ursache: Der Launcher-Schalter `lipSync: false` wird nirgends weitergereicht — `DirectorsTable` setzt `lipSyncEnabled` aus „gibt es Dialog?", und der Orchestrator startet Lip-Sync für jede Szene mit Dialog.
 
-- Kein zusätzlicher Poll-Traffic: die Lounge liest denselben `useAutopilotProduction`-State.
-- Kein Guthaben-Verbrauch durch die Lounge; die AI-Rankung läuft einmal pro Tag pro Brand-Kit (gecacht).
-- Bei „fertig" wird das Entertainment nicht abgewürgt: es erscheint ein prominenter Gold-Banner „Dein Clip ist fertig — ansehen", Spiel läuft weiter, bis der Kunde wechselt.
-- Mobil: Lounge rutscht unter den Fortschritt, Spiele-Tab bleibt bedienbar (Touch).
+- Option `lipSync` von `AutopilotIdeaLauncher` → Briefing → `autopilot-treatment` → Szenenzeile durchreichen.
+- Bei `lipSync: false`: Das Treatment schreibt **Voiceover statt On-Camera-Dialog** (kein sichtbares Sprechen, `narratorOnly`), Anker-/Motion-Prompt bekommt „nobody speaks on camera, mouth closed".
+- `autopilot-orchestrate`: Stage 3 ruft nur noch Voiceover ab, wenn Lip-Sync aus ist; `speakAndSync` wird übersprungen (spart auch die Credits).
+- Bei `lipSync: true` bleibt die bestehende, gehärtete Strecke (Face-Gate, sequenzielle Sync-Pässe) unverändert.
+
+## 5. Produktion bleibt bei Szene 4 auf „Bild wird geprüft"
+
+- **Zeitbudget**: `autopilot-anchor-gate` läuft bis zu 4 Anläufe × (90 s Bild + Judge). Bei drei parallelen Szenen kann ein Anlauf länger als das Heartbeat-Fenster laufen — der Watchdog resumt dann in eine noch laufende Szene. Fix: Heartbeat läuft künftig auf einem Intervall-Timer (alle 60 s) während der gesamten Produktion, nicht nur zwischen Szenen.
+- **Hartes Limit pro Szene**: Anker-Phase bekommt ein Gesamt-Timeout (6 min). Läuft es ab, wird die Szene als `failed` mit Klartext markiert statt endlos auf „Bild wird geprüft" zu stehen — die Produktion läuft mit den restlichen Szenen weiter.
+- **Sichtbarkeit**: Szenenkarte zeigt bei `anchor` Anlauf-Zähler und verstrichene Zeit („Anlauf 2/4 · 1:20"), damit ein langer Prüflauf nicht wie ein Hänger aussieht.
+- Watchdog-Regel prüfen: Szenen im Status `anchor`/`motion` älter als das Szenen-Timeout werden beim Resume auf `pending` zurückgesetzt, damit sie erneut aufgegriffen werden.
 
 ## Technische Details
 
-Neue Dateien: `ProductionLounge.tsx`, `lounge/LoungePanel.tsx`, `lounge/InfoFeed.tsx`, `lounge/games/{Solitaire,Chess,Game2048}.tsx`, `src/lib/autopilot/eta.ts`, `supabase/functions/autopilot-lounge-feed/index.ts`.
-Geändert: `DirectorsTable.tsx` (rendert Lounge statt nackter `ProductionStage`).
-Neue Abhängigkeit: `chess.js` (Regellogik). Tabelle: `autopilot_lounge_feed_cache` (user_id, brand_kit_id, language, payload jsonb, expires_at) mit RLS + GRANTs.
+- Betroffen: `src/components/autopilot/lounge/games/*` (+3 neue Dateien), `LoungePanel.tsx`, `src/lib/autopilot/promptGrammar.ts`, `src/lib/autopilot/types.ts`, `src/components/autopilot/DirectorsTable.tsx`, `ProductionStage.tsx`, `AutopilotIdeaLauncher.tsx`, `supabase/functions/autopilot-treatment/index.ts`, `autopilot-anchor-gate/index.ts`, `autopilot-orchestrate/index.ts`, `autopilot-watchdog/index.ts`.
+- Keine Schemaänderung nötig; Style-Bible und `lipSync` werden im vorhandenen `grammar`-JSON der Szenenzeile abgelegt.
+- Verifikation: Testlauf mit 5 Szenen, Lip-Sync AUS, einem gewählten Charakter — erwartet: einheitlicher fotorealistischer Look, Charakter in jeder Szene, kein Sync-Pass, keine Szene bleibt im Anker-Status hängen.
