@@ -197,8 +197,6 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     [briefing?.characters],
   );
 
-  /** `false` = niemand spricht sichtbar; Dialog wird zu Erzähler-Voiceover. */
-  const lipSyncWanted = briefing?.lipSync ?? true;
 
   /**
    * The model delivers structure; the planner owns time and camera variety.
