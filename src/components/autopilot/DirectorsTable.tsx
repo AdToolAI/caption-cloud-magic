@@ -47,6 +47,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAutopilotProduction } from '@/hooks/useAutopilotProduction';
 import { ProductionStage } from '@/components/autopilot/ProductionStage';
+import { StageProgressBar } from '@/components/autopilot/StageProgressBar';
+import {
+  loadCast,
+  resolveVoices,
+  resolveNarratorVoice,
+  type CastMember,
+  type ResolvedVoice,
+} from '@/lib/autopilot/autoVoice';
 import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/autopilot/types';
 import { cn } from '@/lib/utils';
 
