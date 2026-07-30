@@ -382,7 +382,9 @@ async function judge(args: {
       "composition",
       "text_artifacts",
       "brand_fit",
+      "style_match",
     ]) {
+
       axes[key] = clampInt(Number(parsed[key] ?? 0), 0, 100);
     }
 
