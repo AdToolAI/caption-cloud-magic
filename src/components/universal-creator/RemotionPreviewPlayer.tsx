@@ -302,39 +302,42 @@ export function RemotionPreviewPlayer({
     applyPlayerVolume();
   }, [applyPlayerVolume]);
 
-  useEffect(() => {
-    if (!autoPlay || !playerRef.current) return;
-    // Autoplay muted — matches Step 3's <video muted autoPlay loop>.
-    // User can enable sound via mute toggle / volume slider (handlePlayClick unmutes on gesture).
-    try { playerRef.current.setVolume(0); } catch { /* noop */ }
-    playerRef.current.play();
-  }, [autoPlay]);
+  // Mirror volatile values/callbacks into refs so the player listeners can be
+  // registered exactly once (before autoplay) without ever being detached.
+  const stateRef = useRef({ loop, isPlaying, isDragging, fps });
+  stateRef.current = { loop, isPlaying, isDragging, fps };
+  const audioFnRef = useRef({ playPreviewAudio, pausePreviewAudio, seekPreviewAudio });
+  audioFnRef.current = { playPreviewAudio, pausePreviewAudio, seekPreviewAudio };
 
+  // NOTE: this listener effect MUST stay declared before the autoplay effect —
+  // otherwise the initial 'play' event fires before we subscribe and isPlaying
+  // stays false forever (pause button dead, preview audio never starts).
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
 
     const handlePlay = () => {
       setIsPlaying(true);
-      void playPreviewAudio();
+      void audioFnRef.current.playPreviewAudio();
     };
     const handlePause = () => {
       setIsPlaying(false);
-      pausePreviewAudio();
+      audioFnRef.current.pausePreviewAudio();
     };
     const handleEnded = () => {
       setIsPlaying(false);
-      pausePreviewAudio();
+      audioFnRef.current.pausePreviewAudio();
     };
     const handleFrameUpdate = () => {
+      const { loop: isLoop, isPlaying: playing, isDragging: dragging, fps: currentFps } = stateRef.current;
       const frame = player.getCurrentFrame();
       const previousFrame = lastSeekedFrameRef.current;
-      if (loop && isPlaying && frame + 2 < previousFrame) {
-        seekPreviewAudio(frame / fps);
-        void playPreviewAudio();
+      if (isLoop && playing && frame + 2 < previousFrame) {
+        audioFnRef.current.seekPreviewAudio(frame / currentFps);
+        void audioFnRef.current.playPreviewAudio();
       }
       lastSeekedFrameRef.current = frame;
-      if (!isDragging) setCurrentFrame(frame);
+      if (!dragging) setCurrentFrame(frame);
     };
 
     player.addEventListener('play', handlePlay);
@@ -342,13 +345,26 @@ export function RemotionPreviewPlayer({
     player.addEventListener('ended', handleEnded);
     player.addEventListener('frameupdate', handleFrameUpdate);
 
+    // Adopt the real player state in case playback already started.
+    try { setIsPlaying(player.isPlaying()); } catch { /* noop */ }
+
     return () => {
       player.removeEventListener('play', handlePlay);
       player.removeEventListener('pause', handlePause);
       player.removeEventListener('ended', handleEnded);
       player.removeEventListener('frameupdate', handleFrameUpdate);
     };
-  }, [fps, isDragging, isPlaying, loop, pausePreviewAudio, playPreviewAudio, seekPreviewAudio]);
+  }, []);
+
+  useEffect(() => {
+    if (!autoPlay || !playerRef.current) return;
+    // Autoplay muted — browsers block audible autoplay.
+    // User can enable sound via play/mute toggle (both unmute on gesture).
+    try { playerRef.current.setVolume(0); } catch { /* noop */ }
+    playerRef.current.play();
+    try { setIsPlaying(playerRef.current.isPlaying()); } catch { /* noop */ }
+  }, [autoPlay]);
+
 
   useEffect(() => {
     if (!isPlaying) {
@@ -469,20 +485,38 @@ export function RemotionPreviewPlayer({
   }, [durationInFrames, fps, seekPreviewAudio]);
 
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
-    if (!playerRef.current) return;
+    const player = playerRef.current;
+    if (!player) return;
     if (!hasEverInteracted) setHasEverInteracted(true);
-    playerRef.current.unmute();
+    player.unmute();
     setIsMuted(false);
     // Player volume drives scene <Video> original audio; keep it in sync with master.
-    try { playerRef.current.setVolume(clampAudioVolume(volume)); } catch { /* noop */ }
-    playerRef.current.play(e);
+    try { player.setVolume(clampAudioVolume(volume)); } catch { /* noop */ }
+    player.play(e);
+    setIsPlaying(true);
     void playPreviewAudio();
   }, [hasEverInteracted, playPreviewAudio, volume]);
 
   const handlePauseClick = useCallback(() => {
     playerRef.current?.pause();
     pausePreviewAudio();
+    setIsPlaying(false);
   }, [pausePreviewAudio]);
+
+  // Always derive the action from the real player state — never from a stale
+  // React state — so the button can't get stuck on "play" while it's running.
+  const handleTogglePlay = useCallback((e: React.MouseEvent) => {
+    const player = playerRef.current;
+    if (!player) return;
+    let running = isPlaying;
+    try { running = player.isPlaying(); } catch { /* noop */ }
+    if (running) {
+      handlePauseClick();
+    } else {
+      handlePlayClick(e);
+    }
+  }, [handlePauseClick, handlePlayClick, isPlaying]);
+
 
   const toggleMute = useCallback(() => {
     if (isMuted) {
@@ -571,7 +605,7 @@ export function RemotionPreviewPlayer({
             <Button
               size="icon"
               variant="ghost"
-              onClick={isPlaying ? handlePauseClick : handlePlayClick}
+              onClick={handleTogglePlay}
               className="h-9 w-9 text-foreground hover:bg-primary/20"
             >
               {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
