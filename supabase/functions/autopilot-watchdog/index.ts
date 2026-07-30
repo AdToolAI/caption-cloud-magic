@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
   );
 
   const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+  const finalizeCutoff = new Date(Date.now() - FINALIZE_STALE_MS).toISOString();
   const result = { checked: 0, resumed: 0, finalized: 0, failed: 0 };
 
   try {
@@ -55,7 +56,11 @@ Deno.serve(async (req) => {
 
     for (const row of rows ?? []) {
       const last = row.heartbeat_at ?? row.updated_at ?? row.created_at;
-      if (last && last > cutoff) continue;
+      // v298: Ein laufender Endschnitt (Ton + Lambda) darf 30 Minuten brauchen.
+      // Ohne diese Ausnahme würde der Watchdog einen zweiten Render bezahlen.
+      const inFinalCut = FINAL_STAGES.has(String(row.stage ?? ""));
+      const deadline = inFinalCut ? finalizeCutoff : cutoff;
+      if (last && last > deadline) continue;
       result.checked++;
 
       const { data: scenes } = await admin
@@ -68,16 +73,21 @@ Deno.serve(async (req) => {
         s.status !== "completed" && s.status !== "failed"
       );
       const usable = all.filter((s: Record<string, unknown>) => s.status === "completed");
+      const attempts = Number(row.resume_attempts ?? 0);
 
-      // Fall 2: Szenen stehen, nur der Endschnitt fehlt.
-      if (open.length === 0 && usable.length > 0) {
-        await invoke("autopilot-finalize", { production_id: row.id, user_id: row.user_id });
+      // Fall 2: Szenen stehen, nur der Endschnitt fehlt (oder ist tot).
+      if (open.length === 0 && usable.length > 0 && attempts < MAX_RESUMES) {
+        // Erst den Zähler und den Heartbeat setzen, dann anstoßen — sonst
+        // feuert derselbe Zweig im nächsten 3-Minuten-Zyklus erneut.
+        await admin
+          .from("autopilot_productions")
+          .update({ resume_attempts: attempts + 1, heartbeat_at: new Date().toISOString() })
+          .eq("id", row.id);
         await note(admin, row, "Endschnitt wurde neu angestoßen — die Szenen waren bereits fertig.");
+        await invoke("autopilot-finalize", { production_id: row.id, user_id: row.user_id });
         result.finalized++;
         continue;
       }
-
-      const attempts = Number(row.resume_attempts ?? 0);
 
       // Fall 1: Wiederaufnahme.
       if (open.length > 0 && attempts < MAX_RESUMES) {
@@ -96,25 +106,31 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Fall 3: aufgeben — aber ehrlich und mit dem, was da ist.
+      // Fall 3: Versuche verbraucht — ehrlich schließen. Ein weiterer Endschnitt
+      // würde nur erneut Credits kosten, ohne neue Aussicht auf Erfolg.
       if (usable.length > 0) {
-        await invoke("autopilot-finalize", { production_id: row.id, user_id: row.user_id });
         await admin
           .from("autopilot_productions")
           .update({
+            status: "failed",
+            stage: "failed",
+            progress: 100,
+            heartbeat_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
             error_message:
-              `Nicht alle Szenen konnten produziert werden — der Film wurde aus ${usable.length} fertigen Szenen geschnitten.`,
+              `Der Endschnitt konnte trotz ${MAX_RESUMES} Versuchen nicht abgeschlossen werden — ${usable.length} fertige Szene(n) bleiben gesichert.`,
           })
           .eq("id", row.id);
         await note(
           admin,
           row,
-          `Nach ${MAX_RESUMES} Wiederaufnahmen aufgegeben — Endschnitt läuft mit ${usable.length} fertigen Szenen.`,
-          "warn",
+          `Nach ${MAX_RESUMES} Versuchen aufgegeben — ${usable.length} fertige Szene(n) bleiben erhalten, keine weiteren Kosten.`,
+          "error",
         );
-        result.finalized++;
+        result.failed++;
         continue;
       }
+
 
       await admin
         .from("autopilot_productions")
