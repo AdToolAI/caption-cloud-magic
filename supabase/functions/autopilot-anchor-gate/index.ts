@@ -192,18 +192,37 @@ async function generateAnchor(args: {
   prompt: string;
   aspect: string;
   refs: string[];
+  styleGuide?: string;
+  styleRefUrl?: string;
+  portraitCount?: number;
 }): Promise<{ bytes: Uint8Array; mime: string; ext: string } | null> {
+  const portraitCount = args.portraitCount ?? args.refs.length;
+  const hasStyleRef = Boolean(args.styleRefUrl);
+
   const content: Array<Record<string, unknown>> = [
     {
       type: "text",
-      text:
-        `${args.prompt}\n\nRender a single photorealistic still frame in ${args.aspect} aspect ratio.` +
-        (args.refs.length
-          ? " The attached reference images define the exact identity of the people and the exact appearance of the products. Reproduce them faithfully."
-          : ""),
+      text: [
+        args.prompt,
+        args.styleGuide
+          ? `FILM LOOK (identical for every shot of this film, never deviate): ${args.styleGuide}`
+          : "",
+        `Render a single photorealistic still frame in ${args.aspect} aspect ratio.`,
+        args.refs.length
+          ? `The first ${portraitCount} attached reference image(s) define the exact identity of the people and the exact appearance of the products. Reproduce them faithfully.`
+          : "",
+        hasStyleRef
+          ? "The LAST attached image is a look reference from an earlier shot of the same film: match its film stock, color grading, contrast and lighting quality — do NOT copy its content, framing or people."
+          : "",
+        "Strictly forbidden: anime, manga, illustration, cartoon, comic, painting, 3d render, CGI look, stylised filters.",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
     },
   ];
   for (const url of args.refs) content.push({ type: "image_url", image_url: { url } });
+  if (hasStyleRef) content.push({ type: "image_url", image_url: { url: args.styleRefUrl } });
+
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 90_000);
