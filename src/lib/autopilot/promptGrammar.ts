@@ -111,12 +111,12 @@ function cleanClause(value: string): string {
  */
 export function compileAnchorPrompt(scene: SceneGrammar): string {
   const parts = [
-    SHOT_SIZE_EN[scene.shotSize],
+    SHOT_SIZE_EN[sceneShotSize(scene)],
     cleanClause(scene.subject),
     cleanClause(scene.action),
     `in ${cleanClause(scene.environment)}`,
     `shot on ${cleanClause(scene.lens)} lens`,
-    LIGHTING_EN[scene.lighting],
+    LIGHTING_EN[sceneLighting(scene)],
     `${cleanClause(scene.mood)} mood`,
     'photorealistic, cinematic color grading, sharp focus on the subject',
   ];
@@ -132,13 +132,13 @@ export function compileMotionPrompt(scene: SceneGrammar, opts?: { hasAnchor?: bo
   if (opts?.hasAnchor === false) {
     // Text-to-video fallback: the frame has to be described in full.
     const parts = [
-      SHOT_SIZE_EN[scene.shotSize],
+      SHOT_SIZE_EN[sceneShotSize(scene)],
       cleanClause(scene.subject),
       cleanClause(scene.action),
       `in ${cleanClause(scene.environment)}`,
       move,
       `shot on ${cleanClause(scene.lens)} lens`,
-      LIGHTING_EN[scene.lighting],
+      LIGHTING_EN[sceneLighting(scene)],
       `${cleanClause(scene.mood)} mood`,
     ];
     return `${parts.join(', ')}. Avoid: ${joinNegatives(scene)}.`;
@@ -154,7 +154,7 @@ export function compileMotionPrompt(scene: SceneGrammar, opts?: { hasAnchor?: bo
 
 /** Human-readable one-liner for the production log / storyboard card. */
 export function describeScene(scene: SceneGrammar): string {
-  return `${SHOT_SIZE_EN[scene.shotSize]} · ${CAMERA_MOVE_EN[normalizeMove(scene)]} · ${LIGHTING_EN[scene.lighting]}`;
+  return `${SHOT_SIZE_EN[sceneShotSize(scene)]} · ${CAMERA_MOVE_EN[normalizeMove(scene)]} · ${LIGHTING_EN[sceneLighting(scene)]}`;
 }
 
 /**
