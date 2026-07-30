@@ -229,7 +229,7 @@ export function UniversalVoiceLibraryPicker({
             </Select>
 
             <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
-              <SelectTrigger className="bg-white/[0.03] border-white/10"><SelectValue placeholder="Sortierung" /></SelectTrigger>
+              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Sortierung" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="popularity">Beliebtheit</SelectItem>
                 <SelectItem value="name">Name (A–Z)</SelectItem>
