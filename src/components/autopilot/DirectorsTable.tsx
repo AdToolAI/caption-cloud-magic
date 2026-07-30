@@ -103,6 +103,18 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
+  /** Phase text shown next to the loading bar while the treatment is written. */
+  const [phase, setPhase] = useState(0);
+
+  useEffect(() => {
+    if (!loading) {
+      setPhase(0);
+      return;
+    }
+    const id = window.setInterval(() => setPhase((p) => (p + 1) % TREATMENT_PHASES.length), 2600);
+    return () => window.clearInterval(id);
+  }, [loading]);
+
   const [approved, setApproved] = useState(false);
   const [productionId, setProductionId] = useState<string | null>(null);
   const [treatment, setTreatment] = useState<AutopilotTreatment | null>(null);
