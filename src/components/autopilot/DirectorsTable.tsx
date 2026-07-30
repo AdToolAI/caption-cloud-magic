@@ -182,6 +182,19 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   }, [treatment]);
 
   /**
+   * Ausdrücklich gewählte Figuren aus dem Launcher. Sie sind gesetzt — eine
+   * Szene ohne Besetzung erbt die Hauptfigur, sonst rendert das Bildmodell
+   * fremde Gesichter (der "Sarah taucht nie auf"-Fehler).
+   */
+  const lockedCharacterIds = useMemo(
+    () => (briefing?.characters ?? []).map((c) => c.id).filter(Boolean),
+    [briefing?.characters],
+  );
+
+  /** `false` = niemand spricht sichtbar; Dialog wird zu Erzähler-Voiceover. */
+  const lipSyncWanted = briefing?.lipSync ?? true;
+
+  /**
    * The model delivers structure; the planner owns time and camera variety.
    * Doing this on the client keeps the storyboard instantly re-plannable when
    * the user drags the duration slider after approval.
@@ -190,7 +203,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     if (!treatment) return null;
     const scenes = diversifyCameraMoves(
       applyRhythm(treatment.scenes, treatment.totalDurationSeconds),
-    ).map((scene) => {
+    ).map((scene, sceneIdx) => {
       const characterIds = [...(scene.characterIds ?? [])];
       const turns = (scene.turns ?? []).map((turn) => {
         const speakerId = turn.speakerCharacterId;
@@ -210,6 +223,34 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
       const soloId = scene.speakerCharacterId;
       if (soloId && !characterIds.includes(soloId)) characterIds.push(soloId);
       const soloVoice = (soloId ? voiceByCharacter[soloId] : undefined) ?? narratorVoice ?? undefined;
+
+      // Besetzungs-Garantie: gewählte Figuren dürfen nicht durchfallen.
+      if (lockedCharacterIds.length > 0) {
+        const kept = characterIds.filter((id) => lockedCharacterIds.includes(id));
+        if (kept.length === 0) {
+          kept.push(lockedCharacterIds[sceneIdx % lockedCharacterIds.length]);
+        }
+        characterIds.length = 0;
+        characterIds.push(...kept);
+      }
+
+      if (!lipSyncWanted) {
+        // Kein sichtbares Sprechen: alle Zeilen werden zu einer Erzählerspur.
+        const spoken = turns.length > 0
+          ? turns.map((t) => t.text).filter(Boolean).join(' ')
+          : (scene.dialogue ?? '');
+        return {
+          ...scene,
+          characterIds,
+          turns: undefined,
+          dialogue: spoken || undefined,
+          speakerCharacterId: undefined,
+          narratorOnly: true,
+          voiceId: narratorVoice?.voiceId,
+          autoVoiceName: narratorVoice?.auto ? narratorVoice.voiceName : undefined,
+        };
+      }
+
       return {
         ...scene,
         characterIds,
@@ -225,7 +266,8 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
       };
     });
     return { ...treatment, scenes };
-  }, [treatment, castById, voiceByCharacter, narratorVoice]);
+  }, [treatment, castById, voiceByCharacter, narratorVoice, lockedCharacterIds, lipSyncWanted]);
+
 
 
 
