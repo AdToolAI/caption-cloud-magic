@@ -1,43 +1,42 @@
 ## Ziel
 
-Im Regietisch (KI Autopilot) darf es keine Zustände „Dialog ohne zugeordneten Sprecher“ / „Dialog ohne Stimme“ mehr geben. Wenn der Kunde nichts auswählt, entscheidet die KI. Zusätzlich bekommt jeder Warteprozess einen sichtbaren Ladebalken.
+Die ~20 Minuten Wartezeit im KI-Autopilot werden zu einer bewussten "Warte-Lounge": links sieht der Kunde jederzeit exakt, wo die KI steht (inkl. Restzeit-Schätzung), rechts kann er zwischen **Infos** (tagesaktuell, auf seine Brand zugeschnitten) und **Spielen** (leichte Klassiker) wählen.
 
-## 1. Auto-Casting (Sprecher wird nie leer)
+## 1. Fortschritt sichtbar machen (wie im Content Creator)
 
-Serverseitig in `autopilot-treatment`:
-- Nach dem ID-Lock: Szenen mit Dialog/Turns ohne gültigen Sprecher bekommen automatisch einen zugewiesen — bevorzugt aus den in der Szene vorkommenden Charakteren, sonst aus dem gesamten Cast des Nutzers (Round-Robin, damit nicht immer derselbe spricht).
-- Hat der Nutzer gar keine Charaktere hinterlegt: Cast & World des Nutzers wird geladen und die KI-Auswahl trifft daraus die Besetzung (passend zu Beat/Stimmung). Existiert überhaupt kein Charakter, wird der Dialog als reines Voiceover (Erzählerstimme, kein Lip-Sync) markiert statt als Fehler.
-- Turns, deren Sprecher nicht in `characterIds` steht, werden künftig in die Szene aufgenommen statt verworfen.
+Neue Komponente `src/components/autopilot/ProductionLounge.tsx`, die die bestehende `ProductionStage` als linke Spalte aufnimmt (2/3 Breite) und rechts das Lounge-Panel setzt. Ergänzungen an der Fortschrittsseite:
 
-## 2. Auto-Stimme (Stimme wird nie leer)
+- **ETA-Berechnung** (`src/lib/autopilot/eta.ts`): Restzeit aus Szenenanzahl × Phasen-Durchschnitt (Anchor / Motion / Lip-Sync / Endschnitt) und bereits abgeschlossenen Szenen. Anzeige als „noch ca. 12 Min." mit Unschärfe-Formulierung, nie als exakte Sekunde.
+- **Phasen-Ticker**: kompakte Zeile „Was gerade passiert" mit der letzten Director-Log-Meldung in Klartext (Technik-Jargon wird gefiltert, wie bei `planDisplayFilter`).
+- Alle Wartezustände nutzen die vorhandene `StageProgressBar` (Gold-Sweep), damit nichts „hängt".
+- Browser-Benachrichtigung + Toast, wenn der Clip fertig ist (Opt-in beim Start), damit man wirklich weggehen kann. Titel-Tab zeigt `(fertig)`.
 
-Neue Datei `src/lib/autopilot/autoVoice.ts`:
-- Löst für jeden Charakter die Stimme in dieser Reihenfolge auf: `brand_characters.default_voice_id` → automatische Auswahl aus der Voice-Bibliothek passend zu Projektsprache, Geschlecht und Alter des Charakters → globale Fallback-Stimme der Sprache.
-- Innerhalb einer Szene wird sichergestellt, dass zwei Sprecher nie dieselbe Stimme bekommen.
-- Die automatisch gewählte Stimme wird im Storyboard sichtbar als „automatisch gewählt“ markiert und bleibt manuell überschreibbar.
+## 2. Entertainment-Panel
 
-## 3. Preflight entschärfen
+Neue Komponente `src/components/autopilot/lounge/LoungePanel.tsx` mit zwei Tabs, Auswahl bleibt in `localStorage` gemerkt. Das Panel läuft komplett unabhängig vom Polling — kein Re-Mount bei Statusupdates, damit ein laufendes Spiel nicht zurückgesetzt wird (State liegt oberhalb des Poll-Renders bzw. in einem Context).
 
-In `src/lib/autopilot/preflight.ts`:
-- `dialogue_no_speaker`, `turn_no_speaker`, `dialogue_no_voice`, `turn_no_voice` werden von `block` zu `warn` — sie können nach der Auto-Zuweisung nur noch auftreten, wenn wirklich nichts auflösbar war, und dürfen die Freigabe nicht mehr blockieren.
-- `speaker_not_in_scene` wird automatisch geheilt (Sprecher wird der Szene hinzugefügt) statt zu blockieren.
-- Der rote Fehlerkasten im Storyboard zeigt Warnungen künftig dezent gelb mit Klartext („Stimme automatisch gewählt“) statt als Blocker.
+### Tab „Infos" — brandrelevant und tagesaktuell
+- Neue Edge Function `autopilot-lounge-feed`: kombiniert vorhandene Quellen (`news_hub_articles`, `brand_trends_cache`, `fetch-news-radar`) und rankt sie per Lovable AI gegen das aktive Brand-Kit (Branche, Zielgruppe, Tonalität) — kurze Begründung pro Karte („relevant für dich, weil …").
+- Ergebnis wird pro Brand-Kit + Tag gecacht (24 h), Refresh-Button erzwingt Neuberechnung. Sprache folgt der UI-Sprache (DE/EN/ES).
+- Kartenformat: Headline, 2-Zeilen-Insight, konkreter Handlungsimpuls, Quelle. Optional „Als Idee übernehmen" → legt direkt eine Autopilot-Idee an.
 
-## 4. Anzeigefehler „undefined · undefined · undefined“
+### Tab „Spiele" — leicht, offline, keine Konten
+Drei bewusst simple Titel, alle rein clientseitig, Zustand nur lokal:
+- **Solitär (Klondike)** — Drag/Klick-Steuerung, Auto-Ablage, Neu-Spiel.
+- **Schach** — Brett + Regelwerk über `chess.js`, Gegner über eine schlanke Engine mit drei Stufen (leicht/mittel/schwer). Nur als Zeitvertreib, kein Ranking.
+- **2048** — Tastatur + Swipe, Highscore lokal.
 
-`describeScene()` in `promptGrammar.ts` gibt `undefined` aus, sobald das LLM einen Wert außerhalb der bekannten Listen liefert (z. B. `shotSize: "extreme wide"`). Fix: Normalisierung mit Fallback auf Standardwerte, sodass immer eine lesbare Kamera-Zeile erscheint.
+Spiele werden per `React.lazy` geladen, damit sie das Autopilot-Bundle nicht belasten. Optik im Bond-Gold-Stil: Deep Black, Glas, goldene Akzente, keine Fremd-UI.
 
-## 5. Ladebalken für jeden Warteprozess
+## 3. Sauberkeit / Grenzen
 
-Neue kleine Komponente `src/components/autopilot/StageProgressBar.tsx` (unbestimmter Gold-Sweep + optionaler Prozentwert, Design-Tokens, kein hartkodiertes Weiß/Gold):
-- **Treatment entwickeln**: Balken mit Phasentext („Konzept … Szenen … Dialoge“) statt nur Spinner-Button.
-- **Produktion startet**: Balken während des Orchestrator-Calls.
-- **Pro Szene** in `ProductionStage`: schmaler Fortschrittsbalken je Karte, gespeist aus dem Szenenstatus (Bild 33 % → Bewegung 66 % → Lip-Sync 85 % → fertig 100 %), inklusive Pulsanimation bei laufenden Schritten.
-- **Endschnitt/Finalisierung**: eigener Balken mit Zeitschätzung, damit die Phase nicht „hängend“ wirkt.
-- **Kostendialog/Wallet-Abfrage**: Skeleton-Balken statt leerem Bereich.
+- Kein zusätzlicher Poll-Traffic: die Lounge liest denselben `useAutopilotProduction`-State.
+- Kein Guthaben-Verbrauch durch die Lounge; die AI-Rankung läuft einmal pro Tag pro Brand-Kit (gecacht).
+- Bei „fertig" wird das Entertainment nicht abgewürgt: es erscheint ein prominenter Gold-Banner „Dein Clip ist fertig — ansehen", Spiel läuft weiter, bis der Kunde wechselt.
+- Mobil: Lounge rutscht unter den Fortschritt, Spiele-Tab bleibt bedienbar (Touch).
 
 ## Technische Details
 
-- Betroffene Dateien: `supabase/functions/autopilot-treatment/index.ts`, `src/lib/autopilot/preflight.ts`, `src/lib/autopilot/promptGrammar.ts`, neu `src/lib/autopilot/autoVoice.ts`, `src/components/autopilot/DirectorsTable.tsx`, `src/components/autopilot/ProductionStage.tsx`, neu `StageProgressBar.tsx`.
-- Voice-Auswahl nutzt die bestehende `list-voices` Edge Function inkl. strikter Sprachfilterung und `voice-languages.ts`.
-- Keine Änderung an Abrechnung, Orchestrator-Logik oder Render-Pfad.
+Neue Dateien: `ProductionLounge.tsx`, `lounge/LoungePanel.tsx`, `lounge/InfoFeed.tsx`, `lounge/games/{Solitaire,Chess,Game2048}.tsx`, `src/lib/autopilot/eta.ts`, `supabase/functions/autopilot-lounge-feed/index.ts`.
+Geändert: `DirectorsTable.tsx` (rendert Lounge statt nackter `ProductionStage`).
+Neue Abhängigkeit: `chess.js` (Regellogik). Tabelle: `autopilot_lounge_feed_cache` (user_id, brand_kit_id, language, payload jsonb, expires_at) mit RLS + GRANTs.
