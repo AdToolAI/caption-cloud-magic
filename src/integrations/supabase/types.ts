@@ -1580,6 +1580,39 @@ export type Database = {
           },
         ]
       }
+      autopilot_lounge_feed_cache: {
+        Row: {
+          brand_kit_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          language: string
+          payload: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          language?: string
+          payload?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_kit_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          language?: string
+          payload?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       autopilot_performance_insights: {
         Row: {
           analyzed_until: string
