@@ -97,17 +97,33 @@ Deno.serve(async (req) => {
     const maxAttempts = clampInt(body.max_attempts ?? 4, 1, 6);
     const portraits = (body.portrait_urls ?? []).filter(Boolean).slice(0, 4);
     const props = (body.prop_urls ?? []).filter(Boolean).slice(0, 3);
+    const styleGuide = String(body.style_guide ?? "").trim();
+    const styleRef = String(body.style_reference_url ?? "").trim();
+    // Hartes Zeitbudget: nach Ablauf wird nicht neu generiert, sondern der
+    // beste bisherige Frame zurückgegeben — sonst hängt die Szene ewig auf
+    // "Bild wird geprüft".
+    const deadline = Date.now() + clampInt(body.deadline_ms ?? 360_000, 60_000, 540_000);
 
     const verdicts: unknown[] = [];
     let prompt = body.anchor_prompt;
     let best: { url: string; score: number } | null = null;
+    let usedAttempts = 0;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (Date.now() > deadline) {
+        verdicts.push({ attempt, error: "deadline_reached" });
+        break;
+      }
+      usedAttempts = attempt;
+
       const image = await generateAnchor({
         apiKey: LOVABLE_API_KEY,
         prompt,
         aspect,
         refs: [...portraits, ...props],
+        styleGuide,
+        styleRefUrl: styleRef,
+        portraitCount: portraits.length,
       });
 
       if (!image) {
@@ -128,6 +144,7 @@ Deno.serve(async (req) => {
         hasPortraits: portraits.length > 0,
         characterNames: body.character_names ?? [],
         mustContain: body.must_contain ?? [],
+        styleGuide,
       });
 
       verdicts.push({ attempt, url, ...verdict });
@@ -157,10 +174,11 @@ Deno.serve(async (req) => {
       ok: Boolean(best),
       anchor_url: best?.url ?? null,
       score: best?.score ?? 0,
-      attempts: maxAttempts,
+      attempts: Math.max(1, usedAttempts),
       below_threshold: true,
       verdicts,
     });
+
   } catch (err) {
     console.error("[autopilot-anchor-gate] fatal", err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
