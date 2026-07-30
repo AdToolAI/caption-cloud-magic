@@ -25,6 +25,13 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+/** v298 — Stufen, in denen der Endschnitt bereits läuft. */
+const FINAL_STAGES = new Set(["audio", "voice", "music", "sfx", "finalizing"]);
+/** Ein Endschnitt darf lange dauern (Lambda-Render); erst danach gilt er als tot. */
+const FINALIZE_STALE_MS = 30 * 60_000;
+
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "autopilot-finalize", ok: true });
