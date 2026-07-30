@@ -311,13 +311,15 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
       sceneCount: scenes.length,
       totalDurationSeconds: totalSeconds,
       voiceoverEnabled: speakingScenes.length > 0,
-      lipSyncEnabled: speakingScenes.length > 0,
-      lipSyncSpeakers: speakerIds.size,
+      // Ohne Lip-Sync-Wunsch fällt der Sync-Pass komplett weg — auch im Preis.
+      lipSyncEnabled: lipSyncWanted && speakingScenes.length > 0,
+      lipSyncSpeakers: lipSyncWanted ? speakerIds.size : 0,
 
       speakingSeconds: speakingScenes.reduce((acc, scene) => acc + (scene.durationSeconds || 0), 0),
       musicEnabled: true,
     });
-  }, [plannedTreatment]);
+  }, [plannedTreatment, lipSyncWanted]);
+
 
   const openConfirm = async () => {
     setConfirmOpen(true);
