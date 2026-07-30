@@ -728,6 +728,7 @@ export function UniversalCreator() {
                 })}
                 width={formatConfig.width}
                 height={formatConfig.height}
+                autoPlay={false}
                 durationInFrames={computeDurationInFrames({
                   voiceoverDuration: contentConfig?.voiceoverDuration,
                   actualVoiceoverDuration: contentConfig?.actualVoiceoverDuration,
