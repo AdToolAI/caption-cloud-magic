@@ -1,42 +1,58 @@
-## Autopilot v298 — Pipeline-Prüfung und drei Korrekturen
+## Exakter Fehler
 
-### Was geprüft wurde (Befunde aus Code und Datenbank)
+Du hast recht: In der auswählbaren Bibliothek sind aktuell tatsächlich nur sechs Karten erreichbar und man kann nicht nach unten scrollen.
 
-Verdrahtet und stimmig:
-- Kette **Ideen → Treatment → Orchestrierung → Endschnitt** hängt zusammen: `AutopilotStudio` → `DirectorsTable` ruft `autopilot-treatment` und `autopilot-orchestrate`, der Orchestrator übergibt am Ende per Service-Key an `autopilot-finalize`.
-- Die v297-Spalten existieren in der Datenbank: `heartbeat_at`, `resume_attempts` (Produktionen) sowie `attempt`, `fallback_kind` (Szenen).
-- Der Cron-Job `autopilot-watchdog` läuft aktiv alle 3 Minuten (neben den übrigen 6 Autopilot-Jobs).
-- Retry (2 Anläufe), Standbild-Rettung, Worker-Pool (3 Szenen), Lip-Sync-Serialisierung und Kredit-Stopp (`outOfCredits`) sind im Loop vorhanden; `autopilot-finalize` akzeptiert `fallback_kind='still'` und rendert den Anker mit Ken-Burns.
+Die Backend-Abfrage habe ich mit exakt den Parametern des Screenshots direkt ausgeführt:
 
-Nicht in Ordnung — drei Defekte:
+- `language: de`
+- `nativeOnly: true`
+- `pageSize: 60`
+- Ergebnis: `total: 3405`, `hasMore: true`
+- Der Response enthält auf Seite 1 bereits die Premium-Stimmen plus zahlreiche Community-Stimmen.
 
-1. **Resume antwortet mit 500.** Am Ende des Orchestrator-Handlers steht `scenes: body.scenes.length`. Im Resume-Modus schickt der Watchdog kein `scenes`-Feld, das wirft eine TypeError und der Aufruf endet im 500-Zweig. Die Hintergrundarbeit läuft zwar an, aber der Watchdog sieht jeden Resume als Fehlschlag und kann nicht sauber protokollieren.
+Damit ist ausgeschlossen, dass nur sechs Stimmen geladen werden. Sie werden geladen, aber die UI schneidet sie ab.
 
-2. **Doppelter Endschnitt bei langen Filmen — der teuerste Punkt.** Während `autopilot-finalize` läuft (Voiceover, Musik, SFX, Lambda-Render — bei 180 s deutlich über 12 Minuten) schreibt niemand einen Heartbeat. Der Watchdog sieht `status='running'`, keine offenen Szenen, fertige Szenen vorhanden — und stößt `autopilot-finalize` ein zweites Mal an. Ergebnis: doppelter Lambda-Render und doppelt abgebuchte Ton-Credits.
+Der konkrete Codefehler liegt in `UniversalVoiceLibraryPicker.tsx`:
 
-3. **Watchdog wiederholt sich alle 3 Minuten.** In den Fällen „Endschnitt neu anstoßen" und „aufgeben mit Teilmaterial" wird weder ein Heartbeat noch eine Sperre gesetzt. Solange `finalize` nicht terminal wird, feuert derselbe Zweig im nächsten Zyklus erneut.
+- Der Dialog ist `flex flex-col` mit begrenzter Höhe.
+- Die Ergebnisliste ist eine Radix `ScrollArea` mit `flex-1`, aber ohne `min-h-0` und ohne stabile Höhenbegrenzung.
+- In einem Flex-Container behält sie dadurch ihre automatische Mindesthöhe, wächst mit dem Inhalt und wird vom Dialog nach der dritten Kartenzeile abgeschnitten.
+- Da der Scroll-Viewport keine berechnete Resthöhe bekommt, entsteht kein bedienbarer vertikaler Scrollbereich.
+- Der Infinite-Scroll-Sentinel liegt im abgeschnittenen Bereich und kann nie sichtbar werden; deshalb werden auch keine weiteren Seiten nachgeladen.
 
-Zusätzlich kosmetisch: Der Orchestrator setzt `completed_at`, obwohl die Produktion erst bei `scenes_ready` steht.
+Das entspricht einem bekannten Radix-ScrollArea-/Flex-Layout-Problem: Flex-Kinder benötigen hier `min-height: 0` beziehungsweise eine explizit begrenzte Scrollhöhe.
 
----
+## Umsetzung
 
-### Block 1 — Resume-Antwort reparieren
-- Rückgabe auf `scenes: scenes.length` umstellen (die tatsächlich verarbeitete Liste, in beiden Modi korrekt).
+### 1. Dialoglayout reparieren
+- `DialogContent`: stabile responsive Höhe statt nur `max-height`, weiterhin innerhalb des Viewports.
+- Header, Filter und Footer erhalten `shrink-0`.
+- Der mittlere Listencontainer erhält `min-h-0 flex-1 overflow-hidden`.
+- `ScrollArea` erhält `h-full min-h-0` und einen permanent sichtbaren vertikalen Scrollbalken mit ausreichendem Kontrast.
 
-### Block 2 — Endschnitt gegen Doppelläufe absichern
-- `autopilot-finalize` schreibt bei jedem Stufenwechsel (Voice, Musik, SFX, Render-Poll) `heartbeat_at` — der Watchdog sieht damit ein lebendes Finale.
-- Der Watchdog behandelt die Endschnitt-Stufen (`audio`, `voice`, `music`, `sfx`, `finalizing`) gesondert: erneut anstoßen erst, wenn der Heartbeat **30 Minuten** alt ist (Render-Laufzeit), nicht nach 12.
-- `autopilot-finalize` erhält einen Anspruchs-Claim: läuft die Produktion bereits in einer Endschnitt-Stufe mit frischem Heartbeat, bricht der zweite Aufruf mit `already_finalizing` ab, bevor Credits fließen.
+### 2. Nachladen ausfallsicher machen
+- Infinite Scroll bleibt erhalten.
+- Zusätzlich erscheint am Ende ein sichtbarer Button „Weitere Stimmen laden“, sodass Seite 2 auch dann erreichbar ist, wenn der Intersection Observer ausfällt.
+- Anzeige „60 von 3.405 geladen“ macht den Zustand eindeutig.
 
-### Block 3 — Watchdog-Wiederholungen begrenzen
-- In allen drei Zweigen (Resume, Endschnitt-Neustart, Aufgeben) wird `heartbeat_at` gesetzt, damit ein Zyklus nicht sofort wieder greift.
-- Der Zweig „Aufgeben mit Teilmaterial" zählt ebenfalls auf `resume_attempts` und wird bei erneutem Zugriff endgültig auf `failed` gesetzt statt wieder zu finalisieren.
-- `completed_at` im Orchestrator nur noch beim echten Abschluss bzw. Abbruch setzen.
+### 3. Separaten Kategoriefehler beheben
+Der erste Screenshot mit „Erzähler & Hörbuch“ zeigte nur acht Treffer, weil die UI falsche `use_case`-Werte sendet. Diese werden an die vorhandenen Datenwerte angepasst:
 
----
+- Erzähler: `narrative_story`
+- Charaktere: `characters_animation`
+- Nachrichten: `informative_educational`
+- Werbung: `advertisement` und `social_media`
 
-### Technische Details
-- Geänderte Dateien: `supabase/functions/autopilot-orchestrate/index.ts` (Rückgabewert, `completed_at`), `supabase/functions/autopilot-finalize/index.ts` (Heartbeat je Stufe, Finalize-Claim), `supabase/functions/autopilot-watchdog/index.ts` (stufenabhängige Fristen, Heartbeat je Zweig).
-- Keine Migration nötig — alle Spalten existieren.
-- Nicht angefasst: `compose-dialog-segments`, `sync-so-webhook`, `lipsync-watchdog`, sämtliche geteilten Lip-Sync-Module, Motion Studio.
-- Verifikation: Ein Resume wird direkt gegen `autopilot-orchestrate` mit `{production_id, resume:true}` getestet (erwartet 200 statt 500), und der Watchdog wird gegen eine laufende Endschnitt-Produktion aufgerufen (erwartet: kein zweiter Finalize).
+### 4. Verifikation
+- Deutsch + Nur nativ + Alle Stimmen: mehr als sechs Karten sichtbar, vertikal scrollbar.
+- Bis über die ersten 60 Stimmen scrollen und weitere Seite laden.
+- Kategorien zeigen ihre vollständigen Bestände statt nur der Premium-Stimmen.
+- Stimme aus einer späteren Seite auswählen, Dialog erneut öffnen und Auswahl/Persistenz prüfen.
+
+## Betroffene Dateien
+- `src/components/voices/UniversalVoiceLibraryPicker.tsx`
+- `src/lib/voice-categories.ts`
+- `src/hooks/useVoiceLibrary.ts`
+- `supabase/functions/list-voices/index.ts`
+
+Keine Migration und kein neuer Stimmen-Sync nötig.
