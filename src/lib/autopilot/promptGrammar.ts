@@ -104,15 +104,73 @@ function cleanClause(value: string): string {
   return String(value ?? '').trim().replace(/\s+/g, ' ').replace(/[.,;]+$/, '');
 }
 
+/**
+ * Stilabweichungen sind der teuerste Fehler im Autopilot: eine Anime-Szene
+ * zwischen realen Aufnahmen macht den ganzen Film unbrauchbar. Diese Klausel
+ * hängt zusätzlich zur globalen Negativliste an jedem Autopilot-Prompt.
+ */
+export const STYLE_NEGATIVE_CLAUSE =
+  'no anime, no manga, no illustration, no cartoon, no comic, no painting, no 3d render, no CGI look, no stylised filter';
+
+export interface PromptStyleOptions {
+  /**
+   * Produktionsweiter Look-Block (englisch). Identisch für jede Szene eines
+   * Films — ohne ihn erfindet das Bildmodell pro Szene einen neuen Stil.
+   */
+  styleBible?: string;
+  /** Namen der Figuren, die im Bild als Subjekt gebunden werden sollen. */
+  characterNames?: string[];
+}
+
+/**
+ * Baut den Look-Block eines Films. Deterministisch aus Genre, Stimmung und
+ * Lichtsetzung der ersten Szenen abgeleitet — kein zusätzlicher LLM-Call.
+ */
+export function deriveStyleBible(input: {
+  genre?: string;
+  scenes: SceneGrammar[];
+  brandTone?: string | null;
+}): string {
+  const scenes = input.scenes ?? [];
+  const moods = Array.from(
+    new Set(scenes.map((s) => cleanClause(s.mood)).filter(Boolean)),
+  ).slice(0, 3);
+  const lighting = LIGHTING_EN[sceneLighting(scenes[0] ?? ({} as SceneGrammar))];
+  const lens = cleanClause(scenes[0]?.lens ?? '') || '35mm';
+
+  return [
+    'live-action photorealistic commercial film',
+    'shot on a full-frame cinema camera with natural skin texture and real depth of field',
+    `consistent ${lens} lens character across all shots`,
+    `consistent ${lighting} as the base lighting signature`,
+    'unified cinematic color grading, filmic contrast, subtle film grain',
+    moods.length ? `overall tone: ${moods.join(', ')}` : '',
+    input.brandTone ? `brand tone: ${cleanClause(input.brandTone)}` : '',
+    'every shot of this film must look like it came from the same camera, same lighting crew and same colorist',
+  ]
+    .filter(Boolean)
+    .join('; ');
+}
+
+/** Bindet die Figur namentlich an das Referenzportrait. */
+function subjectClause(scene: SceneGrammar, names?: string[]): string {
+  const subject = cleanClause(scene.subject);
+  const list = (names ?? []).map((n) => cleanClause(n)).filter(Boolean);
+  if (list.length === 0) return subject;
+  const bound = list
+    .map((name, index) => `${name} (identical to reference portrait ${index + 1})`)
+    .join(' and ');
+  return `${bound}, ${subject}`;
+}
 
 /**
  * Prompt for the ANCHOR still. Deliberately omits camera movement — a still has
  * none — and leans on composition and lighting instead.
  */
-export function compileAnchorPrompt(scene: SceneGrammar): string {
+export function compileAnchorPrompt(scene: SceneGrammar, opts?: PromptStyleOptions): string {
   const parts = [
     SHOT_SIZE_EN[sceneShotSize(scene)],
-    cleanClause(scene.subject),
+    subjectClause(scene, opts?.characterNames),
     cleanClause(scene.action),
     `in ${cleanClause(scene.environment)}`,
     `shot on ${cleanClause(scene.lens)} lens`,
@@ -120,37 +178,49 @@ export function compileAnchorPrompt(scene: SceneGrammar): string {
     `${cleanClause(scene.mood)} mood`,
     'photorealistic, cinematic color grading, sharp focus on the subject',
   ];
-  return `${parts.join(', ')}. Avoid: ${joinNegatives(scene)}.`;
+  const style = opts?.styleBible ? ` FILM LOOK: ${cleanClause(opts.styleBible)}.` : '';
+  return `${parts.join(', ')}.${style} Avoid: ${joinNegatives(scene)}, ${STYLE_NEGATIVE_CLAUSE}.`;
 }
 
 /**
  * Prompt for the MOTION pass. Assumes an anchor image is supplied as the first
  * frame, so it describes movement rather than re-describing the whole frame.
  */
-export function compileMotionPrompt(scene: SceneGrammar, opts?: { hasAnchor?: boolean }): string {
+export function compileMotionPrompt(
+  scene: SceneGrammar,
+  opts?: { hasAnchor?: boolean; silentMouth?: boolean } & PromptStyleOptions,
+): string {
   const move = CAMERA_MOVE_EN[normalizeMove(scene)];
+  const silent = opts?.silentMouth
+    ? 'nobody speaks on camera, lips stay closed and still'
+    : '';
+
   if (opts?.hasAnchor === false) {
     // Text-to-video fallback: the frame has to be described in full.
     const parts = [
       SHOT_SIZE_EN[sceneShotSize(scene)],
-      cleanClause(scene.subject),
+      subjectClause(scene, opts?.characterNames),
       cleanClause(scene.action),
       `in ${cleanClause(scene.environment)}`,
       move,
       `shot on ${cleanClause(scene.lens)} lens`,
       LIGHTING_EN[sceneLighting(scene)],
       `${cleanClause(scene.mood)} mood`,
-    ];
-    return `${parts.join(', ')}. Avoid: ${joinNegatives(scene)}.`;
+      'live-action photorealistic',
+      silent,
+    ].filter(Boolean);
+    return `${parts.join(', ')}. Avoid: ${joinNegatives(scene)}, ${STYLE_NEGATIVE_CLAUSE}.`;
   }
 
   const parts = [
     cleanClause(scene.action),
     move,
     'natural physics, consistent lighting, the subject keeps the same face, hair, clothing and colors as the reference frame',
-  ];
-  return `${parts.join(', ')}. Avoid: ${joinNegatives(scene)}.`;
+    silent,
+  ].filter(Boolean);
+  return `${parts.join(', ')}. Avoid: ${joinNegatives(scene)}, ${STYLE_NEGATIVE_CLAUSE}.`;
 }
+
 
 /** Human-readable one-liner for the production log / storyboard card. */
 export function describeScene(scene: SceneGrammar): string {
