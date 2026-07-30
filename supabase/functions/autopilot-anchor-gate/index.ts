@@ -385,7 +385,9 @@ async function judge(args: {
       "style_match",
     ]) {
 
-      axes[key] = clampInt(Number(parsed[key] ?? 0), 0, 100);
+      // Fehlende Achse darf den Frame nicht killen (Score = Minimum).
+      axes[key] = clampInt(Number(parsed[key] ?? 100), 0, 100);
+
     }
 
     // Minimum, not average: one broken axis ruins the frame.
