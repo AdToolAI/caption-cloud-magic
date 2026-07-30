@@ -301,7 +301,7 @@ export function UniversalVoiceLibraryPicker({
 
 
         {/* List */}
-        <ScrollArea type="always" className="min-h-0 h-full flex-1 -mx-6 px-6 [&_[data-radix-scroll-area-thumb]]:bg-white/35">
+        <ScrollArea type="always" className="min-h-0 h-full flex-1 -mx-6 px-6 [&_[data-radix-scroll-area-thumb]]:bg-gold/40 [&_[data-radix-scroll-area-thumb]]:hover:bg-gold/70">
           {isLoading ? (
             <div className="flex items-center justify-center py-16 text-white/50">
               <Loader2 className="h-5 w-5 animate-spin mr-2" /> Lade Stimmen…
@@ -309,7 +309,7 @@ export function UniversalVoiceLibraryPicker({
           ) : voices.length === 0 ? (
             <div className="text-center py-16 text-white/50">Keine Stimmen gefunden. Filter anpassen.</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
               {voices.map((v) => {
                 const tier = TIER_LABEL[v.tier || 'community'];
                 const selected = v.id === currentVoiceId;
@@ -325,36 +325,55 @@ export function UniversalVoiceLibraryPicker({
                       onOpenChange(false);
                     }}
                     className={cn(
-                      'text-left rounded-lg border p-3 transition-all group',
-                      'bg-white/[0.02] hover:bg-white/[0.05]',
-                      selected ? 'border-[#F5C76A] ring-1 ring-[#F5C76A]/40' : 'border-white/10',
+                      'group relative text-left rounded-xl border p-5 transition-all duration-300',
+                      selected
+                        ? 'bg-gold/5 border-gold/60 shadow-lg shadow-gold/5'
+                        : 'bg-white/[0.03] border-white/5 hover:border-gold/40 hover:-translate-y-1 hover:shadow-2xl hover:shadow-gold/5',
                     )}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    {selected && (
+                      <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-gold animate-pulse" />
+                    )}
+                    <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          {v.tier === 'cloned' ? <Sparkles className="h-3.5 w-3.5 text-[#F5C76A] shrink-0" /> : <User className="h-3.5 w-3.5 text-white/40 shrink-0" />}
-                          <span className="font-medium truncate">{v.name}</span>
+                        <div className="flex items-center gap-2 mb-2">
+                          {v.tier === 'cloned'
+                            ? <Sparkles className="h-4 w-4 text-gold shrink-0" />
+                            : <User className={cn('h-4 w-4 shrink-0', selected ? 'text-gold' : 'text-white/40')} />}
+                          <span className={cn(
+                            'text-lg font-bold truncate transition-colors',
+                            selected ? 'text-gold' : 'group-hover:text-gold',
+                          )}>{v.name}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 h-4', tier.className)}>{tier.label}</Badge>
-                          {v.gender && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-white/10 text-white/60">{v.gender}</Badge>}
-                          {v.age && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-white/10 text-white/60">{v.age}</Badge>}
-                          {v.accent && v.accent !== 'native' && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-white/10 text-white/60">{v.accent}</Badge>}
-                          {v.is_native && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-emerald-500/10 text-emerald-300 border-emerald-500/30">nativ</Badge>}
+                          <Badge variant="outline" className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0 h-[18px]', tier.className)}>{tier.label}</Badge>
+                          {v.gender && <Badge variant="outline" className="text-[9px] font-medium uppercase tracking-wider px-2 py-0 h-[18px] border-white/5 bg-white/5 text-white/50">{v.gender}</Badge>}
+                          {v.age && <Badge variant="outline" className="text-[9px] font-medium uppercase tracking-wider px-2 py-0 h-[18px] border-white/5 bg-white/5 text-white/50">{v.age}</Badge>}
+                          {v.accent && v.accent !== 'native' && <Badge variant="outline" className="text-[9px] font-medium uppercase tracking-wider px-2 py-0 h-[18px] border-white/5 bg-white/5 text-white/50">{v.accent}</Badge>}
+                          {v.is_native && <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-wider px-2 py-0 h-[18px] bg-gold/10 text-gold border-gold/20">nativ</Badge>}
                         </div>
                         {v.description && (
-                          <p className="text-xs text-white/40 mt-1.5 line-clamp-2">{v.description}</p>
+                          <p className="text-xs italic leading-relaxed text-white/40 mt-3 line-clamp-2">{v.description}</p>
                         )}
                       </div>
                       <div onClick={(e) => e.stopPropagation()}>
-                        <VoicePreviewButton voiceId={v.id} language={typeof v.language === 'string' ? v.language : 'de'} size="icon" />
+                        <VoicePreviewButton
+                          voiceId={v.id}
+                          language={typeof v.language === 'string' ? v.language : 'de'}
+                          size="icon"
+                          className={cn(
+                            'h-10 w-10 rounded-full transition-all',
+                            selected
+                              ? 'bg-gold text-navy-900 hover:bg-gold-light hover:text-navy-900'
+                              : 'bg-white/5 text-white/70 group-hover:scale-110 hover:bg-gold hover:text-navy-900',
+                          )}
+                        />
                       </div>
                     </div>
                   </button>
                 );
               })}
-              <div ref={sentinelRef} className="col-span-full flex flex-col items-center justify-center gap-2 py-4 text-white/50 text-xs">
+              <div ref={sentinelRef} className="col-span-full flex flex-col items-center justify-center gap-2 py-6 text-white/40 text-[11px] uppercase tracking-widest">
                 <span>{voices.length.toLocaleString('de-DE')} von {total.toLocaleString('de-DE')} geladen</span>
                 {hasNextPage && (
                   <Button
@@ -363,6 +382,7 @@ export function UniversalVoiceLibraryPicker({
                     size="sm"
                     disabled={isFetchingNextPage}
                     onClick={() => fetchNextPage()}
+                    className="mt-1 rounded-lg bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-gold/30 normal-case tracking-normal"
                   >
                     {isFetchingNextPage ? <><Loader2 className="h-3 w-3 animate-spin mr-2" />Lade weitere…</> : 'Weitere Stimmen laden'}
                   </Button>
@@ -372,9 +392,16 @@ export function UniversalVoiceLibraryPicker({
           )}
         </ScrollArea>
 
-        <div className="shrink-0 flex justify-end pt-2 border-t border-white/5">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Schließen</Button>
+        <div className="shrink-0 flex justify-end -mx-6 -mb-6 px-6 py-4 border-t border-white/10 bg-black/40">
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="px-8 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-white hover:bg-white/10"
+          >
+            Schließen
+          </Button>
         </div>
+
       </DialogContent>
     </Dialog>
   );
