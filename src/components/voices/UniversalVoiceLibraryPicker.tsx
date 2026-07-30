@@ -207,7 +207,7 @@ export function UniversalVoiceLibraryPicker({
             </Select>
 
             <Select value={age} onValueChange={(v) => setAge(v as typeof age)}>
-              <SelectTrigger className="bg-white/[0.03] border-white/10"><SelectValue placeholder="Alter" /></SelectTrigger>
+              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Alter" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle Alter</SelectItem>
                 <SelectItem value="young">Jung</SelectItem>
