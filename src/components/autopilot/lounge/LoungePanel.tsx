@@ -78,7 +78,7 @@ export function LoungePanel({ brandKitId, language }: Props) {
 
         {/* forceMount: das Spiel darf beim Tab-Wechsel nicht verloren gehen. */}
         <TabsContent value="spiele" forceMount className={cn('mt-3', tab !== 'spiele' && 'hidden')}>
-          <div className="mb-3 flex gap-1.5">
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {GAMES.map((entry) => (
               <button
                 key={entry.id}
@@ -103,7 +103,11 @@ export function LoungePanel({ brandKitId, language }: Props) {
             {game === 'solitaire' && <Solitaire />}
             {game === 'chess' && <ChessGame />}
             {game === '2048' && <Game2048 />}
+            {game === 'minesweeper' && <Minesweeper />}
+            {game === 'memory' && <MemoryGame />}
+            {game === 'snake' && <SnakeGame />}
           </Suspense>
+
         </TabsContent>
       </Tabs>
     </Card>
