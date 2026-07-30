@@ -15,6 +15,7 @@ import type {
   ProductionRow,
   ProductionSceneRow,
 } from '@/hooks/useAutopilotProduction';
+import { StageProgressBar } from '@/components/autopilot/StageProgressBar';
 import { cn } from '@/lib/utils';
 
 const STAGE_LABEL: Record<string, string> = {
