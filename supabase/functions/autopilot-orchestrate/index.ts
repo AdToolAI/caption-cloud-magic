@@ -595,9 +595,14 @@ async function runProduction(
     }
   };
 
-  await Promise.all(
-    Array.from({ length: Math.min(SCENE_CONCURRENCY, Math.max(1, pending.length)) }, worker),
-  );
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(SCENE_CONCURRENCY, Math.max(1, pending.length)) }, worker),
+    );
+  } finally {
+    clearInterval(heartbeatTimer);
+  }
+
 
   const { done, failed, stills } = counters;
 
