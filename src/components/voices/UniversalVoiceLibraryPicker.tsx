@@ -241,16 +241,16 @@ export function UniversalVoiceLibraryPicker({
             </Select>
 
             {nativeSensitive && (
-              <div className="flex items-center gap-2 px-3 rounded-md bg-white/[0.03] border border-white/10">
-                <ShieldCheck className="h-4 w-4 text-[#F5C76A]" />
-                <Label htmlFor="native-only" className="text-xs flex-1 cursor-pointer">Nur nativ</Label>
+              <div className="flex items-center gap-2.5 px-3 rounded-md bg-white/5 border border-white/10">
+                <ShieldCheck className="h-4 w-4 text-gold shrink-0" />
+                <Label htmlFor="native-only" className="text-[10px] font-bold uppercase tracking-widest text-white/45 flex-1 cursor-pointer">Nur nativ</Label>
                 <Switch id="native-only" checked={nativeOnly} onCheckedChange={setNativeOnly} />
               </div>
             )}
           </div>
 
           {/* Kategorien */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
             {VOICE_CATEGORIES.map((c) => {
               const active = c.id === category;
               return (
@@ -260,21 +260,22 @@ export function UniversalVoiceLibraryPicker({
                   title={c.hint}
                   onClick={() => setCategory(c.id)}
                   className={cn(
-                    'shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors',
+                    'shrink-0 rounded-full px-4 py-2 text-xs transition-all',
                     active
-                      ? 'bg-[#F5C76A]/15 border-[#F5C76A]/50 text-[#F5C76A]'
-                      : 'bg-white/[0.03] border-white/10 text-white/60 hover:text-white hover:bg-white/[0.06]',
+                      ? 'bg-gold text-navy-900 font-semibold shadow-lg shadow-gold/10'
+                      : 'bg-white/5 border border-white/10 font-medium text-white/60 hover:text-white hover:border-gold/30',
                   )}
                 >
-                  <span className="mr-1">{c.icon}</span>
+                  <span className="mr-1.5">{c.icon}</span>
                   {c.label}
                   {c.id === 'mine' && myVoices.length > 0 && (
-                    <span className="ml-1 text-white/40">({myVoices.length})</span>
+                    <span className={cn('ml-1', active ? 'text-navy-900/60' : 'text-white/40')}>({myVoices.length})</span>
                   )}
                 </button>
               );
             })}
           </div>
+
 
           {/* Zuletzt verwendet */}
           {recent.length > 0 && category !== 'mine' && !search.trim() && (
