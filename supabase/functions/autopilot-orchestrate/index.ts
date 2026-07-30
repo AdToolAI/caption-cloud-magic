@@ -419,6 +419,9 @@ async function runProduction(
           });
           anchorUrl = anchor.anchor_url;
           anchorScore = Math.round(anchor.score ?? 0);
+          // Erster freigegebener Frame setzt den Look für den Rest des Films.
+          if (!styleReferenceUrl) styleReferenceUrl = anchorUrl;
+
 
           await log(admin, productionId, userId, {
             stage: "anchors",
