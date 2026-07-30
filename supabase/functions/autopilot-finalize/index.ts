@@ -25,9 +25,18 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+/** v298 — Stufen, in denen der Endschnitt bereits läuft. */
+const FINAL_STAGES = new Set(["audio", "voice", "music", "sfx", "finalizing"]);
+/** Ein Endschnitt darf lange dauern (Lambda-Render); erst danach gilt er als tot. */
+const FINALIZE_STALE_MS = 30 * 60_000;
+
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "autopilot-finalize", ok: true });
+
+
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -55,9 +64,23 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!production || production.user_id !== userId) return json({ error: "not_found" }, 404);
-    if (production.stage === "finalizing") return json({ ok: true, already_running: true });
+
+    // v298 — Anspruchs-Claim: ein zweiter Aufruf (Watchdog) darf keinen
+    // zweiten Lambda-Render und keine zweite Ton-Abrechnung auslösen, solange
+    // der laufende Endschnitt noch atmet.
+    const beat = production.heartbeat_at ? Date.parse(production.heartbeat_at) : 0;
+    const alive = Number.isFinite(beat) && Date.now() - beat < FINALIZE_STALE_MS;
+    if (FINAL_STAGES.has(String(production.stage)) && alive) {
+      return json({ ok: true, already_finalizing: true });
+    }
+
+    await admin
+      .from("autopilot_productions")
+      .update({ heartbeat_at: new Date().toISOString() })
+      .eq("id", productionId);
 
     const task = finalize(admin, production, userId);
+
     // @ts-ignore EdgeRuntime is provided by the Supabase runtime
     if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(task);
     else await task;
@@ -100,7 +123,14 @@ async function finalize(admin: Admin, production: any, userId: string) {
     // ---------------------------------------------------------------- audio
     await admin
       .from("autopilot_productions")
-      .update({ stage: "audio", status: "running", progress: 80, error_message: null })
+      .update({
+        stage: "audio",
+        status: "running",
+        progress: 80,
+        error_message: null,
+        heartbeat_at: new Date().toISOString(),
+      })
+
       .eq("id", productionId);
 
     const totalSeconds = usable.reduce(
@@ -315,6 +345,8 @@ async function finalize(admin: Admin, production: any, userId: string) {
         audio_mix: audioMix,
         stage: "finalizing",
         progress: 88,
+        heartbeat_at: new Date().toISOString(),
+
       })
       .eq("id", productionId);
 
@@ -417,7 +449,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
     const renderId = renderJson.render_id || renderJson.renderId || renderJson.pending_render_id;
     await admin
       .from("autopilot_productions")
-      .update({ render_id: renderId ?? null, progress: 92 })
+      .update({ render_id: renderId ?? null, progress: 92, heartbeat_at: new Date().toISOString() })
       .eq("id", productionId);
 
     await log(admin, productionId, userId, {
@@ -428,7 +460,8 @@ async function finalize(admin: Admin, production: any, userId: string) {
     });
 
     // ----------------------------------------------------------- poll render
-    const finalUrl = renderId ? await waitForRender(admin, renderId) : null;
+    const finalUrl = renderId ? await waitForRender(admin, renderId, productionId) : null;
+
 
     if (!finalUrl) {
       await fail(admin, productionId, userId, "Endschnitt wurde nicht rechtzeitig fertig. Die Szenen bleiben erhalten.");
@@ -502,11 +535,24 @@ async function pickMusic(admin: Admin, mood: string): Promise<string | null> {
   }
 }
 
-/** Poll `video_renders` for up to ~14 minutes. */
-async function waitForRender(admin: Admin, renderId: string): Promise<string | null> {
+/** Poll `video_renders` for up to ~14 minutes; keeps the heartbeat alive (v298). */
+async function waitForRender(
+  admin: Admin,
+  renderId: string,
+  productionId?: string,
+): Promise<string | null> {
   const deadline = Date.now() + 14 * 60_000;
+  let lastBeat = 0;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 8000));
+    if (productionId && Date.now() - lastBeat > 60_000) {
+      lastBeat = Date.now();
+      await admin
+        .from("autopilot_productions")
+        .update({ heartbeat_at: new Date().toISOString() })
+        .eq("id", productionId);
+    }
+
     const { data } = await admin
       .from("video_renders")
       .select("status, video_url, error_message")

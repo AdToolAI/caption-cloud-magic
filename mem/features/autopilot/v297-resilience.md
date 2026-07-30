@@ -19,3 +19,9 @@ type: feature
 - `outOfCredits` stoppt den gesamten Pool.
 
 Nicht angefasst: `compose-dialog-segments`, `sync-so-webhook`, geteilte Lip-Sync-Module.
+
+**v298 — Watchdog-Härtung**
+- `autopilot-finalize` hält `heartbeat_at` über alle Stufen (Audio, Finalizing, Render-Poll alle 60 s) und lehnt Doppelaufrufe mit `already_finalizing` ab, solange eine Endschnitt-Stufe frisch atmet.
+- Watchdog nutzt für Endschnitt-Stufen (`audio|voice|music|sfx|finalizing`) 30 min statt 12 min Frist — verhindert doppelten Lambda-Render.
+- Alle Watchdog-Zweige setzen Heartbeat + `resume_attempts`; nach verbrauchten Versuchen wird `failed` gesetzt statt endlos neu zu finalisieren.
+- Orchestrator: Resume antwortet 200 (`scenes.length` statt `body.scenes.length`); `completed_at` nur bei echtem Ende.
