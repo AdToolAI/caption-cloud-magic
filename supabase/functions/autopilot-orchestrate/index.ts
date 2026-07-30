@@ -319,6 +319,11 @@ async function runProduction(
 
   const pending = scenes.filter((scene) => !skipIndices.has(scene.orderIndex));
 
+  /** Produktionsweiter Look — identisch für jede Szene. */
+  const styleGuide = scenes.find((s) => s.styleGuide)?.styleGuide ?? null;
+  /** Erster freigegebener Anker dient allen folgenden Szenen als Look-Referenz. */
+  let styleReferenceUrl: string | null = null;
+
   const heartbeat = async () => {
     await admin
       .from("autopilot_productions")
@@ -329,6 +334,13 @@ async function runProduction(
       })
       .eq("id", productionId);
   };
+
+  // Auch während langer Renderphasen muss der Puls schlagen, sonst greift
+  // der Watchdog und startet eine bereits laufende Produktion neu.
+  const heartbeatTimer = setInterval(() => {
+    void heartbeat().catch(() => {});
+  }, 60_000);
+
 
   const withLipsyncLock = async <T>(fn: () => Promise<T>): Promise<T> => {
     const previous = lipsyncLock;
