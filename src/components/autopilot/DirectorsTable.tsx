@@ -150,6 +150,9 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   const [narratorVoice, setNarratorVoice] = useState<ResolvedVoice | null>(null);
   const [castingBusy, setCastingBusy] = useState(false);
 
+  /** `false` = niemand spricht sichtbar; Dialog wird zu Erzähler-Voiceover. */
+  const lipSyncWanted = briefing?.lipSync ?? true;
+
   useEffect(() => {
     if (!treatment) return;
     const ids = Array.from(
@@ -164,9 +167,11 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
         const voices = members.length > 0
           ? await resolveVoices(members, treatment.language)
           : {};
-        const needsNarrator =
-          members.length === 0 &&
-          (treatment.scenes ?? []).some((s) => !!s.dialogue || (s.turns?.length ?? 0) > 0);
+        const hasSpokenText = (treatment.scenes ?? []).some(
+          (s) => !!s.dialogue || (s.turns?.length ?? 0) > 0,
+        );
+        // Ohne Lip-Sync spricht immer der Erzähler — auch wenn Cast vorhanden ist.
+        const needsNarrator = hasSpokenText && (members.length === 0 || !lipSyncWanted);
         const narrator = needsNarrator ? await resolveNarratorVoice(treatment.language) : null;
         if (cancelled) return;
         setCastById(cast);
@@ -179,7 +184,8 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     return () => {
       cancelled = true;
     };
-  }, [treatment]);
+  }, [treatment, lipSyncWanted]);
+
 
   /**
    * Ausdrücklich gewählte Figuren aus dem Launcher. Sie sind gesetzt — eine
