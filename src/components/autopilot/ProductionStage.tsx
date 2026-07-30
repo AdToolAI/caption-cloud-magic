@@ -175,6 +175,13 @@ export function ProductionStage({ production, scenes, log }: Props) {
                   )}
                 </div>
               )}
+              {(scene.status === 'anchor' || scene.status === 'motion' || scene.status === 'pending') && (
+                <StageProgressBar
+                  className="mt-2"
+                  label={SCENE_LABEL[scene.status] ?? scene.status}
+                />
+              )}
+
               {scene.lipsync_url || scene.video_url ? (
                 <video
                   src={scene.lipsync_url || scene.video_url || undefined}
