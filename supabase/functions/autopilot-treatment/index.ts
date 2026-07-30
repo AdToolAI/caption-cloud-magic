@@ -118,7 +118,25 @@ Deno.serve(async (req) => {
 
     const language = body.language ?? "de";
     const aspect = body.aspect_ratio ?? "9:16";
-    const characters = (body.characters ?? []).slice(0, 6);
+    let characters = (body.characters ?? []).slice(0, 6);
+
+    // Auto-Casting: the customer never has to pick a cast. When nothing was
+    // pre-selected we hand the model the user's own Cast & World roster so it
+    // can cast the film itself — instead of producing speakerless dialogue.
+    if (characters.length === 0) {
+      const { data: pool } = await supabase
+        .from("brand_characters")
+        .select("id, name, description, usage_count")
+        .eq("user_id", user.id)
+        .order("usage_count", { ascending: false })
+        .limit(6);
+      characters = (pool ?? []).map((row: Record<string, unknown>) => ({
+        id: String(row.id),
+        name: String(row.name ?? "Charakter"),
+        description: (row.description as string) ?? undefined,
+      }));
+    }
+
 
     const userPrompt = [
       `Briefing des Kunden:\n"${brief}"`,
