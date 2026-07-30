@@ -28,7 +28,11 @@ const corsHeaders = {
 
 /** Ohne Lebenszeichen gilt eine Produktion als tot. Eine Szene braucht max. ~4 min. */
 const STALE_MS = 12 * 60_000;
+/** Der Endschnitt (Ton + Lambda-Render) darf deutlich länger brauchen. */
+const FINALIZE_STALE_MS = 30 * 60_000;
+const FINAL_STAGES = new Set(["audio", "voice", "music", "sfx", "finalizing"]);
 const MAX_RESUMES = 2;
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
