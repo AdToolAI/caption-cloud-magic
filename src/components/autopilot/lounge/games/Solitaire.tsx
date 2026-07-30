@@ -145,9 +145,7 @@ export default function Solitaire() {
     setState((s) => {
       const cards = takeCards(s, source);
       const top = s.tableau[target][s.tableau[target].length - 1];
-      if (cards.length === 0 || !top || !top.faceUp ? !canStack(cards[0], top) : !canStack(cards[0], top)) {
-        return s;
-      }
+      if (cards.length === 0 || !canStack(cards[0], top)) return s;
       const cleared = removeCards(s, source);
       const tableau = cleared.tableau.map((pile, i) => (i === target ? [...pile, ...cards] : pile));
       return { ...cleared, tableau };
