@@ -145,28 +145,43 @@ export function UniversalVoiceLibraryPicker({
     return () => io.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const [titleMain, titleSub] = useMemo(() => {
+    const parts = title.split(/\s+[–—-]\s+/);
+    return parts.length > 1 ? [parts[0], parts.slice(1).join(' – ')] : [title, ''];
+  }, [title]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[min(90vh,850px)] max-h-[90vh] flex flex-col overflow-hidden bg-[#050816] border-white/10 text-white">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="font-serif text-2xl text-[#F5C76A]">{title}</DialogTitle>
-          <DialogDescription className="text-white/50">
-            {total.toLocaleString('de-DE')} Stimmen{language !== 'all' && ` in ${voiceLanguageLabel(language)}`}
+      <DialogContent className="max-w-5xl h-[min(90vh,880px)] max-h-[90vh] flex flex-col overflow-hidden gap-4 bg-[#050816] border-white/10 text-white shadow-2xl shadow-black/60 rounded-2xl">
+        <DialogHeader className="shrink-0 space-y-2">
+          <DialogTitle className="font-display text-3xl font-bold tracking-tight text-gold">
+            {titleMain}
+            {titleSub && (
+              <>
+                <span className="mx-3 font-light text-white/25">|</span>
+                <span className="italic font-medium">{titleSub}</span>
+              </>
+            )}
+          </DialogTitle>
+          <DialogDescription className="text-[11px] uppercase tracking-[0.15em] text-white/45">
+            {total.toLocaleString('de-DE')} Stimmen
+            {language !== 'all' && <> in <span className="text-cyan">{voiceLanguageLabel(language)}</span></>}
             {nativeSensitive && nativeOnly && ` · nur native Sprecher`}
           </DialogDescription>
         </DialogHeader>
 
         {/* Filter bar */}
-        <div className="shrink-0 space-y-3 border-b border-white/5 pb-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+        <div className="shrink-0 space-y-3 border-b border-white/10 pb-4">
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/25 transition-colors group-focus-within:text-gold" />
             <Input
               placeholder="Name, Beschreibung, Akzent…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-white/[0.03] border-white/10"
+              className="h-12 pl-11 rounded-lg bg-white/5 border-white/10 placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-gold/50 focus-visible:border-gold/50"
             />
           </div>
+
 
           <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
             {allowLanguageChange && (
