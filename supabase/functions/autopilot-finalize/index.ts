@@ -345,6 +345,8 @@ async function finalize(admin: Admin, production: any, userId: string) {
         audio_mix: audioMix,
         stage: "finalizing",
         progress: 88,
+        heartbeat_at: new Date().toISOString(),
+
       })
       .eq("id", productionId);
 
