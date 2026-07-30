@@ -669,6 +669,9 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               Neu entwickeln
             </Button>
           </div>
+
+          {starting && <StageProgressBar label="Produktion wird gestartet …" />}
+
         </Card>
       )}
 
