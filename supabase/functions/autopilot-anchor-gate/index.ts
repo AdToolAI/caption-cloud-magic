@@ -35,6 +35,15 @@ interface Body {
   pass_score?: number;
   /** Hard cap on generation attempts (1 = generate once, judge, no repair). */
   max_attempts?: number;
+  /**
+   * Produktionsweiter Stilblock (englisch). Jede Szene desselben Films bekommt
+   * denselben Block — ohne ihn driftet der Look (Anime-Ausreißer).
+   */
+  style_guide?: string;
+  /** Freigegebener Anker der ersten Szene — Look-Referenz, nicht Inhalt. */
+  style_reference_url?: string;
+  /** Gesamtbudget in ms; danach wird der beste bisherige Frame zurückgegeben. */
+  deadline_ms?: number;
 }
 
 /** Fixed rubric. Calibrate this, not the prompt of the day. */
@@ -42,7 +51,7 @@ const JUDGE_RULES = `Du bist Bildkritiker in einer Werbeproduktion. Du bewertest
 das gleich als erster Frame eines Videoclips animiert wird. Fehler, die du jetzt durchwinkst,
 kosten später ein Vielfaches.
 
-Bewerte streng und unabhängig in sechs Achsen, je 0–100:
+Bewerte streng und unabhängig in sieben Achsen, je 0–100:
 - identity_fidelity: Stimmen Gesichter mit den Referenzportraits überein? Keine Doppelgänger,
   keine zusätzlichen Personen, keine vertauschten Identitäten. Ohne Referenzportraits: 100.
 - product_fidelity: Ist das Produkt korrekt und unverzerrt dargestellt? Ohne Produkt: 100.
@@ -51,8 +60,11 @@ Bewerte streng und unabhängig in sechs Achsen, je 0–100:
 - text_artifacts: 100 = gar kein Text im Bild. Jede Fantasieschrift, jedes verzerrte Logo
   und jedes Wasserzeichen zieht stark ab.
 - brand_fit: Passen Licht, Farbwelt und Stimmung zur beschriebenen Szene?
+- style_match: Entspricht der Frame exakt dem vorgegebenen Look des Films (Fotorealismus,
+  Filmstock, Farbwelt)? Jede Stilabweichung — Anime, Illustration, Cartoon, 3D-Render,
+  Gemälde, Comic — ist ein harter Durchfall (unter 30). Ohne Stilvorgabe: 100.
 
-Der Gesamtscore ist das MINIMUM aller sechs Achsen, nicht der Durchschnitt — ein einziger
+Der Gesamtscore ist das MINIMUM aller sieben Achsen, nicht der Durchschnitt — ein einziger
 grober Fehler macht den Frame unbrauchbar.
 
 Wenn der Frame durchfällt, formuliere in "repair_instruction" eine kurze, konkrete englische
@@ -60,6 +72,7 @@ Korrekturanweisung, die nur den Fehler adressiert (z. B. "the left hand has six 
 both hands relaxed and partially out of frame"). Erfinde keine neue Bildidee.
 
 Antworte NUR über den Tool-Call.`;
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
