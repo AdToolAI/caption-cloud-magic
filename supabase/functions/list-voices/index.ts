@@ -61,7 +61,11 @@ serve(async (req) => {
     const gender: string | null = body.gender || null;
     const accent: string | null = body.accent || null;
     const age: string | null = body.age || null;
-    const useCase: string | null = body.use_case || null;
+    const useCases: string[] = Array.isArray(body.use_case)
+      ? body.use_case.filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+      : typeof body.use_case === 'string' && body.use_case.length > 0
+        ? [body.use_case]
+        : [];
     const search: string = (body.search || '').toString().trim();
     const nativeOnly: boolean =
       typeof body.nativeOnly === 'boolean'
@@ -110,7 +114,8 @@ serve(async (req) => {
     if (gender) q = q.eq('gender', gender);
     if (accent) q = q.ilike('accent', `%${accent}%`);
     if (age) q = q.eq('age', age);
-    if (useCase) q = q.eq('use_case', useCase);
+    if (useCases.length === 1) q = q.eq('use_case', useCases[0]);
+    else if (useCases.length > 1) q = q.in('use_case', useCases);
     if (search) {
       const esc = search.replace(/[,%()]/g, ' ');
       q = q.or(`name.ilike.%${esc}%,description.ilike.%${esc}%,descriptive.ilike.%${esc}%`);

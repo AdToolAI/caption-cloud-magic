@@ -15,7 +15,7 @@ export type VoiceCategoryId =
   | 'mature';
 
 export interface VoiceCategoryFacets {
-  use_case?: 'narration' | 'conversational' | 'characters' | 'social_media' | 'news' | null;
+  use_case?: string | string[] | null;
   age?: 'young' | 'middle_aged' | 'old' | null;
   gender?: 'male' | 'female' | 'neutral' | null;
 }
@@ -31,10 +31,10 @@ export interface VoiceCategory {
 export const VOICE_CATEGORIES: VoiceCategory[] = [
   { id: 'all',        icon: '🎧', label: 'Alle Stimmen',        hint: 'Komplette Bibliothek',            facets: {} },
   { id: 'mine',       icon: '⭐', label: 'Meine Stimmen',        hint: 'Eigene Voice-Clones',             facets: {} },
-  { id: 'ads',        icon: '📣', label: 'Werbung & Ads',        hint: 'Energisch, verkaufsstark',        facets: { use_case: 'social_media' } },
-  { id: 'narration',  icon: '🎙️', label: 'Erzähler & Hörbuch',   hint: 'Ruhig, tragfähig, lange Texte',   facets: { use_case: 'narration' } },
-  { id: 'characters', icon: '🎭', label: 'Charaktere & Rollen',  hint: 'Dialog, Rollen, Lip-Sync',        facets: { use_case: 'characters' } },
-  { id: 'news',       icon: '📰', label: 'Nachrichten & Seriös', hint: 'Klar, sachlich, vertrauenswürdig', facets: { use_case: 'news' } },
+  { id: 'ads',        icon: '📣', label: 'Werbung & Ads',        hint: 'Energisch, verkaufsstark',        facets: { use_case: ['advertisement', 'social_media'] } },
+  { id: 'narration',  icon: '🎙️', label: 'Erzähler & Hörbuch',   hint: 'Ruhig, tragfähig, lange Texte',   facets: { use_case: 'narrative_story' } },
+  { id: 'characters', icon: '🎭', label: 'Charaktere & Rollen',  hint: 'Dialog, Rollen, Lip-Sync',        facets: { use_case: 'characters_animation' } },
+  { id: 'news',       icon: '📰', label: 'Nachrichten & Seriös', hint: 'Klar, sachlich, vertrauenswürdig', facets: { use_case: 'informative_educational' } },
   { id: 'young',      icon: '🧒', label: 'Jung & Frisch',        hint: 'Junge Sprecher:innen',            facets: { age: 'young' } },
   { id: 'mature',     icon: '👔', label: 'Reif & Autoritär',     hint: 'Erfahrene, tiefe Stimmen',        facets: { age: 'old' } },
 ];
