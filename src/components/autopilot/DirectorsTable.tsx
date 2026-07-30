@@ -71,6 +71,14 @@ const LANGUAGES = [
   { value: 'es', label: 'Spanisch' },
 ];
 
+const TREATMENT_PHASES = [
+  'Briefing wird gelesen …',
+  'Konzept und Dramaturgie …',
+  'Szenen werden gebaut …',
+  'Dialoge und Besetzung …',
+  'Letzter Feinschliff …',
+];
+
 const BEAT_LABEL: Record<string, string> = {
   hook: 'Aufhänger',
   problem: 'Problem',
