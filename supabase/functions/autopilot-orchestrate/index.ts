@@ -60,15 +60,22 @@ interface SceneInput {
   characterNames?: string[];
   soundDesign?: Record<string, unknown> | null;
   grammar?: Record<string, unknown>;
+  /** `false` = kein sichtbares Sprechen, kein Sync-Pass für diese Szene. */
+  lipSync?: boolean;
 }
 
 interface Body {
   production_id: string;
   aspect_ratio?: string;
   scenes?: SceneInput[];
+  /** Produktionsweiter Look — jede Szene wird dagegen geprüft. */
+  style_guide?: string;
+  /** Globaler Nutzerwunsch; `false` deaktiviert Lip-Sync komplett. */
+  lip_sync?: boolean;
   /** v297: Wiederaufnahme durch den Watchdog — Szenenzeilen bleiben stehen. */
   resume?: boolean;
 }
+
 
 
 /** Engine picked per scene length — Hailuo is the reliable i2v workhorse. */
