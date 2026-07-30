@@ -449,7 +449,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
     const renderId = renderJson.render_id || renderJson.renderId || renderJson.pending_render_id;
     await admin
       .from("autopilot_productions")
-      .update({ render_id: renderId ?? null, progress: 92 })
+      .update({ render_id: renderId ?? null, progress: 92, heartbeat_at: new Date().toISOString() })
       .eq("id", productionId);
 
     await log(admin, productionId, userId, {
@@ -460,7 +460,8 @@ async function finalize(admin: Admin, production: any, userId: string) {
     });
 
     // ----------------------------------------------------------- poll render
-    const finalUrl = renderId ? await waitForRender(admin, renderId) : null;
+    const finalUrl = renderId ? await waitForRender(admin, renderId, productionId) : null;
+
 
     if (!finalUrl) {
       await fail(admin, productionId, userId, "Endschnitt wurde nicht rechtzeitig fertig. Die Szenen bleiben erhalten.");
