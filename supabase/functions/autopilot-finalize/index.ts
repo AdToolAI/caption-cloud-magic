@@ -123,7 +123,14 @@ async function finalize(admin: Admin, production: any, userId: string) {
     // ---------------------------------------------------------------- audio
     await admin
       .from("autopilot_productions")
-      .update({ stage: "audio", status: "running", progress: 80, error_message: null })
+      .update({
+        stage: "audio",
+        status: "running",
+        progress: 80,
+        error_message: null,
+        heartbeat_at: new Date().toISOString(),
+      })
+
       .eq("id", productionId);
 
     const totalSeconds = usable.reduce(
