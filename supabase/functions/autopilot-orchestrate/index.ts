@@ -520,7 +520,13 @@ async function runProduction(
         });
 
         // --- Stage 3: speaking scenes get voice + lip-sync ---------------
-        if ((scene.turns?.length ?? 0) > 0 || (scene.dialogue ?? "").trim().length > 1) {
+        // `lipSync === false` ist ein Nutzerwunsch, kein Vorschlag: kein
+        // Sync-Pass, keine Sync-Credits.
+        const wantsLipSync = scene.lipSync !== false;
+        if (
+          wantsLipSync &&
+          ((scene.turns?.length ?? 0) > 0 || (scene.dialogue ?? "").trim().length > 1)
+        ) {
           await withLipsyncLock(() =>
             speakAndSync(admin, {
               productionId,
@@ -531,6 +537,7 @@ async function runProduction(
             })
           );
         }
+
 
         await log(admin, productionId, userId, {
           stage: "motion",
