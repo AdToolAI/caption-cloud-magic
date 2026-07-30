@@ -166,6 +166,9 @@ Deno.serve(async (req) => {
         characterIds: (row.grammar?.characterIds as string[]) ?? [],
         portraitUrls: (row.grammar?.portraitUrls as string[]) ?? [],
         characterNames: (row.grammar?.characterNames as string[]) ?? [],
+        // Wunsch & Look überleben den Neustart nur über die grammar-Spalte.
+        lipSync: row.grammar?.lipSync !== false,
+        styleGuide: (row.grammar?.styleGuide as string) ?? undefined,
         soundDesign: row.sound_design ?? {},
         grammar: row.grammar ?? {},
       }));
@@ -181,9 +184,14 @@ Deno.serve(async (req) => {
           scene_index: scene.orderIndex,
           beat: scene.beat,
           duration_seconds: scene.durationSeconds,
-          grammar: scene.grammar ?? {},
+          grammar: {
+            ...(scene.grammar ?? {}),
+            lipSync: scene.lipSync ?? body.lip_sync ?? true,
+            styleGuide: body.style_guide ?? null,
+          },
           anchor_prompt: scene.anchorPrompt,
           motion_prompt: scene.motionPrompt,
+
           dialogue: (scene.turns?.length ?? 0) > 0
             ? {
                 text: (scene.turns ?? []).map((t) => t.text).join(" "),
