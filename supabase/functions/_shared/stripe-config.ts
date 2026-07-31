@@ -33,4 +33,12 @@ export const FOUNDERS_CREDIT_COUPON = "FOUNDERS_VIDEO_20";
 export const FOUNDERS_DISCOUNT_MONTHS = 24;
 export const FOUNDERS_MAX_SLOTS = 1000;
 
+/**
+ * Interne Marker in `public.founders_signups`. Das sind KEINE Stripe-Coupons —
+ * sie kennzeichnen nur, ob ein Nutzer einen Founders-Slot hält. Auf das Abo
+ * wird nie ein Rabatt angewendet.
+ */
+export const FOUNDERS_SLOT_MARKER = "PRO-FOUNDERS-24M";
+export const LAUNCH_SLOT_MARKER = "PRO-LAUNCH-3M";
+
 export const STRIPE_API_VERSION = "2025-08-27.basil";
