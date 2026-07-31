@@ -123,8 +123,14 @@ export function CharacterCastPicker({
   // Combined pool used for resolving slot ids (briefing first, then library
   // — briefing wins on dupe id).
   const resolutionPool = useMemo<ComposerCharacter[]>(() => {
-    const seen = new Set((characters ?? []).map((c) => c.id));
-    const extras = (libraryCharacters ?? []).filter((c) => !seen.has(c.id));
+    const seen = new Set(
+      (characters ?? []).flatMap((c) =>
+        [c.id, c.brandCharacterId].filter((x): x is string => !!x),
+      ),
+    );
+    const extras = (libraryCharacters ?? []).filter(
+      (c) => !seen.has(c.id) && !(c.brandCharacterId && seen.has(c.brandCharacterId)),
+    );
     return [...(characters ?? []), ...extras];
   }, [characters, libraryCharacters]);
 
