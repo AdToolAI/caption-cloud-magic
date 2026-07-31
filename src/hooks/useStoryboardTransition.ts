@@ -599,7 +599,10 @@ function extractSceneHints(briefingText: string): SceneHint[] {
       // Wörtliche Rede — auch ohne DIALOG:-Präfix, inkl. Sprecher-Label davor.
       const dialogLines: Array<{ speaker?: string; text: string }> = [];
       for (const line of rawLines) {
+        // Marker-Zeilen (OVERLAY:, SHOT:, TONE: …) sind keine wörtliche Rede.
+        if (MARKER_RE.test(line) && !/^DIALOG\b/i.test(line)) continue;
         QUOTE_RE.lastIndex = 0;
+
         let m: RegExpExecArray | null;
         while ((m = QUOTE_RE.exec(line)) !== null) {
           const quoted = m[1].trim();
