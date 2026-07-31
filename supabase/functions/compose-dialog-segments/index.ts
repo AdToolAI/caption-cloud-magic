@@ -2724,7 +2724,8 @@ serve(async (req) => {
           ? "v242_fresh"
           : "existing";
     const v153PlateIdentitySnapshot = {
-      version: "v242" as const,
+      version: PLATE_IDENTITY_SPLIT_VERSION,
+      // ── v329 — GEOMETRIE (plate-gebunden, wird bei Plate-Wechsel verworfen)
       dims: plateDims,
       bboxes: speakerPlateBboxes,
       mouths: speakerPlateMouths,
@@ -2733,6 +2734,13 @@ serve(async (req) => {
       cached: plateIdentityMap?.cached ?? persistedPlateIdentity?.cached ?? false,
       sourceClipUrl,
       hydratedAt: new Date().toISOString(),
+      // ── v329 — IDENTITÄT (plate-unabhängig, überlebt jede Eviction) ─────
+      identity: {
+        bySlot: finalAssignmentLock ?? {},
+        source: lockSource,
+      },
+      // Legacy-Felder bleiben erhalten, damit ältere Leser (compose-video-clips,
+      // Forensik-UI, Bestandsszenen) unverändert weiterfunktionieren.
       assignmentLock: finalAssignmentLock,
       assignmentLockSource: lockSource,
     };
