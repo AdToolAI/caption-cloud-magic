@@ -16,10 +16,13 @@ const corsHeaders = {
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 
 // Replicate model slug per tier
+// Verified against https://replicate.com/bytedance (2026-07-21).
+// `bytedance/seedance-2-mini` never existed (404) — the correct draft tier is
+// seedance-1-lite. Standard/Pro now run on the real Seedance 2.0 family.
 const REPLICATE_SLUG: Record<string, string> = {
-  'seedance-mini':     'bytedance/seedance-2-mini',
-  'seedance-standard': 'bytedance/seedance-1-lite',
-  'seedance-pro':      'bytedance/seedance-1-lite',
+  'seedance-mini':     'bytedance/seedance-1-lite',
+  'seedance-standard': 'bytedance/seedance-2.0-fast',
+  'seedance-pro':      'bytedance/seedance-2.0',
 };
 
 interface GenerateRequest {
@@ -126,7 +129,7 @@ serve(async (req) => {
     console.log(`[generate-seedance-video] Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Create generation record
-    const resolution = model === 'seedance-pro' ? '1080p' : '720p';
+    const resolution = '720p'; // Seedance 2.0 wird bei uns auf 720p bepreist/gerendert
     const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
@@ -178,6 +181,7 @@ serve(async (req) => {
       prompt,
       duration: Math.min(Math.max(duration, 3), 15),
       aspect_ratio: aspectRatio,
+      resolution: '720p',
     };
 
     // Image-to-Video

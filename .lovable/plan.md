@@ -1,49 +1,75 @@
-## Ziel
+## Ergebnis der Analyse
 
-Vier Produktionsfehler beheben (kein Zusammenhang zwischen Szenen, falscher/fehlender Charakter, ungewolltes und schlechtes Lip-Sync, Produktion bleibt bei Szene 4 hängen) und die Warte-Lounge um funktionierende Spiele erweitern.
+Vollständiger Abgleich: interner Modell-Katalog gegen den tatsächlich aufgerufenen Provider-Slug gegen die aktuell verfügbare Version (Stand 31.07.2026).
 
-## 1. Lounge: 2048 reparieren + 3 Spiele mehr
+### A — Kritisch: Wir liefern etwas anderes als draufsteht
 
-- `Game2048.tsx`: Der Zug-Handler ruft `setScore`/`setBest` **innerhalb** des `setGrid`-Updaters auf. Unter React StrictMode läuft der Updater doppelt, dadurch springt das Brett unkontrolliert bzw. reagiert nicht sauber. Umbau auf einen puren Reducer (`useReducer`) mit Zustand `{grid, score, best}`, ein Zug = eine Aktion. Zusätzlich Fokus-/Scroll-Handling: Pfeiltasten nur abfangen, wenn das Board im Viewport/aktiv ist.
-- Neue Spiele im gleichen Stil (leichtgewichtig, kein neues Paket, Partie überlebt Status-Updates):
-  - **Minesweeper** (9×9, Flaggen per Rechtsklick/Long-Press)
-  - **Memory / Pairs** (Bond-Gold-Kartenrücken, Zug- und Zeitzähler)
-  - **Snake** (Tastatur + Wisch, lokaler Highscore)
-- `LoungePanel.tsx`: Spieleauswahl von 3 auf 6 Einträge, umbrechende Chip-Leiste.
+| Was der Kunde sieht | Was wir wirklich aufrufen | Problem |
+|---|---|---|
+| „Seedance 2.0 Standard / Pro" | `bytedance/seedance-1-lite` | Wir verkaufen 2.0, rufen Generation 1 Lite. `bytedance/seedance-2.0` ist auf Replicate verfügbar. |
+| „Vidu Q2 Reference / I2V / T2V" | `vidu/q3-pro` bzw. `vidu/q3-turbo` | Umgekehrter Fall: Label ist eine Generation zu alt, Slugs sind schon Q3. |
+| „Pika 2.2 Std / Pro" | `pika-labs/pika-text-to-video`, im Wartungsstatus, HTTP-410-Kill-Switch aktiv | Das Modell ist faktisch tot, steht aber im Katalog. |
 
-## 2. Look-Konsistenz über alle Szenen (Anime-Ausreißer)
+### B — Harter Abschalt-Termin
 
-Ursache: `compileAnchorPrompt` baut jeden Anker isoliert; es gibt keine produktionsweite Stilvorgabe, und das Ankerbild jeder Szene wird ohne Bezug zu den vorherigen erzeugt.
+**Sora 2 API: 24. September 2026.** Wir führen `sora-2-standard` und `sora-2-pro` mit fest verdrahteten Version-Hashes. Ab dem Datum bricht jede Sora-Szene. Sora Web/App ist bereits seit 26.04.2026 tot.
 
-- **Style-Bible**: Aus Idee/Treatment einmal pro Produktion ein englischer Stil-Block ableiten (Filmstock, Farbwelt, Licht, Objektiv, Grading) und in `promptGrammar.compileAnchorPrompt`/`compileMotionPrompt` in **jede** Szene einsetzen, plus harte Negativliste (`anime, illustration, cartoon, 3d render, CGI, painting`).
-- **Look-Anker**: Die freigegebene Ankergrafik der ersten Szene wird als zusätzliche Referenzbild-URL an `autopilot-anchor-gate` aller Folgeszenen übergeben („match this film's look, not its content").
-- **Judge-Achse**: `autopilot-anchor-gate` bekommt eine siebte Achse `style_match` (Abweichung vom Stilblock = Durchfall), damit Anime-Frames gar nicht erst freigegeben werden.
+### C — Neue Version verfügbar, teils erheblicher Sprung
 
-## 3. Cast-Identität (Sarah Dusatko taucht in keinem Clip auf)
+| Bereich | Aktuell bei uns | Verfügbar | Gewinn |
+|---|---|---|---|
+| **Lip-Sync** | `sync/lipsync-2-pro` | **`sync-3`** (Sync.so-Default, 4K/60fps, Spatial Reasoning, eingebaute Verdeckungs-Erkennung, seitliche Gesichter) | Größter Hebel überhaupt — genau unsere Dauerbaustelle mit Mehrfach-Sprechern und Profilansichten |
+| **Luma** | `luma/ray-2-720p` | **`luma/ray-3.2`** (1080p, HDR/EXR, Video-to-Video) | Wir hängen zwei Generationen zurück und sind auf 720p festgenagelt |
+| **Runway** | `gen4_aleph` (Runway-API) | **`runwayml/gen-4.5`** auf Replicate | Aleph bleibt fürs Editing, Gen-4.5 fürs Generieren |
+| **Wan** | 2.5 + 2.6 | **`wan-video/wan-2.7-t2v / -i2v / -r2v`** (1080p, nativer Ton, 15s, Referenz-zu-Video) | r2v ist ein echter Identitäts-Pfad |
+| **Grok** | `x-ai/grok-imagine` | **Grok Imagine Video 1.5** (GA seit 16.06.2026) | Besserer Motion + Audio |
+| **Bild (Picture Studio „ultra")** | `google/nano-banana` (v1) | **`nano-banana-2`** / **`nano-banana-pro`** | v1 ist zwei Generationen alt |
+| **Bild (Picture Studio „fast", Anchor-Seedream)** | `bytedance/seedream-4` | **`seedream-5-pro`** / **`seedream-5-lite`** | Bessere Text- und Referenztreue — relevant für unsere Anchor-Identität |
+| **Voice** | `eleven_turbo_v2_5` / `eleven_multilingual_v2` | **`eleven_v3`** (70+ Sprachen, Flaggschiff) | Achtung: unser deutscher Hard-Lock hängt an turbo_v2_5, siehe Risiko unten |
+| **Musik** | `minimax/music-1.5` | `minimax/music-2.6` bzw. `music-2.8` | Nebenschauplatz |
+| **LLM (Massen-Pfad)** | `google/gemini-2.5-flash` in ~40 Analyse-Functions | `google/gemini-3.6-flash` | Schneller und günstiger bei gleicher Aufgabe |
+| **STT** | `whisper-1` | Neuere Transkriptionsmodelle | Nebenschauplatz |
 
-- **Durchreichen prüfen und erzwingen**: `DirectorsTable` baut `portraitUrls` nur aus `scene.characterIds`. Wenn das Treatment einer Szene keine IDs zuweist, läuft die Szene ohne Portrait. Fix: Bei ausdrücklich gewählten Charakteren (Launcher-Auswahl) wird jede Szene mit mindestens einem dieser Charaktere besetzt; Szenen ohne Cast erben den Hauptcharakter.
-- **Namentliche Bindung im Prompt**: Anker-Prompt nennt den Charakter explizit als Subjekt („<Name>, identical to reference portrait 1") statt einer generischen Beschreibung.
-- **Identitäts-Gate scharf**: Fehlt `identity_fidelity` (Score unter Schwelle) trotz Portraits, wird repariert statt akzeptiert — `pass_score` für Szenen mit Portraits von 78 auf 82.
-- Charaktere ohne `portrait_url`/`reference_image_url` werden vor dem Start in der Director's Table sichtbar gewarnt (sonst ist Identitätstreue technisch unmöglich).
+### D — Bereits aktuell, kein Handlungsbedarf
 
-## 4. „Kein Lip-Sync" respektieren
+Kling 3.0 + Kling 3.0 Omni ✅ · Veo 3.1 ✅ · Hailuo 2.3 (MiniMax H3 gibt es auf Replicate **nicht**) ✅ · ElevenLabs Music v2 ✅ · Lyria 3 Pro ✅ · Stable Audio 2.5 ✅ · Gemini 3.1 Pro / GPT-5.5 Pro im Text Studio ✅
 
-Ursache: Der Launcher-Schalter `lipSync: false` wird nirgends weitergereicht — `DirectorsTable` setzt `lipSyncEnabled` aus „gibt es Dialog?", und der Orchestrator startet Lip-Sync für jede Szene mit Dialog.
+### E — Nicht verfügbar, trotz Ankündigung
 
-- Option `lipSync` von `AutopilotIdeaLauncher` → Briefing → `autopilot-treatment` → Szenenzeile durchreichen.
-- Bei `lipSync: false`: Das Treatment schreibt **Voiceover statt On-Camera-Dialog** (kein sichtbares Sprechen, `narratorOnly`), Anker-/Motion-Prompt bekommt „nobody speaks on camera, mouth closed".
-- `autopilot-orchestrate`: Stage 3 ruft nur noch Voiceover ab, wenn Lip-Sync aus ist; `speakAndSync` wird übersprungen (spart auch die Credits).
-- Bei `lipSync: true` bleibt die bestehende, gehärtete Strecke (Face-Gate, sequenzielle Sync-Pässe) unverändert.
+**Seedance 2.5**: auf Replicate steht „coming soon", noch kein Endpunkt. **Topaz Astra / Starlight / Hyperion**: nicht auf Replicate, dort gibt es nur `topazlabs/image-upscale` und `topazlabs/video-upscale`. **MiniMax H3**: nicht auf Replicate.
 
-## 5. Produktion bleibt bei Szene 4 auf „Bild wird geprüft"
+---
 
-- **Zeitbudget**: `autopilot-anchor-gate` läuft bis zu 4 Anläufe × (90 s Bild + Judge). Bei drei parallelen Szenen kann ein Anlauf länger als das Heartbeat-Fenster laufen — der Watchdog resumt dann in eine noch laufende Szene. Fix: Heartbeat läuft künftig auf einem Intervall-Timer (alle 60 s) während der gesamten Produktion, nicht nur zwischen Szenen.
-- **Hartes Limit pro Szene**: Anker-Phase bekommt ein Gesamt-Timeout (6 min). Läuft es ab, wird die Szene als `failed` mit Klartext markiert statt endlos auf „Bild wird geprüft" zu stehen — die Produktion läuft mit den restlichen Szenen weiter.
-- **Sichtbarkeit**: Szenenkarte zeigt bei `anchor` Anlauf-Zähler und verstrichene Zeit („Anlauf 2/4 · 1:20"), damit ein langer Prüflauf nicht wie ein Hänger aussieht.
-- Watchdog-Regel prüfen: Szenen im Status `anchor`/`motion` älter als das Szenen-Timeout werden beim Resume auf `pending` zurückgesetzt, damit sie erneut aufgegriffen werden.
+## Umsetzungsplan
+
+### Stufe 1 — Ehrlichkeit und Ausfallschutz (zuerst)
+1. **Seedance-Korrektur**: `seedance-standard`/`seedance-pro` auf `bytedance/seedance-2.0` umstellen, Preis gegen den echten Provider-Cost × 3.00 neu setzen. Wenn der Preissprung zu groß ist: alternativ Label auf „Seedance 1 Lite" zurückstufen. Erstere Variante bevorzugt.
+2. **Vidu-Labels** auf Q3 korrigieren (Slugs stimmen bereits).
+3. **Pika deaktivieren**: aus dem wählbaren Katalog nehmen, Bestandsszenen auf Hailuo umleiten (Fallback existiert bereits im Composer).
+4. **Sora-2-Exit**: als `deprecated` markieren, nicht mehr wählbar, Auto-Fallback beim Rendern auf Seedance 2.0 bzw. Veo 3.1 Fast für Audio-Szenen, Hinweistext im Studio.
+
+### Stufe 2 — Lip-Sync auf sync-3 (größter Qualitätshebel)
+- `lip-sync-video` und die Autopilot-Sync-Strecke von `sync/lipsync-2-pro` auf `sync-3` umstellen.
+- Feature-Flag mit Rückschalter, weil unsere gesamte Face-Gate-/Rekognition-Vorstufe auf das alte Verhalten kalibriert ist.
+- A/B-Testlauf mit einer bekannten 4-Sprecher-Szene, bevor der Default umgestellt wird. Wenn sync-3 die Verdeckungen selbst löst, können wir Teile der Landmark-Vorstufe entlasten.
+
+### Stufe 3 — Modell-Upgrades
+- **Ray 3.2** als neuer Luma-Eintrag inkl. Video-to-Video-Pfad; Ray 2 bleibt vorerst als günstige Stufe.
+- **Gen-4.5** ergänzen, Aleph bleibt fürs Editing.
+- **Wan 2.7** (t2v/i2v/r2v) ergänzen; r2v in das Consistency-Ranking aufnehmen.
+- **Grok Imagine 1.5** Slug aktualisieren.
+- **Nano Banana 2 / Pro** und **Seedream 5** in Picture Studio und Anchor-Generierung; Anchor-Umstellung nur mit Vergleichslauf, weil die Identitätstreue daran hängt.
+
+### Stufe 4 — Voice und LLM (vorsichtig)
+- **eleven_v3** nur nach Test: unser deutscher Hard-Lock erzwingt heute `eleven_turbo_v2_5`, weil `eleven_multilingual_v2` `language_code` ignoriert und ins Englische driftet. Vor jeder Umstellung muss belegt sein, dass v3 `language_code` respektiert. Sonst bleibt turbo_v2_5.
+- **gemini-2.5-flash → gemini-3.6-flash** im Massen-Analyse-Pfad, schrittweise mit Stichproben pro Function-Gruppe.
+
+### Stufe 5 — Optional
+Topaz `video-upscale` als Opt-in-Finishing-Schritt im Director's Cut, nach Lipsync und Schnitt, nie im Universal Content Creator (Raw-Media-Invariant). Seedance 2.5 als vorbereiteter, deaktivierter Katalogeintrag.
 
 ## Technische Details
 
-- Betroffen: `src/components/autopilot/lounge/games/*` (+3 neue Dateien), `LoungePanel.tsx`, `src/lib/autopilot/promptGrammar.ts`, `src/lib/autopilot/types.ts`, `src/components/autopilot/DirectorsTable.tsx`, `ProductionStage.tsx`, `AutopilotIdeaLauncher.tsx`, `supabase/functions/autopilot-treatment/index.ts`, `autopilot-anchor-gate/index.ts`, `autopilot-orchestrate/index.ts`, `autopilot-watchdog/index.ts`.
-- Keine Schemaänderung nötig; Style-Bible und `lipSync` werden im vorhandenen `grammar`-JSON der Szenenzeile abgelegt.
-- Verifikation: Testlauf mit 5 Szenen, Lip-Sync AUS, einem gewählten Charakter — erwartet: einheitlicher fotorealistischer Look, Charakter in jeder Szene, kein Sync-Pass, keine Szene bleibt im Anker-Status hängen.
+- Zentrale Dateien: `supabase/functions/_shared/videoPricingCatalog.ts` (Preise), `src/config/aiVideoModelRegistry.ts` (Frontend-Katalog), die einzelnen `generate-*-video/index.ts` (echte Slugs), `lip-sync-video/index.ts` + `_shared/autopilotLipSync.ts`, `compose-scene-anchor/index.ts`, `generate-image-replicate/index.ts`, `_shared/tts-language.ts`.
+- Achtung Doppelpflege: Slug, Preis und Frontend-Label liegen heute in drei getrennten Dateien — genau daher stammen die Seedance-/Vidu-Abweichungen. Ich ergänze eine Konsistenzprüfung, die im Build meldet, wenn eine Katalog-ID keinen zugehörigen Slug hat.
+- Jeder neue Modelleintrag: Provider-Cost recherchieren, × 3.00, Katalogeintrag, Registry, `providerCapabilities`, `sceneEngineRouter`, `modelConsistencyRanking`, Lipsync-Kompatibilitätsmatrix.
+- Verifikation je Stufe: ein echter Testrender pro neu verdrahtetem Modell, plus Abgleich von angezeigtem und abgebuchtem Preis.

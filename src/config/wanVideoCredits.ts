@@ -75,6 +75,42 @@ export const WAN_VIDEO_MODELS = {
     },
     badge: 'Neu Premium',
   },
+  'wan-2-7-standard': {
+    name: 'Wan 2.7',
+    provider: 'Wan Video (Replicate)',
+    quality: '720p',
+    version: '2.7',
+    costPerSecond: {
+      EUR: 0.30,
+      USD: 0.30,
+    },
+    minDuration: 5,
+    maxDuration: 15,
+    allowedDurations: [5, 10, 15] as const,
+    description: {
+      EUR: '27B MoE · natives Audio · 720p',
+      USD: '27B MoE · native audio · 720p',
+    },
+    badge: 'Neu',
+  },
+  'wan-2-7-pro': {
+    name: 'Wan 2.7 Pro',
+    provider: 'Wan Video (Replicate)',
+    quality: '1080p',
+    version: '2.7',
+    costPerSecond: {
+      EUR: 0.45,
+      USD: 0.45,
+    },
+    minDuration: 5,
+    maxDuration: 15,
+    allowedDurations: [5, 10, 15] as const,
+    description: {
+      EUR: '27B MoE · natives Audio · 1080p',
+      USD: '27B MoE · native audio · 1080p',
+    },
+    badge: 'Premium',
+  },
 } as const;
 
 export type WanVideoModel = keyof typeof WAN_VIDEO_MODELS;

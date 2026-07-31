@@ -15,11 +15,23 @@ const corsHeaders = {
 const MODEL_PRICING: Record<string, Record<string, number>> = {
   'luma-standard': { EUR: 0.21, USD: 0.21 },
   'luma-pro':      { EUR: 0.36, USD: 0.36 },
+  // Ray 3.2 wird von Replicate pro Clip bepreist ($0.30/5s, $0.90/10s @720p);
+  // die Sekundenpreise unten ergeben exakt 3.00× bei fixer Cliplänge.
+  'luma-ray32-5s':  { EUR: 0.18, USD: 0.18 },
+  'luma-ray32-10s': { EUR: 0.27, USD: 0.27 },
+};
+
+/** Replicate slug per model tier. */
+const LUMA_SLUG: Record<string, string> = {
+  'luma-standard':  'luma/ray-2-720p',
+  'luma-pro':       'luma/ray-2-720p',
+  'luma-ray32-5s':  'luma/ray-3.2',
+  'luma-ray32-10s': 'luma/ray-3.2',
 };
 
 interface GenerateRequest {
   prompt: string;
-  model: 'luma-standard' | 'luma-pro';
+  model: 'luma-standard' | 'luma-pro' | 'luma-ray32-5s' | 'luma-ray32-10s';
   duration: number;
   aspectRatio: '16:9' | '9:16' | '1:1';
   startImageUrl?: string;
@@ -184,7 +196,13 @@ serve(async (req) => {
       replicateInput.concepts = [cameraConcept];
     }
 
-    console.log(`[generate-luma-video] Using model: luma/ray-2-720p`);
+    const lumaSlug = LUMA_SLUG[model] || 'luma/ray-2-720p';
+    if (lumaSlug === 'luma/ray-3.2') {
+      // Ray 3.2 erwartet feste Cliplängen (5s oder 10s) und eine Auflösung.
+      replicateInput.duration = model === 'luma-ray32-10s' ? 10 : 5;
+      replicateInput.resolution = '720p';
+    }
+    console.log(`[generate-luma-video] Using model: ${lumaSlug}`);
     console.log(`[generate-luma-video] Replicate input:`, JSON.stringify({
       ...replicateInput,
       prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
@@ -192,7 +210,7 @@ serve(async (req) => {
 
     try {
       const prediction = await replicate.predictions.create({
-        model: 'luma/ray-2-720p',
+        model: lumaSlug as `${string}/${string}`,
         input: replicateInput,
         webhook: webhookUrl,
         webhook_events_filter: ['start', 'completed']

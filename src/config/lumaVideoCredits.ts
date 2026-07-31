@@ -37,6 +37,40 @@ export const LUMA_VIDEO_MODELS = {
     },
     badge: 'Premium',
   },
+  'luma-ray32-5s': {
+    name: 'Luma Ray 3.2 (5s)',
+    provider: 'Luma AI (Replicate)',
+    quality: '720p',
+    costPerSecond: {
+      EUR: 0.18,
+      USD: 0.18,
+    },
+    minDuration: 5,
+    maxDuration: 5,
+    allowedDurations: [5] as const,
+    description: {
+      EUR: 'Ray 3.2 · neueste Luma-Generation — 0,90€ pro Clip',
+      USD: 'Ray 3.2 · latest Luma generation — $0.90 per clip',
+    },
+    badge: 'Neu',
+  },
+  'luma-ray32-10s': {
+    name: 'Luma Ray 3.2 (10s)',
+    provider: 'Luma AI (Replicate)',
+    quality: '720p',
+    costPerSecond: {
+      EUR: 0.27,
+      USD: 0.27,
+    },
+    minDuration: 10,
+    maxDuration: 10,
+    allowedDurations: [10] as const,
+    description: {
+      EUR: 'Ray 3.2 · 10s Langclip — 2,70€ pro Clip',
+      USD: 'Ray 3.2 · 10s long clip — $2.70 per clip',
+    },
+    badge: 'Neu',
+  },
 } as const;
 
 export type LumaVideoModel = keyof typeof LUMA_VIDEO_MODELS;

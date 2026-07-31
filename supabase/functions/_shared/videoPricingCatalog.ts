@@ -38,10 +38,14 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'happyhorse-standard':  { id: 'happyhorse-standard',  label: 'HappyHorse 720p',      unit: 'per-second', sellEUR: 0.42, sellUSD: 0.42, costEUR: 0.14,  minDuration: 3,  maxDuration: 15 },
   'happyhorse-pro':       { id: 'happyhorse-pro',       label: 'HappyHorse Pro 1080p', unit: 'per-second', sellEUR: 0.84, sellUSD: 0.84, costEUR: 0.28,  minDuration: 3,  maxDuration: 15 },
 
-  // Seedance 2.0
-  'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 2.0 Mini',    unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 15 },
-  'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Std',     unit: 'per-second', sellEUR: 0.09, sellUSD: 0.09, costEUR: 0.03,  minDuration: 3,  maxDuration: 15 },
-  'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 Pro',     unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 3,  maxDuration: 15 },
+  // Seedance — verified against Replicate slugs (2026-07-21).
+  // mini  → bytedance/seedance-1-lite      ($0.02/s)
+  // std   → bytedance/seedance-2.0-fast    ($0.15/s @720p)
+  // pro   → bytedance/seedance-2.0         ($0.18/s @720p)
+  'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 1 Lite (Draft)', unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 15 },
+  'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
+  'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.54, sellUSD: 0.54, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
+
 
   // Kling
   'kling-3':              { id: 'kling-3',              label: 'Kling 3.0 1080p',      unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 3,  maxDuration: 15 },
@@ -49,24 +53,32 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'kling-2.6':            { id: 'kling-2.6',            label: 'Kling 2.6',            unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 5,  maxDuration: 15 },
   'kling-omni':           { id: 'kling-omni',           label: 'Kling 3.0 Omni',       unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 5,  maxDuration: 15 },
 
-  // Wan 2.5 / 2.6
+  // Wan 2.5 / 2.6 / 2.7
   'wan-standard':         { id: 'wan-standard',         label: 'Wan 2.5 Std',          unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 4,  maxDuration: 10 },
   'wan-pro':              { id: 'wan-pro',              label: 'Wan 2.5 Pro',          unit: 'per-second', sellEUR: 0.21, sellUSD: 0.21, costEUR: 0.07,  minDuration: 4,  maxDuration: 10 },
   'wan-2-6-standard':     { id: 'wan-2-6-standard',     label: 'Wan 2.6 Std',          unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 4,  maxDuration: 15 },
   'wan-2-6-pro':          { id: 'wan-2-6-pro',          label: 'Wan 2.6 Pro',          unit: 'per-second', sellEUR: 0.21, sellUSD: 0.21, costEUR: 0.07,  minDuration: 4,  maxDuration: 15 },
+  // Wan 2.7 (MoE, natives Audio) — $0.10/s @720p, $0.15/s @1080p
+  'wan-2-7-standard':     { id: 'wan-2-7-standard',     label: 'Wan 2.7 720p',         unit: 'per-second', sellEUR: 0.30, sellUSD: 0.30, costEUR: 0.10,  minDuration: 2,  maxDuration: 15 },
+  'wan-2-7-pro':          { id: 'wan-2-7-pro',          label: 'Wan 2.7 Pro 1080p',    unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 2,  maxDuration: 15 },
 
   // Luma
   'luma-standard':        { id: 'luma-standard',        label: 'Luma Ray 2 Std',       unit: 'per-second', sellEUR: 0.21, sellUSD: 0.21, costEUR: 0.07,  minDuration: 5,  maxDuration: 9  },
   'luma-pro':             { id: 'luma-pro',             label: 'Luma Ray 2 Pro',       unit: 'per-second', sellEUR: 0.36, sellUSD: 0.36, costEUR: 0.12,  minDuration: 5,  maxDuration: 9  },
+  // Luma Ray 3.2 — Replicate bepreist pro Clip ($0.30 / 5s, $0.90 / 10s @720p).
+  // Deshalb je Clip-Länge ein eigener Tarif, damit 3.00× exakt aufgeht.
+  'luma-ray32-5s':        { id: 'luma-ray32-5s',        label: 'Luma Ray 3.2 (5s)',    unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 5,  maxDuration: 5  },
+  'luma-ray32-10s':       { id: 'luma-ray32-10s',       label: 'Luma Ray 3.2 (10s)',   unit: 'per-second', sellEUR: 0.27, sellUSD: 0.27, costEUR: 0.09,  minDuration: 10, maxDuration: 10 },
+
 
   // LTX
   'ltx-standard':         { id: 'ltx-standard',         label: 'LTX 2.0 Std',          unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 10 },
   'ltx-pro':              { id: 'ltx-pro',              label: 'LTX 2.0 Pro',          unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 3,  maxDuration: 10 },
 
-  // Vidu Q2 (per-clip 5s)
-  'vidu-q2-reference':    { id: 'vidu-q2-reference',    label: 'Vidu Q2 Reference (5s)', unit: 'per-clip', sellEUR: 0.66, sellUSD: 0.66, costEUR: 0.22, fixedClipSeconds: 5 },
-  'vidu-q2-i2v':          { id: 'vidu-q2-i2v',          label: 'Vidu Q2 I2V (5s)',       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
-  'vidu-q2-t2v':          { id: 'vidu-q2-t2v',          label: 'Vidu Q2 T2V (5s)',       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
+  // Vidu — Q2-IDs bleiben aus Kompatibilität, laufen aber real auf Vidu Q3 (per-clip 5s)
+  'vidu-q2-reference':    { id: 'vidu-q2-reference',    label: 'Vidu Q3 Reference (5s)', unit: 'per-clip', sellEUR: 0.66, sellUSD: 0.66, costEUR: 0.22, fixedClipSeconds: 5 },
+  'vidu-q2-i2v':          { id: 'vidu-q2-i2v',          label: 'Vidu Q3 I2V (5s)'  ,       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
+  'vidu-q2-t2v':          { id: 'vidu-q2-t2v',          label: 'Vidu Q3 T2V (5s)'  ,       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
 
   // Pika
   'pika-2-2-standard':    { id: 'pika-2-2-standard',    label: 'Pika 2.2 Std',         unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 3,  maxDuration: 10 },
@@ -80,8 +92,8 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'veo-3.1-lite-1080p':   { id: 'veo-3.1-lite-1080p',   label: 'Veo 3.1 Lite 1080p',   unit: 'per-second', sellEUR: 0.66, sellUSD: 0.66, costEUR: 0.22,  minDuration: 4,  maxDuration: 8  },
   'veo-3.1-fast':         { id: 'veo-3.1-fast',         label: 'Veo 3.1 Fast 1080p',   unit: 'per-second', sellEUR: 1.20, sellUSD: 1.20, costEUR: 0.40,  minDuration: 4,  maxDuration: 8  },
   'veo-3.1-pro':          { id: 'veo-3.1-pro',          label: 'Veo 3.1 Pro 1080p',    unit: 'per-second', sellEUR: 3.30, sellUSD: 3.30, costEUR: 1.10,  minDuration: 4,  maxDuration: 8  },
-  'sora-2-standard':      { id: 'sora-2-standard',      label: 'Sora 2 Standard',      unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 4,  maxDuration: 20 },
-  'sora-2-pro':           { id: 'sora-2-pro',           label: 'Sora 2 Pro',           unit: 'per-second', sellEUR: 1.35, sellUSD: 1.35, costEUR: 0.45,  minDuration: 4,  maxDuration: 20 },
+  'sora-2-standard':      { id: 'sora-2-standard',      label: 'Sora 2 Standard (EOL 24.09.2026)',      unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 4,  maxDuration: 20 },
+  'sora-2-pro':           { id: 'sora-2-pro',           label: 'Sora 2 Pro (EOL 24.09.2026)',           unit: 'per-second', sellEUR: 1.35, sellUSD: 1.35, costEUR: 0.45,  minDuration: 4,  maxDuration: 20 },
   'grok-imagine':         { id: 'grok-imagine',         label: 'Grok Imagine',         unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 4,  maxDuration: 15 },
 };
 
@@ -101,4 +113,4 @@ export function computeTotalCost(modelId: string, durationSeconds: number, curre
   return +(price * durationSeconds).toFixed(4);
 }
 
-export const CATALOG_VERSION = '2026-07-14';
+export const CATALOG_VERSION = '2026-07-21';
