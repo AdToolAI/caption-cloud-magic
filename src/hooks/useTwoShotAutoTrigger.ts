@@ -18,6 +18,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { probePlateMotion } from '@/lib/composer/lipsync/samplePlateFrames';
 import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
@@ -76,6 +77,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
   const inflight = useRef<Set<string>>(new Set());
   const autoRetried = useRef<Set<string>>(new Set());
   const progressActive = useRef(false);
+  // v327 — one motion probe per scene+plate. Key is `${sceneId}::${plateUrl}`.
+  const motionProbed = useRef<Set<string>>(new Set());
+
 
   useEffect(() => {
     if (!projectId) return;
@@ -511,9 +515,42 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // filter — the only way back into the pipeline is a user-triggered
           // `reset-lipsync-scene` call. So we never clear failure markers here.
 
+          // v327 — Motion-Probe vor dem Dispatch. Misst auf der fertigen
+          // Plate, ob ein Sprecher sich bewegt. Ergebnis landet in
+          // `composer_scenes.motion_track`; `compose-dialog-segments` wählt
+          // daraufhin Preclip (static) oder Full-Plate-Tracking (moving).
+          // Fail-open: jeder Fehler → Legacy-Pfad, Dispatch läuft trotzdem.
+          const plateForProbe: string | null =
+            (d.lip_sync_source_clip_url as string | null) ?? (d.clip_url as string | null);
+          const probeKey = `${d.id}::${plateForProbe ?? ''}`;
+          if (plateForProbe && !motionProbed.current.has(probeKey)) {
+            motionProbed.current.add(probeKey);
+            try {
+              const { data: authData } = await supabase.auth.getUser();
+              const uid = authData?.user?.id;
+              if (uid) {
+                const probe = await probePlateMotion({
+                  sceneId: d.id,
+                  projectId,
+                  userId: uid,
+                  plateUrl: plateForProbe,
+                });
+                console.info(
+                  `[useTwoShotAutoTrigger] v327 motion probe scene=${d.id} ok=${probe.ok} ${
+                    probe.ok ? `samples=${probe.samples ?? 0}` : `reason=${probe.reason}`
+                  }`,
+                );
+              }
+            } catch (probeErr) {
+              console.warn('[useTwoShotAutoTrigger] v327 motion probe failed (fail-open)', probeErr);
+            }
+            if (cancelled) return;
+          }
+
           console.info(
             `[useTwoShotAutoTrigger] invoking ${fnName} for scene ${d.id} (speakers=${speakers})`,
           );
+
           supabase.functions
             .invoke(fnName, { body: { scene_id: d.id, auto: true } })
             .then(async ({ data: lsData, error: lsErr }) => {

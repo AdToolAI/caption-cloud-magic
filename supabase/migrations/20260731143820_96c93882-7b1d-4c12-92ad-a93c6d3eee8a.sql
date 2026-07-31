@@ -1,0 +1,2 @@
+ALTER TABLE public.composer_scenes ADD COLUMN IF NOT EXISTS motion_track jsonb;
+COMMENT ON COLUMN public.composer_scenes.motion_track IS 'v327 — per-speaker face trajectory measured on the rendered plate (client frame sampling + AWS Rekognition). Used to switch moving speakers from the static preclip path to full-plate tracked lip-sync.';

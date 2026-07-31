@@ -96,6 +96,15 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+// v327 — motion-tolerant lip-sync: measured face trajectories switch moving
+// speakers from the static preclip path to full-plate per-frame bboxes.
+import {
+  buildTrackedPerFrameBoxes,
+  isTrackUsable,
+  parseMotionTrack,
+  slotTrackFor,
+} from "../_shared/face-motion-track.ts";
+
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
@@ -398,6 +407,12 @@ async function uploadBoundingBoxesJson(
     // neighbour faces during turns this speaker is silent.
     voicedWindowsSec?: Array<[number, number]>;
     fps?: number;
+    /**
+     * v327 — pre-built per-frame boxes from a measured face trajectory
+     * (moving speaker). When present it wins over `box`; the caller already
+     * applied the voiced-window nulling and plate clamping.
+     */
+    perFrameBoxes?: Array<[number, number, number, number] | null>;
   },
 ): Promise<{ url: string | null; nonNullFrames: number; totalFrames: number }> {
   try {
@@ -405,7 +420,9 @@ async function uploadBoundingBoxesJson(
     const ts = Date.now();
     const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
     const totalFrames = Math.max(1, params.frameCount);
-    const boxes = params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
+    const boxes = params.perFrameBoxes && params.perFrameBoxes.length === totalFrames
+      ? params.perFrameBoxes
+      : params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
       ? buildPerFrameBoxes({
           box: params.box,
           frameCount: totalFrames,
@@ -413,6 +430,7 @@ async function uploadBoundingBoxesJson(
           voicedWindowsSec: params.voicedWindowsSec,
         })
       : new Array(totalFrames).fill(params.box);
+
     const nonNullFrames = boxes.reduce((acc, v) => acc + (v ? 1 : 0), 0);
     const payload = { bounding_boxes: boxes };
     // v279 — Uint8Array instead of Blob: supabase-js 2.75 in Deno silently
@@ -782,7 +800,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, clip_status, clip_error, retry_count, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets",
+        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, clip_status, clip_error, retry_count, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets, motion_track",
       )
       .eq("id", sceneId)
       .single();
@@ -5327,8 +5345,44 @@ serve(async (req) => {
     let passPreclipUrl: string | null = ((pass as any).preclip_url ?? null);
     let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
 
+    // ── v327 — Motion-Tolerant Lip-Sync ──────────────────────────────────
+    // `report-plate-motion-track` measured this speaker's face trajectory on
+    // the very plate we are about to dispatch. A speaker classified `moving`
+    // must NOT go through the preclip path: the preclip is a fixed square and
+    // the mux overlays it back at exactly that rect, so a walking / stepping
+    // subject drifts out of the crop and the frame-0 silent-face freeze tiles
+    // in DialogStitchVideo no longer match the plate underneath. Instead we
+    // dispatch the FULL PLATE with per-frame interpolated boxes (no overlay).
+    // Everything below fails open: no/stale track → untouched legacy path.
+    const v327Track = isTrackUsable(
+      parseMotionTrack((scene as any)?.motion_track),
+      sourceClipUrl,
+    )
+      ? parseMotionTrack((scene as any)?.motion_track)
+      : null;
+    const v327SlotTrack = slotTrackFor(v327Track, Number(pass.speaker_idx ?? currentPassIdx));
+    const v327Tracked = !!v327SlotTrack && v327SlotTrack.motion_class === "moving" && !!plateDims;
+    if (v327Tracked) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v327_motion_track TRACKED ` +
+          `speaker=${pass.speaker_name} drift=${((v327SlotTrack!.max_drift_pct) * 100).toFixed(1)}% ` +
+          `scale=${((v327SlotTrack!.max_scale_delta) * 100).toFixed(1)}% points=${v327SlotTrack!.points.length} ` +
+          `→ full-plate per-frame bboxes, preclip disabled`,
+      );
+      // Drop any cached preclip so mux/webhook treat this pass as full-plate.
+      passPreclipUrl = null;
+      usePassPreclip = false;
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_crop = null;
+    }
+    (pass as any).bbox_mode = v327Tracked ? "tracked" : "static";
+    (pass as any).motion_class = v327SlotTrack?.motion_class ?? null;
+    (pass as any).max_drift_pct = v327SlotTrack?.max_drift_pct ?? null;
+    (pass as any).track_samples = v327SlotTrack?.points.length ?? null;
+
     const v161PreclipEligible =
       !usePassPreclip &&
+      !v327Tracked &&
       !!tightAudioInfo &&
       !!plateDims &&
       !!sourceClipUrl &&
@@ -5337,6 +5391,7 @@ serve(async (req) => {
       Number.isFinite(Number(pass.coords?.[1])) &&
       Array.isArray(speakerWindowsSecs) && speakerWindowsSecs.length > 0 &&
       body?.noop_auto_escalation !== true;
+
 
     if (v161PreclipEligible) {
       const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
@@ -5870,6 +5925,20 @@ serve(async (req) => {
 
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;
+      // v327 — moving speaker: per-frame boxes interpolated from the measured
+      // trajectory instead of one constant box. Plate space only (the tracked
+      // path never runs inside a preclip), voiced-window nulling preserved.
+      const v327PerFrameBoxes =
+        v327Tracked && v327SlotTrack && !v161UsingPreclipForBbox && plateDims
+          ? buildTrackedPerFrameBoxes({
+              points: v327SlotTrack.points,
+              frameCount,
+              fps: dispatchFps ?? ASSUMED_FPS,
+              voicedWindowsSec: v124VoicedWindows,
+              clampWidth: plateDims.width,
+              clampHeight: plateDims.height,
+            })
+          : null;
       if (retryVariant === "bbox-url-pro" && dispatchBox) {
         const up = await uploadBoundingBoxesJson(supabase, {
           userId,
@@ -5880,10 +5949,18 @@ serve(async (req) => {
           frameCount,
           voicedWindowsSec: v124VoicedWindows,
           fps: dispatchFps,
+          perFrameBoxes: v327PerFrameBoxes ?? undefined,
         });
         usedUrl = up.url;
         nonNullFrames = up.nonNullFrames;
+        if (v327PerFrameBoxes) {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v327_motion_track TRACKED_BBOX_URL ` +
+              `frames=${frameCount} voiced_frames=${nonNullFrames} points=${v327SlotTrack!.points.length} url=${usedUrl ? "ok" : "null"}`,
+          );
+        }
       }
+
 
 
       // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
