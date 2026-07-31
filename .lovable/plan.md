@@ -1,43 +1,55 @@
-**Kurz gesagt: nein, noch nicht — der Plan ist die Behebung, umgesetzt ist er noch nicht.** Und ich will ehrlich sein, warum ich diesmal zuversichtlicher bin als bei den letzten Anläufen: Bisher haben wir immer an den *Symptomen* nachgeschärft (Trust-Ausnahmen, Floor-Werte, Probe-Timeouts). Die Datenbank zeigt jetzt zum ersten Mal die *Ursache* schwarz auf weiß, und die ist banal: das System weiß gar nicht, wo die Münder sind — und rendert die Plate ohne bestätigten Anchor.
+# Plan v341 – Lip-Sync-Stabilisierung statt weiterer Einzel-Patches
 
-## Zuerst: Seedance 2.5
+## Verifizierter aktueller Befund
 
-ByteDance hat Seedance 2.5 **heute (31.07.2026)** offiziell vorgestellt. Verfügbar ist es aktuell nur in den Endnutzer-Produkten **Jimeng AI** und **Doubao Pro**. Im Blog-Post steht wörtlich: API-Zugang kommt "coming soon" über **BytePlus ModelArk**. Es gibt also noch **keinen direkten ByteDance-API-Endpunkt** — auch nicht an Replicate vorbei. Sobald ModelArk live ist, ist die Anbindung ein kleiner Adapter im bestehenden Model-Registry.
+- Der neue Lauf scheitert tatsächlich bereits im Preflight: **22,4 % Face-Share bei geforderten 30 %** (`PREFLIGHT_BLOCKED`, 22:05 UTC). Sync.so wurde dabei richtigerweise nicht mehr aufgerufen und **512 Credits wurden erstattet**.
+- Die aktuelle v340-Teilimplementierung ersetzt ein fehlendes echtes Mund-Landmark durch einen **geschätzten Punkt bei 72 % der Gesichtsbox** und bezeichnet den Crop anschließend trotzdem als `anchor="mouth"`. Damit wird die angekündigte Landmark-Pflicht faktisch umgangen.
+- Gleichzeitig wurde der Mehrsprecher-Floor von 24 % auf 30 % erhöht. Der synthetische Mundpunkt löst also den neuen Crop-Pfad aus, dessen Ergebnis dann am neuen Floor scheitert. **Das ist die aktuelle direkte Ursache des sichtbaren Fehlers.**
+- Der alte Motion-Test ist ebenfalls nicht beweiskräftig: Die vorherigen vier Pässe wurden mit extrem hohen Gesamtbewegungswerten als bestanden markiert, obwohl visuell keine korrekte Mundbewegung vorlag.
+- Die Cast-&-World-Anchor-Pflicht vor der Plate-Erzeugung und der echte Mundband-Test sind noch nicht umgesetzt. v340 ist daher kein vollständiger End-to-End-Fix.
 
-## Befund zur Szene (verifiziert in der Datenbank)
+## Umsetzung
 
-Szene `69d56a49…`, 4 Sprecher, alle aus Cast & World (Samuel, Matthew, Sarah, Kailee — alle vier haben ein Referenzbild hinterlegt):
+### 1. Widersprüchliche v340-Teiländerung entfernen
+- Einen synthetisch aus der Gesichtsbox berechneten Punkt **nicht mehr als echtes Mund-Landmark akzeptieren**.
+- `anchorSource` strikt unterscheiden: echtes Landmark, geschätzter Fallback, kein Anchor.
+- Bei Mehrsprechern nur echte, auf der gerenderten Plate gemessene Landmarks für den produktiven Dispatch zulassen.
+- Face-Share nicht durch einen pauschalen höheren Floor „reparieren“; Crop-Ziel und Mindestwert aus derselben validierten Gesichtsbox berechnen und unmögliche Geometrie vor dem Rendern eindeutig klassifizieren.
 
-1. **Kein einziger Preclip hatte echte Gesichts-Landmarks.** Alle vier Dispatches loggen `detector_used = face-fallback`. Die Crops wurden geometrisch geraten, nicht am Gesicht gemessen.
-2. **Face-Share liegt exakt auf dem Boden**: 0.2404 / 0.2425 / 0.2470 — die 24-%-Untergrenze. Der Crop wurde bis ans Limit aufgezogen, der Mund sitzt nicht zuverlässig in der Mitte.
-3. **Der Sprecher-Punkt fehlt in der Payload**: `asd_has_coordinates: false`, `asd_frame_number: null`. sync-3 bekommt keinen Hinweis, welchen Mund es animieren soll.
-4. **Die Motion-Probe hat trotzdem "bestanden"** (yavg 827–2032 gegen Schwelle 4.0). Diese Varianz stammt aus Kopf-/Körperbewegung im weiten Crop, nicht aus dem Mund — das Gate ist blind für genau den Fehler, den es abfangen soll.
-5. **Ähnlichkeit zu Cast & World**: `preview_anchor_url` leer, `anchor_confirmed_at` = `NULL`, Log nennt `v251_anchor_missing`. Die Plate wurde **ohne bestätigten Anchor** gerendert. Zusätzlich tragen die `dialog_turns` zwar die `characterId`, aber keine `reference_image_url`.
+### 2. Einen einzigen kanonischen Face-Detection-Pfad herstellen
+- Plate-Frame extrahieren und alle sichtbaren Gesichter samt Box, Mundpunkten und Konfidenz einmal erfassen.
+- Genau diese Ergebnisse für Identitätszuordnung, Crop, Sprecherkoordinaten und Motion-Probe verwenden; keine Mischung aus Anchor-, Track- und Plate-Koordinatenräumen.
+- Für jeden Sprecher persistieren: Detektor, echte Landmark-Konfidenz, Face-Box, Mundpunkt und Koordinatenraum.
+- Fehlen bei einer Mehrsprecher-Plate verwertbare Landmarks, einmal Plate neu erzeugen; danach sauber abbrechen und automatisch erstatten, statt weitere Fallbacks zu stapeln.
 
-## Plan v340
+### 3. Cast-&-World-Identität vor Videoerzeugung erzwingen
+- Plate-Erzeugung erst starten, wenn ein bestätigter Anchor aus den zugeordneten Cast-&-World-Referenzbildern vorhanden ist.
+- `reference_image_url` pro Dialogsprecher in den kanonischen Szenendaten mitführen.
+- Gesicht-zu-Sprecher-Zuordnung gegen die Referenzbilder prüfen; keine reine Links-nach-rechts-Zuordnung als produktiven Fallback verwenden.
 
-**A. Landmarks verpflichtend statt Fallback**
-- `face-fallback` ist bei N≥2 **kein Dispatch-Grund** mehr. Liefert AWS Rekognition nicht N unterschiedliche Gesichter mit Mund-Landmarks, wird die Plate einmal automatisch neu erzeugt; scheitert das erneut, bricht der Lauf sauber mit Erstattung ab, statt blind an Sync.so zu gehen.
-- Detector-Ergebnis (Gesichter, Mundpunkte, Konfidenz) wird pro Pass persistiert und in der UI sichtbar.
+### 4. Sync.so-Payload aus den validierten Plate-Daten bauen
+- Pro Pass echte `coordinates` und `frame_number` aus dem Plate-Landmark mitsenden.
+- Vor Dispatch prüfen: richtige Sprecher-ID, genau ein Zielgesicht im Preclip, Mundpunkt innerhalb des Crops und kein Nachbargesicht im Crop.
+- Alte Trust-Ausnahmen (`trusted_preclip_without_probe`, konstruktives Vertrauen bei fehlender Messung) für Mehrsprecher entfernen.
 
-**B. Mund-zentrierter Crop statt Floor-Crop**
-- Crop wird um den erkannten Mundpunkt gebaut, Ziel-Face-Share **0.35–0.45** statt "gerade noch 0.24". Ohne Landmarks kein Crop (folgt aus A).
+### 5. Qualitätsprüfung auf tatsächliche Lippenbewegung umstellen
+- Nicht mehr die Gesamtbewegung des weiten Crops messen.
+- Nur ein enges Mundband über mehrere Frames analysieren und gegen eine ruhige Kontrollregion an Wange/Stirn normalisieren.
+- Kopf-/Körperbewegung bei geschlossenem Mund muss als No-Op erkannt werden.
+- Erst nach bestandenem Mundband-Test darf ein Pass `done` werden und in den finalen Mux gelangen; Timeout oder No-Op führt idempotent zur Erstattung.
 
-**C. Sprecher-Punkt in die Payload**
-- `active_speaker_detection` bekommt echte `coordinates: [cx, cy]` und `frame_number` aus den Landmarks. Dispatch ohne Koordinaten wird bei N≥2 abgelehnt.
+### 6. Atomar testen, dann erst produktiv freigeben
+- Reproduzierbare Tests für 1, 2 und 4 Sprecher anlegen, inklusive der aktuellen Szene als Fehler-Fixture.
+- Negativfälle abdecken: fehlendes Landmark, falsche Identität, zu kleines Gesicht, Nachbargesicht im Crop, statischer Provider-Output und hängender Motion-Probe.
+- Einen frischen 4-Sprecher-Lauf vollständig prüfen. Freigabekriterien:
+  - bestätigter Cast-&-World-Anchor,
+  - vier eindeutige Plate-Identitäten,
+  - vier echte Mund-Landmarks,
+  - vier Payloads mit Koordinaten und Frame-Nummern,
+  - vier bestandene Mundband-Differenztests,
+  - visuelle Übereinstimmung mit den Referenzcharakteren.
+- Bis diese Kriterien erfüllt sind, wird der Lauf nicht als „behoben“ bezeichnet und es werden keine weiteren Schwellenwert-Patches einzeln ausgerollt.
 
-**D. Motion-Gate schärfen**
-- Probe misst nur noch das enge Mundband um den erkannten Mundpunkt und vergleicht gegen die Varianz des Wangen-/Stirnbereichs. Kopf bewegt sich, Mund nicht → NOOP. Die Absolutschwelle 4.0 entfällt.
+## Technische Grenze
 
-**E. Anchor-Pflicht für Cast-&-World-Treue**
-- Kein Plate-Render ohne `anchor_confirmed_at`. Fehlt der Anchor, wird er aus den Cast-&-World-Referenzbildern erzeugt und bestätigt, bevor ein Video-Provider startet.
-- `dialog_turns` bekommen die `reference_image_url` des Charakters mitgeschrieben.
-- Gesicht↔Sprecher wird per Rekognition-Vergleich gegen das Referenzbild zugeordnet, nicht mehr über Bildposition.
-
-**F. Verifikation statt Vermutung**
-- Die Szene wird mit dem neuen Pfad einmal frisch gestartet (Credits sind erstattet). Erst wenn der Log echte Landmarks, Koordinaten in der Payload und ein bestandenes Mundband-Differenz-Gate zeigt — und das Ergebnis visuell gegen die Cast-&-World-Bilder standhält — gilt das Problem als behoben. Ich melde nichts als "gelöst", bevor das geprüft ist.
-
-### Technische Details
-Betroffen: `supabase/functions/compose-dialog-segments/index.ts`, `_shared/preclip-geometry.ts`, `_shared/preclip-trust.ts`, `_shared/syncso-face-gate.ts`, `plateFaceSlotRouter.ts`, `compose-scene-anchor`, `report-lipsync-motion-probe`, `lipsync-watchdog`, clientseitig `src/lib/composer/lipsync/computeMouthYavg.ts` und `src/hooks/useMouthYavgProbe.ts`.
-
-Die v336/v338-„Trust ohne Probe"-Ausnahme wird durch A ersetzt: Vertrauen entsteht künftig aus echten Landmarks, nicht aus konstruktiver Isolation.
+Die Änderung wird als zusammenhängender Pipeline-Fix umgesetzt: Plate-Anchor → Plate-Detection → Identity-Mapping → Preclip → Dispatch → Mouth-Motion-Gate → Mux. Dadurch entfernen wir die inzwischen widersprüchlichen v329/v331/v334/v336/v338/v340-Ausnahmen aus dem Mehrsprecherpfad, statt eine weitere Ausnahme darüberzulegen.

@@ -2581,7 +2581,10 @@ serve(async (req) => {
             ];
             speakerPlateBboxes[i] = repaired;
             speakerCoords[i] = [cx, cy];
-            speakerPlateMouths[i] = [cx, cy];
+            // v341: a repaired bbox center is not a measured mouth landmark.
+            // Keep the mouth empty so multi-speaker preflight fails closed and
+            // triggers plate regeneration instead of dispatching a guessed ASD.
+            speakerPlateMouths[i] = null;
             coordSources[i] = "v185-anchor-repair";
             console.warn(
               `[compose-dialog-segments] scene=${sceneId} v185_anchor_plate_bbox_repair ` +
@@ -5552,7 +5555,7 @@ serve(async (req) => {
         if (
           preclipResult.ok &&
           speakers.length >= 2 &&
-          preclipResult.anchor !== "mouth"
+          (preclipResult.anchor !== "mouth" || preclipResult.anchorSource !== "landmark")
         ) {
           console.error(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v340_preclip_no_mouth_anchor ` +
@@ -7112,18 +7115,14 @@ serve(async (req) => {
       // (extract failure or transient 5xx), log it but let the dispatch
       // through. The Forensik UI surfaces this clearly so we don't silently
       // pretend the probe passed.
-      if (gate.ok && (gate.code === "probe_unavailable" || gate.code === "trusted_preclip_without_probe")) {
+      if (gate.ok && gate.code === "probe_unavailable") {
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_source_kind: "segments", video_url: dispatchVideoUrl,
           coords: gateCoord, frame_number: gateFrame,
           http_status: gate.http_status ?? 0,
-          sync_status: gate.code === "trusted_preclip_without_probe"
-            ? "FACE_GATE_TRUSTED_PRECLIP_WITHOUT_PROBE"
-            : "FACE_GATE_PROBE_UNAVAILABLE",
-          error_class: gate.code === "trusted_preclip_without_probe"
-            ? "trusted_preclip_without_probe"
-            : "face_probe_unavailable",
+          sync_status: "FACE_GATE_PROBE_UNAVAILABLE",
+          error_class: "face_probe_unavailable",
           error_message: (gate.reason ?? "face_probe_unavailable").slice(0, 240),
           ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
           meta: {

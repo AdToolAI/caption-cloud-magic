@@ -44,7 +44,6 @@ export type FaceGateCode =
   | "multiple_faces"
   | "skipped"
   | "probe_unavailable"
-  | "trusted_preclip_without_probe"
   | "untrusted_multispeaker_without_probe"
   | "geometry_suspect_without_probe"
   | "unparsed";
@@ -119,10 +118,9 @@ export interface FaceGateInput {
  * top of the raw gate result: a non-blocking `probe_unavailable` stays
  * non-blocking only while the underlying crop geometry is trustworthy.
  *
- * v336 — multi-speaker full plates and untrusted crops remain fail-closed.
- * A constructively verified single-face preclip may proceed without a second
- * JPEG probe; this preserves the morph guard without demanding an artifact
- * the server-side preclip renderer intentionally cannot produce.
+ * v341 — every multi-speaker pass remains fail-closed when the post-render
+ * frame probe is unavailable. Constructive crop evidence is useful for
+ * diagnostics but cannot prove that the rendered preclip contains the face.
  */
 export async function verifyFaceBeforeDispatch(
   input: FaceGateInput,

@@ -70,7 +70,6 @@ export function decidePreclipTrust(input: PreclipTrustInput): PreclipTrustDecisi
 }
 
 export type ProbeUnavailablePolicyCode =
-  | "trusted_preclip_without_probe"
   | "untrusted_multispeaker_without_probe"
   | "geometry_suspect_without_probe"
   | "probe_unavailable";
@@ -80,18 +79,11 @@ export function decideProbeUnavailablePolicy(input: {
   preclipTrusted: boolean;
   geometrySuspect: boolean;
 }): { ok: boolean; code: ProbeUnavailablePolicyCode; reason: string } {
-  if (input.isMultiSpeakerContext && input.preclipTrusted && !input.geometrySuspect) {
-    return {
-      ok: true,
-      code: "trusted_preclip_without_probe",
-      reason: "Constructively isolated single-face preclip; post-render probe unavailable.",
-    };
-  }
   if (input.isMultiSpeakerContext) {
     return {
       ok: false,
       code: "untrusted_multispeaker_without_probe",
-      reason: "Multi-speaker input has no verifiable isolated-face preclip; blind dispatch rejected.",
+      reason: "Multi-speaker input requires a successful post-render face probe; construction evidence alone is insufficient.",
     };
   }
   if (input.geometrySuspect) {

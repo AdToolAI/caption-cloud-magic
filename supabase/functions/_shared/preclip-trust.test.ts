@@ -1,7 +1,7 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { decidePreclipTrust, decideProbeUnavailablePolicy } from "./preclip-trust.ts";
 
-Deno.test("v336: trusted isolated preclip may dispatch without JPEG probe", () => {
+Deno.test("v341: isolated multi-speaker preclip still requires JPEG probe", () => {
   const trust = decidePreclipTrust({
     renderSucceeded: true,
     faceShare: 0.31,
@@ -16,7 +16,7 @@ Deno.test("v336: trusted isolated preclip may dispatch without JPEG probe", () =
     isMultiSpeakerContext: true,
     preclipTrusted: trust.trusted,
     geometrySuspect: false,
-  }).code, "trusted_preclip_without_probe");
+  }).code, "untrusted_multispeaker_without_probe");
 });
 
 Deno.test("v336: sibling in crop makes missing probe fail closed", () => {
@@ -67,7 +67,7 @@ Deno.test("v336: ordinary single-speaker missing probe remains non-blocking", ()
   assertEquals(decision.code, "probe_unavailable");
 });
 
-Deno.test("v338: small plate box is recovered by valid isolated final crop", () => {
+Deno.test("v341: small plate box can be construction-valid but cannot bypass probe", () => {
   const trust = decidePreclipTrust({
     renderSucceeded: true,
     faceShare: 0.2428700769578995,
@@ -84,7 +84,7 @@ Deno.test("v338: small plate box is recovered by valid isolated final crop", () 
     isMultiSpeakerContext: true,
     preclipTrusted: trust.trusted,
     geometrySuspect: false,
-  }).code, "trusted_preclip_without_probe");
+  }).code, "untrusted_multispeaker_without_probe");
 });
 
 Deno.test("v338: small plate box remains blocked below face-share floor", () => {
