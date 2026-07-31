@@ -1679,7 +1679,7 @@ export const translations: Record<Language, any> = {
         },
         q3: {
           question: "Can I try it for free?",
-          answer: "Yes! We offer a free plan with 20 AI-generated captions per month. No credit card required to start."
+          answer: "Yes! The free plan includes media credits so you can produce your first videos. No credit card required to start."
         },
         q4: {
           question: "What platforms are supported?",
