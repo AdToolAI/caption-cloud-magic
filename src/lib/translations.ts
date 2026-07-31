@@ -7614,7 +7614,7 @@ export const translations: Record<Language, any> = {
     },
 
     footer: {
-      tagline: "KI-gestütztes Social Media Management",
+      tagline: "Ein Creator. Ein ganzes Studio.",
       legal: {
         title: "Rechtliches",
         imprint: "Impressum",
