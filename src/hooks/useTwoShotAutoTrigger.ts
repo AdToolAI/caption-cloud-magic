@@ -76,6 +76,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
   const inflight = useRef<Set<string>>(new Set());
   const autoRetried = useRef<Set<string>>(new Set());
   const progressActive = useRef(false);
+  // v327 — one motion probe per scene+plate. Key is `${sceneId}::${plateUrl}`.
+  const motionProbed = useRef<Set<string>>(new Set());
+
 
   useEffect(() => {
     if (!projectId) return;
