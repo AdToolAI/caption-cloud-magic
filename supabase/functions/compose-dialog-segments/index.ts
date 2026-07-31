@@ -4722,6 +4722,13 @@ serve(async (req) => {
                     siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
                     startSec: unionStart,
                     endSec: unionEnd,
+                    // v331 — Bewegung im Crop einfassen statt Full-Plate.
+                    trackPoints: slotTrackFor(
+                      isTrackUsable(parseMotionTrack((scene as any)?.motion_track), sourceClipUrl)
+                        ? parseMotionTrack((scene as any)?.motion_track)
+                        : null,
+                      Number(bp.speaker_idx ?? idx),
+                    )?.points ?? null,
                   },
                   300_000,
                 );
