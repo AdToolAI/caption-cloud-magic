@@ -9,6 +9,8 @@ import type {
   AdCampaignMeta,
 } from '@/types/video-composer';
 import { dedupeCharacterShots } from '@/lib/video-composer/canonicalCastId';
+import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
+import { useOutfitLookMap } from '@/hooks/useOutfitLookMap';
 
 /**
  * Persist the assembly_config of an existing composer project to the database.
