@@ -3004,6 +3004,17 @@ serve(async (req) => {
                               dims: idResolved.dims,
                               faces: idResolved.faces,
                               assignmentLock: anchorIdentityPayload.assignmentLock,
+                              // v329 — Identity/Geometry-Split: die Slot→Character
+                              // Zuordnung wird plate-unabhängig gespiegelt, damit sie
+                              // eine Geometrie-Eviction (v325) überlebt und später
+                              // per Slot-Index an frisch detektierte Faces gebunden
+                              // werden kann.
+                              identity: {
+                                bySlot: { ...(anchorIdentityPayload.assignmentLock ?? {}) },
+                                source: useGeometryLock
+                                  ? "v326_geometry_rowmajor"
+                                  : (assignmentLockSource ?? null),
+                              },
                               resolvedCount: useGeometryLock ? expected : resolved,
                               expectedCount: expected,
                               v278AnchorLayoutSlots: anchorFaceLayout.slots.length,

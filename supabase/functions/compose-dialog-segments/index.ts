@@ -96,6 +96,11 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+import {
+  applyIdentityLockBySlot,
+  extractIdentityLock,
+  PLATE_IDENTITY_SPLIT_VERSION,
+} from "../_shared/plate-identity-split.ts";
 // v327 — motion-tolerant lip-sync: measured face trajectories switch moving
 // speakers from the static preclip path to full-plate per-frame bboxes.
 import {
@@ -630,7 +635,7 @@ interface SegmentsState {
   final_url?: string | null;
   error?: string;
   plate_identity?: {
-    version: "v153.2" | "v160" | "v242";
+    version: "v153.2" | "v160" | "v242" | "v329";
     dims: { width: number; height: number } | null;
     bboxes: Array<[number, number, number, number] | null>;
     faces?: unknown[];
@@ -648,6 +653,14 @@ interface SegmentsState {
      * assignment across every rerender.
      */
     assignmentLock?: Record<string, string>;
+    assignmentLockSource?: string | null;
+    /**
+     * v329 — Identity/Geometry-Split. Plate-UNABHÄNGIGE Identität: Slot-Index
+     * → Character-ID. Überlebt jede Geometrie-Eviction (v325) und wird über
+     * den Slot-Index an frisch detektierte Faces gebunden. `faces[].characterId`
+     * ist ab v329 ein abgeleiteter Wert, nie mehr die Quelle.
+     */
+    identity?: { bySlot: Record<string, string>; source?: string | null } | null;
   };
 }
 
@@ -1565,11 +1578,18 @@ serve(async (req) => {
       _currentClipUrl.length > 0 &&
       _persistedGeomClipUrl === _currentClipUrl &&
       (!plateDims || _dimsMatchPlate);
+    // v329 — Identität ist plate-UNABHÄNGIG und überlebt jede Geometrie-
+    // Eviction. Sie wird ab hier als eigenständiges Objekt geführt und
+    // ausschließlich über den Slot-Index an die Live-Geometrie gebunden.
+    const _identityLock = extractIdentityLock(_persistedPlateIdentityRaw);
     const persistedPlateIdentity = _persistedPlateIdentityRaw
       ? (_plateGeometryTrusted
         ? _persistedPlateIdentityRaw
         : {
           // identity-only projection — forces live plate re-detection
+          identity: _identityLock
+            ? { bySlot: _identityLock.bySlot, source: _identityLock.source }
+            : null,
           assignmentLock: _persistedPlateIdentityRaw.assignmentLock ?? null,
           assignmentLockSource: _persistedPlateIdentityRaw.assignmentLockSource ?? null,
           status: _persistedPlateIdentityRaw.status ?? null,
@@ -2047,6 +2067,29 @@ serve(async (req) => {
       }
     }
     if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
+      // ── v329 — Identity/Geometry-Split: Slot-Lock zuerst anwenden ───────
+      // Der persistierte Lock (v277-Rekognition oder v326-Row-Major) ist die
+      // einzige Identitätsquelle, die eine Geometrie-Eviction überlebt. Er
+      // wird hier über den SLOT-INDEX auf die frisch detektierten Faces
+      // gebrückt — VOR allen cid-basierten Pfaden, weil diese sonst auf
+      // `face.characterId` treffen, das nach der v325-Eviction garantiert
+      // leer ist (DB-belegt: Szene 23b381ac, resolvedCount 0 trotz Lock →
+      // v183-unlabeled-fallback → falsche/verkleinerte Crops → kein Lip-Sync).
+      if (_identityLock) {
+        const bridged = applyIdentityLockBySlot(plateIdentityMap as any, _identityLock, {
+          overwrite: false,
+          confidence: 0.88,
+        });
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} ${PLATE_IDENTITY_SPLIT_VERSION}_identity_slot_lock ` +
+          `lock_source=${_identityLock.source} lock_slots=${_identityLock.size} ` +
+          `applied=${bridged.applied} bridged_slots=[${bridged.bridgedSlots.join(",")}] ` +
+          `resolved_after=${bridged.resolvedCount}/${plateIdentityMap.faces.length} ` +
+          `geometry_evicted=${!_plateGeometryTrusted}`,
+        );
+      }
+
+
       // v166 — Anchor-Identity Slot Bridge.
       // If the plate-identity step could not label faces (Gemini probe failed
       // or resolvedCount=0), but the anchor faceMap KNOWS the characterId of
@@ -2689,7 +2732,8 @@ serve(async (req) => {
           ? "v242_fresh"
           : "existing";
     const v153PlateIdentitySnapshot = {
-      version: "v242" as const,
+      version: PLATE_IDENTITY_SPLIT_VERSION,
+      // ── v329 — GEOMETRIE (plate-gebunden, wird bei Plate-Wechsel verworfen)
       dims: plateDims,
       bboxes: speakerPlateBboxes,
       mouths: speakerPlateMouths,
@@ -2698,6 +2742,13 @@ serve(async (req) => {
       cached: plateIdentityMap?.cached ?? persistedPlateIdentity?.cached ?? false,
       sourceClipUrl,
       hydratedAt: new Date().toISOString(),
+      // ── v329 — IDENTITÄT (plate-unabhängig, überlebt jede Eviction) ─────
+      identity: {
+        bySlot: finalAssignmentLock ?? {},
+        source: lockSource,
+      },
+      // Legacy-Felder bleiben erhalten, damit ältere Leser (compose-video-clips,
+      // Forensik-UI, Bestandsszenen) unverändert weiterfunktionieren.
       assignmentLock: finalAssignmentLock,
       assignmentLockSource: lockSource,
     };
@@ -5430,6 +5481,30 @@ serve(async (req) => {
           },
           300_000,
         );
+        // ── v329 — Face-Share-Hardening (vor der Erfolgs-Übernahme) ────────
+        // Ein Crop mit sehr kleinem Face-Share ist kein Grenzfall, sondern ein
+        // garantierter No-Op: Sync.so findet im Crop kein animierbares Gesicht
+        // und gibt das Video unverändert zurück — der Kunde zahlt für „done
+        // ohne Lippenbewegung". Wir stufen das deshalb als Preclip-Fehler ein,
+        // damit der bestehende v187-Pfad (kein Full-Plate-Fallback, Refund)
+        // unverändert greift.
+        const V329_FACE_SHARE_FLOOR = 0.12;
+        const v329Share = Number(preclipResult.faceShareInCrop);
+        if (
+          preclipResult.ok &&
+          Number.isFinite(v329Share) &&
+          v329Share < V329_FACE_SHARE_FLOOR
+        ) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v329_preclip_face_share_too_low ` +
+            `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} ` +
+            `geometry=${preclipResult.geometryReason ?? "?"} plate_box_w_pct=${preclipResult.plateBoxWidthPct ?? "?"} ` +
+            `crop=${JSON.stringify(preclipResult.crop ?? null)} — refusing dispatch (guaranteed no-op)`,
+          );
+          (preclipResult as any).ok = false;
+          (preclipResult as any).error = "preclip_face_share_too_low";
+          (preclipResult as any).errorClass = "invalid_input";
+        }
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
           usePassPreclip = true;
@@ -5464,14 +5539,29 @@ serve(async (req) => {
             ? Number(preclipResult.mouthOffsetPx)
             : null;
           (pass as any).preclip_clamped = !!preclipResult.clamped;
+          // v329 — Geometrie-Forensik: sichtbar machen, ob der Crop aus einer
+          // vertrauenswürdigen Detektor-Box stammt oder aus dem proportionalen
+          // Rettungsfenster.
+          (pass as any).preclip_geometry_suspicious = !!preclipResult.geometrySuspicious;
+          (pass as any).preclip_geometry_reason = preclipResult.geometryReason ?? null;
+          (pass as any).preclip_plate_box_w_pct = Number.isFinite(Number(preclipResult.plateBoxWidthPct))
+            ? Number(Number(preclipResult.plateBoxWidthPct).toFixed(4))
+            : null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct}`,
           );
+
+
+
 
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           if (speakers.length >= 2) {
-            const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+            const reason = preclipResult.error === "preclip_face_share_too_low"
+              // v329 — eigene, ehrliche Meldung: das ist kein Timeout, sondern
+              // eine unsichere Gesichts-Geometrie auf dem Plate.
+              ? `preclip_face_share_too_low: Gesichts-Geometrie für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" ist unsicher — das Gesicht ist im erkannten Ausschnitt zu klein (${((Number(preclipResult.faceShareInCrop) || 0) * 100).toFixed(1)} %). Szene neu berechnen, damit das Lip-Sync greifen kann.`
+              : `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
             console.error(
               `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
             );
@@ -6847,6 +6937,9 @@ serve(async (req) => {
         sceneId,
         passIdx: currentPassIdx,
         preclipTrusted: preclipTrustedForGate,
+        // v329 — wenn der Crop aus dem proportionalen Rettungsfenster stammt,
+        // darf ein nicht verfügbarer Probe den Dispatch nicht mehr durchwinken.
+        geometrySuspect: usePassPreclip && !!(pass as any).preclip_geometry_suspicious,
       });
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;

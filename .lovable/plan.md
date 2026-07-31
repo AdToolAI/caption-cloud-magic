@@ -1,38 +1,47 @@
-## Was ich im Code gesehen habe
+## Ursache (an Code + DB verifiziert)
 
-Der Prompt in deinem Screenshot ist wörtlich ein generiertes Template, kein Inhalt aus deinem Briefing:
+Am 27.07. liefen 4 Sprecher sauber: `coord_source = plate-identity-cid-primary`, Methode `per-char-hungarian`, `resolved = 4/4`, Crops 394–700 px.
 
-`src/hooks/useStoryboardTransition.ts:659`
-```
-`${beatLabel} beat for ${briefing.productName ?? 'the brand'}: cinematic ${framing} shot, ${movement}, ${lighting} lighting.`
-```
-Das ergibt exakt „Hook beat for AdTool AI: cinematic medium-close-up shot, slow-push-in, soft-window lighting." — also der **Local-Fallback-Plan** (`buildLocalFallbackPlan`), der greift, wenn `briefing-deep-parse` in Timeout/Fehler läuft (Grace-Window 45s, danach Toast „Basis-Plan bereit").
+Zwei Eingriffe aus dieser Session brechen genau diesen Pfad:
 
-Zweites Problem, unabhängig davon: `extractSceneHints` (Zeile 532 ff.) liest pro Szenenblock nur **strukturierte Marker** — `SHOT:`, `DIALOG: "…"`, `KAMERA:`, `EMOTION:`. Dein Briefing ist Fließtext („Drei Personen stehen in einem normalen Büroaufzug…", Dialog als „…" ohne das Wort DIALOG). Ergebnis: `shot` = leer → generischer Anchor, `dialog` = leer → kein Voiceover, keine Lip-Sync-Szenen, und die 5s-Zeitfenster („0–5 Sekunden") werden nicht gelesen → 3s-Kacheln.
+1. **v325 „Plate-Invariant"** (`compose-dialog-segments`, Z. 1541–1588): verwirft persistierte Geometrie bei Clip-URL-/Dims-Abweichung und lässt nur eine *identity-only projection* (`assignmentLock`) übrig — Live-Detektion erzwungen.
+2. **v326 „Geometry-Rowmajor-Lock"** (`compose-video-clips`): schreibt Slot→Character-Locks, damit keine manuelle Face-Map nötig ist.
 
-Nicht verifiziert: ob die Analyse tatsächlich fehlgeschlagen ist (keine Konsolen-Logs im Snapshot). Deshalb ist Schritt 1 eine Diagnose.
+**Der Bruch:** Die Live-Detektion liefert Gesichter **ohne** `characterId` (`resolvedCount: 0`, DB-belegt für Szene `23b381ac…`). Der Lock-Zweig (Z. 2193–2225) sucht sein Gesicht aber über `face.characterId` ⇒ greift nie ⇒ Fallback `v183-unlabeled-fallback` / `plate-persisted-mouth-positional`. Zusätzlich sind die Live-Boxen winzig (47×63 auf 1284×718), der Crop wird auf `minSize: 128` geklemmt. Der real dispatchte Clip (720×720) zeigt das Gesicht rechts angeschnitten, `face_share` 0.18/0.15 statt ≥ 0.42 — und der Gate meldet `FACE_GATE_PROBE_UNAVAILABLE` (`non_blocking`), dispatcht also blind.
 
-## Plan
+## Plan v329 — Identity/Geometry-Split (Architekturfix statt Patch)
 
-### 1. Diagnose (zuerst)
-- `_meta.source` des zuletzt gespeicherten Plans in `composer_production_plans` prüfen: `local-fallback` vs. AI-Ergebnis.
-- Edge-Function-Logs von `briefing-deep-parse` für den Zeitraum lesen (Timeout / Moderation / Status).
-- Damit steht fest, ob nur der Fallback repariert werden muss oder auch die Server-Analyse.
+### A. Datenmodell trennen (Kern)
+`plate_identity` wird in zwei getrennte Felder aufgeteilt:
+- **`identity`** — `{ slot → characterId, source }`, plate-unabhängig, **überlebt jede Eviction**.
+- **`geometry`** — `{ faces[], dims, sourceClipUrl, detectedAt }`, gilt nur für genau ein Plate, wird von v325 wie bisher verworfen.
 
-### 2. Prose-Parser für den Fallback (`useStoryboardTransition.ts`)
-Aus jedem `SZENE N`-Block ohne Marker gewinnen:
-- **Anchor**: die ersten 1–2 beschreibenden Prosa-Sätze des Blocks (Zeilen ohne Anführungszeichen, ohne Titelzeile) statt des Templates.
-- **Dialog**: alle Zeilen in „…" / "…" / “…” — auch ohne `DIALOG:`-Präfix; Sprecherzuordnung über vorangehende Zeile („Person 1:", „Person 2, trocken:") und Mapping auf die gewählten Cast-Einträge.
-- **Dauer**: Muster `0–5 Sekunden` / `5-10 Sek` → `durationSec` pro Szene, Summe respektiert weiter den User-Slider.
-- **Beat/Label**: Titel nach dem Em-Dash („Der Auftrag", „Die unmögliche Etage", „Der fertige Spot") als Szenenlabel, Beat-Ring nur noch als Notnagel.
-- **Text-Overlay**: Endcard-Zeilen („AdTool AI / Deine Idee wird zur Szene.") als `textOverlay` der letzten Szene.
-- Framing/Movement/Lighting weiterhin per Token-Klassifikation, aber jetzt auf dem Prosa-Text statt auf leerem `SHOT:`.
+Verbunden werden beide **ausschließlich über den Slot-Index** (row-major, wie v242). Damit gibt es keinen Zustand mehr, in dem ein Lock existiert, aber kein auflösbares Gesicht — die Fehlerklasse verschwindet, nicht nur dieser Fall. Alle Resolver (`plate-face-identity.ts`, `plateFaceSlotRouter.ts`, `compose-dialog-segments`) lesen künftig `identity.bySlot`; `characterId` auf Face-Objekten wird zum abgeleiteten Wert, nicht zur Quelle. Legacy-Reader für alte `plate_identity`-Rows bleibt für Bestandsszenen.
 
-### 3. Gleiche Prosa-Regeln serverseitig absichern
-In `briefing-deep-parse` (Pass A) explizit erzwingen: bei Fließtext-Briefings werden Szenenbeschreibung und wörtliche Rede **literal** übernommen (kein Umschreiben zu generischen Beats), Szenenanzahl und Sekundenfenster aus dem Text gewinnen Vorrang. Bestehender Scene-Count-Guard (v177) bleibt.
+### B. Untaugliche Detektion wiederholen statt hochrechnen
+Der 128-px-Floor ist kein Rundungsfehler, sondern das Signal „Detektion untauglich". Deshalb:
+- Box-Breite < 3,5 % der Plate-Breite ⇒ **Re-Detect auf 2×-hochskaliertem Frame** (Rekognition hat auf kleinen Köpfen eine harte Auflösungsgrenze).
+- Erst wenn auch das scheitert: plate-proportionales Fenster um den Mund-Landmark (22–28 % Plate-Höhe, mind. 288 px) — explizit als `coord_source: geometry-fallback-proportional` markiert, damit es in Logs sichtbar bleibt.
+- `minSize: 128` entfällt ersatzlos.
 
-### 4. Sichtbarkeit
-Im Production-Plan-Sheet ein deutliches Badge „Basis-Plan (Analyse fehlgeschlagen)" mit Button „Analyse erneut starten", wenn `_meta.source === 'local-fallback'` — damit ein Fallback nie wieder unbemerkt als AI-Ergebnis durchgeht.
+### C. Face-Gate scharf schalten
+- Probe-Frames aus `composer-frames/…/motion-frames/` (v327-Client-Probe) nutzen statt sofort `probe_unavailable`.
+- Bleibt die Probe unmöglich **und** `face_share` unter dem Floor: Pass abbrechen mit Refund (`preclip_face_share_too_low`), statt einen garantiert wirkungslosen Sync.so-Job zu bezahlen. Blindes Dispatchen wird abgeschafft.
 
-### Nicht angefasst
-Lip-Sync-Pipeline, Render, Anchor-/Face-Map-Pfade, `dialog_shots`, `syncso_*`. Änderungen betreffen nur Briefing → Plan → Storyboard.
+### D. Regressionsschutz
+Genau das fehlte v325/v326 und ist der Grund, warum der Bruch erst beim Kunden auffiel:
+- Fixture-Test (Deno) mit den echten `plate_identity`-Rows vom 27.07. **und** der kaputten Szene `23b381ac…`: prüft `resolvedCount === speakerCount` und Crop-Größe > Floor.
+- `syncso_dispatch_log`: `coord_source`, `crop.size`, `plate_box_w_pct`, `lock_applied`, `face_share` pro Pass.
+- `SceneInlinePlayer`: bei `preclip_face_share_too_low` Hinweis „Gesichts-Geometrie unsicher — Szene neu berechnen" + Retry statt Endlos-Spinner.
+- Szene `23b381ac…` nach Deploy einmalig neu dispatchen.
+
+## Technische Details
+- `supabase/functions/_shared/plate-face-identity.ts` — Split `identity` / `geometry`, Slot-Bridge, Legacy-Reader.
+- `supabase/functions/compose-dialog-segments/index.ts` — Resolver auf `identity.bySlot` (Z. 2193–2290), Geometrie-Gate, Logs.
+- `supabase/functions/compose-video-clips/index.ts` — schreibt v326-Lock ins neue `identity`-Feld.
+- `supabase/functions/_shared/pass-face-preclip.ts` — Floor raus, Re-Detect + proportionales Fenster.
+- `supabase/functions/_shared/syncso-face-gate.ts` — motion-frames als Probe-Quelle, Hard-Fail + Refund.
+- Sync.so-Payload-Shape (`sync-3`, `cut_off`, `bounding_boxes_url`) bleibt unverändert.
+
+## Abwägung
+Der Split (A) ist ein Eingriff in ein Feld, das ~6 Funktionen lesen — mehr Arbeit als das Nachkleben von `characterId` an Live-Faces. Dafür ist danach strukturell ausgeschlossen, dass ein Lock ohne Trägergeometrie entsteht; die Patch-Variante würde beim nächsten Detektor-Wechsel erneut brechen. Wenn du heute nur entsperrt haben willst, kann ich A als reine Slot-Bridge in ~20 Minuten liefern und den Split nachziehen — sag dann kurz Bescheid.
