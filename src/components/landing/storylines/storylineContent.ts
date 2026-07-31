@@ -329,9 +329,9 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Kosten-Transparenz", "Cost transparency", "Transparencia de costes"],
         ["Preis vor dem Render, nicht danach.", "Cost shown before render, not after.", "Coste antes del render, no después."],
         [
-          "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 19,99 € eingerechnet.",
-          "Every render shows how many media credits it costs — up front. No surprise burn, no hidden markup — beta price 19.99 € included.",
-          "Cada render muestra su coste en créditos — antes de lanzarlo. Sin sorpresas, sin recargos ocultos — precio beta 19,99 € incluido.",
+          "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 14,99 € eingerechnet.",
+          "Every render shows how many media credits it costs — up front. No surprise burn, no hidden markup — beta price 14.99 € included.",
+          "Cada render muestra su coste en créditos — antes de lanzarlo. Sin sorpresas, sin recargos ocultos — precio beta 14,99 € incluido.",
         ],
       ),
     },
@@ -696,11 +696,11 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Founders · 02", "Founders · 02", "Founders · 02"],
-        ["15,99 € für 24 Monate.", "€15.99 for 24 months.", "15,99 € durante 24 meses."],
+        ["20 % auf KI-Credits — 24 Monate.", "20% off AI credits — for 24 months.", "20 % en créditos IA — 24 meses."],
         [
-          "Der Founder-Preis ist auf 24 Monate garantiert. Egal wie sich unsere reguläre Preisliste entwickelt — deine 15,99 € stehen fest.",
-          "The founder price is guaranteed for 24 months. No matter how our regular pricing evolves — your €15.99 stays put.",
-          "El precio founder está garantizado 24 meses. Pase lo que pase con la tarifa regular — tus 15,99 € se mantienen.",
+          "Das Abo kostet 14,99 € — für alle gleich. Als Founder bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits.",
+          "The subscription is €14.99 for everyone. As a founder you get 20% off every AI credit purchase for 24 months.",
+          "La suscripción cuesta 14,99 € para todos. Como founder obtienes un 20 % de descuento en cada compra de créditos IA durante 24 meses.",
         ],
       ),
     },

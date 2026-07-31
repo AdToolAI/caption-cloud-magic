@@ -19,13 +19,13 @@ interface Props {
 const benefits = [
   {
     icon: ShieldCheck,
-    title: "15,99 € Preisgarantie für 24 Monate",
-    text: "Als Founder zahlst du statt 19,99 € nur 15,99 € — dieser Preis bleibt für zwei volle Jahre eingefroren, unabhängig von späteren Preisanpassungen.",
+    title: "Ein Abo. 14,99 € im Monat.",
+    text: "Es gibt genau ein Modell: 14,99 € pro Monat für den kompletten Studio-Zugang. Keine Tarifstufen, keine Upsells, keine versteckten Gebühren.",
   },
   {
     icon: Percent,
-    title: "20 % Founders-Rabatt automatisch",
-    text: "Der 20 % Rabatt wird 24 Monate lang automatisch auf jede Rechnung angewendet — Beta-Basis-Preis 19,99 € → dein Preis 15,99 €. Kein Code nötig.",
+    title: "20 % auf alle KI-Credits — 24 Monate",
+    text: "Als einer der ersten 1.000 Founders bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird an der Kasse automatisch abgezogen — kein Code nötig.",
   },
   {
     icon: Sparkles,
@@ -95,7 +95,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
 
         <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="h-3.5 w-3.5" />
-          <span>Beta-Phase: 26.07.2026 – 26.10.2026 · Preisgarantie & Rabatt: 24 Monate ab Signup</span>
+          <span>Beta-Phase: 26.07.2026 – 26.10.2026 · Founders-Rabatt auf KI-Credits: 24 Monate ab Signup</span>
         </div>
 
         <DialogFooter className="mt-4 gap-2 sm:gap-2">

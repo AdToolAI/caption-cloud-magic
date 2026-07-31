@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { FOUNDERS_CREDIT_COUPON } from "../_shared/stripe-config.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,20 +34,20 @@ const CREDIT_PACKS = {
 // Stripe Price IDs mapping
 const STRIPE_PRICE_IDS = {
   starter: {
-    EUR: 'price_1SWOEBDRu4kfSFxjUBaTMzcY', // Deutsch - 10€
-    USD: 'price_1SWOLXDRu4kfSFxjB2f0WitH'  // English - $10
+    EUR: 'price_1TzLPV1xgyPAUyx6NqoJ9nIK', // Deutsch - 10€
+    USD: 'price_1TzLRH1xgyPAUyx6q00iYt0M'  // English - $10
   },
   standard: {
-    EUR: 'price_1SWOFXDRu4kfSFxjX6amIvWL', // Deutsch - 50€
-    USD: 'price_1SWOO5DRu4kfSFxj9t8ulY5g'  // English - $50
+    EUR: 'price_1TzLQ11xgyPAUyx6orEA7320', // Deutsch - 50€
+    USD: 'price_1TzLRv1xgyPAUyx6b903vSQ8'  // English - $50
   },
   pro: {
-    EUR: 'price_1SWOHkDRu4kfSFxjxURoJ2JP', // Deutsch - 100€
-    USD: 'price_1SWOPVDRu4kfSFxjhkMo0rqI'  // English - $100
+    EUR: 'price_1TzLQZ1xgyPAUyx6L7pojKRa', // Deutsch - 100€
+    USD: 'price_1TzLSF1xgyPAUyx6Lu2s3dz2'  // English - $100
   },
   enterprise: {
-    EUR: 'price_1SWOJGDRu4kfSFxj03qDB5Fj', // Deutsch - 250€
-    USD: 'price_1SWOQbDRu4kfSFxjPWv0qH9u'  // English - $250
+    EUR: 'price_1TzLQp1xgyPAUyx6iF7LIwKm', // Deutsch - 250€
+    USD: 'price_1TzLSe1xgyPAUyx6rcWxqFo2'  // English - $250
   }
 };
 
@@ -149,7 +150,7 @@ serve(async (req) => {
       mode: 'payment',
       currency: currency.toLowerCase(),
       allow_promotion_codes: !isFounder,
-      discounts: isFounder ? [{ coupon: 'FOUNDERS_VIDEO_20' }] : undefined,
+      discounts: isFounder ? [{ coupon: FOUNDERS_CREDIT_COUPON }] : undefined,
       invoice_creation: {
         enabled: true,
         invoice_data: {

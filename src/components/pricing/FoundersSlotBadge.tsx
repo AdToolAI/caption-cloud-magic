@@ -9,7 +9,7 @@ interface Props {
 
 /**
  * Live counter showing how many of the first 1000 Founders slots are still available.
- * Founders get the €19.99 base — €15.99 with Founders 20% off — locked for 24 months instead of 3.
+ * Founders pay the same €14.99 subscription — their benefit is 20% off every AI credit purchase for 24 months.
  */
 export const FoundersSlotBadge = ({ className = "" }: Props) => {
   const [claimed, setClaimed] = useState<number | null>(null);
@@ -42,7 +42,7 @@ export const FoundersSlotBadge = ({ className = "" }: Props) => {
         <Sparkles className="w-3.5 h-3.5 text-primary" />
         {soldOut ? (
           <span className="text-muted-foreground">
-            Founders-Deal ausverkauft — Launch-Promo (3 Monate) aktiv
+            Founders-Plätze ausverkauft
           </span>
         ) : remaining === null ? (
           <span className="text-muted-foreground">Founders-Deal verfügbar…</span>
@@ -52,7 +52,7 @@ export const FoundersSlotBadge = ({ className = "" }: Props) => {
               {remaining}
             </span>{" "}
             / {FOUNDERS_MAX_SLOTS} Founders-Plätze frei —{" "}
-            <span className="text-primary">€15,99 für 24 Monate</span>
+            <span className="text-primary">20 % auf alle KI-Credits, 24 Monate</span>
           </span>
         )}
       </div>

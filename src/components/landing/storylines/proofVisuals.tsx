@@ -195,12 +195,12 @@ export const FoundersSeatCounterVisual = () => (
 );
 
 export const PriceLock24mVisual = () => (
-  <Frame label="Price · 24m Lock">
+  <Frame label="Credits · 24m Founder Bonus">
     <div className="flex items-center gap-6">
       <div className="flex flex-col items-center">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground line-through">18,74 €</div>
-        <div className="font-display text-4xl text-primary">15,99 €</div>
-        <div className="text-[10px] uppercase tracking-widest text-primary/70">MONTHLY</div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground line-through">100 €</div>
+        <div className="font-display text-4xl text-primary">80 €</div>
+        <div className="text-[10px] uppercase tracking-widest text-primary/70">KI-CREDITS</div>
       </div>
       <div className="flex flex-col items-center gap-2">
         <Lock className="h-8 w-8 text-primary" />
@@ -249,7 +249,7 @@ export const TimelineGuaranteeVisual = () => (
         ))}
       </div>
       <div className="mt-8 flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest text-primary/80">
-        <Calendar className="h-3 w-3" /> 15,99 € · GUARANTEED
+        <Calendar className="h-3 w-3" /> 20 % ON AI CREDITS · GUARANTEED
       </div>
     </div>
   </Frame>

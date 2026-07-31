@@ -525,7 +525,7 @@ export const InstantAvatarDemo = () => {
               </Button>
               <p className="mt-3 text-xs text-muted-foreground inline-flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-primary/70" />
-                Beta 19,99 € · Gründerpreis 15,99 € für die ersten 1000 Nutzer
+                14,99 €/Monat · Founder: 20 % auf alle KI-Credits für die ersten 1000 Nutzer
               </p>
             </div>
           </div>

@@ -12,16 +12,16 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
     USD: '' // Free plan has no price
   },
   basic: {
-    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ', // Beta-Basic €19.99/month
-    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'  // Reuse EUR price (single Beta-Basic during Beta)
+    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw', // Beta-Basic €14.99/month
+    USD: 'price_1TzLNc1xgyPAUyx6exJw3ihw'  // Reuse EUR price (single Beta-Basic during Beta)
   },
   pro: {
-    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ', // Beta-Basic (Pro tier disabled during Beta)
-    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'
+    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw', // Beta-Basic (Pro tier disabled during Beta)
+    USD: 'price_1TzLNc1xgyPAUyx6exJw3ihw'
   },
   enterprise: {
-    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
-    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'
+    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
+    USD: 'price_1TzLNc1xgyPAUyx6exJw3ihw'
   }
 };
 
@@ -50,30 +50,14 @@ export const getStripeProductId = (plan: PlanId): string => {
 };
 
 /**
- * Intro promotion codes (Stripe Promotion Code IDs)
+ * Founders-Programm
+ *  - Es gibt genau EIN Abomodell: Beta-Basic 14,99 €/Monat, ohne Rabatt.
+ *  - Der Founders-Vorteil ist ein 20-%-Rabatt auf JEDEN Credit-Kauf
+ *    (Stripe-Coupon `FOUNDERS_VIDEO_20`), gültig 24 Monate ab Slot-Claim.
+ *    Angewendet wird er in der Edge-Function `ai-video-purchase-credits`.
  */
-export const INTRO_PROMO_CODES = {
-  basic: {
-    EUR: 'START-BASIC',
-    USD: 'START-BASIC'
-  },
-  enterprise: {
-    EUR: 'START-ENT',
-    USD: 'START-ENT'
-  }
-} as const;
-
-/**
- * Founders Launch promo coupons (applied automatically by create-checkout)
- *  - FOUNDERS: first 1000 subscribers, 20 % off for 24 months
- *              → €19.99 → €15.99 effective for 24 months.
- *  - LAUNCH:   everyone else, standard Beta price €19.99 (no discount).
- */
-export const PRO_PROMO_COUPONS = {
-  founders: 'PRO-FOUNDERS-24M',
-  launch: 'PRO-LAUNCH-3M',
-} as const;
-
 export const FOUNDERS_MAX_SLOTS = 1000;
-export const PRO_REGULAR_PRICE_EUR = 19.99;
-export const PRO_PROMO_PRICE_EUR = 15.99;
+export const FOUNDERS_CREDIT_COUPON = 'FOUNDERS_VIDEO_20';
+export const FOUNDERS_CREDIT_DISCOUNT_PERCENT = 20;
+export const FOUNDERS_DISCOUNT_MONTHS = 24;
+export const BETA_BASIC_PRICE_EUR = 14.99;

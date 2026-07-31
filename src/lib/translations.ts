@@ -1559,7 +1559,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "19.99",
+          price: "14.99",
           currency: "$",
           period: "month",
           credits: "800 credits",
@@ -1654,7 +1654,7 @@ export const translations: Record<Language, any> = {
         toPro: "Upgrade to Pro"
       },
       intro: {
-        basic: "Intro Month: Only $4.99 instead of $19.99",
+        basic: "Intro Month: Only $14.99 – single plan, no upsells",
         enterprise: "Intro Month: Only $9.99 instead of $69.95",
         monthly: "Cancel anytime"
       },
@@ -3904,7 +3904,7 @@ export const translations: Record<Language, any> = {
         headline1: "One creator.",
         headline2: "A whole studio.",
         subline: "Produce complete AI videos with the leading models, voices and lip-sync tools in a single workflow — from idea to finished video, without a film crew and without switching platforms.",
-        pricingHint: "From €19.99/month (Launch promo) · 14-day trial · No auto-subscription",
+        pricingHint: "From €14.99/month · 14-day trial · No auto-subscription",
         ctaPrimary: "Start for free",
         ctaSecondary: "Watch demo",
         stats: {
@@ -6416,7 +6416,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "19,99",
+          price: "14,99",
           currency: "€",
           period: "Monat",
           credits: "800 Credits",
@@ -6501,7 +6501,7 @@ export const translations: Record<Language, any> = {
         remove: "Coupon entfernen"
       },
       intro: {
-        basic: "Intro-Monat: Nur 4,99 € statt 19,99 €",
+        basic: "Intro-Monat: Nur 14,99 € – ein Modell, keine Upsells",
         enterprise: "Intro-Monat: Nur 9,99 € statt 69,95 €",
         monthly: "Jederzeit kündbar"
       },
@@ -8753,7 +8753,7 @@ export const translations: Record<Language, any> = {
         headline1: "Ein Creator.",
         headline2: "Ein ganzes Studio.",
         subline: "Erstelle komplette KI-Videos mit den führenden Modellen, Stimmen und Lip-Sync-Tools in einem einzigen Workflow — von der Idee zum fertigen Video, ohne Filmteam und ohne Plattformwechsel.",
-        pricingHint: "Ab 19,99 €/Monat (Launch-Promo) · 14 Tage testen · Kein Auto-Abo",
+        pricingHint: "Ab 14,99 €/Monat · 14 Tage testen · Kein Auto-Abo",
         ctaPrimary: "Kostenlos starten",
         ctaSecondary: "Demo ansehen",
         stats: {
@@ -11303,7 +11303,7 @@ export const translations: Record<Language, any> = {
         remove: "Eliminar cupón"
       },
       intro: {
-        basic: "Mes de Intro: Solo €4.99 en lugar de €19.99",
+        basic: "Mes de Intro: Solo 14,99 € – un único plan",
         enterprise: "Mes de Intro: Solo €9.99 en lugar de €69.95",
         monthly: "Cancelar en cualquier momento"
       },
@@ -13335,7 +13335,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
-          price: "19,99",
+          price: "14,99",
           currency: "€",
           period: "mes",
           credits: "800 créditos por mes",
@@ -13387,7 +13387,7 @@ export const translations: Record<Language, any> = {
         headline1: "Un creador.",
         headline2: "Un estudio completo.",
         subline: "Crea vídeos de IA completos con los modelos, voces y herramientas de lip-sync líderes en un único flujo de trabajo — de la idea al vídeo final, sin equipo de rodaje y sin cambiar de plataforma.",
-        pricingHint: "Desde 19,99 €/mes (promo de lanzamiento) · 14 días de prueba · Sin suscripción automática",
+        pricingHint: "Desde 14,99 €/mes · 14 días de prueba · Sin suscripción automática",
         ctaPrimary: "Empezar gratis",
         ctaSecondary: "Ver demo",
         stats: {

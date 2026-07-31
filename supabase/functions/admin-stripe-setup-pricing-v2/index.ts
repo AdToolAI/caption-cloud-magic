@@ -156,24 +156,22 @@ serve(async (req) => {
       log.push(`Orphan product not found / already gone: ${e instanceof Error ? e.message : e}`);
     }
 
-    // --- 6. Verify coupons ---
-    for (const cid of ["PRO-FOUNDERS-24M", "PRO-LAUNCH-3M"]) {
-      try {
-        const c = await stripe.coupons.retrieve(cid);
-        log.push(`Coupon OK: ${cid} (valid=${c.valid})`);
-      } catch {
-        const months = cid === "PRO-FOUNDERS-24M" ? 24 : 3;
-        await stripe.coupons.create({
-          id: cid,
-          name: cid === "PRO-FOUNDERS-24M" ? "Founders Deal — 24 Months" : "Launch Promo — 3 Months",
-          amount_off: 1500,
-          currency: "eur",
-          duration: "repeating",
-          duration_in_months: months,
-          metadata: { plan: "pro", tier: cid === "PRO-FOUNDERS-24M" ? "founders" : "launch" },
-        });
-        log.push(`Created missing coupon ${cid}`);
-      }
+    // --- 6. Verify credit coupon ---
+    // Auf das Abo (14,99 €) wird kein Rabatt gewährt. Der einzige aktive Coupon ist
+    // FOUNDERS_VIDEO_20: 20 % auf jeden KI-Credit-Kauf (Founders, 24 Monate über
+    // is_founder_active gesteuert). Die alten Abo-Coupons werden nicht mehr angelegt.
+    try {
+      const c = await stripe.coupons.retrieve("FOUNDERS_VIDEO_20");
+      log.push(`Coupon OK: FOUNDERS_VIDEO_20 (valid=${c.valid})`);
+    } catch {
+      await stripe.coupons.create({
+        id: "FOUNDERS_VIDEO_20",
+        name: "Founders — 20 % auf KI-Credits",
+        percent_off: 20,
+        duration: "forever",
+        metadata: { scope: "credits", tier: "founders" },
+      });
+      log.push("Created missing coupon FOUNDERS_VIDEO_20");
     }
 
     return new Response(

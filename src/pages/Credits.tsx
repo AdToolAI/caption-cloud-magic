@@ -32,7 +32,7 @@ const Credits = () => {
     { 
       credits: 1000, 
       name: language === 'de' ? 'Extra Paket' : language === 'es' ? 'Paquete Extra' : 'Extra Pack', 
-      price: `${symbol}${getCurrencyForLanguage(language) === 'USD' ? '19.99' : '19,99'}`,
+      price: `${symbol}${getCurrencyForLanguage(language) === 'USD' ? '14.99' : '14,99'}`,
       icon: Zap,
       popular: false,
       description: language === 'de' ? 'Perfekt für gelegentliche Nutzung' : language === 'es' ? 'Perfecto para uso ocasional' : 'Perfect for occasional use'

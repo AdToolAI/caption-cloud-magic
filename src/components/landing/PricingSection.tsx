@@ -79,7 +79,7 @@ export const PricingSection = () => {
                       {currencySymbol}29.99
                     </span>
                     <span className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-gold-dark bg-clip-text text-transparent tabular-nums">
-                      {currencySymbol}19.99
+                      {currencySymbol}14.99
                     </span>
                     <span className="text-muted-foreground">
                       {t("landing.pricing.perMonth")}
