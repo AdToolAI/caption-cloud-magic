@@ -2961,6 +2961,36 @@ serve(async (req) => {
                             `slots=${anchorFaceLayout.slots.length}/${expected} ` +
                             `source=geometry_plus_prompt_order biometric=${resolved}/${expected}`,
                           );
+                          // v326 — Geometry fallback. AWS CompareFaces returns no
+                          // similarity for stylised anchors quite often; when the
+                          // detector still found EXACTLY as many faces as we have
+                          // speakers, the mapping is unambiguous via the anchor
+                          // layout (prompt/row-major order). Lock it instead of
+                          // parking the scene in `awaiting_manual_face_map`.
+                          const geometryLock: Record<string, string> = {};
+                          if (resolved < expected && anchorLayoutComplete) {
+                            for (const slot of anchorFaceLayout.slots) {
+                              if (slot?.characterId) geometryLock[String(slot.slotIndex)] = slot.characterId;
+                            }
+                          }
+                          const useGeometryLock =
+                            resolved < expected &&
+                            anchorLayoutComplete &&
+                            Object.keys(geometryLock).length >= expected;
+                          if (useGeometryLock) {
+                            anchorIdentityPayload.assignmentLock = {
+                              ...geometryLock,
+                              ...(idResolved.assignmentLock ?? {}),
+                            };
+                            (anchorIdentityPayload as any).assignmentLockSource = "v326_geometry_rowmajor";
+                            (anchorIdentityPayload as any).status = "geometry";
+                            (anchorIdentityPayload as any).resolvedCount = expected;
+                            console.log(
+                              `[compose-video-clips] v326_geometry_lock scene=${scene.id} ` +
+                              `biometric=${resolved}/${expected} → geometry lock applied, no manual review`,
+                            );
+                          }
+
                           const nextDialogShots = {
                             ...nextDialogShotsBase,
                             anchor_face_layout: anchorFaceLayout,
