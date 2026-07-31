@@ -430,7 +430,8 @@ export default function SceneInlinePlayer({
             lower.includes('inappropriate content');
           if (isGreenNet) {
             friendly =
-              'Alibabas Inhaltsfilter („Green Net") reagiert auf detaillierte Mund-/Lippen-Beschreibungen und Negativlisten im Prompt — nicht auf deinen Szeneninhalt. Wir haben den Prompt automatisch gekürzt und erneut gesendet; blockt es weiterhin, klicke „Neu rendern" oder wechsle auf Hailuo.';
+              'Der Inhaltsfilter des Video-Anbieters („Green Net") hat den Prompt blockiert — meist wegen detaillierter Mund-/Lippen-Beschreibungen, nicht wegen deines Szeneninhalts. Der Prompt wurde bereits automatisch gekürzt und erneut gesendet. Die Szene ist damit endgültig gestoppt (kein Lip-Sync, keine Credits verbraucht): bitte den Szenentext anpassen und „Neu rendern" klicken oder auf Hailuo wechseln.';
+
 
           } else if (!rawErr) {
             friendly = 'Render fehlgeschlagen.';
