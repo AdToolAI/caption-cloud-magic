@@ -218,7 +218,10 @@ export function CharacterCastPicker({
   };
   const addFromLibrary = (c: ComposerCharacter) => {
     if (cast.length >= MAX_CAST) return;
-    if (onAddToBriefing && !(characters ?? []).some((b) => b.id === c.id)) {
+    if (
+      onAddToBriefing &&
+      !(characters ?? []).some((b) => b.id === c.id || b.brandCharacterId === c.id)
+    ) {
       onAddToBriefing(c);
     }
     addSlot(c.id);
