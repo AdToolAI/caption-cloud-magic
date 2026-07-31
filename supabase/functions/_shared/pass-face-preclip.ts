@@ -37,6 +37,7 @@ import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
 import { assessCropGeometry } from "./plate-identity-split.ts";
+import { capCropToFaceShare, faceShareForCrop } from "./preclip-geometry.ts";
 
 export interface PassPreclipInput {
   sceneId: string;
@@ -273,6 +274,31 @@ export async function renderPassFacePreclip(
       crop0X = Math.max(0, Math.min(sW - crop0Size, Math.round(cx - crop0Size / 2)));
       crop0Y = Math.max(0, Math.min(sH - crop0Size, Math.round(cy - crop0Size / 2)));
     }
+
+    // v335 — The legacy path (valid bbox, missing mouth landmark) previously
+    // never assigned faceShareInCrop, so every valid crop was reported as 0%.
+    // It also retained computeFaceCrop's large scene-height floor (394px in
+    // the reported run) even for a 55px face. Measure from the plate bbox and
+    // cap the crop using the exact same floor as the dispatcher.
+    const legacyFloor = Number.isFinite(Number(faceShareFloor)) && Number(faceShareFloor) > 0
+      ? Number(faceShareFloor)
+      : 0.12;
+    const legacyCapped = capCropToFaceShare({
+      crop: { x: crop0X, y: crop0Y, size: crop0Size, outputSize: 720 },
+      bbox: bbox ?? null,
+      floor: legacyFloor,
+      plateWidth: sW,
+      plateHeight: sH,
+    });
+    crop0X = legacyCapped.crop.x;
+    crop0Y = legacyCapped.crop.y;
+    crop0Size = legacyCapped.crop.size;
+    faceShareInCrop = legacyCapped.faceShare ?? 0;
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v335_legacy_crop ` +
+      `capped=${legacyCapped.capped} crop=${crop0X},${crop0Y},${crop0Size} ` +
+      `face_share=${faceShareInCrop.toFixed(3)} floor=${legacyFloor} siblings=${siblingCoords?.length ?? 0}`,
+    );
   }
   let crop0 = { x: crop0X, y: crop0Y, size: crop0Size };
 
@@ -471,6 +497,9 @@ export async function renderPassFacePreclip(
     expandedY = Math.max(0, Math.min(sH - expandedSize, Math.round(centerY - expandedSize / 2)));
     expandedX = expandedX % 2 === 0 ? expandedX : Math.max(0, expandedX - 1);
     expandedY = expandedY % 2 === 0 ? expandedY : Math.max(0, expandedY - 1);
+    if (!useMouthAnchor && !motionCropApplied) {
+      faceShareInCrop = faceShareForCrop(bbox ?? null, expandedSize) ?? 0;
+    }
   }
 
   // v112 — Sync.so docs explicitly require ≥480p for reliable face detection

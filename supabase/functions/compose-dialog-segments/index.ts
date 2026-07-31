@@ -96,6 +96,7 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+import { collectSiblingFaceCenters } from "../_shared/preclip-geometry.ts";
 import {
   applyIdentityLockBySlot,
   extractIdentityLock,
@@ -4700,10 +4701,11 @@ serve(async (req) => {
                 if (bpWindows.length === 0) return { idx, status: "skip_no_windows" };
                 const unionStart = Math.max(0, Math.min(...bpWindows.map(([s]) => s)));
                 const unionEnd = Math.min(totalSec, Math.max(...bpWindows.map(([, e]) => e)));
-                const siblingCoords: Array<[number, number]> = passes
-                  .filter((other: any) => other?.speaker_idx !== bp.speaker_idx && Array.isArray(other?.coords))
-                  .map((other: any) => [Number(other.coords[0]), Number(other.coords[1])] as [number, number])
-                  .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+                const siblingCoords = collectSiblingFaceCenters(
+                  Number(bp.speaker_idx ?? idx),
+                  speakerPlateBboxes,
+                  (speakers as any[]).map((speaker) => speaker?.coords ?? null),
+                );
                 const result = await renderPassFacePreclip(
                   supabase,
                   serviceKey,
@@ -4729,6 +4731,7 @@ serve(async (req) => {
                         : null,
                       Number(bp.speaker_idx ?? idx),
                     )?.points ?? null,
+                    faceShareFloor: speakers.length >= 2 ? 0.24 : 0.12,
                   },
                   300_000,
                 );
@@ -5469,14 +5472,11 @@ serve(async (req) => {
     if (v161PreclipEligible) {
       const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
       const unionEnd = Math.min(totalSec, Math.max(...speakerWindowsSecs.map(([, e]) => e)));
-      const siblingCoords: Array<[number, number]> = [];
-      for (let i = 0; i < speakers.length; i++) {
-        if (i === pass.speaker_idx) continue;
-        const c = (speakers as any[])[i]?.coords;
-        if (Array.isArray(c) && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1]))) {
-          siblingCoords.push([Number(c[0]), Number(c[1])]);
-        }
-      }
+      const siblingCoords = collectSiblingFaceCenters(
+        Number(pass.speaker_idx ?? currentPassIdx),
+        speakerPlateBboxes,
+        (speakers as any[]).map((speaker) => speaker?.coords ?? null),
+      );
       const platePassBoxForPreclip = speakerPlateBboxes?.[pass.speaker_idx] ?? null;
       console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
@@ -8045,14 +8045,11 @@ serve(async (req) => {
                   }
                   const wpUnionStart = Math.max(0, Math.min(...wpWindows.map(([s]) => s)));
                   const wpUnionEnd = Math.min(totalSec, Math.max(...wpWindows.map(([, e]) => e)));
-                  const wpSiblings: Array<[number, number]> = [];
-                  for (let k = 0; k < speakers.length; k++) {
-                    if (k === wp.speaker_idx) continue;
-                    const c = (speakers as any[])[k]?.coords;
-                    if (Array.isArray(c) && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1]))) {
-                      wpSiblings.push([Number(c[0]), Number(c[1])]);
-                    }
-                  }
+                  const wpSiblings = collectSiblingFaceCenters(
+                    Number(wp.speaker_idx ?? waitIdx),
+                    speakerPlateBboxes,
+                    (speakers as any[]).map((speaker) => speaker?.coords ?? null),
+                  );
                   const wpPlateBox = speakerPlateBboxes?.[wp.speaker_idx] ?? null;
                   const wpPreclip = await renderPassFacePreclip(
                     supabase,
@@ -8079,6 +8076,7 @@ serve(async (req) => {
                           : null,
                         Number(wp.speaker_idx ?? waitIdx),
                       )?.points ?? null,
+                      faceShareFloor: speakers.length >= 2 ? 0.24 : 0.12,
                     },
                     300_000,
                   );
