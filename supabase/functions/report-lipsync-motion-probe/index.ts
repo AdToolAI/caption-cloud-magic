@@ -25,7 +25,6 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { failLipSync } from "../_shared/lipsync-fail.ts";
 
 const YAVG_NOOP_THRESHOLD = 4.0;
 
@@ -51,9 +50,6 @@ interface Payload {
   pass_idx: number;
   yavg: number;
   yavg_normalized?: number;
-  control_yavg?: number;
-  differential_yavg?: number;
-  motion_ratio?: number;
   frames?: number;
   method?: string;
 }
@@ -106,10 +102,7 @@ Deno.serve(async (req) => {
       return json({ error: "forbidden" }, 403);
     }
 
-    const hasDifferential = Number.isFinite(body.differential_yavg) && Number.isFinite(body.motion_ratio);
-    const isNoop = hasDifferential
-      ? Number(body.differential_yavg) < YAVG_NOOP_THRESHOLD || Number(body.motion_ratio) < 1.12
-      : true;
+    const isNoop = body.yavg < YAVG_NOOP_THRESHOLD;
     const nowIso = new Date().toISOString();
 
     // Persist metric to dispatch log (best-effort, latest row for this job/pass).
@@ -121,14 +114,10 @@ Deno.serve(async (req) => {
           meta_yavg_probe: {
             yavg: body.yavg,
             yavg_normalized: body.yavg_normalized ?? null,
-            control_yavg: body.control_yavg ?? null,
-            differential_yavg: body.differential_yavg ?? null,
-            motion_ratio: body.motion_ratio ?? null,
             frames: body.frames ?? null,
             method: body.method ?? "canvas-mouth-band-v248",
             is_noop: isNoop,
             threshold: YAVG_NOOP_THRESHOLD,
-            ratio_threshold: 1.12,
             reported_at: nowIso,
           },
         })
@@ -147,15 +136,6 @@ Deno.serve(async (req) => {
     const pass = passes[body.pass_idx] as Record<string, unknown> | undefined;
     if (!pass) return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD });
 
-    // v337 stale-result guard: a probe belongs to one provider attempt only.
-    // A late browser callback from an earlier retry must never approve or fail
-    // the current job occupying this pass slot.
-    const currentJobId = String(pass.job_id ?? pass.motion_probe_job_id ?? "");
-    if (!body.job_id || !currentJobId || body.job_id !== currentJobId) {
-      console.warn(`[report-lipsync-motion-probe] v337 stale probe ignored scene=${body.scene_id} pass=${body.pass_idx} reported_job=${body.job_id ?? "none"} current_job=${currentJobId || "none"}`);
-      return json({ ok: true, ignored: "stale_job", is_noop: isNoop });
-    }
-
     try {
       await admin.rpc("update_dialog_pass_slot", {
         _scene_id: body.scene_id,
@@ -163,8 +143,6 @@ Deno.serve(async (req) => {
         _patch: {
           yavg_probed_at: nowIso,
           yavg_value: body.yavg,
-          motion_probe_job_id: body.job_id,
-          motion_probe_status: isNoop ? "failed" : "passed",
           ...(isNoop ? { motion_noop: true, motion_noop_yavg: body.yavg, motion_noop_reported_at: nowIso } : {}),
         },
       });
@@ -173,94 +151,6 @@ Deno.serve(async (req) => {
     }
 
     if (!isNoop) {
-      await admin.rpc("update_dialog_pass_slot", {
-        _scene_id: body.scene_id,
-        _pass_idx: body.pass_idx,
-        _patch: {
-          status: "done",
-          motion_probe_status: "passed",
-          motion_probe_job_id: body.job_id,
-          motion_probe_passed_at: nowIso,
-          yavg_probed_at: nowIso,
-          yavg_value: body.yavg,
-        },
-      });
-      await logDispatch(admin, {
-        scene_id: body.scene_id,
-        job_id: body.job_id,
-        turn_idx: Number(pass.idx ?? body.pass_idx),
-        sync_status: "MOTION_PROBE_PASSED",
-        meta: {
-          pass_idx: body.pass_idx,
-          yavg: body.yavg,
-          control_yavg: body.control_yavg ?? null,
-          differential_yavg: body.differential_yavg ?? null,
-          motion_ratio: body.motion_ratio ?? null,
-          threshold: YAVG_NOOP_THRESHOLD,
-          ratio_threshold: 1.12,
-        },
-      });
-
-      // Re-read after the atomic slot promotion. Only the final passing probe
-      // may claim and dispatch the mux (or directly finalize a legacy N=1).
-      const { data: freshScene } = await admin
-        .from("composer_scenes")
-        .select("dialog_shots")
-        .eq("id", body.scene_id)
-        .single();
-      const freshState = (freshScene as { dialog_shots?: Record<string, unknown> } | null)?.dialog_shots ?? {};
-      const freshPasses = Array.isArray((freshState as { passes?: unknown[] }).passes)
-        ? (freshState as { passes: Record<string, unknown>[] }).passes
-        : [];
-      const allPassed = freshPasses.length > 0 && freshPasses.every((p) =>
-        p.status === "done" && p.motion_probe_status === "passed" && !!p.output_url
-      );
-      if (allPassed) {
-        const lastPass = [...freshPasses].reverse().find((p) => !!p.output_url);
-        const finalUrl = String(lastPass?.output_url ?? "");
-        const singleTight = freshPasses.length === 1 && lastPass?.audio_tight === true;
-        if (freshPasses.length === 1 && !singleTight) {
-          await admin.from("composer_scenes").update({
-            dialog_shots: { ...freshState, passes: freshPasses, status: "done", final_url: finalUrl, finished_at: nowIso },
-            clip_url: finalUrl,
-            clip_status: "ready",
-            lip_sync_status: "applied",
-            lip_sync_applied_at: nowIso,
-            twoshot_stage: "complete",
-            clip_error: null,
-            updated_at: nowIso,
-          }).eq("id", body.scene_id);
-        } else {
-          let claimed = false;
-          try {
-            const { data } = await admin.rpc("try_claim_mux_dispatch", { _scene_id: body.scene_id });
-            claimed = data === true;
-          } catch {
-            claimed = !(freshState as { audio_mux?: { dispatched_at?: string } }).audio_mux?.dispatched_at;
-          }
-          if (claimed) {
-            await admin.from("composer_scenes").update({
-              dialog_shots: {
-                ...freshState,
-                passes: freshPasses,
-                status: "audio_muxing",
-                final_url: finalUrl,
-                finished_at: nowIso,
-                audio_mux: { ...((freshState as any).audio_mux ?? {}), dispatched_at: nowIso },
-              },
-              lip_sync_status: "audio_muxing",
-              twoshot_stage: "audio_muxing",
-              clip_error: null,
-              updated_at: nowIso,
-            }).eq("id", body.scene_id);
-            fetch(`${url}/functions/v1/render-sync-segments-audio-mux`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${service}` },
-              body: JSON.stringify({ scene_id: body.scene_id }),
-            }).catch((e) => console.warn(`[report-lipsync-motion-probe] mux dispatch failed: ${(e as Error).message}`));
-          }
-        }
-      }
       console.log(
         `[report-lipsync-motion-probe] v248 scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} OK`,
       );
@@ -322,12 +212,6 @@ Deno.serve(async (req) => {
             noop_retry_attempt_id: newAttemptId,
             noop_retry_reason: noopReason,
             previous_noop_output_url: pass.output_url ?? null,
-            yavg_probed_at: null,
-            yavg_value: null,
-            motion_noop: false,
-            motion_noop_yavg: null,
-            motion_probe_status: null,
-            motion_probe_job_id: null,
             retry_history: [...prevHistory, newRetryEntry],
           },
         });
@@ -411,18 +295,15 @@ Deno.serve(async (req) => {
     ).toFixed(1);
     const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`;
 
-    const failure = await failLipSync({
-      supabase: admin,
-      sceneId: body.scene_id,
-      reason: userMsg,
-      userId,
-      extraSyncJobIds: jobId ? [jobId] : [],
-      syncApiKey: Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY") ?? null,
-    });
-    await admin.from("composer_scenes").update({
-      twoshot_stage: "needs_clip_rerender",
-      updated_at: nowIso,
-    }).eq("id", body.scene_id);
+    await admin
+      .from("composer_scenes")
+      .update({
+        lip_sync_status: "failed",
+        twoshot_stage: "needs_clip_rerender",
+        clip_error: userMsg,
+        updated_at: nowIso,
+      })
+      .eq("id", body.scene_id);
 
     await logDispatch(admin, {
       scene_id: body.scene_id,
@@ -447,7 +328,7 @@ Deno.serve(async (req) => {
       `[report-lipsync-motion-probe] v248_slice4 scene=${body.scene_id} pass=${body.pass_idx} speaker="${passSpeakerName}" NOOP-LADDER-EXHAUSTED → hard-fail`,
     );
 
-    return json({ ok: true, is_noop: true, escalated: false, hard_failed: true, refunded: failure.refunded });
+    return json({ ok: true, is_noop: true, escalated: false, hard_failed: true });
   } catch (e) {
     console.error(`[report-lipsync-motion-probe] error: ${(e as Error).message}`);
     return json({ error: "internal", message: (e as Error).message }, 500);

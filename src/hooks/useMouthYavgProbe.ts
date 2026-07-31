@@ -1,10 +1,11 @@
 /**
  * v248 — useMouthYavgProbe
  * ------------------------------------------------------------------
- * When a sync-segments provider job enters motion_probe_pending, we sample its
+ * When a Cinematic-Sync scene's lipsync pipeline finishes (each pass
+ * has status='done' and an output_url), we sample the muxed pass
  * output on the CLIENT (canvas) to detect motion-noop lipsyncs.
  *
- * Each provider job is probed AT MOST ONCE per session; results are stored
+ * Each pass is probed AT MOST ONCE per session; results are stored
  * server-side by `report-lipsync-motion-probe`, and the pass is
  * flagged with `motion_noop=true` when yavg < threshold.
  *
@@ -29,7 +30,7 @@ interface PassEntry {
   preclip_crop?: { faceShareInCrop?: number; anchor?: string } | null;
 }
 
-/** Session-scoped set; job_id keeps retries independently probeable. */
+/** Sessions-scoped set of "scene_id::pass_idx" strings we've already probed. */
 const probedThisSession = new Set<string>();
 
 export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
@@ -37,6 +38,9 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
 
   useEffect(() => {
     if (!scene) return;
+    const isCinematic = scene.engineOverride === 'cinematic-sync';
+    if (!isCinematic) return;
+
     const dialogShotsState =
       (scene as unknown as { dialogShots?: { passes?: PassEntry[]; status?: string } })
         .dialogShots ??
@@ -48,11 +52,11 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
     if (passes.length === 0) return;
 
     for (const pass of passes) {
-      if (!pass || !['motion_probe_pending', 'done'].includes(pass.status ?? '')) continue;
+      if (!pass || pass.status !== 'done') continue;
       if (!pass.output_url) continue;
       if (pass.motion_noop === true) continue;      // already flagged server-side
       if (pass.yavg_probed_at) continue;             // already probed server-side
-      const key = `${scene.id}::${pass.idx}::${pass.job_id ?? pass.output_url}`;
+      const key = `${scene.id}::${pass.idx}`;
       if (probedThisSession.has(key)) continue;
       if (inflightRef.current.has(key)) continue;
       inflightRef.current.add(key);
@@ -62,44 +66,36 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
       const mouthCy = 0.6;
 
       (async () => {
-        const controller = new AbortController();
-        const timeout = window.setTimeout(() => controller.abort(), 45_000);
         try {
           const result = await computeMouthYavg({
             videoUrl: pass.output_url as string,
             mouthCx,
             mouthCy,
             samples: 12,
-            signal: controller.signal,
           });
+          probedThisSession.add(key);
 
           const { data: sessionData } = await supabase.auth.getSession();
           const token = sessionData.session?.access_token;
-          if (!token) throw new Error('motion probe requires an active session');
+          if (!token) return;
 
-          const { error } = await supabase.functions.invoke('report-lipsync-motion-probe', {
+          await supabase.functions.invoke('report-lipsync-motion-probe', {
             body: {
               scene_id: scene.id,
               job_id: pass.job_id ?? null,
               pass_idx: pass.idx,
               yavg: result.yavg,
               yavg_normalized: result.yavgNormalized,
-              control_yavg: result.controlYavg,
-              differential_yavg: result.differentialYavg,
-              motion_ratio: result.motionRatio,
               frames: result.frames,
               method: result.method,
             },
           });
-          if (error) throw new Error(error.message ?? 'motion probe report failed');
-          probedThisSession.add(key);
         } catch (err) {
           // Best-effort probe. Do not surface to user.
           console.warn(
             `[useMouthYavgProbe] scene=${scene.id} pass=${pass.idx} failed: ${(err as Error).message}`,
           );
         } finally {
-          window.clearTimeout(timeout);
           inflightRef.current.delete(key);
         }
       })();
