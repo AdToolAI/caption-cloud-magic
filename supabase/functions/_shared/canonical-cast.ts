@@ -18,6 +18,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export interface CastPoolEntry {
   id: string;
   name?: string | null;
+  /**
+   * v320 — Cast & World is the ONLY character source. Briefing rows keep a
+   * readable slug in `id` and the real `brand_characters` UUID here; when
+   * present that UUID is the canonical identity.
+   */
+  brandCharacterId?: string | null;
+}
+
+/** Canonical id of a pool entry: the Cast & World UUID when linked. */
+export function canonicalPoolId(entry: CastPoolEntry): string {
+  const brandId = String(entry?.brandCharacterId ?? '').trim();
+  return UUID_RE.test(brandId) ? brandId : entry.id;
 }
 
 export interface CastSlotLike {
