@@ -578,7 +578,7 @@ serve(async (req) => {
                 faceMask: {
                   cx: Number(p.coords[0]),
                   cy: Number(p.coords[1]),
-                  radius: radiusForCount,
+                  radius: faceRadiusForPass(p),
                 },
               };
 
