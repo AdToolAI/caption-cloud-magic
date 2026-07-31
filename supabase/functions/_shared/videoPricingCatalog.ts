@@ -75,10 +75,10 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'ltx-standard':         { id: 'ltx-standard',         label: 'LTX 2.0 Std',          unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 10 },
   'ltx-pro':              { id: 'ltx-pro',              label: 'LTX 2.0 Pro',          unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 3,  maxDuration: 10 },
 
-  // Vidu Q2 (per-clip 5s)
-  'vidu-q2-reference':    { id: 'vidu-q2-reference',    label: 'Vidu Q2 Reference (5s)', unit: 'per-clip', sellEUR: 0.66, sellUSD: 0.66, costEUR: 0.22, fixedClipSeconds: 5 },
-  'vidu-q2-i2v':          { id: 'vidu-q2-i2v',          label: 'Vidu Q2 I2V (5s)',       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
-  'vidu-q2-t2v':          { id: 'vidu-q2-t2v',          label: 'Vidu Q2 T2V (5s)',       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
+  // Vidu — Q2-IDs bleiben aus Kompatibilität, laufen aber real auf Vidu Q3 (per-clip 5s)
+  'vidu-q2-reference':    { id: 'vidu-q2-reference',    label: 'Vidu Q3 Reference (5s)', unit: 'per-clip', sellEUR: 0.66, sellUSD: 0.66, costEUR: 0.22, fixedClipSeconds: 5 },
+  'vidu-q2-i2v':          { id: 'vidu-q2-i2v',          label: 'Vidu Q3 I2V (5s)'  ,       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
+  'vidu-q2-t2v':          { id: 'vidu-q2-t2v',          label: 'Vidu Q3 T2V (5s)'  ,       unit: 'per-clip', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20, fixedClipSeconds: 5 },
 
   // Pika
   'pika-2-2-standard':    { id: 'pika-2-2-standard',    label: 'Pika 2.2 Std',         unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 3,  maxDuration: 10 },
@@ -92,8 +92,8 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'veo-3.1-lite-1080p':   { id: 'veo-3.1-lite-1080p',   label: 'Veo 3.1 Lite 1080p',   unit: 'per-second', sellEUR: 0.66, sellUSD: 0.66, costEUR: 0.22,  minDuration: 4,  maxDuration: 8  },
   'veo-3.1-fast':         { id: 'veo-3.1-fast',         label: 'Veo 3.1 Fast 1080p',   unit: 'per-second', sellEUR: 1.20, sellUSD: 1.20, costEUR: 0.40,  minDuration: 4,  maxDuration: 8  },
   'veo-3.1-pro':          { id: 'veo-3.1-pro',          label: 'Veo 3.1 Pro 1080p',    unit: 'per-second', sellEUR: 3.30, sellUSD: 3.30, costEUR: 1.10,  minDuration: 4,  maxDuration: 8  },
-  'sora-2-standard':      { id: 'sora-2-standard',      label: 'Sora 2 Standard',      unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 4,  maxDuration: 20 },
-  'sora-2-pro':           { id: 'sora-2-pro',           label: 'Sora 2 Pro',           unit: 'per-second', sellEUR: 1.35, sellUSD: 1.35, costEUR: 0.45,  minDuration: 4,  maxDuration: 20 },
+  'sora-2-standard':      { id: 'sora-2-standard',      label: 'Sora 2 Standard (EOL 24.09.2026)',      unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 4,  maxDuration: 20 },
+  'sora-2-pro':           { id: 'sora-2-pro',           label: 'Sora 2 Pro (EOL 24.09.2026)',           unit: 'per-second', sellEUR: 1.35, sellUSD: 1.35, costEUR: 0.45,  minDuration: 4,  maxDuration: 20 },
   'grok-imagine':         { id: 'grok-imagine',         label: 'Grok Imagine',         unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 4,  maxDuration: 15 },
 };
 
@@ -113,4 +113,4 @@ export function computeTotalCost(modelId: string, durationSeconds: number, curre
   return +(price * durationSeconds).toFixed(4);
 }
 
-export const CATALOG_VERSION = '2026-07-14';
+export const CATALOG_VERSION = '2026-07-21';
