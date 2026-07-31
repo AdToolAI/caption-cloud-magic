@@ -297,7 +297,7 @@ serve(async (req) => {
           clip_error: null,
           updated_at: dispatchedAt,
         }).eq("id", d.id);
-        fetch(`${url}/functions/v1/render-sync-segments-audio-mux`, {
+        fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
           body: JSON.stringify({ scene_id: d.id }),
