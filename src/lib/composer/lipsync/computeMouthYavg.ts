@@ -36,9 +36,12 @@ export interface MouthYavgInput {
 export interface MouthYavgResult {
   yavg: number;            // mean per-pixel temporal variance in mouth band
   yavgNormalized: number;  // yavg / 255^2, clamped 0..1
+  controlYavg: number;     // temporal variance in stable cheek/forehead region
+  differentialYavg: number;// mouth variance minus control variance
+  motionRatio: number;     // mouth variance / control variance
   frames: number;
   sampledSec: number[];
-  method: "canvas-mouth-band-v248";
+  method: "canvas-mouth-control-differential-v341";
 }
 
 /**
@@ -103,6 +106,7 @@ export async function computeMouthYavg(input: MouthYavgInput): Promise<MouthYavg
   if (!ctx) throw new Error("yavg: canvas 2d unsupported");
 
   const frames: Uint8ClampedArray[] = [];
+  const controlFrames: Uint8ClampedArray[] = [];
   const sampledSec: number[] = [];
   const startPad = 0.05 * dur;
   const endPad = 0.05 * dur;
@@ -115,39 +119,55 @@ export async function computeMouthYavg(input: MouthYavgInput): Promise<MouthYavg
     ctx.drawImage(video, bx, by, bw, bh, 0, 0, bw, bh);
     const img = ctx.getImageData(0, 0, bw, bh);
     frames.push(img.data);
+    // Same-sized region above and slightly beside the mouth. It captures
+    // camera/head motion but excludes the lips, so global motion no longer
+    // masquerades as successful lip-sync.
+    const controlCx = Math.max(bandW / 2, Math.min(1 - bandW / 2, mouthCx + bandW * 0.42));
+    const controlCy = Math.max(bandH / 2, Math.min(1 - bandH / 2, mouthCy - bandH * 1.35));
+    const controlX = Math.max(0, Math.min(w - bw, Math.round(controlCx * w - bw / 2)));
+    const controlY = Math.max(0, Math.min(h - bh, Math.round(controlCy * h - bh / 2)));
+    ctx.drawImage(video, controlX, controlY, bw, bh, 0, 0, bw, bh);
+    controlFrames.push(ctx.getImageData(0, 0, bw, bh).data);
     sampledSec.push(t);
   }
 
   // Compute per-pixel luminance variance across frames.
   const px = bw * bh;
-  const means = new Float32Array(px);
-  for (const data of frames) {
-    for (let p = 0; p < px; p++) {
-      const off = p * 4;
-      // Rec.601 luma
-      means[p] += 0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2];
+  const temporalVariance = (sampledFrames: Uint8ClampedArray[]): number => {
+    const means = new Float32Array(px);
+    for (const data of sampledFrames) {
+      for (let p = 0; p < px; p++) {
+        const off = p * 4;
+        means[p] += 0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2];
+      }
     }
-  }
-  for (let p = 0; p < px; p++) means[p] /= frames.length;
-
-  let sumVar = 0;
-  for (const data of frames) {
-    for (let p = 0; p < px; p++) {
-      const off = p * 4;
-      const y = 0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2];
-      const d = y - means[p];
-      sumVar += d * d;
+    for (let p = 0; p < px; p++) means[p] /= sampledFrames.length;
+    let sumVar = 0;
+    for (const data of sampledFrames) {
+      for (let p = 0; p < px; p++) {
+        const off = p * 4;
+        const y = 0.299 * data[off] + 0.587 * data[off + 1] + 0.114 * data[off + 2];
+        const d = y - means[p];
+        sumVar += d * d;
+      }
     }
-  }
-  const yavg = sumVar / (frames.length * px); // mean per-pixel variance (luma²)
+    return sumVar / (sampledFrames.length * px);
+  };
+  const yavg = temporalVariance(frames);
+  const controlYavg = temporalVariance(controlFrames);
+  const differentialYavg = yavg - controlYavg;
+  const motionRatio = yavg / Math.max(1, controlYavg);
   const yavgNormalized = Math.max(0, Math.min(1, yavg / (255 * 255)));
 
   return {
     yavg,
     yavgNormalized,
+    controlYavg,
+    differentialYavg,
+    motionRatio,
     frames: frames.length,
     sampledSec,
-    method: "canvas-mouth-band-v248",
+    method: "canvas-mouth-control-differential-v341",
   };
 }
 
@@ -177,5 +197,5 @@ function seekTo(video: HTMLVideoElement, t: number): Promise<void> {
 export const MOUTH_YAVG_NOOP_THRESHOLD = 4.0; // ≈ 0.006% of 255²
 
 export function isMouthYavgNoop(r: MouthYavgResult): boolean {
-  return r.yavg < MOUTH_YAVG_NOOP_THRESHOLD;
+  return r.differentialYavg < MOUTH_YAVG_NOOP_THRESHOLD || r.motionRatio < 1.12;
 }

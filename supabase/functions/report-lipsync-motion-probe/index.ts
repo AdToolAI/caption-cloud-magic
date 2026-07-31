@@ -51,6 +51,9 @@ interface Payload {
   pass_idx: number;
   yavg: number;
   yavg_normalized?: number;
+  control_yavg?: number;
+  differential_yavg?: number;
+  motion_ratio?: number;
   frames?: number;
   method?: string;
 }
@@ -103,7 +106,10 @@ Deno.serve(async (req) => {
       return json({ error: "forbidden" }, 403);
     }
 
-    const isNoop = body.yavg < YAVG_NOOP_THRESHOLD;
+    const hasDifferential = Number.isFinite(body.differential_yavg) && Number.isFinite(body.motion_ratio);
+    const isNoop = hasDifferential
+      ? Number(body.differential_yavg) < YAVG_NOOP_THRESHOLD || Number(body.motion_ratio) < 1.12
+      : true;
     const nowIso = new Date().toISOString();
 
     // Persist metric to dispatch log (best-effort, latest row for this job/pass).
@@ -115,10 +121,14 @@ Deno.serve(async (req) => {
           meta_yavg_probe: {
             yavg: body.yavg,
             yavg_normalized: body.yavg_normalized ?? null,
+            control_yavg: body.control_yavg ?? null,
+            differential_yavg: body.differential_yavg ?? null,
+            motion_ratio: body.motion_ratio ?? null,
             frames: body.frames ?? null,
             method: body.method ?? "canvas-mouth-band-v248",
             is_noop: isNoop,
             threshold: YAVG_NOOP_THRESHOLD,
+            ratio_threshold: 1.12,
             reported_at: nowIso,
           },
         })
