@@ -5534,6 +5534,8 @@ serve(async (req) => {
           console.error(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v329_preclip_face_share_too_low ` +
             `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} speakers=${speakers.length} ` +
+            `share_src=${(preclipResult as any).faceShareSource ?? "?"} motion_applied=${(preclipResult as any).motionCropApplied ?? "?"} ` +
+            `motion_skip=${(preclipResult as any).motionSkipReason ?? "none"} ` +
             `geometry=${preclipResult.geometryReason ?? "?"} plate_box_w_pct=${preclipResult.plateBoxWidthPct ?? "?"} ` +
             `crop=${JSON.stringify(preclipResult.crop ?? null)} — refusing dispatch (guaranteed no-op)`,
           );
