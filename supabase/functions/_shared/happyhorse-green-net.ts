@@ -291,8 +291,9 @@ export function compressLipReadyPlate(input: string, hard = false): LipReadyComp
   }
 
 
-  // 4) whitespace + length cap.
+  // 4) whitespace, sentence-case repair and length cap.
   s = s.replace(/\s*,\s*,+/g, ",").replace(/[ \t]+/g, " ").replace(/\s+([,.])/g, "$1").trim();
+  s = s.replace(/(^|[.!?]\s+)([a-z])/g, (_m, pre, ch) => pre + ch.toUpperCase());
   const cap = hard ? 520 : 900;
   if (s.length > cap) {
     s = capAtSentenceBoundary(s, cap);
