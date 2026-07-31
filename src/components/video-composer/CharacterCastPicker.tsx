@@ -172,9 +172,15 @@ export function CharacterCastPicker({
     return s;
   }, [cast, resolutionPool, canonOpts]);
 
-  const briefingAvailable = (characters ?? []).filter((c) => !inCast.has(c.id));
+  // v320 — a person is "already in the cast" under EITHER id form (briefing
+  // slug or Cast & World UUID), so she is never offered a second time.
+  const isTaken = (c: ComposerCharacter) =>
+    inCast.has(c.id) || !!(c.brandCharacterId && inCast.has(c.brandCharacterId));
+  const briefingAvailable = (characters ?? []).filter((c) => !isTaken(c));
   const libraryAvailable = (libraryCharacters ?? []).filter(
-    (c) => !inCast.has(c.id) && !(characters ?? []).some((b) => b.id === c.id),
+    (c) =>
+      !isTaken(c) &&
+      !(characters ?? []).some((b) => b.id === c.id || b.brandCharacterId === c.id),
   );
 
   // Render nothing if there is genuinely nothing to show or do.
