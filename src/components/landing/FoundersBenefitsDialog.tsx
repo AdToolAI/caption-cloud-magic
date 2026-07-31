@@ -29,8 +29,8 @@ const benefits = [
   },
   {
     icon: Sparkles,
-    title: "Voller Feature-Zugang während der Beta",
-    text: "Cast & World, Motion Studio, AI Video Studio, Picture Studio — alles freigeschaltet.",
+    title: "Voller Studio-Zugang während der Beta",
+    text: "Der komplette Produktionsworkflow ist freigeschaltet: führende KI-Modelle, Stimmen, Multi-Speaker-Lip-Sync und Schnitt — in einem System statt in fünf Abos.",
   },
   {
     icon: Crown,

@@ -1,8 +1,9 @@
 # AdTool AI
 
-> KI-gestützter Social-Media- und Video-Content-Manager. Erstelle Captions, Kurzvideos, Voiceovers und Musik in Sekunden — mit lippensynchronen Sprechern, Marken-Charakteren und automatisiertem Posting.
+> Ein Creator. Ein ganzes Studio. AdTool AI verbindet die führenden KI-Modelle, Stimmen und Lip-Sync-Tools zu einem durchgängigen Video-Produktions-Workflow — von der Idee zum fertigen Video, ohne Filmteam und ohne Wechsel zwischen mehreren Plattformen.
 
-AdTool AI ist eine Beta-Plattform (Launch 2026) für Creator, Agenturen und Marken. Kernfeatures: AI Video Studio (Motion + Cinematic-Sync Lip-Sync), Picture Studio, Music Studio, Universal Content Creator, Director's Cut Timeline-Editor, Cast & World Charakter-Bibliothek. Preise ab 14,99 €/Monat im Founders-Deal.
+AdTool AI ist keine weitere Oberfläche für einzelne KI-Modelle, sondern der verbundene Produktionsworkflow: Szenen, Sprecher, Voiceover, präziser Multi-Speaker-Lip-Sync, Musik und Schnitt in einem System — mit einem Credit-Konto statt fünf Abos. Beta-Plattform (Launch 2026) für Creator, Freelancer, kleine Agenturen und Marketingverantwortliche, die professionelle Inhalte ohne eigenes Filmteam produzieren. Kernfeatures: AI Video Studio (Motion + Cinematic-Sync Lip-Sync), KI Autopilot, Universal Content Creator, Director's Cut Timeline-Editor, Cast & World Charakter-Bibliothek, Voice/Audio Studio, Picture Studio, Music Studio sowie Caption- und Planungs-Tools. Deutschsprachiger Multi-Speaker-Lip-Sync ist ein Leistungsbeweis, keine geografische Begrenzung. Preise ab 14,99 €/Monat im Founders-Deal.
+
 
 ## Pages
 
