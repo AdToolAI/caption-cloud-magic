@@ -12,7 +12,7 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
     USD: '' // Free plan has no price
   },
   basic: {
-    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw', // Beta-Basic €19.99/month
+    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw', // Beta-Basic €14.99/month
     USD: 'price_1TzLNc1xgyPAUyx6exJw3ihw'  // Reuse EUR price (single Beta-Basic during Beta)
   },
   pro: {
