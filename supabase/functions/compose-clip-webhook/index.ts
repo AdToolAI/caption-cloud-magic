@@ -5,7 +5,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-speakers.ts";
-import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
+import { isGreenNetRejection, hardSanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
