@@ -42,6 +42,7 @@ function adaptCharacter(c: any): MotionStudioCharacter {
     workspace_id: null,
     created_at: c.created_at,
     updated_at: c.updated_at,
+    aliasIds: c.aliasIds ?? [],
   };
 }
 

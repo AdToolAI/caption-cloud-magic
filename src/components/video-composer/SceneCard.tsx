@@ -619,7 +619,7 @@ export default function SceneCard({
   // catch storyboard refreshes and late-arriving brand characters.
   useEffect(() => {
     if (!scene.clipSource.startsWith("ai-")) return;
-    if (!characters || characters.length === 0) return;
+    if (castResolutionPool.length === 0) return;
     const cast =
       scene.characterShots ??
       (scene.characterShot ? [scene.characterShot] : []);
@@ -629,7 +629,7 @@ export default function SceneCard({
       const newSubject = applyCastToPrompt(
         currentSubject,
         cast,
-        characters,
+        castResolutionPool,
         lang,
       );
       if (newSubject !== currentSubject) {
@@ -643,7 +643,7 @@ export default function SceneCard({
       const newPrompt = applyCastToPrompt(
         scene.aiPrompt || "",
         cast,
-        characters,
+        castResolutionPool,
         lang,
       );
       if (newPrompt !== (scene.aiPrompt || ""))

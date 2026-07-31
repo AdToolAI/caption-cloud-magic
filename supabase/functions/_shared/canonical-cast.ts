@@ -203,5 +203,8 @@ export function dedupeCharacterShots<T extends CastSlotLike>(
     byKey.set(canon, mergeSlots(existing, normalized));
   }
 
-  return order.map((k) => byKey.get(k)!);
+  return order.flatMap((k) => {
+    const slot = byKey.get(k);
+    return slot ? [slot] : [];
+  });
 }

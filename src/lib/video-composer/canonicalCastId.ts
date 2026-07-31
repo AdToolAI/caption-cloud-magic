@@ -256,7 +256,10 @@ export function dedupeCharacterShots(
   }
 
   if (!changed) return input;
-  return order.map((k) => byKey.get(k)!);
+  return order.flatMap((k) => {
+    const slot = byKey.get(k);
+    return slot ? [slot] : [];
+  });
 }
 
 /** True when at least two slots resolve to the same person. */
