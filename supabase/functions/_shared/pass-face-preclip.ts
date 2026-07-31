@@ -293,7 +293,21 @@ export async function renderPassFacePreclip(
     crop0X = legacyCapped.crop.x;
     crop0Y = legacyCapped.crop.y;
     crop0Size = legacyCapped.crop.size;
-    faceShareInCrop = legacyCapped.faceShare ?? 0;
+    if (legacyCapped.faceShare === null) {
+      console.error(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v335_face_geometry_unavailable ` +
+        `bbox=${JSON.stringify(bbox ?? null)} crop=${crop0X},${crop0Y},${crop0Size}`,
+      );
+      return {
+        ok: false,
+        error: "preclip_face_geometry_unavailable",
+        errorClass: "invalid_input",
+        geometrySuspicious: geometry.suspicious,
+        geometryReason: geometry.reason,
+        plateBoxWidthPct: geometry.boxWidthPct,
+      };
+    }
+    faceShareInCrop = legacyCapped.faceShare;
     console.log(
       `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v335_legacy_crop ` +
       `capped=${legacyCapped.capped} crop=${crop0X},${crop0Y},${crop0Size} ` +
