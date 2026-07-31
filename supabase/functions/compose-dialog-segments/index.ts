@@ -1570,11 +1570,18 @@ serve(async (req) => {
       _currentClipUrl.length > 0 &&
       _persistedGeomClipUrl === _currentClipUrl &&
       (!plateDims || _dimsMatchPlate);
+    // v329 — Identität ist plate-UNABHÄNGIG und überlebt jede Geometrie-
+    // Eviction. Sie wird ab hier als eigenständiges Objekt geführt und
+    // ausschließlich über den Slot-Index an die Live-Geometrie gebunden.
+    const _identityLock = extractIdentityLock(_persistedPlateIdentityRaw);
     const persistedPlateIdentity = _persistedPlateIdentityRaw
       ? (_plateGeometryTrusted
         ? _persistedPlateIdentityRaw
         : {
           // identity-only projection — forces live plate re-detection
+          identity: _identityLock
+            ? { bySlot: _identityLock.bySlot, source: _identityLock.source }
+            : null,
           assignmentLock: _persistedPlateIdentityRaw.assignmentLock ?? null,
           assignmentLockSource: _persistedPlateIdentityRaw.assignmentLockSource ?? null,
           status: _persistedPlateIdentityRaw.status ?? null,
