@@ -537,6 +537,9 @@ export async function renderPassFacePreclip(
         trackSamplesUsed,
         trackDriftPx,
         motionCropApplied,
+        motionSkipReason,
+        faceShareSource,
+
       };
     }
   } catch (reuseErr) {
