@@ -37,6 +37,7 @@ import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensu
 import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
 import { logPlanRepairEvent } from '@/lib/video-composer/briefing/logPlanRepair';
 import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup';
+import { resolveCanonicalCharacterId } from '@/lib/video-composer/canonicalCastId';
 import { getOutfitPresetById } from '@/config/defaultOutfitPresets';
 import { isDirectiveTurn } from '@/lib/motion-studio/planDisplayFilter';
 
@@ -311,8 +312,18 @@ function planSceneToComposerScene(
     absent: 0, full: 1, profile: 2, pov: 3, detail: 4,
   };
   const dedupMap = new Map<string, CharacterShot>();
+  // v318 — resolve slot ids against the plan's own cast pool so a slug slot
+  // ("samuel-dusatko") collapses into the UUID slot of the same person.
+  const planCastPool = (ps.cast ?? [])
+    .filter((c) => c.characterId && PLAN_UUID_RE.test(stripPrefix(String(c.characterId))))
+    .map((c) => ({
+      id: stripPrefix(String(c.characterId)),
+      name: (c.characterName ?? '').trim(),
+    }));
   for (const shot of rawShots) {
-    const key = String(shot.characterId).toLowerCase().trim();
+    const key =
+      resolveCanonicalCharacterId(shot.characterId, planCastPool) ??
+      String(shot.characterId).toLowerCase().trim();
     if (!key) continue;
     const existing = dedupMap.get(key);
     if (!existing) {

@@ -15,8 +15,27 @@
 // - Caps at 4 slots — matches Multi-Portrait Nano Banana 2 / Vidu Q2 limit.
 
 import type { CharacterShot, ComposerCharacter } from '@/types/video-composer';
+import { resolveCanonicalCharacterId } from '@/lib/video-composer/canonicalCastId';
 
 const MAX_CAST = 4;
+
+/**
+ * Set of canonical character ids already present in `shots` — resolves drifted
+ * slot ids (slug instead of UUID) so a character that is present as
+ * "samuel-dusatko" is never appended a second time as its UUID (v318).
+ */
+function presentCanonicalIds(
+  shots: CharacterShot[],
+  pool: ComposerCharacter[] | undefined,
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of shots) {
+    if (!s?.characterId) continue;
+    out.add(resolveCanonicalCharacterId(s.characterId, pool) ?? s.characterId);
+  }
+  return out;
+}
+
 
 function matchesPrompt(prompt: string, character: ComposerCharacter): boolean {
   if (!character?.name) return false;
@@ -38,7 +57,7 @@ export function syncCastFromPrompt(
   if (current.length >= MAX_CAST) return current;
 
   const lower = prompt.toLowerCase();
-  const haveIds = new Set(current.map((s) => s.characterId));
+  const haveIds = presentCanonicalIds(current, characters);
   const dismissed = new Set((dismissedIds ?? []).map((id) => String(id)));
 
   const additions: CharacterShot[] = [];
@@ -85,7 +104,7 @@ export function ensureEnsembleScene<S extends SceneLike>(
     const visible = (sc.characterShots ?? []).filter(
       (x) => x?.shotType && x.shotType !== 'absent',
     );
-    const present = new Set(visible.map((x) => x.characterId));
+    const present = presentCanonicalIds(visible as CharacterShot[], characters);
     for (const id of requiredIds) if (!present.has(id)) return false;
     return true;
   };
@@ -116,8 +135,9 @@ export function ensureEnsembleScene<S extends SceneLike>(
     const sc = next[idx];
     if (isEnsemble(sc)) continue;
     const shots = Array.isArray(sc.characterShots) ? [...sc.characterShots] : [];
-    const present = new Set(
-      shots.filter((x) => x?.shotType && x.shotType !== 'absent').map((x) => x.characterId),
+    const present = presentCanonicalIds(
+      shots.filter((x) => x?.shotType && x.shotType !== 'absent'),
+      characters,
     );
     for (const ch of allChars) {
       if (present.has(ch.id)) continue;

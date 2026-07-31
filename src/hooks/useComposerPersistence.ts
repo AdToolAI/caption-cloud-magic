@@ -8,6 +8,7 @@ import type {
   ComposerStatus,
   AdCampaignMeta,
 } from '@/types/video-composer';
+import { dedupeCharacterShots } from '@/lib/video-composer/canonicalCastId';
 
 /**
  * Persist the assembly_config of an existing composer project to the database.
@@ -172,8 +173,21 @@ export function useComposerPersistence() {
       // 4. Persist scenes (update existing, insert new) at their final order_index
       const persistedScenes: ComposerScene[] = [];
 
+      // v318 — cast pool for identity dedupe (slug slots collapse into the
+      // canonical brand_characters UUID before they hit the DB).
+      const castPool = (project.briefing?.characters ?? []).map((c) => ({
+        id: c.id,
+        name: c.name,
+      }));
+      const castShotsFor = (scene: ComposerScene) =>
+        dedupeCharacterShots(
+          scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []),
+          castPool,
+        );
+
       for (let i = 0; i < project.scenes.length; i++) {
         const scene = project.scenes[i];
+
         const sceneHasUuid = isUuid(scene.id);
 
         if (sceneHasUuid) {
@@ -199,7 +213,7 @@ export function useComposerPersistence() {
               transition_duration: scene.transitionDuration,
               cost_euros: scene.costEuros,
               character_shot: (scene.characterShot ?? null) as any,
-              character_shots: (scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])) as any,
+              character_shots: castShotsFor(scene) as any,
               dialog_script: scene.dialogScript ?? null,
               dialog_turns: ((scene as any).dialogTurns ?? []) as any,
               dialog_voices: (scene.dialogVoices ?? {}) as any,
@@ -259,7 +273,7 @@ export function useComposerPersistence() {
               cost_euros: scene.costEuros || 0,
               retry_count: scene.retryCount || 0,
               character_shot: (scene.characterShot ?? null) as any,
-              character_shots: (scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])) as any,
+              character_shots: castShotsFor(scene) as any,
               dialog_script: scene.dialogScript ?? null,
               dialog_turns: ((scene as any).dialogTurns ?? []) as any,
               dialog_voices: (scene.dialogVoices ?? {}) as any,
