@@ -182,25 +182,23 @@ export function useComposerPersistence() {
       // 4. Persist scenes (update existing, insert new) at their final order_index
       const persistedScenes: ComposerScene[] = [];
 
-      // v319 — cast pool for identity dedupe: briefing cast + the user's full
-      // avatar library, so slug slots AND `outfit:<lookId>` refs collapse into
-      // the canonical brand_characters UUID before they hit the DB.
+      // Cast & World is the canonical pool. Briefing rows are appended only as
+      // aliases for legacy slugs, never as an independent character source.
       const briefingCast = (project.briefing?.characters ?? []).map((c) => ({
         id: c.id,
         name: c.name,
         // v320 — Cast & World UUID is the canonical identity of this entry.
         brandCharacterId: c.brandCharacterId,
       }));
-      const seenPool = new Set(
-        briefingCast.flatMap((c) =>
-          [c.id, c.brandCharacterId].filter((x): x is string => !!x),
-        ),
-      );
       const castPool = [
-        ...briefingCast,
         ...libraryCharacters
-          .filter((c: any) => c?.id && !seenPool.has(c.id))
-          .map((c: any) => ({ id: c.id as string, name: (c.name as string) ?? '' })),
+          .filter((c: any) => c?.id)
+          .map((c: any) => ({
+            id: c.id as string,
+            name: (c.name as string) ?? '',
+            aliasIds: c.aliasIds ?? [],
+          })),
+        ...briefingCast,
       ];
       const castShotsFor = (scene: ComposerScene) =>
         dedupeCharacterShots(

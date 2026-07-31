@@ -125,6 +125,8 @@ export interface ComposerCharacter {
    * Gemini-generated identity-card prompt for far stronger face consistency.
    */
   brandCharacterId?: string;
+  /** Legacy duplicate Cast & World UUIDs that resolve to this canonical row. */
+  aliasIds?: string[];
   /** Hedra-optimised portrait or original reference image — used as i2v anchor. */
   referenceImageUrl?: string;
   /** Pre-built identity-card prompt fragment from the Brand Character. */

@@ -49,8 +49,6 @@ const LABELS = {
     de: 'Bis zu 4 Charaktere pro Szene. Bei ≥2 komponiert Nano Banana 2 sie ins erste Frame; Vidu Q2 (Multi-Reference) wird empfohlen.',
     es: 'Hasta 4 personajes por escena. Con ≥2, Nano Banana 2 los compone en el primer frame; se recomienda Vidu Q2.',
   },
-  briefingSection: { en: 'In this project', de: 'In diesem Projekt', es: 'En este proyecto' },
-  librarySection:  { en: 'From your avatar library', de: 'Aus deiner Avatar-Bibliothek', es: 'De tu biblioteca de avatares' },
   createNew:       { en: 'Create new avatar…', de: 'Neuen Avatar erstellen…', es: 'Crear nuevo avatar…' },
   unknown:         { en: 'Unknown — remove?', de: 'Unbekannt – entfernen?', es: 'Desconocido – ¿quitar?' },
   outfit:          { en: 'Outfit', de: 'Outfit', es: 'Atuendo' },
@@ -155,7 +153,9 @@ export function CharacterCastPicker({
 
   // A Cast & World person is already taken under any canonical/alias id.
   const isTaken = (c: ComposerCharacter) =>
-    inCast.has(c.id) || !!(c.brandCharacterId && inCast.has(c.brandCharacterId));
+    inCast.has(c.id) ||
+    !!(c.brandCharacterId && inCast.has(c.brandCharacterId)) ||
+    !!c.aliasIds?.some((id) => inCast.has(id));
   const availableCharacters = (characters ?? []).filter((c) => !isTaken(c));
 
   // Render nothing if there is genuinely nothing to show or do.

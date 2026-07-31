@@ -260,8 +260,7 @@ interface SceneCardProps {
     partials: Partial<ComposerScene>[],
     opts?: { removeParent?: boolean },
   ) => Promise<(string | undefined)[]>;
-  /** Propagates a newly-picked library character into the project briefing cast
-   *  so prompt injection / anchor resolution finds it. */
+  /** Legacy callback retained for director-generated briefing updates. */
   onAddCharacter?: (character: ComposerCharacter) => void;
   language: string;
   /** Auto-persist hook for the per-scene Dialog Studio (voiceover generation). */
@@ -359,24 +358,19 @@ export default function SceneCard({
   // the same person is treated as two cast members.
   const { outfitLookMap } = useOutfitLookMap();
   const castResolutionPool = useMemo<ComposerCharacter[]>(() => {
-    // v320 — a briefing entry and its Cast & World avatar are ONE person:
-    // index both id forms so the library copy is never added as a second pool
-    // member (which is what produced the duplicate chip).
-    const seen = new Set(
-      (characters ?? []).flatMap((c) =>
-        [c.id, c.brandCharacterId].filter((x): x is string => !!x),
-      ),
-    );
-    const extras = (libCharacters ?? [])
-      .filter((c: any) => c?.id && !seen.has(c.id) && !String(c.id).includes(':'))
+    // Cast & World is the only selectable source. Briefing characters are
+    // compatibility aliases only and never enter the picker independently.
+    const castWorld = (libCharacters ?? [])
+      .filter((c: any) => c?.id && !String(c.id).includes(':'))
       .map((c: any) => ({
         id: c.id as string,
         name: (c.name as string) ?? '',
         appearance: c.description ?? '',
         signatureItems: c.signature_items ?? '',
         referenceImageUrl: c.reference_image_url ?? undefined,
+        aliasIds: c.aliasIds ?? [],
       })) as ComposerCharacter[];
-    return [...(characters ?? []), ...extras];
+    return castWorld;
   }, [characters, libCharacters]);
   // World-asset pools for the UnifiedAssetPicker (Locations / Buildings / Props).
   const { locations: brandLocations } = useBrandLocations();
@@ -1771,7 +1765,7 @@ export default function SceneCard({
               )}
 
               <SceneStudioSectionHeader tab="cast" language={lang} />
-              {/* Character Cast picker (multi, max 4) — shown for any AI scene when the user has at least one avatar (briefing or library). */}
+              {/* Character Cast picker (multi, max 4) — Cast & World only. */}
               {scene.clipSource.startsWith("ai-") &&
                 ((characters && characters.length > 0) ||
                   libCharacters.length > 0 ||
@@ -1783,17 +1777,7 @@ export default function SceneCard({
                   catalogProps.length > 0) && (
                   <>
                     <UnifiedAssetPicker
-                      characters={characters ?? []}
-                      libraryCharacters={libCharacters.map(
-                        (c): ComposerCharacter => ({
-                          id: c.id,
-                          name: c.name,
-                          appearance: c.description ?? "",
-                          signatureItems: c.signature_items ?? "",
-                          referenceImageUrl: c.reference_image_url ?? undefined,
-                        }),
-                      )}
-                      onAddToBriefing={onAddCharacter}
+                      characters={castResolutionPool}
                       cast={scene.characterShots}
                       legacyCast={scene.characterShot}
                       onCastChange={(next) => {
