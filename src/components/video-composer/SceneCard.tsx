@@ -596,7 +596,6 @@ export default function SceneCard({
       current,
       castResolutionPool,
       scene.dismissedCharacterIds,
-      { resolutionPool: castResolutionPool, outfitLookMap },
     );
     if (next === current) return;
     onUpdate({
