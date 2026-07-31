@@ -122,7 +122,13 @@ export function ensureEnsembleScene<S extends SceneLike>(
   if (!scenes?.length || !characters?.length || characters.length < 2) return scenes;
 
   const allChars = characters.slice(0, MAX_CAST);
-  const requiredIds = new Set(allChars.map((c) => c.id));
+  // v320 — required identities are Cast & World UUIDs (falling back to the
+  // entry id for unlinked rows), matching what `presentCanonicalIds` returns.
+  const requiredIds = new Set(
+    allChars.map(
+      (c) => resolveCanonicalCharacterId(c.id, characters) ?? c.brandCharacterId ?? c.id,
+    ),
+  );
   const requiredEnsembles = scenes.length >= 6 ? 2 : 1;
 
   const isEnsemble = (sc: SceneLike): boolean => {
