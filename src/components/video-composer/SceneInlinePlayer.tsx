@@ -364,7 +364,10 @@ export default function SceneInlinePlayer({
                   (p: any) => Number(p?.noop_escalation_step ?? 0) > 0 && (p?.status === "pending" || p?.status === "rendering"),
                 );
                 const totalPasses = passesArr.length;
-                const donePasses = passesArr.filter((p: any) => p?.status === "done" || p?.status === "failed").length;
+                const providerCompletePasses = passesArr.filter((p: any) =>
+                  p?.status === "done" || p?.status === "failed" || p?.status === "motion_probe_pending",
+                ).length;
+                const probePendingPasses = passesArr.filter((p: any) => p?.status === "motion_probe_pending").length;
                 let title = 'Szene wird gebaut…';
                 let sub = isLipSyncIntentional(scene) ? 'VO & Lip-Sync inklusive' : 'Nur Bild-Render';
                 if (status === 'ready' && lipsyncRunning) {
@@ -380,10 +383,13 @@ export default function SceneInlinePlayer({
                     const variantLabel = step === 1 ? 'bounding_boxes_url' : step === 2 ? 'bounding-box ASD' : 'fallback';
                     title = `NOOP-Retry läuft (Stufe ${step}/2)…`;
                     sub = `${sp} · sync-3 ${variantLabel} · max. 2 Stufen, dann Hard-Fail`;
+                  } else if (probePendingPasses > 0) {
+                    title = 'Lip-Sync wird geprüft…';
+                    sub = `${providerCompletePasses}/${totalPasses} Sprecher verarbeitet · Qualitätsprüfung`;
                   } else if (lipSyncStatus === 'running' && hasProviderJob) {
                     title = 'Lip-Sync läuft…';
                     sub = totalPasses > 0
-                      ? `Sync.so · Pass ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
+                      ? `Sync.so · Pass ${Math.min(providerCompletePasses + 1, totalPasses)}/${totalPasses}`
                       : 'Sync.so · ~60 s pro Sprecher-Turn';
                   } else if (twoshotStage === 'audio') {
                     if (audioUrl) {
