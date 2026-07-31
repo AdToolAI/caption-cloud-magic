@@ -420,19 +420,73 @@ export default function ProductionPlanSheet({
     },
     staleTime: 60_000,
   });
+  // v320 — Cast & World is the ONLY character source, so the outfit dropdown
+  // must be fed straight from `avatar_outfit_looks` of the avatars used in the
+  // plan. Relying on the unified mention library alone meant looks were shown
+  // only when that library happened to be warm — which is why outfits kept
+  // disappearing from the briefing analysis.
+  const planBaseCharacterIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of safePlan?.scenes ?? plan?.scenes ?? []) {
+      for (const c of s.cast ?? []) {
+        const raw = String(c?.characterId ?? '').trim();
+        if (!raw) continue;
+        const inner = uuidInside(raw) ?? raw;
+        if (UUID_ONLY_RE.test(inner)) set.add(inner);
+      }
+    }
+    for (const [, info] of outfitById) if (info.baseId) set.add(info.baseId);
+    return Array.from(set);
+  }, [safePlan, plan, outfitById]);
+
+  const { data: dbLooksByAvatar = [] } = useQuery({
+    queryKey: ['avatar-outfit-looks-by-avatar', planBaseCharacterIds.slice().sort().join(',')],
+    enabled: planBaseCharacterIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('avatar_outfit_looks')
+        .select('id, name, avatar_id')
+        .in('avatar_id', planBaseCharacterIds);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; avatar_id: string }>;
+    },
+    staleTime: 60_000,
+  });
+
+  /** Merged look list per avatar: DB (authoritative) + mention library. */
+  const outfitsByCharacter = useMemo(() => {
+    const map = new Map<string, Array<{ lookId: string; name: string }>>();
+    const seen = new Set<string>();
+    const push = (baseId: string, lookId: string, name: string) => {
+      const key = `${baseId}::${lookId}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const arr = map.get(baseId) ?? [];
+      arr.push({ lookId, name });
+      map.set(baseId, arr);
+    };
+    for (const row of dbLooksByAvatar) {
+      if (row?.id && row?.avatar_id) push(row.avatar_id, row.id, String(row.name ?? '').trim());
+    }
+    for (const [baseId, looks] of outfitsByCharacterFromMentions) {
+      for (const l of looks) push(baseId, l.lookId, l.name);
+    }
+    return map;
+  }, [dbLooksByAvatar, outfitsByCharacterFromMentions]);
+
   const outfitLabelById = useMemo(() => {
     const map = new Map<string, string>();
     // Library mentions first — only real names, no fake fallbacks.
     for (const [lookId, info] of outfitById) {
       if (info.name) map.set(lookId, info.name);
     }
-    // DB fallback wins for explicit names.
-    for (const row of dbOutfitLooks) {
+    // DB wins for explicit names.
+    for (const row of [...dbOutfitLooks, ...dbLooksByAvatar]) {
       const trimmed = String(row?.name ?? '').trim();
       if (row?.id && trimmed) map.set(row.id, trimmed);
     }
     return map;
-  }, [outfitById, dbOutfitLooks]);
+  }, [outfitById, dbOutfitLooks, dbLooksByAvatar]);
 
   /** Resolve any raw cast id (legacy `outfit:` or base UUID) to base + look. */
   const splitCastId = (rawId: string | null | undefined): { baseId: string | null; outfitLookId: string | null } => {
