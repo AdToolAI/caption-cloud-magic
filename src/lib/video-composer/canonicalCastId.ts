@@ -18,7 +18,17 @@ import type { CharacterShot, ComposerCharacter } from '@/types/video-composer';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type CharacterLike = { id: string; name?: string | null };
+type CharacterLike = {
+  id: string;
+  name?: string | null;
+  /**
+   * v320 — Cast & World is the ONLY character source. Composer briefing rows
+   * keep a readable slug in `id` and the real `brand_characters` UUID here.
+   * When present, that UUID is the canonical cast identity; the slug is just
+   * an alias used for resolving, never a value we write.
+   */
+  brandCharacterId?: string | null;
+};
 
 /** `lookId → avatar (brand_characters) id` — see `useOutfitLookMap()`. */
 export type OutfitLookMap = ReadonlyMap<string, string>;
