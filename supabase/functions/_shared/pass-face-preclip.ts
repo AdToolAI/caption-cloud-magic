@@ -269,7 +269,7 @@ export async function renderPassFacePreclip(
           Math.round(Number((bbox as number[])[3])),
         ],
         center: [Math.round(Number(coords[0])), Math.round(Number(coords[1]))],
-        mouth: [Math.round(Number((mouth as number[])[0])), Math.round(Number((mouth as number[])[1]))],
+        mouth: [Math.round(effectiveMouth![0]), Math.round(effectiveMouth![1])],
       },
       plateWidth: sW,
       plateHeight: sH,
@@ -288,8 +288,9 @@ export async function renderPassFacePreclip(
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size} v329_geometry=${geometry.reason} min_crop=${geometry.minCropSize}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v340_mouth_anchor_preclip anchor=${anchor} anchor_src=${anchorSource} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size} v329_geometry=${geometry.reason} min_crop=${geometry.minCropSize}`,
     );
+
   } else {
     const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
     crop0X = cf.x;
