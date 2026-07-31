@@ -7737,8 +7737,8 @@ export const translations: Record<Language, any> = {
     
     // Hero section
     hero: {
-      title: "Deine KI-gestützte Social Media Management Plattform",
-      subtitle: "Erstelle, optimiere und analysiere deine Inhalte – professionell, effizient, skalierbar.",
+      title: "Ein Creator. Ein ganzes Studio.",
+      subtitle: "Alle führenden KI-Modelle in einem durchgängigen Workflow – von der Idee zum fertigen Video, ohne Filmteam.",
       cta: "Kostenlos starten",
       demo: "Demo ansehen",
       login: "Anmelden",
