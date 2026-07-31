@@ -59,7 +59,7 @@ export function GoalsStep({
       </div>
 
       <div className="space-y-3">
-        <Label>Posts pro Woche: <span className="font-bold text-primary">{postsPerWeek}</span></Label>
+        <Label>Veröffentlichungen pro Woche: <span className="font-bold text-primary">{postsPerWeek}</span></Label>
         <Slider
           value={[postsPerWeek]}
           onValueChange={(v) => onPostsPerWeekChange(v[0])}
