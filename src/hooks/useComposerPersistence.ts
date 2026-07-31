@@ -8,6 +8,7 @@ import type {
   ComposerStatus,
   AdCampaignMeta,
 } from '@/types/video-composer';
+import { dedupeCharacterShots } from '@/lib/video-composer/canonicalCastId';
 
 /**
  * Persist the assembly_config of an existing composer project to the database.
