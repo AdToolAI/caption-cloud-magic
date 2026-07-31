@@ -577,6 +577,7 @@ export default function SceneCard({
       current,
       characters,
       scene.dismissedCharacterIds,
+      { resolutionPool: castResolutionPool, outfitLookMap },
     );
     if (next === current) return;
     onUpdate({
@@ -584,7 +585,14 @@ export default function SceneCard({
       characterShot: next[0] ?? scene.characterShot,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.aiPrompt, characters?.length, scene.dismissedCharacterIds?.length]);
+  }, [
+    scene.aiPrompt,
+    characters?.length,
+    scene.dismissedCharacterIds?.length,
+    castResolutionPool,
+    outfitLookMap,
+  ]);
+
 
   // Backfill: ensure scenes with a cast also carry the cast marker in the
   // prompt. `applyCastToPrompt` is idempotent (strips the existing marker
