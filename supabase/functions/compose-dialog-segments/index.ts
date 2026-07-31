@@ -5327,8 +5327,44 @@ serve(async (req) => {
     let passPreclipUrl: string | null = ((pass as any).preclip_url ?? null);
     let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
 
+    // ── v327 — Motion-Tolerant Lip-Sync ──────────────────────────────────
+    // `report-plate-motion-track` measured this speaker's face trajectory on
+    // the very plate we are about to dispatch. A speaker classified `moving`
+    // must NOT go through the preclip path: the preclip is a fixed square and
+    // the mux overlays it back at exactly that rect, so a walking / stepping
+    // subject drifts out of the crop and the frame-0 silent-face freeze tiles
+    // in DialogStitchVideo no longer match the plate underneath. Instead we
+    // dispatch the FULL PLATE with per-frame interpolated boxes (no overlay).
+    // Everything below fails open: no/stale track → untouched legacy path.
+    const v327Track = isTrackUsable(
+      parseMotionTrack((scene as any)?.motion_track),
+      sourceClipUrl,
+    )
+      ? parseMotionTrack((scene as any)?.motion_track)
+      : null;
+    const v327SlotTrack = slotTrackFor(v327Track, Number(pass.speaker_idx ?? currentPassIdx));
+    const v327Tracked = !!v327SlotTrack && v327SlotTrack.motion_class === "moving" && !!plateDims;
+    if (v327Tracked) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v327_motion_track TRACKED ` +
+          `speaker=${pass.speaker_name} drift=${((v327SlotTrack!.max_drift_pct) * 100).toFixed(1)}% ` +
+          `scale=${((v327SlotTrack!.max_scale_delta) * 100).toFixed(1)}% points=${v327SlotTrack!.points.length} ` +
+          `→ full-plate per-frame bboxes, preclip disabled`,
+      );
+      // Drop any cached preclip so mux/webhook treat this pass as full-plate.
+      passPreclipUrl = null;
+      usePassPreclip = false;
+      (pass as any).preclip_url = null;
+      (pass as any).preclip_crop = null;
+    }
+    (pass as any).bbox_mode = v327Tracked ? "tracked" : "static";
+    (pass as any).motion_class = v327SlotTrack?.motion_class ?? null;
+    (pass as any).max_drift_pct = v327SlotTrack?.max_drift_pct ?? null;
+    (pass as any).track_samples = v327SlotTrack?.points.length ?? null;
+
     const v161PreclipEligible =
       !usePassPreclip &&
+      !v327Tracked &&
       !!tightAudioInfo &&
       !!plateDims &&
       !!sourceClipUrl &&
@@ -5337,6 +5373,7 @@ serve(async (req) => {
       Number.isFinite(Number(pass.coords?.[1])) &&
       Array.isArray(speakerWindowsSecs) && speakerWindowsSecs.length > 0 &&
       body?.noop_auto_escalation !== true;
+
 
     if (v161PreclipEligible) {
       const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
