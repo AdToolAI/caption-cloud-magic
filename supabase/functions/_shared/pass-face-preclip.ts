@@ -153,37 +153,55 @@ export async function renderPassFacePreclip(
   const sW = evenDimension(srcWidth, 1280);
   const sH = evenDimension(srcHeight, 720);
 
-  // v247 — mouth-anchor crop when we have both a mouth landmark and a
-  // face bbox. Guarantees faceShareInCrop ≥ ~42% so Sync.so cannot no-op
-  // on tiny/far faces. Falls back to legacy face-center crop otherwise.
-  const useMouthAnchor =
+  // v247 — mouth-anchor crop when we have a face bbox. Guarantees
+  // faceShareInCrop ≥ ~42% so Sync.so cannot no-op on tiny/far faces.
+  //
+  // v342 — the detector frequently returns a face bbox WITHOUT mouth
+  // landmarks (AWS Rekognition on Hailuo plates). Previously that dropped
+  // us into the legacy face-center crop, which produced a fixed ~394px box
+  // around a 60–100px face → face share ~3% → Sync.so animated nothing.
+  // We now derive the mouth anchor from the lower third of the bbox
+  // (same formula as v280_bbox_derived_mouth_anchor) so the tight crop
+  // applies whenever a bbox exists.
+  const bboxValid =
+    Array.isArray(bbox) &&
+    bbox.length === 4 &&
+    bbox.every((n) => Number.isFinite(Number(n))) &&
+    Number(bbox[2]) > Number(bbox[0]) &&
+    Number(bbox[3]) > Number(bbox[1]);
+  const mouthValid =
     Array.isArray(mouth) &&
     mouth.length === 2 &&
     Number.isFinite(Number(mouth[0])) &&
-    Number.isFinite(Number(mouth[1])) &&
-    Array.isArray(bbox) &&
-    bbox.length === 4 &&
-    bbox.every((n) => Number.isFinite(Number(n)));
+    Number.isFinite(Number(mouth[1]));
+  const useMouthAnchor = bboxValid;
 
   let crop0Size: number;
   let crop0X: number;
   let crop0Y: number;
-  let anchor: "mouth" | "face_center" = "face_center";
+  let anchor: "mouth" | "face_center" | "mouth_from_bbox" = "face_center";
   let faceShareInCrop = 0;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
 
   if (useMouthAnchor) {
+    const bx1 = Math.round(Number((bbox as number[])[0]));
+    const by1 = Math.round(Number((bbox as number[])[1]));
+    const bx2 = Math.round(Number((bbox as number[])[2]));
+    const by2 = Math.round(Number((bbox as number[])[3]));
+    // Lower-third anchor: horizontal center, ~72% down the face box.
+    const derivedMouth: [number, number] = [
+      Math.round((bx1 + bx2) / 2),
+      Math.round(by1 + (by2 - by1) * 0.72),
+    ];
+    const mouthPoint: [number, number] = mouthValid
+      ? [Math.round(Number((mouth as number[])[0])), Math.round(Number((mouth as number[])[1]))]
+      : derivedMouth;
     const r = computeMouthCenteredCrop({
       face: {
-        bbox: [
-          Math.round(Number((bbox as number[])[0])),
-          Math.round(Number((bbox as number[])[1])),
-          Math.round(Number((bbox as number[])[2])),
-          Math.round(Number((bbox as number[])[3])),
-        ],
+        bbox: [bx1, by1, bx2, by2],
         center: [Math.round(Number(coords[0])), Math.round(Number(coords[1]))],
-        mouth: [Math.round(Number((mouth as number[])[0])), Math.round(Number((mouth as number[])[1]))],
+        mouth: mouthPoint,
       },
       plateWidth: sW,
       plateHeight: sH,
@@ -194,19 +212,23 @@ export async function renderPassFacePreclip(
     crop0X = r.crop.x;
     crop0Y = r.crop.y;
     crop0Size = r.crop.size;
-    anchor = r.anchor;
+    anchor = mouthValid ? r.anchor : "mouth_from_bbox";
     faceShareInCrop = r.faceShareInCrop;
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_mouth_anchor_preclip anchor=${anchor} mouth_source=${mouthValid ? "detector" : "bbox_lower_third"} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
   } else {
     const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
     crop0X = cf.x;
     crop0Y = cf.y;
     crop0Size = cf.size;
+    console.warn(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_no_bbox_legacy_crop crop=${crop0X},${crop0Y},${crop0Size} — no usable face bbox, falling back to coords crop`,
+    );
   }
+
   const crop0 = { x: crop0X, y: crop0Y, size: crop0Size };
 
   // v116 (Fix B) — expand the crop on repair retries. We multiply `size`
