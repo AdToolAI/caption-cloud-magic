@@ -76,13 +76,20 @@ export function syncCastFromPrompt(
   const lower = prompt.toLowerCase();
   const haveIds = presentCanonicalIds(current, characters, opts);
   const dismissed = new Set((dismissedIds ?? []).map((id) => String(id)));
+  const resolvePool = opts?.resolutionPool?.length ? opts.resolutionPool : characters;
 
   const additions: CharacterShot[] = [];
   for (const c of characters) {
-    if (haveIds.has(c.id)) continue;
-    if (dismissed.has(c.id)) continue;
+    // v320 — Cast & World is the single character source: a briefing entry
+    // carries the readable slug in `id` and the real avatar UUID in
+    // `brandCharacterId`. Compare AND write the UUID, otherwise the same
+    // person is appended a second time next to the existing UUID slot.
+    const candidateId =
+      resolveCanonicalCharacterId(c.id, resolvePool, opts) ?? c.brandCharacterId ?? c.id;
+    if (haveIds.has(c.id) || haveIds.has(candidateId)) continue;
+    if (dismissed.has(c.id) || dismissed.has(candidateId)) continue;
     if (!matchesPrompt(lower, c)) continue;
-    additions.push({ characterId: c.id, shotType: 'full' });
+    additions.push({ characterId: candidateId, shotType: 'full' });
     if (current.length + additions.length >= MAX_CAST) break;
   }
 
