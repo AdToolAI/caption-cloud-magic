@@ -107,6 +107,13 @@ const isUuid = (val?: string) =>
 const inFlightPersists = new Map<string, Promise<PersistResult>>();
 
 export function useComposerPersistence() {
+  // v319 — full identity pool for cast dedupe: briefing cast alone is not
+  // enough (a character picked straight from the library never reaches
+  // `briefing.characters`, so its slug/outfit slot stayed unresolvable and
+  // survived as a duplicate).
+  const { data: libraryCharacters = [] } = useAccessibleCharacters();
+  const { outfitLookMap } = useOutfitLookMap();
+
   const ensureProjectPersisted = useCallback(
     async (project: PersistableProject): Promise<PersistResult> => {
       const cacheKey = project.id || '__new__';
