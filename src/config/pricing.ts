@@ -172,7 +172,7 @@ export type PlanType = PlanId;
 // plan (legacy Basic/Pro/Enterprise) is normalized to Beta-Basic so past
 // subscribers keep full access.
 const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
-  'prod_UyE4edZ94ktyOt', // Beta-Basic 19,99 € (canonical)
+  'prod_UyE4edZ94ktyOt', // Beta-Basic 14,99 € (canonical)
   'prod_TIRSoTyzmRpbpT', // legacy Beta-Basic 14,99 €
   'prod_TDoWFAZjKKUnA2', // legacy Basic
   'prod_TDoYdYP1nOOWsN', // legacy Pro

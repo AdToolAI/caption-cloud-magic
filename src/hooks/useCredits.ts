@@ -2,7 +2,7 @@
  * useCredits — No-Op (Beta 2026).
  *
  * Das alte generische Credit-System wurde mit Launch des Beta-Basic-Abos
- * (19,99 €) abgeschafft. Alle App-Features (Chat, Edge Functions, Automation,
+ * (14,99 €) abgeschafft. Alle App-Features (Chat, Edge Functions, Automation,
  * Publishing …) sind im Abo enthalten. Nur AI-Video / Music / Bild-
  * Generierung wird über `ai_video_wallets` separat abgerechnet
  * (siehe `useAIVideoWallet`).

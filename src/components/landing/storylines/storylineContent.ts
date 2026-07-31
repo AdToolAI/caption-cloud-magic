@@ -329,9 +329,9 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Kosten-Transparenz", "Cost transparency", "Transparencia de costes"],
         ["Preis vor dem Render, nicht danach.", "Cost shown before render, not after.", "Coste antes del render, no después."],
         [
-          "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 19,99 € eingerechnet.",
-          "Every render shows how many media credits it costs — up front. No surprise burn, no hidden markup — beta price 19.99 € included.",
-          "Cada render muestra su coste en créditos — antes de lanzarlo. Sin sorpresas, sin recargos ocultos — precio beta 19,99 € incluido.",
+          "Jeder Render zeigt vorher, wieviel Media-Credits er kostet. Kein Überraschungsverbrauch, keine versteckten Aufschläge — Beta-Preis 14,99 € eingerechnet.",
+          "Every render shows how many media credits it costs — up front. No surprise burn, no hidden markup — beta price 14.99 € included.",
+          "Cada render muestra su coste en créditos — antes de lanzarlo. Sin sorpresas, sin recargos ocultos — precio beta 14,99 € incluido.",
         ],
       ),
     },

@@ -20,12 +20,12 @@ const benefits = [
   {
     icon: ShieldCheck,
     title: "15,99 € Preisgarantie für 24 Monate",
-    text: "Als Founder zahlst du statt 19,99 € nur 15,99 € — dieser Preis bleibt für zwei volle Jahre eingefroren, unabhängig von späteren Preisanpassungen.",
+    text: "Als Founder zahlst du statt 14,99 € nur 15,99 € — dieser Preis bleibt für zwei volle Jahre eingefroren, unabhängig von späteren Preisanpassungen.",
   },
   {
     icon: Percent,
     title: "20 % Founders-Rabatt automatisch",
-    text: "Der 20 % Rabatt wird 24 Monate lang automatisch auf jede Rechnung angewendet — Beta-Basis-Preis 19,99 € → dein Preis 15,99 €. Kein Code nötig.",
+    text: "Der 20 % Rabatt wird 24 Monate lang automatisch auf jede Rechnung angewendet — Beta-Basis-Preis 14,99 € → dein Preis 15,99 €. Kein Code nötig.",
   },
   {
     icon: Sparkles,
