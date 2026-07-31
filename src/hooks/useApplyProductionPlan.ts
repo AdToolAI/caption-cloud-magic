@@ -320,16 +320,21 @@ function planSceneToComposerScene(
       id: stripPrefix(String(c.characterId)),
       name: (c.characterName ?? '').trim(),
     }));
-  for (const shot of rawShots) {
-    const key =
-      resolveCanonicalCharacterId(shot.characterId, planCastPool) ??
-      String(shot.characterId).toLowerCase().trim();
+  for (const rawShot of rawShots) {
+    const canon = resolveCanonicalCharacterId(rawShot.characterId, planCastPool);
+    const key = canon ?? String(rawShot.characterId).toLowerCase().trim();
     if (!key) continue;
+    // v319 — persist the canonical id, not the drifted slug: otherwise the
+    // slot re-enters the cast later as a "new" person.
+    const shot: CharacterShot = canon && canon !== rawShot.characterId
+      ? { ...rawShot, characterId: canon }
+      : rawShot;
     const existing = dedupMap.get(key);
     if (!existing) {
       dedupMap.set(key, shot);
       continue;
     }
+
     // Keep the more specific shotType, but preserve the existing outfit
     // selection if the new one doesn't have one.
     const existingRank = shotSpecificity[existing.shotType ?? 'full'] ?? 1;
