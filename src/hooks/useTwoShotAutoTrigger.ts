@@ -18,6 +18,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { probePlateMotion } from '@/lib/composer/lipsync/samplePlateFrames';
 import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
@@ -536,7 +537,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 });
                 console.info(
                   `[useTwoShotAutoTrigger] v327 motion probe scene=${d.id} ok=${probe.ok} ${
-                    probe.ok ? `slots=${probe.slots ?? '?'}` : `reason=${probe.reason}`
+                    probe.ok ? `samples=${probe.samples ?? 0}` : `reason=${probe.reason}`
                   }`,
                 );
               }
