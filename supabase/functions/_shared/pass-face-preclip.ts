@@ -173,6 +173,22 @@ export async function renderPassFacePreclip(
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
 
+  // ── v329 — Geometrie-Plausibilität VOR dem Crop ────────────────────────
+  // Der frühere feste `minSize: 128` hat untaugliche Detektor-Boxen nicht
+  // abgefangen, sondern zementiert: eine 47×63-Box auf 1284×718 ergab einen
+  // 128-px-Crop mit 18 % Face-Share, in dem der Kopf am Rand abgeschnitten
+  // war. Sync.so gibt so ein Video unverändert zurück. Statt zu klemmen
+  // bewerten wir die Box und ziehen bei unplausibler Geometrie ein
+  // PLATE-PROPORTIONALES Fenster um den Mund-Landmark auf.
+  const geometry = assessCropGeometry({ bbox: bbox ?? null, plateWidth: sW, plateHeight: sH });
+  if (geometry.suspicious) {
+    console.warn(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v329_geometry_suspicious reason=${geometry.reason} ` +
+      `box_w_pct=${(geometry.boxWidthPct * 100).toFixed(2)}% box_h_pct=${(geometry.boxHeightPct * 100).toFixed(2)}% ` +
+      `min_crop=${geometry.minCropSize} plate=${sW}x${sH} — widening crop to plate-proportional window`,
+    );
+  }
+
   if (useMouthAnchor) {
     const r = computeMouthCenteredCrop({
       face: {
@@ -188,7 +204,10 @@ export async function renderPassFacePreclip(
       plateWidth: sW,
       plateHeight: sH,
       targetFaceShare: 0.42,
-      minSize: 128,
+      // v329 — kein harter 128-px-Floor mehr. Bei plausibler Box eine
+      // konservative Untergrenze, bei unplausibler Box das proportionale
+      // Rettungsfenster (≈ 26 % Plate-Höhe, min. 288 px).
+      minSize: geometry.minCropSize,
       outputSize: 720,
     });
     crop0X = r.crop.x;
@@ -199,13 +218,23 @@ export async function renderPassFacePreclip(
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size} v329_geometry=${geometry.reason} min_crop=${geometry.minCropSize}`,
     );
   } else {
     const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
     crop0X = cf.x;
     crop0Y = cf.y;
     crop0Size = cf.size;
+    // v329 — auch der Legacy-Pfad darf nicht unter das proportionale
+    // Mindestfenster fallen, wenn die Geometrie unplausibel ist.
+    if (geometry.suspicious && crop0Size < geometry.minCropSize) {
+      const target = Math.min(Math.min(sW, sH), geometry.minCropSize);
+      const cx = crop0X + crop0Size / 2;
+      const cy = crop0Y + crop0Size / 2;
+      crop0Size = target % 2 === 0 ? target : target - 1;
+      crop0X = Math.max(0, Math.min(sW - crop0Size, Math.round(cx - crop0Size / 2)));
+      crop0Y = Math.max(0, Math.min(sH - crop0Size, Math.round(cy - crop0Size / 2)));
+    }
   }
   const crop0 = { x: crop0X, y: crop0Y, size: crop0Size };
 
