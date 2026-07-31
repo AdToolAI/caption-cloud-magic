@@ -11323,8 +11323,8 @@ export const translations: Record<Language, any> = {
       title: "Preguntas frecuentes",
       questions: {
         q1: {
-          question: "¿Qué es CaptionGenie?",
-          answer: "CaptionGenie es una herramienta impulsada por IA que te ayuda a crear pies de foto atractivos y optimizados para tus publicaciones en redes sociales. Ahorra tiempo mientras maximiza el potencial de tu contenido."
+          question: "¿Qué es AdTool AI?",
+          answer: "AdTool AI reúne todos los modelos de IA líderes en un único flujo de producción: de la idea al guion, la escena, el sonido y el video terminado — sin equipo de rodaje."
         },
         q2: {
           question: "¿Cómo funciona la IA?",
