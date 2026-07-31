@@ -142,6 +142,7 @@ export function dedupeCharacterShots<T extends CastSlotLike>(
   shots: T[] | null | undefined,
   pool: readonly CastPoolEntry[] | undefined,
   dropUnresolvable = true,
+  outfitLookMap?: OutfitLookMap,
 ): T[] {
   const input = Array.isArray(shots) ? shots : [];
   if (input.length === 0) return [];
@@ -151,10 +152,11 @@ export function dedupeCharacterShots<T extends CastSlotLike>(
 
   for (const slot of input) {
     if (!slot) continue;
-    const canon = resolveCanonicalCharacterId(slot.characterId, pool);
+    const split = splitCastSlotId(slot.characterId, outfitLookMap);
+    const canon = resolveCanonicalCharacterId(slot.characterId, pool, outfitLookMap);
     if (!canon) {
       if (dropUnresolvable) continue;
-      const fallbackKey = String(slot.characterId ?? '').toLowerCase().trim();
+      const fallbackKey = (split.base || String(slot.characterId ?? '')).toLowerCase().trim();
       if (!fallbackKey) continue;
       if (!byKey.has(fallbackKey)) {
         byKey.set(fallbackKey, slot);
@@ -163,8 +165,13 @@ export function dedupeCharacterShots<T extends CastSlotLike>(
       continue;
     }
     const normalized = (canon !== slot.characterId
-      ? { ...slot, characterId: canon }
+      ? {
+          ...slot,
+          characterId: canon,
+          outfitLookId: slot.outfitLookId ?? split.outfitLookId ?? null,
+        }
       : slot) as T;
+
     const existing = byKey.get(canon);
     if (!existing) {
       byKey.set(canon, normalized);
