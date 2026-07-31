@@ -5479,41 +5479,41 @@ export const translations: Record<Language, any> = {
     onboarding: {
       welcome: {
         title: "Willkommen bei AdTool AI!",
-        description: "Dein Dashboard zeigt alle Aktivitäten und Insights auf einen Blick"
+        description: "Ein Creator. Ein ganzes Studio. Dein Dashboard zeigt alle Produktionen auf einen Blick"
       },
       features: {
-        title: "Funktionen entdecken",
-        description: "Durchstöbere unsere KI-Tools, organisiert nach Kategorien"
+        title: "Deine Studio-Bereiche",
+        description: "Idee, Skript, Szene, Ton, Export — jeder Schritt des Workflows an einem Ort"
       },
       generator: {
-        title: "Erstelle deine erste Caption",
-        description: "Starte mit unserem KI-Caption-Generator – dein meistgenutztes Tool"
+        title: "Erstelle dein erstes Video",
+        description: "Von der Idee zum fertigen Video — ohne Filmteam"
       },
       performance: {
-        title: "Verfolge deinen Erfolg",
-        description: "Überwache deine Post-Performance und erhalte KI-Insights"
+        title: "Veröffentlichen und auswerten",
+        description: "Bring dein fertiges Video auf alle Kanäle und sieh, wie es läuft"
       },
       back: "Zurück",
       next: "Weiter",
       finish: "Loslegen",
       modal: {
         title: "Willkommen bei AdTool AI!",
-        subtitle: "Deine KI-gestützte Social Media Management Plattform",
+        subtitle: "Ein Creator. Ein ganzes Studio.",
         feature1: {
-          title: "KI-Content-Erstellung",
-          description: "Generiere Captions, Hooks und Skripte sofort"
+          title: "Alle führenden KI-Modelle",
+          description: "Video-, Stimmen-, Musik- und Bildmodelle in einem durchgängigen Workflow"
         },
         feature2: {
-          title: "Performance-Analysen",
-          description: "Verfolge und optimiere deinen Social-Media-Erfolg"
+          title: "Von der Idee zum Final Cut",
+          description: "Skript, Cast, Szenen, Lip-Sync und Ton — nichts verlässt die Plattform"
         },
         feature3: {
-          title: "Smart Scheduling",
-          description: "Plane und organisiere deinen Content-Kalender"
+          title: "Dein eigener Cast",
+          description: "Wiederkehrende Charaktere und Stimmen, die über alle Videos konsistent bleiben"
         },
         feature4: {
-          title: "Markenkonsistenz",
-          description: "Bewahre deine einzigartige Stimme auf allen Plattformen"
+          title: "Überall veröffentlichen",
+          description: "Das fertige Video geht direkt auf deine Kanäle — der letzte Schritt, nicht das Produkt"
         },
         skip: "Tour überspringen",
         startTour: "Schnelle Tour starten"
