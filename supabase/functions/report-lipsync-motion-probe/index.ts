@@ -190,7 +190,15 @@ Deno.serve(async (req) => {
         job_id: body.job_id,
         turn_idx: Number(pass.idx ?? body.pass_idx),
         sync_status: "MOTION_PROBE_PASSED",
-        meta: { pass_idx: body.pass_idx, yavg: body.yavg, threshold: YAVG_NOOP_THRESHOLD },
+        meta: {
+          pass_idx: body.pass_idx,
+          yavg: body.yavg,
+          control_yavg: body.control_yavg ?? null,
+          differential_yavg: body.differential_yavg ?? null,
+          motion_ratio: body.motion_ratio ?? null,
+          threshold: YAVG_NOOP_THRESHOLD,
+          ratio_threshold: 1.12,
+        },
       });
 
       // Re-read after the atomic slot promotion. Only the final passing probe

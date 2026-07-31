@@ -243,9 +243,9 @@ export async function renderPassFacePreclip(
     anchorSource = "landmark";
   }
 
-  const useMouthAnchor = !!effectiveMouth && bboxUsable;
+  const useMouthAnchor = effectiveMouth !== null && bboxUsable;
 
-  if (useMouthAnchor) {
+  if (effectiveMouth && bboxUsable) {
 
     const r = computeMouthCenteredCrop({
       face: {
