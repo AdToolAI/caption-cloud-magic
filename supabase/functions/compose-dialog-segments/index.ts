@@ -2059,6 +2059,29 @@ serve(async (req) => {
       }
     }
     if (plateIdentityMap && plateIdentityMap.faces.length > 0) {
+      // ── v329 — Identity/Geometry-Split: Slot-Lock zuerst anwenden ───────
+      // Der persistierte Lock (v277-Rekognition oder v326-Row-Major) ist die
+      // einzige Identitätsquelle, die eine Geometrie-Eviction überlebt. Er
+      // wird hier über den SLOT-INDEX auf die frisch detektierten Faces
+      // gebrückt — VOR allen cid-basierten Pfaden, weil diese sonst auf
+      // `face.characterId` treffen, das nach der v325-Eviction garantiert
+      // leer ist (DB-belegt: Szene 23b381ac, resolvedCount 0 trotz Lock →
+      // v183-unlabeled-fallback → falsche/verkleinerte Crops → kein Lip-Sync).
+      if (_identityLock) {
+        const bridged = applyIdentityLockBySlot(plateIdentityMap as any, _identityLock, {
+          overwrite: false,
+          confidence: 0.88,
+        });
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} ${PLATE_IDENTITY_SPLIT_VERSION}_identity_slot_lock ` +
+          `lock_source=${_identityLock.source} lock_slots=${_identityLock.size} ` +
+          `applied=${bridged.applied} bridged_slots=[${bridged.bridgedSlots.join(",")}] ` +
+          `resolved_after=${bridged.resolvedCount}/${plateIdentityMap.faces.length} ` +
+          `geometry_evicted=${!_plateGeometryTrusted}`,
+        );
+      }
+
+
       // v166 — Anchor-Identity Slot Bridge.
       // If the plate-identity step could not label faces (Gemini probe failed
       // or resolvedCount=0), but the anchor faceMap KNOWS the characterId of
