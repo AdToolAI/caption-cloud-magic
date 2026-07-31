@@ -587,14 +587,14 @@ export default function SceneCard({
   // changes, so no render loop. Must run BEFORE the cast-marker backfill below
   // so the marker picks up the auto-added slots in the same pass.
   useEffect(() => {
-    if (!characters || characters.length === 0) return;
+    if (castResolutionPool.length === 0) return;
     const current =
       scene.characterShots ??
       (scene.characterShot ? [scene.characterShot] : []);
     const next = syncCastFromPrompt(
       scene.aiPrompt || "",
       current,
-      characters,
+      castResolutionPool,
       scene.dismissedCharacterIds,
       { resolutionPool: castResolutionPool, outfitLookMap },
     );
@@ -606,7 +606,7 @@ export default function SceneCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scene.aiPrompt,
-    characters?.length,
+    castResolutionPool,
     scene.dismissedCharacterIds?.length,
     castResolutionPool,
     outfitLookMap,
@@ -2689,13 +2689,7 @@ export default function SceneCard({
                   <SceneDirectorBox
                     scene={scene}
                     lang={lang as "en" | "de" | "es"}
-                    characters={characters}
-                    libraryCharacters={libCharacters.map((c) => ({
-                      id: c.id,
-                      name: c.name,
-                      description: c.description ?? null,
-                      reference_image_url: c.reference_image_url ?? undefined,
-                    }))}
+                    characters={castResolutionPool}
                     locations={brandLocations.map((l) => ({
                       id: l.id,
                       name: l.name,
@@ -2714,7 +2708,6 @@ export default function SceneCard({
                       description: p.description ?? null,
                       reference_image_url: p.reference_image_url,
                     }))}
-                    onAddCharacter={onAddCharacter}
                     realismPreset={scene.realismPreset}
                     onApply={({ aiPrompt, dialogScript, characterShots, actionBeat, sceneActionUser, sceneActionEn, characterActions }) => {
                       const updates: Partial<ComposerScene> = { aiPrompt };
