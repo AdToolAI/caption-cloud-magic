@@ -176,7 +176,15 @@ export function CharacterCastPicker({
   // slug or Cast & World UUID), so she is never offered a second time.
   const isTaken = (c: ComposerCharacter) =>
     inCast.has(c.id) || !!(c.brandCharacterId && inCast.has(c.brandCharacterId));
-  const briefingAvailable = (characters ?? []).filter((c) => !isTaken(c));
+  // v320 — Cast & World is the single character source: briefing entries are
+  // only offered when they are linked to a real avatar (or are an avatar UUID
+  // themselves). Unlinked briefing-only people are never castable anymore.
+  const briefingAvailable = (characters ?? []).filter(
+    (c) =>
+      !isTaken(c) &&
+      (!!c.brandCharacterId ||
+        (libraryCharacters ?? []).some((l) => l.id === c.id)),
+  );
   const libraryAvailable = (libraryCharacters ?? []).filter(
     (c) =>
       !isTaken(c) &&
