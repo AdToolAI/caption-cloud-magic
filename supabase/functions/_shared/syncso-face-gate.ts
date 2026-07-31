@@ -102,9 +102,35 @@ export interface FaceGateInput {
    *  self-healing. */
   plateWidth?: number;
   plateHeight?: number;
+  /** v329 — true when the pre-clip geometry came from the proportional rescue
+   *  window instead of a trustworthy detector box. In that state a
+   *  `probe_unavailable` must NOT wave the dispatch through: unverifiable
+   *  geometry + unverifiable probe is a guaranteed silent no-op, so we fail
+   *  hard and let the caller refund. */
+  geometrySuspect?: boolean;
 }
 
+/**
+ * v329 — public entry point. Applies the geometry-suspect hard-fail policy on
+ * top of the raw gate result: a non-blocking `probe_unavailable` stays
+ * non-blocking only while the underlying crop geometry is trustworthy.
+ */
 export async function verifyFaceBeforeDispatch(
+  input: FaceGateInput,
+): Promise<FaceGateResult> {
+  const result = await runFaceGate(input);
+  if (input.geometrySuspect && result.ok && result.code === "probe_unavailable") {
+    return {
+      ...result,
+      ok: false,
+      code: "no_face",
+      reason: `v329_geometry_suspect_and_probe_unavailable: ${result.reason ?? "probe unavailable"} — Crop-Geometrie stammt aus dem Rettungsfenster, blinder Dispatch abgelehnt.`,
+    };
+  }
+  return result;
+}
+
+async function runFaceGate(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
   if (!hasAwsCreds()) return { ok: true, code: "skipped", reason: "no_aws_credentials" };
