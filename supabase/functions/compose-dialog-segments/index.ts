@@ -5557,7 +5557,11 @@ serve(async (req) => {
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           if (speakers.length >= 2) {
-            const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+            const reason = preclipResult.error === "preclip_face_share_too_low"
+              // v329 — eigene, ehrliche Meldung: das ist kein Timeout, sondern
+              // eine unsichere Gesichts-Geometrie auf dem Plate.
+              ? `preclip_face_share_too_low: Gesichts-Geometrie für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" ist unsicher — das Gesicht ist im erkannten Ausschnitt zu klein (${((Number(preclipResult.faceShareInCrop) || 0) * 100).toFixed(1)} %). Szene neu berechnen, damit das Lip-Sync greifen kann.`
+              : `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
             console.error(
               `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
             );
