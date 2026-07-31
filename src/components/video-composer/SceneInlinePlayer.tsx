@@ -59,8 +59,10 @@ export default function SceneInlinePlayer({
       : language === 'es' ? 'Aún no renderizado'
         : 'Noch nicht gerendert';
   const { reset: resetLipSync, resettingId } = useResetLipSync();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
   const [faceMapOpen, setFaceMapOpen] = useState(false);
+
 
 
   const clipUrl = scene.clipUrl;
