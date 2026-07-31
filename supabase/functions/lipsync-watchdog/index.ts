@@ -278,7 +278,7 @@ serve(async (req) => {
       : [];
     if (motionProbePasses.length > 0) {
       const oldestPendingAt = Math.min(...motionProbePasses.map((p: any) => {
-        const candidate = p?.motion_probe_requested_at ?? p?.finished_at ?? ds?.updated_at ?? d.updated_at;
+        const candidate = ds?.motion_probe_recovered_at ?? p?.motion_probe_requested_at ?? p?.finished_at ?? ds?.updated_at ?? d.updated_at;
         const parsed = typeof candidate === "string" ? Date.parse(candidate) : NaN;
         return Number.isFinite(parsed) ? parsed : now;
       }));
