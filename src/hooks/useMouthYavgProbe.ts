@@ -62,20 +62,22 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
       const mouthCy = 0.6;
 
       (async () => {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 45_000);
         try {
           const result = await computeMouthYavg({
             videoUrl: pass.output_url as string,
             mouthCx,
             mouthCy,
             samples: 12,
+            signal: controller.signal,
           });
-          probedThisSession.add(key);
 
           const { data: sessionData } = await supabase.auth.getSession();
           const token = sessionData.session?.access_token;
-          if (!token) return;
+          if (!token) throw new Error('motion probe requires an active session');
 
-          await supabase.functions.invoke('report-lipsync-motion-probe', {
+          const { error } = await supabase.functions.invoke('report-lipsync-motion-probe', {
             body: {
               scene_id: scene.id,
               job_id: pass.job_id ?? null,
@@ -86,12 +88,15 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
               method: result.method,
             },
           });
+          if (error) throw new Error(error.message ?? 'motion probe report failed');
+          probedThisSession.add(key);
         } catch (err) {
           // Best-effort probe. Do not surface to user.
           console.warn(
             `[useMouthYavgProbe] scene=${scene.id} pass=${pass.idx} failed: ${(err as Error).message}`,
           );
         } finally {
+          window.clearTimeout(timeout);
           inflightRef.current.delete(key);
         }
       })();
