@@ -5505,6 +5505,11 @@ serve(async (req) => {
             // Ausschnitt; passt sie nicht nachbarsicher hinein, schlägt der
             // Preclip mit `motion_uncoverable` ehrlich fehl.
             trackPoints: v327SlotTrack?.points ?? null,
+            // v334 — der Motion-Cover muss denselben Floor kennen wie der
+            // Gate unten, sonst weitet er den Crop in einen garantierten
+            // „face_share_too_low"-Abbruch hinein.
+            faceShareFloor: speakers.length >= 2 ? 0.24 : 0.12,
+
           },
           300_000,
         );
