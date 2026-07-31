@@ -653,6 +653,14 @@ interface SegmentsState {
      * assignment across every rerender.
      */
     assignmentLock?: Record<string, string>;
+    assignmentLockSource?: string | null;
+    /**
+     * v329 — Identity/Geometry-Split. Plate-UNABHÄNGIGE Identität: Slot-Index
+     * → Character-ID. Überlebt jede Geometrie-Eviction (v325) und wird über
+     * den Slot-Index an frisch detektierte Faces gebunden. `faces[].characterId`
+     * ist ab v329 ein abgeleiteter Wert, nie mehr die Quelle.
+     */
+    identity?: { bySlot: Record<string, string>; source?: string | null } | null;
   };
 }
 
