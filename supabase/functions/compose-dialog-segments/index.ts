@@ -5916,6 +5916,20 @@ serve(async (req) => {
 
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;
+      // v327 — moving speaker: per-frame boxes interpolated from the measured
+      // trajectory instead of one constant box. Plate space only (the tracked
+      // path never runs inside a preclip), voiced-window nulling preserved.
+      const v327PerFrameBoxes =
+        v327Tracked && v327SlotTrack && !v161UsingPreclipForBbox && plateDims
+          ? buildTrackedPerFrameBoxes({
+              points: v327SlotTrack.points,
+              frameCount,
+              fps: dispatchFps ?? ASSUMED_FPS,
+              voicedWindowsSec: v124VoicedWindows,
+              clampWidth: plateDims.width,
+              clampHeight: plateDims.height,
+            })
+          : null;
       if (retryVariant === "bbox-url-pro" && dispatchBox) {
         const up = await uploadBoundingBoxesJson(supabase, {
           userId,
@@ -5926,10 +5940,18 @@ serve(async (req) => {
           frameCount,
           voicedWindowsSec: v124VoicedWindows,
           fps: dispatchFps,
+          perFrameBoxes: v327PerFrameBoxes ?? undefined,
         });
         usedUrl = up.url;
         nonNullFrames = up.nonNullFrames;
+        if (v327PerFrameBoxes) {
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v327_motion_track TRACKED_BBOX_URL ` +
+              `frames=${frameCount} voiced_frames=${nonNullFrames} points=${v327SlotTrack!.points.length} url=${usedUrl ? "ok" : "null"}`,
+          );
+        }
       }
+
 
 
       // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
