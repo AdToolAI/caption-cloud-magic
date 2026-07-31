@@ -125,7 +125,7 @@ export const BlackTieHero = () => {
                 onClick={() => setFoundersOpen(true)}
                 className="text-xs text-primary/70 hover:text-primary transition-colors underline underline-offset-4"
               >
-                → Klicken für Founders-Vorteile & Preisgarantie
+                → Klicken für Founders-Vorteile
               </button>
             </motion.div>
           </motion.div>

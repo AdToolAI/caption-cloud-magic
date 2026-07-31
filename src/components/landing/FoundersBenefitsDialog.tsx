@@ -95,7 +95,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
 
         <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="h-3.5 w-3.5" />
-          <span>Beta-Phase: 26.07.2026 – 26.10.2026 · Preisgarantie & Rabatt: 24 Monate ab Signup</span>
+          <span>Beta-Phase: 26.07.2026 – 26.10.2026 · Founders-Rabatt auf KI-Credits: 24 Monate ab Signup</span>
         </div>
 
         <DialogFooter className="mt-4 gap-2 sm:gap-2">
