@@ -1007,6 +1007,10 @@ export function useStoryboardTransition({
     // GUARD 3 — empty briefing: nothing to analyse.
     const text = buildBriefingText(briefing);
     const analysisRequestedDurationSec = normalizeUserSliderDuration(briefing?.duration);
+    // v328 — Zeitstempel des Analyse-Starts (mit 60s Toleranz) für den
+    // Server-Plan-Rescue: nur Pläne aus DIESEM Lauf dürfen wiederhergestellt werden.
+    const analysisStartedAtIso = new Date(Date.now() - 60_000).toISOString();
+
     if (text.length < 40) {
       return { handled: false };
     }
