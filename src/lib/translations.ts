@@ -2904,8 +2904,8 @@ export const translations: Record<Language, any> = {
     
     // Hero section
     hero: {
-      title: "Your AI-powered Social Media Management Platform",
-      subtitle: "Create, optimize, and analyze your content — professionally, efficiently, scalably.",
+      title: "One creator. A whole studio.",
+      subtitle: "All leading AI models in one continuous workflow — from idea to finished video, without a film crew.",
       cta: "Start for free",
       demo: "View Demo",
       login: "Sign In",
