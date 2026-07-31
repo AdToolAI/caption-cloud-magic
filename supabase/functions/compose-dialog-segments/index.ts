@@ -4287,6 +4287,50 @@ serve(async (req) => {
       currentPassIdx = 0;
     }
 
+    // ── v343 — Slot-Integrity Guard ──────────────────────────────────────
+    // Verified failure (scene 69d56a49, 2026-07-31 23:09): a concurrent
+    // full-array read-modify-write left `passes[0]` as `{}` — no idx, no
+    // speaker_idx, no status. Every later redispatch then read
+    // `speaker_idx=undefined`, hit the v87 sanity block and returned a
+    // non-terminal 202 forever: the scene could neither finish nor fail and
+    // the UI hung on "Pass 4/4". Heal any structurally broken slot from the
+    // freshly built skeleton before anything downstream reads it.
+    if (Array.isArray(builtPasses) && builtPasses.length > 0) {
+      const healed: number[] = [];
+      for (let i = 0; i < passes.length; i++) {
+        const slot: any = passes[i];
+        const broken =
+          !slot ||
+          typeof slot !== "object" ||
+          !Number.isFinite(Number(slot.idx)) ||
+          !Number.isFinite(Number(slot.speaker_idx));
+        if (!broken) continue;
+        const skeleton: any = builtPasses[i];
+        if (!skeleton) continue;
+        // Skeleton first, then whatever survived on the wiped slot.
+        passes[i] = { ...skeleton, ...(slot && typeof slot === "object" ? slot : {}), idx: i, speaker_idx: skeleton.speaker_idx };
+        healed.push(i);
+      }
+      if (healed.length > 0) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v343_slot_integrity_healed idx=[${healed.join(",")}] ` +
+          `total=${passes.length} — wiped pass slot(s) rebuilt from turn skeleton`,
+        );
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId,
+            engine: "sync-segments",
+            sync_status: "SLOT_INTEGRITY_HEALED",
+            error_class: "pass_slot_wiped",
+            error_message: `healed=[${healed.join(",")}] total=${passes.length}`,
+            meta: { v343: true, healed, total_passes: passes.length },
+          });
+        } catch { /* best-effort */ }
+      }
+    }
+
+
     // ── v87 — Coords refresh on advance/retry ────────────────────────────
     // Bug (verified in edge logs, scene 4c310576…): pass 1 dispatched with
     // heuristic [x, plateH*0.5] because anchor faceMap wasn't cached yet.
@@ -4396,9 +4440,21 @@ serve(async (req) => {
     if (speakers.length >= 2) {
       const pSrc = coordSources[Number(passes[currentPassIdx]?.speaker_idx ?? -1)] ?? "none";
       if (pSrc === "heuristic" || pSrc === "none") {
+        // v343 — This guard used to return a non-terminal 202 unconditionally.
+        // A pass that can never resolve a coord source (e.g. a wiped slot with
+        // speaker_idx=undefined) therefore looped forever: no terminal status,
+        // no inflight row, nothing for the watchdog to reconcile, UI stuck on
+        // "Lip-Sync läuft…". Bound it like the fresh-path guard: 3 attempts,
+        // then terminal failure + refund.
+        const blockKey = `sanity_block_count_${currentPassIdx}`;
+        const prevBlockCount = Number((prevState as any)?.[blockKey] ?? 0);
+        const nextBlockCount = prevBlockCount + 1;
+        const giveUpSanity = nextBlockCount >= 3;
+
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} v87 SANITY-BLOCK pass=${currentPassIdx} ` +
-          `speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc} — skipping dispatch, awaiting retry`,
+          `speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc} ` +
+          `attempt=${nextBlockCount}/3 giveUp=${giveUpSanity}`,
         );
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
@@ -4406,19 +4462,80 @@ serve(async (req) => {
           engine: "sync-segments",
           sync_status: "HEURISTIC_BLOCKED",
           error_class: "coords_heuristic_unverified",
-          error_message: `pass=${currentPassIdx} speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc}`,
-          meta: { speakers: speakers.length, pass_idx: currentPassIdx, is_advance: isAdvance, is_retry: isRetry },
+          error_message: `pass=${currentPassIdx} speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc} attempt=${nextBlockCount}/3`,
+          meta: {
+            speakers: speakers.length,
+            pass_idx: currentPassIdx,
+            is_advance: isAdvance,
+            is_retry: isRetry,
+            v343_block_count: nextBlockCount,
+            v343_gave_up: giveUpSanity,
+          },
         });
+
+        if (!giveUpSanity) {
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: mergeDialogShots(prevState ?? {}, { [blockKey]: nextBlockCount }),
+            })
+            .eq("id", sceneId);
+          return json(
+            {
+              ok: true,
+              status: "awaiting_face_detection",
+              skipped: `pass_${currentPassIdx}_heuristic_coord_unverified`,
+              attempt: nextBlockCount,
+            },
+            202,
+          );
+        }
+
+        // Terminal: refund once, mark the scene failed so the UI stops waiting.
+        const alreadyRefundedSanity = !!(prevState as any)?.refunded;
+        if (!alreadyRefundedSanity) {
+          const { data: wSan } = await supabase
+            .from("wallets").select("balance").eq("user_id", userId).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(wSan?.balance ?? 0) + totalCost,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        }
+        const sanityReason =
+          `coords_unverified_pass_${currentPassIdx}: Für Sprecher ${currentPassIdx + 1} konnte keine ` +
+          `verifizierte Gesichtsposition ermittelt werden. Die Credits wurden erstattet — bitte die Plate neu rendern.`;
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: mergeDialogShots(prevState ?? {}, {
+              [blockKey]: 0,
+              status: "failed",
+              error: sanityReason,
+              refunded: !alreadyRefundedSanity,
+              finished_at: new Date().toISOString(),
+            }),
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: sanityReason,
+          })
+          .eq("id", sceneId);
+
         return json(
           {
-            ok: true,
-            status: "awaiting_face_detection",
-            skipped: `pass_${currentPassIdx}_heuristic_coord_unverified`,
+            ok: false,
+            status: "failed",
+            error: "coords_heuristic_unverified",
+            message: sanityReason,
+            refunded: !alreadyRefundedSanity,
           },
-          202,
+          422,
         );
       }
     }
+
 
 
     const pass = passes[currentPassIdx];

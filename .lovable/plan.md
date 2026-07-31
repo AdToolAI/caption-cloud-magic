@@ -1,38 +1,61 @@
-## Befund (aus den Logs von Szene 69d56a49…, 31.07. 22:48–22:50)
+## Was ich in der Datenbank gefunden habe (Szene 69d56a49, heute 23:08–23:18)
 
-Die Pipeline läuft technisch sauber durch — Sync.so bekommt für alle 4 Sprecher einen Job, alle 4 liefern ein Ergebnis. Das Problem liegt **vor** dem Provider, in der Zuschnitt-Geometrie:
+Das ist kein Geometrie-Problem mehr. Der Hänger hat eine ganz banale Ursache:
 
-| Pass | Sprecher | Gesichts-Box im Plate | Preclip-Crop | Gesichtsanteil |
-|---|---|---|---|---|
-| 2 | Matthew | 67 × 88 px | 394 × 394 | ~3,8 % |
-| 3 | Sarah | 102 × 125 px | 394 × 394 | ~8,2 % |
-| 4 | Kailee | 59 × 76 px | 394 × 394 | ~2,9 % |
+| Slot in `dialog_shots.passes` | Inhalt |
+|---|---|
+| **[0]** | **`{}` — komplett leer.** Kein `idx`, kein `speaker_idx`, kein `status`, keine `input_url` |
+| [1] | `done`, job `7d34de71…`, output vorhanden |
+| [2] | `done`, job `6baa9534…`, output vorhanden |
+| [3] | `done`, job `a4a420f9…`, output vorhanden |
 
-Alle Logzeilen zeigen `v247_anchor=face_center face_share=0 mouth_off_px=0` und `mouth_used=false`.
+`total_passes = 4`, `current_pass = 3`. Drei von vier Passes sind sauber fertig — Pass 0 wurde um **23:09:05 erfolgreich dispatcht** (`DISPATCHED`, face_share 0.307, Variante `bbox-url-pro`), und **danach wurde sein Slot überschrieben und geleert**.
 
-Bedeutung: Der Mund-zentrierte Zuschnitt (der einen Gesichtsanteil von ~42 % garantiert) wurde **nicht** verwendet, weil er zwingend einen echten Mund-Landmark verlangt. Der Detektor lieferte für diese Plate nur Gesichts-Boxen, keine Mund-Landmarks (`v280_bbox_derived_mouth_anchor … no detector mouth landmark`). Dadurch fiel der Preclip auf den alten Grob-Crop zurück: 394 px Kasten um ein 60–100 px großes Gesicht. Nach dem Hochskalieren auf 720×720 ist der Mund nur noch wenige Pixel groß — Sync.so animiert dort praktisch nichts sichtbares. Genau das sieht man im Video.
+Ab diesem Moment passiert Folgendes bei jedem Wiederanlauf (belegbar um 23:10:58 und 23:12:14 im `syncso_dispatch_log`):
 
-Zusatzbefund: Die Frame-Probe ist serverseitig deaktiviert (`no_cache_no_server_extract`), das Face-Gate lässt den Dispatch deshalb ungeprüft durch (`dispatch will proceed unchecked`). Der offensichtlich untaugliche 3-%-Crop wird also nirgends gestoppt.
+```
+HEURISTIC_BLOCKED  coords_heuristic_unverified
+pass=0 speaker_idx=undefined source=none
+```
 
-## Fix (klein, gezielt, kein neues Geometrie-Framework)
+Das ist der v87-Sanity-Block in `compose-dialog-segments/index.ts` (~Z. 4396). Er liest `passes[0].speaker_idx` → `undefined` → `coordSources[-1]` → `"none"` → **Abbruch mit HTTP 202 `awaiting_face_detection`**. 202 ist "alles ok, später nochmal" — also:
 
-**1. Mund-Landmark ist nicht mehr Pflicht für den engen Crop**
-In `supabase/functions/_shared/pass-face-preclip.ts`: Wenn eine valide Gesichts-Box vorliegt, aber kein Mund-Landmark, wird der Mund-Anker aus dem unteren Drittel der Box abgeleitet (exakt die Formel, die `compose-dialog-segments` bereits unter `v280_bbox_derived_mouth_anchor` benutzt) und `computeMouthCenteredCrop` damit gefüttert. Anker wird als `face_center_derived` protokolliert, damit die Herkunft sichtbar bleibt.
-Ergebnis: Crop ≈ 1,54 × Gesichtsseite statt fix 394 px → Gesichtsanteil ~42 % statt 3 %.
+- kein Terminal-Status auf dem Pass
+- keine Zeile in `syncso_inflight_jobs` (Tabelle für die Szene ist leer)
+- der Watchdog hat nichts zu rekonzilieren
+- die UI bleibt ewig auf „Lip-Sync läuft… Pass 4/4"
 
-**2. Harte Untergrenze für den Gesichtsanteil vor dem Dispatch**
-Liegt `face_share_in_preclip` unter 15 %, wird der Crop einmalig auf die Box nachgezogen (statt zu dispatchen). Bleibt er darunter, wird der Pass mit klarer Meldung abgebrochen und die Credits erstattet — statt einen garantiert wirkungslosen Job zu bezahlen. Kein neuer „Trust-Contract", nur diese eine Schwelle.
+Die Szene kann in diesem Zustand **nie** fertig werden und auch nie fehlschlagen. Genau das siehst du.
 
-**3. Telemetrie sichtbar machen**
-`face_share`, `anchor` und `crop_size/face_size`-Verhältnis wandern in `syncso_dispatch_log.meta`, damit ein Fehlschlag künftig in einer SQL-Zeile erkennbar ist, statt in 76 Logzeilen.
+## Fix — drei Schritte, keine neue Geometrie
+
+**1. Ursache des Slot-Wipes finden und schließen (zuerst)**
+Es gibt zwei Stellen, die den Slot komplett ersetzen (`passes[currentPassIdx] = pass`, Z. 5984 und 7133) plus die Webhook-Schreibpfade. Der in der v169-Doku beschriebene atomare Per-Slot-RPC **`update_dialog_shot_pass` existiert in dieser Datenbank nicht** (`pg_proc` liefert null Zeilen) — geschrieben wird stattdessen per Read-Modify-Write auf dem ganzen `passes`-Array. Bei parallelen Webhooks (23:12:04 kamen Pass 1 und 2 innerhalb von 84 ms zurück) überschreibt der langsamere Writer das Array mit seinem älteren Stand — Lost Update. Ich instrumentiere die drei Writer, reproduziere das an der vorhandenen Szene und mache den Schreibpfad dann konfliktfrei: entweder der RPC aus der v169-Spec (`update_dialog_shot_pass(scene_id, pass_idx, patch)` mit `jsonb_set` in einer einzigen Anweisung) oder ein `FOR UPDATE`-Read direkt vor dem Write.
+
+**2. Slot-Integritäts-Guard (schützt sofort, unabhängig von 1)**
+Vor jedem Schreiben eines Pass-Slots: hat das Objekt kein `idx`/`speaker_idx`, wird nicht geschrieben, sondern der Slot aus den `dialog_turns` neu aufgebaut. Beim Einlesen genauso: ein leerer Slot wird aus dem Turn rekonstruiert statt als „speaker_idx undefined" weiterzureichen. Damit läuft eine Szene wie diese von selbst weiter, statt zu blockieren.
+
+**3. Der v87-Block darf nicht mehr endlos 202 zurückgeben**
+Der Block bekommt denselben Zähler wie sein großer Bruder weiter oben (`face_detect_retry_count`, 3 Versuche): danach `lip_sync_status='failed'`, klare Meldung, idempotenter Credit-Refund. Ein Pass, der nicht dispatcht werden kann, endet damit **immer** terminal — die UI hängt nie wieder unbegrenzt, und der Watchdog sieht einen Zustand, den er beenden kann.
+
+## Abgleich mit deinem v169-Guide
+
+| v169-Invariante | Ist-Zustand |
+|---|---|
+| Parallel-Fanout, eigener Preclip pro Pass | ✅ erfüllt (3 Passes parallel um 23:09:06) |
+| Deterministisches ASD, nie `auto_detect` bei N≥2 | ✅ erfüllt (`bbox-url-pro`) |
+| Per-Pass-Lock | ✅ vorhanden |
+| **Per-Slot-RPC `update_dialog_shot_pass` statt Array-Rewrite** | ❌ **fehlt — genau das ist der Bug** |
+| Watchdog beendet hängende Passes | ⚠️ greift nicht, weil kein Inflight-Row und kein Status existiert |
+
+Dein Guide hat den Fehler also bereits benannt: „Per-slot RPC write — never full-row rewrite." Der Punkt ist beim Umbau verloren gegangen. Schritt 1 stellt ihn wieder her.
+
+## Was ich nicht anfasse
+
+Preclip-Geometrie, Face-Share-Schwellen, Retry-Ladder, Provider-Payload, Mux, Motion Studio UI. Die Werte von 23:09 (face_share 0.29–0.32, alle vier Dispatches angenommen) zeigen, dass dieser Teil funktioniert.
 
 ## Verifikation
 
-Nach dem Deploy eine 4-Sprecher-Szene rendern und prüfen:
-- `v163_preclip_render OK … face_share=` liegt bei ≥ 0,35 für alle Passes
-- `crop.size` liegt bei ~1,5 × der Gesichts-Box-Seite (also 90–200 px, nicht 394)
-- Sichtprüfung des fertigen Clips
-
-## Nicht Teil dieses Plans
-
-Kein Zurückrollen weiterer Teile, keine Wiedereinführung der v334–v341-Geometrie-Tracker, keine Änderung an Provider, Webhook, Watchdog oder Mux.
+- Die hängende Szene 69d56a49 wird repariert (Slot 0 rekonstruiert) und läuft durch — oder scheitert terminal mit Refund.
+- Neue 4-Sprecher-Szene: alle vier Slots behalten nach dem letzten Webhook `idx`/`speaker_idx`/`status`; keine `HEURISTIC_BLOCKED`-Zeile mit `speaker_idx=undefined` mehr im Log.
+- Kein Pass bleibt länger als der Watchdog-Timeout ohne Terminalzustand.
