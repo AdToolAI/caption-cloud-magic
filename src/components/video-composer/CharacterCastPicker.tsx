@@ -95,7 +95,7 @@ function findCharacter(
   pool: ComposerCharacter[],
 ): ComposerCharacter | undefined {
   if (!slotId || !pool.length) return undefined;
-  const exact = pool.find((c) => c.id === slotId);
+  const exact = pool.find((c) => c.id === slotId || c.brandCharacterId === slotId);
   if (exact) return exact;
   const lower = safeLower(slotId);
   if (!lower) return undefined;
