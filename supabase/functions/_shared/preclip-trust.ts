@@ -11,6 +11,13 @@ export interface PreclipTrustInput {
   faceShare: number | null | undefined;
   faceShareFloor: number;
   geometrySuspicious: boolean;
+  /**
+   * `box_too_small` describes the detector box in plate space, not necessarily
+   * the final rendered crop. It may be recovered when the final crop itself
+   * satisfies every constructive isolation invariant. Missing/unknown geometry
+   * remains fail-closed.
+   */
+  geometryReason?: string | null;
   ambiguityRisk?: string | null;
   crop?: { x: number; y: number; size: number } | null;
   siblingCenters?: Array<[number, number]> | null;
@@ -24,20 +31,42 @@ export interface PreclipTrustDecision {
 
 export function decidePreclipTrust(input: PreclipTrustInput): PreclipTrustDecision {
   const crop = input.crop;
+  const cropValid = Boolean(
+    crop &&
+      Number.isFinite(Number(crop.x)) && Number(crop.x) >= 0 &&
+      Number.isFinite(Number(crop.y)) && Number(crop.y) >= 0 &&
+      Number.isFinite(Number(crop.size)) && Number(crop.size) > 0
+  );
   const siblingInsideCrop = Boolean(crop && input.siblingCenters?.some(([x, y]) =>
     x >= crop.x && x <= crop.x + crop.size && y >= crop.y && y <= crop.y + crop.size
   ));
   const share = Number(input.faceShare);
 
   if (!input.renderSucceeded) return { trusted: false, reason: "render_not_successful", siblingInsideCrop };
+  if (!cropValid) return { trusted: false, reason: "invalid_crop", siblingInsideCrop };
   if (!Number.isFinite(share)) return { trusted: false, reason: "face_share_unavailable", siblingInsideCrop };
   if (share < input.faceShareFloor) return { trusted: false, reason: "face_share_below_floor", siblingInsideCrop };
-  if (input.geometrySuspicious) return { trusted: false, reason: "geometry_suspicious", siblingInsideCrop };
+  // A small detector box is recoverable after rendering when the final crop
+  // proves sufficient face share and isolation. `no_bbox` and any unknown
+  // suspicious state still lack the evidence required for blind dispatch.
+  if (input.geometrySuspicious && input.geometryReason !== "box_too_small") {
+    return {
+      trusted: false,
+      reason: input.geometryReason === "no_bbox" ? "geometry_no_bbox" : "geometry_suspicious",
+      siblingInsideCrop,
+    };
+  }
   if (input.ambiguityRisk && input.ambiguityRisk !== "clean") {
     return { trusted: false, reason: `ambiguity_${input.ambiguityRisk}`, siblingInsideCrop };
   }
   if (siblingInsideCrop) return { trusted: false, reason: "sibling_inside_crop", siblingInsideCrop };
-  return { trusted: true, reason: "constructed_single_face_preclip", siblingInsideCrop };
+  return {
+    trusted: true,
+    reason: input.geometryReason === "box_too_small"
+      ? "constructed_single_face_preclip_small_box_recovered"
+      : "constructed_single_face_preclip",
+    siblingInsideCrop,
+  };
 }
 
 export type ProbeUnavailablePolicyCode =
