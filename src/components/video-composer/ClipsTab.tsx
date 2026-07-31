@@ -351,11 +351,17 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           // ungewollt Sync.so-Kosten auslösen.
           if (
             isLipSyncIntentionalRow(dbScene as any) &&
+            // v317: Master-Clip muss fertig sein — nie Lip-Sync auf einem
+            // fehlgeschlagenen/laufenden Master starten.
+            dbScene.clip_status === 'ready' &&
+            typeof (dbScene as any).clip_url === 'string' &&
+            (dbScene as any).clip_url.length > 0 &&
             !(dbScene as any).lip_sync_applied_at &&
             (dbScene as any).lip_sync_status !== 'running' &&
             (dbScene as any).lip_sync_status !== 'no_voiceover' &&
             speakerCount <= 1
           ) {
+
             lipSyncTargets.push(scene.id);
           }
         }
