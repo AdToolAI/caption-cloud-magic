@@ -74,6 +74,16 @@ export interface PassPreclipInput {
    *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
    *  computeFaceCrop path when unset. */
   mouth?: [number, number] | null;
+  /**
+   * v331 (27.07./v169 restore) — measured face trajectory of THIS speaker on
+   * the master plate, in plate pixel space. v327 used a "moving" classification
+   * to drop the preclip entirely and dispatch the full plate, which let Sync.so
+   * bleed onto neighbouring faces (visible morphing). v331 keeps the preclip as
+   * the single source of truth and instead widens/recenters the crop so the
+   * speaker's whole trajectory over the voiced window stays inside it.
+   * Points outside [startSec, endSec] are ignored.
+   */
+  trackPoints?: Array<{ t: number; bbox: [number, number, number, number] }> | null;
 }
 
 export interface PassPreclipResult {
