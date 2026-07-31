@@ -280,15 +280,6 @@ serve(async (req) => {
       ds.passes.every((p: any) => p?.status === "done" && p?.motion_probe_status === "passed" &&
         p?.motion_probe_job_id === p?.job_id && !!p?.output_url);
     if (allMotionProbesPassed && ds?.status !== "audio_muxing" && d.lip_sync_status !== "applied") {
-      // A failed/refunded watchdog run can leave the original claim timestamp
-      // behind. Treat it as stale so reconciliation may claim exactly once.
-      if (d.lip_sync_status === "running" && ds?.audio_mux?.dispatched_at && !ds?.audio_mux?.render_id) {
-        await supabase.from("composer_scenes").update({
-          dialog_shots: { ...ds, audio_mux: { ...(ds.audio_mux ?? {}), dispatched_at: null } },
-          updated_at: new Date().toISOString(),
-        }).eq("id", d.id);
-        ds.audio_mux.dispatched_at = null;
-      }
       const alreadyDispatched = !!ds?.audio_mux?.dispatched_at;
       const { data: claimed } = alreadyDispatched
         ? { data: false }
