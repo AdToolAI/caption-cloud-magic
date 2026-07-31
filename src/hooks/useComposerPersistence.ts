@@ -273,7 +273,7 @@ export function useComposerPersistence() {
               cost_euros: scene.costEuros || 0,
               retry_count: scene.retryCount || 0,
               character_shot: (scene.characterShot ?? null) as any,
-              character_shots: (scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])) as any,
+              character_shots: castShotsFor(scene) as any,
               dialog_script: scene.dialogScript ?? null,
               dialog_turns: ((scene as any).dialogTurns ?? []) as any,
               dialog_voices: (scene.dialogVoices ?? {}) as any,
