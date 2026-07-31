@@ -677,6 +677,37 @@ serve(async (req) => {
         id: c.id,
         name: (c as any).name ?? null,
       }));
+      // v319 — outfit look → avatar UUID, so `outfit:<lookId>` slots resolve to
+      // their parent character instead of surviving as a second identity.
+      const outfitLookMap = new Map<string, string>();
+      try {
+        const lookIds = new Set<string>();
+        for (const s of scenes) {
+          for (const slot of [
+            ...(s.characterShots ?? []),
+            ...(s.characterShot ? [s.characterShot] : []),
+          ]) {
+            const id = String((slot as any)?.characterId ?? "");
+            if (id.startsWith("outfit:") || id.startsWith("catalog:")) {
+              const lookId = id.split(":", 2)[1]?.trim();
+              if (lookId) lookIds.add(lookId);
+            }
+          }
+        }
+        if (lookIds.size > 0) {
+          const { data: looks } = await supabase
+            .from("avatar_outfit_looks")
+            .select("id, avatar_id")
+            .in("id", Array.from(lookIds));
+          for (const l of looks ?? []) {
+            if ((l as any)?.id && (l as any)?.avatar_id) {
+              outfitLookMap.set((l as any).id, (l as any).avatar_id);
+            }
+          }
+        }
+      } catch (lookErr) {
+        console.warn("[compose-video-clips] outfit look map failed:", lookErr);
+      }
       let collapsed = 0;
       for (const s of scenes) {
         const before = [
@@ -684,7 +715,8 @@ serve(async (req) => {
           ...(s.characterShot ? [s.characterShot] : []),
         ];
         if (before.length < 2) continue;
-        const after = dedupeCharacterShots(before as any, castPool, false);
+        const after = dedupeCharacterShots(before as any, castPool, false, outfitLookMap);
+
         if (after.length !== before.length) {
           collapsed += before.length - after.length;
         }
