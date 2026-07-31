@@ -36,8 +36,6 @@ import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
-import { assessCropGeometry } from "./plate-identity-split.ts";
-import { capCropToFaceShare, faceShareForCrop } from "./preclip-geometry.ts";
 
 export interface PassPreclipInput {
   sceneId: string;
@@ -75,24 +73,7 @@ export interface PassPreclipInput {
    *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
    *  computeFaceCrop path when unset. */
   mouth?: [number, number] | null;
-  /**
-   * v331 (27.07./v169 restore) — measured face trajectory of THIS speaker on
-   * the master plate, in plate pixel space. v327 used a "moving" classification
-   * to drop the preclip entirely and dispatch the full plate, which let Sync.so
-   * bleed onto neighbouring faces (visible morphing). v331 keeps the preclip as
-   * the single source of truth and instead widens/recenters the crop so the
-   * speaker's whole trajectory over the voiced window stays inside it.
-   * Points outside [startSec, endSec] are ignored.
-   */
-  trackPoints?: Array<{ t: number; bbox: [number, number, number, number] }> | null;
-  /**
-   * v334 — geltender Face-Share-Floor des Dispatchers (0.24 bei ≥ 2 Sprechern,
-   * sonst 0.12). Der Motion-Cover deckelt die Crop-Größe so, dass der Share
-   * diesen Wert nicht unterschreitet.
-   */
-  faceShareFloor?: number | null;
 }
-
 
 export interface PassPreclipResult {
   ok: boolean;
@@ -105,35 +86,15 @@ export interface PassPreclipResult {
   frameCount?: number;
   /** v247 — anchor used ("mouth" | "face_center"). */
   anchor?: "mouth" | "face_center";
-  /** v341 — only a detector landmark may identify a mouth anchor. */
-  anchorSource?: "landmark" | "face_center";
   /** v247 — face bbox area / crop area after clamping (0..1). */
   faceShareInCrop?: number;
   /** v247 — distance (px) between mouth and crop center. */
   mouthOffsetPx?: number;
   /** v247 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
-  /** v329 — true when the detector box was too small to be trusted. */
-  geometrySuspicious?: boolean;
-  /** v329 — why the geometry was rejected ("ok" | "box_too_small" | "no_bbox"). */
-  geometryReason?: string;
-  /** v329 — detector box width as a fraction of plate width (0..1). */
-  plateBoxWidthPct?: number;
-  /** v331 — number of trajectory samples inside the voiced window. */
-  trackSamplesUsed?: number;
-  /** v331 — max center drift (px) of the speaker across the voiced window. */
-  trackDriftPx?: number;
-  /** v331 — true when the crop was widened/recentered to cover the trajectory. */
-  motionCropApplied?: boolean;
-  /** v334 — why the motion cover did not run ("insufficient_samples" | "insufficient_motion" | "v334_track_scale_mismatch" | "no_hull" | "uncoverable"). */
-  motionSkipReason?: string | null;
-  /** v334 — which box source the reported faceShareInCrop was measured from. */
-  faceShareSource?: "plate" | "track";
-
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
-
 
 
 const FPS = 30;
@@ -176,8 +137,6 @@ export async function renderPassFacePreclip(
     endSec,
     cropExpansionFactor,
     mouth,
-    trackPoints,
-    faceShareFloor,
   } = input;
 
   if (!masterVideoUrl || !Number.isFinite(srcWidth) || !Number.isFinite(srcHeight)) {
@@ -197,56 +156,24 @@ export async function renderPassFacePreclip(
   // v247 — mouth-anchor crop when we have both a mouth landmark and a
   // face bbox. Guarantees faceShareInCrop ≥ ~42% so Sync.so cannot no-op
   // on tiny/far faces. Falls back to legacy face-center crop otherwise.
-  const bboxUsable =
-    Array.isArray(bbox) &&
-    bbox.length === 4 &&
-    bbox.every((n) => Number.isFinite(Number(n)));
-  const hasMouthLandmark =
+  const useMouthAnchor =
     Array.isArray(mouth) &&
     mouth.length === 2 &&
     Number.isFinite(Number(mouth[0])) &&
-    Number.isFinite(Number(mouth[1]));
+    Number.isFinite(Number(mouth[1])) &&
+    Array.isArray(bbox) &&
+    bbox.length === 4 &&
+    bbox.every((n) => Number.isFinite(Number(n)));
 
   let crop0Size: number;
   let crop0X: number;
   let crop0Y: number;
   let anchor: "mouth" | "face_center" = "face_center";
-  let anchorSource: "landmark" | "face_center" = "face_center";
   let faceShareInCrop = 0;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
 
-  // ── v329 — Geometrie-Plausibilität VOR dem Crop ────────────────────────
-  // Der frühere feste `minSize: 128` hat untaugliche Detektor-Boxen nicht
-  // abgefangen, sondern zementiert: eine 47×63-Box auf 1284×718 ergab einen
-  // 128-px-Crop mit 18 % Face-Share, in dem der Kopf am Rand abgeschnitten
-  // war. Sync.so gibt so ein Video unverändert zurück. Statt zu klemmen
-  // bewerten wir die Box und ziehen bei unplausibler Geometrie ein
-  // PLATE-PROPORTIONALES Fenster um den Mund-Landmark auf.
-  const geometry = assessCropGeometry({ bbox: bbox ?? null, plateWidth: sW, plateHeight: sH });
-  if (geometry.suspicious) {
-    console.warn(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v329_geometry_suspicious reason=${geometry.reason} ` +
-      `box_w_pct=${(geometry.boxWidthPct * 100).toFixed(2)}% box_h_pct=${(geometry.boxHeightPct * 100).toFixed(2)}% ` +
-      `min_crop=${geometry.minCropSize} plate=${sW}x${sH} — widening crop to plate-proportional window`,
-    );
-  }
-
-  // v341 — Never synthesize a mouth from a bbox. The v340 72%-of-box estimate
-  // entered the same path and carried the same label as a measured landmark,
-  // making an unverified crop look detector-backed. Multi-speaker dispatch is
-  // now allowed only when the caller supplied a real plate landmark.
-  const effectiveMouth: [number, number] | null = hasMouthLandmark
-    ? [Number((mouth as number[])[0]), Number((mouth as number[])[1])]
-    : null;
-  if (effectiveMouth) {
-    anchorSource = "landmark";
-  }
-
-  const useMouthAnchor = effectiveMouth !== null && bboxUsable;
-
-  if (effectiveMouth && bboxUsable) {
-
+  if (useMouthAnchor) {
     const r = computeMouthCenteredCrop({
       face: {
         bbox: [
@@ -256,15 +183,12 @@ export async function renderPassFacePreclip(
           Math.round(Number((bbox as number[])[3])),
         ],
         center: [Math.round(Number(coords[0])), Math.round(Number(coords[1]))],
-        mouth: [Math.round(effectiveMouth[0]), Math.round(effectiveMouth[1])],
+        mouth: [Math.round(Number((mouth as number[])[0])), Math.round(Number((mouth as number[])[1]))],
       },
       plateWidth: sW,
       plateHeight: sH,
       targetFaceShare: 0.42,
-      // v329 — kein harter 128-px-Floor mehr. Bei plausibler Box eine
-      // konservative Untergrenze, bei unplausibler Box das proportionale
-      // Rettungsfenster (≈ 26 % Plate-Höhe, min. 288 px).
-      minSize: geometry.minCropSize,
+      minSize: 128,
       outputSize: 720,
     });
     crop0X = r.crop.x;
@@ -275,238 +199,15 @@ export async function renderPassFacePreclip(
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v340_mouth_anchor_preclip anchor=${anchor} anchor_src=${anchorSource} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size} v329_geometry=${geometry.reason} min_crop=${geometry.minCropSize}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
-
   } else {
     const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
     crop0X = cf.x;
     crop0Y = cf.y;
     crop0Size = cf.size;
-    // v329 — auch der Legacy-Pfad darf nicht unter das proportionale
-    // Mindestfenster fallen, wenn die Geometrie unplausibel ist.
-    if (geometry.suspicious && crop0Size < geometry.minCropSize) {
-      const target = Math.min(Math.min(sW, sH), geometry.minCropSize);
-      const cx = crop0X + crop0Size / 2;
-      const cy = crop0Y + crop0Size / 2;
-      crop0Size = target % 2 === 0 ? target : target - 1;
-      crop0X = Math.max(0, Math.min(sW - crop0Size, Math.round(cx - crop0Size / 2)));
-      crop0Y = Math.max(0, Math.min(sH - crop0Size, Math.round(cy - crop0Size / 2)));
-    }
-
-    // v335 — The legacy path (valid bbox, missing mouth landmark) previously
-    // never assigned faceShareInCrop, so every valid crop was reported as 0%.
-    // It also retained computeFaceCrop's large scene-height floor (394px in
-    // the reported run) even for a 55px face. Measure from the plate bbox and
-    // cap the crop using the exact same floor as the dispatcher.
-    const legacyFloor = Number.isFinite(Number(faceShareFloor)) && Number(faceShareFloor) > 0
-      ? Number(faceShareFloor)
-      : 0.12;
-    const legacyCapped = capCropToFaceShare({
-      crop: { x: crop0X, y: crop0Y, size: crop0Size, outputSize: 720 },
-      bbox: bbox ?? null,
-      floor: legacyFloor,
-      plateWidth: sW,
-      plateHeight: sH,
-    });
-    crop0X = legacyCapped.crop.x;
-    crop0Y = legacyCapped.crop.y;
-    crop0Size = legacyCapped.crop.size;
-    if (legacyCapped.faceShare === null) {
-      console.error(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v335_face_geometry_unavailable ` +
-        `bbox=${JSON.stringify(bbox ?? null)} crop=${crop0X},${crop0Y},${crop0Size}`,
-      );
-      return {
-        ok: false,
-        error: "preclip_face_geometry_unavailable",
-        errorClass: "invalid_input",
-        geometrySuspicious: geometry.suspicious,
-        geometryReason: geometry.reason,
-        plateBoxWidthPct: geometry.boxWidthPct,
-      };
-    }
-    faceShareInCrop = legacyCapped.faceShare;
-    console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v335_legacy_crop ` +
-      `capped=${legacyCapped.capped} crop=${crop0X},${crop0Y},${crop0Size} ` +
-      `face_share=${faceShareInCrop.toFixed(3)} floor=${legacyFloor} siblings=${siblingCoords?.length ?? 0}`,
-    );
   }
-  let crop0 = { x: crop0X, y: crop0Y, size: crop0Size };
-
-  // ── v331 — Motion-Cover Crop (Rückbau des v327 Full-Plate-Pfads) ────────
-  // v327 hat bei "moving" den Preclip fallen gelassen und die volle Plate an
-  // Sync.so geschickt — genau dort greift der Provider auf Nachbargesichter
-  // über (Morphing). v331 behält den Preclip und fasst die Bewegung stattdessen
-  // IM Crop ein: Wir bilden die Hüllbox aller gemessenen Gesichtsboxen im
-  // Sprechfenster, addieren einen Sicherheitsrand und zentrieren neu.
-  //
-  // v334 — Face-Share-Konsistenz. Der v331-Block hat die Hüllbox aus den
-  // TRACK-Boxen gebildet, den Face-Share danach aber mit der (viel kleineren)
-  // Plate-Box gegen die Hüllfläche gerechnet. Ergebnis: systematisch zu kleine
-  // Shares (z. B. 2,8 % bei 4 px Drift) → `preclip_face_share_too_low` obwohl
-  // der Mund-Anker-Crop sauber war. v334 misst konsistent aus derselben
-  // Boxquelle, greift nur bei echter Bewegung und deckelt share-erhaltend.
-  let trackSamplesUsed = 0;
-  let trackDriftPx = 0;
-  let motionCropApplied = false;
-  let motionSkipReason: string | null = null;
-  let faceShareSource: "plate" | "track" = "plate";
-  const shareFloor = Number.isFinite(Number(faceShareFloor)) && Number(faceShareFloor) > 0
-    ? Number(faceShareFloor)
-    : 0.12;
-
-  if (Array.isArray(trackPoints) && trackPoints.length > 0) {
-    const pad = 0.15; // 15 % Sicherheitsrand auf die Hüllbox
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let firstC: [number, number] | null = null;
-    const trackWidths: number[] = [];
-    const trackAreas: number[] = [];
-    for (const p of trackPoints) {
-      const t = Number(p?.t);
-      if (!Number.isFinite(t) || t < startSec - 0.2 || t > endSec + 0.2) continue;
-      const b = p?.bbox;
-      if (!Array.isArray(b) || b.length !== 4 || !b.every((n) => Number.isFinite(Number(n)))) continue;
-      const bw = Number(b[2]) - Number(b[0]);
-      const bh = Number(b[3]) - Number(b[1]);
-      if (!(bw > 0) || !(bh > 0)) continue;
-      trackSamplesUsed++;
-      trackWidths.push(bw);
-      trackAreas.push(bw * bh);
-      minX = Math.min(minX, Number(b[0]));
-      minY = Math.min(minY, Number(b[1]));
-      maxX = Math.max(maxX, Number(b[2]));
-      maxY = Math.max(maxY, Number(b[3]));
-      const c: [number, number] = [(Number(b[0]) + Number(b[2])) / 2, (Number(b[1]) + Number(b[3])) / 2];
-      if (!firstC) firstC = c;
-      else trackDriftPx = Math.max(trackDriftPx, Math.hypot(c[0] - firstC[0], c[1] - firstC[1]));
-    }
-
-    const median = (arr: number[]): number => {
-      if (arr.length === 0) return 0;
-      const s = [...arr].sort((a, b) => a - b);
-      const m = Math.floor(s.length / 2);
-      return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m];
-    };
-    const medianTrackWidth = median(trackWidths);
-    const medianTrackArea = median(trackAreas);
-
-    const plateBoxWidth = Array.isArray(bbox) && bbox.length === 4
-      ? Number(bbox[2]) - Number(bbox[0])
-      : 0;
-
-    // (4) Plausibilitätsbremse: weichen die Boxquellen um mehr als Faktor 2.5
-    // voneinander ab, stimmen die Koordinatenräume nicht überein — dann darf
-    // aus dem Track kein Crop abgeleitet werden.
-    const scaleRatio = plateBoxWidth > 0 && medianTrackWidth > 0
-      ? Math.max(medianTrackWidth / plateBoxWidth, plateBoxWidth / medianTrackWidth)
-      : 1;
-
-    // (2) Motion-Cover nur bei echter Bewegung.
-    const driftRelevant = medianTrackWidth > 0
-      ? trackDriftPx > 0.08 * medianTrackWidth
-      : trackDriftPx > 8;
-
-    if (trackSamplesUsed < 3) {
-      motionSkipReason = "insufficient_samples";
-    } else if (scaleRatio > 2.5) {
-      motionSkipReason = "v334_track_scale_mismatch";
-      console.warn(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v334_track_scale_mismatch ` +
-        `plate_box_w=${Math.round(plateBoxWidth)} track_box_w=${Math.round(medianTrackWidth)} ratio=${scaleRatio.toFixed(2)} — motion cover discarded`,
-      );
-    } else if (!driftRelevant) {
-      motionSkipReason = "insufficient_motion";
-    } else if (!(Number.isFinite(minX) && maxX > minX && maxY > minY)) {
-      motionSkipReason = "no_hull";
-    }
-
-    if (!motionSkipReason) {
-      const hullW = (maxX - minX) * (1 + pad * 2);
-      const hullH = (maxY - minY) * (1 + pad * 2);
-      const cx = (minX + maxX) / 2;
-      const cy = (minY + maxY) / 2;
-      let want = Math.ceil(Math.max(hullW, hullH, crop0.size));
-
-      // Nachbar-Deckel: der Crop darf nie bis zu einem anderen Gesicht reichen.
-      let neighborCap = Infinity;
-      for (const s of siblingCoords ?? []) {
-        if (!Array.isArray(s) || s.length !== 2) continue;
-        const d = Math.max(Math.abs(Number(s[0]) - cx), Math.abs(Number(s[1]) - cy));
-        if (Number.isFinite(d)) neighborCap = Math.min(neighborCap, Math.max(64, (d - 24) * 2));
-      }
-
-      // (3) Share-erhaltende Deckelung: der Crop darf nie so groß werden, dass
-      // das (mit derselben Boxquelle gemessene) Gesicht unter den Floor fällt.
-      const faceArea = medianTrackArea > 0
-        ? medianTrackArea
-        : (plateBoxWidth > 0 && Array.isArray(bbox)
-          ? plateBoxWidth * (Number(bbox[3]) - Number(bbox[1]))
-          : 0);
-      const shareCap = faceArea > 0 ? Math.sqrt(faceArea / shareFloor) : Infinity;
-
-      const maxAllowed = Math.min(sW, sH, neighborCap, shareCap);
-
-      if (want > maxAllowed) {
-        // Bewegung passt nicht in einen nachbarsicheren Crop → ehrlich
-        // fehlschlagen statt Full-Plate zu riskieren (Morph-Vermeidung).
-        if (Math.max(hullW, hullH) > maxAllowed) {
-          console.warn(
-            `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v331_motion_uncoverable ` +
-            `hull=${Math.round(hullW)}x${Math.round(hullH)} max_allowed=${Math.round(maxAllowed)} ` +
-            `neighbor_cap=${Number.isFinite(neighborCap) ? Math.round(neighborCap) : "none"} ` +
-            `share_cap=${Number.isFinite(shareCap) ? Math.round(shareCap) : "none"} floor=${shareFloor} ` +
-            `drift_px=${Math.round(trackDriftPx)} samples=${trackSamplesUsed}`,
-          );
-          return {
-            ok: false,
-            error: "motion_uncoverable",
-            errorClass: "invalid_input",
-            trackSamplesUsed,
-            trackDriftPx,
-            motionSkipReason: "uncoverable",
-          };
-        }
-        want = Math.floor(maxAllowed);
-      }
-
-      const size = (want % 2 === 0 ? want : want - 1);
-      const x = Math.max(0, Math.min(sW - size, Math.round(cx - size / 2)));
-      const y = Math.max(0, Math.min(sH - size, Math.round(cy - size / 2)));
-      if (size !== crop0.size || x !== crop0.x || y !== crop0.y) {
-        motionCropApplied = true;
-        crop0 = { x: x % 2 === 0 ? x : Math.max(0, x - 1), y: y % 2 === 0 ? y : Math.max(0, y - 1), size };
-        // (1) Face-Share aus DERSELBEN Boxquelle wie die Hüllbox messen.
-        if (medianTrackArea > 0) {
-          faceShareInCrop = medianTrackArea / (size * size);
-          faceShareSource = "track";
-        } else if (Array.isArray(bbox) && bbox.length === 4) {
-          const fw = Number(bbox[2]) - Number(bbox[0]);
-          const fh = Number(bbox[3]) - Number(bbox[1]);
-          if (fw > 0 && fh > 0) {
-            faceShareInCrop = (fw * fh) / (size * size);
-            faceShareSource = "plate";
-          }
-        }
-      }
-      console.log(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v331_motion_cover applied=${motionCropApplied} ` +
-        `samples=${trackSamplesUsed} drift_px=${Math.round(trackDriftPx)} crop=${crop0.x},${crop0.y},${crop0.size} ` +
-        `face_share=${faceShareInCrop.toFixed(3)} share_src=${faceShareSource} floor=${shareFloor}`,
-      );
-    } else {
-      console.log(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v334_motion_cover_skipped reason=${motionSkipReason} ` +
-        `samples=${trackSamplesUsed} drift_px=${Math.round(trackDriftPx)} track_box_w=${Math.round(medianTrackWidth)} ` +
-        `plate_box_w=${Math.round(plateBoxWidth)} crop=${crop0.x},${crop0.y},${crop0.size} face_share=${faceShareInCrop.toFixed(3)}`,
-      );
-    }
-  }
-
-
-
-
+  const crop0 = { x: crop0X, y: crop0Y, size: crop0Size };
 
   // v116 (Fix B) — expand the crop on repair retries. We multiply `size`
   // around the same center coords and re-clamp to source bounds. This is
@@ -530,9 +231,6 @@ export async function renderPassFacePreclip(
     expandedY = Math.max(0, Math.min(sH - expandedSize, Math.round(centerY - expandedSize / 2)));
     expandedX = expandedX % 2 === 0 ? expandedX : Math.max(0, expandedX - 1);
     expandedY = expandedY % 2 === 0 ? expandedY : Math.max(0, expandedY - 1);
-    if (!useMouthAnchor && !motionCropApplied) {
-      faceShareInCrop = faceShareForCrop(bbox ?? null, expandedSize) ?? 0;
-    }
   }
 
   // v112 — Sync.so docs explicitly require ≥480p for reliable face detection
@@ -590,19 +288,9 @@ export async function renderPassFacePreclip(
         fps: FPS,
         frameCount: durationInFrames,
         anchor,
-        anchorSource,
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
-        geometrySuspicious: geometry.suspicious,
-        geometryReason: geometry.reason,
-        plateBoxWidthPct: geometry.boxWidthPct,
-        trackSamplesUsed,
-        trackDriftPx,
-        motionCropApplied,
-        motionSkipReason,
-        faceShareSource,
-
       };
     }
   } catch (reuseErr) {
@@ -768,19 +456,9 @@ export async function renderPassFacePreclip(
         fps: FPS,
         frameCount: durationInFrames,
         anchor,
-        anchorSource,
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
-        geometrySuspicious: geometry.suspicious,
-        geometryReason: geometry.reason,
-        plateBoxWidthPct: geometry.boxWidthPct,
-        trackSamplesUsed,
-        trackDriftPx,
-        motionCropApplied,
-        motionSkipReason,
-        faceShareSource,
-
       };
     }
     if (status === "failed") {

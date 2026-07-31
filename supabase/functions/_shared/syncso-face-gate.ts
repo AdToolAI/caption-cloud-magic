@@ -31,9 +31,8 @@
 
 import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
-import { decideProbeUnavailablePolicy } from "./preclip-trust.ts";
 
-const GATE_VERSION = "v336-preclip-trust-contract";
+const GATE_VERSION = "v252-aws-face-gate-primary";
 
 
 export type FaceGateCode =
@@ -44,8 +43,6 @@ export type FaceGateCode =
   | "multiple_faces"
   | "skipped"
   | "probe_unavailable"
-  | "untrusted_multispeaker_without_probe"
-  | "geometry_suspect_without_probe"
   | "unparsed";
 
 export interface FaceGateResult {
@@ -105,44 +102,9 @@ export interface FaceGateInput {
    *  self-healing. */
   plateWidth?: number;
   plateHeight?: number;
-  /** v329 — true when the pre-clip geometry came from the proportional rescue
-   *  window instead of a trustworthy detector box. In that state a
-   *  `probe_unavailable` must NOT wave the dispatch through: unverifiable
-   *  geometry + unverifiable probe is a guaranteed silent no-op, so we fail
-   *  hard and let the caller refund. */
-  geometrySuspect?: boolean;
 }
 
-/**
- * v329 — public entry point. Applies the geometry-suspect hard-fail policy on
- * top of the raw gate result: a non-blocking `probe_unavailable` stays
- * non-blocking only while the underlying crop geometry is trustworthy.
- *
- * v341 — every multi-speaker pass remains fail-closed when the post-render
- * frame probe is unavailable. Constructive crop evidence is useful for
- * diagnostics but cannot prove that the rendered preclip contains the face.
- */
 export async function verifyFaceBeforeDispatch(
-  input: FaceGateInput,
-): Promise<FaceGateResult> {
-  const result = await runFaceGate(input);
-  if (result.ok && result.code === "probe_unavailable") {
-    const policy = decideProbeUnavailablePolicy({
-      isMultiSpeakerContext: !!input.isMultiSpeakerContext,
-      preclipTrusted: !!input.preclipTrusted,
-      geometrySuspect: !!input.geometrySuspect,
-    });
-    return {
-      ...result,
-      ok: policy.ok,
-      code: policy.code,
-      reason: `${policy.reason} Source: ${result.reason ?? "probe unavailable"}`,
-    };
-  }
-  return result;
-}
-
-async function runFaceGate(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
   if (!hasAwsCreds()) return { ok: true, code: "skipped", reason: "no_aws_credentials" };

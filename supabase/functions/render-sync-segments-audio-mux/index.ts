@@ -194,20 +194,6 @@ serve(async (req) => {
     const height = evenDimension(state.video_height, 720);
 
     const passes = Array.isArray((state as any).passes) ? (state as any).passes : [];
-    // v337 defense in depth: direct/manual invocations cannot bypass the
-    // per-attempt mouth-motion quality contract.
-    const unverifiedPasses = passes.filter((p: any) =>
-      p?.status !== "done" || p?.motion_probe_status !== "passed" ||
-      !p?.motion_probe_job_id || p?.motion_probe_job_id !== p?.job_id
-    );
-    if (unverifiedPasses.length > 0) {
-      console.warn(`[render-sync-segments-audio-mux] scene=${sceneId} MOTION_PROBE_PENDING unverified=${unverifiedPasses.length}/${passes.length}`);
-      return json({
-        error: "motion_probe_pending",
-        message: "All lip-sync passes must pass motion validation before muxing.",
-        pending_passes: unverifiedPasses.map((p: any) => p?.idx ?? null),
-      }, 409);
-    }
     const donePasses = passes.filter(
       (p: any) =>
         p?.status === "done" &&
@@ -240,56 +226,13 @@ serve(async (req) => {
       : finalLipsyncUrl;
 
     const minAxis = Math.min(width, height);
-    // v114 — legacy fallback radius (0.28 * minAxis) when we know nothing
-    // about the speaker's face geometry.
+    // v114 — Floor radius at 0.28 regardless of speaker count. The previous
+    // 0.15..0.22 floor for ≥3 speakers produced 108–158 px masks on a 720 px
+    // axis, which routinely clipped the chin/mouth (radial gradient inner
+    // edge at 68% radius → ~73–107 px). The mouth movement was happening in
+    // the Sync.so output but hidden behind the mask edge. We trade a bit of
+    // overlap risk between adjacent speakers for guaranteed mouth visibility.
     const radiusForCount = minAxis * 0.28;
-
-    // ── v331 — gesichtsproportionale Maske mit Nachbar-Deckel ──────────────
-    // Der feste 0.28-Radius deckte auf einem 720-px-Plate rund 200 px ab —
-    // deutlich mehr als ein Gesicht. Dadurch wurde Sync.so-Output über Haut,
-    // Haaransatz und Hintergrund geblendet und bei zwei nahen Sprechern sogar
-    // in den Nachbarkopf hinein: genau das sichtbare Morphing. v331 leitet den
-    // Radius aus der tatsächlichen Gesichtsgeometrie ab und deckelt ihn hart
-    // auf 45 % des Abstands zum nächsten Nachbargesicht, damit sich zwei
-    // Overlays nie überlappen können.
-    const passCenter = (p: any): [number, number] | null => {
-      const cx = Number(p?.coords?.[0]);
-      const cy = Number(p?.coords?.[1]);
-      return Number.isFinite(cx) && Number.isFinite(cy) ? [cx, cy] : null;
-    };
-    const faceRadiusForPass = (p: any): number => {
-      // 1) Gesichtsgröße: bevorzugt die persistierte Preclip-Crop-Größe
-      //    (die ist mouth-anchored auf ~42 % Face-Share dimensioniert),
-      //    sonst die Plate-Bbox, sonst der Legacy-Wert.
-      const cropSize = Number(p?.preclip_crop?.size);
-      const bbox = Array.isArray(p?.plate_bbox) ? p.plate_bbox.map(Number) : null;
-      let base: number;
-      if (Number.isFinite(cropSize) && cropSize > 0) {
-        base = cropSize * 0.5;
-      } else if (bbox && bbox.length === 4 && bbox.every((n: number) => Number.isFinite(n))) {
-        base = Math.max(bbox[2] - bbox[0], bbox[3] - bbox[1]) * 0.62;
-      } else {
-        base = radiusForCount;
-      }
-
-      // 2) Nachbar-Deckel.
-      const me = passCenter(p);
-      let cap = minAxis * 0.34;
-      if (me) {
-        for (const other of donePasses) {
-          if (other === p) continue;
-          const o = passCenter(other);
-          if (!o) continue;
-          const d = Math.hypot(o[0] - me[0], o[1] - me[1]);
-          if (Number.isFinite(d) && d > 0) cap = Math.min(cap, d * 0.45);
-        }
-      }
-
-      // 3) Untergrenze, damit der Mund nie hinter der Maskenkante verschwindet.
-      const floor = minAxis * 0.11;
-      return Math.max(floor, Math.min(base, cap));
-    };
-
 
     // Keep overlays windowed to the actual speaker turns. This is the
     // Sync.so-compliant behavior: target face + target audio + exact timeline
@@ -592,7 +535,7 @@ serve(async (req) => {
                 faceMask: {
                   cx: Number(p.coords[0]),
                   cy: Number(p.coords[1]),
-                  radius: faceRadiusForPass(p),
+                  radius: radiusForCount,
                 },
               };
 
@@ -725,10 +668,6 @@ serve(async (req) => {
     // Multi-speaker fanout MUST use preclip_crop overlays. A faceMask
     // fallback on N≥2 means one of the passes lost its preclip_crop — that
     // resurrects the wide-plate morph artefacts v204 was built to avoid.
-    // v331 — dieser Guard und der Dispatch sind jetzt deckungsgleich:
-    // compose-dialog-segments erzwingt für N≥2 ausnahmslos einen Preclip
-    // (der v327-Full-Plate-Pfad ist dort auf Einzelsprecher beschränkt).
-    // Der Guard kann also nicht mehr gegen den eigenen Dispatch feuern.
     if (isFanout && donePasses.length >= 2 && facemasksUsed > 0) {
       const msg =
         `v205 guard: multi-speaker mux for scene=${sceneId} fell back to faceMask on ` +

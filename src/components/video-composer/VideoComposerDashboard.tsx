@@ -64,7 +64,6 @@ import { isPageReload } from '@/lib/composer/isPageReload';
 import { useStoryboardTransition } from '@/hooks/useStoryboardTransition';
 import ProductionWarRoom from './storyboard/ProductionWarRoom';
 import ProductionPlanSheet from './briefing/ProductionPlanSheet';
-import { MouthMotionProbeCoordinator } from './MouthMotionProbeCoordinator';
 
 type TabId = 'briefing' | 'storyboard' | 'clips' | 'text' | 'audio' | 'export' | 'campaign';
 
@@ -1487,7 +1486,6 @@ export default function VideoComposerDashboard() {
     <ComposerHistoryContext.Provider value={{ pushEntry: pushHistoryEntry }}>
     <SceneRenderConfirmProvider>
     <div className="min-h-screen bg-background">
-      <MouthMotionProbeCoordinator scenes={project.scenes} />
       {/* Header */}
       <div className="border-b border-border/40 bg-card/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">

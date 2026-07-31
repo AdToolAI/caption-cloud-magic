@@ -15,7 +15,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle, UserCheck } from 'lucide-react';
+import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -23,8 +23,6 @@ import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { ComposerScene } from '@/types/video-composer';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
-import { FaceMapReviewDialog } from './FaceMapReviewDialog';
-
 
 interface Props {
   scene: ComposerScene;
@@ -61,9 +59,6 @@ export default function SceneInlinePlayer({
   const { reset: resetLipSync, resettingId } = useResetLipSync();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
-  const [faceMapOpen, setFaceMapOpen] = useState(false);
-
-
 
   const clipUrl = scene.clipUrl;
   // Only true scene outputs count as a thumbnail. `referenceImageUrl` /
@@ -93,23 +88,16 @@ export default function SceneInlinePlayer({
     twoshotStage === 'done' ||
     twoshotStage === 'complete';
   const lipsyncFailed = lipSyncStatus === 'failed' || twoshotStage === 'failed';
-  // v326 — Szene ist bewusst geparkt und wartet auf manuelle Sprecher↔Gesicht-
-  // Zuordnung. Das ist KEIN laufender Job: ohne diesen Guard läuft der
-  // "Szene wird gebaut…"-Spinner endlos, weil twoshot_stage='anchor' nicht in
-  // der Terminal-Liste steht.
-  const awaitingFaceMap = (status as string) === 'awaiting_manual_face_map';
   const lipsyncRunning =
     needsLipsync &&
     !lipsyncDone &&
     !lipsyncFailed &&
     !lipsyncCanceled &&
-    !awaitingFaceMap &&
     (lipSyncStatus === 'running' ||
       lipSyncStatus === 'stitching' ||
       lipSyncStatus === 'audio_muxing' ||
       (twoshotStage && !['failed', 'done', 'complete', 'canceled'].includes(twoshotStage)) ||
       status === 'ready'); // clip ready, lip-sync still pending
-
 
   // v131.7 — Stale-Lipsync-Detection (Realtime-Backstop).
   // Wenn Lipsync >9 min läuft, ohne dass `lipSyncAppliedAt` gesetzt wurde
@@ -140,12 +128,11 @@ export default function SceneInlinePlayer({
       lipSyncStatus === 'running' ||
       (twoshotStage && !['failed', 'done', 'complete', 'canceled'].includes(twoshotStage)));
   const isWorking =
-    !isFailed && !awaitingFaceMap && (
+    !isFailed && (
       isGenerating ||
       (status === 'generating' && hasActiveBackendJob) ||
       lipsyncRunning
     );
-
 
   // ── Plan v72 — Start-Limbo detection ────────────────────────────────────
   // A scene parked in `master_clip` with NO provider job for >3 min means the
@@ -244,18 +231,11 @@ export default function SceneInlinePlayer({
               {lipsyncRunning && status === 'ready' ? 'Lip-Sync' : 'Baut'}
             </span>
           )}
-          {awaitingFaceMap && (
-            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 backdrop-blur text-[9px] font-semibold text-amber-300 border border-amber-500/40 flex items-center gap-1">
-              <UserCheck className="h-2.5 w-2.5" />
-              Face-Map
-            </span>
-          )}
-          {!isReady && !isWorking && !isFailed && !awaitingFaceMap && (
+          {!isReady && !isWorking && !isFailed && (
             <span className="px-1.5 py-0.5 rounded-md bg-muted/40 backdrop-blur text-[9px] uppercase tracking-wider text-muted-foreground border border-border/40">
               Wartet
             </span>
           )}
-
           {isFailed && (
             <span className="px-1.5 py-0.5 rounded-md bg-destructive/15 backdrop-blur text-[9px] font-semibold text-destructive border border-destructive/40">
               ✕ Fehler
@@ -302,31 +282,8 @@ export default function SceneInlinePlayer({
           </div>
         )}
 
-        {/* v326 — Face-Map-Review statt Endlos-Spinner */}
-        {awaitingFaceMap && (
-          <div className="absolute inset-0 z-30 bg-black/75 backdrop-blur-[2px] flex flex-col items-center justify-center text-center px-3 gap-1">
-            <UserCheck className="h-6 w-6 text-amber-400" />
-            <span className="text-[11px] font-semibold text-amber-300">Face-Map prüfen</span>
-            <span className="text-[9px] text-muted-foreground leading-tight max-w-[90%]">
-              Sprecher konnten dem Anker nicht automatisch zugeordnet werden.
-            </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setFaceMapOpen(true);
-              }}
-              className="mt-1 bg-amber-500/90 hover:bg-amber-500 text-black rounded px-2.5 py-1 text-[10px] font-semibold"
-            >
-              Zuordnung öffnen
-            </button>
-          </div>
-        )}
-        <FaceMapReviewDialog open={faceMapOpen} onOpenChange={setFaceMapOpen} scene={scene} />
-
         {/* Working shimmer overlay */}
         <AnimatePresence>
-
           {isWorking && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -364,10 +321,7 @@ export default function SceneInlinePlayer({
                   (p: any) => Number(p?.noop_escalation_step ?? 0) > 0 && (p?.status === "pending" || p?.status === "rendering"),
                 );
                 const totalPasses = passesArr.length;
-                const providerCompletePasses = passesArr.filter((p: any) =>
-                  p?.status === "done" || p?.status === "failed" || p?.status === "motion_probe_pending",
-                ).length;
-                const probePendingPasses = passesArr.filter((p: any) => p?.status === "motion_probe_pending").length;
+                const donePasses = passesArr.filter((p: any) => p?.status === "done" || p?.status === "failed").length;
                 let title = 'Szene wird gebaut…';
                 let sub = isLipSyncIntentional(scene) ? 'VO & Lip-Sync inklusive' : 'Nur Bild-Render';
                 if (status === 'ready' && lipsyncRunning) {
@@ -383,13 +337,10 @@ export default function SceneInlinePlayer({
                     const variantLabel = step === 1 ? 'bounding_boxes_url' : step === 2 ? 'bounding-box ASD' : 'fallback';
                     title = `NOOP-Retry läuft (Stufe ${step}/2)…`;
                     sub = `${sp} · sync-3 ${variantLabel} · max. 2 Stufen, dann Hard-Fail`;
-                  } else if (probePendingPasses > 0) {
-                    title = 'Lip-Sync wird geprüft…';
-                    sub = `${providerCompletePasses}/${totalPasses} Sprecher verarbeitet · Qualitätsprüfung`;
                   } else if (lipSyncStatus === 'running' && hasProviderJob) {
                     title = 'Lip-Sync läuft…';
                     sub = totalPasses > 0
-                      ? `Sync.so · Pass ${Math.min(providerCompletePasses + 1, totalPasses)}/${totalPasses}`
+                      ? `Sync.so · Pass ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
                       : 'Sync.so · ~60 s pro Sprecher-Turn';
                   } else if (twoshotStage === 'audio') {
                     if (audioUrl) {
@@ -479,9 +430,7 @@ export default function SceneInlinePlayer({
             lower.includes('inappropriate content');
           if (isGreenNet) {
             friendly =
-              'Der Inhaltsfilter des Video-Anbieters („Green Net") hat den Prompt blockiert — meist wegen detaillierter Mund-/Lippen-Beschreibungen, nicht wegen deines Szeneninhalts. Der Prompt wurde bereits automatisch gekürzt und erneut gesendet. Die Szene ist damit endgültig gestoppt (kein Lip-Sync, keine Credits verbraucht): bitte den Szenentext anpassen und „Neu rendern" klicken oder auf Hailuo wechseln.';
-
-
+              'HappyHorse-Inhaltsfilter (Alibaba „Green Net") hat den Prompt blockiert. Wir haben den Provider automatisch auf Hailuo umgestellt – klicke „Neu rendern", um es erneut zu versuchen.';
           } else if (!rawErr) {
             friendly = 'Render fehlgeschlagen.';
           } else if (

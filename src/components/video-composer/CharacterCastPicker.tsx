@@ -154,8 +154,7 @@ export function CharacterCastPicker({
   // A Cast & World person is already taken under any canonical/alias id.
   const isTaken = (c: ComposerCharacter) =>
     inCast.has(c.id) ||
-    !!(c.brandCharacterId && inCast.has(c.brandCharacterId)) ||
-    !!c.aliasIds?.some((id) => inCast.has(id));
+    !!(c.brandCharacterId && inCast.has(c.brandCharacterId));
   const availableCharacters = (characters ?? []).filter((c) => !isTaken(c));
 
   // Render nothing if there is genuinely nothing to show or do.

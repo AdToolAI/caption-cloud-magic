@@ -48,9 +48,6 @@ const STALE_DISPATCH_RECOVERY_MS = 30_000;
 // own timeout is now 300 s (see render-sync-segments-audio-mux), so 6 min
 // gives one extra retry cycle before we hard-fail the scene.
 const STALE_AUDIO_MUX_MS = 6 * 60_000;
-// v339 — Provider output is already available, but the browser-backed mouth
-// motion quality probe never reported. Never leave users at 95% indefinitely.
-const STALE_MOTION_PROBE_MS = 10 * 60_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 
@@ -267,72 +264,6 @@ serve(async (req) => {
       ds?.version === 5 &&
       ds?.engine === "sync-segments" &&
       Array.isArray(ds?.passes);
-
-    // ── v339 motion-probe stall guard ────────────────────────────────────
-    // The canvas probe normally runs in the composer coordinator. A closed
-    // tab, blocked media decode, or lost client invocation must not strand a
-    // completed provider output forever. We fail closed (rather than blindly
-    // approving unverified lipsync) and use the standard idempotent refund.
-    const motionProbePasses: any[] = Array.isArray(ds?.passes)
-      ? ds.passes.filter((p: any) => String(p?.status ?? "") === "motion_probe_pending" && !!p?.output_url)
-      : [];
-    const allMotionProbesPassed = Array.isArray(ds?.passes) && ds.passes.length > 0 &&
-      ds.passes.every((p: any) => p?.status === "done" && p?.motion_probe_status === "passed" &&
-        p?.motion_probe_job_id === p?.job_id && !!p?.output_url);
-    if (allMotionProbesPassed && ds?.status !== "audio_muxing" && d.lip_sync_status !== "applied") {
-      const alreadyDispatched = !!ds?.audio_mux?.dispatched_at;
-      const { data: claimed } = alreadyDispatched
-        ? { data: false }
-        : await supabase.rpc("try_claim_mux_dispatch", { _scene_id: d.id });
-      if (claimed === true) {
-        const lastPass = [...ds.passes].reverse().find((p: any) => !!p?.output_url);
-        const dispatchedAt = new Date().toISOString();
-        await supabase.from("composer_scenes").update({
-          dialog_shots: {
-            ...ds,
-            status: "audio_muxing",
-            final_url: lastPass?.output_url ?? ds?.final_url ?? null,
-            finished_at: dispatchedAt,
-            audio_mux: { ...(ds?.audio_mux ?? {}), dispatched_at: dispatchedAt },
-          },
-          lip_sync_status: "audio_muxing",
-          twoshot_stage: "audio_muxing",
-          clip_error: null,
-          updated_at: dispatchedAt,
-        }).eq("id", d.id);
-        fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({ scene_id: d.id }),
-        }).catch((e) => console.warn(`[lipsync-watchdog] mux reconciliation dispatch failed: ${(e as Error).message}`));
-        console.log(`[lipsync-watchdog] v339 scene=${d.id} reconciled passed probes into audio mux`);
-        return;
-      }
-    }
-    if (motionProbePasses.length > 0) {
-      const oldestPendingAt = Math.min(...motionProbePasses.map((p: any) => {
-        const candidate = ds?.motion_probe_recovered_at ?? p?.motion_probe_requested_at ?? p?.finished_at ?? ds?.updated_at ?? d.updated_at;
-        const parsed = typeof candidate === "string" ? Date.parse(candidate) : NaN;
-        return Number.isFinite(parsed) ? parsed : now;
-      }));
-      const probeAgeMs = now - oldestPendingAt;
-      if (probeAgeMs >= STALE_MOTION_PROBE_MS) {
-        const uid = await userIdForProject(supabase, d.project_id);
-        await failLipSync({
-          supabase,
-          sceneId: d.id,
-          userId: uid,
-          reason: "watchdog_motion_probe_timeout",
-          refundCredits: Number(ds?.cost_credits) || 0,
-          syncApiKey,
-        });
-        console.warn(
-          `[lipsync-watchdog] v339 scene=${d.id} motion_probe_timeout pending=${motionProbePasses.length} age=${Math.round(probeAgeMs / 1000)}s`,
-        );
-        failed.push({ scene_id: d.id, reason: "motion_probe_timeout" });
-        return;
-      }
-    }
 
     // ── v252 audio-mux stall guard ────────────────────────────────────────
     // `render-sync-segments-audio-mux` dispatches the final DialogStitchVideo

@@ -15,43 +15,8 @@
 // - Caps at 4 slots — matches Multi-Portrait Nano Banana 2 / Vidu Q2 limit.
 
 import type { CharacterShot, ComposerCharacter } from '@/types/video-composer';
-import {
-  resolveCanonicalCharacterId,
-  type CanonicalCastOptions,
-} from '@/lib/video-composer/canonicalCastId';
 
 const MAX_CAST = 4;
-
-/** Extra identity context so slot ids that drifted still resolve (v319). */
-export interface CastSyncOptions extends CanonicalCastOptions {
-  /**
-   * Broader pool used ONLY for resolving existing slot ids (briefing cast +
-   * avatar library). Detection of new cast members still runs against the
-   * briefing characters.
-   */
-  resolutionPool?: ComposerCharacter[];
-}
-
-/**
- * Set of canonical character ids already present in `shots` — resolves drifted
- * slot ids (slug or `outfit:<lookId>` instead of the UUID) so a character that
- * is present in another id form is never appended a second time (v318/v319).
- */
-function presentCanonicalIds(
-  shots: CharacterShot[],
-  pool: ComposerCharacter[] | undefined,
-  opts?: CastSyncOptions,
-): Set<string> {
-  const out = new Set<string>();
-  const resolvePool = opts?.resolutionPool?.length ? opts.resolutionPool : pool;
-  for (const s of shots) {
-    if (!s?.characterId) continue;
-    out.add(s.characterId);
-    out.add(resolveCanonicalCharacterId(s.characterId, resolvePool, opts) ?? s.characterId);
-  }
-  return out;
-}
-
 
 function matchesPrompt(prompt: string, character: ComposerCharacter): boolean {
   if (!character?.name) return false;
@@ -67,36 +32,27 @@ export function syncCastFromPrompt(
   currentShots: CharacterShot[] | undefined,
   characters: ComposerCharacter[] | undefined,
   dismissedIds?: string[],
-  opts?: CastSyncOptions,
 ): CharacterShot[] {
   const current = currentShots ?? [];
   if (!prompt || !characters?.length) return current;
   if (current.length >= MAX_CAST) return current;
 
   const lower = prompt.toLowerCase();
-  const haveIds = presentCanonicalIds(current, characters, opts);
+  const haveIds = new Set(current.map((s) => s.characterId));
   const dismissed = new Set((dismissedIds ?? []).map((id) => String(id)));
-  const resolvePool = opts?.resolutionPool?.length ? opts.resolutionPool : characters;
 
   const additions: CharacterShot[] = [];
   for (const c of characters) {
-    // v320 — Cast & World is the single character source: a briefing entry
-    // carries the readable slug in `id` and the real avatar UUID in
-    // `brandCharacterId`. Compare AND write the UUID, otherwise the same
-    // person is appended a second time next to the existing UUID slot.
-    const candidateId =
-      resolveCanonicalCharacterId(c.id, resolvePool, opts) ?? c.brandCharacterId ?? c.id;
-    if (haveIds.has(c.id) || haveIds.has(candidateId)) continue;
-    if (dismissed.has(c.id) || dismissed.has(candidateId)) continue;
+    if (haveIds.has(c.id)) continue;
+    if (dismissed.has(c.id)) continue;
     if (!matchesPrompt(lower, c)) continue;
-    additions.push({ characterId: candidateId, shotType: 'full' });
+    additions.push({ characterId: c.id, shotType: 'full' });
     if (current.length + additions.length >= MAX_CAST) break;
   }
 
   if (additions.length === 0) return current;
   return [...current, ...additions];
 }
-
 
 // ---------------------------------------------------------------------------
 // Ensemble guarantee (client-side safety net)
@@ -122,20 +78,14 @@ export function ensureEnsembleScene<S extends SceneLike>(
   if (!scenes?.length || !characters?.length || characters.length < 2) return scenes;
 
   const allChars = characters.slice(0, MAX_CAST);
-  // v320 — required identities are Cast & World UUIDs (falling back to the
-  // entry id for unlinked rows), matching what `presentCanonicalIds` returns.
-  const requiredIds = new Set(
-    allChars.map(
-      (c) => resolveCanonicalCharacterId(c.id, characters) ?? c.brandCharacterId ?? c.id,
-    ),
-  );
+  const requiredIds = new Set(allChars.map((c) => c.id));
   const requiredEnsembles = scenes.length >= 6 ? 2 : 1;
 
   const isEnsemble = (sc: SceneLike): boolean => {
     const visible = (sc.characterShots ?? []).filter(
       (x) => x?.shotType && x.shotType !== 'absent',
     );
-    const present = presentCanonicalIds(visible as CharacterShot[], characters);
+    const present = new Set(visible.map((x) => x.characterId));
     for (const id of requiredIds) if (!present.has(id)) return false;
     return true;
   };
@@ -166,18 +116,15 @@ export function ensureEnsembleScene<S extends SceneLike>(
     const sc = next[idx];
     if (isEnsemble(sc)) continue;
     const shots = Array.isArray(sc.characterShots) ? [...sc.characterShots] : [];
-    const present = presentCanonicalIds(
-      shots.filter((x) => x?.shotType && x.shotType !== 'absent'),
-      characters,
+    const present = new Set(
+      shots.filter((x) => x?.shotType && x.shotType !== 'absent').map((x) => x.characterId),
     );
     for (const ch of allChars) {
-      // v320 — always write the Cast & World UUID, never the briefing slug.
-      const chId = resolveCanonicalCharacterId(ch.id, characters) ?? ch.brandCharacterId ?? ch.id;
-      if (present.has(ch.id) || present.has(chId)) continue;
+      if (present.has(ch.id)) continue;
       const visibleCount = shots.filter((x) => x?.shotType && x.shotType !== 'absent').length;
       if (visibleCount >= MAX_CAST) break;
-      shots.push({ characterId: chId, shotType: 'full' });
-      present.add(chId);
+      shots.push({ characterId: ch.id, shotType: 'full' });
+      present.add(ch.id);
     }
     next[idx] = { ...sc, characterShots: shots };
     repaired++;
