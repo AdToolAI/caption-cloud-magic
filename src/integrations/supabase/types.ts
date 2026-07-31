@@ -6389,6 +6389,7 @@ export type Database = {
           lock_reference_url: string | null
           mentioned_character_ids: string[] | null
           mentioned_location_ids: string[] | null
+          motion_track: Json | null
           order_index: number
           preview_anchor_url: string | null
           preview_audit: Json | null
@@ -6479,6 +6480,7 @@ export type Database = {
           lock_reference_url?: string | null
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
+          motion_track?: Json | null
           order_index?: number
           preview_anchor_url?: string | null
           preview_audit?: Json | null
@@ -6569,6 +6571,7 @@ export type Database = {
           lock_reference_url?: string | null
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
+          motion_track?: Json | null
           order_index?: number
           preview_anchor_url?: string | null
           preview_audit?: Json | null
