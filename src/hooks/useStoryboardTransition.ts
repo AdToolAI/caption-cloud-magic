@@ -522,7 +522,7 @@ const MOVEMENT_TOKENS: Array<[RegExp, string]> = [
 const LIGHTING_TOKENS: Array<[RegExp, string]> = [
   [/laptop[-\s]?glow|monitor[-\s]?glow|screen[-\s]?glow/i, 'screen-glow'],
   [/golden[-\s]?hour/i, 'golden-hour'],
-  [/window|tageslicht|natural[-\s]?light/i, 'soft-window'],
+  [/window|fenster|tageslicht|natural[-\s]?light/i, 'soft-window'],
   [/neon/i, 'neon'],
   [/low[-\s]?key|dunkel|dark/i, 'low-key'],
   [/high[-\s]?key|hell|bright/i, 'high-key'],
