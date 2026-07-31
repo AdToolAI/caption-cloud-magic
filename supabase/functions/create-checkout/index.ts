@@ -4,8 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { trackBusinessEvent } from "../_shared/telemetry.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import {
-  FOUNDERS_COUPON,
-  LAUNCH_COUPON,
+  FOUNDERS_CREDIT_COUPON,
   FOUNDERS_MAX_SLOTS,
   PRO_PRICE_IDS,
   STRIPE_API_VERSION,
