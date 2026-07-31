@@ -173,8 +173,21 @@ export function useComposerPersistence() {
       // 4. Persist scenes (update existing, insert new) at their final order_index
       const persistedScenes: ComposerScene[] = [];
 
+      // v318 — cast pool for identity dedupe (slug slots collapse into the
+      // canonical brand_characters UUID before they hit the DB).
+      const castPool = (project.briefing?.characters ?? []).map((c) => ({
+        id: c.id,
+        name: c.name,
+      }));
+      const castShotsFor = (scene: ComposerScene) =>
+        dedupeCharacterShots(
+          scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []),
+          castPool,
+        );
+
       for (let i = 0; i < project.scenes.length; i++) {
         const scene = project.scenes[i];
+
         const sceneHasUuid = isUuid(scene.id);
 
         if (sceneHasUuid) {
