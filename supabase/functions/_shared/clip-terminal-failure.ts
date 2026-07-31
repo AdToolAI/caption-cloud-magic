@@ -57,6 +57,7 @@ export const TERMINAL_CLIP_FAILURE_MESSAGE =
 export function buildClipRerenderPatch(
   scene: { clip_error?: unknown; retry_count?: unknown } | null | undefined,
   friendlyMessage: string,
+  stage: string = "needs_clip_rerender",
 ): Record<string, unknown> {
   if (scene && isTerminalClipFailure(scene)) {
     return {
@@ -69,6 +70,8 @@ export function buildClipRerenderPatch(
     };
   }
   return {
+    lip_sync_status: "failed",
+    twoshot_stage: stage,
     clip_status: "pending",
     clip_url: null,
     lip_sync_source_clip_url: null,

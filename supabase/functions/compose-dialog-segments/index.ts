@@ -116,6 +116,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { buildClipRerenderPatch, isTerminalClipFailure } from "../_shared/clip-terminal-failure.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -2880,12 +2881,7 @@ serve(async (req) => {
               },
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
-            clip_status: "pending",
-            clip_url: null,
-            lip_sync_source_clip_url: null,
-            clip_error: userMsg,
+            ...buildClipRerenderPatch(scene as any, userMsg, "needs_clip_rerender"),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -3037,14 +3033,9 @@ serve(async (req) => {
               error: `v117_plate_quality_gate:${reason}`,
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
-            clip_status: "pending",
-            clip_url: null,
-            lip_sync_source_clip_url: null,
-            clip_error: splitScreenReason
+            ...buildClipRerenderPatch(scene as any, splitScreenReason
               ? `Plate-Quality-Gate (v9): Der gerenderte Scene-Clip ist ein Split-Screen/Panel-Layout (${speakers.length} isolierte Einzel-Panels statt einer gemeinsamen Group-Composition). Sync.so kann Einzel-Panels nicht lipsyncen. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen im selben Raum stehen, in einem durchgehenden Kamera-Frame. Credits wurden zurückerstattet.`
-              : `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`,
+              : `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`, "failed"),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -3280,12 +3271,7 @@ serve(async (req) => {
               v132_turn_gate: { failures, probes },
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
-            clip_status: "pending",
-            clip_url: null,
-            lip_sync_source_clip_url: null,
-            clip_error: userMsg,
+            ...buildClipRerenderPatch(scene as any, userMsg, "needs_clip_rerender"),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -5546,12 +5532,7 @@ serve(async (req) => {
             },
             finished_at: new Date().toISOString(),
           }),
-          lip_sync_status: "failed",
-          twoshot_stage: "needs_clip_rerender",
-          clip_status: "pending",
-          clip_url: null,
-          lip_sync_source_clip_url: null,
-          clip_error: friendlyClipError,
+          ...buildClipRerenderPatch(scene as any, friendlyClipError, "needs_clip_rerender"),
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
