@@ -51,9 +51,9 @@ export function StarterPlanPreview({ plans, loading, error, onComplete, onRetry 
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-xl font-semibold">Dein Starter-Plan ist fertig! 🎉</h3>
+        <h3 className="text-xl font-semibold">Dein Produktionsplan steht! 🎉</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          {plans.length} Posts für deine erste Woche — optimiert für maximale Reichweite
+          {plans.length} Videoideen für deine erste Woche — von der Idee bis zur Veröffentlichung
         </p>
       </div>
 
