@@ -345,7 +345,7 @@ export function useComposerPersistence() {
         inFlightPersists.delete(cacheKey);
       }
     },
-    []
+    [libraryCharacters, outfitLookMap]
   );
 
   return { ensureProjectPersisted };
