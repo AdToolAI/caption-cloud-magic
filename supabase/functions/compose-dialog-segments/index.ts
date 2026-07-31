@@ -5396,15 +5396,18 @@ serve(async (req) => {
     let passPreclipUrl: string | null = ((pass as any).preclip_url ?? null);
     let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
 
-    // ── v327 — Motion-Tolerant Lip-Sync ──────────────────────────────────
-    // `report-plate-motion-track` measured this speaker's face trajectory on
-    // the very plate we are about to dispatch. A speaker classified `moving`
-    // must NOT go through the preclip path: the preclip is a fixed square and
-    // the mux overlays it back at exactly that rect, so a walking / stepping
-    // subject drifts out of the crop and the frame-0 silent-face freeze tiles
-    // in DialogStitchVideo no longer match the plate underneath. Instead we
-    // dispatch the FULL PLATE with per-frame interpolated boxes (no overlay).
-    // Everything below fails open: no/stale track → untouched legacy path.
+    // ── v331 — Rückbau auf den 27.07.-Stand (v169) ───────────────────────
+    // v327 hat bei „bewegten" Sprechern den Preclip komplett fallen gelassen
+    // und die volle Plate mit per-Frame-Boxen an Sync.so geschickt. Genau das
+    // ist der Full-Frame-Pfad, den v169 abgeschafft hatte: der Provider greift
+    // dabei auf Nachbargesichter über → sichtbares Morphing (Aufzug-Szene).
+    //
+    // v331: Für N ≥ 2 Sprecher gilt wieder ausnahmslos „ein Pass = ein eigener
+    // Single-Face-Preclip". Der Motion-Track bleibt erhalten, dient aber nur
+    // noch dazu, den PRECLIP-CROP so zu dimensionieren, dass die Bewegungsbahn
+    // hineinpasst (siehe `trackPoints` unten). Nur bei genau einem Sprecher —
+    // wo es keinen Nachbarn gibt, auf den übergegriffen werden könnte — bleibt
+    // der Full-Plate-Tracked-Pfad erlaubt.
     const v327Track = isTrackUsable(
       parseMotionTrack((scene as any)?.motion_track),
       sourceClipUrl,
@@ -5412,13 +5415,25 @@ serve(async (req) => {
       ? parseMotionTrack((scene as any)?.motion_track)
       : null;
     const v327SlotTrack = slotTrackFor(v327Track, Number(pass.speaker_idx ?? currentPassIdx));
-    const v327Tracked = !!v327SlotTrack && v327SlotTrack.motion_class === "moving" && !!plateDims;
+    const v331MultiSpeaker = Array.isArray(speakers) && speakers.length >= 2;
+    const v327Tracked =
+      !v331MultiSpeaker &&
+      !!v327SlotTrack &&
+      v327SlotTrack.motion_class === "moving" &&
+      !!plateDims;
+    if (v331MultiSpeaker && v327SlotTrack?.motion_class === "moving") {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v331_tracked_fullplate_blocked ` +
+          `speakers=${speakers.length} speaker=${pass.speaker_name} drift=${((v327SlotTrack.max_drift_pct) * 100).toFixed(1)}% ` +
+          `→ preclip stays mandatory, motion is absorbed inside the crop`,
+      );
+    }
     if (v327Tracked) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v327_motion_track TRACKED ` +
           `speaker=${pass.speaker_name} drift=${((v327SlotTrack!.max_drift_pct) * 100).toFixed(1)}% ` +
           `scale=${((v327SlotTrack!.max_scale_delta) * 100).toFixed(1)}% points=${v327SlotTrack!.points.length} ` +
-          `→ full-plate per-frame bboxes, preclip disabled`,
+          `→ full-plate per-frame bboxes, preclip disabled (single speaker only)`,
       );
       // Drop any cached preclip so mux/webhook treat this pass as full-plate.
       passPreclipUrl = null;
