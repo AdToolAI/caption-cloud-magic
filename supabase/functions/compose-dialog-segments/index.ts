@@ -152,7 +152,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v336-preclip-trust-contract";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v338-evidence-based-preclip-trust";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -5608,6 +5608,7 @@ serve(async (req) => {
             faceShare: (pass as any).preclip_face_share,
             faceShareFloor: V329_FACE_SHARE_FLOOR,
             geometrySuspicious: !!(pass as any).preclip_geometry_suspicious,
+            geometryReason: (pass as any).preclip_geometry_reason,
             ambiguityRisk: String((pass as any)._v1291_ambiguity?.risk ?? "clean"),
             crop: (pass as any).preclip_crop,
             siblingCenters: siblingCoords,
@@ -7011,7 +7012,13 @@ serve(async (req) => {
         preclipTrusted: preclipTrustedForGate,
         // v329 — wenn der Crop aus dem proportionalen Rettungsfenster stammt,
         // darf ein nicht verfügbarer Probe den Dispatch nicht mehr durchwinken.
-        geometrySuspect: usePassPreclip && !!(pass as any).preclip_geometry_suspicious,
+        // v338 — `box_too_small` is a plate-space detector warning. Once the
+        // rendered crop passes the full constructive trust contract it is no
+        // longer unresolved geometry risk. Missing/invalid geometry remains
+        // fail-closed because such a preclip cannot become trusted.
+        geometrySuspect: usePassPreclip &&
+          !!(pass as any).preclip_geometry_suspicious &&
+          !preclipTrustedForGate,
       });
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
