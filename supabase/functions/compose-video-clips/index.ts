@@ -665,6 +665,41 @@ serve(async (req) => {
       );
     }
 
+    // v318 — Identity-based cast dedupe -------------------------------------
+    // A scene can carry the SAME person twice: once as the brand UUID and once
+    // as a drifted slug ("samuel-dusatko"). Left alone, the anchor composer
+    // burns two portrait slots on one face (visible clone) and the lip-sync
+    // router builds a ghost speaker pass. Collapse them now, before any
+    // portrait / prompt / pass logic reads `characterShots`.
+    {
+      const castPool = Array.from(charById.values()).map((c) => ({
+        id: c.id,
+        name: (c as any).name ?? null,
+      }));
+      let collapsed = 0;
+      for (const s of scenes) {
+        const before = [
+          ...(s.characterShots ?? []),
+          ...(s.characterShot ? [s.characterShot] : []),
+        ];
+        if (before.length < 2) continue;
+        const after = dedupeCharacterShots(before as any, castPool, false);
+        if (after.length !== before.length) {
+          collapsed += before.length - after.length;
+        }
+        s.characterShots = after as any;
+        if (s.characterShot) {
+          s.characterShot = (after[0] ?? s.characterShot) as any;
+        }
+      }
+      if (collapsed > 0) {
+        console.log(
+          `[compose-video-clips] v318_cast_dedupe collapsed=${collapsed} duplicate cast slot(s)`,
+        );
+      }
+    }
+
+
     // ID-Only Cast Resolution ------------------------------------------------
     // Fetch canonical dialog_turns for every scene up-front. When present,
     // the two speaker-resolution sites below skip name-based fuzzy matching
