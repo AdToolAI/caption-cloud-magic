@@ -7361,7 +7361,18 @@ serve(async (req) => {
           coords_sent: syncOptions.active_speaker_detection?.coordinates ?? null,
           preclip_face_count: (pass as any).preclip_face_count ?? null,
           preclip_crop: (pass as any).preclip_crop ?? null,
+          // v342 — geometry telemetry so a no-op is visible in one SQL row.
+          preclip_anchor: (pass as any).preclip_anchor ?? null,
+          preclip_face_share: (pass as any).preclip_face_share ?? null,
+          preclip_crop_to_face_ratio: (() => {
+            const c = (pass as any).preclip_crop;
+            const b = speakerPlateBboxes?.[pass.speaker_idx] as number[] | null | undefined;
+            if (!c?.size || !Array.isArray(b) || b.length !== 4) return null;
+            const side = Math.max(Number(b[2]) - Number(b[0]), Number(b[3]) - Number(b[1]));
+            return side > 0 ? Number((Number(c.size) / side).toFixed(2)) : null;
+          })(),
           preclip_repair_attempts: (pass as any).preclip_repair_attempts ?? 0,
+
           coord_source: coordSources[Number(pass.speaker_idx ?? -1)] ?? "unknown",
           plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
           plate_identity_total: plateIdentityMap?.faces?.length ?? 0,
