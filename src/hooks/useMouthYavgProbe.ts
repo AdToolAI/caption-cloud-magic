@@ -1,11 +1,10 @@
 /**
  * v248 — useMouthYavgProbe
  * ------------------------------------------------------------------
- * When a Cinematic-Sync scene's lipsync pipeline finishes (each pass
- * has status='done' and an output_url), we sample the muxed pass
+ * When a sync-segments provider job enters motion_probe_pending, we sample its
  * output on the CLIENT (canvas) to detect motion-noop lipsyncs.
  *
- * Each pass is probed AT MOST ONCE per session; results are stored
+ * Each provider job is probed AT MOST ONCE per session; results are stored
  * server-side by `report-lipsync-motion-probe`, and the pass is
  * flagged with `motion_noop=true` when yavg < threshold.
  *
@@ -30,7 +29,7 @@ interface PassEntry {
   preclip_crop?: { faceShareInCrop?: number; anchor?: string } | null;
 }
 
-/** Sessions-scoped set of "scene_id::pass_idx" strings we've already probed. */
+/** Session-scoped set; job_id keeps retries independently probeable. */
 const probedThisSession = new Set<string>();
 
 export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
@@ -38,9 +37,6 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
 
   useEffect(() => {
     if (!scene) return;
-    const isCinematic = scene.engineOverride === 'cinematic-sync';
-    if (!isCinematic) return;
-
     const dialogShotsState =
       (scene as unknown as { dialogShots?: { passes?: PassEntry[]; status?: string } })
         .dialogShots ??
@@ -52,11 +48,11 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
     if (passes.length === 0) return;
 
     for (const pass of passes) {
-      if (!pass || pass.status !== 'done') continue;
+      if (!pass || !['motion_probe_pending', 'done'].includes(pass.status ?? '')) continue;
       if (!pass.output_url) continue;
       if (pass.motion_noop === true) continue;      // already flagged server-side
       if (pass.yavg_probed_at) continue;             // already probed server-side
-      const key = `${scene.id}::${pass.idx}`;
+      const key = `${scene.id}::${pass.idx}::${pass.job_id ?? pass.output_url}`;
       if (probedThisSession.has(key)) continue;
       if (inflightRef.current.has(key)) continue;
       inflightRef.current.add(key);

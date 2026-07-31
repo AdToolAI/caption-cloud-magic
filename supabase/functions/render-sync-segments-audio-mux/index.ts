@@ -194,6 +194,20 @@ serve(async (req) => {
     const height = evenDimension(state.video_height, 720);
 
     const passes = Array.isArray((state as any).passes) ? (state as any).passes : [];
+    // v337 defense in depth: direct/manual invocations cannot bypass the
+    // per-attempt mouth-motion quality contract.
+    const unverifiedPasses = passes.filter((p: any) =>
+      p?.status !== "done" || p?.motion_probe_status !== "passed" ||
+      !p?.motion_probe_job_id || p?.motion_probe_job_id !== p?.job_id
+    );
+    if (unverifiedPasses.length > 0) {
+      console.warn(`[render-sync-segments-audio-mux] scene=${sceneId} MOTION_PROBE_PENDING unverified=${unverifiedPasses.length}/${passes.length}`);
+      return json({
+        error: "motion_probe_pending",
+        message: "All lip-sync passes must pass motion validation before muxing.",
+        pending_passes: unverifiedPasses.map((p: any) => p?.idx ?? null),
+      }, 409);
+    }
     const donePasses = passes.filter(
       (p: any) =>
         p?.status === "done" &&
