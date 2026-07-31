@@ -21,42 +21,42 @@ const stepIcons: Record<ChecklistStep["key"], any> = {
 
 const stepLabels: Record<string, Record<ChecklistStep["key"], string>> = {
   en: {
-    onboarding: "Complete onboarding",
-    first_video: "Create your first video",
-    social_connected: "Connect a social account",
-    post_planned: "Plan your first post",
-    brand_kit: "Set up brand kit",
+    onboarding: "Set up your studio",
+    first_video: "Produce your first video",
+    social_connected: "Connect a channel for publishing",
+    post_planned: "Schedule your first release",
+    brand_kit: "Create your cast & brand look",
   },
   de: {
-    onboarding: "Onboarding abschließen",
-    first_video: "Erstes Video erstellen",
-    social_connected: "Social-Konto verbinden",
-    post_planned: "Ersten Post planen",
-    brand_kit: "Brand Kit einrichten",
+    onboarding: "Studio einrichten",
+    first_video: "Erstes Video produzieren",
+    social_connected: "Kanal für die Veröffentlichung verbinden",
+    post_planned: "Ersten Release planen",
+    brand_kit: "Cast & Markenlook anlegen",
   },
   es: {
-    onboarding: "Completar onboarding",
-    first_video: "Crear tu primer video",
-    social_connected: "Conectar cuenta social",
-    post_planned: "Planificar primer post",
-    brand_kit: "Configurar Brand Kit",
+    onboarding: "Configura tu estudio",
+    first_video: "Produce tu primer video",
+    social_connected: "Conecta un canal para publicar",
+    post_planned: "Programa tu primer lanzamiento",
+    brand_kit: "Crea tu cast y look de marca",
   },
 };
 
 const headlines: Record<string, { title: string; subtitle: string; allDone: string }> = {
   en: {
-    title: "Getting Started",
-    subtitle: "Complete these steps to unlock your full power",
+    title: "Your first production",
+    subtitle: "From idea to published video — one step at a time",
     allDone: "All steps completed! 🎉",
   },
   de: {
-    title: "Erste Schritte",
-    subtitle: "Schließe diese Schritte ab, um dein volles Potenzial zu entfalten",
+    title: "Deine erste Produktion",
+    subtitle: "Von der Idee zum veröffentlichten Video – Schritt für Schritt",
     allDone: "Alle Schritte abgeschlossen! 🎉",
   },
   es: {
-    title: "Primeros pasos",
-    subtitle: "Completa estos pasos para desbloquear todo tu potencial",
+    title: "Tu primera producción",
+    subtitle: "De la idea al video publicado, paso a paso",
     allDone: "¡Todos los pasos completados! 🎉",
   },
 };
