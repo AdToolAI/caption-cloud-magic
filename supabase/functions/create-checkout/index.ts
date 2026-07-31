@@ -5,6 +5,8 @@ import { trackBusinessEvent } from "../_shared/telemetry.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import {
   FOUNDERS_CREDIT_COUPON,
+  FOUNDERS_SLOT_MARKER,
+  LAUNCH_SLOT_MARKER,
   FOUNDERS_MAX_SLOTS,
   PRO_PRICE_IDS,
   STRIPE_API_VERSION,
@@ -146,14 +148,14 @@ serve(async (req) => {
 
     await trackBusinessEvent("checkout_session_created", user.id, {
       price_id: priceId,
-      coupon: resolvedCoupon,
+      coupon: couponId ?? null,
       promo_code: promoCode || null,
       founders_slot_reserved: foundersSlotReserved,
       session_id: session.id,
     });
 
     return new Response(
-      JSON.stringify({ url: session.url, applied_coupon: resolvedCoupon }),
+      JSON.stringify({ url: session.url, applied_coupon: couponId ?? null }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   } catch (error) {
