@@ -696,11 +696,11 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Founders · 02", "Founders · 02", "Founders · 02"],
-        ["15,99 € für 24 Monate.", "€15.99 for 24 months.", "15,99 € durante 24 meses."],
+        ["20 % auf KI-Credits — 24 Monate.", "20% off AI credits — for 24 months.", "20 % en créditos IA — 24 meses."],
         [
-          "Der Founder-Preis ist auf 24 Monate garantiert. Egal wie sich unsere reguläre Preisliste entwickelt — deine 15,99 € stehen fest.",
-          "The founder price is guaranteed for 24 months. No matter how our regular pricing evolves — your €15.99 stays put.",
-          "El precio founder está garantizado 24 meses. Pase lo que pase con la tarifa regular — tus 15,99 € se mantienen.",
+          "Das Abo kostet 14,99 € — für alle gleich. Als Founder bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits.",
+          "The subscription is €14.99 for everyone. As a founder you get 20% off every AI credit purchase for 24 months.",
+          "La suscripción cuesta 14,99 € para todos. Como founder obtienes un 20 % de descuento en cada compra de créditos IA durante 24 meses.",
         ],
       ),
     },
