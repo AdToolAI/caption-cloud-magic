@@ -1,38 +1,49 @@
-## Problem
+## Befund (verifiziert an echten Daten)
 
-Szene 1 („Hook") ist am HappyHorse-Inhaltsfilter gescheitert, trotzdem läuft der Lip-Sync-Balken los, meldet „Lip-Sync abgebrochen" und startet erneut — Gummiband.
+Die heute um 12:08 angelegte Szene (`composer_scenes.8bd233f7…`) hat wirklich zwei Cast-Slots für dieselbe Person:
 
-## Was ich verifiziert habe (DB + Code)
+```text
+character_shots = [
+  { characterId: "483f9cdc-…-9d5e7d955016", characterName: "Samuel Dusatko", shotType: "full" },
+  { characterId: "samuel-dusatko",                                            shotType: "full" }
+]
+```
 
-- Die betroffene Szene in der DB: `clip_status='failed'`, `clip_error='[green_net_rejected] …'`, `retry_count=3`, `clip_url=NULL`. Die Lip-Sync-Felder sind dort korrekt geleert (`lip_sync_status`/`twoshot_stage` = NULL).
-- `compose-dialog-segments` (Server) hat **keinen** Eingangs-Check auf `clip_status='failed'`. Der Dispatcher startet also auch für eine Szene ohne gültige Plate.
-- Mehrere Gates im Dispatcher (v117 Plate-Quality, v132 Turn-Visibility, v133 Identity, v153 BBox) setzen bei Ablehnung `clip_status='pending'` + `clip_url=NULL` + `twoshot_stage='needs_clip_rerender'`. Die Szene wird dadurch neu gerendert, scheitert erneut am Green-Net → derselbe Kreislauf.
-- Im Client emittiert `useTwoShotAutoTrigger` `lipsync:start`, aber das passende `lipsync:end` kommt nur in bestimmten Fehlerpfaden — bei „stiller" Ablehnung (SILENT_RACE) bleibt der Balken an und flackert beim nächsten Tick wieder los.
+In `brand_characters` existiert Samuel Dusatko **genau einmal** (`483f9cdc…`) — es ist also kein doppelter Avatar in der Bibliothek, sondern ein **Slug-Slot neben dem UUID-Slot**.
 
-Nicht abschließend verifiziert: welcher der beiden Auslöser (Server-Dispatch ohne Gate vs. Client-Retrigger) im konkreten Screenshot zuerst feuert. Deshalb Schritt 1 = Log-Beweis, danach die Fixes.
+Warum das durchrutscht:
+- `useApplyProductionPlan.ts` dedupt Cast-Slots über `String(shot.characterId).toLowerCase()` — `"samuel-dusatko"` ≠ UUID, also bleiben beide erhalten.
+- `CharacterCastPicker.tsx` löst beide Slots über die tolerante `findCharacter`-Heuristik (Name-im-ID-Substring) auf denselben Charakter auf → zwei identische Chips „Samuel Dusatko" und zwei identische Aktionsfelder (genau der Screenshot).
+- Der Self-Heal in `CharacterCastPicker` schreibt den Slug auf die UUID um, dedupt aber **nicht** danach → aus „Slug + UUID" werden „UUID + UUID". Er läuft zusätzlich nur einmal pro Mount (`healedRef`).
+- Auch `syncCastFromPrompt` / `ensureEnsembleScene` vergleichen nur `characterId`-Strings, sind also gegen Slug-Doppel blind.
+
+**Zum Clone-Verdacht:** ja, das ist plausibel derselbe Ursprung. Zwei Slots = zwei Portrait-Slots für den Anker-Kompositor (Nano Banana / Seedream) und zwei Face-Slots im Sync.so-Face-Map-Router. Derselbe Mensch wird zweimal ins Frame komponiert → Doppelgänger im Bild und ein "Geister-Sprecher", der beim Lip-Sync einen Pass frisst.
 
 ## Plan
 
-### 1. Beweis aus den Logs (kurz)
-`compose-dialog-segments`- und `compose-clip-webhook`-Logs zur betroffenen Szene ziehen und festhalten, welcher Pfad nach dem Green-Net-Fail noch Lip-Sync anstößt.
+### 1. Kanonische Identitäts-Auflösung (neues Modul)
+`src/lib/video-composer/canonicalCastId.ts`:
+- `resolveCanonicalCharacterId(slotId, pool)` — UUID-Exact-Match zuerst, dann Slug-/Namens-Match (`samuel-dusatko` → `483f9cdc…`), sonst `null`.
+- `dedupeCharacterShots(shots, pool)` — kollabiert Slots auf die kanonische ID; behält den spezifischeren `shotType`, mergt `outfitLookId`, `actionEn/actionUser`, `referenceImageUrl` und `characterName` (nicht-leerer Wert gewinnt). Reihenfolge des ersten Vorkommens bleibt erhalten.
+- Reines Modul, idempotent (gleiche Array-Referenz zurück, wenn nichts zu tun ist) — wichtig gegen `useEffect`-Loops.
 
-### 2. Server: Terminal-Fail-Gate in `compose-dialog-segments`
-Ganz früh (direkt nach dem Scene-Load, vor jeder Credit-Reservierung):
-- Wenn `clip_status='failed'` **oder** kein verwertbarer `clip_url` vorhanden ist → sofort 200/422 mit `error: 'master_clip_failed'` zurück, Lip-Sync-Felder geleert lassen, keine Credits, kein Sync.so-Call, kein Reset auf `pending`.
+### 2. UI-Härtung (`CharacterCastPicker.tsx`)
+- Self-Heal ersetzt durch `dedupeCharacterShots` gegen `resolutionPool` → Slug-Slots werden auf die UUID normalisiert **und** anschließend zusammengeführt.
+- `healedRef`-Einmal-Sperre entfällt; stattdessen Guard „nur schreiben, wenn Ergebnis sich unterscheidet".
+- Zusätzlich Anzeige-Dedup direkt beim Rendern, damit auch ungespeicherte Zustände nie zwei identische Chips zeigen.
 
-### 3. Server: Re-Render-Reset nicht mehr blind
-Die Gates, die auf `clip_status='pending'` zurücksetzen, bekommen eine Zähl-Grenze: Wenn die Szene bereits ≥2 fehlgeschlagene Clip-Renders hat (`retry_count`) oder der letzte `clip_error` ein Content-Filter-Marker (`[green_net_rejected]`, `E005`) ist, wird **nicht** auf `pending` zurückgesetzt, sondern terminal `clip_status='failed'` mit klarer Meldung („Prompt vom Anbieter-Filter blockiert — bitte Szenentext anpassen"). Damit endet die Schleife.
+### 3. Schreibpfade absichern
+- `useApplyProductionPlan.ts`: Dedup-Key auf kanonische ID umstellen (statt Roh-String).
+- `syncCastFromPrompt.ts` (`syncCastFromPrompt` + `ensureEnsembleScene`): Präsenzprüfung über kanonische IDs, damit ein bereits als Slug vorhandener Charakter nicht erneut angehängt wird.
+- `useComposerPersistence.ts`: Beim Persistieren von `character_shots` einmal `dedupeCharacterShots` durchlaufen lassen — damit bestehende Projekte beim nächsten Speichern selbstheilen.
 
-### 4. Client: Trigger- und Balken-Hygiene
-- `useTwoShotAutoTrigger`: Kandidaten-Filter und Audio-Prep-Pfade zusätzlich hart auf `clip_status === 'ready'` prüfen; `master_clip_failed` in die stillen Gründe aufnehmen und dabei **immer** `lipsync:end` emittieren.
-- `ClipsTab.tsx`: `clip_status === 'ready'`-Guard vor dem Push in `lipSyncTargets`.
-- Watchdog-/Self-Heal-Blöcke (orphanReruns, stalePrep, talking-head-Reset) überspringen Szenen mit `clip_status='failed'`.
+### 4. Server-Guard (Anker + Lip-Sync)
+- In `supabase/functions/_shared/` eine kleine Deno-Variante der Dedup-Funktion; angewendet in `compose-video-clips` (vor Portrait-/Anker-Komposition) und `compose-dialog-segments` (vor Pass-Berechnung), sodass ein doppelter Slot niemals zu doppelten Portraits oder einem Extra-Sync.so-Pass führt. Nicht-auflösbare Nicht-UUID-Slots werden dort verworfen statt als eigener Charakter behandelt.
 
-### 5. UI
-Bei terminal fehlgeschlagener Szene zeigt die Karte nur noch „Szene fehlgeschlagen — Prompt vom Anbieterfilter blockiert" mit Aktion „Prompt anpassen & neu rendern"; kein Lip-Sync-Spinner, kein Fortschrittsbalken.
+### 5. Einmal-Bereinigung bestehender Daten
+Migration, die in `composer_scenes.character_shots` Slots mit gleicher aufgelöster Identität zusammenführt (UUID gewinnt, Slug-Duplikate fallen weg). Betroffen ist aktuell nachweislich mindestens eine Szene; die Migration läuft generisch über alle Zeilen des Nutzers.
 
-## Technische Details
-
-- `supabase/functions/compose-dialog-segments/index.ts`: neuer Early-Return-Gate; Reset-Stellen (~L2840, L2997, L3240, L5506) auf terminal-fail umstellen, wenn Content-Filter/Retry-Limit erkannt.
-- `src/hooks/useTwoShotAutoTrigger.ts`, `src/components/video-composer/ClipsTab.tsx`, `src/lib/composer/isRealizedScene.ts` (Marker für terminale Content-Filter-Fehler).
-- Keine Schema-Änderung, keine Preis-/Credit-Logik-Änderung; Refunds laufen über die bestehenden idempotenten Pfade.
+### Verifikation
+- SQL-Recheck: keine Szene mehr mit zwei Slots, deren Namen/Identität identisch sind.
+- UI: die betroffene Szene zeigt nur noch **einen** Samuel-Chip und **ein** Aktionsfeld.
+- Lip-Sync-Log: Sprecheranzahl entspricht der Chip-Anzahl (kein Geister-Pass).
