@@ -5505,6 +5505,11 @@ serve(async (req) => {
             // Ausschnitt; passt sie nicht nachbarsicher hinein, schlägt der
             // Preclip mit `motion_uncoverable` ehrlich fehl.
             trackPoints: v327SlotTrack?.points ?? null,
+            // v334 — der Motion-Cover muss denselben Floor kennen wie der
+            // Gate unten, sonst weitet er den Crop in einen garantierten
+            // „face_share_too_low"-Abbruch hinein.
+            faceShareFloor: speakers.length >= 2 ? 0.24 : 0.12,
+
           },
           300_000,
         );
@@ -5529,6 +5534,8 @@ serve(async (req) => {
           console.error(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v329_preclip_face_share_too_low ` +
             `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} speakers=${speakers.length} ` +
+            `share_src=${(preclipResult as any).faceShareSource ?? "?"} motion_applied=${(preclipResult as any).motionCropApplied ?? "?"} ` +
+            `motion_skip=${(preclipResult as any).motionSkipReason ?? "none"} ` +
             `geometry=${preclipResult.geometryReason ?? "?"} plate_box_w_pct=${preclipResult.plateBoxWidthPct ?? "?"} ` +
             `crop=${JSON.stringify(preclipResult.crop ?? null)} — refusing dispatch (guaranteed no-op)`,
           );
@@ -5587,8 +5594,12 @@ serve(async (req) => {
           (pass as any).preclip_motion_samples = Number.isFinite(Number(preclipResult.trackSamplesUsed))
             ? Number(preclipResult.trackSamplesUsed)
             : null;
+          // v334 — Forensik: warum der Motion-Cover (nicht) griff und aus
+          // welcher Boxquelle der Face-Share stammt.
+          (pass as any).preclip_motion_skip_reason = (preclipResult as any).motionSkipReason ?? null;
+          (pass as any).preclip_face_share_source = (preclipResult as any).faceShareSource ?? null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} v331_motion=${(pass as any).preclip_motion_applied} drift_px=${(pass as any).preclip_motion_drift_px}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} share_src=${(pass as any).preclip_face_share_source} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} v331_motion=${(pass as any).preclip_motion_applied} motion_skip=${(pass as any).preclip_motion_skip_reason} drift_px=${(pass as any).preclip_motion_drift_px}`,
           );
 
 

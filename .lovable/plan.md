@@ -1,48 +1,45 @@
-## Ausgangslage (geprüft gegen das verbundene Stripe-Konto)
+## Was der Fehler wirklich ist
 
-| Bereich | Code | Stripe live | Status |
-| --- | --- | --- | --- |
-| Abo (Frontend) | 19,99 € (`price_1TyHcA…`) | existiert, 19,99 €/Monat | falscher Preis |
-| Abo (Server, `_shared/stripe-config.ts`) | `price_1SLqZy…` / `price_1TSLxW…` | **existiert nicht** | tot |
-| Abo-Coupons `PRO-FOUNDERS-24M`, `PRO-LAUNCH-3M` | im Checkout verdrahtet | **existieren nicht** | falsch konzipiert + tot |
-| Credit-Pakete 10/50/100/250 € | 8 Price-IDs `price_1SWO…` | **existieren nicht** | Credit-Kauf schlägt live fehl |
-| Founders-Rabatt auf Credits | `FOUNDERS_VIDEO_20` in `ai-video-purchase-credits` | existiert, 20 % | korrekt, bleibt |
+Die Meldung „preclip_face_share_too_low … 2.8 %" ist **kein Erkennungsfehler auf dem Bild**, sondern ein Rechenfehler in unserer eigenen Crop-Logik.
 
-## Zielzustand
+Aus den Logs der betroffenen Szene (`69d56a49…`, Sprecher Samuel Dusatko, 4 Sprecher):
 
-- **Ein Abomodell: 14,99 €/Monat**, ohne Rabatt, ohne Coupon.
-- **Founders-Vorteil: 20 % auf jeden Credit-Kauf, 24 Monate** — bereits über `FOUNDERS_VIDEO_20` + `is_founder_active` umgesetzt, wird nur repariert und sauber kommuniziert.
-- Pricing-Seite zeigt **nur 14,99 €**, kein Hinweis auf spätere Erhöhung.
+```text
+v331_motion_cover applied=true samples=2 drift_px=4 crop=30,0,394 face_share=0.028
+v329_preclip_face_share_too_low face_share=0.028 floor=0.24 geometry=ok
+plate_box_w_pct=0.0428  crop={"x":30,"y":0,"size":394}
+```
 
-## Schritte
+Zwei Zahlen passen nicht zusammen:
+- Die Gesichtsbox aus der Plate-Identität ist ca. **4,3 % der Plate-Breite** (~55 px).
+- Der Motion-Cover hat den Crop trotzdem auf **394 px** aufgezogen — obwohl die gemessene Bewegung nur **4 px** beträgt und nur **2 Track-Samples** vorlagen.
 
-**1. Stripe-Objekte anlegen**
-- Neuer wiederkehrender Preis **14,99 €/Monat** auf Produkt `prod_UyE4edZ94ktyOt` (Beta-Basic); der 19,99-€-Preis wird deaktiviert. Laufende Abos bleiben unberührt.
-- 8 neue Einmalpreise für die Credit-Pakete (10 / 50 / 100 / 250, je EUR und USD) im aktiven Konto.
-- Coupon `FOUNDERS_VIDEO_20` bleibt unverändert (20 %, gilt pro Credit-Kauf; die 24-Monats-Grenze wird serverseitig über `is_founder_active` geprüft).
+Ursache: In `pass-face-preclip.ts` bildet der v331-Motion-Block die Hüllbox aus den **Track-Boxen** (anderer Detektor, andere Skala) und rechnet den Face-Share danach mit der **kleinen Plate-Box** gegen die große Hüllfläche. Das Ergebnis ist systematisch zu klein (55²/394² ≈ 2,8 %) und fällt unter den v331-Floor von 0,24. Der Gate stuft das als garantierten No-Op ein, bricht ab und erstattet Credits — obwohl der eigentliche Mund-Anker-Crop (Ziel-Face-Share 42 %) völlig in Ordnung war.
 
-**2. Abo-Rabattlogik entfernen**
-- `supabase/functions/create-checkout/index.ts`: Der Founders-/Launch-Coupon wird **nicht mehr auf das Abo angewendet**. Der Slot-Claim (`claim_founders_slot`) bleibt erhalten — er markiert den Founder-Status für den Credit-Rabatt — aber sein `coupon_id` wird nicht mehr in `session.discounts` gesetzt.
-- `PRO_PRICE_IDS` zeigt auf die tatsächlich genutzte Abo-Price-ID, damit der Slot-Claim überhaupt auslöst.
-- Manuell übergebene `promoCode`/`couponId` bleiben möglich (Support-Fälle).
+## Fix (v334 — Motion-Cover Face-Share-Konsistenz)
 
-**3. Konfiguration angleichen**
-- `src/config/pricing.ts`: 14,99 € + neue Price-ID; `getProductInfo` liefert 14,99 €.
-- `src/config/stripe.ts`: neue Price-ID, `PRO_REGULAR_PRICE_EUR = 14.99`, `PRO_PROMO_PRICE_EUR` entfällt; tote `PRO_PROMO_COUPONS` und `INTRO_PROMO_CODES` (`START-BASIC`/`START-ENT` existieren nicht) entfernen.
-- `src/lib/intro.ts`: tote Intro-Code-Logik entfernen.
-- `src/config/aiVideoCredits.ts` und `supabase/functions/ai-video-purchase-credits/index.ts`: neue Credit-Pack-Price-IDs.
-- `supabase/functions/_shared/stripe-config.ts`: Price-/Product-Map auf real existierende Objekte, Coupon-Konstanten bereinigen.
-- Betroffene Edge Functions neu deployen (`create-checkout`, `ai-video-purchase-credits` und alles, was `stripe-config.ts` importiert).
+**1. Face-Share konsistent messen** (`supabase/functions/_shared/pass-face-preclip.ts`)
+Nach dem Motion-Cover den Share nicht mehr aus der Einzelframe-Plate-Box gegen die Hüllfläche rechnen. Stattdessen die **mediane Track-Boxfläche** (dieselbe Quelle wie die Hüllbox) verwenden; nur wenn keine Track-Boxen vorliegen, die Plate-Box nutzen. Damit werden nie zwei Boxquellen vermischt.
 
-**4. Texte umstellen**
-- Preis überall 14,99 €/Monat: `src/pages/Pricing.tsx`, `src/components/landing/PricingSection.tsx`, `src/pages/Legal.tsx`, `src/components/landing/CompetitorComparisonCard.tsx`, `src/lib/translations.ts` (DE/EN/ES).
-- `src/components/landing/FoundersBenefitsDialog.tsx` + `src/components/pricing/FoundersSlotBadge.tsx`: Founder-Vorteil wird umformuliert von „günstigeres Abo" zu **„20 % auf alle KI-Modelle / jeden Credit-Kauf, 24 Monate lang"**. Der Abopreis wird dort nicht mehr als rabattiert dargestellt.
+**2. Motion-Cover nur bei echter Bewegung**
+Der Block greift künftig nur, wenn
+- mindestens 3 verwertbare Track-Samples vorliegen **und**
+- der gemessene Drift relevant ist (> 8 % der Face-Boxbreite).
+Bei 2 Samples / 4 px Drift bleibt der saubere Mund-Anker-Crop unverändert stehen.
 
-**5. Verifikation**
-- Jede im Code verwendete Price-, Product- und Coupon-ID einzeln gegen die Stripe-API auflösen.
-- Repo-Sweep: keine `…DRu4kfSFxj…`-ID und kein „19,99"/„19.99" mehr übrig.
-- Typecheck.
+**3. Share-erhaltende Deckelung**
+Falls der Motion-Cover den Crop doch weitet, wird die Größe so gedeckelt, dass der resultierende Face-Share den geltenden Floor (0,24 bei ≥ 2 Sprechern) nicht unterschreitet — Nachbar-Deckel bleibt weiterhin die harte Obergrenze. Passt Bewegung nur mit Share-Verlust hinein, bleibt der bestehende `motion_uncoverable`-Pfad zuständig.
 
-## Hinweis
+**4. Plausibilitätsbremse gegen Boxquellen-Drift**
+Weicht die Track-Boxbreite um mehr als Faktor 2,5 von der Plate-Boxbreite ab, wird der Motion-Cover verworfen und geloggt (`v334_track_scale_mismatch`) — dann stimmen die Koordinatenräume nicht überein und wir dürfen daraus keinen Crop ableiten.
 
-Bestehende Abonnenten zu 19,99 € behalten diesen Preis, bis sie kündigen — Stripe migriert laufende Abos nicht automatisch. Sag Bescheid, falls sie aktiv auf 14,99 € umgestellt werden sollen.
+**5. Telemetrie**
+Zusätzliche Felder im Pass-Meta: `preclip_motion_skip_reason`, `preclip_face_share_source` (`track` | `plate`), plus eine Logzeile pro Entscheidung, damit ein Wiederauftreten in einem Blick zuzuordnen ist.
+
+## Betroffene Dateien
+- `supabase/functions/_shared/pass-face-preclip.ts` (Kern der Änderung)
+- `supabase/functions/compose-dialog-segments/index.ts` (nur neue Meta-/Logfelder durchreichen; Floor und Refund-Pfad bleiben unverändert)
+
+## Verifikation
+- Betroffene Szene neu rendern und prüfen: `v331_motion_cover applied=false skip_reason=insufficient_motion`, `face_share ≥ 0.24`, Dispatch geht raus statt `PREFLIGHT_BLOCKED`.
+- Gegenprobe an einer bewegten Szene: Motion-Cover greift weiter, Share bleibt über dem Floor, kein Full-Plate-Dispatch (kein Morphing-Rückfall).
