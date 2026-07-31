@@ -5,7 +5,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-speakers.ts";
-import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
+import { isGreenNetRejection, hardSanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
@@ -520,6 +520,71 @@ serve(async (req) => {
           // Fall through to the normal failed+refund path below.
         }
       }
+
+      // ── Green-Net auto-retry with a hard-compressed prompt (v316) ─────────
+      // Alibaba's filter rejects the long lip-ready master plate because of
+      // its dense mouth/lip/jaw vocabulary and negative cascades. Before we
+      // fail the scene we resend ONCE with the compressed prompt. Idempotent
+      // by construction: if the hard-compressed text equals what we already
+      // sent, we skip and fall through to the refund path.
+      const sentPrompt = String((payload?.input as any)?.prompt ?? '');
+      if (
+        isGreenNetRejection(enrichedError) &&
+        String((scene as any)?.clip_source ?? '') === 'ai-happyhorse' &&
+        sentPrompt &&
+        (payload.model || payload.version)
+      ) {
+        const hard = hardSanitizeForHappyHorse(sentPrompt);
+        const changed = !hard.emptied && hard.clean.trim() !== sentPrompt.trim();
+        if (changed) {
+          try {
+            const replicateKey = Deno.env.get('REPLICATE_API_KEY');
+            if (!replicateKey) throw new Error('REPLICATE_API_KEY missing');
+            const replicate = new Replicate({ auth: replicateKey });
+            const webhookBase = appendWebhookToken(
+              `${supabaseUrl}/functions/v1/compose-clip-webhook`,
+            );
+            const createArgs: Record<string, unknown> = {
+              input: { ...(payload.input as Record<string, unknown>), prompt: hard.clean },
+              webhook: `${webhookBase}&scene_id=${sceneId}&project_id=${projectId}`,
+              webhook_events_filter: ['completed'],
+            };
+            if (payload.model) createArgs.model = payload.model;
+            else createArgs.version = payload.version;
+
+            const retried = await replicate.predictions.create(
+              createArgs as Parameters<typeof replicate.predictions.create>[0],
+            );
+
+            await supabase
+              .from('composer_scenes')
+              .update({
+                clip_status: 'generating',
+                replicate_prediction_id: retried.id,
+                ai_prompt: hard.clean,
+                clip_error: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sceneId);
+
+            console.warn(
+              `[compose-clip-webhook] green-net retry for scene ${sceneId} → pred ${retried.id}, compressed ${sentPrompt.length}→${hard.clean.length} chars (${hard.touched.join(', ')})`,
+            );
+
+            return new Response(
+              JSON.stringify({ ok: true, greenNetRetry: true }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          } catch (gnErr) {
+            console.error('[compose-clip-webhook] green-net retry dispatch failed:', gnErr);
+          }
+        } else {
+          console.warn(
+            `[compose-clip-webhook] green-net rejection on scene ${sceneId} — prompt already compressed, no further retry`,
+          );
+        }
+      }
+
 
       // ── Green-Net (Alibaba HappyHorse content filter) → tag, do NOT switch ──
       // v176: previously we silently rewrote clip_source to ai-hailuo so the

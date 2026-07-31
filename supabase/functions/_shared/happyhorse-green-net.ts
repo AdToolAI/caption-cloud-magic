@@ -104,9 +104,220 @@ function dedupeSentences(s: string): { out: string; touched: boolean } {
 
 const NON_ASCII = /[^\x00-\x7F]/g;
 
-export function sanitizeForHappyHorse(input: string): GreenNetSanitizeResult {
+// ─────────────────────────────────────────────────────────────────────────
+// v316 — Lip-Ready Compressor
+//
+// The cinematic-sync master plate prompt grew to ~2.4k chars saturated with
+// mouth/lip/jaw/breathing/swallow/whisper vocabulary plus long negative
+// cascades ("no lip-flap, no chewing pattern, no whispering shapes").
+// Green Net reads negations as positives and treats dense mouth/body
+// descriptions of people as intimate content → DataInspectionFailed even
+// for a harmless office-elevator scene.
+//
+// The compressor collapses that choreography into one neutral sentence,
+// drops negative lists, harmonises contradictory people counts and caps the
+// length. Lip-sync quality is unaffected: the mouth is driven by sync-3 in
+// post, not by the plate prompt.
+// ─────────────────────────────────────────────────────────────────────────
+
+const MOUTH_TOKENS = [
+  "mouth", "lip", "lips", "lip-line", "lip-flap", "jaw", "whisper", "whispering",
+  "swallow", "chewing", "syllable", "syllables", "muttering", "breathing",
+  "nose", "teeth", "tongue",
+];
+
+const NEUTRAL_FACE_CLAUSE =
+  "Everyone has a calm, natural, neutral facial expression with the face fully visible and unobstructed.";
+const NEUTRAL_IDLE_CLAUSE =
+  "Everyone shows subtle natural idle motion; heads stay steady, eyes open and alert.";
+const CAMERA_LOCK_CLAUSE =
+  "Locked static tripod shot with fixed framing for the entire clip.";
+
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+};
+const COUNT_WORDS = ["", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+
+function countMouthTokens(sentence: string): number {
+  const lower = sentence.toLowerCase();
+  let n = 0;
+  for (const t of MOUTH_TOKENS) {
+    if (new RegExp(`\\b${t}\\b`).test(lower)) n++;
+  }
+  return n;
+}
+
+/** A sentence that is essentially a negative list ("No X, no Y, no Z."). */
+function isNegativeList(sentence: string): boolean {
+  const lower = sentence.toLowerCase();
+  const negs = (lower.match(/\bno\b|\bnever\b|\bwithout\b/g) ?? []).length;
+  if (negs === 0) return false;
+  const words = lower.split(/\s+/).filter(Boolean).length || 1;
+  return negs >= 3 || negs / words > 0.18;
+}
+
+function splitSentences(s: string): string[] {
+  return s
+    .split(/(?<=[.!?])\s+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function capAtSentenceBoundary(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const parts = splitSentences(s);
+  const kept: string[] = [];
+  let len = 0;
+  for (const p of parts) {
+    if (len + p.length + 1 > max) break;
+    kept.push(p);
+    len += p.length + 1;
+  }
+  if (kept.length === 0) return s.slice(0, max).replace(/\s+\S*$/, "") + ".";
+  return kept.join(" ");
+}
+
+export interface LipReadyCompressResult {
+  out: string;
+  touched: string[];
+}
+
+/**
+ * Collapse the lip-sync master-plate choreography into Green-Net-safe text.
+ * `hard` shortens further (used for the automatic retry after a rejection).
+ */
+export function compressLipReadyPlate(input: string, hard = false): LipReadyCompressResult {
   const touched: string[] = [];
   let s = String(input ?? "");
+
+  // 1) numbered directive blocks ("[3 SHOT] …", "[8 NEGATIVE] …") and the
+  //    legacy "no on-screen text" tail.
+  if (/\[\s*\d+\s+NEGATIVE\s*\]/i.test(s)) {
+    s = s.replace(/\[\s*\d+\s+NEGATIVE\s*\][^.]*\.?/gi, "");
+    touched.push("negative-block");
+  }
+  if (/\[\s*\d+\s+[A-Z]+\s*\]/.test(s)) {
+    s = s.replace(/\[\s*\d+\s+([A-Z]+)\s*\]/g, "");
+    touched.push("numbered-directive-tag");
+  }
+  if (/no on-screen text/i.test(s)) {
+    s = s.replace(/,?\s*no on-screen text[^.]*\.?/gi, "");
+    touched.push("no-onscreen-text-tail");
+  }
+
+  // 1b) rescue the cast lock BEFORE the mouth-block filter deletes it —
+  //     "Exactly 2 distinct people: Samuel Dusatko, …" sits inside the same
+  //     sentence as the mouth/jaw directive.
+  let castClause = "";
+  let castCount = 0;
+  const exact = s.match(
+    /\bexactly\s+(\d+|one|two|three|four|five|six|seven|eight)\s+(?:distinct\s+)?(?:people|persons|person)\s*:?\s*([^,.;—]*)/i,
+  );
+  if (exact) {
+    const raw = exact[1].toLowerCase();
+    const n = NUMBER_WORDS[raw] ?? Number(raw);
+    if (Number.isFinite(n) && n >= 1 && n <= 8) {
+      castCount = n;
+      const names = (exact[2] || "").trim().replace(/\s+/g, " ");
+      const word = COUNT_WORDS[n] ?? String(n);
+      castClause = names
+        ? `Exactly ${word} ${n === 1 ? "person" : "people"} in frame: ${names}.`
+        : `Exactly ${word} ${n === 1 ? "person" : "people"} in frame.`;
+      touched.push("cast-lock-preserved");
+    }
+  }
+
+  // 1c) internal bracket tags ("[Besetzung: … ]") read as role instructions.
+  if (/\[[^\]]*\]/.test(s)) {
+    s = s.replace(/\[[^\]]*\]/g, " ");
+    touched.push("bracket-tag");
+  }
+
+  // 2) sentence-level pass: drop mouth-choreography and negative lists.
+  const sentences = splitSentences(s);
+  const kept: string[] = [];
+  let droppedMouth = false;
+  let droppedNegative = false;
+  let droppedCamera = false;
+
+  for (const sentence of sentences) {
+    const lower = sentence.toLowerCase();
+    const mouthHits = countMouthTokens(sentence);
+    const cameraLock =
+      /\b(locked|static)\b/.test(lower) && /\bcamera\b/.test(lower);
+
+    if (cameraLock) {
+      droppedCamera = true;
+      continue;
+    }
+    if (mouthHits >= 2 || (hard && mouthHits >= 1)) {
+      droppedMouth = true;
+      continue;
+    }
+    if (isNegativeList(sentence)) {
+      droppedNegative = true;
+      continue;
+    }
+    kept.push(sentence);
+  }
+
+  if (castClause) kept.unshift(castClause);
+  if (droppedMouth) {
+    touched.push("mouth-choreography-collapsed");
+    kept.push(NEUTRAL_FACE_CLAUSE);
+    if (!hard) kept.push(NEUTRAL_IDLE_CLAUSE);
+  }
+  if (droppedNegative) touched.push("negative-list-dropped");
+  if (droppedCamera) {
+    touched.push("camera-lock-collapsed");
+    kept.push(CAMERA_LOCK_CLAUSE);
+  }
+  s = kept.join(" ");
+
+  // 3) harmonise contradictory people counts against the cast lock.
+  if (castCount > 0) {
+    const word = COUNT_WORDS[castCount] ?? String(castCount);
+    const before = s;
+    let first = true;
+    s = s.replace(
+      /\b(one|two|three|four|five|six|seven|eight|\d+)\s+(people|persons)\b/gi,
+      (m, num) => {
+        if (first) { first = false; return m; } // keep the cast clause itself
+        const val = NUMBER_WORDS[String(num).toLowerCase()] ?? Number(num);
+        return val === castCount ? m : `${word} ${castCount === 1 ? "person" : "people"}`;
+      },
+    );
+    if (s !== before) touched.push("people-count-harmonised");
+  }
+
+
+  // 4) whitespace, sentence-case repair and length cap.
+  s = s.replace(/\s*,\s*,+/g, ",").replace(/[ \t]+/g, " ").replace(/\s+([,.])/g, "$1").trim();
+  s = s.replace(/(^|[.!?]\s+)([a-z])/g, (_m, pre, ch) => pre + ch.toUpperCase());
+  const cap = hard ? 520 : 900;
+  if (s.length > cap) {
+    s = capAtSentenceBoundary(s, cap);
+    touched.push(hard ? "length-cap-hard" : "length-cap");
+  }
+
+  return { out: s, touched };
+}
+
+export function sanitizeForHappyHorse(
+  input: string,
+  opts: { compress?: boolean; hard?: boolean } = {},
+): GreenNetSanitizeResult {
+  const touched: string[] = [];
+  let s = String(input ?? "");
+
+  const compress = opts.compress !== false;
+  if (compress) {
+    const c = compressLipReadyPlate(s, opts.hard === true);
+    if (c.touched.length > 0) {
+      touched.push(...c.touched);
+      s = c.out;
+    }
+  }
 
   for (const [re, repl, tag] of REPLACEMENTS) {
     if (re.test(s)) {
@@ -137,6 +348,12 @@ export function sanitizeForHappyHorse(input: string): GreenNetSanitizeResult {
     emptied: meaningful < 3,
   };
 }
+
+/** Aggressive variant used for the single automatic retry after a rejection. */
+export function hardSanitizeForHappyHorse(input: string): GreenNetSanitizeResult {
+  return sanitizeForHappyHorse(input, { compress: true, hard: true });
+}
+
 
 /**
  * Classify a Replicate / provider error message as a Green-Net rejection.

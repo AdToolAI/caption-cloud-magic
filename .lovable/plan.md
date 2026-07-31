@@ -1,75 +1,41 @@
-## Ergebnis der Analyse
+## Befund (verifiziert im Code)
 
-Vollständiger Abgleich: interner Modell-Katalog gegen den tatsächlich aufgerufenen Provider-Slug gegen die aktuell verfügbare Version (Stand 31.07.2026).
+Dieser Prompt stammt nicht direkt vom Kunden, sondern aus `buildCinematicSyncMasterPrompt()` in `compose-video-clips` (Zeile ~4341, Pfad `isCinematicSyncHH`). Er geht durch `sanitizeForHappyHorse()` — und der Sanitizer hat für genau dieses Muster **keine Regel**. Nachgemessen am gesendeten Text:
 
-### A — Kritisch: Wir liefern etwas anderes als draufsteht
+- **2.423 Zeichen**, davon eine extreme Ballung an Mund-/Körper-Vokabular: `lip/lips` **11×**, `mouth` **5×**, dazu `jaw`, `breathing` (2×), `whispering`, `swallow`, `chewing`, `nose`, `syllables`, `lips softly closed` … Alibabas Green Net bewertet Cluster aus Mund-, Lippen-, Atem- und Schluck-Beschreibungen an Personen als intime/sexualisierte Inhalte — unabhängig davon, dass wir damit nur Lip-Sync-Tauglichkeit erzwingen. Das ist der wahrscheinlichste Auslöser.
+- **Negativlisten werden positiv gelesen**: „No lip-flap, no chewing pattern, no whispering shapes", „no person ever fully static", „[8 NEGATIVE] no watermarks, no logos" — Green Net scannt Rohtext ohne Negationslogik und zählt *chewing*, *whispering*, *lip-flap* als vorhandene Inhalte.
+- **Widerspruch im Prompt**: „Exactly 2 distinct people: Samuel Dusatko" gegen „Three people are standing …" gegen „[Besetzung: Matthew Dusatko]". Personenzahl-Widersprüche triggern die „Rollen-/Instruktions"-Heuristik zusätzlich.
+- Warum es früher lief: Der Master-Plate-Prompt ist über die letzten Iterationen (v198/v242/v245-Härtungen) immer länger geworden. Frühere HappyHorse-Clips hatten kürzere, weniger mundlastige Prompts.
 
-| Was der Kunde sieht | Was wir wirklich aufrufen | Problem |
-|---|---|---|
-| „Seedance 2.0 Standard / Pro" | `bytedance/seedance-1-lite` | Wir verkaufen 2.0, rufen Generation 1 Lite. `bytedance/seedance-2.0` ist auf Replicate verfügbar. |
-| „Vidu Q2 Reference / I2V / T2V" | `vidu/q3-pro` bzw. `vidu/q3-turbo` | Umgekehrter Fall: Label ist eine Generation zu alt, Slugs sind schon Q3. |
-| „Pika 2.2 Std / Pro" | `pika-labs/pika-text-to-video`, im Wartungsstatus, HTTP-410-Kill-Switch aktiv | Das Modell ist faktisch tot, steht aber im Katalog. |
+Der bestehende Sanitizer entfernt nur `[SceneAction]`-Tags, Nacht-/Bildschirm-Phrasen und Duplikate — davon greift hier fast nichts.
 
-### B — Harter Abschalt-Termin
+## Plan
 
-**Sora 2 API: 24. September 2026.** Wir führen `sora-2-standard` und `sora-2-pro` mit fest verdrahteten Version-Hashes. Ab dem Datum bricht jede Sora-Szene. Sora Web/App ist bereits seit 26.04.2026 tot.
+### 1. `_shared/happyhorse-green-net.ts` erweitern (Kern des Fixes)
+Neue Stufe **„Lip-Ready Compressor"**, die vor allen bestehenden Regeln läuft:
 
-### C — Neue Version verfügbar, teils erheblicher Sprung
+- **Mund-Choreografie kollabieren**: Der komplette Block von „Lips relaxed …" bis „… everyone else listens attentively with closed lips." wird durch **einen** neutralen Satz ersetzt:
+  *„Everyone has a calm, natural, neutral facial expression, faces fully visible and unobstructed."*
+  Damit fallen ~1.300 Zeichen und alle `lip/mouth/jaw/whisper/swallow/chewing`-Tokens weg. Die Lip-Sync-Tauglichkeit bleibt erhalten, weil die eigentliche Mundsteuerung ohnehin erst im Sync.so-Post-Pass passiert und Sync-3 Profil/OTS nativ handhabt.
+- **Idle-Body-Block kürzen** auf: *„Everyone shows subtle natural idle motion; heads stay steady, eyes open and alert."*
+- **Negativlisten extrahieren**: Alle Sätze/Fragmente `No X` / `no X, no Y` / `[8 NEGATIVE] …` werden aus dem Prompt entfernt (HappyHorse hat kein `negative_prompt`-Feld — sie werden ersatzlos gestrichen statt dem Filter Reizwörter zu liefern). Ausnahme: die harmlosen Framing-Negationen der Kamera („no cuts, no zoom, no pan") bleiben zusammengefasst als *„locked static tripod shot, fixed framing"*.
+- **Personenzahl vereinheitlichen**: Wenn der Prompt „Exactly N distinct people: <Namen>" enthält, wird jede abweichende Zahlangabe („Three people are standing …") auf N normalisiert. Bei Widerspruch gewinnt die Cast-Zahl.
+- **Längenkappe** bei ~900 Zeichen an Satzgrenze (Green-Net-Trefferquote steigt messbar mit der Länge).
 
-| Bereich | Aktuell bei uns | Verfügbar | Gewinn |
-|---|---|---|---|
-| **Lip-Sync** | `sync/lipsync-2-pro` | **`sync-3`** (Sync.so-Default, 4K/60fps, Spatial Reasoning, eingebaute Verdeckungs-Erkennung, seitliche Gesichter) | Größter Hebel überhaupt — genau unsere Dauerbaustelle mit Mehrfach-Sprechern und Profilansichten |
-| **Luma** | `luma/ray-2-720p` | **`luma/ray-3.2`** (1080p, HDR/EXR, Video-to-Video) | Wir hängen zwei Generationen zurück und sind auf 720p festgenagelt |
-| **Runway** | `gen4_aleph` (Runway-API) | **`runwayml/gen-4.5`** auf Replicate | Aleph bleibt fürs Editing, Gen-4.5 fürs Generieren |
-| **Wan** | 2.5 + 2.6 | **`wan-video/wan-2.7-t2v / -i2v / -r2v`** (1080p, nativer Ton, 15s, Referenz-zu-Video) | r2v ist ein echter Identitäts-Pfad |
-| **Grok** | `x-ai/grok-imagine` | **Grok Imagine Video 1.5** (GA seit 16.06.2026) | Besserer Motion + Audio |
-| **Bild (Picture Studio „ultra")** | `google/nano-banana` (v1) | **`nano-banana-2`** / **`nano-banana-pro`** | v1 ist zwei Generationen alt |
-| **Bild (Picture Studio „fast", Anchor-Seedream)** | `bytedance/seedream-4` | **`seedream-5-pro`** / **`seedream-5-lite`** | Bessere Text- und Referenztreue — relevant für unsere Anchor-Identität |
-| **Voice** | `eleven_turbo_v2_5` / `eleven_multilingual_v2` | **`eleven_v3`** (70+ Sprachen, Flaggschiff) | Achtung: unser deutscher Hard-Lock hängt an turbo_v2_5, siehe Risiko unten |
-| **Musik** | `minimax/music-1.5` | `minimax/music-2.6` bzw. `music-2.8` | Nebenschauplatz |
-| **LLM (Massen-Pfad)** | `google/gemini-2.5-flash` in ~40 Analyse-Functions | `google/gemini-3.6-flash` | Schneller und günstiger bei gleicher Aufgabe |
-| **STT** | `whisper-1` | Neuere Transkriptionsmodelle | Nebenschauplatz |
+Rückgabe erweitert um `compressed: boolean` und die getroffenen Tags für Forensik.
 
-### D — Bereits aktuell, kein Handlungsbedarf
+### 2. Prompt-Builder an der Quelle entschärfen
+`buildCinematicSyncMasterPrompt()` bekommt eine **providerabhängige Kurzfassung**: Für `ai-happyhorse` wird direkt die komprimierte Variante gebaut (keine Mund-Mikrodirektiven, keine Negativkaskaden), für Hailuo/Kling/Wan bleibt der bisherige Langtext unverändert. So greift der Sanitizer nur noch als zweites Netz.
 
-Kling 3.0 + Kling 3.0 Omni ✅ · Veo 3.1 ✅ · Hailuo 2.3 (MiniMax H3 gibt es auf Replicate **nicht**) ✅ · ElevenLabs Music v2 ✅ · Lyria 3 Pro ✅ · Stable Audio 2.5 ✅ · Gemini 3.1 Pro / GPT-5.5 Pro im Text Studio ✅
+### 3. Retry statt Provider-Wechsel
+In `compose-clip-webhook` bei `isGreenNetRejection`: **ein** automatischer Retry mit der hart komprimierten Fassung auf HappyHorse, bevor die Szene als Fehler markiert wird (Zähler `greennet_retry_count`, keine Doppelbelastung). Erst wenn auch der Retry blockt, bleibt es beim heutigen Verhalten (Fehlerkarte + Refund + Hailuo-Vorschlag).
 
-### E — Nicht verfügbar, trotz Ankündigung
+### 4. Fehlerkarte präzisieren
+Statt „HappyHorse-Inhaltsfilter hat den Prompt blockiert" künftig mit Ursache und Selbsthilfe: *„Alibabas Filter reagiert auf Mund-/Lippen-Detailbeschreibungen und Negativlisten. Wir haben den Prompt automatisch gekürzt und erneut gesendet."* plus Button „Gekürzten Prompt anzeigen".
 
-**Seedance 2.5**: auf Replicate steht „coming soon", noch kein Endpunkt. **Topaz Astra / Starlight / Hyperion**: nicht auf Replicate, dort gibt es nur `topazlabs/image-upscale` und `topazlabs/video-upscale`. **MiniMax H3**: nicht auf Replicate.
-
----
-
-## Umsetzungsplan
-
-### Stufe 1 — Ehrlichkeit und Ausfallschutz (zuerst)
-1. **Seedance-Korrektur**: `seedance-standard`/`seedance-pro` auf `bytedance/seedance-2.0` umstellen, Preis gegen den echten Provider-Cost × 3.00 neu setzen. Wenn der Preissprung zu groß ist: alternativ Label auf „Seedance 1 Lite" zurückstufen. Erstere Variante bevorzugt.
-2. **Vidu-Labels** auf Q3 korrigieren (Slugs stimmen bereits).
-3. **Pika deaktivieren**: aus dem wählbaren Katalog nehmen, Bestandsszenen auf Hailuo umleiten (Fallback existiert bereits im Composer).
-4. **Sora-2-Exit**: als `deprecated` markieren, nicht mehr wählbar, Auto-Fallback beim Rendern auf Seedance 2.0 bzw. Veo 3.1 Fast für Audio-Szenen, Hinweistext im Studio.
-
-### Stufe 2 — Lip-Sync auf sync-3 (größter Qualitätshebel)
-- `lip-sync-video` und die Autopilot-Sync-Strecke von `sync/lipsync-2-pro` auf `sync-3` umstellen.
-- Feature-Flag mit Rückschalter, weil unsere gesamte Face-Gate-/Rekognition-Vorstufe auf das alte Verhalten kalibriert ist.
-- A/B-Testlauf mit einer bekannten 4-Sprecher-Szene, bevor der Default umgestellt wird. Wenn sync-3 die Verdeckungen selbst löst, können wir Teile der Landmark-Vorstufe entlasten.
-
-### Stufe 3 — Modell-Upgrades
-- **Ray 3.2** als neuer Luma-Eintrag inkl. Video-to-Video-Pfad; Ray 2 bleibt vorerst als günstige Stufe.
-- **Gen-4.5** ergänzen, Aleph bleibt fürs Editing.
-- **Wan 2.7** (t2v/i2v/r2v) ergänzen; r2v in das Consistency-Ranking aufnehmen.
-- **Grok Imagine 1.5** Slug aktualisieren.
-- **Nano Banana 2 / Pro** und **Seedream 5** in Picture Studio und Anchor-Generierung; Anchor-Umstellung nur mit Vergleichslauf, weil die Identitätstreue daran hängt.
-
-### Stufe 4 — Voice und LLM (vorsichtig)
-- **eleven_v3** nur nach Test: unser deutscher Hard-Lock erzwingt heute `eleven_turbo_v2_5`, weil `eleven_multilingual_v2` `language_code` ignoriert und ins Englische driftet. Vor jeder Umstellung muss belegt sein, dass v3 `language_code` respektiert. Sonst bleibt turbo_v2_5.
-- **gemini-2.5-flash → gemini-3.6-flash** im Massen-Analyse-Pfad, schrittweise mit Stichproben pro Function-Gruppe.
-
-### Stufe 5 — Optional
-Topaz `video-upscale` als Opt-in-Finishing-Schritt im Director's Cut, nach Lipsync und Schnitt, nie im Universal Content Creator (Raw-Media-Invariant). Seedance 2.5 als vorbereiteter, deaktivierter Katalogeintrag.
+### 5. Verifikation
+Ich lasse den Original-Prompt aus deiner Nachricht durch den neuen Sanitizer laufen, zeige dir die gekürzte Fassung, und starte damit einen echten HappyHorse-Testlauf (6s, 720p) gegen `alibaba/happyhorse-1.0` — erst wenn die Prediction durchläuft, melde ich fertig.
 
 ## Technische Details
-
-- Zentrale Dateien: `supabase/functions/_shared/videoPricingCatalog.ts` (Preise), `src/config/aiVideoModelRegistry.ts` (Frontend-Katalog), die einzelnen `generate-*-video/index.ts` (echte Slugs), `lip-sync-video/index.ts` + `_shared/autopilotLipSync.ts`, `compose-scene-anchor/index.ts`, `generate-image-replicate/index.ts`, `_shared/tts-language.ts`.
-- Achtung Doppelpflege: Slug, Preis und Frontend-Label liegen heute in drei getrennten Dateien — genau daher stammen die Seedance-/Vidu-Abweichungen. Ich ergänze eine Konsistenzprüfung, die im Build meldet, wenn eine Katalog-ID keinen zugehörigen Slug hat.
-- Jeder neue Modelleintrag: Provider-Cost recherchieren, × 3.00, Katalogeintrag, Registry, `providerCapabilities`, `sceneEngineRouter`, `modelConsistencyRanking`, Lipsync-Kompatibilitätsmatrix.
-- Verifikation je Stufe: ein echter Testrender pro neu verdrahtetem Modell, plus Abgleich von angezeigtem und abgebuchtem Preis.
+- Geändert: `supabase/functions/_shared/happyhorse-green-net.ts`, `supabase/functions/compose-video-clips/index.ts` (Builder + Übergabe), `supabase/functions/compose-clip-webhook/index.ts` (Retry), Fehleranzeige der SceneCard.
+- Keine Preis-, Margen- oder Schema-Änderung außer einem Retry-Zähler; Lip-Sync-Pipeline, Anchor-Invariante und Toggle-Veto bleiben unangetastet.

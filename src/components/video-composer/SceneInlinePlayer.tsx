@@ -430,7 +430,8 @@ export default function SceneInlinePlayer({
             lower.includes('inappropriate content');
           if (isGreenNet) {
             friendly =
-              'HappyHorse-Inhaltsfilter (Alibaba „Green Net") hat den Prompt blockiert. Wir haben den Provider automatisch auf Hailuo umgestellt – klicke „Neu rendern", um es erneut zu versuchen.';
+              'Alibabas Inhaltsfilter („Green Net") reagiert auf detaillierte Mund-/Lippen-Beschreibungen und Negativlisten im Prompt — nicht auf deinen Szeneninhalt. Wir haben den Prompt automatisch gekürzt und erneut gesendet; blockt es weiterhin, klicke „Neu rendern" oder wechsle auf Hailuo.';
+
           } else if (!rawErr) {
             friendly = 'Render fehlgeschlagen.';
           } else if (
