@@ -48,7 +48,17 @@ type SceneHint = {
   overlayPosition?: 'top' | 'center' | 'bottom';
   tone?: string;
   seed?: number;
+  // v328 — Prosa-Modus (Briefings ohne SHOT:/DIALOG:-Marker)
+  /** Titel hinter dem Em-Dash: „SZENE 1 — Der Auftrag" → „Der Auftrag". */
+  title?: string;
+  /** Beschreibende Prosa des Blocks (ohne Titel, Marker, Zitate). */
+  prose?: string;
+  /** Alle wörtlichen Reden des Blocks inkl. erkanntem Sprecher-Label. */
+  dialogLines?: Array<{ speaker?: string; text: string }>;
+  /** Aus „0–5 Sekunden" / „5-10 Sek" abgeleitete Szenenlänge. */
+  durationSec?: number;
 };
+
 
 type BriefingTiming = {
   durationSec: number;
