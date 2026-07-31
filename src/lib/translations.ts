@@ -2306,7 +2306,7 @@ export const translations: Record<Language, any> = {
       today: "Today",
       // YouTube
       ytConnectTitle: "Connect YouTube Live",
-      ytConnectDesc: "Connect your YouTube channel via the Integrations page to control live broadcasts directly from CaptionGenie.",
+      ytConnectDesc: "Connect your YouTube channel via the Integrations page to control live broadcasts directly from AdTool AI.",
       ytGoToIntegration: "Go to YouTube Integration →",
       createBroadcast: "Create Broadcast",
       titleLabel: "Title",
@@ -7150,7 +7150,7 @@ export const translations: Record<Language, any> = {
       clipNotifSent: "Clip-Benachrichtigung gesendet!",
       today: "Heute",
       ytConnectTitle: "YouTube Live verbinden",
-      ytConnectDesc: "Verbinde deinen YouTube-Kanal über die Integrationen-Seite, um Live-Broadcasts direkt aus CaptionGenie zu steuern.",
+      ytConnectDesc: "Verbinde deinen YouTube-Kanal über die Integrationen-Seite, um Live-Broadcasts direkt aus AdTool AI zu steuern.",
       ytGoToIntegration: "Zur YouTube-Integration →",
       createBroadcast: "Broadcast erstellen",
       titleLabel: "Titel",
@@ -11207,7 +11207,7 @@ export const translations: Record<Language, any> = {
     pricingDetails: {
       header: {
         badge: "Precios Simples y Transparentes",
-        title: "Crece con CaptionGenie",
+        title: "Crece con AdTool AI",
         subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Comienza gratis, actualiza en cualquier momento.",
       },
       period: "mes",
@@ -11952,7 +11952,7 @@ export const translations: Record<Language, any> = {
       clipNotifSent: "¡Notificación de clip enviada!",
       today: "Hoy",
       ytConnectTitle: "Conectar YouTube Live",
-      ytConnectDesc: "Conecta tu canal de YouTube a través de la página de Integraciones para controlar transmisiones en vivo directamente desde CaptionGenie.",
+      ytConnectDesc: "Conecta tu canal de YouTube a través de la página de Integraciones para controlar transmisiones en vivo directamente desde AdTool AI.",
       ytGoToIntegration: "Ir a Integración de YouTube →",
       createBroadcast: "Crear Transmisión",
       titleLabel: "Título",
@@ -13292,7 +13292,7 @@ export const translations: Record<Language, any> = {
     auth_no_account: '¿No tienes cuenta?',
     auth_have_account: '¿Ya tienes una cuenta?',
     auth_welcome_back: '¡Bienvenido de nuevo!',
-    auth_welcome_new: '¡Bienvenido a CaptionGenie!',
+    auth_welcome_new: '¡Bienvenido a AdTool AI!',
     auth_show_password: 'Mostrar contraseña',
     auth_hide_password: 'Ocultar contraseña',
     auth_remember_me: 'Recordarme',
@@ -13330,7 +13330,7 @@ export const translations: Record<Language, any> = {
     },
     // Pricing Page
     pricingPage: {
-      title: "Crece con CaptionGenie",
+      title: "Crece con AdTool AI",
       subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Mejora en cualquier momento.",
       plans: {
         basic: {
