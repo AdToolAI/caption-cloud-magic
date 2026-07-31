@@ -711,6 +711,10 @@ serve(async (req) => {
     // Multi-speaker fanout MUST use preclip_crop overlays. A faceMask
     // fallback on N≥2 means one of the passes lost its preclip_crop — that
     // resurrects the wide-plate morph artefacts v204 was built to avoid.
+    // v331 — dieser Guard und der Dispatch sind jetzt deckungsgleich:
+    // compose-dialog-segments erzwingt für N≥2 ausnahmslos einen Preclip
+    // (der v327-Full-Plate-Pfad ist dort auf Einzelsprecher beschränkt).
+    // Der Guard kann also nicht mehr gegen den eigenen Dispatch feuern.
     if (isFanout && donePasses.length >= 2 && facemasksUsed > 0) {
       const msg =
         `v205 guard: multi-speaker mux for scene=${sceneId} fell back to faceMask on ` +
