@@ -84,7 +84,14 @@ export interface PassPreclipInput {
    * Points outside [startSec, endSec] are ignored.
    */
   trackPoints?: Array<{ t: number; bbox: [number, number, number, number] }> | null;
+  /**
+   * v334 — geltender Face-Share-Floor des Dispatchers (0.24 bei ≥ 2 Sprechern,
+   * sonst 0.12). Der Motion-Cover deckelt die Crop-Größe so, dass der Share
+   * diesen Wert nicht unterschreitet.
+   */
+  faceShareFloor?: number | null;
 }
+
 
 export interface PassPreclipResult {
   ok: boolean;
