@@ -78,8 +78,8 @@ const Index = () => {
     <PageWrapper>
       <div className="min-h-screen flex flex-col bg-background">
         <SEO
-          title="AdTool AI - KI Social Media Marketing Platform"
-          description="Effektives Marketing. Smarte Kampagnen. Dein KI-gestütztes Marketing-Arsenal für Social Media Erfolg."
+          title="Ein Creator. Ein ganzes Studio. — KI-Videos mit AdTool AI"
+          description="Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam."
           canonical="https://useadtool.ai/"
           lang={language}
           structuredData={structuredData}
