@@ -5515,9 +5515,62 @@ serve(async (req) => {
             ? Number(preclipResult.mouthOffsetPx)
             : null;
           (pass as any).preclip_clamped = !!preclipResult.clamped;
+          // v329 — Geometrie-Forensik: sichtbar machen, ob der Crop aus einer
+          // vertrauenswürdigen Detektor-Box stammt oder aus dem proportionalen
+          // Rettungsfenster.
+          (pass as any).preclip_geometry_suspicious = !!preclipResult.geometrySuspicious;
+          (pass as any).preclip_geometry_reason = preclipResult.geometryReason ?? null;
+          (pass as any).preclip_plate_box_w_pct = Number.isFinite(Number(preclipResult.plateBoxWidthPct))
+            ? Number(Number(preclipResult.plateBoxWidthPct).toFixed(4))
+            : null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct}`,
           );
+
+          // ── v329 — Face-Share-Hardening ───────────────────────────────────
+          // Ein Crop mit sehr kleinem Face-Share ist kein Grenzfall, sondern
+          // ein garantierter No-Op: Sync.so findet im Crop kein animierbares
+          // Gesicht und gibt das Video unverändert zurück — der Kunde zahlt
+          // für „done ohne Lippenbewegung". Statt blind zu dispatchen brechen
+          // wir den Pass hier ab; der Refund-Pfad des Aufrufers greift.
+          const v329Share = Number((pass as any).preclip_face_share);
+          const V329_FACE_SHARE_FLOOR = 0.12;
+          if (Number.isFinite(v329Share) && v329Share < V329_FACE_SHARE_FLOOR) {
+            usePassPreclip = false;
+            passPreclipUrl = "";
+            (pass as any).preclip_error = "preclip_face_share_too_low";
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v329_preclip_face_share_too_low ` +
+              `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} ` +
+              `geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} ` +
+              `crop=${JSON.stringify((pass as any).preclip_crop)} — refusing dispatch (guaranteed no-op)`,
+            );
+            await logSyncDispatch(supabase, {
+              scene_id: sceneId,
+              user_id: userId,
+              engine: "sync-segments",
+              sync_source_kind: "segments",
+              video_url: preclipResult.preclipUrl,
+              coords: [Number(pass.coords[0]), Number(pass.coords[1])],
+              frame_number: null,
+              http_status: 0,
+              sync_status: "V329_PRECLIP_FACE_SHARE_TOO_LOW",
+              error_class: "preclip_face_share_too_low",
+              error_message:
+                `Gesichts-Geometrie unsicher: Face-Share ${(v329Share * 100).toFixed(1)}% < ${(V329_FACE_SHARE_FLOOR * 100).toFixed(0)}% — Szene neu berechnen.`,
+              meta: {
+                pass_idx: currentPassIdx,
+                v329: {
+                  face_share: v329Share,
+                  floor: V329_FACE_SHARE_FLOOR,
+                  geometry_reason: (pass as any).preclip_geometry_reason,
+                  plate_box_w_pct: (pass as any).preclip_plate_box_w_pct,
+                  crop: (pass as any).preclip_crop,
+                },
+              },
+            });
+          }
+
 
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
