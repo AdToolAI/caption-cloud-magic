@@ -50,7 +50,7 @@ const STALE_DISPATCH_RECOVERY_MS = 30_000;
 const STALE_AUDIO_MUX_MS = 6 * 60_000;
 // v339 — Provider output is already available, but the browser-backed mouth
 // motion quality probe never reported. Never leave users at 95% indefinitely.
-const STALE_MOTION_PROBE_MS = 4 * 60_000;
+const STALE_MOTION_PROBE_MS = 10 * 60_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 
