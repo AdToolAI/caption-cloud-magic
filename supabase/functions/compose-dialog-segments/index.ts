@@ -635,7 +635,7 @@ interface SegmentsState {
   final_url?: string | null;
   error?: string;
   plate_identity?: {
-    version: "v153.2" | "v160" | "v242";
+    version: "v153.2" | "v160" | "v242" | "v329";
     dims: { width: number; height: number } | null;
     bboxes: Array<[number, number, number, number] | null>;
     faces?: unknown[];
