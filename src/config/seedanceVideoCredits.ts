@@ -1,10 +1,13 @@
 import { Currency } from './pricing';
 
 // Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Mini: $0.02/s → €0.06/s | Std: $0.03/s → €0.09/s | Pro: $0.06/s → €0.18/s
+// Verifizierte Replicate-Slugs (21.07.2026):
+// Mini = seedance-1-lite ($0.02/s → €0.06/s)
+// Std  = seedance-2.0-fast ($0.15/s → €0.45/s)
+// Pro  = seedance-2.0 ($0.18/s → €0.54/s)
 export const SEEDANCE_VIDEO_MODELS = {
   'seedance-mini': {
-    name: 'Seedance 2.0 Mini',
+    name: 'Seedance 1 Lite (Draft)',
     provider: 'ByteDance (Replicate)',
     quality: '720p',
     costPerSecond: {
@@ -14,40 +17,40 @@ export const SEEDANCE_VIDEO_MODELS = {
     minDuration: 3,
     maxDuration: 15,
     description: {
-      EUR: 'Schnelle 720p-AI-Videos ab 0,30€ pro 5 Sekunden',
-      USD: 'Fast 720p AI videos from $0.30 per 5 seconds',
+      EUR: 'Günstiger Draft-Renderer, 720p — ab 0,30€ pro 5 Sekunden',
+      USD: 'Low-cost draft renderer, 720p — from $0.30 per 5 seconds',
     },
     badge: 'Schnell & Günstig',
   },
   'seedance-standard': {
-    name: 'Seedance 2.0 Standard',
+    name: 'Seedance 2.0 Fast',
     provider: 'ByteDance (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.09,
-      USD: 0.09,
+      EUR: 0.45,
+      USD: 0.45,
     },
     minDuration: 3,
     maxDuration: 15,
     description: {
-      EUR: 'Hochwertige AI-Videos ab 0,45€ pro 5 Sekunden',
-      USD: 'High-quality AI videos from $0.45 per 5 seconds',
+      EUR: 'Seedance 2.0 Fast · 720p — ab 2,25€ pro 5 Sekunden',
+      USD: 'Seedance 2.0 Fast · 720p — from $2.25 per 5 seconds',
     },
     badge: 'Empfohlen',
   },
   'seedance-pro': {
-    name: 'Seedance 2.0 Pro',
+    name: 'Seedance 2.0',
     provider: 'ByteDance (Replicate)',
-    quality: '1080p',
+    quality: '720p',
     costPerSecond: {
-      EUR: 0.18,
-      USD: 0.18,
+      EUR: 0.54,
+      USD: 0.54,
     },
     minDuration: 3,
     maxDuration: 15,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 0,90€ pro 5 Sekunden',
-      USD: 'Premium 1080p quality from $0.90 per 5 seconds',
+      EUR: 'Seedance 2.0 Flagship · 720p — ab 2,70€ pro 5 Sekunden',
+      USD: 'Seedance 2.0 flagship · 720p — from $2.70 per 5 seconds',
     },
     badge: 'Premium',
   },

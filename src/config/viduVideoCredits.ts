@@ -1,7 +1,7 @@
 /**
- * Vidu Q2 Pricing Reference
+ * Vidu Pricing Reference (IDs heißen weiterhin q2-*, laufen real auf Vidu Q3)
  * --------------------------------------------------------------
- * Vidu Q2 from Shengshu AI — distinguishing feature: Reference2V mode
+ * Vidu Q3 from Shengshu AI — distinguishing feature: Reference2V mode
  * accepts up to 7 reference images (character + product + location +
  * style + props) and blends them into one consistent 5-second clip.
  *
@@ -14,7 +14,7 @@
 // Ref: $0.22/clip → €0.66 | I2V/T2V: $0.20/clip → €0.60
 export const VIDU_VIDEO_MODELS = {
   'vidu-q2-reference': {
-    name: 'Vidu Q2 Reference',
+    name: 'Vidu Q3 Reference',
     provider: 'Shengshu AI (Replicate)',
     flatCostEUR: 0.66,
     flatCostUSD: 0.66,
@@ -24,7 +24,7 @@ export const VIDU_VIDEO_MODELS = {
     badge: 'Multi-Ref',
   },
   'vidu-q2-i2v': {
-    name: 'Vidu Q2 Image-to-Video',
+    name: 'Vidu Q3 Image-to-Video',
     provider: 'Shengshu AI (Replicate)',
     flatCostEUR: 0.60,
     flatCostUSD: 0.60,
@@ -33,7 +33,7 @@ export const VIDU_VIDEO_MODELS = {
     badge: 'I2V',
   },
   'vidu-q2-t2v': {
-    name: 'Vidu Q2 Text-to-Video',
+    name: 'Vidu Q3 Text-to-Video',
     provider: 'Shengshu AI (Replicate)',
     flatCostEUR: 0.60,
     flatCostUSD: 0.60,
