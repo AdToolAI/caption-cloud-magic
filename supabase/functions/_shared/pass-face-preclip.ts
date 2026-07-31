@@ -272,6 +272,31 @@ export async function renderPassFacePreclip(
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
+  // v342 — hard face-share floor. Recompute the share against the FINAL
+  // crop (expansion retries enlarge the box and shrink the share). Below
+  // 15% Sync.so reliably emits the input unchanged, so we refuse to pay
+  // for a job that cannot work and let the caller refund the pass.
+  if (bboxValid) {
+    const fbW = Math.max(1, Number((bbox as number[])[2]) - Number((bbox as number[])[0]));
+    const fbH = Math.max(1, Number((bbox as number[])[3]) - Number((bbox as number[])[1]));
+    faceShareInCrop = Math.min(1, (fbW * fbH) / Math.max(1, crop.size * crop.size));
+    const FACE_SHARE_FLOOR = 0.15;
+    if (faceShareInCrop < FACE_SHARE_FLOOR) {
+      console.error(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_face_share_floor_block face_share=${faceShareInCrop.toFixed(3)} floor=${FACE_SHARE_FLOOR} crop=${crop.x},${crop.y},${crop.size} face=${Math.round(fbW)}x${Math.round(fbH)} anchor=${anchor}`,
+      );
+      return {
+        ok: false,
+        error: `preclip_face_share_too_low:${(faceShareInCrop * 100).toFixed(1)}%_crop${crop.size}px_face${Math.round(fbW)}x${Math.round(fbH)}`,
+        errorClass: "invalid_input",
+      };
+    }
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_face_share_final share=${faceShareInCrop.toFixed(3)} crop_size=${crop.size} face_side=${Math.round(Math.max(fbW, fbH))} ratio=${(crop.size / Math.max(1, Math.max(fbW, fbH))).toFixed(2)} anchor=${anchor}`,
+    );
+  }
+
+
   const t0 = Date.now();
 
   // v188 (Phase 1.2) — Reuse-Guard. If an earlier Lambda run for THIS exact
