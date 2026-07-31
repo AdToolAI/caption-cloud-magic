@@ -190,7 +190,6 @@ const Legal = () => {
                       Rabatte werden technisch über Stripe automatisch beim Checkout angewendet. Es besteht
                       kein Anspruch auf manuelle Eingabe oder nachträgliche Gewährung eines Rabatts.
                     </li>
-                  </ul>
                     <li>
                       Es handelt sich um ein freibleibendes Angebot. Maßgeblich für den abgeschlossenen Vertrag sind
                       ausschließlich die im Stripe-Checkout finalisierten Konditionen.
