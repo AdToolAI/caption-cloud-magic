@@ -1,59 +1,59 @@
-## Kurzantwort
-
-Ja, das hängt zusammen — es ist dasselbe Grundproblem: **eine Person kann in unserem System unter mehreren IDs auftreten**, und die Outfit-Variante ist eine davon.
-
 ## Befund (an echten Daten verifiziert)
 
-Die betroffene Szene (`composer_scenes.8bd233f7…`, zuletzt 12:23 Uhr geschrieben) hat drei Cast-Slots:
+Es gibt heute tatsächlich **zwei Charakterquellen** parallel:
+
+1. **Cast & World** (`brand_characters`) — echte UUID, z. B. `483f9cdc-…` = Samuel Dusatko.
+2. **Projekt-Briefing** (`composer_projects.briefing.characters`) — eigene lokale ID, im betroffenen Projekt:
 
 ```text
-[
-  { characterId: "483f9cdc-…-9c5e7d955016", characterName: "Samuel Dusatko" },
-  { characterId: "outfit:673c117b-a97d-4e64-b414-a080c0b1f77f" },
-  { characterId: "samuel-dusatko" }
-]
+id: "samuel-dusatko"
+brandCharacterId: "483f9cdc-…"
+name: "Samuel Dusatko"
 ```
 
-- `avatar_outfit_looks.673c117b…` gehört zu `avatar_id 54d90504…` = **Matthew Dusatko**, Look „Casual". Der manuell hinzugefügte Charakter landet also als **Outfit-Referenz** statt als Charakter-UUID im Cast.
-- In `brand_characters` gibt es Samuel Dusatko **genau einmal** — der dritte Slot ist ein reiner Slug.
+Genau daraus entsteht die Dublette. Die Szene `6253b1af…` enthält beide Formen derselben Person:
 
-Zwei bestätigte Ursachen:
+```text
+[ { characterId: "483f9cdc-…", characterName: "Samuel Dusatko" },
+  { characterId: "samuel-dusatko" } ]
+```
 
-1. **`resolveCanonicalCharacterId` (canonicalCastId.ts) kennt die Legacy-Präfixe `outfit:` / `catalog:` / `lib:` nicht.** Ein Look-Slot und der Basis-Slot derselben Person werden nie zusammengeführt. `CastRef.ts` kann das bereits (`stripLegacyCastIdPrefix`, `legacyCastIdToRef`), wird im Dedupe-Pfad aber nicht benutzt.
-2. **Der Auflösungs-Pool beim Speichern ist zu klein.** `useComposerPersistence.ts` (Zeile 178) baut den Pool nur aus `project.briefing.characters`. Steht ein Charakter nicht im Briefing, kann `"samuel-dusatko"` nicht aufgelöst werden — der Slug-Slot überlebt den Dedupe und wird erneut in die DB geschrieben.
+Der Prompt-Sync vergleicht nur gegen die Briefing-ID (`samuel-dusatko`), findet die vorhandene UUID nicht — und hängt Samuel ein zweites Mal an. Der bisherige v319-Fix löst Slugs, Namen und `outfit:`-Präfixe auf, kennt aber `brandCharacterId` nicht als kanonische Identität. Deshalb blieb das Problem bestehen.
 
-**Warum Outfits in der Briefing-Analyse mal erkannt werden und mal nicht:** dieselbe uneinheitliche ID-Form. Wird ein Charakter als `outfit:<lookId>` referenziert, trägt der Slot die Outfit-Info **in der ID**; wird er als Basis-UUID referenziert, muss sie in `outfitLookId` stehen. Beim heutigen (nicht präfix-fähigen) Zusammenführen geht je nach Reihenfolge mal der eine, mal der andere Slot verloren — damit verschwindet auch mal der Look. Das ist derselbe Defekt, nicht ein zweiter.
+**Outfits in der Briefing-Analyse:** Die Briefing-Charaktere tragen kein Outfit-Feld — im gespeicherten Briefing stehen nur `appearance`, `identityCardPrompt`, `referenceImageUrl`, `signatureItems`. Der Look liegt aber in `avatar_outfit_looks` am Cast-&-World-Avatar (Samuel hat dort „Brunch", „Casual", „Greek Hoplite"). Weil die Briefing-Analyse mit der Briefing-ID statt der Avatar-UUID arbeitet, findet sie die Looks nie — daher werden Outfits dort nicht angezeigt. Das ist derselbe Defekt, nicht ein zweiter.
 
-## Die saubere Lösung: eine einzige kanonische Cast-Form
+## Lösung: Cast & World wird die einzige Charakterquelle
 
-Grundregel, die wir durchgängig erzwingen: **Ein Cast-Slot ist immer `{ characterId: <brand_characters UUID>, outfitLookId?: <lookId> }`.** Kein Slug, kein Präfix, nirgends.
+### 1. Eine einzige Identität pro Person
+- Kanonische Cast-ID ist ausschließlich die `brand_characters`-UUID.
+- Überall dort, wo Charakter-Pools gebildet werden, gilt: hat ein Briefing-Eintrag ein `brandCharacterId`, ist **das** seine Identität — der lokale Slug ist nur noch ein Alias fürs Auflösen, nie ein Wert zum Schreiben.
+- Slug, Name, `lib:`-, `outfit:`- und `catalog:`-Referenz lösen alle auf dieselbe UUID auf.
 
-### 1. Resolver versteht Legacy-Refs (`canonicalCastId.ts`)
-- Vor der Auflösung `stripLegacyCastIdPrefix` anwenden; bei `outfit:` / `catalog:` über eine Look-Map (`lookId → avatarId`) auf die Avatar-UUID auflösen.
-- Signatur abwärtskompatibel erweitern: `resolveCanonicalCharacterId(slotId, pool, opts?: { outfitLookMap })`, analog `dedupeCharacterShots`.
-- Beim Kollabieren eines Präfix-Slots geht der Look **nie** verloren: `outfitLookId` wird auf den gestrippten Look gesetzt und beim Merge bevorzugt behalten.
+### 2. Zweite Quelle abschalten
+- Briefing-Charaktere ohne Cast-&-World-Verknüpfung können nicht mehr neu entstehen: Beim Hinzufügen wird immer der Avatar aus Cast & World übernommen (inklusive UUID, Portrait, Identity Card, Standardstimme).
+- Auswahl-Oberflächen (Cast-Picker, Asset-Picker, Dialog Studio) zeigen nur noch Cast-&-World-Avatare als wählbare Personen; freie/verwaiste Briefing-Einträge werden beim Laden auf ihren Avatar gemappt statt separat angeboten.
+- Bereits vorhandene Briefing-Einträge mit `brandCharacterId` werden beim Öffnen des Projekts still auf die UUID normalisiert.
 
-### 2. Look-Map zentral bereitstellen
-- Neuer Hook `useOutfitLookMap()` (React Query, hoher `staleTime`), lädt `avatar_outfit_looks (id, avatar_id, name)` einmalig.
-- Konsumenten: `CharacterCastPicker`, `useComposerPersistence`, `useApplyProductionPlan`, Briefing-Analyse-Mapping.
+### 3. Prompt-Sync härten
+- Der automatische Abgleich „Name im Prompt → Cast" prüft vorhandene Slots gegen Slug **und** UUID und fügt neu erkannte Personen nur mit ihrer UUID ein.
+- Damit hängt sich beim manuellen Hinzufügen eines anderen Charakters kein zweiter Samuel mehr an.
 
-### 3. Vollständiger Auflösungs-Pool auf allen Schreibpfaden
-- `useComposerPersistence.ts`: Pool = Briefing-Charaktere **+ Brand-Character-Bibliothek**.
-- `useApplyProductionPlan.ts` und die `syncCastFromPrompt`-Aufrufe in `SceneCard.tsx` bekommen denselben kombinierten Pool (der Picker hat ihn über `resolutionPool` schon).
+### 4. Outfits in der Briefing-Analyse sichtbar machen
+- Die Analyse löst jeden Charakter zuerst auf die Avatar-UUID auf und lädt dann dessen Looks aus `avatar_outfit_looks`.
+- Erkennt der Text ein Outfit („Casual", „Brunch", …), wird der passende Look-Eintrag gesetzt und im Chip angezeigt („Samuel Dusatko — Casual").
+- Ohne Treffer bleibt der Standard-Look, wird aber ebenfalls als wählbar angezeigt, statt das Feld leer zu lassen.
+- Der Look überlebt jedes Zusammenführen doppelter Slots (spezifischerer Shot-Type gewinnt, Outfit wird nie verworfen).
 
-### 4. Ursache abstellen statt nur reparieren (Eingangs-Normalisierung)
-- Im Cast-Picker beim Hinzufügen aus Library/@-Mention sofort normalisieren: statt `outfit:<lookId>` wird `{ characterId: <avatarUUID>, outfitLookId: <lookId> }` geschrieben. Damit entstehen gar keine neuen Präfix-Slots mehr.
-- `briefingAvailable` / `libraryAvailable` filtern über die **kanonische** ID, damit eine bereits besetzte Person nicht erneut als „verfügbar" angeboten wird (heute nur Roh-ID-Vergleich).
-- Gleiche Normalisierung im Briefing-Deep-Parse-Mapping → Outfits werden dann **immer** erkannt, nicht mal so, mal so.
+### 5. Server-Parität
+- Die serverseitige Cast-Auflösung erhält dieselbe Alias-Logik, damit Portrait-Komposition und Lip-Sync-Pässe exakt so viele Slots bauen, wie Chips sichtbar sind.
 
-### 5. Server-Guard nachziehen
-- `supabase/functions/_shared/canonical-cast.ts` bekommt dieselbe Präfix-Behandlung; `compose-video-clips` und `compose-dialog-segments` laden die Look-Map (ein SELECT auf `avatar_outfit_looks`) und deduplizieren damit, bevor Portraits und Lip-Sync-Pässe berechnet werden.
-
-### 6. Einmalige Datenbereinigung
-- Migration über `composer_scenes.character_shots`: `outfit:<lookId>` → Avatar-UUID + `outfitLookId`, Slug-Slots per Namensabgleich mit `brand_characters` auf die UUID, danach identitätsgleiche Slots zusammenführen (spezifischerer `shotType` gewinnt).
+### 6. Bestandsdaten bereinigen
+- Einmalige Bereinigung der gespeicherten Szenen: Slug-Slots, die zu einem Avatar derselben Person gehören, werden mit dem UUID-Slot zusammengeführt.
+- Projekt-Briefings werden auf die Avatar-UUID umgestellt, wo ein `brandCharacterId` hinterlegt ist.
 
 ## Verifikation
-- SQL: keine `character_shots`-Zeile mehr mit `outfit:` / `catalog:` / `lib:`-Präfix und keine zwei Slots derselben aufgelösten Identität.
-- UI: Szene `8bd233f7…` zeigt genau **einen** Samuel- und **einen** Matthew-Chip; manuelles Hinzufügen hängt nichts Weiteres an.
-- Briefing-Analyse: der Look bleibt nach dem Zusammenführen erhalten (Chip zeigt „Matthew Dusatko — Casual").
-- Render-Log: Portrait-Slots und Lip-Sync-Pässe = Chip-Anzahl.
+- Szene `6253b1af…` enthält danach genau **einen** Samuel-Slot mit UUID.
+- Keine gespeicherte Szene enthält noch beide Identitätsformen derselben Person.
+- Manuelles Hinzufügen eines Charakters hängt keinen weiteren an.
+- Briefing-Analyse zeigt für jeden Charakter ein Outfit-Feld mit den echten Cast-&-World-Looks.
+- Render-Log: Portrait-Slots und Lip-Sync-Pässe entsprechen exakt der Chip-Anzahl.

@@ -95,7 +95,7 @@ function findCharacter(
   pool: ComposerCharacter[],
 ): ComposerCharacter | undefined {
   if (!slotId || !pool.length) return undefined;
-  const exact = pool.find((c) => c.id === slotId);
+  const exact = pool.find((c) => c.id === slotId || c.brandCharacterId === slotId);
   if (exact) return exact;
   const lower = safeLower(slotId);
   if (!lower) return undefined;
@@ -123,8 +123,14 @@ export function CharacterCastPicker({
   // Combined pool used for resolving slot ids (briefing first, then library
   // — briefing wins on dupe id).
   const resolutionPool = useMemo<ComposerCharacter[]>(() => {
-    const seen = new Set((characters ?? []).map((c) => c.id));
-    const extras = (libraryCharacters ?? []).filter((c) => !seen.has(c.id));
+    const seen = new Set(
+      (characters ?? []).flatMap((c) =>
+        [c.id, c.brandCharacterId].filter((x): x is string => !!x),
+      ),
+    );
+    const extras = (libraryCharacters ?? []).filter(
+      (c) => !seen.has(c.id) && !(c.brandCharacterId && seen.has(c.brandCharacterId)),
+    );
     return [...(characters ?? []), ...extras];
   }, [characters, libraryCharacters]);
 
@@ -166,9 +172,23 @@ export function CharacterCastPicker({
     return s;
   }, [cast, resolutionPool, canonOpts]);
 
-  const briefingAvailable = (characters ?? []).filter((c) => !inCast.has(c.id));
+  // v320 — a person is "already in the cast" under EITHER id form (briefing
+  // slug or Cast & World UUID), so she is never offered a second time.
+  const isTaken = (c: ComposerCharacter) =>
+    inCast.has(c.id) || !!(c.brandCharacterId && inCast.has(c.brandCharacterId));
+  // v320 — Cast & World is the single character source: briefing entries are
+  // only offered when they are linked to a real avatar (or are an avatar UUID
+  // themselves). Unlinked briefing-only people are never castable anymore.
+  const briefingAvailable = (characters ?? []).filter(
+    (c) =>
+      !isTaken(c) &&
+      (!!c.brandCharacterId ||
+        (libraryCharacters ?? []).some((l) => l.id === c.id)),
+  );
   const libraryAvailable = (libraryCharacters ?? []).filter(
-    (c) => !inCast.has(c.id) && !(characters ?? []).some((b) => b.id === c.id),
+    (c) =>
+      !isTaken(c) &&
+      !(characters ?? []).some((b) => b.id === c.id || b.brandCharacterId === c.id),
   );
 
   // Render nothing if there is genuinely nothing to show or do.
@@ -206,7 +226,10 @@ export function CharacterCastPicker({
   };
   const addFromLibrary = (c: ComposerCharacter) => {
     if (cast.length >= MAX_CAST) return;
-    if (onAddToBriefing && !(characters ?? []).some((b) => b.id === c.id)) {
+    if (
+      onAddToBriefing &&
+      !(characters ?? []).some((b) => b.id === c.id || b.brandCharacterId === c.id)
+    ) {
       onAddToBriefing(c);
     }
     addSlot(c.id);

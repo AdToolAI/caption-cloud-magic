@@ -18,7 +18,17 @@ import type { CharacterShot, ComposerCharacter } from '@/types/video-composer';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type CharacterLike = { id: string; name?: string | null };
+type CharacterLike = {
+  id: string;
+  name?: string | null;
+  /**
+   * v320 — Cast & World is the ONLY character source. Composer briefing rows
+   * keep a readable slug in `id` and the real `brand_characters` UUID here.
+   * When present, that UUID is the canonical cast identity; the slug is just
+   * an alias used for resolving, never a value we write.
+   */
+  brandCharacterId?: string | null;
+};
 
 /** `lookId → avatar (brand_characters) id` — see `useOutfitLookMap()`. */
 export type OutfitLookMap = ReadonlyMap<string, string>;
@@ -38,6 +48,16 @@ function norm(v: unknown): string {
 function firstNameNorm(name: unknown): string {
   const parts = String(name ?? '').toLowerCase().trim().split(/\s+/);
   return norm(parts[0] ?? '');
+}
+
+/**
+ * The canonical id of a pool entry: the Cast & World UUID when the entry is
+ * linked, otherwise its own id. Never returns the briefing slug for a linked
+ * character (v320 — single character source).
+ */
+export function canonicalPoolId(character: CharacterLike): string {
+  const brandId = String(character?.brandCharacterId ?? '').trim();
+  return UUID_RE.test(brandId) ? brandId : character?.id;
 }
 
 /**
@@ -89,23 +109,24 @@ export function resolveCanonicalCharacterId(
 
   if (!pool?.length) return viaLook;
 
-  // 1. Exact id match (fast path, also the UUID case).
-  const exact = pool.find((c) => c.id === raw);
-  if (exact) return exact.id;
+  // 1. Exact id match (fast path, also the UUID case). A briefing slug and the
+  //    linked Cast & World UUID are the SAME person → both resolve to the UUID.
+  const exact = pool.find((c) => c.id === raw || c.brandCharacterId === raw);
+  if (exact) return canonicalPoolId(exact);
 
   const needle = norm(raw);
   if (!needle) return viaLook;
 
   // 2. Full-name match, ignoring separators ("samuel-dusatko" → "Samuel Dusatko").
   const byName = pool.find((c) => norm(c.name) === needle);
-  if (byName) return byName.id;
+  if (byName) return canonicalPoolId(byName);
 
   // 3. Name contained in the id ("lib:samuel-dusatko-42", "@samueldusatko").
   const byNameInId = pool.find((c) => {
     const full = norm(c.name);
     return !!full && full.length >= 4 && needle.includes(full);
   });
-  if (byNameInId) return byNameInId.id;
+  if (byNameInId) return canonicalPoolId(byNameInId);
 
   // 4. Last resort: unique first-name hit (never for UUID-shaped ids —
   //    a UUID must match exactly or not at all).
@@ -114,7 +135,7 @@ export function resolveCanonicalCharacterId(
     const f = firstNameNorm(c.name);
     return !!f && f.length >= 3 && needle.includes(f);
   });
-  if (first.length === 1) return first[0].id;
+  if (first.length === 1) return canonicalPoolId(first[0]);
 
   return viaLook;
 }

@@ -676,6 +676,9 @@ serve(async (req) => {
       const castPool = Array.from(charById.values()).map((c) => ({
         id: c.id,
         name: (c as any).name ?? null,
+        // v320 — Cast & World UUID is the canonical identity of a briefing row.
+        brandCharacterId:
+          (c as any).brandCharacterId ?? (c as any).brand_character_id ?? null,
       }));
       // v319 — outfit look → avatar UUID, so `outfit:<lookId>` slots resolve to
       // their parent character instead of surviving as a second identity.

@@ -359,7 +359,14 @@ export default function SceneCard({
   // the same person is treated as two cast members.
   const { outfitLookMap } = useOutfitLookMap();
   const castResolutionPool = useMemo<ComposerCharacter[]>(() => {
-    const seen = new Set((characters ?? []).map((c) => c.id));
+    // v320 — a briefing entry and its Cast & World avatar are ONE person:
+    // index both id forms so the library copy is never added as a second pool
+    // member (which is what produced the duplicate chip).
+    const seen = new Set(
+      (characters ?? []).flatMap((c) =>
+        [c.id, c.brandCharacterId].filter((x): x is string => !!x),
+      ),
+    );
     const extras = (libCharacters ?? [])
       .filter((c: any) => c?.id && !seen.has(c.id) && !String(c.id).includes(':'))
       .map((c: any) => ({

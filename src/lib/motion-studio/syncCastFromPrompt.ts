@@ -76,13 +76,20 @@ export function syncCastFromPrompt(
   const lower = prompt.toLowerCase();
   const haveIds = presentCanonicalIds(current, characters, opts);
   const dismissed = new Set((dismissedIds ?? []).map((id) => String(id)));
+  const resolvePool = opts?.resolutionPool?.length ? opts.resolutionPool : characters;
 
   const additions: CharacterShot[] = [];
   for (const c of characters) {
-    if (haveIds.has(c.id)) continue;
-    if (dismissed.has(c.id)) continue;
+    // v320 — Cast & World is the single character source: a briefing entry
+    // carries the readable slug in `id` and the real avatar UUID in
+    // `brandCharacterId`. Compare AND write the UUID, otherwise the same
+    // person is appended a second time next to the existing UUID slot.
+    const candidateId =
+      resolveCanonicalCharacterId(c.id, resolvePool, opts) ?? c.brandCharacterId ?? c.id;
+    if (haveIds.has(c.id) || haveIds.has(candidateId)) continue;
+    if (dismissed.has(c.id) || dismissed.has(candidateId)) continue;
     if (!matchesPrompt(lower, c)) continue;
-    additions.push({ characterId: c.id, shotType: 'full' });
+    additions.push({ characterId: candidateId, shotType: 'full' });
     if (current.length + additions.length >= MAX_CAST) break;
   }
 
@@ -115,7 +122,13 @@ export function ensureEnsembleScene<S extends SceneLike>(
   if (!scenes?.length || !characters?.length || characters.length < 2) return scenes;
 
   const allChars = characters.slice(0, MAX_CAST);
-  const requiredIds = new Set(allChars.map((c) => c.id));
+  // v320 — required identities are Cast & World UUIDs (falling back to the
+  // entry id for unlinked rows), matching what `presentCanonicalIds` returns.
+  const requiredIds = new Set(
+    allChars.map(
+      (c) => resolveCanonicalCharacterId(c.id, characters) ?? c.brandCharacterId ?? c.id,
+    ),
+  );
   const requiredEnsembles = scenes.length >= 6 ? 2 : 1;
 
   const isEnsemble = (sc: SceneLike): boolean => {
@@ -158,11 +171,13 @@ export function ensureEnsembleScene<S extends SceneLike>(
       characters,
     );
     for (const ch of allChars) {
-      if (present.has(ch.id)) continue;
+      // v320 — always write the Cast & World UUID, never the briefing slug.
+      const chId = resolveCanonicalCharacterId(ch.id, characters) ?? ch.brandCharacterId ?? ch.id;
+      if (present.has(ch.id) || present.has(chId)) continue;
       const visibleCount = shots.filter((x) => x?.shotType && x.shotType !== 'absent').length;
       if (visibleCount >= MAX_CAST) break;
-      shots.push({ characterId: ch.id, shotType: 'full' });
-      present.add(ch.id);
+      shots.push({ characterId: chId, shotType: 'full' });
+      present.add(chId);
     }
     next[idx] = { ...sc, characterShots: shots };
     repaired++;
