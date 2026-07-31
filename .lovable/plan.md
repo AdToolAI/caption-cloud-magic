@@ -1,45 +1,45 @@
-## Was jetzt tatsächlich fehlschlägt
+# Plan v336 — Preclip-Vertrauensvertrag reparieren
 
-Der aktuelle Lauf um **19:45 UTC** enthält bereits die v334-Telemetrie. v334 arbeitet korrekt: Bei nur zwei Track-Samples wird der Motion-Cover mit `insufficient_samples` übersprungen.
+## Bestätigte Ursache
+Der aktuelle Lauf `69d56a49-8f59-42ab-ab06-8868f0b42db1` scheitert laut Funktions-Log am 31.07.2026 um 20:04:16 UTC mit `v331_multispeaker_probe_unavailable`.
 
-Der neue Log beweist jedoch zwei nachgelagerte Fehler:
+Der Preclip wird erzeugt, aber der nachgelagerte Gate-Code erwartet einen zusätzlichen JPEG-Nachweis, den die Pipeline nicht liefern kann:
 
-```text
-siblings=0
-motion_skip=insufficient_samples
-crop=54,0,394
-face_share=0.000
-plate_box_w_pct=0.0428
-```
+- `face-frame-extract.ts` erlaubt seit v251 absichtlich keine serverseitige MP4-Frame-Extraktion mehr.
+- Der deterministische Browser-Cache enthält für den frisch serverseitig gerenderten Preclip kein Probe-Frame.
+- `compose-dialog-segments` setzt beim erfolgreichen Preclip kein `preclip_face_count`; deshalb wird `preclip_trusted=false`.
+- v331 behandelt anschließend jedes `probe_unavailable` in einer Mehrsprecher-Szene als harten Fehler – selbst wenn tatsächlich ein isolierter Single-Face-Preclip dispatcht werden soll.
 
-1. **Legacy-Face-Share bleibt immer 0:** Für Samuel existiert eine gültige Plate-BBox, aber kein Mouth-Landmark. Dadurch läuft `computeFaceCrop(...)`; anschließend wird `faceShareInCrop` nie aus der BBox berechnet und bleibt beim Initialwert `0`.
-2. **Sibling-Ermittlung liest die falsche Quelle:** Obwohl vier Plate-Gesichter aufgelöst wurden, sucht der Hauptpfad Nachbarn in `speakers[i].coords`. Dort fehlen sie, deshalb entsteht `siblings=0`. Ohne Nachbar-Cap wird der Crop unnötig auf 394 px erweitert.
-3. **Der 24-%-Floor ist geometrisch nicht erreichbar:** Eine ungefähr 55 px breite Face-BBox kann in einem 394-px-Crop rechnerisch keine 24 % Fläche belegen. Der Floor darf daher nicht nur prüfen, sondern muss bereits die Legacy-Crop-Größe begrenzen.
+Das ist ein interner Vertragswiderspruch. Der frühere 0,0-%-Crop-Fehler ist in diesem Lauf nicht mehr die Abbruchursache.
 
-## Fix v335 — Legacy-Crop vollständig konsistent machen
+## Umsetzung
 
-### 1. Face-Share in jedem Crop-Pfad berechnen
-In `pass-face-preclip.ts` wird direkt nach dem finalen Legacy-Crop der Share aus der gültigen Plate-BBox berechnet. `0` ist danach nur noch möglich, wenn wirklich keine verwertbare BBox existiert; dieser Zustand erhält einen eigenen Fehler statt einer irreführenden Prozentmeldung.
+1. **Single-Face-Preclip-Vertrauen explizit ableiten**
+   - In `compose-dialog-segments` einen zentralen Trust-Entscheider ergänzen.
+   - Ein Preclip gilt nur dann als konstruktiv isoliert, wenn:
+     - der Preclip-Render erfolgreich ist,
+     - Face-Share den geltenden Floor erfüllt,
+     - die Geometrie nicht verdächtig ist,
+     - die Ambiguitätsprüfung sauber ist,
+     - kein Geschwister-Gesicht im Crop liegt.
+   - Das Ergebnis samt Begründung auf dem Pass persistieren und loggen; kein erfundener Detektorwert `face_count=1`.
 
-### 2. Share-erhaltenden Legacy-Crop bauen
-Auch ohne Mouth-Landmark wird die BBox als Größenquelle verwendet. Die Crop-Größe wird so begrenzt, dass sie den übergebenen Face-Share-Floor nicht unterschreitet, dabei aber das vollständige Gesicht enthält und innerhalb der Plate bleibt. Kein künstlicher 394-px-Floor mehr für eine 55-px-Face-Box.
+2. **v331 Gate korrekt zwischen Full-Plate und isoliertem Preclip unterscheiden lassen**
+   - `syncso-face-gate.ts` so ändern, dass `probe_unavailable` bei einer Mehrsprecher-**Full-Plate** weiterhin fail-closed bleibt.
+   - Bei einem konstruktiv verifizierten Single-Face-Preclip darf das fehlende zusätzliche JPEG den Dispatch nicht blockieren.
+   - Falls ein echtes Probe-Frame vorhanden ist und darauf null oder mehrere Gesichter erkannt werden, bleibt der harte Morph-Schutz unverändert aktiv.
 
-### 3. Sibling-Koordinaten aus der Plate-Geometrie ableiten
-In allen drei Preclip-Aufrufern von `compose-dialog-segments` werden Nachbarzentren bevorzugt aus `speakerPlateBboxes` berechnet; `speakers[].coords` bleibt nur Fallback. Damit erhält eine bestätigte Vier-Sprecher-Szene tatsächlich drei Siblings und der Nachbar-Cap funktioniert wieder.
+3. **Widersprüchliche Diagnose bereinigen**
+   - Die Meldung `dispatch will proceed unchecked` nicht mehr in einen anschließend harten `no_face`-Fehler einbetten.
+   - Eindeutige Codes für `trusted_preclip_without_probe` und `untrusted_multispeaker_without_probe` ausgeben, damit UI und Logs die tatsächliche Ursache zeigen.
 
-### 4. Alle Preclip-Pfade angleichen
-`faceShareFloor` und dieselbe Sibling-Logik werden nicht nur im seriellen Hauptpfad, sondern auch im Batch-Preclip- und Pre-Fanout-Pfad verwendet. So hängt das Resultat nicht davon ab, welcher Orchestrator-Zweig zuerst läuft.
+4. **Regressionstests ergänzen**
+   - Vertrauenswürdiger Single-Face-Preclip + kein JPEG → Dispatch erlaubt.
+   - Verdächtiger/mehrdeutiger Preclip + kein JPEG → blockiert und erstattet.
+   - Full-Plate mit mehreren Sprechern + kein JPEG → blockiert.
+   - Probe erkennt null oder mehrere Gesichter → weiterhin blockiert.
+   - Single-Speaker-Verhalten bleibt unverändert.
 
-### 5. Regressionstests und Telemetrie
-Gezielte Tests decken ab:
-- gültige BBox ohne Mouth-Landmark ergibt einen realen Share statt `0`;
-- vier Plate-BBoxen ergeben drei Siblings;
-- Legacy-Crop bleibt bei Mehrsprechern über dem Floor;
-- Motion-Cover mit zwei Samples bleibt übersprungen, ohne den korrekten Legacy-Share zu zerstören.
-
-Danach wird `compose-dialog-segments` deployed und der relevante Logpfad geprüft. Erwartung für die Szene: `siblings=3`, `share_src=plate`, `face_share >= 0.24`, kein `preclip_face_share_too_low`, anschließend Sync-3-Dispatch statt Refund.
-
-## Betroffene Dateien
-- `supabase/functions/_shared/pass-face-preclip.ts`
-- `supabase/functions/compose-dialog-segments/index.ts`
-- passende Tests im bestehenden Shared-/Function-Testbereich
+5. **Deploy und Laufprüfung**
+   - `compose-dialog-segments` mit den Shared-Modulen deployen.
+   - Den nächsten Neu-Render anhand der Logs prüfen: Preclip-Trust-Grund, Face-Share, Sibling-Status und Face-Gate-Entscheidung müssen zusammenpassen; Sync.so darf erst danach starten.
