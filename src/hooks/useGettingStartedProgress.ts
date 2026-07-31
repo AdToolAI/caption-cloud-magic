@@ -70,11 +70,17 @@ export const useGettingStartedProgress = () => {
           .eq("user_id", userId),
       ]);
 
+      // Ordered along the production workflow: setup -> brand -> produce -> distribute
       const steps: ChecklistStep[] = [
         {
           key: "onboarding",
           done: !!onboardingRes.data,
           route: "/onboarding",
+        },
+        {
+          key: "brand_kit",
+          done: (brandRes.count ?? 0) > 0,
+          route: "/brand-kit",
         },
         {
           key: "first_video",
@@ -90,11 +96,6 @@ export const useGettingStartedProgress = () => {
           key: "post_planned",
           done: (calendarRes.count ?? 0) > 0,
           route: "/calendar",
-        },
-        {
-          key: "brand_kit",
-          done: (brandRes.count ?? 0) > 0,
-          route: "/brand-kit",
         },
       ];
 
