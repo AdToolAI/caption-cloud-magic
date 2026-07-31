@@ -1020,6 +1020,17 @@ serve(async (req) => {
       }
       const block = blocks[i];
       const { pcm, ttsDiag, voice } = res;
+      // v325 Audio-Invariant — unify loudness BEFORE the PCM is placed on
+      // the timeline. `pcm` is shared by the merged track, the per-speaker
+      // track and the Sync.so slice, so one in-place pass covers all three.
+      const loud = normalizeSegmentLoudnessInPlace(pcm);
+      if (loud.gainDb !== 0) {
+        console.log(
+          `[compose-twoshot-audio] scene ${scene_id} v325_loudness speaker=${block.speakerName} ` +
+          `src=${loud.sourceLufs.toFixed(1)}LUFS gain=${loud.gainDb.toFixed(1)}dB → ${loud.resultLufs.toFixed(1)}LUFS`,
+        );
+      }
+
       // Insert pause as PCM silence BEFORE every non-first utterance.
       if (i > 0 && INTER_SPEAKER_PAUSE_SEC > 0) {
         const pause = silenceSamples(INTER_SPEAKER_PAUSE_SEC);
