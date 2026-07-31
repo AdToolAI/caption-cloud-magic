@@ -302,8 +302,31 @@ export default function SceneInlinePlayer({
           </div>
         )}
 
+        {/* v326 — Face-Map-Review statt Endlos-Spinner */}
+        {awaitingFaceMap && (
+          <div className="absolute inset-0 z-30 bg-black/75 backdrop-blur-[2px] flex flex-col items-center justify-center text-center px-3 gap-1">
+            <UserCheck className="h-6 w-6 text-amber-400" />
+            <span className="text-[11px] font-semibold text-amber-300">Face-Map prüfen</span>
+            <span className="text-[9px] text-muted-foreground leading-tight max-w-[90%]">
+              Sprecher konnten dem Anker nicht automatisch zugeordnet werden.
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFaceMapOpen(true);
+              }}
+              className="mt-1 bg-amber-500/90 hover:bg-amber-500 text-black rounded px-2.5 py-1 text-[10px] font-semibold"
+            >
+              Zuordnung öffnen
+            </button>
+          </div>
+        )}
+        <FaceMapReviewDialog open={faceMapOpen} onOpenChange={setFaceMapOpen} scene={scene} />
+
         {/* Working shimmer overlay */}
         <AnimatePresence>
+
           {isWorking && (
             <motion.div
               initial={{ opacity: 0 }}
