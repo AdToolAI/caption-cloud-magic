@@ -1,45 +1,45 @@
-## Was der Fehler wirklich ist
+## Was jetzt tatsächlich fehlschlägt
 
-Die Meldung „preclip_face_share_too_low … 2.8 %" ist **kein Erkennungsfehler auf dem Bild**, sondern ein Rechenfehler in unserer eigenen Crop-Logik.
+Der aktuelle Lauf um **19:45 UTC** enthält bereits die v334-Telemetrie. v334 arbeitet korrekt: Bei nur zwei Track-Samples wird der Motion-Cover mit `insufficient_samples` übersprungen.
 
-Aus den Logs der betroffenen Szene (`69d56a49…`, Sprecher Samuel Dusatko, 4 Sprecher):
+Der neue Log beweist jedoch zwei nachgelagerte Fehler:
 
 ```text
-v331_motion_cover applied=true samples=2 drift_px=4 crop=30,0,394 face_share=0.028
-v329_preclip_face_share_too_low face_share=0.028 floor=0.24 geometry=ok
-plate_box_w_pct=0.0428  crop={"x":30,"y":0,"size":394}
+siblings=0
+motion_skip=insufficient_samples
+crop=54,0,394
+face_share=0.000
+plate_box_w_pct=0.0428
 ```
 
-Zwei Zahlen passen nicht zusammen:
-- Die Gesichtsbox aus der Plate-Identität ist ca. **4,3 % der Plate-Breite** (~55 px).
-- Der Motion-Cover hat den Crop trotzdem auf **394 px** aufgezogen — obwohl die gemessene Bewegung nur **4 px** beträgt und nur **2 Track-Samples** vorlagen.
+1. **Legacy-Face-Share bleibt immer 0:** Für Samuel existiert eine gültige Plate-BBox, aber kein Mouth-Landmark. Dadurch läuft `computeFaceCrop(...)`; anschließend wird `faceShareInCrop` nie aus der BBox berechnet und bleibt beim Initialwert `0`.
+2. **Sibling-Ermittlung liest die falsche Quelle:** Obwohl vier Plate-Gesichter aufgelöst wurden, sucht der Hauptpfad Nachbarn in `speakers[i].coords`. Dort fehlen sie, deshalb entsteht `siblings=0`. Ohne Nachbar-Cap wird der Crop unnötig auf 394 px erweitert.
+3. **Der 24-%-Floor ist geometrisch nicht erreichbar:** Eine ungefähr 55 px breite Face-BBox kann in einem 394-px-Crop rechnerisch keine 24 % Fläche belegen. Der Floor darf daher nicht nur prüfen, sondern muss bereits die Legacy-Crop-Größe begrenzen.
 
-Ursache: In `pass-face-preclip.ts` bildet der v331-Motion-Block die Hüllbox aus den **Track-Boxen** (anderer Detektor, andere Skala) und rechnet den Face-Share danach mit der **kleinen Plate-Box** gegen die große Hüllfläche. Das Ergebnis ist systematisch zu klein (55²/394² ≈ 2,8 %) und fällt unter den v331-Floor von 0,24. Der Gate stuft das als garantierten No-Op ein, bricht ab und erstattet Credits — obwohl der eigentliche Mund-Anker-Crop (Ziel-Face-Share 42 %) völlig in Ordnung war.
+## Fix v335 — Legacy-Crop vollständig konsistent machen
 
-## Fix (v334 — Motion-Cover Face-Share-Konsistenz)
+### 1. Face-Share in jedem Crop-Pfad berechnen
+In `pass-face-preclip.ts` wird direkt nach dem finalen Legacy-Crop der Share aus der gültigen Plate-BBox berechnet. `0` ist danach nur noch möglich, wenn wirklich keine verwertbare BBox existiert; dieser Zustand erhält einen eigenen Fehler statt einer irreführenden Prozentmeldung.
 
-**1. Face-Share konsistent messen** (`supabase/functions/_shared/pass-face-preclip.ts`)
-Nach dem Motion-Cover den Share nicht mehr aus der Einzelframe-Plate-Box gegen die Hüllfläche rechnen. Stattdessen die **mediane Track-Boxfläche** (dieselbe Quelle wie die Hüllbox) verwenden; nur wenn keine Track-Boxen vorliegen, die Plate-Box nutzen. Damit werden nie zwei Boxquellen vermischt.
+### 2. Share-erhaltenden Legacy-Crop bauen
+Auch ohne Mouth-Landmark wird die BBox als Größenquelle verwendet. Die Crop-Größe wird so begrenzt, dass sie den übergebenen Face-Share-Floor nicht unterschreitet, dabei aber das vollständige Gesicht enthält und innerhalb der Plate bleibt. Kein künstlicher 394-px-Floor mehr für eine 55-px-Face-Box.
 
-**2. Motion-Cover nur bei echter Bewegung**
-Der Block greift künftig nur, wenn
-- mindestens 3 verwertbare Track-Samples vorliegen **und**
-- der gemessene Drift relevant ist (> 8 % der Face-Boxbreite).
-Bei 2 Samples / 4 px Drift bleibt der saubere Mund-Anker-Crop unverändert stehen.
+### 3. Sibling-Koordinaten aus der Plate-Geometrie ableiten
+In allen drei Preclip-Aufrufern von `compose-dialog-segments` werden Nachbarzentren bevorzugt aus `speakerPlateBboxes` berechnet; `speakers[].coords` bleibt nur Fallback. Damit erhält eine bestätigte Vier-Sprecher-Szene tatsächlich drei Siblings und der Nachbar-Cap funktioniert wieder.
 
-**3. Share-erhaltende Deckelung**
-Falls der Motion-Cover den Crop doch weitet, wird die Größe so gedeckelt, dass der resultierende Face-Share den geltenden Floor (0,24 bei ≥ 2 Sprechern) nicht unterschreitet — Nachbar-Deckel bleibt weiterhin die harte Obergrenze. Passt Bewegung nur mit Share-Verlust hinein, bleibt der bestehende `motion_uncoverable`-Pfad zuständig.
+### 4. Alle Preclip-Pfade angleichen
+`faceShareFloor` und dieselbe Sibling-Logik werden nicht nur im seriellen Hauptpfad, sondern auch im Batch-Preclip- und Pre-Fanout-Pfad verwendet. So hängt das Resultat nicht davon ab, welcher Orchestrator-Zweig zuerst läuft.
 
-**4. Plausibilitätsbremse gegen Boxquellen-Drift**
-Weicht die Track-Boxbreite um mehr als Faktor 2,5 von der Plate-Boxbreite ab, wird der Motion-Cover verworfen und geloggt (`v334_track_scale_mismatch`) — dann stimmen die Koordinatenräume nicht überein und wir dürfen daraus keinen Crop ableiten.
+### 5. Regressionstests und Telemetrie
+Gezielte Tests decken ab:
+- gültige BBox ohne Mouth-Landmark ergibt einen realen Share statt `0`;
+- vier Plate-BBoxen ergeben drei Siblings;
+- Legacy-Crop bleibt bei Mehrsprechern über dem Floor;
+- Motion-Cover mit zwei Samples bleibt übersprungen, ohne den korrekten Legacy-Share zu zerstören.
 
-**5. Telemetrie**
-Zusätzliche Felder im Pass-Meta: `preclip_motion_skip_reason`, `preclip_face_share_source` (`track` | `plate`), plus eine Logzeile pro Entscheidung, damit ein Wiederauftreten in einem Blick zuzuordnen ist.
+Danach wird `compose-dialog-segments` deployed und der relevante Logpfad geprüft. Erwartung für die Szene: `siblings=3`, `share_src=plate`, `face_share >= 0.24`, kein `preclip_face_share_too_low`, anschließend Sync-3-Dispatch statt Refund.
 
 ## Betroffene Dateien
-- `supabase/functions/_shared/pass-face-preclip.ts` (Kern der Änderung)
-- `supabase/functions/compose-dialog-segments/index.ts` (nur neue Meta-/Logfelder durchreichen; Floor und Refund-Pfad bleiben unverändert)
-
-## Verifikation
-- Betroffene Szene neu rendern und prüfen: `v331_motion_cover applied=false skip_reason=insufficient_motion`, `face_share ≥ 0.24`, Dispatch geht raus statt `PREFLIGHT_BLOCKED`.
-- Gegenprobe an einer bewegten Szene: Motion-Cover greift weiter, Share bleibt über dem Floor, kein Full-Plate-Dispatch (kein Morphing-Rückfall).
+- `supabase/functions/_shared/pass-face-preclip.ts`
+- `supabase/functions/compose-dialog-segments/index.ts`
+- passende Tests im bestehenden Shared-/Function-Testbereich
