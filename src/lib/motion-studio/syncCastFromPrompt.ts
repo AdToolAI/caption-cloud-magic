@@ -15,23 +15,39 @@
 // - Caps at 4 slots — matches Multi-Portrait Nano Banana 2 / Vidu Q2 limit.
 
 import type { CharacterShot, ComposerCharacter } from '@/types/video-composer';
-import { resolveCanonicalCharacterId } from '@/lib/video-composer/canonicalCastId';
+import {
+  resolveCanonicalCharacterId,
+  type CanonicalCastOptions,
+} from '@/lib/video-composer/canonicalCastId';
 
 const MAX_CAST = 4;
 
+/** Extra identity context so slot ids that drifted still resolve (v319). */
+export interface CastSyncOptions extends CanonicalCastOptions {
+  /**
+   * Broader pool used ONLY for resolving existing slot ids (briefing cast +
+   * avatar library). Detection of new cast members still runs against the
+   * briefing characters.
+   */
+  resolutionPool?: ComposerCharacter[];
+}
+
 /**
  * Set of canonical character ids already present in `shots` — resolves drifted
- * slot ids (slug instead of UUID) so a character that is present as
- * "samuel-dusatko" is never appended a second time as its UUID (v318).
+ * slot ids (slug or `outfit:<lookId>` instead of the UUID) so a character that
+ * is present in another id form is never appended a second time (v318/v319).
  */
 function presentCanonicalIds(
   shots: CharacterShot[],
   pool: ComposerCharacter[] | undefined,
+  opts?: CastSyncOptions,
 ): Set<string> {
   const out = new Set<string>();
+  const resolvePool = opts?.resolutionPool?.length ? opts.resolutionPool : pool;
   for (const s of shots) {
     if (!s?.characterId) continue;
-    out.add(resolveCanonicalCharacterId(s.characterId, pool) ?? s.characterId);
+    out.add(s.characterId);
+    out.add(resolveCanonicalCharacterId(s.characterId, resolvePool, opts) ?? s.characterId);
   }
   return out;
 }
@@ -51,13 +67,14 @@ export function syncCastFromPrompt(
   currentShots: CharacterShot[] | undefined,
   characters: ComposerCharacter[] | undefined,
   dismissedIds?: string[],
+  opts?: CastSyncOptions,
 ): CharacterShot[] {
   const current = currentShots ?? [];
   if (!prompt || !characters?.length) return current;
   if (current.length >= MAX_CAST) return current;
 
   const lower = prompt.toLowerCase();
-  const haveIds = presentCanonicalIds(current, characters);
+  const haveIds = presentCanonicalIds(current, characters, opts);
   const dismissed = new Set((dismissedIds ?? []).map((id) => String(id)));
 
   const additions: CharacterShot[] = [];
@@ -72,6 +89,7 @@ export function syncCastFromPrompt(
   if (additions.length === 0) return current;
   return [...current, ...additions];
 }
+
 
 // ---------------------------------------------------------------------------
 // Ensemble guarantee (client-side safety net)
