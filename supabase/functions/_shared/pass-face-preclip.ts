@@ -109,6 +109,12 @@ export interface PassPreclipResult {
   geometryReason?: string;
   /** v329 — detector box width as a fraction of plate width (0..1). */
   plateBoxWidthPct?: number;
+  /** v331 — number of trajectory samples inside the voiced window. */
+  trackSamplesUsed?: number;
+  /** v331 — max center drift (px) of the speaker across the voiced window. */
+  trackDriftPx?: number;
+  /** v331 — true when the crop was widened/recentered to cover the trajectory. */
+  motionCropApplied?: boolean;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
