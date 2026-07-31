@@ -2961,28 +2961,64 @@ serve(async (req) => {
                             `slots=${anchorFaceLayout.slots.length}/${expected} ` +
                             `source=geometry_plus_prompt_order biometric=${resolved}/${expected}`,
                           );
+                          // v326 — Geometry fallback. AWS CompareFaces returns no
+                          // similarity for stylised anchors quite often; when the
+                          // detector still found EXACTLY as many faces as we have
+                          // speakers, the mapping is unambiguous via the anchor
+                          // layout (prompt/row-major order). Lock it instead of
+                          // parking the scene in `awaiting_manual_face_map`.
+                          const geometryLock: Record<string, string> = {};
+                          if (resolved < expected && anchorLayoutComplete) {
+                            for (const slot of anchorFaceLayout.slots) {
+                              if (slot?.characterId) geometryLock[String(slot.slotIndex)] = slot.characterId;
+                            }
+                          }
+                          const useGeometryLock =
+                            resolved < expected &&
+                            anchorLayoutComplete &&
+                            Object.keys(geometryLock).length >= expected;
+                          if (useGeometryLock) {
+                            anchorIdentityPayload.assignmentLock = {
+                              ...geometryLock,
+                              ...(idResolved.assignmentLock ?? {}),
+                            };
+                            (anchorIdentityPayload as any).assignmentLockSource = "v326_geometry_rowmajor";
+                            (anchorIdentityPayload as any).status = "geometry";
+                            (anchorIdentityPayload as any).resolvedCount = expected;
+                            console.log(
+                              `[compose-video-clips] v326_geometry_lock scene=${scene.id} ` +
+                              `biometric=${resolved}/${expected} → geometry lock applied, no manual review`,
+                            );
+                          }
+
                           const nextDialogShots = {
                             ...nextDialogShotsBase,
                             anchor_face_layout: anchorFaceLayout,
                             plate_identity: {
                               ...(nextDialogShotsBase.plate_identity ?? {}),
                               method: idResolved.method,
-                              status: identityStatus,
-                              assignmentLockSource,
+                              status: useGeometryLock ? "geometry" : identityStatus,
+                              assignmentLockSource: useGeometryLock
+                                ? "v326_geometry_rowmajor"
+                                : assignmentLockSource,
                               dims: idResolved.dims,
                               faces: idResolved.faces,
-                              assignmentLock: idResolved.assignmentLock,
-                              resolvedCount: resolved,
+                              assignmentLock: anchorIdentityPayload.assignmentLock,
+                              resolvedCount: useGeometryLock ? expected : resolved,
                               expectedCount: expected,
                               v278AnchorLayoutSlots: anchorFaceLayout.slots.length,
                               v278AnchorLayoutComplete: anchorLayoutComplete,
                             },
                           };
                           // v276: hard-block only on total miss (0/N) when soft-gate enabled.
+                          // v326: … and only when the geometry fallback can't resolve it either.
                           // Legacy hard-gate (any partial for N>=3) restored via V276_SOFT_GATE=false.
-                          const needsManualReview = softGateEnabled
-                            ? isTotalMiss
-                            : (expected >= 3 && (!idResolved.ok || resolved < expected));
+                          const needsManualReview = useGeometryLock
+                            ? false
+                            : softGateEnabled
+                              ? isTotalMiss
+                              : (expected >= 3 && (!idResolved.ok || resolved < expected));
+
                           await supabaseAdmin
                             .from("composer_scenes")
                             .update({
