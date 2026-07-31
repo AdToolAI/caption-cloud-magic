@@ -5493,17 +5493,26 @@ serve(async (req) => {
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
+            // v331 — Bewegung wird IM Crop aufgefangen statt durch Aufgabe des
+            // Preclips (v327 Full-Plate). Die gemessene Bahn dimensioniert den
+            // Ausschnitt; passt sie nicht nachbarsicher hinein, schlägt der
+            // Preclip mit `motion_uncoverable` ehrlich fehl.
+            trackPoints: v327SlotTrack?.points ?? null,
           },
           300_000,
         );
-        // ── v329 — Face-Share-Hardening (vor der Erfolgs-Übernahme) ────────
+        // ── v331 — Face-Share-Hardening (vor der Erfolgs-Übernahme) ────────
         // Ein Crop mit sehr kleinem Face-Share ist kein Grenzfall, sondern ein
         // garantierter No-Op: Sync.so findet im Crop kein animierbares Gesicht
         // und gibt das Video unverändert zurück — der Kunde zahlt für „done
         // ohne Lippenbewegung". Wir stufen das deshalb als Preclip-Fehler ein,
         // damit der bestehende v187-Pfad (kein Full-Plate-Fallback, Refund)
         // unverändert greift.
-        const V329_FACE_SHARE_FLOOR = 0.12;
+        //
+        // Der letzte Aufzug-Lauf lag bei 15,5 % / 18,1 % Face-Share und wurde
+        // vom v329-Floor (0.12) durchgewunken → Morphing statt Lip-Sync.
+        // v331 hebt den Floor für Mehrsprecher-Szenen deutlich darüber an.
+        const V329_FACE_SHARE_FLOOR = speakers.length >= 2 ? 0.24 : 0.12;
         const v329Share = Number(preclipResult.faceShareInCrop);
         if (
           preclipResult.ok &&
@@ -5512,7 +5521,7 @@ serve(async (req) => {
         ) {
           console.error(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v329_preclip_face_share_too_low ` +
-            `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} ` +
+            `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} speakers=${speakers.length} ` +
             `geometry=${preclipResult.geometryReason ?? "?"} plate_box_w_pct=${preclipResult.plateBoxWidthPct ?? "?"} ` +
             `crop=${JSON.stringify(preclipResult.crop ?? null)} — refusing dispatch (guaranteed no-op)`,
           );
