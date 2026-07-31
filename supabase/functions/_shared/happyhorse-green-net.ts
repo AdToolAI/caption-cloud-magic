@@ -205,6 +205,34 @@ export function compressLipReadyPlate(input: string, hard = false): LipReadyComp
     touched.push("no-onscreen-text-tail");
   }
 
+  // 1b) rescue the cast lock BEFORE the mouth-block filter deletes it —
+  //     "Exactly 2 distinct people: Samuel Dusatko, …" sits inside the same
+  //     sentence as the mouth/jaw directive.
+  let castClause = "";
+  let castCount = 0;
+  const exact = s.match(
+    /\bexactly\s+(\d+|one|two|three|four|five|six|seven|eight)\s+(?:distinct\s+)?(?:people|persons|person)\s*:?\s*([^,.;—]*)/i,
+  );
+  if (exact) {
+    const raw = exact[1].toLowerCase();
+    const n = NUMBER_WORDS[raw] ?? Number(raw);
+    if (Number.isFinite(n) && n >= 1 && n <= 8) {
+      castCount = n;
+      const names = (exact[2] || "").trim().replace(/\s+/g, " ");
+      const word = COUNT_WORDS[n] ?? String(n);
+      castClause = names
+        ? `Exactly ${word} ${n === 1 ? "person" : "people"} in frame: ${names}.`
+        : `Exactly ${word} ${n === 1 ? "person" : "people"} in frame.`;
+      touched.push("cast-lock-preserved");
+    }
+  }
+
+  // 1c) internal bracket tags ("[Besetzung: … ]") read as role instructions.
+  if (/\[[^\]]*\]/.test(s)) {
+    s = s.replace(/\[[^\]]*\]/g, " ");
+    touched.push("bracket-tag");
+  }
+
   // 2) sentence-level pass: drop mouth-choreography and negative lists.
   const sentences = splitSentences(s);
   const kept: string[] = [];
@@ -233,6 +261,7 @@ export function compressLipReadyPlate(input: string, hard = false): LipReadyComp
     kept.push(sentence);
   }
 
+  if (castClause) kept.unshift(castClause);
   if (droppedMouth) {
     touched.push("mouth-choreography-collapsed");
     kept.push(NEUTRAL_FACE_CLAUSE);
@@ -245,24 +274,22 @@ export function compressLipReadyPlate(input: string, hard = false): LipReadyComp
   }
   s = kept.join(" ");
 
-  // 3) harmonise contradictory people counts.
-  const exact = s.match(/\bexactly\s+(\d+|one|two|three|four|five|six|seven|eight)\s+(?:distinct\s+)?(?:people|persons|person)\b/i);
-  if (exact) {
-    const raw = exact[1].toLowerCase();
-    const n = NUMBER_WORDS[raw] ?? Number(raw);
-    if (Number.isFinite(n) && n >= 1 && n <= 8) {
-      const word = COUNT_WORDS[n] ?? String(n);
-      const before = s;
-      s = s.replace(
-        /\b(one|two|three|four|five|six|seven|eight|\d+)\s+(people|persons)\b/gi,
-        (m, num) => {
-          const val = NUMBER_WORDS[String(num).toLowerCase()] ?? Number(num);
-          return val === n ? m : `${word} ${n === 1 ? "person" : "people"}`;
-        },
-      );
-      if (s !== before) touched.push("people-count-harmonised");
-    }
+  // 3) harmonise contradictory people counts against the cast lock.
+  if (castCount > 0) {
+    const word = COUNT_WORDS[castCount] ?? String(castCount);
+    const before = s;
+    let first = true;
+    s = s.replace(
+      /\b(one|two|three|four|five|six|seven|eight|\d+)\s+(people|persons)\b/gi,
+      (m, num) => {
+        if (first) { first = false; return m; } // keep the cast clause itself
+        const val = NUMBER_WORDS[String(num).toLowerCase()] ?? Number(num);
+        return val === castCount ? m : `${word} ${castCount === 1 ? "person" : "people"}`;
+      },
+    );
+    if (s !== before) touched.push("people-count-harmonised");
   }
+
 
   // 4) whitespace + length cap.
   s = s.replace(/\s*,\s*,+/g, ",").replace(/[ \t]+/g, " ").replace(/\s+([,.])/g, "$1").trim();
