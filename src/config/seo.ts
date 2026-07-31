@@ -87,7 +87,7 @@ export const getLocale = (lang: string): string => {
 export const PAGES_SEO = {
   home: {
     path: '/',
-    title: 'Ein Creator. Ein ganzes Studio. — KI-Videos mit AdTool AI',
+    title: 'Ein Creator. Ein ganzes Studio. — KI-Videoproduktion',
     description: 'Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.',
     ogImage: '/og-home.jpg',
     priority: 1.0,

@@ -78,7 +78,7 @@ const Index = () => {
     <PageWrapper>
       <div className="min-h-screen flex flex-col bg-background">
         <SEO
-          title="Ein Creator. Ein ganzes Studio. — KI-Videos mit AdTool AI"
+          title="Ein Creator. Ein ganzes Studio. — KI-Videoproduktion"
           description="Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam."
           canonical="https://useadtool.ai/"
           lang={language}
