@@ -1,44 +1,34 @@
-# Plan v337 — Lip-Sync Quality Gate vor dem finalen Mux
+# Plan v338 — Evidenzbasierter Preclip-Trust-Fix
 
-## Ziel
-Kein Provider-Job darf mehr nur wegen Status „completed“ als erfolgreich gelten. Jeder einzelne Sprecher-Pass muss vor dem finalen Composite nachweislich sichtbare Bewegung im Mundbereich enthalten.
+## Bestätigte Ursache
+Beim aktuellen Lauf `69d56a49-8f59-42ab-ab06-8868f0b42db1` wurden drei Sprecher erfolgreich an den Lip-Sync-Anbieter geschickt. Der vierte Preclip wurde ebenfalls korrekt gerendert, hatte:
+
+- 720×720 Ausgabe
+- 24,29 % Face-Share bei einem Mindestwert von 24 %
+- keinen zweiten Gesichtsmittelpunkt im Crop
+- einen gültigen 68-Frame-Bounding-Box-Track
+
+Trotzdem wurde er blockiert, weil die ursprüngliche Gesichtbox nur 2,88 % der gesamten Plate-Breite einnahm und deshalb pauschal `box_too_small → geometry_suspicious → untrusted_multispeaker_without_probe` gesetzt wurde. Das ist ein Widerspruch: Die kleine Box beschreibt hier ein kleines, aber sauber isoliertes Gesicht; der daraus berechnete Crop erfüllt anschließend bereits alle relevanten Sicherheitsbedingungen.
 
 ## Umsetzung
+1. **Geometrie-Risiken differenzieren**
+   - `box_too_small` nicht länger pauschal mit einer unbrauchbaren finalen Preclip-Geometrie gleichsetzen.
+   - Zwischen fehlender/ungültiger Box und einer kleinen, aber erfolgreich validierten Box unterscheiden.
 
-1. **Bestehende Bewegungsprüfung auf alle Lip-Sync-Engines erweitern**
-   - `useMouthYavgProbe` derzeit nicht nur für `cinematic-sync`, sondern auch für den tatsächlich genutzten `sync-segments`-Pfad aktivieren.
-   - Weiterhin direkt die isolierten 720×720-Provider-Ausgaben prüfen, nicht erst das fertige Gruppen-Video.
-   - Die Messung pro Provider-Job statt nur pro Sitzungsschlüssel absichern, damit ein Retry erneut geprüft wird.
+2. **Trust aus der finalen Konstruktion ableiten**
+   - Einen Preclip ohne JPEG-Probe nur dann freigeben, wenn Render erfolgreich, Face-Share ≥ 24 %, Crop gültig, kein Geschwistergesicht im Crop und Ambiguität sauber sind.
+   - `no_bbox`, ungültige Maße, Geschwistergesicht, zu geringer Face-Share und echte Geometriefehler bleiben weiterhin fail-closed.
 
-2. **Finalen Mux bis zum Qualitätsnachweis sperren**
-   - Ein Pass erhält nach Provider-Abschluss zunächst den Zustand „Qualitätsprüfung ausstehend“ statt sofort vollständig freigegeben zu werden.
-   - `render-sync-segments-audio-mux` darf erst starten, wenn alle Passes einen erfolgreichen Motion-Probe-Nachweis besitzen.
-   - Fehlende oder noch laufende Prüfungen bleiben wartend und erzeugen kein scheinbar fertiges Video.
+3. **Face-Gate konsistent machen**
+   - Die Trust-Entscheidung und ihren exakten Grund unverändert bis `verifyFaceBeforeDispatch` transportieren.
+   - `trusted_preclip_without_probe` für den belegten Fall erlauben; Full-Plate-Inputs bleiben blockiert.
 
-3. **Statische Provider-Ausgaben automatisch behandeln**
-   - Unterhalb des bestehenden Bewegungs-Schwellenwerts wird der vorhandene NOOP-Retry ausgelöst.
-   - Erster Fehlversuch: erneuter Dispatch mit der alternativen, bereits vorhandenen ASD-Strategie.
-   - Bei kleinem Gesicht zuerst der vorhandene mouth-anchored Re-Zoom, danach Bounding-Box-Retry.
-   - Erneut statisches Ergebnis: sauber abbrechen, Szene als fehlgeschlagen markieren und Credits idempotent erstatten; niemals einen statischen Pass in den Mux übernehmen.
+4. **Regressionstests ergänzen**
+   - Exakter Fehlerfall: 2,88 % Plate-Breite, 24,29 % finaler Face-Share, kein Sibling → vertrauenswürdig.
+   - Gegenfälle: Share unter 24 %, Sibling im Crop, fehlende/ungültige Box, zweifelhafte Ambiguität → blockiert.
+   - Sicherstellen, dass bestehende v336-Fail-Closed-Fälle unverändert bestehen.
 
-4. **Race Conditions und doppelte Kosten verhindern**
-   - Motion-Probe, Retry und Mux mit vorhandenen Pass-/Attempt-IDs idempotent machen.
-   - Veraltete Probe-Ergebnisse eines früheren Jobs dürfen einen neuen Retry nicht freigeben.
-   - Parallel eintreffende Webhooks oder Browser-Probes dürfen weder doppelt dispatchen noch doppelt erstatten.
-
-5. **Diagnose vereinheitlichen**
-   - Eindeutige Telemetrie für `MOTION_PROBE_PENDING`, `MOTION_PROBE_PASSED`, `MOTION_NOOP_DETECTED`, `NOOP_ESCALATING` und `NOOP_LADDER_EXHAUSTED` schreiben.
-   - Sprecher, Pass, Job-ID, Messwert, Schwellenwert und Retry-Variante protokollieren.
-   - Die UI zeigt bei endgültigem Fehlschlag eine verständliche Meldung statt eines technisch „erfolgreichen“ Videos ohne Lip-Sync.
-
-6. **Regressionstests und Live-Verifikation**
-   - Animierter Pass → freigegeben und gemuxt.
-   - Statischer Pass → kein Mux, automatischer Retry.
-   - Statischer Retry → Fehler + genau eine Erstattung.
-   - Vier Sprecher, davon einer statisch → gesamter Mux bleibt blockiert.
-   - Veraltetes Probe-Ergebnis → ignoriert.
-   - Doppelte Webhooks/Probe-Requests → kein doppelter Retry oder Refund.
-   - Danach Functions deployen und einen 4-Sprecher-Testlauf anhand der Pass-Metriken und des finalen Videos prüfen.
-
-## Bewusste Entscheidung
-Kein 1:1-Rollback auf den 27.07.: Der damalige Stand verwendete bereits denselben Sync-3/Preclip-Grundpfad und hätte statische Provider-Ausgaben ebenfalls nicht zuverlässig erkannt. Der gezielte Quality Gate behebt die nachgewiesene Fehlerklasse, ohne Autopilot, aktuelle Geometrie- und Identitätsdaten oder den Mux-Schutz zurückzubauen.
+5. **Deployment und Verifikation**
+   - Betroffene gemeinsame Trust-/Geometrie-Module und `compose-dialog-segments` deployen.
+   - Den fehlgeschlagenen Szenenpfad erneut ausführen und anhand der Logs prüfen, dass alle vier Passes das Face-Gate durchlaufen und anschließend v337s Motion-Probe vor dem finalen Mux greift.
+   - Credits bleiben bei endgültigem Anbieter-/Motion-Probe-Fehler automatisch und idempotent geschützt.
