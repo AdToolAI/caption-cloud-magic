@@ -567,12 +567,63 @@ function extractSceneHints(briefingText: string): SceneHint[] {
   return blocks
     .sort((a, b) => a.idx - b.idx)
     .map(({ body }) => {
-      const dialog = body.match(dialogRe)?.[1]?.trim();
       const shot = body.match(shotRe)?.[1]?.trim();
       const camera = body.match(camRe)?.[1]?.trim();
       const emotion = body.match(emoRe)?.[1]?.trim();
       const beat = body.match(beatRe)?.[1]?.trim();
-      const blob = `${shot ?? ''} ${camera ?? ''}`;
+
+      // ---- v328 Prosa-Modus -------------------------------------------------
+      const rawLines = body.split('\n').map((l) => l.trim()).filter(Boolean);
+      const MARKER_RE = /^(?:DIALOG|SHOT|KAMERA|CAMERA|EMOTION|MOOD|TRANSITION|ÜBERGANG|UEBERGANG|OVERLAY|TEXT[-\s]?OVERLAY|ON[-\s]?SCREEN[-\s]?TEXT|EINBLENDUNG|TONE|TON|STIMMUNG|SEED)\b/i;
+      const QUOTE_RE = /["„“]([^"„“”]{2,300})["“”]/g;
+
+      // Titel: erste Zeile des Blocks, Em-Dash/Doppelpunkt-Präfix entfernt.
+      const titleRaw = rawLines[0] ?? '';
+      const title = /["„“]/.test(titleRaw) || MARKER_RE.test(titleRaw)
+        ? undefined
+        : titleRaw.replace(/^[\s—–\-:•]+/, '').replace(/\s*\(.*?\)\s*$/, '').trim().slice(0, 60) || undefined;
+
+      // Dauer: „0–5 Sekunden" / „5-10 Sek" / „ca. 5 Sekunden"
+      let durationSec: number | undefined;
+      const rangeMatch = body.match(/(\d{1,3})\s*(?:–|—|-|bis|to)\s*(\d{1,3})\s*(?:sek(?:unden?)?|sec(?:onds?)?|s)\b/i);
+      if (rangeMatch) {
+        const d = Number(rangeMatch[2]) - Number(rangeMatch[1]);
+        if (Number.isFinite(d) && d > 0 && d <= 120) durationSec = d;
+      }
+      if (durationSec === undefined) {
+        const singleMatch = body.match(/(?:ca\.?\s*)?(\d{1,3})\s*(?:sek(?:unden?)?|sec(?:onds?)?)\b/i);
+        const d = singleMatch ? Number(singleMatch[1]) : NaN;
+        if (Number.isFinite(d) && d > 0 && d <= 120) durationSec = d;
+      }
+
+      // Wörtliche Rede — auch ohne DIALOG:-Präfix, inkl. Sprecher-Label davor.
+      const dialogLines: Array<{ speaker?: string; text: string }> = [];
+      for (const line of rawLines) {
+        QUOTE_RE.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = QUOTE_RE.exec(line)) !== null) {
+          const quoted = m[1].trim();
+          if (!quoted) continue;
+          const before = line.slice(0, m.index).replace(/^DIALOG\s*[:\-–]?\s*/i, '').trim();
+          const speakerMatch = before.match(/^([^:]{2,40}?)\s*(?:\([^)]*\))?\s*:\s*$/);
+          dialogLines.push({
+            speaker: speakerMatch?.[1]?.trim() || undefined,
+            text: quoted,
+          });
+        }
+      }
+
+      // Prosa: beschreibende Zeilen (kein Titel, kein Marker, kein Zitat).
+      const prose = rawLines
+        .slice(title ? 1 : 0)
+        .filter((l) => !MARKER_RE.test(l) && !/["„“]/.test(l))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 600) || undefined;
+
+      const dialog = body.match(dialogRe)?.[1]?.trim() ?? dialogLines[0]?.text;
+      const blob = `${shot ?? ''} ${camera ?? ''} ${prose ?? ''}`;
 
       // Transition
       const tMatch = body.match(transitionRe);
@@ -614,9 +665,14 @@ function extractSceneHints(briefingText: string): SceneHint[] {
         overlayPosition,
         tone,
         seed: Number.isFinite(seed) ? seed : undefined,
+        title,
+        prose,
+        dialogLines: dialogLines.length ? dialogLines : undefined,
+        durationSec,
       } as SceneHint;
     });
 }
+
 
 function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string): TProductionPlan {
   const hints = extractSceneHints(briefingText);
