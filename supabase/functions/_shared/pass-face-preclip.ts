@@ -122,6 +122,11 @@ export interface PassPreclipResult {
   trackDriftPx?: number;
   /** v331 — true when the crop was widened/recentered to cover the trajectory. */
   motionCropApplied?: boolean;
+  /** v334 — why the motion cover did not run ("insufficient_samples" | "insufficient_motion" | "v334_track_scale_mismatch" | "no_hull" | "uncoverable"). */
+  motionSkipReason?: string | null;
+  /** v334 — which box source the reported faceShareInCrop was measured from. */
+  faceShareSource?: "plate" | "track";
+
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
