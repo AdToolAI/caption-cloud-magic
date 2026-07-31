@@ -48,7 +48,17 @@ type SceneHint = {
   overlayPosition?: 'top' | 'center' | 'bottom';
   tone?: string;
   seed?: number;
+  // v328 — Prosa-Modus (Briefings ohne SHOT:/DIALOG:-Marker)
+  /** Titel hinter dem Em-Dash: „SZENE 1 — Der Auftrag" → „Der Auftrag". */
+  title?: string;
+  /** Beschreibende Prosa des Blocks (ohne Titel, Marker, Zitate). */
+  prose?: string;
+  /** Alle wörtlichen Reden des Blocks inkl. erkanntem Sprecher-Label. */
+  dialogLines?: Array<{ speaker?: string; text: string }>;
+  /** Aus „0–5 Sekunden" / „5-10 Sek" abgeleitete Szenenlänge. */
+  durationSec?: number;
 };
+
 
 type BriefingTiming = {
   durationSec: number;
@@ -506,13 +516,13 @@ const MOVEMENT_TOKENS: Array<[RegExp, string]> = [
   [/push[-\s]?in|dolly[-\s]?in/i, 'slow-push-in'],
   [/pull[-\s]?out|dolly[-\s]?out/i, 'slow-pull-out'],
   [/pan/i, 'pan'],
-  [/track(ing)?/i, 'tracking'],
+  [/track(ing)?|kamerafahrt|kran|crane/i, 'tracking'],
   [/handheld|breathing/i, 'handheld'],
 ];
 const LIGHTING_TOKENS: Array<[RegExp, string]> = [
   [/laptop[-\s]?glow|monitor[-\s]?glow|screen[-\s]?glow/i, 'screen-glow'],
   [/golden[-\s]?hour/i, 'golden-hour'],
-  [/window|tageslicht|natural[-\s]?light/i, 'soft-window'],
+  [/window|fenster|tageslicht|natural[-\s]?light/i, 'soft-window'],
   [/neon/i, 'neon'],
   [/low[-\s]?key|dunkel|dark/i, 'low-key'],
   [/high[-\s]?key|hell|bright/i, 'high-key'],
@@ -557,12 +567,66 @@ function extractSceneHints(briefingText: string): SceneHint[] {
   return blocks
     .sort((a, b) => a.idx - b.idx)
     .map(({ body }) => {
-      const dialog = body.match(dialogRe)?.[1]?.trim();
       const shot = body.match(shotRe)?.[1]?.trim();
       const camera = body.match(camRe)?.[1]?.trim();
       const emotion = body.match(emoRe)?.[1]?.trim();
       const beat = body.match(beatRe)?.[1]?.trim();
-      const blob = `${shot ?? ''} ${camera ?? ''}`;
+
+      // ---- v328 Prosa-Modus -------------------------------------------------
+      const rawLines = body.split('\n').map((l) => l.trim()).filter(Boolean);
+      const MARKER_RE = /^(?:DIALOG|SHOT|KAMERA|CAMERA|EMOTION|MOOD|TRANSITION|ÜBERGANG|UEBERGANG|OVERLAY|TEXT[-\s]?OVERLAY|ON[-\s]?SCREEN[-\s]?TEXT|EINBLENDUNG|TONE|TON|STIMMUNG|SEED)\b/i;
+      const QUOTE_RE = /["„“]([^"„“”]{2,300})["“”]/g;
+
+      // Titel: erste Zeile des Blocks, Em-Dash/Doppelpunkt-Präfix entfernt.
+      const titleRaw = rawLines[0] ?? '';
+      const title = /["„“]/.test(titleRaw) || MARKER_RE.test(titleRaw)
+        ? undefined
+        : titleRaw.replace(/^[\s—–\-:•]+/, '').replace(/\s*\(.*?\)\s*$/, '').trim().slice(0, 60) || undefined;
+
+      // Dauer: „0–5 Sekunden" / „5-10 Sek" / „ca. 5 Sekunden"
+      let durationSec: number | undefined;
+      const rangeMatch = body.match(/(\d{1,3})\s*(?:–|—|-|bis|to)\s*(\d{1,3})\s*(?:sek(?:unden?)?|sec(?:onds?)?|s)\b/i);
+      if (rangeMatch) {
+        const d = Number(rangeMatch[2]) - Number(rangeMatch[1]);
+        if (Number.isFinite(d) && d > 0 && d <= 120) durationSec = d;
+      }
+      if (durationSec === undefined) {
+        const singleMatch = body.match(/(?:ca\.?\s*)?(\d{1,3})\s*(?:sek(?:unden?)?|sec(?:onds?)?)\b/i);
+        const d = singleMatch ? Number(singleMatch[1]) : NaN;
+        if (Number.isFinite(d) && d > 0 && d <= 120) durationSec = d;
+      }
+
+      // Wörtliche Rede — auch ohne DIALOG:-Präfix, inkl. Sprecher-Label davor.
+      const dialogLines: Array<{ speaker?: string; text: string }> = [];
+      for (const line of rawLines) {
+        // Marker-Zeilen (OVERLAY:, SHOT:, TONE: …) sind keine wörtliche Rede.
+        if (MARKER_RE.test(line) && !/^DIALOG\b/i.test(line)) continue;
+        QUOTE_RE.lastIndex = 0;
+
+        let m: RegExpExecArray | null;
+        while ((m = QUOTE_RE.exec(line)) !== null) {
+          const quoted = m[1].trim();
+          if (!quoted) continue;
+          const before = line.slice(0, m.index).replace(/^DIALOG\s*[:\-–]?\s*/i, '').trim();
+          const speakerMatch = before.match(/^([^:]{2,40}?)\s*(?:\([^)]*\))?\s*:\s*$/);
+          dialogLines.push({
+            speaker: speakerMatch?.[1]?.trim() || undefined,
+            text: quoted,
+          });
+        }
+      }
+
+      // Prosa: beschreibende Zeilen (kein Titel, kein Marker, kein Zitat).
+      const prose = rawLines
+        .slice(title ? 1 : 0)
+        .filter((l) => !MARKER_RE.test(l) && !/["„“]/.test(l))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 600) || undefined;
+
+      const dialog = body.match(dialogRe)?.[1]?.trim() ?? dialogLines[0]?.text;
+      const blob = `${shot ?? ''} ${camera ?? ''} ${prose ?? ''}`;
 
       // Transition
       const tMatch = body.match(transitionRe);
@@ -604,9 +668,14 @@ function extractSceneHints(briefingText: string): SceneHint[] {
         overlayPosition,
         tone,
         seed: Number.isFinite(seed) ? seed : undefined,
+        title,
+        prose,
+        dialogLines: dialogLines.length ? dialogLines : undefined,
+        durationSec,
       } as SceneHint;
     });
 }
+
 
 function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string): TProductionPlan {
   const hints = extractSceneHints(briefingText);
@@ -640,31 +709,70 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
     { beat: 'CTA',    framing: 'medium',          movement: 'static',       energy: 'high' },
   ];
 
+  // v328 — Prosa-Briefings: die im Text ausgeschriebenen Szenen gewinnen,
+  // der generische Beat-Ring dient nur noch als Notnagel.
   const sceneCount = canonicalTiming?.explicitSceneCount && canonicalTiming.sceneCount
     ? canonicalTiming.sceneCount
-    : Math.max(canonicalTiming?.sceneCount ?? 0, hints.length, defaultBeats.length);
+    : hints.length > 0
+    ? hints.length
+    : Math.max(canonicalTiming?.sceneCount ?? 0, defaultBeats.length);
   const per = Math.max(1, Math.min(60, total / sceneCount));
 
+  // Szenenlängen aus dem Text („0–5 Sekunden") — auf die Gesamtdauer normiert,
+  // damit der User-Slider weiterhin die harte Obergrenze bleibt.
+  const hintDurations = Array.from({ length: sceneCount }).map((_, i) => hints[i]?.durationSec);
+  const hintSum = hintDurations.reduce<number>((acc, d) => acc + (d ?? 0), 0);
+  const allHintDurations = hintDurations.every((d) => typeof d === 'number' && d > 0);
+  const durationScale = allHintDurations && hintSum > 0 ? total / hintSum : null;
+
   const hasDialogAnywhere = hints.some((h) => !!h.dialog);
+
+  /** Ordnet ein Sprecher-Label („Person 2", „Samuel") einem Cast-Eintrag zu. */
+  const resolveSpeaker = (label?: string) => {
+    if (!label || cast.length === 0) return null;
+    const norm = label.toLowerCase().trim();
+    const byName = cast.find((c) =>
+      norm.includes(String(c.characterName ?? '').toLowerCase().split(/\s+/)[0] ?? '\u0000'),
+    );
+    if (byName) return byName;
+    const idxMatch = norm.match(/(?:person|sprecher|speaker|charakter|character)\s*(\d{1,2})/);
+    if (idxMatch) {
+      const idx = Number(idxMatch[1]) - 1;
+      if (idx >= 0 && idx < cast.length) return cast[idx];
+    }
+    return null;
+  };
 
   const scenes = Array.from({ length: sceneCount }).map((_, i) => {
     const h = hints[i];
     const fallback = defaultBeats[i] ?? defaultBeats[defaultBeats.length - 1];
     const beatLabel = h?.beat ?? fallback.beat;
+    const sceneLabel = h?.title ?? beatLabel;
     const framing = h?.framing ?? fallback.framing;
     const movement = h?.movement ?? fallback.movement;
     const lighting = h?.lighting ?? 'soft-window';
+    // Anchor-Priorität: expliziter SHOT: → Prosa aus dem Briefing → Template.
     const anchor = h?.shot
       ? h.shot
+      : h?.prose && h.prose.length >= 25
+      ? h.prose
       : `${beatLabel} beat for ${briefing.productName ?? 'the brand'}: cinematic ${framing} shot, ${movement}, ${lighting} lighting.`;
     const voiceover = h?.dialog ? { text: h.dialog } : undefined;
+    const speakerCast = resolveSpeaker(h?.dialogLines?.[0]?.speaker);
     const isRequiredEnsemble = cast.length >= 2 && (i === 0 || (sceneCount >= 6 && i === sceneCount - 1));
-    const sceneCast = isRequiredEnsemble ? cast : cast.slice(0, 1);
+    const sceneCast = isRequiredEnsemble
+      ? cast
+      : speakerCast
+      ? [speakerCast]
+      : cast.slice(0, 1);
+    const sceneDuration = durationScale && h?.durationSec
+      ? Math.max(1, Math.min(60, h.durationSec * durationScale))
+      : per;
     return {
       index: i + 1,
-      label: beatLabel,
+      label: sceneLabel,
       beat: beatLabel,
-      durationSec: per,
+      durationSec: sceneDuration,
       engine: (firstMention && (h?.dialog || !hasDialogAnywhere)) ? 'cinematic-sync' as const : 'broll' as const,
       lipSync: !!(firstMention && h?.dialog),
       cast: sceneCast,
@@ -682,6 +790,7 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
         blick: (h?.dialog || beatLabel.toLowerCase().includes('cta')) ? 'to-camera' : 'away',
         energy: fallback.energy === 'high' ? 4 : 3,
       },
+
       musicCue: { energy: fallback.energy },
       // Stage-3: surface extracted plan→storyboard fields when present.
       transition: h?.transition
@@ -1007,6 +1116,10 @@ export function useStoryboardTransition({
     // GUARD 3 — empty briefing: nothing to analyse.
     const text = buildBriefingText(briefing);
     const analysisRequestedDurationSec = normalizeUserSliderDuration(briefing?.duration);
+    // v328 — Zeitstempel des Analyse-Starts (mit 60s Toleranz) für den
+    // Server-Plan-Rescue: nur Pläne aus DIESEM Lauf dürfen wiederhergestellt werden.
+    const analysisStartedAtIso = new Date(Date.now() - 60_000).toISOString();
+
     if (text.length < 40) {
       return { handled: false };
     }
@@ -1369,9 +1482,63 @@ export function useStoryboardTransition({
         const GRACE_MS = 45_000;
         let resolved = false;
 
-        const openFallback = () => {
+        /**
+         * v328 — Server-Plan-Rescue.
+         * Die Edge-Function persistiert ihren Plan in `composer_production_plans`,
+         * auch wenn der Client-Fetch in Timeout/Abbruch gelaufen ist. Bevor wir
+         * einen Local-Fallback zeigen, holen wir den frisch persistierten
+         * AI-Plan — sonst überschreibt der generische Basis-Plan das echte
+         * Briefing-Ergebnis (Symptom: „Hook beat for …" statt Szenentext).
+         */
+        const loadPersistedPlan = async (): Promise<TProductionPlan | null> => {
+          if (!isUuid(activeProjectId)) return null;
+          try {
+            const { data, error } = await supabase
+              .from('composer_production_plans')
+              .select('manifest, created_at')
+              .eq('project_id', activeProjectId as string)
+              .gte('created_at', analysisStartedAtIso)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (error || !data?.manifest) return null;
+            const { plan: persisted } = parsePlan({ plan: data.manifest });
+            if (!persisted) return null;
+            (persisted as any)._meta = {
+              ...((persisted as any)._meta ?? {}),
+              source: 'ai-recovered',
+            };
+            const withDuration = attachRequestedDurationToPlan(persisted, analysisRequestedDurationSec);
+            return applyCanonicalTimingToPlan(withDuration, briefing, text).plan;
+          } catch (rescueErr) {
+            console.warn('[useStoryboardTransition] server-plan rescue failed', rescueErr);
+            return null;
+          }
+        };
+
+        const openFallback = async () => {
           if (resolved || cancelledRef.current) return;
           resolved = true;
+
+          const rescued = await loadPersistedPlan();
+          if (cancelledRef.current) return;
+          if (rescued) {
+            toast({
+              title: '✨ Analyse-Ergebnis wiederhergestellt',
+              description: 'Die Verbindung war instabil, der Plan war serverseitig aber fertig — dein Briefing wurde vollständig übernommen.',
+            });
+            setState({
+              warRoomOpen: false,
+              phase: 'idle',
+              progress: 0,
+              phaseLabel: '',
+              planSheetOpen: true,
+              initialPlan: rescued,
+              activeProjectId,
+            });
+            return;
+          }
+
           const fallbackRaw = buildLocalFallbackPlan(briefing, text);
           const normalizedFallback = applyCanonicalTimingToPlan(fallbackRaw, briefing, text);
           const fallback = normalizedFallback.plan;
@@ -1395,7 +1562,8 @@ export function useStoryboardTransition({
           });
         };
 
-        const graceTimer = window.setTimeout(openFallback, GRACE_MS);
+        const graceTimer = window.setTimeout(() => { void openFallback(); }, GRACE_MS);
+
 
         // Late-arrival retry — bei jeder Soft-Fail-Ursache versuchen wir
         // Server-seitig nochmal (kein Client-Timeout mehr). Kommt der echte

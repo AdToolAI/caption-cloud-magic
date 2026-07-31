@@ -316,7 +316,7 @@ export const PlanMeta = z.object({
    *  - 'local-fallback' — produced by useStoryboardTransition.buildLocalFallbackPlan
    *                       when the edge function timed out / failed
    */
-  source: z.enum(['ai', 'ai-partial', 'local-fallback']).optional(),
+  source: z.enum(['ai', 'ai-partial', 'ai-recovered', 'local-fallback']).optional(),
   /**
    * v213 — Briefing Fidelity telemetry. Present when LITERAL mode kicked
    * in (the user shipped an explicit script). Surfaced as a chip in the

@@ -1,58 +1,38 @@
-## Ziel
+## Was ich im Code gesehen habe
 
-Lip-Sync soll auch bei bewegten Charakteren treffen — ohne die bestehende, stabile Statik-Pipeline zu gefährden.
+Der Prompt in deinem Screenshot ist wörtlich ein generiertes Template, kein Inhalt aus deinem Briefing:
 
-## Ist-Zustand (verifiziert)
+`src/hooks/useStoryboardTransition.ts:659`
+```
+`${beatLabel} beat for ${briefing.productName ?? 'the brand'}: cinematic ${framing} shot, ${movement}, ${lighting} lighting.`
+```
+Das ergibt exakt „Hook beat for AdTool AI: cinematic medium-close-up shot, slow-push-in, soft-window lighting." — also der **Local-Fallback-Plan** (`buildLocalFallbackPlan`), der greift, wenn `briefing-deep-parse` in Timeout/Fehler läuft (Grace-Window 45s, danach Toast „Basis-Plan bereit").
 
-- `compose-dialog-segments` baut die Sync.so-Boxen aus **einer** Plate-Messung: `new Array(totalFrames).fill(box)`, nur Nicht-Sprech-Frames sind `null`.
-- `_shared/pass-face-preclip.ts` rendert einen **fixen** quadratischen Crop; das Ergebnis wird später an genau dieser Stelle zurückgeblendet.
-- `preclip_crop` ist ein geteilter Vertrag: `render-sync-segments-audio-mux` (Overlay-Rect), `sync-so-webhook` (`outputSize`-Achsenprüfung), `DialogStitchVideo.tsx` (Maske + Silent-Face-Freeze-Tiles aus Frame 0), `report-lipsync-motion-probe` (`havePreclipCrop`).
-- Prompts in `compose-video-clips` erzwingen heute „LOCKED CAMERA … position and size stay identical", halten Bewegung also künstlich klein.
+Zweites Problem, unabhängig davon: `extractSceneHints` (Zeile 532 ff.) liest pro Szenenblock nur **strukturierte Marker** — `SHOT:`, `DIALOG: "…"`, `KAMERA:`, `EMOTION:`. Dein Briefing ist Fließtext („Drei Personen stehen in einem normalen Büroaufzug…", Dialog als „…" ohne das Wort DIALOG). Ergebnis: `shot` = leer → generischer Anchor, `dialog` = leer → kein Voiceover, keine Lip-Sync-Szenen, und die 5s-Zeitfenster („0–5 Sekunden") werden nicht gelesen → 3s-Kacheln.
 
-## Warum nicht einfach „größerer Crop"
-
-Ein aufgeweiteter Crop würde das Overlay-Rechteck vergrößern und damit im Mux mehr Hintergrund/Nachbargesicht überschreiben; zusätzlich stammen die Silent-Face-Tiles aus Frame 0 und passen bei bewegtem Körper nicht mehr zum Plate darunter (Geisterkanten). Deshalb: bei echter Bewegung **kein Crop-Overlay**, sondern Vollplate mit getrackten Boxen.
+Nicht verifiziert: ob die Analyse tatsächlich fehlgeschlagen ist (keine Konsolen-Logs im Snapshot). Deshalb ist Schritt 1 eine Diagnose.
 
 ## Plan
 
-### 1. Motion-Messung (neu, rein additiv)
-`supabase/functions/_shared/face-motion-track.ts`:
-- Sampelt das gerenderte Plate (z. B. alle 0,25 s), Gesichtserkennung über die bereits genutzte AWS-Rekognition-Route.
-- Slot-Zuordnung per Nearest-Center gegen die bestehende, gelockte Identity-Map (kein neues Matching-Verfahren, keine Konkurrenz zu v320/v326).
-- Liefert pro Speaker eine Trajektorie `[{t, bbox}]` plus `max_drift_pct` und `max_scale_delta`.
-- Jeder Fehler (Rekognition down, zu wenige Samples, Slot nicht eindeutig) → `null` zurück, Aufrufer fällt exakt auf den heutigen Pfad zurück.
+### 1. Diagnose (zuerst)
+- `_meta.source` des zuletzt gespeicherten Plans in `composer_production_plans` prüfen: `local-fallback` vs. AI-Ergebnis.
+- Edge-Function-Logs von `briefing-deep-parse` für den Zeitraum lesen (Timeout / Moderation / Status).
+- Damit steht fest, ob nur der Fallback repariert werden muss oder auch die Server-Analyse.
 
-### 2. Zwei Klassen statt drei
-- **static** (Drift < 6 % Bildbreite, Scale-Delta < 12 %): Pipeline bleibt **bitgleich** wie heute — Preclip, fixe Box, Overlay, Freeze-Tiles.
-- **moving**: getrackter Vollplate-Pfad (Schritt 3). Kein Preclip, kein Overlay-Rect, keine Freeze-Tile-Problematik.
+### 2. Prose-Parser für den Fallback (`useStoryboardTransition.ts`)
+Aus jedem `SZENE N`-Block ohne Marker gewinnen:
+- **Anchor**: die ersten 1–2 beschreibenden Prosa-Sätze des Blocks (Zeilen ohne Anführungszeichen, ohne Titelzeile) statt des Templates.
+- **Dialog**: alle Zeilen in „…" / "…" / “…” — auch ohne `DIALOG:`-Präfix; Sprecherzuordnung über vorangehende Zeile („Person 1:", „Person 2, trocken:") und Mapping auf die gewählten Cast-Einträge.
+- **Dauer**: Muster `0–5 Sekunden` / `5-10 Sek` → `durationSec` pro Szene, Summe respektiert weiter den User-Slider.
+- **Beat/Label**: Titel nach dem Em-Dash („Der Auftrag", „Die unmögliche Etage", „Der fertige Spot") als Szenenlabel, Beat-Ring nur noch als Notnagel.
+- **Text-Overlay**: Endcard-Zeilen („AdTool AI / Deine Idee wird zur Szene.") als `textOverlay` der letzten Szene.
+- Framing/Movement/Lighting weiterhin per Token-Klassifikation, aber jetzt auf dem Prosa-Text statt auf leerem `SHOT:`.
 
-### 3. Getrackter Vollplate-Pfad
-- `uploadBoundingBoxesJson` erhält optional die Trajektorie und schreibt interpolierte Boxen pro Frame (`null` außerhalb der Voiced-Windows bleibt unverändert — das ist der v201-Schutz gegen Morph-Bleed).
-- Dispatch über die vorhandene Variante `bbox-url-pro` mit `preclip_url = null`, `preclip_crop = null`.
-- Mux nimmt für diese Passes den bereits existierenden Vollplate-Zweig; es wird kein neuer Compositing-Modus gebaut.
+### 3. Gleiche Prosa-Regeln serverseitig absichern
+In `briefing-deep-parse` (Pass A) explizit erzwingen: bei Fließtext-Briefings werden Szenenbeschreibung und wörtliche Rede **literal** übernommen (kein Umschreiben zu generischen Beats), Szenenanzahl und Sekundenfenster aus dem Text gewinnen Vorrang. Bestehender Scene-Count-Guard (v177) bleibt.
 
-### 4. Anpassungen an den Vertragskonsumenten
-- `sync-so-webhook`: Achsenprüfung `expectedPreclipAxis` nur noch anwenden, wenn `bbox_mode = 'static'`; für `tracked` greift die Vollplate-Prüfung.
-- `render-sync-segments-audio-mux`: Der Hard-Fail „Multi-Speaker ohne preclip_crop" wird auf `bbox_mode = 'static'` eingegrenzt, damit getrackte Passes ihn nicht auslösen. Mischbetrieb (Speaker A static + Speaker B tracked in derselben Szene) wird explizit unterstützt: statische Passes overlayen wie bisher, getrackte kommen als Vollplate-Layer.
-- `report-lipsync-motion-probe`: NOOP + `bbox_mode = 'static'` + `motion_class = moving` → sofort auf den getrackten Pfad eskalieren statt dieselbe fixe Box zu wiederholen. Ladder-Länge bleibt gleich (kein zusätzlicher Kostenpfad).
-- `DialogStitchVideo.tsx`: Freeze-Tiles nur noch für Slots mit `bbox_mode = 'static'` erzeugen.
+### 4. Sichtbarkeit
+Im Production-Plan-Sheet ein deutliches Badge „Basis-Plan (Analyse fehlgeschlagen)" mit Button „Analyse erneut starten", wenn `_meta.source === 'local-fallback'` — damit ein Fallback nie wieder unbemerkt als AI-Ergebnis durchgeht.
 
-### 5. Prompt-Lockerung (kontrolliert)
-In `compose-video-clips` bleibt das Kamera-Lock unverändert. Nur die Subjekt-Klausel wird von „position and size stay identical" zu „bleibt durchgehend vollständig im Bild, Gesicht und Mund frei sichtbar, keine Positions-Swaps" umformuliert. Kamerabewegung bleibt verboten (sonst bricht die Plate-Invariante gegen den Anchor).
-
-### 6. Diagnose
-Neue Pass-Felder: `motion_class`, `max_drift_pct`, `track_samples`, `bbox_mode`. Logs mit Prefix `v327_motion_track`, damit sich Regressionen von den Statik-Fällen trennen lassen.
-
-## Risiken und wie sie abgedeckt sind
-
-| Risiko | Abdeckung |
-| --- | --- |
-| Regression bei heutigen statischen Szenen | Klasse `static` durchläuft unveränderten Code; Tracking-Fehler fallen ebenfalls dorthin zurück |
-| Vollplate-Pfad trifft bei kleinen Gesichtern schlechter als Preclip | Face-Share-Floor bleibt aktiv; unterschreitet ein bewegter Speaker ihn, wird die Szene wie heute geblockt statt still falsch gerendert |
-| Overlay/Freeze-Tile-Artefakte | Entfallen im getrackten Pfad, weil dort nicht overlayt wird |
-| Zusätzliche Kosten | 8–20 Rekognition-Detects pro Szene, kein zusätzlicher Lambda-Render; statische Szenen unverändert |
-| Mehr Bewegung durch gelockerten Prompt bei Modellen ohne Tracking-Bedarf | Prompt-Änderung erst nach Verifikation von Schritt 1–4 aktivieren, damit sie separat rückrollbar ist |
-
-## Technische Details
-
-Betroffen: `_shared/face-motion-track.ts` (neu), `compose-dialog-segments/index.ts`, `_shared/pass-face-preclip.ts`, `sync-so-webhook/index.ts`, `render-sync-segments-audio-mux/index.ts`, `report-lipsync-motion-probe/index.ts`, `compose-video-clips/index.ts`, `src/remotion/templates/DialogStitchVideo.tsx`, plus Migration für die vier Diagnose-Spalten.
+### Nicht angefasst
+Lip-Sync-Pipeline, Render, Anchor-/Face-Map-Pfade, `dialog_shots`, `syncso_*`. Änderungen betreffen nur Briefing → Plan → Storyboard.
