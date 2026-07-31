@@ -87,28 +87,28 @@ export function resolveCanonicalCharacterId(
   const raw = splitCastSlotId(slotId, outfitLookMap).base;
   if (!raw || !pool?.length) return null;
 
-  const exact = pool.find((c) => c.id === raw);
-  if (exact) return exact.id;
+  const exact = pool.find((c) => c.id === raw || c.brandCharacterId === raw);
+  if (exact) return canonicalPoolId(exact);
 
   const needle = norm(raw);
   if (!needle) return null;
 
 
   const byName = pool.find((c) => norm(c.name) === needle);
-  if (byName) return byName.id;
+  if (byName) return canonicalPoolId(byName);
 
   const byNameInId = pool.find((c) => {
     const full = norm(c.name);
     return !!full && full.length >= 4 && needle.includes(full);
   });
-  if (byNameInId) return byNameInId.id;
+  if (byNameInId) return canonicalPoolId(byNameInId);
 
   if (UUID_RE.test(raw)) return null;
   const first = pool.filter((c) => {
     const f = firstNameNorm(c.name);
     return !!f && f.length >= 3 && needle.includes(f);
   });
-  if (first.length === 1) return first[0].id;
+  if (first.length === 1) return canonicalPoolId(first[0]);
 
   return null;
 }
