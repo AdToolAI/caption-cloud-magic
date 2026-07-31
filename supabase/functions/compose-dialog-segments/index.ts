@@ -5481,6 +5481,30 @@ serve(async (req) => {
           },
           300_000,
         );
+        // ── v329 — Face-Share-Hardening (vor der Erfolgs-Übernahme) ────────
+        // Ein Crop mit sehr kleinem Face-Share ist kein Grenzfall, sondern ein
+        // garantierter No-Op: Sync.so findet im Crop kein animierbares Gesicht
+        // und gibt das Video unverändert zurück — der Kunde zahlt für „done
+        // ohne Lippenbewegung". Wir stufen das deshalb als Preclip-Fehler ein,
+        // damit der bestehende v187-Pfad (kein Full-Plate-Fallback, Refund)
+        // unverändert greift.
+        const V329_FACE_SHARE_FLOOR = 0.12;
+        const v329Share = Number(preclipResult.faceShareInCrop);
+        if (
+          preclipResult.ok &&
+          Number.isFinite(v329Share) &&
+          v329Share < V329_FACE_SHARE_FLOOR
+        ) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v329_preclip_face_share_too_low ` +
+            `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} ` +
+            `geometry=${preclipResult.geometryReason ?? "?"} plate_box_w_pct=${preclipResult.plateBoxWidthPct ?? "?"} ` +
+            `crop=${JSON.stringify(preclipResult.crop ?? null)} — refusing dispatch (guaranteed no-op)`,
+          );
+          (preclipResult as any).ok = false;
+          (preclipResult as any).error = "preclip_face_share_too_low";
+          (preclipResult as any).errorClass = "invalid_input";
+        }
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
           usePassPreclip = true;
