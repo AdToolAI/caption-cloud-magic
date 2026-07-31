@@ -6937,6 +6937,9 @@ serve(async (req) => {
         sceneId,
         passIdx: currentPassIdx,
         preclipTrusted: preclipTrustedForGate,
+        // v329 — wenn der Crop aus dem proportionalen Rettungsfenster stammt,
+        // darf ein nicht verfügbarer Probe den Dispatch nicht mehr durchwinken.
+        geometrySuspect: usePassPreclip && !!(pass as any).preclip_geometry_suspicious,
       });
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
