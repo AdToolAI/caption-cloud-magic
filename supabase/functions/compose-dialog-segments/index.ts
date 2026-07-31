@@ -4287,6 +4287,50 @@ serve(async (req) => {
       currentPassIdx = 0;
     }
 
+    // ── v343 — Slot-Integrity Guard ──────────────────────────────────────
+    // Verified failure (scene 69d56a49, 2026-07-31 23:09): a concurrent
+    // full-array read-modify-write left `passes[0]` as `{}` — no idx, no
+    // speaker_idx, no status. Every later redispatch then read
+    // `speaker_idx=undefined`, hit the v87 sanity block and returned a
+    // non-terminal 202 forever: the scene could neither finish nor fail and
+    // the UI hung on "Pass 4/4". Heal any structurally broken slot from the
+    // freshly built skeleton before anything downstream reads it.
+    if (Array.isArray(builtPasses) && builtPasses.length > 0) {
+      const healed: number[] = [];
+      for (let i = 0; i < passes.length; i++) {
+        const slot: any = passes[i];
+        const broken =
+          !slot ||
+          typeof slot !== "object" ||
+          !Number.isFinite(Number(slot.idx)) ||
+          !Number.isFinite(Number(slot.speaker_idx));
+        if (!broken) continue;
+        const skeleton: any = builtPasses[i];
+        if (!skeleton) continue;
+        // Skeleton first, then whatever survived on the wiped slot.
+        passes[i] = { ...skeleton, ...(slot && typeof slot === "object" ? slot : {}), idx: i, speaker_idx: skeleton.speaker_idx };
+        healed.push(i);
+      }
+      if (healed.length > 0) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v343_slot_integrity_healed idx=[${healed.join(",")}] ` +
+          `total=${passes.length} — wiped pass slot(s) rebuilt from turn skeleton`,
+        );
+        try {
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId,
+            engine: "sync-segments",
+            sync_status: "SLOT_INTEGRITY_HEALED",
+            error_class: "pass_slot_wiped",
+            error_message: `healed=[${healed.join(",")}] total=${passes.length}`,
+            meta: { v343: true, healed, total_passes: passes.length },
+          });
+        } catch { /* best-effort */ }
+      }
+    }
+
+
     // ── v87 — Coords refresh on advance/retry ────────────────────────────
     // Bug (verified in edge logs, scene 4c310576…): pass 1 dispatched with
     // heuristic [x, plateH*0.5] because anchor faceMap wasn't cached yet.
