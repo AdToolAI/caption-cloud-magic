@@ -12,16 +12,16 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
     USD: '' // Free plan has no price
   },
   basic: {
-    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ', // Beta-Basic €19.99/month
-    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'  // Reuse EUR price (single Beta-Basic during Beta)
+    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw', // Beta-Basic €19.99/month
+    USD: 'price_1TzLNc1xgyPAUyx6exJw3ihw'  // Reuse EUR price (single Beta-Basic during Beta)
   },
   pro: {
-    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ', // Beta-Basic (Pro tier disabled during Beta)
-    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'
+    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw', // Beta-Basic (Pro tier disabled during Beta)
+    USD: 'price_1TzLNc1xgyPAUyx6exJw3ihw'
   },
   enterprise: {
-    EUR: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
-    USD: 'price_1TyHcA1xgyPAUyx6QLytGHFZ'
+    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
+    USD: 'price_1TzLNc1xgyPAUyx6exJw3ihw'
   }
 };
 

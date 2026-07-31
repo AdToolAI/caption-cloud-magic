@@ -65,10 +65,10 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'basic',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 19.99, USD: 19.99 },
+    price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
+    priceId: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
     productId: 'prod_UyE4edZ94ktyOt',
     checkoutUrl: '',
     features: {
@@ -97,10 +97,10 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'pro',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 19.99, USD: 19.99 },
+    price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
+    priceId: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
     productId: 'prod_UyE4edZ94ktyOt',
     checkoutUrl: '',
     features: {
@@ -125,10 +125,10 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'enterprise',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 19.99, USD: 19.99 },
+    price: { EUR: 14.99, USD: 14.99 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1TyHcA1xgyPAUyx6QLytGHFZ',
+    priceId: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
     productId: 'prod_UyE4edZ94ktyOt',
     checkoutUrl: '',
     features: {
@@ -186,7 +186,7 @@ const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
   if (LEGACY_PAID_PRODUCT_IDS.has(productId)) {
-    return { name: 'Beta-Basic', price: 19.99, currency: '€' };
+    return { name: 'Beta-Basic', price: 14.99, currency: '€' };
   }
   return { name: 'Free', price: 0, currency: '€' };
 };
