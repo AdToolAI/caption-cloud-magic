@@ -10340,42 +10340,42 @@ export const translations: Record<Language, any> = {
     // Onboarding
     onboarding: {
       welcome: {
-        title: "¡Bienvenido a CaptionGenie!",
-        description: "Tu panel muestra todas las actividades e insights de un vistazo"
+        title: "¡Bienvenido a AdTool AI!",
+        description: "Un creador. Un estudio entero. Tu panel muestra todas las producciones de un vistazo"
       },
       features: {
-        title: "Explora las Funciones",
-        description: "Navega por nuestras herramientas de IA organizadas por categoría"
+        title: "Tus Áreas del Estudio",
+        description: "Idea, guion, escena, sonido, exportación — cada paso del flujo en un solo lugar"
       },
       generator: {
-        title: "Crea tu Primera Caption",
-        description: "Comienza con nuestro Generador de Captions IA – tu herramienta más usada"
+        title: "Crea tu Primer Video",
+        description: "De la idea al video terminado — sin equipo de rodaje"
       },
       performance: {
-        title: "Sigue tu Éxito",
-        description: "Monitorea el rendimiento de tus posts y obtén insights de IA"
+        title: "Publica y Analiza",
+        description: "Lleva tu video terminado a todos los canales y mira cómo rinde"
       },
       back: "Atrás",
       next: "Siguiente",
       finish: "Comenzar",
       modal: {
-        title: "¡Bienvenido a CaptionGenie!",
-        subtitle: "Tu Plataforma de Gestión de Redes Sociales con IA",
+        title: "¡Bienvenido a AdTool AI!",
+        subtitle: "Un creador. Un estudio entero.",
         feature1: {
-          title: "Creación de Contenido IA",
-          description: "Genera captions, hooks y guiones al instante"
+          title: "Todos los Modelos IA Líderes",
+          description: "Modelos de video, voz, música e imagen en un flujo continuo"
         },
         feature2: {
-          title: "Análisis de Rendimiento",
-          description: "Rastrea y optimiza tu éxito en redes sociales"
+          title: "De la Idea al Corte Final",
+          description: "Guion, reparto, escenas, lip-sync y sonido — nada sale de la plataforma"
         },
         feature3: {
-          title: "Programación Inteligente",
-          description: "Planifica y organiza tu calendario de contenido"
+          title: "Tu Propio Reparto",
+          description: "Personajes y voces recurrentes que se mantienen consistentes en cada video"
         },
         feature4: {
-          title: "Consistencia de Marca",
-          description: "Mantén tu voz única en todas las plataformas"
+          title: "Publica en Todas Partes",
+          description: "El video terminado va directo a tus canales — el último paso, no el producto"
         },
         skip: "Saltar Tour",
         startTour: "Hacer un Tour Rápido"
