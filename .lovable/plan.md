@@ -1,49 +1,59 @@
-## Befund (verifiziert an echten Daten)
+## Kurzantwort
 
-Die heute um 12:08 angelegte Szene (`composer_scenes.8bd233f7…`) hat wirklich zwei Cast-Slots für dieselbe Person:
+Ja, das hängt zusammen — es ist dasselbe Grundproblem: **eine Person kann in unserem System unter mehreren IDs auftreten**, und die Outfit-Variante ist eine davon.
+
+## Befund (an echten Daten verifiziert)
+
+Die betroffene Szene (`composer_scenes.8bd233f7…`, zuletzt 12:23 Uhr geschrieben) hat drei Cast-Slots:
 
 ```text
-character_shots = [
-  { characterId: "483f9cdc-…-9d5e7d955016", characterName: "Samuel Dusatko", shotType: "full" },
-  { characterId: "samuel-dusatko",                                            shotType: "full" }
+[
+  { characterId: "483f9cdc-…-9c5e7d955016", characterName: "Samuel Dusatko" },
+  { characterId: "outfit:673c117b-a97d-4e64-b414-a080c0b1f77f" },
+  { characterId: "samuel-dusatko" }
 ]
 ```
 
-In `brand_characters` existiert Samuel Dusatko **genau einmal** (`483f9cdc…`) — es ist also kein doppelter Avatar in der Bibliothek, sondern ein **Slug-Slot neben dem UUID-Slot**.
+- `avatar_outfit_looks.673c117b…` gehört zu `avatar_id 54d90504…` = **Matthew Dusatko**, Look „Casual". Der manuell hinzugefügte Charakter landet also als **Outfit-Referenz** statt als Charakter-UUID im Cast.
+- In `brand_characters` gibt es Samuel Dusatko **genau einmal** — der dritte Slot ist ein reiner Slug.
 
-Warum das durchrutscht:
-- `useApplyProductionPlan.ts` dedupt Cast-Slots über `String(shot.characterId).toLowerCase()` — `"samuel-dusatko"` ≠ UUID, also bleiben beide erhalten.
-- `CharacterCastPicker.tsx` löst beide Slots über die tolerante `findCharacter`-Heuristik (Name-im-ID-Substring) auf denselben Charakter auf → zwei identische Chips „Samuel Dusatko" und zwei identische Aktionsfelder (genau der Screenshot).
-- Der Self-Heal in `CharacterCastPicker` schreibt den Slug auf die UUID um, dedupt aber **nicht** danach → aus „Slug + UUID" werden „UUID + UUID". Er läuft zusätzlich nur einmal pro Mount (`healedRef`).
-- Auch `syncCastFromPrompt` / `ensureEnsembleScene` vergleichen nur `characterId`-Strings, sind also gegen Slug-Doppel blind.
+Zwei bestätigte Ursachen:
 
-**Zum Clone-Verdacht:** ja, das ist plausibel derselbe Ursprung. Zwei Slots = zwei Portrait-Slots für den Anker-Kompositor (Nano Banana / Seedream) und zwei Face-Slots im Sync.so-Face-Map-Router. Derselbe Mensch wird zweimal ins Frame komponiert → Doppelgänger im Bild und ein "Geister-Sprecher", der beim Lip-Sync einen Pass frisst.
+1. **`resolveCanonicalCharacterId` (canonicalCastId.ts) kennt die Legacy-Präfixe `outfit:` / `catalog:` / `lib:` nicht.** Ein Look-Slot und der Basis-Slot derselben Person werden nie zusammengeführt. `CastRef.ts` kann das bereits (`stripLegacyCastIdPrefix`, `legacyCastIdToRef`), wird im Dedupe-Pfad aber nicht benutzt.
+2. **Der Auflösungs-Pool beim Speichern ist zu klein.** `useComposerPersistence.ts` (Zeile 178) baut den Pool nur aus `project.briefing.characters`. Steht ein Charakter nicht im Briefing, kann `"samuel-dusatko"` nicht aufgelöst werden — der Slug-Slot überlebt den Dedupe und wird erneut in die DB geschrieben.
 
-## Plan
+**Warum Outfits in der Briefing-Analyse mal erkannt werden und mal nicht:** dieselbe uneinheitliche ID-Form. Wird ein Charakter als `outfit:<lookId>` referenziert, trägt der Slot die Outfit-Info **in der ID**; wird er als Basis-UUID referenziert, muss sie in `outfitLookId` stehen. Beim heutigen (nicht präfix-fähigen) Zusammenführen geht je nach Reihenfolge mal der eine, mal der andere Slot verloren — damit verschwindet auch mal der Look. Das ist derselbe Defekt, nicht ein zweiter.
 
-### 1. Kanonische Identitäts-Auflösung (neues Modul)
-`src/lib/video-composer/canonicalCastId.ts`:
-- `resolveCanonicalCharacterId(slotId, pool)` — UUID-Exact-Match zuerst, dann Slug-/Namens-Match (`samuel-dusatko` → `483f9cdc…`), sonst `null`.
-- `dedupeCharacterShots(shots, pool)` — kollabiert Slots auf die kanonische ID; behält den spezifischeren `shotType`, mergt `outfitLookId`, `actionEn/actionUser`, `referenceImageUrl` und `characterName` (nicht-leerer Wert gewinnt). Reihenfolge des ersten Vorkommens bleibt erhalten.
-- Reines Modul, idempotent (gleiche Array-Referenz zurück, wenn nichts zu tun ist) — wichtig gegen `useEffect`-Loops.
+## Die saubere Lösung: eine einzige kanonische Cast-Form
 
-### 2. UI-Härtung (`CharacterCastPicker.tsx`)
-- Self-Heal ersetzt durch `dedupeCharacterShots` gegen `resolutionPool` → Slug-Slots werden auf die UUID normalisiert **und** anschließend zusammengeführt.
-- `healedRef`-Einmal-Sperre entfällt; stattdessen Guard „nur schreiben, wenn Ergebnis sich unterscheidet".
-- Zusätzlich Anzeige-Dedup direkt beim Rendern, damit auch ungespeicherte Zustände nie zwei identische Chips zeigen.
+Grundregel, die wir durchgängig erzwingen: **Ein Cast-Slot ist immer `{ characterId: <brand_characters UUID>, outfitLookId?: <lookId> }`.** Kein Slug, kein Präfix, nirgends.
 
-### 3. Schreibpfade absichern
-- `useApplyProductionPlan.ts`: Dedup-Key auf kanonische ID umstellen (statt Roh-String).
-- `syncCastFromPrompt.ts` (`syncCastFromPrompt` + `ensureEnsembleScene`): Präsenzprüfung über kanonische IDs, damit ein bereits als Slug vorhandener Charakter nicht erneut angehängt wird.
-- `useComposerPersistence.ts`: Beim Persistieren von `character_shots` einmal `dedupeCharacterShots` durchlaufen lassen — damit bestehende Projekte beim nächsten Speichern selbstheilen.
+### 1. Resolver versteht Legacy-Refs (`canonicalCastId.ts`)
+- Vor der Auflösung `stripLegacyCastIdPrefix` anwenden; bei `outfit:` / `catalog:` über eine Look-Map (`lookId → avatarId`) auf die Avatar-UUID auflösen.
+- Signatur abwärtskompatibel erweitern: `resolveCanonicalCharacterId(slotId, pool, opts?: { outfitLookMap })`, analog `dedupeCharacterShots`.
+- Beim Kollabieren eines Präfix-Slots geht der Look **nie** verloren: `outfitLookId` wird auf den gestrippten Look gesetzt und beim Merge bevorzugt behalten.
 
-### 4. Server-Guard (Anker + Lip-Sync)
-- In `supabase/functions/_shared/` eine kleine Deno-Variante der Dedup-Funktion; angewendet in `compose-video-clips` (vor Portrait-/Anker-Komposition) und `compose-dialog-segments` (vor Pass-Berechnung), sodass ein doppelter Slot niemals zu doppelten Portraits oder einem Extra-Sync.so-Pass führt. Nicht-auflösbare Nicht-UUID-Slots werden dort verworfen statt als eigener Charakter behandelt.
+### 2. Look-Map zentral bereitstellen
+- Neuer Hook `useOutfitLookMap()` (React Query, hoher `staleTime`), lädt `avatar_outfit_looks (id, avatar_id, name)` einmalig.
+- Konsumenten: `CharacterCastPicker`, `useComposerPersistence`, `useApplyProductionPlan`, Briefing-Analyse-Mapping.
 
-### 5. Einmal-Bereinigung bestehender Daten
-Migration, die in `composer_scenes.character_shots` Slots mit gleicher aufgelöster Identität zusammenführt (UUID gewinnt, Slug-Duplikate fallen weg). Betroffen ist aktuell nachweislich mindestens eine Szene; die Migration läuft generisch über alle Zeilen des Nutzers.
+### 3. Vollständiger Auflösungs-Pool auf allen Schreibpfaden
+- `useComposerPersistence.ts`: Pool = Briefing-Charaktere **+ Brand-Character-Bibliothek**.
+- `useApplyProductionPlan.ts` und die `syncCastFromPrompt`-Aufrufe in `SceneCard.tsx` bekommen denselben kombinierten Pool (der Picker hat ihn über `resolutionPool` schon).
 
-### Verifikation
-- SQL-Recheck: keine Szene mehr mit zwei Slots, deren Namen/Identität identisch sind.
-- UI: die betroffene Szene zeigt nur noch **einen** Samuel-Chip und **ein** Aktionsfeld.
-- Lip-Sync-Log: Sprecheranzahl entspricht der Chip-Anzahl (kein Geister-Pass).
+### 4. Ursache abstellen statt nur reparieren (Eingangs-Normalisierung)
+- Im Cast-Picker beim Hinzufügen aus Library/@-Mention sofort normalisieren: statt `outfit:<lookId>` wird `{ characterId: <avatarUUID>, outfitLookId: <lookId> }` geschrieben. Damit entstehen gar keine neuen Präfix-Slots mehr.
+- `briefingAvailable` / `libraryAvailable` filtern über die **kanonische** ID, damit eine bereits besetzte Person nicht erneut als „verfügbar" angeboten wird (heute nur Roh-ID-Vergleich).
+- Gleiche Normalisierung im Briefing-Deep-Parse-Mapping → Outfits werden dann **immer** erkannt, nicht mal so, mal so.
+
+### 5. Server-Guard nachziehen
+- `supabase/functions/_shared/canonical-cast.ts` bekommt dieselbe Präfix-Behandlung; `compose-video-clips` und `compose-dialog-segments` laden die Look-Map (ein SELECT auf `avatar_outfit_looks`) und deduplizieren damit, bevor Portraits und Lip-Sync-Pässe berechnet werden.
+
+### 6. Einmalige Datenbereinigung
+- Migration über `composer_scenes.character_shots`: `outfit:<lookId>` → Avatar-UUID + `outfitLookId`, Slug-Slots per Namensabgleich mit `brand_characters` auf die UUID, danach identitätsgleiche Slots zusammenführen (spezifischerer `shotType` gewinnt).
+
+## Verifikation
+- SQL: keine `character_shots`-Zeile mehr mit `outfit:` / `catalog:` / `lib:`-Präfix und keine zwei Slots derselben aufgelösten Identität.
+- UI: Szene `8bd233f7…` zeigt genau **einen** Samuel- und **einen** Matthew-Chip; manuelles Hinzufügen hängt nichts Weiteres an.
+- Briefing-Analyse: der Look bleibt nach dem Zusammenführen erhalten (Chip zeigt „Matthew Dusatko — Casual").
+- Render-Log: Portrait-Slots und Lip-Sync-Pässe = Chip-Anzahl.
