@@ -1369,9 +1369,63 @@ export function useStoryboardTransition({
         const GRACE_MS = 45_000;
         let resolved = false;
 
-        const openFallback = () => {
+        /**
+         * v328 — Server-Plan-Rescue.
+         * Die Edge-Function persistiert ihren Plan in `composer_production_plans`,
+         * auch wenn der Client-Fetch in Timeout/Abbruch gelaufen ist. Bevor wir
+         * einen Local-Fallback zeigen, holen wir den frisch persistierten
+         * AI-Plan — sonst überschreibt der generische Basis-Plan das echte
+         * Briefing-Ergebnis (Symptom: „Hook beat for …" statt Szenentext).
+         */
+        const loadPersistedPlan = async (): Promise<TProductionPlan | null> => {
+          if (!isUuid(activeProjectId)) return null;
+          try {
+            const { data, error } = await supabase
+              .from('composer_production_plans')
+              .select('manifest, created_at')
+              .eq('project_id', activeProjectId as string)
+              .gte('created_at', analysisStartedAtIso)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (error || !data?.manifest) return null;
+            const { plan: persisted } = parsePlan({ plan: data.manifest });
+            if (!persisted) return null;
+            (persisted as any)._meta = {
+              ...((persisted as any)._meta ?? {}),
+              source: 'ai-recovered',
+            };
+            const withDuration = attachRequestedDurationToPlan(persisted, analysisRequestedDurationSec);
+            return applyCanonicalTimingToPlan(withDuration, briefing, text).plan;
+          } catch (rescueErr) {
+            console.warn('[useStoryboardTransition] server-plan rescue failed', rescueErr);
+            return null;
+          }
+        };
+
+        const openFallback = async () => {
           if (resolved || cancelledRef.current) return;
           resolved = true;
+
+          const rescued = await loadPersistedPlan();
+          if (cancelledRef.current) return;
+          if (rescued) {
+            toast({
+              title: '✨ Analyse-Ergebnis wiederhergestellt',
+              description: 'Die Verbindung war instabil, der Plan war serverseitig aber fertig — dein Briefing wurde vollständig übernommen.',
+            });
+            setState({
+              warRoomOpen: false,
+              phase: 'idle',
+              progress: 0,
+              phaseLabel: '',
+              planSheetOpen: true,
+              initialPlan: rescued,
+              activeProjectId,
+            });
+            return;
+          }
+
           const fallbackRaw = buildLocalFallbackPlan(briefing, text);
           const normalizedFallback = applyCanonicalTimingToPlan(fallbackRaw, briefing, text);
           const fallback = normalizedFallback.plan;
@@ -1395,7 +1449,8 @@ export function useStoryboardTransition({
           });
         };
 
-        const graceTimer = window.setTimeout(openFallback, GRACE_MS);
+        const graceTimer = window.setTimeout(() => { void openFallback(); }, GRACE_MS);
+
 
         // Late-arrival retry — bei jeder Soft-Fail-Ursache versuchen wir
         // Server-seitig nochmal (kein Client-Timeout mehr). Kommt der echte
