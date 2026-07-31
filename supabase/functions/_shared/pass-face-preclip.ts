@@ -195,19 +195,21 @@ export async function renderPassFacePreclip(
   // v247 — mouth-anchor crop when we have both a mouth landmark and a
   // face bbox. Guarantees faceShareInCrop ≥ ~42% so Sync.so cannot no-op
   // on tiny/far faces. Falls back to legacy face-center crop otherwise.
-  const useMouthAnchor =
-    Array.isArray(mouth) &&
-    mouth.length === 2 &&
-    Number.isFinite(Number(mouth[0])) &&
-    Number.isFinite(Number(mouth[1])) &&
+  const bboxUsable =
     Array.isArray(bbox) &&
     bbox.length === 4 &&
     bbox.every((n) => Number.isFinite(Number(n)));
+  const hasMouthLandmark =
+    Array.isArray(mouth) &&
+    mouth.length === 2 &&
+    Number.isFinite(Number(mouth[0])) &&
+    Number.isFinite(Number(mouth[1]));
 
   let crop0Size: number;
   let crop0X: number;
   let crop0Y: number;
   let anchor: "mouth" | "face_center" = "face_center";
+  let anchorSource: "landmark" | "synthetic_bbox" | "face_center" = "face_center";
   let faceShareInCrop = 0;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
@@ -228,7 +230,36 @@ export async function renderPassFacePreclip(
     );
   }
 
+  // ── v340 — Mund-Anker ist Pflicht, nicht Bonus ─────────────────────────
+  // Forensik der Szene 69d56a49 zeigte: JEDER Pass lief mit
+  // `detector_used=face-fallback`, weil das Mund-Landmark fehlte. Der Crop
+  // wurde dann auf die Bbox-Mitte (= Augenhöhe) zentriert, der Mund saß am
+  // unteren Rand → Sync.so animiert nichts. Fehlt das Landmark, leiten wir
+  // es jetzt geometrisch aus einer PLAUSIBLEN Box ab (Mund liegt bei ~72 %
+  // der Gesichtshöhe). Ist die Box unplausibel, bleibt der Legacy-Pfad und
+  // der Dispatcher entscheidet fail-closed.
+  let effectiveMouth: [number, number] | null = hasMouthLandmark
+    ? [Number((mouth as number[])[0]), Number((mouth as number[])[1])]
+    : null;
+  if (!effectiveMouth && bboxUsable && !geometry.suspicious) {
+    const [bx1, by1, bx2, by2] = (bbox as number[]).map((n) => Number(n));
+    effectiveMouth = [
+      Math.round((bx1 + bx2) / 2),
+      Math.round(by1 + (by2 - by1) * 0.72),
+    ];
+    anchorSource = "synthetic_bbox";
+    console.warn(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v340_mouth_synthesized_from_bbox ` +
+      `mouth=[${effectiveMouth[0]},${effectiveMouth[1]}] bbox=${JSON.stringify(bbox)} — no landmark from detector`,
+    );
+  } else if (effectiveMouth) {
+    anchorSource = "landmark";
+  }
+
+  const useMouthAnchor = !!effectiveMouth && bboxUsable;
+
   if (useMouthAnchor) {
+
     const r = computeMouthCenteredCrop({
       face: {
         bbox: [
