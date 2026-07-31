@@ -695,7 +695,7 @@ serve(async (req) => {
           }
         }
         if (lookIds.size > 0) {
-          const { data: looks } = await supabase
+          const { data: looks } = await supabaseAdmin
             .from("avatar_outfit_looks")
             .select("id, avatar_id")
             .in("id", Array.from(lookIds));
