@@ -4150,7 +4150,7 @@ export const translations: Record<Language, any> = {
           p4Desc: "Extra time before your account is paused.",
         },
         proFeatures: {
-          f1: "Unlimited AI captions in 25+ languages",
+          f1: "Full studio workflow in 25+ languages",
           f2: "AI image studio + smart background replace",
           f3: "Director's Cut video editor with subtitles & voiceover",
           f4: "Auto-posting to Instagram, TikTok, YouTube, Facebook",
