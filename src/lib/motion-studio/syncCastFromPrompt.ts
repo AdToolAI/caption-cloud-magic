@@ -165,11 +165,13 @@ export function ensureEnsembleScene<S extends SceneLike>(
       characters,
     );
     for (const ch of allChars) {
-      if (present.has(ch.id)) continue;
+      // v320 — always write the Cast & World UUID, never the briefing slug.
+      const chId = resolveCanonicalCharacterId(ch.id, characters) ?? ch.brandCharacterId ?? ch.id;
+      if (present.has(ch.id) || present.has(chId)) continue;
       const visibleCount = shots.filter((x) => x?.shotType && x.shotType !== 'absent').length;
       if (visibleCount >= MAX_CAST) break;
-      shots.push({ characterId: ch.id, shotType: 'full' });
-      present.add(ch.id);
+      shots.push({ characterId: chId, shotType: 'full' });
+      present.add(chId);
     }
     next[idx] = { ...sc, characterShots: shots };
     repaired++;
