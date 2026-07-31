@@ -97,6 +97,62 @@ function peakDbFs(samples: Int16Array): number {
   return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
 }
 
+/**
+ * v325 — AUDIO-INVARIANT (unified loudness across speakers).
+ *
+ * ElevenLabs renders different voices at wildly different levels (measured
+ * -16 LUFS vs -39 LUFS in one two-shot scene). Since every speaker's PCM
+ * feeds BOTH the merged playback track AND the per-speaker Sync.so slice,
+ * that spread produced "speaker 1 shouts with a wide-open mouth, speaker 2
+ * whispers and barely moves". We therefore normalise every TTS segment
+ * bidirectionally (boost AND attenuate) to a common loudness target before
+ * it is placed on the timeline, with a peak ceiling to avoid clipping.
+ */
+function measureLufsInt16(samples: Int16Array): number {
+  if (!samples.length) return -Infinity;
+  // Gate out silence so a long pause does not drag the measurement down.
+  const gate = 0.0025; // ≈ -52 dBFS
+  let sumSq = 0;
+  let count = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = samples[i] / 32768;
+    if (Math.abs(v) < gate) continue;
+    sumSq += v * v;
+    count++;
+  }
+  if (count < 400) return -Infinity;
+  const rms = Math.sqrt(sumSq / count);
+  return rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+}
+
+function normalizeSegmentLoudnessInPlace(
+  samples: Int16Array,
+  targetLufs = -18,
+  maxBoostDb = 14,
+  maxCutDb = 14,
+  peakCeilDbFs = -1,
+): { sourceLufs: number; gainDb: number; resultLufs: number } {
+  const sourceLufs = measureLufsInt16(samples);
+  if (!Number.isFinite(sourceLufs)) return { sourceLufs, gainDb: 0, resultLufs: sourceLufs };
+  let gainDb = targetLufs - sourceLufs;
+  gainDb = Math.max(-maxCutDb, Math.min(maxBoostDb, gainDb));
+  let gain = Math.pow(10, gainDb / 20);
+  // Peak ceiling — never clip after the gain.
+  const peak = peakDbFs(samples);
+  if (Number.isFinite(peak) && peak + gainDb > peakCeilDbFs) {
+    gainDb = peakCeilDbFs - peak;
+    gain = Math.pow(10, gainDb / 20);
+  }
+  if (Math.abs(gainDb) < 0.5) return { sourceLufs, gainDb: 0, resultLufs: sourceLufs };
+  for (let i = 0; i < samples.length; i++) {
+    const v = Math.round(samples[i] * gain);
+    samples[i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
+  }
+  return { sourceLufs, gainDb, resultLufs: sourceLufs + gainDb };
+}
+
+
+
 function samplesToWav(samples: Int16Array): Uint8Array {
   const dataBytes = samples.byteLength;
   const buf = new ArrayBuffer(44 + dataBytes);
