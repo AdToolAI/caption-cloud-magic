@@ -1089,14 +1089,20 @@ export default function ProductionPlanSheet({
             Production Plan — Briefing analysieren & übernehmen
             {safePlan?._meta?.source === 'local-fallback' && (
               <Badge variant="outline" className="ml-auto text-[10px] border-amber-400/40 text-amber-300 bg-amber-400/[0.06]">
-                Lokaler Fallback-Plan
+                Basis-Plan — AI-Analyse fehlgeschlagen
+              </Badge>
+            )}
+            {safePlan?._meta?.source === 'ai-recovered' && (
+              <Badge variant="outline" className="ml-auto text-[10px] border-emerald-400/40 text-emerald-300 bg-emerald-400/[0.06]">
+                AI-Plan wiederhergestellt
               </Badge>
             )}
           </DialogTitle>
           <DialogDescription className="text-xs">
             {safePlan?._meta?.source === 'local-fallback'
-              ? 'Die AI-Analyse war offline — dieser Plan wurde lokal aus deinem Briefing-Text extrahiert. Bitte vor dem Übernehmen prüfen.'
+              ? 'Achtung: Die AI-Analyse ist fehlgeschlagen — dieser Plan wurde nur lokal aus deinem Briefing-Text extrahiert. Prüfe Prompts und Dialoge, oder starte die Analyse über „Briefing analysieren" erneut.'
               : 'Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.'}
+
           </DialogDescription>
         </DialogHeader>
 
