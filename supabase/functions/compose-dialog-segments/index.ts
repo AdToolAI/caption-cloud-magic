@@ -5578,8 +5578,17 @@ serve(async (req) => {
           (pass as any).preclip_plate_box_w_pct = Number.isFinite(Number(preclipResult.plateBoxWidthPct))
             ? Number(Number(preclipResult.plateBoxWidthPct).toFixed(4))
             : null;
+          // v331 — Motion-Cover-Forensik: sichtbar machen, ob und wie stark der
+          // Crop wegen einer gemessenen Bewegungsbahn geweitet wurde.
+          (pass as any).preclip_motion_applied = !!preclipResult.motionCropApplied;
+          (pass as any).preclip_motion_drift_px = Number.isFinite(Number(preclipResult.trackDriftPx))
+            ? Math.round(Number(preclipResult.trackDriftPx))
+            : null;
+          (pass as any).preclip_motion_samples = Number.isFinite(Number(preclipResult.trackSamplesUsed))
+            ? Number(preclipResult.trackSamplesUsed)
+            : null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} v331_motion=${(pass as any).preclip_motion_applied} drift_px=${(pass as any).preclip_motion_drift_px}`,
           );
 
 
