@@ -456,41 +456,41 @@ export const translations: Record<Language, any> = {
     onboarding: {
       welcome: {
         title: "Welcome to AdTool AI!",
-        description: "Your dashboard shows all activities and insights at a glance"
+        description: "One creator. A whole studio. Your dashboard shows every production at a glance"
       },
       features: {
-        title: "Explore Features",
-        description: "Browse through our AI-powered tools organized by category"
+        title: "Your Studio Departments",
+        description: "Idea, script, scene, sound, export — every step of the workflow in one place"
       },
       generator: {
-        title: "Create Your First Caption",
-        description: "Start with our AI Caption Generator – your most-used tool"
+        title: "Create Your First Video",
+        description: "From idea to finished video — no film crew required"
       },
       performance: {
-        title: "Track Your Success",
-        description: "Monitor your post performance and get AI insights"
+        title: "Publish and Track",
+        description: "Send your finished video to every channel and see how it performs"
       },
       back: "Back",
       next: "Next",
       finish: "Get Started",
       modal: {
         title: "Welcome to AdTool AI!",
-        subtitle: "Your AI-powered Social Media Management Platform",
+        subtitle: "One creator. A whole studio.",
         feature1: {
-          title: "AI Content Creation",
-          description: "Generate captions, hooks, and scripts instantly"
+          title: "All Leading AI Models",
+          description: "Video, voice, music and image models in one continuous workflow"
         },
         feature2: {
-          title: "Performance Analytics",
-          description: "Track and optimize your social media success"
+          title: "From Idea to Final Cut",
+          description: "Script, cast, scenes, lip-sync and sound — nothing leaves the platform"
         },
         feature3: {
-          title: "Smart Scheduling",
-          description: "Plan and organize your content calendar"
+          title: "Your Own Cast",
+          description: "Recurring characters and voices that stay consistent across every video"
         },
         feature4: {
-          title: "Brand Consistency",
-          description: "Maintain your unique voice across all platforms"
+          title: "Publish Everywhere",
+          description: "The finished video goes straight to your channels — the last step, not the product"
         },
         skip: "Skip Tour",
         startTour: "Take a Quick Tour"
