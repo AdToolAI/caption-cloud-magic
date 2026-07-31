@@ -54,7 +54,6 @@ export function syncCastFromPrompt(
   return [...current, ...additions];
 }
 
-
 // ---------------------------------------------------------------------------
 // Ensemble guarantee (client-side safety net)
 // ---------------------------------------------------------------------------
