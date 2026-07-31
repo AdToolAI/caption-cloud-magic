@@ -432,7 +432,7 @@ export default function ProductionPlanSheet({
         const raw = String(c?.characterId ?? '').trim();
         if (!raw) continue;
         const inner = uuidInside(raw) ?? raw;
-        if (UUID_ONLY_RE.test(inner)) set.add(inner);
+        if (isUuid(inner)) set.add(inner);
       }
     }
     for (const [, info] of outfitById) if (info.baseId) set.add(info.baseId);
