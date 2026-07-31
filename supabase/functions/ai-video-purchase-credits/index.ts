@@ -149,7 +149,7 @@ serve(async (req) => {
       mode: 'payment',
       currency: currency.toLowerCase(),
       allow_promotion_codes: !isFounder,
-      discounts: isFounder ? [{ coupon: 'FOUNDERS_VIDEO_20' }] : undefined,
+      discounts: isFounder ? [{ coupon: FOUNDERS_CREDIT_COUPON }] : undefined,
       invoice_creation: {
         enabled: true,
         invoice_data: {
