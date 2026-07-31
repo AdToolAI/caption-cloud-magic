@@ -97,6 +97,7 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
 import { collectSiblingFaceCenters } from "../_shared/preclip-geometry.ts";
+import { decidePreclipTrust } from "../_shared/preclip-trust.ts";
 import {
   applyIdentityLockBySlot,
   extractIdentityLock,
@@ -151,7 +152,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v283-face-gate-partial-identity-soft-pass";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v336-preclip-trust-contract";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -5598,8 +5599,24 @@ serve(async (req) => {
           // welcher Boxquelle der Face-Share stammt.
           (pass as any).preclip_motion_skip_reason = (preclipResult as any).motionSkipReason ?? null;
           (pass as any).preclip_face_share_source = (preclipResult as any).faceShareSource ?? null;
+          // v336 — Trust comes from explicit construction invariants, never
+          // from an invented face_count. This permits a safe isolated preclip
+          // to survive a missing post-render JPEG while keeping full plates
+          // and ambiguous crops fail-closed.
+          const preclipTrust = decidePreclipTrust({
+            renderSucceeded: true,
+            faceShare: (pass as any).preclip_face_share,
+            faceShareFloor: V329_FACE_SHARE_FLOOR,
+            geometrySuspicious: !!(pass as any).preclip_geometry_suspicious,
+            ambiguityRisk: String((pass as any)._v1291_ambiguity?.risk ?? "clean"),
+            crop: (pass as any).preclip_crop,
+            siblingCenters: siblingCoords,
+          });
+          (pass as any).preclip_constructively_trusted = preclipTrust.trusted;
+          (pass as any).preclip_trust_reason = preclipTrust.reason;
+          (pass as any).preclip_sibling_inside_crop = preclipTrust.siblingInsideCrop;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} share_src=${(pass as any).preclip_face_share_source} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} v331_motion=${(pass as any).preclip_motion_applied} motion_skip=${(pass as any).preclip_motion_skip_reason} drift_px=${(pass as any).preclip_motion_drift_px}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v336_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} share_src=${(pass as any).preclip_face_share_source} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} v331_motion=${(pass as any).preclip_motion_applied} motion_skip=${(pass as any).preclip_motion_skip_reason} drift_px=${(pass as any).preclip_motion_drift_px} trusted=${preclipTrust.trusted} trust_reason=${preclipTrust.reason} sibling_inside=${preclipTrust.siblingInsideCrop}`,
           );
 
 
@@ -6973,8 +6990,7 @@ serve(async (req) => {
         ? Number(preclipDimsForGate?.height ?? preclipCropForGate?.outputSize ?? 0)
         : Number(plateDims?.height ?? 0);
       const preclipTrustedForGate = usePassPreclip &&
-        Number((pass as any).preclip_face_count ?? 0) === 1 &&
-        String((pass as any)._v1291_ambiguity?.risk ?? "clean") === "clean";
+        (pass as any).preclip_constructively_trusted === true;
       // v136 — Always run the face-gate. The previous "auto_detect preclip
       // trusted" short-circuit (v131.4) is gone because we no longer dispatch
       // auto_detect on preclips; we send explicit center coords and the gate
@@ -7069,13 +7085,18 @@ serve(async (req) => {
       // (extract failure or transient 5xx), log it but let the dispatch
       // through. The Forensik UI surfaces this clearly so we don't silently
       // pretend the probe passed.
-      if (gate.ok && gate.code === "probe_unavailable") {
+      if (gate.ok && (gate.code === "probe_unavailable" || gate.code === "trusted_preclip_without_probe")) {
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_source_kind: "segments", video_url: dispatchVideoUrl,
           coords: gateCoord, frame_number: gateFrame,
-          http_status: gate.http_status ?? 0, sync_status: "FACE_GATE_PROBE_UNAVAILABLE",
-          error_class: "face_probe_unavailable",
+          http_status: gate.http_status ?? 0,
+          sync_status: gate.code === "trusted_preclip_without_probe"
+            ? "FACE_GATE_TRUSTED_PRECLIP_WITHOUT_PROBE"
+            : "FACE_GATE_PROBE_UNAVAILABLE",
+          error_class: gate.code === "trusted_preclip_without_probe"
+            ? "trusted_preclip_without_probe"
+            : "face_probe_unavailable",
           error_message: (gate.reason ?? "face_probe_unavailable").slice(0, 240),
           ...preclipMetricsForPass(pass as any, attempt, usePassPreclip),
           meta: {
@@ -7096,6 +7117,7 @@ serve(async (req) => {
               gemini_ms: gate.gemini_ms,
             },
             non_blocking: true,
+            preclip_trust_reason: (pass as any).preclip_trust_reason ?? null,
           },
         });
       }

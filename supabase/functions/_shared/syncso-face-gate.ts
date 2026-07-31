@@ -31,8 +31,9 @@
 
 import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
+import { decideProbeUnavailablePolicy } from "./preclip-trust.ts";
 
-const GATE_VERSION = "v252-aws-face-gate-primary";
+const GATE_VERSION = "v336-preclip-trust-contract";
 
 
 export type FaceGateCode =
@@ -43,6 +44,9 @@ export type FaceGateCode =
   | "multiple_faces"
   | "skipped"
   | "probe_unavailable"
+  | "trusted_preclip_without_probe"
+  | "untrusted_multispeaker_without_probe"
+  | "geometry_suspect_without_probe"
   | "unparsed";
 
 export interface FaceGateResult {
@@ -115,36 +119,27 @@ export interface FaceGateInput {
  * top of the raw gate result: a non-blocking `probe_unavailable` stays
  * non-blocking only while the underlying crop geometry is trustworthy.
  *
- * v331 (27.07./v169 restore) — for multi-speaker scenes `probe_unavailable`
- * is fail-CLOSED regardless of geometry. A blind dispatch on a plate that
- * carries two or more faces is exactly the state that produced the morphing
- * elevator scene: Sync.so picks up the neighbour's mouth and the mux blends
- * it back over the master plate. Single-speaker preclips keep failing open
- * because there is no neighbour to bleed into.
+ * v336 — multi-speaker full plates and untrusted crops remain fail-closed.
+ * A constructively verified single-face preclip may proceed without a second
+ * JPEG probe; this preserves the morph guard without demanding an artifact
+ * the server-side preclip renderer intentionally cannot produce.
  */
 export async function verifyFaceBeforeDispatch(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
   const result = await runFaceGate(input);
   if (result.ok && result.code === "probe_unavailable") {
-    if (input.isMultiSpeakerContext) {
-      return {
-        ...result,
-        ok: false,
-        code: "no_face",
-        reason:
-          `v331_multispeaker_probe_unavailable: ${result.reason ?? "probe unavailable"} — ` +
-          `Mehrsprecher-Szene ohne verifizierbares Gesicht: blinder Dispatch abgelehnt (Morph-Schutz).`,
-      };
-    }
-    if (input.geometrySuspect) {
-      return {
-        ...result,
-        ok: false,
-        code: "no_face",
-        reason: `v329_geometry_suspect_and_probe_unavailable: ${result.reason ?? "probe unavailable"} — Crop-Geometrie stammt aus dem Rettungsfenster, blinder Dispatch abgelehnt.`,
-      };
-    }
+    const policy = decideProbeUnavailablePolicy({
+      isMultiSpeakerContext: !!input.isMultiSpeakerContext,
+      preclipTrusted: !!input.preclipTrusted,
+      geometrySuspect: !!input.geometrySuspect,
+    });
+    return {
+      ...result,
+      ok: policy.ok,
+      code: policy.code,
+      reason: `${policy.reason} Source: ${result.reason ?? "probe unavailable"}`,
+    };
   }
   return result;
 }
