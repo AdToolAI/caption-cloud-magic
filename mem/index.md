@@ -126,6 +126,7 @@ Updated: today
 - [v64 N=1 Tight-Slice Parity](mem://architecture/lipsync/v64-n1-tight-slice-parity) — N=1 now uses tight-slice + audio-mux overlay (same path as N≥2 success); `sync_mode=cut_off` for N=1, `loop` for N≥2; fixes provider_unknown_error on 78%-silence WAVs
 - [No Per-User Video Rate Limit](mem://architecture/video-edge-functions/no-per-user-rate-limit) — wallet-only spend protection
 - [Composer Engine Normalization](mem://architecture/video-composer/engine-normalization-policy) — ai-sora → ai-hailuo, Kling 3 Omni for T2V
+- [Markenpositionierung](mem://brand/positioning-territory) — Claim, Messaging-Hierarchie, Zielmarkt, Beachhead-Regel, Verbotsliste für Texte.
 - [James Bond 2028 Design](mem://design/james-bond-2028-comprehensive-design-system) — Deep black/gold aesthetic
 - [Credit Refund Automation](mem://architecture/failure-credit-refund-automation) — Lambda/Sora timeout refunds
 - [Lambda Production Config](mem://infrastructure/remotion-lambda-production-configuration) — 3008MB RAM, 600s timeout
