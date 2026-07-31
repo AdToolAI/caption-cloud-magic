@@ -5592,8 +5592,12 @@ serve(async (req) => {
           (pass as any).preclip_motion_samples = Number.isFinite(Number(preclipResult.trackSamplesUsed))
             ? Number(preclipResult.trackSamplesUsed)
             : null;
+          // v334 — Forensik: warum der Motion-Cover (nicht) griff und aus
+          // welcher Boxquelle der Face-Share stammt.
+          (pass as any).preclip_motion_skip_reason = (preclipResult as any).motionSkipReason ?? null;
+          (pass as any).preclip_face_share_source = (preclipResult as any).faceShareSource ?? null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} v331_motion=${(pass as any).preclip_motion_applied} drift_px=${(pass as any).preclip_motion_drift_px}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} share_src=${(pass as any).preclip_face_share_source} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} v331_motion=${(pass as any).preclip_motion_applied} motion_skip=${(pass as any).preclip_motion_skip_reason} drift_px=${(pass as any).preclip_motion_drift_px}`,
           );
 
 
