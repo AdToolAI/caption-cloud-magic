@@ -84,8 +84,9 @@ export interface PassPreclipResult {
   durationSec?: number;
   fps?: number;
   frameCount?: number;
-  /** v247 — anchor used ("mouth" | "face_center"). */
-  anchor?: "mouth" | "face_center";
+  /** v247/v342 — anchor used ("mouth" | "mouth_from_bbox" | "face_center"). */
+  anchor?: "mouth" | "face_center" | "mouth_from_bbox";
+
   /** v247 — face bbox area / crop area after clamping (0..1). */
   faceShareInCrop?: number;
   /** v247 — distance (px) between mouth and crop center. */
