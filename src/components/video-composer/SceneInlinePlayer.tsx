@@ -93,16 +93,23 @@ export default function SceneInlinePlayer({
     twoshotStage === 'done' ||
     twoshotStage === 'complete';
   const lipsyncFailed = lipSyncStatus === 'failed' || twoshotStage === 'failed';
+  // v326 — Szene ist bewusst geparkt und wartet auf manuelle Sprecher↔Gesicht-
+  // Zuordnung. Das ist KEIN laufender Job: ohne diesen Guard läuft der
+  // "Szene wird gebaut…"-Spinner endlos, weil twoshot_stage='anchor' nicht in
+  // der Terminal-Liste steht.
+  const awaitingFaceMap = (status as string) === 'awaiting_manual_face_map';
   const lipsyncRunning =
     needsLipsync &&
     !lipsyncDone &&
     !lipsyncFailed &&
     !lipsyncCanceled &&
+    !awaitingFaceMap &&
     (lipSyncStatus === 'running' ||
       lipSyncStatus === 'stitching' ||
       lipSyncStatus === 'audio_muxing' ||
       (twoshotStage && !['failed', 'done', 'complete', 'canceled'].includes(twoshotStage)) ||
       status === 'ready'); // clip ready, lip-sync still pending
+
 
   // v131.7 — Stale-Lipsync-Detection (Realtime-Backstop).
   // Wenn Lipsync >9 min läuft, ohne dass `lipSyncAppliedAt` gesetzt wurde
