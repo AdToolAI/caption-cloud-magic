@@ -24,6 +24,7 @@ export interface CastPoolEntry {
    * present that UUID is the canonical identity.
    */
   brandCharacterId?: string | null;
+  aliasIds?: readonly string[] | null;
 }
 
 /** Canonical id of a pool entry: the Cast & World UUID when linked. */
@@ -87,8 +88,17 @@ export function resolveCanonicalCharacterId(
   const raw = splitCastSlotId(slotId, outfitLookMap).base;
   if (!raw || !pool?.length) return null;
 
-  const exact = pool.find((c) => c.id === raw || c.brandCharacterId === raw);
-  if (exact) return canonicalPoolId(exact);
+  const exact = pool.find(
+    (c) => c.id === raw || c.brandCharacterId === raw || c.aliasIds?.includes(raw),
+  );
+  if (exact) {
+    // If legacy duplicate UUID rows are present, the first same-name Cast &
+    // World entry is the canonical winner for every duplicate.
+    const sameNameWinner = exact.name
+      ? pool.find((c) => norm(c.name) === norm(exact.name))
+      : undefined;
+    return canonicalPoolId(sameNameWinner ?? exact);
+  }
 
   const needle = norm(raw);
   if (!needle) return null;

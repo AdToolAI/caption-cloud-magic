@@ -28,6 +28,7 @@ type CharacterLike = {
    * an alias used for resolving, never a value we write.
    */
   brandCharacterId?: string | null;
+  aliasIds?: readonly string[] | null;
 };
 
 /** `lookId → avatar (brand_characters) id` — see `useOutfitLookMap()`. */
@@ -111,7 +112,9 @@ export function resolveCanonicalCharacterId(
 
   // 1. Exact id match (fast path, also the UUID case). A briefing slug and the
   //    linked Cast & World UUID are the SAME person → both resolve to the UUID.
-  const exact = pool.find((c) => c.id === raw || c.brandCharacterId === raw);
+  const exact = pool.find(
+    (c) => c.id === raw || c.brandCharacterId === raw || c.aliasIds?.includes(raw),
+  );
   if (exact) return canonicalPoolId(exact);
 
   const needle = norm(raw);
