@@ -25,6 +25,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { failLipSync } from "../_shared/lipsync-fail.ts";
 
 const YAVG_NOOP_THRESHOLD = 4.0;
 
@@ -303,6 +304,12 @@ Deno.serve(async (req) => {
             noop_retry_attempt_id: newAttemptId,
             noop_retry_reason: noopReason,
             previous_noop_output_url: pass.output_url ?? null,
+            yavg_probed_at: null,
+            yavg_value: null,
+            motion_noop: false,
+            motion_noop_yavg: null,
+            motion_probe_status: null,
+            motion_probe_job_id: null,
             retry_history: [...prevHistory, newRetryEntry],
           },
         });
@@ -386,15 +393,18 @@ Deno.serve(async (req) => {
     ).toFixed(1);
     const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`;
 
-    await admin
-      .from("composer_scenes")
-      .update({
-        lip_sync_status: "failed",
-        twoshot_stage: "needs_clip_rerender",
-        clip_error: userMsg,
-        updated_at: nowIso,
-      })
-      .eq("id", body.scene_id);
+    const failure = await failLipSync({
+      supabase: admin,
+      sceneId: body.scene_id,
+      reason: userMsg,
+      userId,
+      extraSyncJobIds: jobId ? [jobId] : [],
+      syncApiKey: Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY") ?? null,
+    });
+    await admin.from("composer_scenes").update({
+      twoshot_stage: "needs_clip_rerender",
+      updated_at: nowIso,
+    }).eq("id", body.scene_id);
 
     await logDispatch(admin, {
       scene_id: body.scene_id,
@@ -419,7 +429,7 @@ Deno.serve(async (req) => {
       `[report-lipsync-motion-probe] v248_slice4 scene=${body.scene_id} pass=${body.pass_idx} speaker="${passSpeakerName}" NOOP-LADDER-EXHAUSTED → hard-fail`,
     );
 
-    return json({ ok: true, is_noop: true, escalated: false, hard_failed: true });
+    return json({ ok: true, is_noop: true, escalated: false, hard_failed: true, refunded: failure.refunded });
   } catch (e) {
     console.error(`[report-lipsync-motion-probe] error: ${(e as Error).message}`);
     return json({ error: "internal", message: (e as Error).message }, 500);
