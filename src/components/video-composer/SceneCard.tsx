@@ -652,7 +652,7 @@ export default function SceneCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scene.id,
-    characters?.length,
+    castResolutionPool,
     scene.characterShots?.length,
     scene.characterShot?.characterId,
     scene.characterShots
@@ -1799,7 +1799,7 @@ export default function SceneCard({
                         );
                         // Resolve removed-character objects for name-based prompt scrubbing.
                         const removedChars = removedNow
-                          .map((id) => characters?.find((c) => c.id === id))
+                          .map((id) => castResolutionPool.find((c) => c.id === id || c.aliasIds?.includes(id)))
                           .filter(
                             (c): c is NonNullable<typeof c> =>
                               !!c && !!c.name,
@@ -1833,7 +1833,7 @@ export default function SceneCard({
                           const newSubject = applyCastToPrompt(
                             scrubbedSubject,
                             next,
-                            characters,
+                            castResolutionPool,
                             lang,
                           );
                           const nextSlots: PromptSlots = {
@@ -1853,7 +1853,7 @@ export default function SceneCard({
                           updates.aiPrompt = applyCastToPrompt(
                             scrubbedPrompt,
                             next,
-                            characters,
+                            castResolutionPool,
                             lang,
                           );
                         }
