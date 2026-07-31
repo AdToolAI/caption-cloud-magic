@@ -19044,10 +19044,6 @@ export type Database = {
         Args: { _pass_idx: number; _patch: Json; _scene_id: string }
         Returns: Json
       }
-      update_dialog_shot_pass: {
-        Args: { p_pass_idx: number; p_patch: Json; p_scene_id: string }
-        Returns: Json
-      }
       update_dialog_shots_root_merge: {
         Args: { _patch: Json; _scene_id: string }
         Returns: Json
