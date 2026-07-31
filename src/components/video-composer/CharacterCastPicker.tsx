@@ -25,6 +25,7 @@ import type {
   ComposerCharacter,
 } from '@/types/video-composer';
 import { safeLower, safeFirstNameLower } from '@/lib/motion-studio/strings';
+import { dedupeCharacterShots } from '@/lib/video-composer/canonicalCastId';
 import { useSavedOutfits } from '@/hooks/useSavedOutfits';
 
 const MAX_CAST = 4;
