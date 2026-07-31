@@ -260,8 +260,7 @@ interface SceneCardProps {
     partials: Partial<ComposerScene>[],
     opts?: { removeParent?: boolean },
   ) => Promise<(string | undefined)[]>;
-  /** Propagates a newly-picked library character into the project briefing cast
-   *  so prompt injection / anchor resolution finds it. */
+  /** Legacy callback retained for director-generated briefing updates. */
   onAddCharacter?: (character: ComposerCharacter) => void;
   language: string;
   /** Auto-persist hook for the per-scene Dialog Studio (voiceover generation). */
@@ -359,24 +358,19 @@ export default function SceneCard({
   // the same person is treated as two cast members.
   const { outfitLookMap } = useOutfitLookMap();
   const castResolutionPool = useMemo<ComposerCharacter[]>(() => {
-    // v320 — a briefing entry and its Cast & World avatar are ONE person:
-    // index both id forms so the library copy is never added as a second pool
-    // member (which is what produced the duplicate chip).
-    const seen = new Set(
-      (characters ?? []).flatMap((c) =>
-        [c.id, c.brandCharacterId].filter((x): x is string => !!x),
-      ),
-    );
-    const extras = (libCharacters ?? [])
-      .filter((c: any) => c?.id && !seen.has(c.id) && !String(c.id).includes(':'))
+    // Cast & World is the only selectable source. Briefing characters are
+    // compatibility aliases only and never enter the picker independently.
+    const castWorld = (libCharacters ?? [])
+      .filter((c: any) => c?.id && !String(c.id).includes(':'))
       .map((c: any) => ({
         id: c.id as string,
         name: (c.name as string) ?? '',
         appearance: c.description ?? '',
         signatureItems: c.signature_items ?? '',
         referenceImageUrl: c.reference_image_url ?? undefined,
+        aliasIds: c.aliasIds ?? [],
       })) as ComposerCharacter[];
-    return [...(characters ?? []), ...extras];
+    return castWorld;
   }, [characters, libCharacters]);
   // World-asset pools for the UnifiedAssetPicker (Locations / Buildings / Props).
   const { locations: brandLocations } = useBrandLocations();
@@ -593,14 +587,14 @@ export default function SceneCard({
   // changes, so no render loop. Must run BEFORE the cast-marker backfill below
   // so the marker picks up the auto-added slots in the same pass.
   useEffect(() => {
-    if (!characters || characters.length === 0) return;
+    if (castResolutionPool.length === 0) return;
     const current =
       scene.characterShots ??
       (scene.characterShot ? [scene.characterShot] : []);
     const next = syncCastFromPrompt(
       scene.aiPrompt || "",
       current,
-      characters,
+      castResolutionPool,
       scene.dismissedCharacterIds,
       { resolutionPool: castResolutionPool, outfitLookMap },
     );
@@ -612,7 +606,7 @@ export default function SceneCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scene.aiPrompt,
-    characters?.length,
+    castResolutionPool,
     scene.dismissedCharacterIds?.length,
     castResolutionPool,
     outfitLookMap,
@@ -625,7 +619,7 @@ export default function SceneCard({
   // catch storyboard refreshes and late-arriving brand characters.
   useEffect(() => {
     if (!scene.clipSource.startsWith("ai-")) return;
-    if (!characters || characters.length === 0) return;
+    if (castResolutionPool.length === 0) return;
     const cast =
       scene.characterShots ??
       (scene.characterShot ? [scene.characterShot] : []);
@@ -635,7 +629,7 @@ export default function SceneCard({
       const newSubject = applyCastToPrompt(
         currentSubject,
         cast,
-        characters,
+        castResolutionPool,
         lang,
       );
       if (newSubject !== currentSubject) {
@@ -649,7 +643,7 @@ export default function SceneCard({
       const newPrompt = applyCastToPrompt(
         scene.aiPrompt || "",
         cast,
-        characters,
+        castResolutionPool,
         lang,
       );
       if (newPrompt !== (scene.aiPrompt || ""))
@@ -658,7 +652,7 @@ export default function SceneCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scene.id,
-    characters?.length,
+    castResolutionPool,
     scene.characterShots?.length,
     scene.characterShot?.characterId,
     scene.characterShots
@@ -1771,7 +1765,7 @@ export default function SceneCard({
               )}
 
               <SceneStudioSectionHeader tab="cast" language={lang} />
-              {/* Character Cast picker (multi, max 4) — shown for any AI scene when the user has at least one avatar (briefing or library). */}
+              {/* Character Cast picker (multi, max 4) — Cast & World only. */}
               {scene.clipSource.startsWith("ai-") &&
                 ((characters && characters.length > 0) ||
                   libCharacters.length > 0 ||
@@ -1783,17 +1777,7 @@ export default function SceneCard({
                   catalogProps.length > 0) && (
                   <>
                     <UnifiedAssetPicker
-                      characters={characters ?? []}
-                      libraryCharacters={libCharacters.map(
-                        (c): ComposerCharacter => ({
-                          id: c.id,
-                          name: c.name,
-                          appearance: c.description ?? "",
-                          signatureItems: c.signature_items ?? "",
-                          referenceImageUrl: c.reference_image_url ?? undefined,
-                        }),
-                      )}
-                      onAddToBriefing={onAddCharacter}
+                      characters={castResolutionPool}
                       cast={scene.characterShots}
                       legacyCast={scene.characterShot}
                       onCastChange={(next) => {
@@ -1815,7 +1799,7 @@ export default function SceneCard({
                         );
                         // Resolve removed-character objects for name-based prompt scrubbing.
                         const removedChars = removedNow
-                          .map((id) => characters?.find((c) => c.id === id))
+                          .map((id) => castResolutionPool.find((c) => c.id === id || c.aliasIds?.includes(id)))
                           .filter(
                             (c): c is NonNullable<typeof c> =>
                               !!c && !!c.name,
@@ -1849,7 +1833,7 @@ export default function SceneCard({
                           const newSubject = applyCastToPrompt(
                             scrubbedSubject,
                             next,
-                            characters,
+                            castResolutionPool,
                             lang,
                           );
                           const nextSlots: PromptSlots = {
@@ -1869,7 +1853,7 @@ export default function SceneCard({
                           updates.aiPrompt = applyCastToPrompt(
                             scrubbedPrompt,
                             next,
-                            characters,
+                            castResolutionPool,
                             lang,
                           );
                         }
@@ -2705,13 +2689,7 @@ export default function SceneCard({
                   <SceneDirectorBox
                     scene={scene}
                     lang={lang as "en" | "de" | "es"}
-                    characters={characters}
-                    libraryCharacters={libCharacters.map((c) => ({
-                      id: c.id,
-                      name: c.name,
-                      description: c.description ?? null,
-                      reference_image_url: c.reference_image_url ?? undefined,
-                    }))}
+                    characters={castResolutionPool}
                     locations={brandLocations.map((l) => ({
                       id: l.id,
                       name: l.name,
@@ -2730,7 +2708,6 @@ export default function SceneCard({
                       description: p.description ?? null,
                       reference_image_url: p.reference_image_url,
                     }))}
-                    onAddCharacter={onAddCharacter}
                     realismPreset={scene.realismPreset}
                     onApply={({ aiPrompt, dialogScript, characterShots, actionBeat, sceneActionUser, sceneActionEn, characterActions }) => {
                       const updates: Partial<ComposerScene> = { aiPrompt };

@@ -49,8 +49,6 @@ const LABELS = {
     de: 'Bis zu 4 Charaktere pro Szene. Bei ≥2 komponiert Nano Banana 2 sie ins erste Frame; Vidu Q2 (Multi-Reference) wird empfohlen.',
     es: 'Hasta 4 personajes por escena. Con ≥2, Nano Banana 2 los compone en el primer frame; se recomienda Vidu Q2.',
   },
-  briefingSection: { en: 'In this project', de: 'In diesem Projekt', es: 'En este proyecto' },
-  librarySection:  { en: 'From your avatar library', de: 'Aus deiner Avatar-Bibliothek', es: 'De tu biblioteca de avatares' },
   createNew:       { en: 'Create new avatar…', de: 'Neuen Avatar erstellen…', es: 'Crear nuevo avatar…' },
   unknown:         { en: 'Unknown — remove?', de: 'Unbekannt – entfernen?', es: 'Desconocido – ¿quitar?' },
   outfit:          { en: 'Outfit', de: 'Outfit', es: 'Atuendo' },
@@ -59,13 +57,8 @@ const LABELS = {
 } as const;
 
 interface Props {
+  /** The canonical Cast & World pool. No briefing-only character source. */
   characters: ComposerCharacter[];
-  /** Optional: full avatar library (brand_characters + purchased). Shown as a
-   *  second section in the add-popover. Picking one auto-adds it to briefing. */
-  libraryCharacters?: ComposerCharacter[];
-  /** Called when the user picks a character that wasn't in `characters` yet,
-   *  so the parent can persist it to the project briefing cast. */
-  onAddToBriefing?: (character: ComposerCharacter) => void;
   value?: CharacterShot[];
   /** Backwards-compat: legacy single-slot value. */
   legacyValue?: CharacterShot;
@@ -109,8 +102,6 @@ function findCharacter(
 
 export function CharacterCastPicker({
   characters,
-  libraryCharacters,
-  onAddToBriefing,
   value,
   legacyValue,
   onChange,
@@ -120,19 +111,7 @@ export function CharacterCastPicker({
   const lang: Lang = language;
   const rawCast = normalizeValue(value, legacyValue);
 
-  // Combined pool used for resolving slot ids (briefing first, then library
-  // — briefing wins on dupe id).
-  const resolutionPool = useMemo<ComposerCharacter[]>(() => {
-    const seen = new Set(
-      (characters ?? []).flatMap((c) =>
-        [c.id, c.brandCharacterId].filter((x): x is string => !!x),
-      ),
-    );
-    const extras = (libraryCharacters ?? []).filter(
-      (c) => !seen.has(c.id) && !(c.brandCharacterId && seen.has(c.brandCharacterId)),
-    );
-    return [...(characters ?? []), ...extras];
-  }, [characters, libraryCharacters]);
+  const resolutionPool = characters ?? [];
 
   // v319 — Identity dedupe: slots whose id drifted (slug, `outfit:<lookId>`,
   // `lib:<id>` instead of the brand UUID) are rewritten to the canonical id
@@ -172,29 +151,16 @@ export function CharacterCastPicker({
     return s;
   }, [cast, resolutionPool, canonOpts]);
 
-  // v320 — a person is "already in the cast" under EITHER id form (briefing
-  // slug or Cast & World UUID), so she is never offered a second time.
+  // A Cast & World person is already taken under any canonical/alias id.
   const isTaken = (c: ComposerCharacter) =>
-    inCast.has(c.id) || !!(c.brandCharacterId && inCast.has(c.brandCharacterId));
-  // v320 — Cast & World is the single character source: briefing entries are
-  // only offered when they are linked to a real avatar (or are an avatar UUID
-  // themselves). Unlinked briefing-only people are never castable anymore.
-  const briefingAvailable = (characters ?? []).filter(
-    (c) =>
-      !isTaken(c) &&
-      (!!c.brandCharacterId ||
-        (libraryCharacters ?? []).some((l) => l.id === c.id)),
-  );
-  const libraryAvailable = (libraryCharacters ?? []).filter(
-    (c) =>
-      !isTaken(c) &&
-      !(characters ?? []).some((b) => b.id === c.id || b.brandCharacterId === c.id),
-  );
+    inCast.has(c.id) ||
+    !!(c.brandCharacterId && inCast.has(c.brandCharacterId)) ||
+    !!c.aliasIds?.some((id) => inCast.has(id));
+  const availableCharacters = (characters ?? []).filter((c) => !isTaken(c));
 
   // Render nothing if there is genuinely nothing to show or do.
   if (
     (characters?.length ?? 0) === 0 &&
-    (libraryCharacters?.length ?? 0) === 0 &&
     cast.length === 0
   ) {
     return null;
@@ -224,21 +190,9 @@ export function CharacterCastPicker({
       },
     ]);
   };
-  const addFromLibrary = (c: ComposerCharacter) => {
-    if (cast.length >= MAX_CAST) return;
-    if (
-      onAddToBriefing &&
-      !(characters ?? []).some((b) => b.id === c.id || b.brandCharacterId === c.id)
-    ) {
-      onAddToBriefing(c);
-    }
-    addSlot(c.id);
-  };
-
-
   const canAddMore =
     cast.length < MAX_CAST &&
-    (briefingAvailable.length > 0 || libraryAvailable.length > 0 || !!onAddToBriefing);
+    availableCharacters.length > 0;
 
   return (
     <div className="space-y-1.5">
@@ -340,44 +294,17 @@ export function CharacterCastPicker({
             </PopoverTrigger>
             <PopoverContent align="start" className="w-64 p-1">
               <div className="space-y-1">
-                {briefingAvailable.length > 0 && (
+                {availableCharacters.length > 0 && (
                   <div>
                     <div className="px-2 pt-1 pb-0.5 text-[9px] uppercase tracking-widest text-muted-foreground/70">
-                      {LABELS.briefingSection[lang]}
+                      Cast &amp; World
                     </div>
                     <div className="space-y-0.5">
-                      {briefingAvailable.map((c) => (
+                      {availableCharacters.map((c) => (
                         <button
                           key={c.id}
                           type="button"
                           onClick={() => addSlot(c.id)}
-                          className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left"
-                        >
-                          {c.referenceImageUrl ? (
-                            <img src={c.referenceImageUrl} alt={c.name} className="h-6 w-6 rounded-full object-cover" />
-                          ) : (
-                            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
-                              {c.name[0]}
-                            </div>
-                          )}
-                          <span className="text-xs">{c.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {libraryAvailable.length > 0 && (
-                  <div>
-                    <div className="px-2 pt-1 pb-0.5 text-[9px] uppercase tracking-widest text-muted-foreground/70">
-                      {LABELS.librarySection[lang]}
-                    </div>
-                    <div className="space-y-0.5">
-                      {libraryAvailable.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => addFromLibrary(c)}
                           className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left"
                         >
                           {c.referenceImageUrl ? (

@@ -13,6 +13,23 @@ export interface AccessibleCharacter extends BrandCharacter {
   source: 'owned' | 'purchased';
   purchase_id?: string;
   license_version?: string;
+  /** Older Cast & World rows with the same normalized name. */
+  aliasIds?: string[];
+}
+
+function normalizedCharacterName(name: string | null | undefined): string {
+  return String(name ?? '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+}
+
+function characterPriority(character: AccessibleCharacter): number {
+  const row = character as AccessibleCharacter & Record<string, unknown>;
+  let score = character.source === 'owned' ? 10_000 : 0;
+  if (character.reference_image_url) score += 1_000;
+  if (character.description) score += 100;
+  if (row.identity_card || row.identity_card_json) score += 50;
+  const updated = Date.parse(String(row.updated_at ?? row.created_at ?? ''));
+  if (Number.isFinite(updated)) score += updated / 1_000_000_000_000;
+  return score;
 }
 
 export function useAccessibleCharacters() {
@@ -74,15 +91,31 @@ export function useAccessibleCharacters() {
           .filter((x): x is AccessibleCharacter => x !== null);
       }
 
-      // De-dupe (someone could own AND have purchased their own — keep owned)
-      const seen = new Set<string>();
-      const out: AccessibleCharacter[] = [];
+      // Cast & World is the single character source. Collapse both duplicate
+      // ids and duplicate names so every person is offered exactly once.
+      const byId = new Map<string, AccessibleCharacter>();
       for (const c of [...ownList, ...purchasedList]) {
-        if (seen.has(c.id)) continue;
-        seen.add(c.id);
-        out.push(c);
+        const current = byId.get(c.id);
+        if (!current || characterPriority(c) > characterPriority(current)) byId.set(c.id, c);
       }
-      return out;
+
+      const byName = new Map<string, AccessibleCharacter[]>();
+      for (const c of byId.values()) {
+        const key = normalizedCharacterName(c.name) || `id:${c.id}`;
+        const group = byName.get(key) ?? [];
+        group.push(c);
+        byName.set(key, group);
+      }
+
+      return Array.from(byName.values()).map((group) => {
+        const ranked = [...group].sort((a, b) => characterPriority(b) - characterPriority(a));
+        const winner = ranked[0];
+        if (!winner) throw new Error('Invalid empty Cast & World character group');
+        return {
+          ...winner,
+          aliasIds: ranked.slice(1).map((c) => c.id),
+        };
+      });
     },
   });
 }

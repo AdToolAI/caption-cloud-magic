@@ -95,8 +95,6 @@ const FAMILIES: AssetFamilyConfig[] = [
 export interface UnifiedAssetPickerProps {
   /** Cast pass-through */
   characters: ComposerCharacter[];
-  libraryCharacters?: ComposerCharacter[];
-  onAddToBriefing?: (character: ComposerCharacter) => void;
   cast?: CharacterShot[];
   legacyCast?: CharacterShot;
   onCastChange: (next: CharacterShot[]) => void;
@@ -129,8 +127,6 @@ function pickByFamily(
 
 export function UnifiedAssetPicker({
   characters,
-  libraryCharacters,
-  onAddToBriefing,
   cast,
   legacyCast,
   onCastChange,
@@ -204,8 +200,6 @@ export function UnifiedAssetPicker({
       {/* Cast row — unchanged behaviour */}
       <CharacterCastPicker
         characters={characters}
-        libraryCharacters={libraryCharacters}
-        onAddToBriefing={onAddToBriefing}
         value={cast}
         legacyValue={legacyCast}
         onChange={onCastChange}

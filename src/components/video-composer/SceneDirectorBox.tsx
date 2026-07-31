@@ -15,8 +15,7 @@ interface AssetEntry { id: string; name: string; reference_image_url?: string; d
 interface SceneDirectorBoxProps {
   scene: ComposerScene;
   lang: 'en' | 'de' | 'es';
-  characters?: ComposerCharacter[];          // briefing characters
-  libraryCharacters: AssetEntry[];           // brand_characters
+  characters: ComposerCharacter[];           // Cast & World only
   locations: AssetEntry[];
   buildings: AssetEntry[];
   props: AssetEntry[];
@@ -31,7 +30,6 @@ interface SceneDirectorBoxProps {
     sceneActionEn?: string;
     characterActions?: Array<{ characterId: string; actionUser: string; actionEn: string }>;
   }) => void;
-  onAddCharacter?: (c: ComposerCharacter) => void;
   onInsertFollowups?: (descriptions: string[]) => void;
   onGenerateMissingAsset?: (kind: 'character' | 'location' | 'building' | 'prop', name: string, suggestedPrompt: string) => void;
 }
@@ -47,14 +45,12 @@ export function SceneDirectorBox({
   scene,
   lang,
   characters,
-  libraryCharacters,
   locations,
   buildings,
   props,
   brandKitContext,
   realismPreset,
   onApply,
-  onAddCharacter,
   onInsertFollowups,
   onGenerateMissingAsset,
 }: SceneDirectorBoxProps) {
@@ -68,11 +64,13 @@ export function SceneDirectorBox({
   const budgetText = useMemo(() => summarizeBudget(budget, lang), [budget, lang]);
 
   const allCharacters = useMemo(() => {
-    const m = new Map<string, AssetEntry>();
-    (characters || []).forEach((c) => m.set(c.id, { id: c.id, name: c.name, description: c.appearance, reference_image_url: c.referenceImageUrl }));
-    libraryCharacters.forEach((c) => { if (!m.has(c.id)) m.set(c.id, c); });
-    return Array.from(m.values());
-  }, [characters, libraryCharacters]);
+    return characters.map((c) => ({
+      id: c.id,
+      name: c.name,
+      description: c.appearance,
+      reference_image_url: c.referenceImageUrl,
+    }));
+  }, [characters]);
 
   async function handleGenerate() {
     if (!description.trim()) return;
@@ -138,25 +136,6 @@ export function SceneDirectorBox({
         merged.push({ characterId: id, shotType: 'full' as const });
       }
       const characterShots: CharacterShot[] = merged;
-
-      // Auto-add library characters that aren't in the briefing yet
-      if (onAddCharacter && characters) {
-        const briefingIds = new Set(characters.map((c) => c.id));
-        for (const id of data.matchedAssets.characterIds || []) {
-          if (!briefingIds.has(id)) {
-            const lib = libraryCharacters.find((c) => c.id === id);
-            if (lib) {
-              onAddCharacter({
-                id: lib.id,
-                name: lib.name,
-                appearance: lib.description ?? '',
-                signatureItems: '',
-                referenceImageUrl: lib.reference_image_url,
-              });
-            }
-          }
-        }
-      }
 
       // Per-character actions, indexed by id, for the SceneCard to push into
       // each cast slot's actionUser/actionEn fields.
