@@ -174,6 +174,7 @@ export async function renderPassFacePreclip(
     cropExpansionFactor,
     mouth,
     trackPoints,
+    faceShareFloor,
   } = input;
 
   if (!masterVideoUrl || !Number.isFinite(srcWidth) || !Number.isFinite(srcHeight)) {
