@@ -328,6 +328,9 @@ export async function renderPassFacePreclip(
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        geometrySuspicious: geometry.suspicious,
+        geometryReason: geometry.reason,
+        plateBoxWidthPct: geometry.boxWidthPct,
       };
     }
   } catch (reuseErr) {
@@ -496,6 +499,9 @@ export async function renderPassFacePreclip(
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        geometrySuspicious: geometry.suspicious,
+        geometryReason: geometry.reason,
+        plateBoxWidthPct: geometry.boxWidthPct,
       };
     }
     if (status === "failed") {
