@@ -102,8 +102,11 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           (d) =>
             isDialogEngine(d.engine_override) &&
             !d.lip_sync_applied_at &&
+            // v317: never re-queue a terminally failed clip (Content-Filter).
+            d.clip_status !== 'failed' &&
             isTalkingHeadUrl(d.clip_url),
         );
+
         if (talkingHeadMasters.length > 0) {
           console.warn(
             `[useTwoShotAutoTrigger] self-heal: clearing ${talkingHeadMasters.length} talking-head master(s) for cinematic-sync`,
@@ -231,6 +234,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           (d) =>
             isDialogEngine(d.engine_override) &&
             d.lip_sync_status === 'pending' &&
+            d.clip_status !== 'failed' &&
             d.lip_sync_applied_at &&
             typeof d.clip_url === 'string' &&
             d.clip_url.length > 0,
@@ -262,6 +266,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           (d) =>
             isDialogEngine(d.engine_override) &&
             d.lip_sync_status !== 'canceled' &&
+            d.clip_status !== 'failed' &&
             d.twoshot_stage === 'audio' &&
             !d.audio_plan?.twoshot?.url &&
             d.updated_at &&
@@ -534,6 +539,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 // Scene was deleted (new project / scene removed) between
                 // the poll snapshot and the invoke. Not a real failure.
                 'scene_not_found',
+                // v317: master clip failed (e.g. provider content filter) —
+                // terminal on the clip side, never a lip-sync error.
+                'master_clip_failed',
                 // Plan v71: benign 202s from compose-dialog-segments mean
                 // the server is already working on it / waiting for a slot.
                 // The lipsync-watchdog owns recovery — don't surface as error.
@@ -544,6 +552,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 'circuit_open',
               ]);
               if (reason && SILENT_RACE.has(String(reason))) {
+                if (String(reason) === 'master_clip_failed') {
+                  progressActive.current = false;
+                  emitPipelineEvent({ type: 'lipsync:end' });
+                }
                 console.info(
                   `[useTwoShotAutoTrigger] silent retry for ${d.id}: ${reason}`,
                 );

@@ -116,6 +116,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { buildClipRerenderPatch, isTerminalClipFailure } from "../_shared/clip-terminal-failure.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -781,12 +782,56 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets",
+        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, clip_status, clip_error, retry_count, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets",
       )
       .eq("id", sceneId)
       .single();
     if (sceneErr || !scene) {
       return json({ error: "scene_not_found", details: sceneErr?.message }, 404);
+    }
+
+    // ── v317 — Terminal master-clip gate ────────────────────────────────
+    // Ohne gültige Master-Plate darf NIE ein Lip-Sync-Lauf starten. Sonst
+    // reserviert der Dispatcher Credits, scheitert am Preflight, setzt die
+    // Szene auf `pending` zurück → Clip-Render scheitert erneut am
+    // Content-Filter → Gummiband-Loop im UI.
+    {
+      const cs = (scene as any).clip_status;
+      const cu = (scene as any).clip_url;
+      const hasUsableClip =
+        (typeof cu === "string" && cu.length > 0) ||
+        (typeof (scene as any).lip_sync_source_clip_url === "string" &&
+          (scene as any).lip_sync_source_clip_url.length > 0);
+      if (cs === "failed" || !hasUsableClip) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v317_master_clip_failed clip_status=${cs} has_clip=${hasUsableClip} — dispatch aborted`,
+        );
+        if (cs === "failed") {
+          // Lip-Sync-Felder sauber leeren, damit die UI keinen Spinner zeigt.
+          try {
+            await supabase
+              .from("composer_scenes")
+              .update({
+                lip_sync_status: null,
+                twoshot_stage: null,
+                lip_sync_source_clip_url: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", sceneId)
+              .eq("clip_status", "failed");
+          } catch (_) { /* best-effort */ }
+        }
+        return json(
+          {
+            error: "master_clip_failed",
+            scene_id: sceneId,
+            clip_status: cs ?? null,
+            message:
+              "Der Master-Clip dieser Szene ist nicht bereit (fehlgeschlagen oder nicht vorhanden). Lip-Sync wurde nicht gestartet.",
+          },
+          200,
+        );
+      }
     }
 
     const { data: project } = await supabase
@@ -803,6 +848,7 @@ serve(async (req) => {
     ) {
       return json({ ok: true, skipped: "canceled", scene_id: sceneId });
     }
+
 
     // v100 — register sceneId/userId/supabase/syncApiKey for the crash-safe
     // outer catch (line ~3107). From this point on, any uncaught throw will
@@ -2835,12 +2881,7 @@ serve(async (req) => {
               },
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
-            clip_status: "pending",
-            clip_url: null,
-            lip_sync_source_clip_url: null,
-            clip_error: userMsg,
+            ...buildClipRerenderPatch(scene as any, userMsg, "needs_clip_rerender"),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -2992,14 +3033,9 @@ serve(async (req) => {
               error: `v117_plate_quality_gate:${reason}`,
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
-            clip_status: "pending",
-            clip_url: null,
-            lip_sync_source_clip_url: null,
-            clip_error: splitScreenReason
+            ...buildClipRerenderPatch(scene as any, splitScreenReason
               ? `Plate-Quality-Gate (v9): Der gerenderte Scene-Clip ist ein Split-Screen/Panel-Layout (${speakers.length} isolierte Einzel-Panels statt einer gemeinsamen Group-Composition). Sync.so kann Einzel-Panels nicht lipsyncen. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen im selben Raum stehen, in einem durchgehenden Kamera-Frame. Credits wurden zurückerstattet.`
-              : `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`,
+              : `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`, "failed"),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -3235,12 +3271,7 @@ serve(async (req) => {
               v132_turn_gate: { failures, probes },
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
-            clip_status: "pending",
-            clip_url: null,
-            lip_sync_source_clip_url: null,
-            clip_error: userMsg,
+            ...buildClipRerenderPatch(scene as any, userMsg, "needs_clip_rerender"),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -5501,12 +5532,7 @@ serve(async (req) => {
             },
             finished_at: new Date().toISOString(),
           }),
-          lip_sync_status: "failed",
-          twoshot_stage: "needs_clip_rerender",
-          clip_status: "pending",
-          clip_url: null,
-          lip_sync_source_clip_url: null,
-          clip_error: friendlyClipError,
+          ...buildClipRerenderPatch(scene as any, friendlyClipError, "needs_clip_rerender"),
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
