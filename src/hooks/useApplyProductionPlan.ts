@@ -37,6 +37,7 @@ import { ensureProductionPlanEnsemble } from '@/lib/video-composer/briefing/ensu
 import { finalizePlanCanonical } from '@/lib/video-composer/briefing/finalizePlanCanonical';
 import { logPlanRepairEvent } from '@/lib/video-composer/briefing/logPlanRepair';
 import { dedupePlanSceneCast } from '@/lib/video-composer/briefing/planCastDedup';
+import { resolveCanonicalCharacterId } from '@/lib/video-composer/canonicalCastId';
 import { getOutfitPresetById } from '@/config/defaultOutfitPresets';
 import { isDirectiveTurn } from '@/lib/motion-studio/planDisplayFilter';
 
