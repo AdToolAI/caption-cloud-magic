@@ -435,6 +435,9 @@ export async function renderPassFacePreclip(
         geometrySuspicious: geometry.suspicious,
         geometryReason: geometry.reason,
         plateBoxWidthPct: geometry.boxWidthPct,
+        trackSamplesUsed,
+        trackDriftPx,
+        motionCropApplied,
       };
     }
   } catch (reuseErr) {
@@ -606,6 +609,9 @@ export async function renderPassFacePreclip(
         geometrySuspicious: geometry.suspicious,
         geometryReason: geometry.reason,
         plateBoxWidthPct: geometry.boxWidthPct,
+        trackSamplesUsed,
+        trackDriftPx,
+        motionCropApplied,
       };
     }
     if (status === "failed") {
