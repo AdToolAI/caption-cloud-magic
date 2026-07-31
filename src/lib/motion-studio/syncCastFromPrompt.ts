@@ -57,7 +57,7 @@ export function syncCastFromPrompt(
   if (current.length >= MAX_CAST) return current;
 
   const lower = prompt.toLowerCase();
-  const haveIds = new Set(current.map((s) => s.characterId));
+  const haveIds = presentCanonicalIds(current, characters);
   const dismissed = new Set((dismissedIds ?? []).map((id) => String(id)));
 
   const additions: CharacterShot[] = [];
