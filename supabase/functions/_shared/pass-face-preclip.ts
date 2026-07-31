@@ -93,9 +93,16 @@ export interface PassPreclipResult {
   mouthOffsetPx?: number;
   /** v247 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
+  /** v329 — true when the detector box was too small to be trusted. */
+  geometrySuspicious?: boolean;
+  /** v329 — why the geometry was rejected ("ok" | "box_too_small" | "no_bbox"). */
+  geometryReason?: string;
+  /** v329 — detector box width as a fraction of plate width (0..1). */
+  plateBoxWidthPct?: number;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
+
 
 
 const FPS = 30;
