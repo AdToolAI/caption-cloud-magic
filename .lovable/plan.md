@@ -1,45 +1,27 @@
-# Selektiver Restore auf den Stand vom 27.07.2026
+## Ausgangslage (verifiziert)
 
-**Bestätigte Referenz:** Commit `58060cffe2a6506da8485e599439950a9d219c25` vom **27.07.2026, 23:45 UTC**. Es wird **kein kompletter Projekt-Revert** und kein History-Rollback durchgeführt.
+Der Diff gegen den Baseline-Commit vom 27.07.2026 (`58060cff`) zeigt für die Lip-Sync-Pipeline:
 
-## 1. Lip-Sync-Pipeline exakt zurücksetzen
+| Datei | Status |
+|---|---|
+| `compose-dialog-segments/index.ts` | identisch mit 27.07. |
+| `sync-so-webhook`, `compose-clip-webhook` | identisch |
+| `lipsync-watchdog`, `report-lipsync-motion-probe` | identisch |
+| `_shared/pass-face-preclip.ts`, `_shared/syncso-face-gate.ts` | identisch |
+| `render-sync-segments-audio-mux/index.ts` | nur +9 Zeilen Export-Qualität (crf 16, preset medium, jpegQuality 95, Audio 256k); Masken-/Sync-Logik = Juli-Stand |
+| `_shared/preclip-geometry.ts` + `.test.ts` | **neu seit v334, von keiner Funktion importiert** |
+| `_shared/preclip-trust.ts` + `.test.ts` | **neu seit v336, von keiner Funktion importiert** |
 
-- Die serverseitige Dialog-/Lip-Sync-Kette wird dateibezogen auf den bestätigten Referenzstand zurückgeführt:
-  - Dialogsegment-Aufbau und Preclip-Rendering
-  - Sync.so Face-Gate und Dispatch
-  - Provider- und Clip-Webhooks
-  - Watchdog und Motion-Probe-Reporting
-- Seit dem 27.07. neu hinzugefügte v317–v341-Komponenten werden aus dem aktiven Pfad entfernt, insbesondere Face-Motion-Tracking, globale Mouth-Probe-Koordination und die neue Differential-Probe.
-- Neue Dateien, die am Referenzstand nicht existierten und ausschließlich diese spätere Pipeline implementieren, werden entfernt.
-- Bei gemeinsam genutzten Frontend-Dateien werden **nur Lip-Sync-bezogene Änderungen** zurückgenommen; spätere Arbeiten an Branding, Credits, Stimmen, Cast & World, Autopilot und anderen Studio-Funktionen bleiben erhalten.
+Die Laufzeit ist also bereits auf dem 27.07.-Verhalten. Die vier verwaisten Dateien sind toter Code, der bei künftiger Fehlersuche wieder zu Verwirrung führt.
 
-## 2. Motion Studio selektiv zurücksetzen
+## Umfang
 
-Die Prüfung zeigt nur vier nach dem Referenzstand veränderte Motion-Studio-Kerndateien:
+1. Löschen: `supabase/functions/_shared/preclip-geometry.ts`, `preclip-geometry.test.ts`, `preclip-trust.ts`, `preclip-trust.test.ts`.
+2. Repo-weiter Import-Check (`rg "preclip-geometry|preclip-trust"`) zur Bestätigung, dass keine Edge Function oder Frontend-Datei darauf verweist.
+3. Verifikations-Diff gegen `58060cff` erneut laufen lassen; erwartetes Ergebnis: als einzige Abweichung der Export-Qualitäts-Block in `render-sync-segments-audio-mux`.
+4. Kein Re-Deploy nötig (die betroffenen Funktionen wurden bereits deployed und referenzieren die gelöschten Dateien nicht); optional ein Deploy von `compose-dialog-segments` zur Sicherheit.
 
-- `VoicePicker`
-- `syncCastFromPrompt`
-- Motion-Studio `Hub`
-- Motion-Studio-Typen
+## Bewusst nicht angefasst
 
-Diese werden auf den Stand vom 27.07. zurückgeführt. Andere spätere Änderungen außerhalb dieses klaren Motion-Studio-Scopes bleiben unangetastet.
-
-## 3. Kompatibilität statt blindem Datei-Revert
-
-- Imports und Typen werden an den heutigen Rest des Projekts angepasst, falls spätere unabhängige Änderungen sonst den Build brechen würden.
-- Keine Datenbanktabellen, Auth-, Stripe-, Credit-, Landingpage-, UCC-, Autopilot- oder Cast-&-World-Arbeiten werden zurückgesetzt.
-- Es werden keine Git-History-Aktionen ausgeführt; der Restore erfolgt als gezielte Codeänderung auf dem aktuellen Stand.
-
-## 4. Backend ausrollen und Altzustände bereinigen
-
-- Alle tatsächlich zurückgesetzten Lip-Sync-Funktionen werden gemeinsam deployed, damit Frontend und Backend nicht verschiedene Pipeline-Versionen verwenden.
-- Bereits hängende v339–v341-Jobs werden nicht weiterverarbeitet. Sie werden über den bestehenden idempotenten Fehler-/Refund-Pfad beendet, damit keine Credits verloren gehen und keine alten Motion-Probe-Zustände die restaurierte Pipeline blockieren.
-- Keine neuen Tabellen oder Migrationen sind vorgesehen.
-
-## 5. Verifikation vor Abschluss
-
-- Relevante Unit-Tests und Typechecks für den restaurierten Pfad ausführen.
-- Einen Einzelsprecher- und einen Mehrsprecher-Fall gegen die restaurierte Pipeline prüfen.
-- Kontrollieren, dass kein `motion_probe_pending`, `preclip_face_share_too_low` oder v341-Differential-Gate mehr im aktiven Ablauf hängt.
-- Motion Studio öffnen und Voice-Auswahl, Prompt/Cast-Synchronisierung sowie Generierungsstart prüfen.
-- Erst nach erfolgreicher End-to-End-Prüfung den Restore als abgeschlossen melden.
+- Export-Qualitätsprofil im Mux (bessere Bildqualität, unabhängig vom Lip-Sync-Verhalten).
+- Autopilot, Branding, Credits, Stripe, Voice Library — alles nach dem 27.07. entstanden und nicht Teil der Pipeline.

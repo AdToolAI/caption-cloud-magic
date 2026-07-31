@@ -35,7 +35,7 @@ Updated: today
 - **AWS Lambda Quota**: 100 (eu-central-1) → Render-Pool 80 (Founder-Reserve ab 68), 20 für Edge+Burst. Tier-Caps unverändert bis LambdaHealth peak > 60 an ≥ 3 Tagen. Siehe [Quota 100 Launch Distribution](mem://infrastructure/aws-lambda/quota-100-launch-distribution).
 
 ## Memories
-- [v336 Preclip Trust Contract](mem://architecture/lipsync/v336-preclip-trust-contract) — Missing JPEG probes may pass only for constructively verified single-face preclips (face-share floor, sound geometry, clean ambiguity, no sibling in crop); full plates and ambiguous multi-speaker crops remain fail-closed.
+- **Lip-Sync Restore 2026-07-31**: Pipeline wurde selektiv auf den Stand vom 27.07.2026 (Commit `58060cff`) zurückgesetzt. Alles aus v317–v341 (Preclip-Trust-Contract, Preclip-Geometry, Differential-Motion-Probe, Motion-Tracking, Alias-ID-Resolution) ist entfernt — nicht wieder einführen ohne explizite Freigabe. Einzige bewusste Abweichung: Export-Qualitätsprofil in `render-sync-segments-audio-mux` (crf 16, preset medium, jpegQuality 95, Audio 256k).
 - [v317 Terminal Clip-Failure Gate](mem://architecture/lipsync/v317-terminal-clip-failure-gate) — Kein Lip-Sync-Dispatch ohne fertigen Master-Clip; Content-Filter-Fails (Green Net/E005) und ≥2 Render-Retries werden terminal statt auf `pending` zurückgesetzt.
 
 - [v209 Risky Provider Consent](mem://architecture/lipsync/v209-risky-provider-consent) — Kling ignoriert Plate-Prompt bei N≥2 → Ghost-Mouthing. Kein Auto-Migrate. In-Dialog Warn-Block + Consent-Checkbox + Persistenz in `composer_scenes.scene_assets.risky_provider_consent`; Refund-Ausschluss nur für Lipsync-Artefakte. `LIPSYNC_SAFE_PROVIDERS = [hailuo, happyhorse]`.
