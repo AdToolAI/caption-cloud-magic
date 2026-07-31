@@ -8999,7 +8999,7 @@ export const translations: Record<Language, any> = {
           p4Desc: "Zusätzliche Zeit, bevor dein Konto pausiert wird.",
         },
         proFeatures: {
-          f1: "Unbegrenzte KI-Captions in 25+ Sprachen",
+          f1: "Kompletter Studio-Workflow in 25+ Sprachen",
           f2: "AI Picture Studio + Smart Background Replace",
           f3: "Director's Cut Video-Editor mit Untertiteln & Voiceover",
           f4: "Auto-Posting zu Instagram, TikTok, YouTube, Facebook",
