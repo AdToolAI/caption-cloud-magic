@@ -1,62 +1,48 @@
-## Ziel
+## Ausgangslage (geprüft gegen das verbundene Stripe-Konto)
 
-Die Positionierung endet aktuell an der Startseite. Nach der Anmeldung spricht das Produkt weiter die Caption-Sprache. Diese Lücke wird geschlossen — ohne Umbau der Navigation und ohne Funktionsverlust.
+| Bereich | Code | Stripe live | Status |
+| --- | --- | --- | --- |
+| Abo (Frontend) | 19,99 € (`price_1TyHcA…`) | existiert, 19,99 €/Monat | falscher Preis |
+| Abo (Server, `_shared/stripe-config.ts`) | `price_1SLqZy…` / `price_1TSLxW…` | **existiert nicht** | tot |
+| Abo-Coupons `PRO-FOUNDERS-24M`, `PRO-LAUNCH-3M` | im Checkout verdrahtet | **existieren nicht** | falsch konzipiert + tot |
+| Credit-Pakete 10/50/100/250 € | 8 Price-IDs `price_1SWO…` | **existieren nicht** | Credit-Kauf schlägt live fehl |
+| Founders-Rabatt auf Credits | `FOUNDERS_VIDEO_20` in `ai-video-purchase-credits` | existiert, 20 % | korrekt, bleibt |
 
-Verbindliche Hierarchie in allen Texten:
-1. **Ein Creator. Ein ganzes Studio.** (Marke)
-2. **Alle führenden KI-Modelle. Ein durchgängiger Workflow.** (Differenzierung)
-3. **Von der Idee zum fertigen Video — ohne Filmteam.** (Nutzen)
+## Zielzustand
 
-Social bleibt erhalten, wird aber sprachlich als **letzter Schritt** eingeordnet: Video fertig → veröffentlichen. Nicht als eigenes Produkt.
+- **Ein Abomodell: 14,99 €/Monat**, ohne Rabatt, ohne Coupon.
+- **Founders-Vorteil: 20 % auf jeden Credit-Kauf, 24 Monate** — bereits über `FOUNDERS_VIDEO_20` + `is_founder_active` umgesetzt, wird nur repariert und sauber kommuniziert.
+- Pricing-Seite zeigt **nur 14,99 €**, kein Hinweis auf spätere Erhöhung.
 
----
+## Schritte
 
-## 1. Onboarding: erster Eindruck bestätigt das Versprechen
+**1. Stripe-Objekte anlegen**
+- Neuer wiederkehrender Preis **14,99 €/Monat** auf Produkt `prod_UyE4edZ94ktyOt` (Beta-Basic); der 19,99-€-Preis wird deaktiviert. Laufende Abos bleiben unberührt.
+- 8 neue Einmalpreise für die Credit-Pakete (10 / 50 / 100 / 250, je EUR und USD) im aktiven Konto.
+- Coupon `FOUNDERS_VIDEO_20` bleibt unverändert (20 %, gilt pro Credit-Kauf; die 24-Monats-Grenze wird serverseitig über `is_founder_active` geprüft).
 
-Betrifft `WelcomeModal`, `OnboardingFlow`, `GettingStartedChecklist`, `ProductTour`, `StarterPlanPreview`, `GoalsStep`, `PlatformStep`.
+**2. Abo-Rabattlogik entfernen**
+- `supabase/functions/create-checkout/index.ts`: Der Founders-/Launch-Coupon wird **nicht mehr auf das Abo angewendet**. Der Slot-Claim (`claim_founders_slot`) bleibt erhalten — er markiert den Founder-Status für den Credit-Rabatt — aber sein `coupon_id` wird nicht mehr in `session.discounts` gesetzt.
+- `PRO_PRICE_IDS` zeigt auf die tatsächlich genutzte Abo-Price-ID, damit der Slot-Claim überhaupt auslöst.
+- Manuell übergebene `promoCode`/`couponId` bleiben möglich (Support-Fälle).
 
-- Der erste vorgeschlagene Schritt wird **„Dein erstes Video"** statt „Create Your First Caption".
-- Die Getting-Started-Checkliste folgt dem Produktionsweg: Charakter anlegen → Szene bauen → Stimme wählen → exportieren → veröffentlichen.
-- Der Plattform-Schritt wird als Ausspielziel formuliert („Wo soll dein Video hin?"), nicht als Kanalverwaltung.
-- Die Ziel-Auswahl bekommt videoorientierte Optionen statt reiner Posting-Ziele.
+**3. Konfiguration angleichen**
+- `src/config/pricing.ts`: 14,99 € + neue Price-ID; `getProductInfo` liefert 14,99 €.
+- `src/config/stripe.ts`: neue Price-ID, `PRO_REGULAR_PRICE_EUR = 14.99`, `PRO_PROMO_PRICE_EUR` entfällt; tote `PRO_PROMO_COUPONS` und `INTRO_PROMO_CODES` (`START-BASIC`/`START-ENT` existieren nicht) entfernen.
+- `src/lib/intro.ts`: tote Intro-Code-Logik entfernen.
+- `src/config/aiVideoCredits.ts` und `supabase/functions/ai-video-purchase-credits/index.ts`: neue Credit-Pack-Price-IDs.
+- `supabase/functions/_shared/stripe-config.ts`: Price-/Product-Map auf real existierende Objekte, Coupon-Konstanten bereinigen.
+- Betroffene Edge Functions neu deployen (`create-checkout`, `ai-video-purchase-credits` und alles, was `stripe-config.ts` importiert).
 
-## 2. Preisdarstellung in Studio-Einheiten
+**4. Texte umstellen**
+- Preis überall 14,99 €/Monat: `src/pages/Pricing.tsx`, `src/components/landing/PricingSection.tsx`, `src/pages/Legal.tsx`, `src/components/landing/CompetitorComparisonCard.tsx`, `src/lib/translations.ts` (DE/EN/ES).
+- `src/components/landing/FoundersBenefitsDialog.tsx` + `src/components/pricing/FoundersSlotBadge.tsx`: Founder-Vorteil wird umformuliert von „günstigeres Abo" zu **„20 % auf alle KI-Modelle / jeden Credit-Kauf, 24 Monate lang"**. Der Abopreis wird dort nicht mehr als rabattiert dargestellt.
 
-Heute sind Features als „20 AI captions per month" gestaffelt — das widerspricht dem Versprechen und der bereits umgesetzten Umstellung auf Media Credits.
+**5. Verifikation**
+- Jede im Code verwendete Price-, Product- und Coupon-ID einzeln gegen die Stripe-API auflösen.
+- Repo-Sweep: keine `…DRu4kfSFxj…`-ID und kein „19,99"/„19.99" mehr übrig.
+- Typecheck.
 
-- Feature-Listen in `translations.ts` und `UpgradeModal.tsx` werden auf Video-, Bild- und Musik-Einheiten sowie Studio-Zugang umformuliert.
-- Captions bleiben als Nebenleistung gelistet, nicht als Hauptmerkmal.
-- Der Beta-Preis und der Gründer-Rabatt bleiben unverändert; nur die Beschreibung ändert sich.
+## Hinweis
 
-## 3. Sprach-Sweep durch die Anwendung
-
-- Überschriften, leere Zustände, Tooltips und Erfolgs-/Fehlermeldungen, die „Social Media Manager", „Caption-Generator" oder ähnliche Formulierungen als Produktbeschreibung verwenden, werden angepasst.
-- **Wichtig:** Rein funktionale Vorkommen bleiben unberührt — ein Eingabefeld für den Begleittext eines Posts heißt weiterhin „Caption". Geändert wird nur, wo das Produkt sich selbst beschreibt.
-- Die Bereiche Composer, Coach, Calendar und Caption Insights bekommen eine kurze Einordnung als Veröffentlichungs-/Distributionsschritt.
-
-## 4. E-Mails
-
-Betrifft die Willkommens-, Aktivierungs-, Drip- und Rückgewinnungs-Strecken.
-
-- Betreffzeilen und Einstiegsabsätze folgen der neuen Hierarchie.
-- Die Handlungsaufforderung führt in die Videoproduktion, nicht in den Caption-Generator.
-- Rechtliche Fußzeilen und Abmeldelogik bleiben unverändert.
-
-## 5. Drei Sprachen gleichzeitig
-
-Jede Textänderung wird in **DE, EN und ES** gepflegt. Keine Sprache bleibt auf dem alten Stand — sonst entsteht genau die Inkonsistenz, die wir beheben wollen.
-
----
-
-## Technische Hinweise
-
-- Schwerpunkt liegt auf `src/lib/translations.ts` (drei Sprachblöcke), `src/components/onboarding/*` und `src/components/UpgradeModal.tsx`.
-- E-Mail-Texte liegen in den Funktionen `process-activation-emails`, `process-drip-emails`, `process-winback-emails` und `grant-welcome-bonus`.
-- Es werden keine Routen entfernt, keine Navigation umgebaut, keine Datenbankänderungen vorgenommen und keine Preise verändert. Reine Präsentationsebene.
-- `mem://brand/positioning-territory` dient als verbindliche Textquelle und wird um die Regel „Social = Distributionsschritt" ergänzt.
-
-## Nicht Teil dieses Plans
-
-- Navigation nach Workflow ordnen
-- Caption-Bereiche zurückstufen oder verstecken
-- Neue Funktionen
+Bestehende Abonnenten zu 19,99 € behalten diesen Preis, bis sie kündigen — Stripe migriert laufende Abos nicht automatisch. Sag Bescheid, falls sie aktiv auf 14,99 € umgestellt werden sollen.
