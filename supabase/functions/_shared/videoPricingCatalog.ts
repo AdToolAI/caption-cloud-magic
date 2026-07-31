@@ -38,10 +38,14 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'happyhorse-standard':  { id: 'happyhorse-standard',  label: 'HappyHorse 720p',      unit: 'per-second', sellEUR: 0.42, sellUSD: 0.42, costEUR: 0.14,  minDuration: 3,  maxDuration: 15 },
   'happyhorse-pro':       { id: 'happyhorse-pro',       label: 'HappyHorse Pro 1080p', unit: 'per-second', sellEUR: 0.84, sellUSD: 0.84, costEUR: 0.28,  minDuration: 3,  maxDuration: 15 },
 
-  // Seedance 2.0
-  'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 2.0 Mini',    unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 15 },
-  'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Std',     unit: 'per-second', sellEUR: 0.09, sellUSD: 0.09, costEUR: 0.03,  minDuration: 3,  maxDuration: 15 },
-  'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 Pro',     unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 3,  maxDuration: 15 },
+  // Seedance — verified against Replicate slugs (2026-07-21).
+  // mini  → bytedance/seedance-1-lite      ($0.02/s)
+  // std   → bytedance/seedance-2.0-fast    ($0.15/s @720p)
+  // pro   → bytedance/seedance-2.0         ($0.18/s @720p)
+  'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 1 Lite (Draft)', unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 15 },
+  'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
+  'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.54, sellUSD: 0.54, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
+
 
   // Kling
   'kling-3':              { id: 'kling-3',              label: 'Kling 3.0 1080p',      unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 3,  maxDuration: 15 },
