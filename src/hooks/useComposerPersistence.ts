@@ -9,6 +9,8 @@ import type {
   AdCampaignMeta,
 } from '@/types/video-composer';
 import { dedupeCharacterShots } from '@/lib/video-composer/canonicalCastId';
+import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
+import { useOutfitLookMap } from '@/hooks/useOutfitLookMap';
 
 /**
  * Persist the assembly_config of an existing composer project to the database.
@@ -107,6 +109,13 @@ const isUuid = (val?: string) =>
 const inFlightPersists = new Map<string, Promise<PersistResult>>();
 
 export function useComposerPersistence() {
+  // v319 — full identity pool for cast dedupe: briefing cast alone is not
+  // enough (a character picked straight from the library never reaches
+  // `briefing.characters`, so its slug/outfit slot stayed unresolvable and
+  // survived as a duplicate).
+  const { data: libraryCharacters = [] } = useAccessibleCharacters();
+  const { outfitLookMap } = useOutfitLookMap();
+
   const ensureProjectPersisted = useCallback(
     async (project: PersistableProject): Promise<PersistResult> => {
       const cacheKey = project.id || '__new__';
@@ -173,17 +182,27 @@ export function useComposerPersistence() {
       // 4. Persist scenes (update existing, insert new) at their final order_index
       const persistedScenes: ComposerScene[] = [];
 
-      // v318 — cast pool for identity dedupe (slug slots collapse into the
-      // canonical brand_characters UUID before they hit the DB).
-      const castPool = (project.briefing?.characters ?? []).map((c) => ({
+      // v319 — cast pool for identity dedupe: briefing cast + the user's full
+      // avatar library, so slug slots AND `outfit:<lookId>` refs collapse into
+      // the canonical brand_characters UUID before they hit the DB.
+      const briefingCast = (project.briefing?.characters ?? []).map((c) => ({
         id: c.id,
         name: c.name,
       }));
+      const seenPool = new Set(briefingCast.map((c) => c.id));
+      const castPool = [
+        ...briefingCast,
+        ...libraryCharacters
+          .filter((c: any) => c?.id && !seenPool.has(c.id))
+          .map((c: any) => ({ id: c.id as string, name: (c.name as string) ?? '' })),
+      ];
       const castShotsFor = (scene: ComposerScene) =>
         dedupeCharacterShots(
           scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []),
           castPool,
+          { outfitLookMap },
         );
+
 
       for (let i = 0; i < project.scenes.length; i++) {
         const scene = project.scenes[i];
@@ -326,7 +345,7 @@ export function useComposerPersistence() {
         inFlightPersists.delete(cacheKey);
       }
     },
-    []
+    [libraryCharacters, outfitLookMap]
   );
 
   return { ensureProjectPersisted };

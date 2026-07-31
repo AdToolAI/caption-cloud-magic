@@ -183,6 +183,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useSceneRenderConfirm } from "@/lib/composer/sceneRenderConfirm";
 import { countSceneSpeakers } from "@/lib/composer/countSceneSpeakers";
+import { useOutfitLookMap } from "@/hooks/useOutfitLookMap";
 
 /**
  * Wave 3.1 — compact Catalog-ID chip strip. Reads scene-level shadow IDs
@@ -353,6 +354,23 @@ export default function SceneCard({
   // Library for live mention resolution preview
   const { characters: libCharacters, locations: libLocations } =
     useUnifiedMentionLibrary();
+  // v319 — identity resolution pool + outfit-look map. `outfit:<lookId>` refs
+  // and slug slots must resolve to the same avatar UUID everywhere, otherwise
+  // the same person is treated as two cast members.
+  const { outfitLookMap } = useOutfitLookMap();
+  const castResolutionPool = useMemo<ComposerCharacter[]>(() => {
+    const seen = new Set((characters ?? []).map((c) => c.id));
+    const extras = (libCharacters ?? [])
+      .filter((c: any) => c?.id && !seen.has(c.id) && !String(c.id).includes(':'))
+      .map((c: any) => ({
+        id: c.id as string,
+        name: (c.name as string) ?? '',
+        appearance: c.description ?? '',
+        signatureItems: c.signature_items ?? '',
+        referenceImageUrl: c.reference_image_url ?? undefined,
+      })) as ComposerCharacter[];
+    return [...(characters ?? []), ...extras];
+  }, [characters, libCharacters]);
   // World-asset pools for the UnifiedAssetPicker (Locations / Buildings / Props).
   const { locations: brandLocations } = useBrandLocations();
   const { buildings: brandBuildings } = useBrandBuildings();
@@ -577,6 +595,7 @@ export default function SceneCard({
       current,
       characters,
       scene.dismissedCharacterIds,
+      { resolutionPool: castResolutionPool, outfitLookMap },
     );
     if (next === current) return;
     onUpdate({
@@ -584,7 +603,14 @@ export default function SceneCard({
       characterShot: next[0] ?? scene.characterShot,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.aiPrompt, characters?.length, scene.dismissedCharacterIds?.length]);
+  }, [
+    scene.aiPrompt,
+    characters?.length,
+    scene.dismissedCharacterIds?.length,
+    castResolutionPool,
+    outfitLookMap,
+  ]);
+
 
   // Backfill: ensure scenes with a cast also carry the cast marker in the
   // prompt. `applyCastToPrompt` is idempotent (strips the existing marker

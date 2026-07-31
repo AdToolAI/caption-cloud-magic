@@ -20,6 +20,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 type CharacterLike = { id: string; name?: string | null };
 
+/** `lookId → avatar (brand_characters) id` — see `useOutfitLookMap()`. */
+export type OutfitLookMap = ReadonlyMap<string, string>;
+
+export interface CanonicalCastOptions {
+  /** Resolves `outfit:<lookId>` / `catalog:<lookId>` refs to the avatar UUID. */
+  outfitLookMap?: OutfitLookMap;
+}
+
 function norm(v: unknown): string {
   return String(v ?? '')
     .toLowerCase()
@@ -33,22 +41,60 @@ function firstNameNorm(name: unknown): string {
 }
 
 /**
- * Resolve a (possibly drifted) slot id to the canonical character id from the
- * pool. Returns `null` when nothing matches.
+ * Split a raw slot id into its base reference and (when the id carried an
+ * `outfit:` / `catalog:` prefix) the look id it encoded.
+ *
+ * v319 — the cast invariant is `{ characterId: <avatar UUID>, outfitLookId? }`.
+ * Legacy writers emitted the look inside the id, which made the SAME person
+ * look like two different cast members.
+ */
+export function splitCastSlotId(
+  raw: string | null | undefined,
+  opts?: CanonicalCastOptions,
+): { base: string; outfitLookId: string | null } {
+  const t = String(raw ?? '').trim();
+  if (!t) return { base: '', outfitLookId: null };
+  if (t.startsWith('lib:')) return { base: t.slice(4).trim(), outfitLookId: null };
+  if (t.startsWith('outfit:') || t.startsWith('catalog:')) {
+    const lookId = (t.split(':', 2)[1] ?? '').trim();
+    if (!lookId) return { base: '', outfitLookId: null };
+    const avatarId = opts?.outfitLookMap?.get(lookId) ?? '';
+    // Without the map we cannot reach the avatar — keep the look so callers can
+    // retry once the map arrives, and expose the look id either way.
+    return {
+      base: avatarId || t,
+      outfitLookId: t.startsWith('outfit:') ? lookId : null,
+    };
+  }
+  return { base: t, outfitLookId: null };
+}
+
+/**
+ * Resolve a (possibly drifted or prefixed) slot id to the canonical character
+ * id from the pool. Returns `null` when nothing matches.
  */
 export function resolveCanonicalCharacterId(
   slotId: string | undefined | null,
   pool: readonly CharacterLike[] | undefined,
+  opts?: CanonicalCastOptions,
 ): string | null {
-  const raw = String(slotId ?? '').trim();
-  if (!raw || !pool?.length) return null;
+  const { base } = splitCastSlotId(slotId, opts);
+  const raw = base;
+  if (!raw) return null;
+
+  // An outfit ref resolved through the look map is authoritative even when the
+  // avatar isn't in the (possibly incomplete) pool.
+  const viaLook =
+    raw !== String(slotId ?? '').trim() && UUID_RE.test(raw) ? raw : null;
+
+  if (!pool?.length) return viaLook;
 
   // 1. Exact id match (fast path, also the UUID case).
   const exact = pool.find((c) => c.id === raw);
   if (exact) return exact.id;
 
   const needle = norm(raw);
-  if (!needle) return null;
+  if (!needle) return viaLook;
 
   // 2. Full-name match, ignoring separators ("samuel-dusatko" → "Samuel Dusatko").
   const byName = pool.find((c) => norm(c.name) === needle);
@@ -63,15 +109,16 @@ export function resolveCanonicalCharacterId(
 
   // 4. Last resort: unique first-name hit (never for UUID-shaped ids —
   //    a UUID must match exactly or not at all).
-  if (UUID_RE.test(raw)) return null;
+  if (UUID_RE.test(raw)) return viaLook;
   const first = pool.filter((c) => {
     const f = firstNameNorm(c.name);
     return !!f && f.length >= 3 && needle.includes(f);
   });
   if (first.length === 1) return first[0].id;
 
-  return null;
+  return viaLook;
 }
+
 
 const SHOT_SPECIFICITY: Record<string, number> = {
   absent: 0,
@@ -109,8 +156,34 @@ function mergeSlots(existing: CharacterShot, incoming: CharacterShot): Character
 }
 
 /**
+ * Normalize a single slot to the canonical shape
+ * `{ characterId: <avatar UUID>, outfitLookId?: <lookId> }`.
+ * Returns the SAME object when nothing changes.
+ */
+export function normalizeCharacterShot(
+  slot: CharacterShot,
+  pool: readonly CharacterLike[] | undefined,
+  opts?: CanonicalCastOptions,
+): CharacterShot {
+  if (!slot) return slot;
+  const { outfitLookId } = splitCastSlotId(slot.characterId, opts);
+  const canon = resolveCanonicalCharacterId(slot.characterId, pool, opts);
+  const nextId = canon ?? slot.characterId;
+  const nextLook = (slot as any).outfitLookId ?? outfitLookId ?? undefined;
+  const idChanged = nextId !== slot.characterId;
+  const lookChanged = nextLook !== (slot as any).outfitLookId && !!nextLook;
+  if (!idChanged && !lookChanged) return slot;
+  return {
+    ...slot,
+    characterId: nextId,
+    ...(nextLook ? { outfitLookId: nextLook } : {}),
+  } as CharacterShot;
+}
+
+/**
  * Collapse cast slots that resolve to the same person and rewrite drifted ids
- * to the canonical UUID.
+ * to the canonical UUID (including `outfit:` / `catalog:` / `lib:` refs — the
+ * encoded look is preserved in `outfitLookId`).
  *
  * Idempotent: returns the SAME array reference when nothing changes, so it is
  * safe inside `useEffect` / render paths.
@@ -118,16 +191,16 @@ function mergeSlots(existing: CharacterShot, incoming: CharacterShot): Character
 export function dedupeCharacterShots(
   shots: CharacterShot[] | undefined,
   pool: readonly CharacterLike[] | undefined,
+  opts?: CanonicalCastOptions,
 ): CharacterShot[] {
   const input = shots ?? [];
-  if (input.length < 2 && input.length > 0) {
-    // Single slot: still normalize a drifted id when possible.
-    const only = input[0];
-    const canon = resolveCanonicalCharacterId(only?.characterId, pool);
-    if (canon && canon !== only.characterId) return [{ ...only, characterId: canon }];
-    return input;
-  }
   if (input.length === 0) return input;
+  if (input.length === 1) {
+    const only = input[0];
+    if (!only) return input;
+    const normalized = normalizeCharacterShot(only, pool, opts);
+    return normalized === only ? input : [normalized];
+  }
 
   const order: string[] = [];
   const byKey = new Map<string, CharacterShot>();
@@ -138,13 +211,11 @@ export function dedupeCharacterShots(
       changed = true;
       continue;
     }
-    const canon = resolveCanonicalCharacterId(slot.characterId, pool);
-    const normalized: CharacterShot =
-      canon && canon !== slot.characterId ? { ...slot, characterId: canon } : slot;
+    const normalized = normalizeCharacterShot(slot, pool, opts);
     if (normalized !== slot) changed = true;
 
     // Unresolvable slots keep their raw id but are still deduped on it.
-    const key = canon ?? String(slot.characterId ?? '').toLowerCase().trim();
+    const key = String(normalized.characterId ?? '').toLowerCase().trim();
     if (!key) {
       changed = true;
       continue;
@@ -168,7 +239,9 @@ export function dedupeCharacterShots(
 export function hasDuplicateCast(
   shots: CharacterShot[] | undefined,
   pool: readonly CharacterLike[] | undefined,
+  opts?: CanonicalCastOptions,
 ): boolean {
-  const deduped = dedupeCharacterShots(shots, pool);
+  const deduped = dedupeCharacterShots(shots, pool, opts);
   return deduped.length < (shots?.length ?? 0);
 }
+

@@ -41,11 +41,38 @@ function firstNameNorm(name: unknown): string {
   return norm(parts[0] ?? '');
 }
 
+/** `lookId → avatar (brand_characters) id`, from `avatar_outfit_looks`. */
+export type OutfitLookMap = ReadonlyMap<string, string>;
+
+/**
+ * Strip legacy slot prefixes (`lib:`, `outfit:<lookId>`, `catalog:<lookId>`)
+ * and return the base id plus the outfit look it referenced (v319).
+ */
+export function splitCastSlotId(
+  raw: string | null | undefined,
+  outfitLookMap?: OutfitLookMap,
+): { base: string; outfitLookId: string | null } {
+  const t = String(raw ?? '').trim();
+  if (!t) return { base: '', outfitLookId: null };
+  if (t.startsWith('lib:')) return { base: t.slice(4).trim(), outfitLookId: null };
+  if (t.startsWith('outfit:') || t.startsWith('catalog:')) {
+    const lookId = (t.split(':', 2)[1] ?? '').trim();
+    if (!lookId) return { base: '', outfitLookId: null };
+    const avatarId = outfitLookMap?.get(lookId) ?? '';
+    return {
+      base: avatarId || t,
+      outfitLookId: t.startsWith('outfit:') ? lookId : null,
+    };
+  }
+  return { base: t, outfitLookId: null };
+}
+
 export function resolveCanonicalCharacterId(
   slotId: string | null | undefined,
   pool: readonly CastPoolEntry[] | undefined,
+  outfitLookMap?: OutfitLookMap,
 ): string | null {
-  const raw = String(slotId ?? '').trim();
+  const raw = splitCastSlotId(slotId, outfitLookMap).base;
   if (!raw || !pool?.length) return null;
 
   const exact = pool.find((c) => c.id === raw);
@@ -53,6 +80,7 @@ export function resolveCanonicalCharacterId(
 
   const needle = norm(raw);
   if (!needle) return null;
+
 
   const byName = pool.find((c) => norm(c.name) === needle);
   if (byName) return byName.id;
@@ -114,6 +142,7 @@ export function dedupeCharacterShots<T extends CastSlotLike>(
   shots: T[] | null | undefined,
   pool: readonly CastPoolEntry[] | undefined,
   dropUnresolvable = true,
+  outfitLookMap?: OutfitLookMap,
 ): T[] {
   const input = Array.isArray(shots) ? shots : [];
   if (input.length === 0) return [];
@@ -123,10 +152,11 @@ export function dedupeCharacterShots<T extends CastSlotLike>(
 
   for (const slot of input) {
     if (!slot) continue;
-    const canon = resolveCanonicalCharacterId(slot.characterId, pool);
+    const split = splitCastSlotId(slot.characterId, outfitLookMap);
+    const canon = resolveCanonicalCharacterId(slot.characterId, pool, outfitLookMap);
     if (!canon) {
       if (dropUnresolvable) continue;
-      const fallbackKey = String(slot.characterId ?? '').toLowerCase().trim();
+      const fallbackKey = (split.base || String(slot.characterId ?? '')).toLowerCase().trim();
       if (!fallbackKey) continue;
       if (!byKey.has(fallbackKey)) {
         byKey.set(fallbackKey, slot);
@@ -135,8 +165,13 @@ export function dedupeCharacterShots<T extends CastSlotLike>(
       continue;
     }
     const normalized = (canon !== slot.characterId
-      ? { ...slot, characterId: canon }
+      ? {
+          ...slot,
+          characterId: canon,
+          outfitLookId: slot.outfitLookId ?? split.outfitLookId ?? null,
+        }
       : slot) as T;
+
     const existing = byKey.get(canon);
     if (!existing) {
       byKey.set(canon, normalized);
