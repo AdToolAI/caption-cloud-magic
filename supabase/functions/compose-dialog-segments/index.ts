@@ -4732,7 +4732,7 @@ serve(async (req) => {
                         : null,
                       Number(bp.speaker_idx ?? idx),
                     )?.points ?? null,
-                    faceShareFloor: speakers.length >= 2 ? 0.24 : 0.12,
+                    faceShareFloor: speakers.length >= 2 ? 0.30 : 0.12,
                   },
                   300_000,
                 );
@@ -5509,7 +5509,7 @@ serve(async (req) => {
             // v334 — der Motion-Cover muss denselben Floor kennen wie der
             // Gate unten, sonst weitet er den Crop in einen garantierten
             // „face_share_too_low"-Abbruch hinein.
-            faceShareFloor: speakers.length >= 2 ? 0.24 : 0.12,
+            faceShareFloor: speakers.length >= 2 ? 0.30 : 0.12,
 
           },
           300_000,
@@ -5525,7 +5525,7 @@ serve(async (req) => {
         // Der letzte Aufzug-Lauf lag bei 15,5 % / 18,1 % Face-Share und wurde
         // vom v329-Floor (0.12) durchgewunken → Morphing statt Lip-Sync.
         // v331 hebt den Floor für Mehrsprecher-Szenen deutlich darüber an.
-        const V329_FACE_SHARE_FLOOR = speakers.length >= 2 ? 0.24 : 0.12;
+        const V329_FACE_SHARE_FLOOR = speakers.length >= 2 ? 0.30 : 0.12;
         const v329Share = Number(preclipResult.faceShareInCrop);
         if (
           preclipResult.ok &&
@@ -5542,6 +5542,25 @@ serve(async (req) => {
           );
           (preclipResult as any).ok = false;
           (preclipResult as any).error = "preclip_face_share_too_low";
+          (preclipResult as any).errorClass = "invalid_input";
+        }
+        // ── v340 — Mund-Anker-Pflicht bei Mehrsprecher-Szenen ─────────────
+        // Ein Crop ohne Mund-Anker zentriert auf Augenhöhe; der Mund landet am
+        // Rand oder außerhalb. Sync.so liefert dann ein unverändertes Video
+        // zurück ("done" ohne Lippenbewegung) und der Kunde zahlt dafür.
+        // DB-Beleg: Szene 69d56a49 — alle Pässe detector_used=face-fallback.
+        if (
+          preclipResult.ok &&
+          speakers.length >= 2 &&
+          preclipResult.anchor !== "mouth"
+        ) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v340_preclip_no_mouth_anchor ` +
+            `anchor=${preclipResult.anchor ?? "none"} anchor_src=${(preclipResult as any).anchorSource ?? "none"} ` +
+            `geometry=${preclipResult.geometryReason ?? "?"} speakers=${speakers.length} — refusing dispatch (guaranteed no-op)`,
+          );
+          (preclipResult as any).ok = false;
+          (preclipResult as any).error = "preclip_no_mouth_anchor";
           (preclipResult as any).errorClass = "invalid_input";
         }
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
@@ -5571,6 +5590,7 @@ serve(async (req) => {
           (pass as any).preclip_error = null;
           // v247 — mouth-anchor observability, flowed into syncso_dispatch_log via meta.
           (pass as any).preclip_anchor = preclipResult.anchor ?? null;
+          (pass as any).preclip_anchor_source = (preclipResult as any).anchorSource ?? null;
           (pass as any).preclip_face_share = Number.isFinite(Number(preclipResult.faceShareInCrop))
             ? Number(preclipResult.faceShareInCrop)
             : null;
@@ -8105,7 +8125,7 @@ serve(async (req) => {
                           : null,
                         Number(wp.speaker_idx ?? waitIdx),
                       )?.points ?? null,
-                      faceShareFloor: speakers.length >= 2 ? 0.24 : 0.12,
+                      faceShareFloor: speakers.length >= 2 ? 0.30 : 0.12,
                     },
                     300_000,
                   );
