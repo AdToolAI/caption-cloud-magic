@@ -135,8 +135,9 @@ export function ensureEnsembleScene<S extends SceneLike>(
     const sc = next[idx];
     if (isEnsemble(sc)) continue;
     const shots = Array.isArray(sc.characterShots) ? [...sc.characterShots] : [];
-    const present = new Set(
-      shots.filter((x) => x?.shotType && x.shotType !== 'absent').map((x) => x.characterId),
+    const present = presentCanonicalIds(
+      shots.filter((x) => x?.shotType && x.shotType !== 'absent'),
+      characters,
     );
     for (const ch of allChars) {
       if (present.has(ch.id)) continue;
