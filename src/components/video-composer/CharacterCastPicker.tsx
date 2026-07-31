@@ -128,14 +128,16 @@ export function CharacterCastPicker({
     return [...(characters ?? []), ...extras];
   }, [characters, libraryCharacters]);
 
-  // v318 — Identity dedupe: slots whose id drifted (slug instead of the brand
-  // UUID) are rewritten to the canonical id AND collapsed with the slot that
-  // already holds that person. Without this the same character shows up twice
-  // (duplicate chip + duplicate action field) and downstream burns a portrait
-  // slot / lip-sync pass on a ghost speaker.
+  // v319 — Identity dedupe: slots whose id drifted (slug, `outfit:<lookId>`,
+  // `lib:<id>` instead of the brand UUID) are rewritten to the canonical id
+  // AND collapsed with the slot that already holds that person. Without this
+  // the same character shows up twice (duplicate chip + duplicate action
+  // field) and downstream burns a portrait slot / lip-sync pass on a ghost.
+  const { outfitLookMap } = useOutfitLookMap();
+  const canonOpts = useMemo(() => ({ outfitLookMap }), [outfitLookMap]);
   const cast = useMemo(
-    () => dedupeCharacterShots(rawCast, resolutionPool),
-    [rawCast, resolutionPool],
+    () => dedupeCharacterShots(rawCast, resolutionPool, canonOpts),
+    [rawCast, resolutionPool, canonOpts],
   );
 
   // Persist the healed shape exactly once per change (guarded — only writes
@@ -143,15 +145,26 @@ export function CharacterCastPicker({
   const lastHealedRef = useRef<string>('');
   useEffect(() => {
     if (cast === rawCast) return;
-    const sig = cast.map((s) => `${s.characterId}:${s.shotType}`).join('|');
+    const sig = cast
+      .map((s) => `${s.characterId}:${s.shotType}:${s.outfitLookId ?? ''}`)
+      .join('|');
     if (lastHealedRef.current === sig) return;
     lastHealedRef.current = sig;
     onChange(cast);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cast, rawCast]);
 
-  const inCast = new Set(cast.map((s) => s.characterId));
-
+  // Canonical presence check — an avatar already in the cast must never be
+  // offered again, not even under a different id form (outfit ref / slug).
+  const inCast = useMemo(() => {
+    const s = new Set<string>();
+    for (const slot of cast) {
+      s.add(slot.characterId);
+      const canon = resolveCanonicalCharacterId(slot.characterId, resolutionPool, canonOpts);
+      if (canon) s.add(canon);
+    }
+    return s;
+  }, [cast, resolutionPool, canonOpts]);
 
   const briefingAvailable = (characters ?? []).filter((c) => !inCast.has(c.id));
   const libraryAvailable = (libraryCharacters ?? []).filter(
@@ -173,9 +186,23 @@ export function CharacterCastPicker({
   const removeSlot = (id: string) => {
     onChange(cast.filter((s) => s.characterId !== id));
   };
-  const addSlot = (id: string) => {
+  const addSlot = (rawId: string) => {
     if (cast.length >= MAX_CAST) return;
-    onChange([...cast, { characterId: id, shotType: 'full' }]);
+    // v319 — normalize at the entry point: never write a prefixed id into the
+    // cast. `outfit:<lookId>` becomes `{ characterId: <avatarUUID>,
+    // outfitLookId: <lookId> }`, the canonical cast shape.
+    const { base, outfitLookId } = splitCastSlotId(rawId, canonOpts);
+    const canon =
+      resolveCanonicalCharacterId(rawId, resolutionPool, canonOpts) ?? base ?? rawId;
+    if (inCast.has(canon)) return;
+    onChange([
+      ...cast,
+      {
+        characterId: canon,
+        shotType: 'full',
+        ...(outfitLookId ? { outfitLookId } : {}),
+      },
+    ]);
   };
   const addFromLibrary = (c: ComposerCharacter) => {
     if (cast.length >= MAX_CAST) return;
@@ -184,6 +211,7 @@ export function CharacterCastPicker({
     }
     addSlot(c.id);
   };
+
 
   const canAddMore =
     cast.length < MAX_CAST &&
