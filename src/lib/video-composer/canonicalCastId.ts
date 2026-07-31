@@ -1,0 +1,174 @@
+/**
+ * Canonical cast identity resolution + de-duplication.
+ *
+ * Root cause this solves (v318):
+ * A scene can end up with TWO cast slots for the SAME person, e.g.
+ *   [{ characterId: "483f9cdc-…" }, { characterId: "samuel-dusatko" }]
+ * because some upstream writers emit a slug instead of the brand_characters
+ * UUID. Every consumer compares raw `characterId` strings, so the duplicate
+ * survives: the UI renders two identical chips, the anchor composer burns two
+ * portrait slots on the same face (→ visible clone/doppelganger) and the
+ * lip-sync router builds a ghost speaker pass.
+ *
+ * All cast handling should route slot ids through `resolveCanonicalCharacterId`
+ * and collapse arrays with `dedupeCharacterShots`.
+ */
+
+import type { CharacterShot, ComposerCharacter } from '@/types/video-composer';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type CharacterLike = { id: string; name?: string | null };
+
+function norm(v: unknown): string {
+  return String(v ?? '')
+    .toLowerCase()
+    .trim()
+    .replace(/[-_\s]+/g, '');
+}
+
+function firstNameNorm(name: unknown): string {
+  const parts = String(name ?? '').toLowerCase().trim().split(/\s+/);
+  return norm(parts[0] ?? '');
+}
+
+/**
+ * Resolve a (possibly drifted) slot id to the canonical character id from the
+ * pool. Returns `null` when nothing matches.
+ */
+export function resolveCanonicalCharacterId(
+  slotId: string | undefined | null,
+  pool: readonly CharacterLike[] | undefined,
+): string | null {
+  const raw = String(slotId ?? '').trim();
+  if (!raw || !pool?.length) return null;
+
+  // 1. Exact id match (fast path, also the UUID case).
+  const exact = pool.find((c) => c.id === raw);
+  if (exact) return exact.id;
+
+  const needle = norm(raw);
+  if (!needle) return null;
+
+  // 2. Full-name match, ignoring separators ("samuel-dusatko" → "Samuel Dusatko").
+  const byName = pool.find((c) => norm(c.name) === needle);
+  if (byName) return byName.id;
+
+  // 3. Name contained in the id ("lib:samuel-dusatko-42", "@samueldusatko").
+  const byNameInId = pool.find((c) => {
+    const full = norm(c.name);
+    return !!full && full.length >= 4 && needle.includes(full);
+  });
+  if (byNameInId) return byNameInId.id;
+
+  // 4. Last resort: unique first-name hit (never for UUID-shaped ids —
+  //    a UUID must match exactly or not at all).
+  if (UUID_RE.test(raw)) return null;
+  const first = pool.filter((c) => {
+    const f = firstNameNorm(c.name);
+    return !!f && f.length >= 3 && needle.includes(f);
+  });
+  if (first.length === 1) return first[0].id;
+
+  return null;
+}
+
+const SHOT_SPECIFICITY: Record<string, number> = {
+  absent: 0,
+  silhouette: 1,
+  back: 1,
+  full: 2,
+  profile: 3,
+  pov: 4,
+  detail: 5,
+};
+
+function rank(shotType: unknown): number {
+  return SHOT_SPECIFICITY[String(shotType ?? 'full')] ?? 2;
+}
+
+function mergeSlots(existing: CharacterShot, incoming: CharacterShot): CharacterShot {
+  const base = rank(incoming.shotType) > rank(existing.shotType) ? incoming : existing;
+  const other = base === incoming ? existing : incoming;
+  const pick = <K extends keyof CharacterShot>(k: K): CharacterShot[K] =>
+    (base[k] ?? other[k]) as CharacterShot[K];
+  return {
+    ...other,
+    ...base,
+    shotType: base.shotType,
+    characterName: pick('characterName' as any) as any,
+    // `name` is a legacy mirror of characterName on some rows.
+    ...(('name' in base || 'name' in other)
+      ? { name: ((base as any).name ?? (other as any).name) }
+      : {}),
+    outfitLookId: pick('outfitLookId' as any) as any,
+    referenceImageUrl: pick('referenceImageUrl' as any) as any,
+    actionEn: pick('actionEn' as any) as any,
+    actionUser: pick('actionUser' as any) as any,
+  } as CharacterShot;
+}
+
+/**
+ * Collapse cast slots that resolve to the same person and rewrite drifted ids
+ * to the canonical UUID.
+ *
+ * Idempotent: returns the SAME array reference when nothing changes, so it is
+ * safe inside `useEffect` / render paths.
+ */
+export function dedupeCharacterShots(
+  shots: CharacterShot[] | undefined,
+  pool: readonly CharacterLike[] | undefined,
+): CharacterShot[] {
+  const input = shots ?? [];
+  if (input.length < 2 && input.length > 0) {
+    // Single slot: still normalize a drifted id when possible.
+    const only = input[0];
+    const canon = resolveCanonicalCharacterId(only?.characterId, pool);
+    if (canon && canon !== only.characterId) return [{ ...only, characterId: canon }];
+    return input;
+  }
+  if (input.length === 0) return input;
+
+  const order: string[] = [];
+  const byKey = new Map<string, CharacterShot>();
+  let changed = false;
+
+  for (const slot of input) {
+    if (!slot) {
+      changed = true;
+      continue;
+    }
+    const canon = resolveCanonicalCharacterId(slot.characterId, pool);
+    const normalized: CharacterShot =
+      canon && canon !== slot.characterId ? { ...slot, characterId: canon } : slot;
+    if (normalized !== slot) changed = true;
+
+    // Unresolvable slots keep their raw id but are still deduped on it.
+    const key = canon ?? String(slot.characterId ?? '').toLowerCase().trim();
+    if (!key) {
+      changed = true;
+      continue;
+    }
+
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, normalized);
+      order.push(key);
+      continue;
+    }
+    changed = true;
+    byKey.set(key, mergeSlots(existing, normalized));
+  }
+
+  if (!changed) return input;
+  return order.map((k) => byKey.get(k)!);
+}
+
+/** True when at least two slots resolve to the same person. */
+export function hasDuplicateCast(
+  shots: CharacterShot[] | undefined,
+  pool: readonly CharacterLike[] | undefined,
+): boolean {
+  const deduped = dedupeCharacterShots(shots, pool);
+  return deduped.length < (shots?.length ?? 0);
+}
