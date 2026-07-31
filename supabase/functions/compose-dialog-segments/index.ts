@@ -5581,11 +5581,16 @@ serve(async (req) => {
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           if (speakers.length >= 2) {
+            const speakerLabel = pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`;
             const reason = preclipResult.error === "preclip_face_share_too_low"
               // v329 — eigene, ehrliche Meldung: das ist kein Timeout, sondern
               // eine unsichere Gesichts-Geometrie auf dem Plate.
-              ? `preclip_face_share_too_low: Gesichts-Geometrie für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" ist unsicher — das Gesicht ist im erkannten Ausschnitt zu klein (${((Number(preclipResult.faceShareInCrop) || 0) * 100).toFixed(1)} %). Szene neu berechnen, damit das Lip-Sync greifen kann.`
-              : `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+              ? `preclip_face_share_too_low: Gesichts-Geometrie für „${speakerLabel}" ist unsicher — das Gesicht ist im erkannten Ausschnitt zu klein (${((Number(preclipResult.faceShareInCrop) || 0) * 100).toFixed(1)} %). Szene neu berechnen, damit das Lip-Sync greifen kann.`
+              : preclipResult.error === "motion_uncoverable"
+              // v331 — bewegter Sprecher, der nicht nachbarsicher eingefasst
+              // werden kann. Ehrlich fehlschlagen statt Full-Plate + Morphing.
+              ? `motion_uncoverable: „${speakerLabel}" bewegt sich zu weit durchs Bild (${Math.round(Number(preclipResult.trackDriftPx) || 0)} px), um ihn ohne Übergriff auf ein Nachbargesicht sauber freizustellen. Szene mit ruhigerer Kameraführung neu generieren — Credits wurden zurückerstattet.`
+              : `v187_preclip_required_no_fullplate_fallback: Preclip für „${speakerLabel}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
             console.error(
               `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
             );
