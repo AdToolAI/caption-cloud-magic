@@ -156,8 +156,34 @@ function mergeSlots(existing: CharacterShot, incoming: CharacterShot): Character
 }
 
 /**
+ * Normalize a single slot to the canonical shape
+ * `{ characterId: <avatar UUID>, outfitLookId?: <lookId> }`.
+ * Returns the SAME object when nothing changes.
+ */
+export function normalizeCharacterShot(
+  slot: CharacterShot,
+  pool: readonly CharacterLike[] | undefined,
+  opts?: CanonicalCastOptions,
+): CharacterShot {
+  if (!slot) return slot;
+  const { outfitLookId } = splitCastSlotId(slot.characterId, opts);
+  const canon = resolveCanonicalCharacterId(slot.characterId, pool, opts);
+  const nextId = canon ?? slot.characterId;
+  const nextLook = (slot as any).outfitLookId ?? outfitLookId ?? undefined;
+  const idChanged = nextId !== slot.characterId;
+  const lookChanged = nextLook !== (slot as any).outfitLookId && !!nextLook;
+  if (!idChanged && !lookChanged) return slot;
+  return {
+    ...slot,
+    characterId: nextId,
+    ...(nextLook ? { outfitLookId: nextLook } : {}),
+  } as CharacterShot;
+}
+
+/**
  * Collapse cast slots that resolve to the same person and rewrite drifted ids
- * to the canonical UUID.
+ * to the canonical UUID (including `outfit:` / `catalog:` / `lib:` refs — the
+ * encoded look is preserved in `outfitLookId`).
  *
  * Idempotent: returns the SAME array reference when nothing changes, so it is
  * safe inside `useEffect` / render paths.
@@ -165,16 +191,16 @@ function mergeSlots(existing: CharacterShot, incoming: CharacterShot): Character
 export function dedupeCharacterShots(
   shots: CharacterShot[] | undefined,
   pool: readonly CharacterLike[] | undefined,
+  opts?: CanonicalCastOptions,
 ): CharacterShot[] {
   const input = shots ?? [];
-  if (input.length < 2 && input.length > 0) {
-    // Single slot: still normalize a drifted id when possible.
-    const only = input[0];
-    const canon = resolveCanonicalCharacterId(only?.characterId, pool);
-    if (canon && canon !== only.characterId) return [{ ...only, characterId: canon }];
-    return input;
-  }
   if (input.length === 0) return input;
+  if (input.length === 1) {
+    const only = input[0];
+    if (!only) return input;
+    const normalized = normalizeCharacterShot(only, pool, opts);
+    return normalized === only ? input : [normalized];
+  }
 
   const order: string[] = [];
   const byKey = new Map<string, CharacterShot>();
@@ -185,13 +211,11 @@ export function dedupeCharacterShots(
       changed = true;
       continue;
     }
-    const canon = resolveCanonicalCharacterId(slot.characterId, pool);
-    const normalized: CharacterShot =
-      canon && canon !== slot.characterId ? { ...slot, characterId: canon } : slot;
+    const normalized = normalizeCharacterShot(slot, pool, opts);
     if (normalized !== slot) changed = true;
 
     // Unresolvable slots keep their raw id but are still deduped on it.
-    const key = canon ?? String(slot.characterId ?? '').toLowerCase().trim();
+    const key = String(normalized.characterId ?? '').toLowerCase().trim();
     if (!key) {
       changed = true;
       continue;
@@ -215,7 +239,9 @@ export function dedupeCharacterShots(
 export function hasDuplicateCast(
   shots: CharacterShot[] | undefined,
   pool: readonly CharacterLike[] | undefined,
+  opts?: CanonicalCastOptions,
 ): boolean {
-  const deduped = dedupeCharacterShots(shots, pool);
+  const deduped = dedupeCharacterShots(shots, pool, opts);
   return deduped.length < (shots?.length ?? 0);
 }
+
