@@ -188,8 +188,14 @@ export function useComposerPersistence() {
       const briefingCast = (project.briefing?.characters ?? []).map((c) => ({
         id: c.id,
         name: c.name,
+        // v320 — Cast & World UUID is the canonical identity of this entry.
+        brandCharacterId: c.brandCharacterId,
       }));
-      const seenPool = new Set(briefingCast.map((c) => c.id));
+      const seenPool = new Set(
+        briefingCast.flatMap((c) =>
+          [c.id, c.brandCharacterId].filter((x): x is string => !!x),
+        ),
+      );
       const castPool = [
         ...briefingCast,
         ...libraryCharacters
