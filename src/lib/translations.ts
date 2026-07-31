@@ -11332,11 +11332,11 @@ export const translations: Record<Language, any> = {
         },
         q3: {
           question: "¿Puedo probarlo gratis?",
-          answer: "¡Sí! Ofrecemos un plan gratuito con 20 pies de foto generados por IA al mes. No se requiere tarjeta de crédito para comenzar."
+          answer: "¡Sí! El plan gratuito incluye créditos de medios para que produzcas tus primeros videos. No se requiere tarjeta de crédito."
         },
         q4: {
           question: "¿Qué plataformas son compatibles?",
-          answer: "CaptionGenie es compatible con Instagram, TikTok, Facebook, LinkedIn, Twitter/X y YouTube. Cada plataforma tiene su propio estilo de pie de foto optimizado."
+          answer: "Tu video terminado se publica en Instagram, TikTok, Facebook, LinkedIn, Twitter/X y YouTube — la publicación es el último paso del flujo."
         },
         q5: {
           question: "¿Puedo personalizar los pies de foto generados?",
