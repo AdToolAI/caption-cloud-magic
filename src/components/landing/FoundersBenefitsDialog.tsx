@@ -29,8 +29,8 @@ const benefits = [
   },
   {
     icon: Sparkles,
-    title: "Voller Feature-Zugang während der Beta",
-    text: "Cast & World, Motion Studio, AI Video Studio, Picture Studio — alles freigeschaltet.",
+    title: "Voller Studio-Zugang während der Beta",
+    text: "Der komplette Produktionsworkflow ist freigeschaltet: führende KI-Modelle, Stimmen, Multi-Speaker-Lip-Sync und Schnitt — in einem System statt in fünf Abos.",
   },
   {
     icon: Crown,
@@ -53,10 +53,11 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
             </DialogTitle>
           </div>
           <DialogDescription className="text-base leading-relaxed">
-            Wir starten am <strong className="text-foreground">26.07.2026</strong> in eine öffentliche{" "}
+            Ein Creator. Ein ganzes Studio. Wir starten am{" "}
+            <strong className="text-foreground">26.07.2026</strong> in eine öffentliche{" "}
             <strong className="text-foreground">3-Monats-Beta</strong>. Als einer der ersten{" "}
-            <strong className="text-foreground">1.000 Founders</strong> sicherst du dir dauerhafte Vorteile —
-            und hilfst uns, die Plattform gemeinsam großartig zu machen.
+            <strong className="text-foreground">1.000 Founders</strong> sicherst du dir dauerhaften
+            Zugang zum kompletten Produktionsworkflow — und hilfst uns, ihn gemeinsam großartig zu machen.
           </DialogDescription>
         </DialogHeader>
 

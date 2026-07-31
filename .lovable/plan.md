@@ -1,58 +1,74 @@
-# Zurück auf den Stand vom 27.07.2026 (v169)
 
-## Wo wir am 27.07. standen — und was seitdem passiert ist
+# Positionierung: Ein Creator. Ein ganzes Studio.
 
-Ich habe den Code gegen den 27.07.-Stand geprüft. Ergebnis: **die v169-Architektur liegt vollständig und aktiv im Code.** Verifiziert:
+Ziel: Die Produktkommunikation an das tatsächliche Produkt angleichen — vor dem Launch am 26.07. Redaktionsplan, Formate und Veröffentlichungsrhythmus bleiben bewusst außerhalb des Codes.
 
-- Paralleler Fan-out, `concurrencyCap = 4`, Killswitch aktiv.
-- Per-Pass-Lock aktiv.
-- Per-Slot-Schreibzugriff statt Voll-Rewrite.
-- Preclip-Pre-Fanout für Passes jenseits des Caps.
-- Jeder Pass nutzt seinen **eigenen** Preclip als Input — keine Verkettung auf den Vorgänger-Output.
-- Webhook plus Watchdog mit Reconcile und idempotentem Refund.
+## Ausgangslage (im Code geprüft)
 
-Es muss also nichts neu gebaut werden. Kaputt gemacht haben es die Schichten, die **nach** dem 27.07. daraufgesetzt wurden. Diese vier Punkte habe ich konkret nachgewiesen:
+Die aktuelle Kommunikation beschreibt eine frühere Produktstufe:
 
-1. **v327 kippt bei „bewegten" Sprechern den Preclip komplett weg** und schickt die volle Plate mit per-Frame-Boxen an Sync.so. Das ist exakt der Full-Frame-Pfad, den v169 abgeschafft hatte — weil der Provider dabei auf Nachbargesichter übergreift. Das ist das Morphen in deinem Aufzug-Screenshot.
-2. Der Mux **widerspricht** dem: für Mehrsprecher bricht er hart ab, wenn ein Pass keinen Crop hat. Ein v327-Tracked-Pass hat per Definition keinen. Beide Regeln können nicht gleichzeitig gelten.
-3. Dein letzter Zwei-Sprecher-Lauf lief mit **Face-Share 18,1 % und 15,5 %**. Das Face-Gate meldete für beide `probe_unavailable` — und hat trotzdem dispatcht.
-4. Die Overlay-Maske hat einen **festen Radius von 28 %** der kürzeren Bildachse. Sie deckt weit mehr als das Gesicht ab und mischt Provider-Output über Haut und Hintergrund.
+- `src/lib/translations.ts` — Hero DE/EN/ES: „Effektives Marketing. Smarte Kampagnen." / Subline „Dein KI-gestütztes Marketing-Toolkit für Social Media."
+- `src/pages/Index.tsx` — SEO-Titel „KI Social Media Marketing Platform"
+- `index.html` — Titel „KI Social Media Manager", Keywords auf Captions ausgerichtet
+- `src/config/seo.ts` — `defaultTitle` / `defaultDescription` / `keywords` positionieren AdTool AI als **Caption Generator**; `PAGES_SEO.home` ebenso
+- `public/llms.txt` — beschreibt zuerst Captions, Video erst danach
 
-## Umsetzung: die Post-27.07.-Schichten entfernen
+Es geht also nicht um eine Verfeinerung, sondern um die Angleichung an die Video-Pipeline, die seit Monaten gebaut wurde.
 
-### 1. Preclip als einzige Wahrheit zurückholen
-- Zwei oder mehr Sprecher: ausnahmslos ein eigener Single-Face-Preclip pro Pass. Keine Full-Plate-Dispatches.
-- v327-Tracked-Pfad für Mehrsprecher deaktivieren.
-- Bewegung wird **innerhalb** des Preclips aufgefangen: der Crop wird so dimensioniert, dass die gemessene Bewegungsbahn des Sprechers über sein Sprechfenster mit Sicherheitsrand hineinpasst.
-- Passt ein Sprecher nicht sauber hinein: ehrlich fehlschlagen und erstatten statt morphen.
+## Die Messaging-Hierarchie
 
-### 2. Overlay-Maske eng ans Gesicht binden
-- Radius proportional zur tatsächlichen Gesichtsbox statt pauschal 28 % der Bildachse.
-- Harte Obergrenze relativ zum Abstand zum nächsten Nachbargesicht — zwei Overlays können sich nie überlappen.
-- Nur Mund- und Kieferbereich wird ersetzt; Stirn, Haaransatz, Hintergrund bleiben Plate.
-- Stille Freeze-Layer bleiben aus, wie im v169-Stand.
+Diese drei Ebenen werden verbindlich und überall in dieser Reihenfolge verwendet:
 
-### 3. Face-Gate scharf statt durchwinken
-- `probe_unavailable` ist bei Mehrsprecher-Szenen kein Freifahrtschein mehr.
-- Vor dem Dispatch verlangt: ausreichende Gesichtsgröße im tatsächlich gesendeten Clip, eindeutige Identität pro Slot, kein Slot doppelt belegt.
-- Grenzwert für den Gesichtsanteil deutlich über die zuletzt gemessenen 15–18 % anheben.
-- Darunter: nicht dispatchen, erstatten, klare Meldung.
+```text
+Ebene 1 — Markenversprechen (emotional)
+  Ein Creator. Ein ganzes Studio.
 
-### 4. Widerspruch Dispatch ↔ Mux auflösen
-- Eine gemeinsame Regel: der Mux erwartet für Mehrsprecher immer einen gültigen Crop, und der Dispatch garantiert ihn.
-- Damit entfällt der Zustand „Provider fertig, Mux bricht ab oder weicht still auf einen weichen Fallback aus".
+Ebene 2 — Differenzierung (funktional)
+  Alle führenden KI-Modelle. Ein durchgängiger Workflow.
 
-### 5. Kontrolliert verifizieren
-- Erst die Aufzug-Szene aus deinem Screenshot: zwei Sprecher, beide klar sichtbar.
-- Belege pro Pass: eigener Preclip, Gesichtsanteil über Grenzwert, korrekte Identität, kein Full-Plate-Dispatch, saubere Maskengrenzen.
-- Danach vier Sprecher, danach ein sich bewegender Sprecher.
+Ebene 3 — Kundennutzen (konkret)
+  Von der Idee zum fertigen Video — ohne Filmteam und ohne
+  zwischen fünf Tools zu wechseln.
+```
 
-## Technische Details
-- `supabase/functions/compose-dialog-segments/index.ts` — v327-Tracked-Pfad für N≥2 aus, Preclip-Pflicht zurück, Bewegungsbahn in die Crop-Berechnung, Face-Share-Grenzwert anheben.
-- `supabase/functions/_shared/pass-face-preclip.ts` — Crop deckt die Bewegungsbahn über das Sprechfenster ab.
-- `supabase/functions/_shared/face-motion-track.ts` — Track dimensioniert nur noch den Crop, ist kein Full-Plate-Schalter mehr.
-- `supabase/functions/_shared/syncso-face-gate.ts` — `probe_unavailable` bei N≥2 fail-closed.
-- `supabase/functions/render-sync-segments-audio-mux/index.ts` — Maskenradius gesichtsproportional mit Nachbarabstands-Deckel; Crop-Pflicht bleibt.
+Marktdefinition: „Für alle, die professionelle Inhalte produzieren müssen — ohne eigenes Filmteam." Solo-Creator sind kulturelle Kernzielgruppe, nicht die sprachliche Grenze.
 
-## Abwägung
-Der Preis: stark bewegte Sprecher, die sich nicht in einen stabilen Crop fassen lassen, schlagen künftig ehrlich fehl statt einen morphenden Clip zu liefern. Das halte ich für richtig — ein sauberer Fehlschlag mit Erstattung ist besser als ein Video, das du nicht ausliefern kannst. Wenn du für bewegte Sprecher lieber einen weichen Fallback willst, baue ich stattdessen ein automatisches Neu-Rendern der Plate mit fixierter Kamera ein.
+Sprache: global positioniert, deutscher Beachhead. DE-Multi-Speaker-Lip-Sync erscheint als Leistungsbeweis, nie als Zielgruppendefinition. EN- und ES-Claims werden im selben Durchgang geschrieben, nicht nachgezogen.
+
+## Umfang 1 — Startseite
+
+`src/lib/translations.ts`, Block `landing.hero` in allen drei Sprachen:
+
+- `headline1` / `headline2` → „Ein Creator." / „Ein ganzes Studio." (EN: „One creator." / „A whole studio.", ES entsprechend)
+- `subline` → Ebene 2 + 3 verdichtet: führende Modelle, Stimmen und Lip-Sync in einem Workflow, ohne Plattformwechsel
+- `badge` → weg von „Für moderne Marketer", hin zur Produktionsaussage
+- `socialProof.creators` bleibt (Founders-Beta ist ehrlich und funktioniert)
+
+`src/components/landing/BlackTieHero.tsx` bleibt strukturell unverändert — nur die Texte kommen aus den geänderten Keys. Kein Layout-Umbau kurz vor Launch.
+
+## Umfang 2 — Metadaten und Crawler
+
+- `index.html`: `<title>`, `description`, `keywords`, `og:*` und `twitter:*` auf die Studio-/Workflow-Positionierung; Founders-Preis bleibt als Nutzenhinweis erhalten. Kein `og:image` setzen (Hosting liefert die Vorschau).
+- `src/config/seo.ts`: `defaultTitle`, `defaultDescription`, `keywords` und `PAGES_SEO.home` von Captions auf KI-Videoproduktion; Keywords auf Begriffe wie KI-Videogenerator, Lip-Sync, Avatar-Video, Videoproduktion ohne Team.
+- `src/pages/Index.tsx`: `SEO`-Props auf die neue Hierarchie.
+- `public/llms.txt`: Einleitungsabsatz stellt die Workflow-Positionierung voran, Captions werden zu einem Feature unter anderen.
+
+Titel unter 60 Zeichen, Description unter 160, genau ein H1 auf der Startseite — bleibt gewahrt.
+
+## Umfang 3 — Founders-Pitch
+
+`FoundersBenefitsDialog.tsx` erhält die Rahmung „Studio-Zugang" statt Feature-Aufzählung. Preise, Rabattlogik und Bedingungen bleiben unverändert — nur der Einleitungstext.
+
+## Umfang 4 — Positionierungs-Memory
+
+Neue Projekt-Memory `mem://brand/positioning-territory` mit: Markenversprechen, die drei Hierarchieebenen, Marktdefinition, Beachhead-Regel, die fünf Standpunkte und die Verbotsliste (keine Feature-Rundgänge, keine reinen Modelllisten, kein „KI oder echt?" bis die Lip-Sync-Artefakte sauber sind). Referenz in `mem://index.md` unter Core, damit jeder künftige Text daran gemessen wird.
+
+## Bewusst nicht in diesem Durchgang
+
+- Onboarding-Texte und E-Mail-Betreffzeilen — zweiter Durchgang nach dem Launch; die Flows laufen gerade stabil.
+- Redaktionsplan, Formate, Serien, Veröffentlichungsrhythmus — gehören in ein Marketingdokument, nicht in die Codebase.
+- Neuaufbau von Hero-, Nutzen- oder Social-Proof-Sektionen — zu großer Eingriff sechs Tage vor Launch.
+
+## Technische Hinweise
+
+Alle Änderungen sind Text- und Konfigurationsänderungen. Keine Logik, keine Backend-Migration, keine Edge-Function betroffen. `translations.ts` wird an drei Stellen parallel geändert (DE ~8753, EN ~3904, ES ~13387), damit die Sprachen nicht auseinanderlaufen. Nach den Edits: Typecheck plus ein Screenshot der Startseite zur Kontrolle, dass die längere Headline im Hero-Grid nicht umbricht.

@@ -3900,10 +3900,10 @@ export const translations: Record<Language, any> = {
     // Landing Page
     landing: {
       hero: {
-        badge: "Powered by AI · For Modern Marketers",
-        headline1: "Effective Marketing.",
-        headline2: "Smart Campaigns.",
-        subline: "Your AI-powered marketing toolkit for social media. Create, plan and analyze content like a pro.",
+        badge: "Every leading AI model · One continuous workflow",
+        headline1: "One creator.",
+        headline2: "A whole studio.",
+        subline: "Produce complete AI videos with the leading models, voices and lip-sync tools in a single workflow — from idea to finished video, without a film crew and without switching platforms.",
         pricingHint: "From €19.99/month (Launch promo) · 14-day trial · No auto-subscription",
         ctaPrimary: "Start for free",
         ctaSecondary: "Watch demo",
@@ -8749,10 +8749,10 @@ export const translations: Record<Language, any> = {
     // Landing Page
     landing: {
       hero: {
-        badge: "Powered by AI · Für moderne Marketer",
-        headline1: "Effektives Marketing.",
-        headline2: "Smarte Kampagnen.",
-        subline: "Dein KI-gestütztes Marketing-Toolkit für Social Media. Erstelle, plane und analysiere Content wie ein Profi.",
+        badge: "Alle führenden KI-Modelle · Ein durchgängiger Workflow",
+        headline1: "Ein Creator.",
+        headline2: "Ein ganzes Studio.",
+        subline: "Erstelle komplette KI-Videos mit den führenden Modellen, Stimmen und Lip-Sync-Tools in einem einzigen Workflow — von der Idee zum fertigen Video, ohne Filmteam und ohne Plattformwechsel.",
         pricingHint: "Ab 19,99 €/Monat (Launch-Promo) · 14 Tage testen · Kein Auto-Abo",
         ctaPrimary: "Kostenlos starten",
         ctaSecondary: "Demo ansehen",
@@ -13383,10 +13383,10 @@ export const translations: Record<Language, any> = {
     // Landing Page
     landing: {
       hero: {
-        badge: "Powered by AI · Para marketers modernos",
-        headline1: "Marketing Efectivo.",
-        headline2: "Campañas Inteligentes.",
-        subline: "Tu kit de marketing impulsado por IA para redes sociales. Crea, planifica y analiza contenido como un profesional.",
+        badge: "Todos los modelos de IA líderes · Un solo flujo de trabajo",
+        headline1: "Un creador.",
+        headline2: "Un estudio completo.",
+        subline: "Crea vídeos de IA completos con los modelos, voces y herramientas de lip-sync líderes en un único flujo de trabajo — de la idea al vídeo final, sin equipo de rodaje y sin cambiar de plataforma.",
         pricingHint: "Desde 19,99 €/mes (promo de lanzamiento) · 14 días de prueba · Sin suscripción automática",
         ctaPrimary: "Empezar gratis",
         ctaSecondary: "Ver demo",

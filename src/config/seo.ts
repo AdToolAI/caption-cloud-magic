@@ -9,8 +9,9 @@ export const SEO_CONFIG = {
   
   // Site Information
   siteName: 'AdTool AI',
-  defaultTitle: 'AdTool AI - KI Social Media Manager & Caption Generator',
-  defaultDescription: 'Erstelle perfekte Social Media Captions mit KI in Sekunden. Instagram, TikTok, LinkedIn & mehr. Über 10.000 Creator vertrauen AdTool AI für besseren Content.',
+  defaultTitle: 'AdTool AI — Ein Creator. Ein ganzes Studio.',
+  defaultDescription: 'Erstelle komplette KI-Videos mit den führenden Modellen, Stimmen und Lip-Sync in einem einzigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.',
+
   
   // Social Media
   twitterHandle: '@adtoolai',
@@ -37,14 +38,14 @@ export const SEO_CONFIG = {
   // Additional SEO Settings
   author: 'AdTool AI Team',
   keywords: [
-    'KI Caption Generator',
-    'Social Media Manager',
-    'Instagram Captions',
-    'TikTok Content',
-    'LinkedIn Posts',
-    'AI Social Media',
+    'KI Videogenerator',
+    'KI Video erstellen',
+    'Lip-Sync KI',
+    'AI Avatar Video',
+    'Videoproduktion ohne Team',
+    'KI Voiceover',
     'Content Creator Tools',
-    'Social Media Planner',
+    'KI Werbevideo',
   ],
 };
 
@@ -86,12 +87,12 @@ export const getLocale = (lang: string): string => {
 export const PAGES_SEO = {
   home: {
     path: '/',
-    title: 'KI Social Media Caption Generator - Instagram, TikTok & LinkedIn',
-    description: 'Erstelle perfekte Social Media Captions in Sekunden mit KI. Instagram, TikTok, LinkedIn & Facebook. Über 10.000 Creator vertrauen AdTool AI für viralen Content.',
+    title: 'Ein Creator. Ein ganzes Studio. — KI-Videoproduktion',
+    description: 'Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.',
     ogImage: '/og-home.jpg',
     priority: 1.0,
     changefreq: 'weekly' as const,
-    keywords: ['KI Caption Generator', 'Instagram Captions', 'TikTok Hooks', 'Social Media AI'],
+    keywords: ['KI Videogenerator', 'Lip-Sync KI', 'AI Avatar Video', 'KI Werbevideo'],
   },
   pricing: {
     path: '/pricing',
