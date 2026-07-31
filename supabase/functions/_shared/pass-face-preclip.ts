@@ -105,6 +105,8 @@ export interface PassPreclipResult {
   frameCount?: number;
   /** v247 — anchor used ("mouth" | "face_center"). */
   anchor?: "mouth" | "face_center";
+  /** v340 — where the mouth anchor came from. */
+  anchorSource?: "landmark" | "synthetic_bbox" | "face_center";
   /** v247 — face bbox area / crop area after clamping (0..1). */
   faceShareInCrop?: number;
   /** v247 — distance (px) between mouth and crop center. */
@@ -603,6 +605,7 @@ export async function renderPassFacePreclip(
         fps: FPS,
         frameCount: durationInFrames,
         anchor,
+        anchorSource,
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
@@ -780,6 +783,7 @@ export async function renderPassFacePreclip(
         fps: FPS,
         frameCount: durationInFrames,
         anchor,
+        anchorSource,
         faceShareInCrop,
         mouthOffsetPx,
         clamped: clampedAnchor,
