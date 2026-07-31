@@ -112,7 +112,7 @@ export function CharacterCastPicker({
   showActionFields = true,
 }: Props) {
   const lang: Lang = language;
-  const cast = normalizeValue(value, legacyValue);
+  const rawCast = normalizeValue(value, legacyValue);
 
   // Combined pool used for resolving slot ids (briefing first, then library
   // — briefing wins on dupe id).
@@ -122,32 +122,30 @@ export function CharacterCastPicker({
     return [...(characters ?? []), ...extras];
   }, [characters, libraryCharacters]);
 
-  // Self-heal: when a slot's id is drifted (e.g. "lib:matthew-…") but matches
-  // a real character via tolerant lookup, rewrite it to the canonical UUID
-  // exactly once. Subsequent renders see the corrected id and stop.
-  const healedRef = useRef(false);
+  // v318 — Identity dedupe: slots whose id drifted (slug instead of the brand
+  // UUID) are rewritten to the canonical id AND collapsed with the slot that
+  // already holds that person. Without this the same character shows up twice
+  // (duplicate chip + duplicate action field) and downstream burns a portrait
+  // slot / lip-sync pass on a ghost speaker.
+  const cast = useMemo(
+    () => dedupeCharacterShots(rawCast, resolutionPool),
+    [rawCast, resolutionPool],
+  );
+
+  // Persist the healed shape exactly once per change (guarded — only writes
+  // when the deduped result actually differs from what the parent holds).
+  const lastHealedRef = useRef<string>('');
   useEffect(() => {
-    if (healedRef.current) return;
-    if (cast.length === 0) return;
-    let changed = false;
-    const next = cast.map((s) => {
-      if (resolutionPool.some((c) => c.id === s.characterId)) return s;
-      const match = findCharacter(s.characterId, resolutionPool);
-      if (match && match.id !== s.characterId) {
-        changed = true;
-        return { ...s, characterId: match.id };
-      }
-      return s;
-    });
-    if (changed) {
-      healedRef.current = true;
-      onChange(next);
-    }
-    // Dependencies kept lean — only re-run when ids actually change.
+    if (cast === rawCast) return;
+    const sig = cast.map((s) => `${s.characterId}:${s.shotType}`).join('|');
+    if (lastHealedRef.current === sig) return;
+    lastHealedRef.current = sig;
+    onChange(cast);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cast.map((s) => s.characterId).join('|'), resolutionPool.map((c) => c.id).join('|')]);
+  }, [cast, rawCast]);
 
   const inCast = new Set(cast.map((s) => s.characterId));
+
 
   const briefingAvailable = (characters ?? []).filter((c) => !inCast.has(c.id));
   const libraryAvailable = (libraryCharacters ?? []).filter(
