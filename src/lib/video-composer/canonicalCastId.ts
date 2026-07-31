@@ -51,6 +51,16 @@ function firstNameNorm(name: unknown): string {
 }
 
 /**
+ * The canonical id of a pool entry: the Cast & World UUID when the entry is
+ * linked, otherwise its own id. Never returns the briefing slug for a linked
+ * character (v320 — single character source).
+ */
+export function canonicalPoolId(character: CharacterLike): string {
+  const brandId = String(character?.brandCharacterId ?? '').trim();
+  return UUID_RE.test(brandId) ? brandId : character?.id;
+}
+
+/**
  * Split a raw slot id into its base reference and (when the id carried an
  * `outfit:` / `catalog:` prefix) the look id it encoded.
  *
