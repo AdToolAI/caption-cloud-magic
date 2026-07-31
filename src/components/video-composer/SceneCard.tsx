@@ -353,9 +353,6 @@ export default function SceneCard({
   // Library for live mention resolution preview
   const { characters: libCharacters, locations: libLocations } =
     useUnifiedMentionLibrary();
-  // v319 — identity resolution pool + outfit-look map. `outfit:<lookId>` refs
-  // and slug slots must resolve to the same avatar UUID everywhere, otherwise
-  // the same person is treated as two cast members.
   const { outfitLookMap } = useOutfitLookMap();
   const castResolutionPool = useMemo<ComposerCharacter[]>(() => {
     // Cast & World is the only selectable source. Briefing characters are
@@ -368,7 +365,6 @@ export default function SceneCard({
         appearance: c.description ?? '',
         signatureItems: c.signature_items ?? '',
         referenceImageUrl: c.reference_image_url ?? undefined,
-        aliasIds: c.aliasIds ?? [],
       })) as ComposerCharacter[];
     return castWorld;
   }, [characters, libCharacters]);
@@ -1798,7 +1794,7 @@ export default function SceneCard({
                         );
                         // Resolve removed-character objects for name-based prompt scrubbing.
                         const removedChars = removedNow
-                          .map((id) => castResolutionPool.find((c) => c.id === id || c.aliasIds?.includes(id)))
+                          .map((id) => castResolutionPool.find((c) => c.id === id))
                           .filter(
                             (c): c is NonNullable<typeof c> =>
                               !!c && !!c.name,
