@@ -104,7 +104,7 @@ export function ensureEnsembleScene<S extends SceneLike>(
     const visible = (sc.characterShots ?? []).filter(
       (x) => x?.shotType && x.shotType !== 'absent',
     );
-    const present = new Set(visible.map((x) => x.characterId));
+    const present = presentCanonicalIds(visible as CharacterShot[], characters);
     for (const id of requiredIds) if (!present.has(id)) return false;
     return true;
   };
