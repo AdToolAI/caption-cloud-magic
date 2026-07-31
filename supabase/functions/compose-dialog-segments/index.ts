@@ -398,6 +398,12 @@ async function uploadBoundingBoxesJson(
     // neighbour faces during turns this speaker is silent.
     voicedWindowsSec?: Array<[number, number]>;
     fps?: number;
+    /**
+     * v327 — pre-built per-frame boxes from a measured face trajectory
+     * (moving speaker). When present it wins over `box`; the caller already
+     * applied the voiced-window nulling and plate clamping.
+     */
+    perFrameBoxes?: Array<[number, number, number, number] | null>;
   },
 ): Promise<{ url: string | null; nonNullFrames: number; totalFrames: number }> {
   try {
@@ -405,7 +411,9 @@ async function uploadBoundingBoxesJson(
     const ts = Date.now();
     const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
     const totalFrames = Math.max(1, params.frameCount);
-    const boxes = params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
+    const boxes = params.perFrameBoxes && params.perFrameBoxes.length === totalFrames
+      ? params.perFrameBoxes
+      : params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
       ? buildPerFrameBoxes({
           box: params.box,
           frameCount: totalFrames,
@@ -413,6 +421,7 @@ async function uploadBoundingBoxesJson(
           voicedWindowsSec: params.voicedWindowsSec,
         })
       : new Array(totalFrames).fill(params.box);
+
     const nonNullFrames = boxes.reduce((acc, v) => acc + (v ? 1 : 0), 0);
     const payload = { bounding_boxes: boxes };
     // v279 — Uint8Array instead of Blob: supabase-js 2.75 in Deno silently
