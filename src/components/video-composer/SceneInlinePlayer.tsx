@@ -15,7 +15,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
+import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -23,6 +23,8 @@ import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { ComposerScene } from '@/types/video-composer';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
+import { FaceMapReviewDialog } from './FaceMapReviewDialog';
+
 
 interface Props {
   scene: ComposerScene;
