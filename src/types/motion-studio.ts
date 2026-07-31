@@ -14,8 +14,6 @@ export interface MotionStudioCharacter {
   workspace_id: string | null;
   created_at: string;
   updated_at: string;
-  /** Duplicate Cast & World UUIDs collapsed into this canonical character. */
-  aliasIds?: string[];
   /**
    * Optional CastRef metadata. Set by `useUnifiedMentionLibrary` for
    * synthetic outfit / catalog mention entries so consumers can recover
