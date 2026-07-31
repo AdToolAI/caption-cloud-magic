@@ -516,7 +516,7 @@ const MOVEMENT_TOKENS: Array<[RegExp, string]> = [
   [/push[-\s]?in|dolly[-\s]?in/i, 'slow-push-in'],
   [/pull[-\s]?out|dolly[-\s]?out/i, 'slow-pull-out'],
   [/pan/i, 'pan'],
-  [/track(ing)?/i, 'tracking'],
+  [/track(ing)?|kamerafahrt|kran|crane/i, 'tracking'],
   [/handheld|breathing/i, 'handheld'],
 ];
 const LIGHTING_TOKENS: Array<[RegExp, string]> = [
