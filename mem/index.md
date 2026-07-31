@@ -35,6 +35,8 @@ Updated: today
 - **AWS Lambda Quota**: 100 (eu-central-1) → Render-Pool 80 (Founder-Reserve ab 68), 20 für Edge+Burst. Tier-Caps unverändert bis LambdaHealth peak > 60 an ≥ 3 Tagen. Siehe [Quota 100 Launch Distribution](mem://infrastructure/aws-lambda/quota-100-launch-distribution).
 
 ## Memories
+- [v317 Terminal Clip-Failure Gate](mem://architecture/lipsync/v317-terminal-clip-failure-gate) — Kein Lip-Sync-Dispatch ohne fertigen Master-Clip; Content-Filter-Fails (Green Net/E005) und ≥2 Render-Retries werden terminal statt auf `pending` zurückgesetzt.
+
 - [v209 Risky Provider Consent](mem://architecture/lipsync/v209-risky-provider-consent) — Kling ignoriert Plate-Prompt bei N≥2 → Ghost-Mouthing. Kein Auto-Migrate. In-Dialog Warn-Block + Consent-Checkbox + Persistenz in `composer_scenes.scene_assets.risky_provider_consent`; Refund-Ausschluss nur für Lipsync-Artefakte. `LIPSYNC_SAFE_PROVIDERS = [hailuo, happyhorse]`.
 - [v208 Root-Cause Isolation](mem://architecture/lipsync/v208-rootcause-isolation) — Debug view `/debug/lipsync/:sceneId` rendert 4 Layer (Master Plate / Preclip / Pass-Output / Final Mux) aus `composer_scenes.dialog_shots`; Matrix mappt Symptom → genau eine Fix-Phase (2A/B/C/D). Keine weiteren Overlay-Layer, kein v167-Prompt-Rollback.
 - [v195 Silent-Face Freeze](mem://architecture/lipsync/v195-silent-face-freeze) — Per-speaker `<Freeze frame=0>` tiles at `preclip_crop` on master plate; masks pre/post-script lip motion while background keeps animating. Supersedes v182 full-frame freeze and v183/v190 portrait ghosts. Flag `composer.silent_anchor_v195` (default ON).
