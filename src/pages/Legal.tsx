@@ -153,39 +153,44 @@ const Legal = () => {
                 </ul>
               </LegalSection>
 
-              <LegalSection id="section-8" title="8. Aktionspreise, Founders- und Launch-Angebote" icon="alert" index={7}>
+              <LegalSection id="section-8" title="8. Abopreis und Founders-Vorteil" icon="alert" index={7}>
                 <div className="space-y-3">
                   <p>
-                    Sämtliche als „Founders-Deal", „Launch-Promo", „Einführungspreis" oder vergleichbar gekennzeichneten
-                    Angebote (insbesondere der Pro-Plan zu € 14,99/Monat für 24 bzw. 3 Monate) sind
-                    <strong className="text-foreground"> zeitlich und mengenmäßig begrenzte Einführungsangebote</strong>.
+                    Es besteht genau ein kostenpflichtiges Abomodell zu
+                    <strong className="text-foreground"> € 14,99 pro Monat</strong> (inkl. USt., monatlich kündbar).
+                    Auf die Abogebühr wird kein Rabatt gewährt. Der Founders-Vorteil bezieht sich
+                    <strong className="text-foreground"> ausschließlich auf den Kauf von KI-Credits</strong>.
                   </p>
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">
                     <li>
-                      Die Anzahl der Founders-Plätze ist auf <strong className="text-foreground">1.000 Subscriptions</strong> begrenzt.
-                      Sind diese vergeben, kann ohne Vorankündigung auf die Launch-Promo (3 Monate Rabatt) oder den
-                      regulären Listenpreis umgestellt werden.
+                      Die ersten <strong className="text-foreground">1.000 Abonnenten</strong> („Founders") erhalten für
+                      <strong className="text-foreground"> 24 Monate ab Reservierung des Founders-Platzes 20 % Rabatt</strong>
+                      auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird beim Checkout automatisch angewendet.
                     </li>
                     <li>
-                      Der Anbieter behält sich vor, Aktionspreise, Rabattbedingungen, Slot-Anzahl und Laufzeit
-                      <strong className="text-foreground"> jederzeit ohne Vorankündigung zu ändern, auszusetzen oder vollständig zu beenden</strong>.
-                      Ein Anspruch auf Wiederaufnahme oder Verlängerung beendeter Aktionen besteht nicht.
+                      Die Anzahl der Founders-Plätze ist auf <strong className="text-foreground">1.000</strong> begrenzt.
+                      Sind diese vergeben, entfällt der Vorteil für weitere Anmeldungen ohne Vorankündigung.
+                    </li>
+                    <li>
+                      Der Founders-Vorteil ist an ein aktives Abonnement gebunden. Bei Kündigung des Abos oder Löschung
+                      des Kontos <strong className="text-foreground">erlischt der Rabatt und der Platz wird freigegeben</strong>;
+                      ein Wiederaufleben nach erneuter Anmeldung besteht nicht.
+                    </li>
+                    <li>
+                      Der Anbieter behält sich vor, den regulären Abopreis, die Rabattbedingungen, die Slot-Anzahl und die
+                      Laufzeit <strong className="text-foreground">für die Zukunft zu ändern, auszusetzen oder zu beenden</strong>.
+                      Preisänderungen für bestehende Abonnements werden mit angemessener Frist angekündigt; das Sonder­kündigungsrecht bleibt unberührt.
                     </li>
                     <li>
                       Die Aktion gilt <strong className="text-foreground">ausschließlich für die Dauer des aktiven Betriebs des Dienstes</strong>.
-                      Wird der Dienst eingestellt, erlischt jeder Anspruch auf den vergünstigten Preis. Bereits gezahlte
+                      Wird der Dienst eingestellt, erlischt jeder Anspruch auf den Rabatt. Bereits gezahlte
                       Beträge werden anteilig nach geltendem Recht behandelt.
                     </li>
                     <li>
-                      Bereits abgeschlossene Subscriptions zum Founders- oder Launch-Preis bleiben für die im
-                      Buchungszeitpunkt zugesagte Rabatt-Laufzeit (24 bzw. 3 Monate) zum gebuchten Preis bestehen,
-                      sofern der Dienst weiterhin betrieben wird. Nach Ablauf dieser Laufzeit gilt automatisch der
-                      dann gültige Standard-Listenpreis.
-                    </li>
-                    <li>
-                      Rabatte werden technisch über Stripe-Coupons automatisch beim Checkout angewendet. Es besteht
+                      Rabatte werden technisch über Stripe automatisch beim Checkout angewendet. Es besteht
                       kein Anspruch auf manuelle Eingabe oder nachträgliche Gewährung eines Rabatts.
                     </li>
+                  </ul>
                     <li>
                       Es handelt sich um ein freibleibendes Angebot. Maßgeblich für den abgeschlossenen Vertrag sind
                       ausschließlich die im Stripe-Checkout finalisierten Konditionen.
