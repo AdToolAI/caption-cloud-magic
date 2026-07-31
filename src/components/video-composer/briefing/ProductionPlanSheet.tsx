@@ -338,8 +338,8 @@ export default function ProductionPlanSheet({
     if (changed || nextPlan !== plan) setPlan(nextPlan);
   }, [plan, findLocationOption, currentBriefing]);
 
-  /** Outfit looks belonging to a given base character id. */
-  const outfitsByCharacter = useMemo(() => {
+  /** Outfit looks belonging to a given base character id (mention library). */
+  const outfitsByCharacterFromMentions = useMemo(() => {
     const map = new Map<string, Array<{ lookId: string; name: string }>>();
     const seen = new Set<string>();
     for (const m of outfitMentions) {
