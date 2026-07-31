@@ -17,6 +17,8 @@ const MODEL_PRICING: Record<string, Record<string, number>> = {
   'wan-pro':           { EUR: 0.21, USD: 0.21 },
   'wan-2-6-standard':  { EUR: 0.12, USD: 0.12 },
   'wan-2-6-pro':       { EUR: 0.21, USD: 0.21 },
+  'wan-2-7-standard':  { EUR: 0.30, USD: 0.30 },
+  'wan-2-7-pro':       { EUR: 0.45, USD: 0.45 },
 };
 
 const REPLICATE_MODELS: Record<string, { t2v: string; i2v: string }> = {
@@ -36,6 +38,21 @@ const REPLICATE_MODELS: Record<string, { t2v: string; i2v: string }> = {
     t2v: 'wan-video/wan-2.6-t2v',
     i2v: 'wan-video/wan-2.6-i2v',
   },
+  // Wan 2.7 — 27B MoE, natives Audio, 2–15s, 720p/1080p
+  'wan-2-7-standard': {
+    t2v: 'wan-video/wan-2.7-t2v',
+    i2v: 'wan-video/wan-2.7-i2v',
+  },
+  'wan-2-7-pro': {
+    t2v: 'wan-video/wan-2.7-t2v',
+    i2v: 'wan-video/wan-2.7-i2v',
+  },
+};
+
+/** Resolution passed to Wan 2.7 (the 2.5/2.6 slugs ignore this input). */
+const WAN_RESOLUTION: Record<string, string> = {
+  'wan-2-7-standard': '720p',
+  'wan-2-7-pro': '1080p',
 };
 
 // Wan 2.5 size mapping for T2V
