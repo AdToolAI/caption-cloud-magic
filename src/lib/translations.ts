@@ -6530,7 +6530,7 @@ export const translations: Record<Language, any> = {
         },
         q3: {
           question: "Kann ich es kostenlos testen?",
-          answer: "Ja! Wir bieten einen kostenlosen Plan mit 20 KI-generierten Captions pro Monat. Keine Kreditkarte erforderlich."
+          answer: "Ja! Der kostenlose Plan enthält Media-Credits, damit du deine ersten Videos produzieren kannst. Keine Kreditkarte erforderlich."
         },
         q4: {
           question: "Welche Plattformen werden unterstützt?",
