@@ -74,6 +74,16 @@ export interface PassPreclipInput {
    *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
    *  computeFaceCrop path when unset. */
   mouth?: [number, number] | null;
+  /**
+   * v331 (27.07./v169 restore) — measured face trajectory of THIS speaker on
+   * the master plate, in plate pixel space. v327 used a "moving" classification
+   * to drop the preclip entirely and dispatch the full plate, which let Sync.so
+   * bleed onto neighbouring faces (visible morphing). v331 keeps the preclip as
+   * the single source of truth and instead widens/recenters the crop so the
+   * speaker's whole trajectory over the voiced window stays inside it.
+   * Points outside [startSec, endSec] are ignored.
+   */
+  trackPoints?: Array<{ t: number; bbox: [number, number, number, number] }> | null;
 }
 
 export interface PassPreclipResult {
@@ -99,6 +109,12 @@ export interface PassPreclipResult {
   geometryReason?: string;
   /** v329 — detector box width as a fraction of plate width (0..1). */
   plateBoxWidthPct?: number;
+  /** v331 — number of trajectory samples inside the voiced window. */
+  trackSamplesUsed?: number;
+  /** v331 — max center drift (px) of the speaker across the voiced window. */
+  trackDriftPx?: number;
+  /** v331 — true when the crop was widened/recentered to cover the trajectory. */
+  motionCropApplied?: boolean;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
@@ -145,6 +161,7 @@ export async function renderPassFacePreclip(
     endSec,
     cropExpansionFactor,
     mouth,
+    trackPoints,
   } = input;
 
   if (!masterVideoUrl || !Number.isFinite(srcWidth) || !Number.isFinite(srcHeight)) {
@@ -244,7 +261,94 @@ export async function renderPassFacePreclip(
       crop0Y = Math.max(0, Math.min(sH - crop0Size, Math.round(cy - crop0Size / 2)));
     }
   }
-  const crop0 = { x: crop0X, y: crop0Y, size: crop0Size };
+  let crop0 = { x: crop0X, y: crop0Y, size: crop0Size };
+
+  // ── v331 — Motion-Cover Crop (Rückbau des v327 Full-Plate-Pfads) ────────
+  // v327 hat bei "moving" den Preclip fallen gelassen und die volle Plate an
+  // Sync.so geschickt — genau dort greift der Provider auf Nachbargesichter
+  // über (Morphing). v331 behält den Preclip und fasst die Bewegung stattdessen
+  // IM Crop ein: Wir bilden die Hüllbox aller gemessenen Gesichtsboxen im
+  // Sprechfenster, addieren einen Sicherheitsrand und zentrieren neu.
+  let trackSamplesUsed = 0;
+  let trackDriftPx = 0;
+  let motionCropApplied = false;
+  if (Array.isArray(trackPoints) && trackPoints.length > 0) {
+    const pad = 0.15; // 15 % Sicherheitsrand auf die Hüllbox
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let firstC: [number, number] | null = null;
+    for (const p of trackPoints) {
+      const t = Number(p?.t);
+      if (!Number.isFinite(t) || t < startSec - 0.2 || t > endSec + 0.2) continue;
+      const b = p?.bbox;
+      if (!Array.isArray(b) || b.length !== 4 || !b.every((n) => Number.isFinite(Number(n)))) continue;
+      trackSamplesUsed++;
+      minX = Math.min(minX, Number(b[0]));
+      minY = Math.min(minY, Number(b[1]));
+      maxX = Math.max(maxX, Number(b[2]));
+      maxY = Math.max(maxY, Number(b[3]));
+      const c: [number, number] = [(Number(b[0]) + Number(b[2])) / 2, (Number(b[1]) + Number(b[3])) / 2];
+      if (!firstC) firstC = c;
+      else trackDriftPx = Math.max(trackDriftPx, Math.hypot(c[0] - firstC[0], c[1] - firstC[1]));
+    }
+
+    if (trackSamplesUsed >= 2 && Number.isFinite(minX) && maxX > minX && maxY > minY) {
+      const hullW = (maxX - minX) * (1 + pad * 2);
+      const hullH = (maxY - minY) * (1 + pad * 2);
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      let want = Math.ceil(Math.max(hullW, hullH, crop0.size));
+
+      // Nachbar-Deckel: der Crop darf nie bis zu einem anderen Gesicht reichen.
+      let neighborCap = Infinity;
+      for (const s of siblingCoords ?? []) {
+        if (!Array.isArray(s) || s.length !== 2) continue;
+        const d = Math.max(Math.abs(Number(s[0]) - cx), Math.abs(Number(s[1]) - cy));
+        if (Number.isFinite(d)) neighborCap = Math.min(neighborCap, Math.max(64, (d - 24) * 2));
+      }
+      const maxAllowed = Math.min(sW, sH, neighborCap);
+
+      if (want > maxAllowed) {
+        // Bewegung passt nicht in einen nachbarsicheren Crop → ehrlich
+        // fehlschlagen statt Full-Plate zu riskieren (Morph-Vermeidung).
+        if (Math.max(hullW, hullH) > maxAllowed) {
+          console.warn(
+            `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v331_motion_uncoverable ` +
+            `hull=${Math.round(hullW)}x${Math.round(hullH)} max_allowed=${Math.round(maxAllowed)} ` +
+            `drift_px=${Math.round(trackDriftPx)} samples=${trackSamplesUsed}`,
+          );
+          return {
+            ok: false,
+            error: "motion_uncoverable",
+            errorClass: "invalid_input",
+            trackSamplesUsed,
+            trackDriftPx,
+          };
+        }
+        want = Math.floor(maxAllowed);
+      }
+
+      const size = (want % 2 === 0 ? want : want - 1);
+      const x = Math.max(0, Math.min(sW - size, Math.round(cx - size / 2)));
+      const y = Math.max(0, Math.min(sH - size, Math.round(cy - size / 2)));
+      if (size !== crop0.size || x !== crop0.x || y !== crop0.y) {
+        motionCropApplied = true;
+        crop0 = { x: x % 2 === 0 ? x : Math.max(0, x - 1), y: y % 2 === 0 ? y : Math.max(0, y - 1), size };
+        // Face-Share neu bewerten: die Hüllbox ist größer als ein Einzelframe.
+        if (Array.isArray(bbox) && bbox.length === 4) {
+          const fw = Number(bbox[2]) - Number(bbox[0]);
+          const fh = Number(bbox[3]) - Number(bbox[1]);
+          if (fw > 0 && fh > 0) faceShareInCrop = (fw * fh) / (size * size);
+        }
+      }
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v331_motion_cover applied=${motionCropApplied} ` +
+        `samples=${trackSamplesUsed} drift_px=${Math.round(trackDriftPx)} crop=${crop0.x},${crop0.y},${crop0.size} ` +
+        `face_share=${faceShareInCrop.toFixed(3)}`,
+      );
+    }
+  }
+
+
 
   // v116 (Fix B) — expand the crop on repair retries. We multiply `size`
   // around the same center coords and re-clamp to source bounds. This is
@@ -331,6 +435,9 @@ export async function renderPassFacePreclip(
         geometrySuspicious: geometry.suspicious,
         geometryReason: geometry.reason,
         plateBoxWidthPct: geometry.boxWidthPct,
+        trackSamplesUsed,
+        trackDriftPx,
+        motionCropApplied,
       };
     }
   } catch (reuseErr) {
@@ -502,6 +609,9 @@ export async function renderPassFacePreclip(
         geometrySuspicious: geometry.suspicious,
         geometryReason: geometry.reason,
         plateBoxWidthPct: geometry.boxWidthPct,
+        trackSamplesUsed,
+        trackDriftPx,
+        motionCropApplied,
       };
     }
     if (status === "failed") {

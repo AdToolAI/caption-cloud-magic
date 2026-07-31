@@ -114,18 +114,37 @@ export interface FaceGateInput {
  * v329 — public entry point. Applies the geometry-suspect hard-fail policy on
  * top of the raw gate result: a non-blocking `probe_unavailable` stays
  * non-blocking only while the underlying crop geometry is trustworthy.
+ *
+ * v331 (27.07./v169 restore) — for multi-speaker scenes `probe_unavailable`
+ * is fail-CLOSED regardless of geometry. A blind dispatch on a plate that
+ * carries two or more faces is exactly the state that produced the morphing
+ * elevator scene: Sync.so picks up the neighbour's mouth and the mux blends
+ * it back over the master plate. Single-speaker preclips keep failing open
+ * because there is no neighbour to bleed into.
  */
 export async function verifyFaceBeforeDispatch(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
   const result = await runFaceGate(input);
-  if (input.geometrySuspect && result.ok && result.code === "probe_unavailable") {
-    return {
-      ...result,
-      ok: false,
-      code: "no_face",
-      reason: `v329_geometry_suspect_and_probe_unavailable: ${result.reason ?? "probe unavailable"} — Crop-Geometrie stammt aus dem Rettungsfenster, blinder Dispatch abgelehnt.`,
-    };
+  if (result.ok && result.code === "probe_unavailable") {
+    if (input.isMultiSpeakerContext) {
+      return {
+        ...result,
+        ok: false,
+        code: "no_face",
+        reason:
+          `v331_multispeaker_probe_unavailable: ${result.reason ?? "probe unavailable"} — ` +
+          `Mehrsprecher-Szene ohne verifizierbares Gesicht: blinder Dispatch abgelehnt (Morph-Schutz).`,
+      };
+    }
+    if (input.geometrySuspect) {
+      return {
+        ...result,
+        ok: false,
+        code: "no_face",
+        reason: `v329_geometry_suspect_and_probe_unavailable: ${result.reason ?? "probe unavailable"} — Crop-Geometrie stammt aus dem Rettungsfenster, blinder Dispatch abgelehnt.`,
+      };
+    }
   }
   return result;
 }

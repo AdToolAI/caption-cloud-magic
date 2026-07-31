@@ -4722,6 +4722,13 @@ serve(async (req) => {
                     siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
                     startSec: unionStart,
                     endSec: unionEnd,
+                    // v331 — Bewegung im Crop einfassen statt Full-Plate.
+                    trackPoints: slotTrackFor(
+                      isTrackUsable(parseMotionTrack((scene as any)?.motion_track), sourceClipUrl)
+                        ? parseMotionTrack((scene as any)?.motion_track)
+                        : null,
+                      Number(bp.speaker_idx ?? idx),
+                    )?.points ?? null,
                   },
                   300_000,
                 );
@@ -5396,15 +5403,18 @@ serve(async (req) => {
     let passPreclipUrl: string | null = ((pass as any).preclip_url ?? null);
     let usePassPreclip: boolean = !!passPreclipUrl && !!(pass as any).preclip_crop;
 
-    // ── v327 — Motion-Tolerant Lip-Sync ──────────────────────────────────
-    // `report-plate-motion-track` measured this speaker's face trajectory on
-    // the very plate we are about to dispatch. A speaker classified `moving`
-    // must NOT go through the preclip path: the preclip is a fixed square and
-    // the mux overlays it back at exactly that rect, so a walking / stepping
-    // subject drifts out of the crop and the frame-0 silent-face freeze tiles
-    // in DialogStitchVideo no longer match the plate underneath. Instead we
-    // dispatch the FULL PLATE with per-frame interpolated boxes (no overlay).
-    // Everything below fails open: no/stale track → untouched legacy path.
+    // ── v331 — Rückbau auf den 27.07.-Stand (v169) ───────────────────────
+    // v327 hat bei „bewegten" Sprechern den Preclip komplett fallen gelassen
+    // und die volle Plate mit per-Frame-Boxen an Sync.so geschickt. Genau das
+    // ist der Full-Frame-Pfad, den v169 abgeschafft hatte: der Provider greift
+    // dabei auf Nachbargesichter über → sichtbares Morphing (Aufzug-Szene).
+    //
+    // v331: Für N ≥ 2 Sprecher gilt wieder ausnahmslos „ein Pass = ein eigener
+    // Single-Face-Preclip". Der Motion-Track bleibt erhalten, dient aber nur
+    // noch dazu, den PRECLIP-CROP so zu dimensionieren, dass die Bewegungsbahn
+    // hineinpasst (siehe `trackPoints` unten). Nur bei genau einem Sprecher —
+    // wo es keinen Nachbarn gibt, auf den übergegriffen werden könnte — bleibt
+    // der Full-Plate-Tracked-Pfad erlaubt.
     const v327Track = isTrackUsable(
       parseMotionTrack((scene as any)?.motion_track),
       sourceClipUrl,
@@ -5412,13 +5422,25 @@ serve(async (req) => {
       ? parseMotionTrack((scene as any)?.motion_track)
       : null;
     const v327SlotTrack = slotTrackFor(v327Track, Number(pass.speaker_idx ?? currentPassIdx));
-    const v327Tracked = !!v327SlotTrack && v327SlotTrack.motion_class === "moving" && !!plateDims;
+    const v331MultiSpeaker = Array.isArray(speakers) && speakers.length >= 2;
+    const v327Tracked =
+      !v331MultiSpeaker &&
+      !!v327SlotTrack &&
+      v327SlotTrack.motion_class === "moving" &&
+      !!plateDims;
+    if (v331MultiSpeaker && v327SlotTrack?.motion_class === "moving") {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v331_tracked_fullplate_blocked ` +
+          `speakers=${speakers.length} speaker=${pass.speaker_name} drift=${((v327SlotTrack.max_drift_pct) * 100).toFixed(1)}% ` +
+          `→ preclip stays mandatory, motion is absorbed inside the crop`,
+      );
+    }
     if (v327Tracked) {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v327_motion_track TRACKED ` +
           `speaker=${pass.speaker_name} drift=${((v327SlotTrack!.max_drift_pct) * 100).toFixed(1)}% ` +
           `scale=${((v327SlotTrack!.max_scale_delta) * 100).toFixed(1)}% points=${v327SlotTrack!.points.length} ` +
-          `→ full-plate per-frame bboxes, preclip disabled`,
+          `→ full-plate per-frame bboxes, preclip disabled (single speaker only)`,
       );
       // Drop any cached preclip so mux/webhook treat this pass as full-plate.
       passPreclipUrl = null;
@@ -5478,17 +5500,26 @@ serve(async (req) => {
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
+            // v331 — Bewegung wird IM Crop aufgefangen statt durch Aufgabe des
+            // Preclips (v327 Full-Plate). Die gemessene Bahn dimensioniert den
+            // Ausschnitt; passt sie nicht nachbarsicher hinein, schlägt der
+            // Preclip mit `motion_uncoverable` ehrlich fehl.
+            trackPoints: v327SlotTrack?.points ?? null,
           },
           300_000,
         );
-        // ── v329 — Face-Share-Hardening (vor der Erfolgs-Übernahme) ────────
+        // ── v331 — Face-Share-Hardening (vor der Erfolgs-Übernahme) ────────
         // Ein Crop mit sehr kleinem Face-Share ist kein Grenzfall, sondern ein
         // garantierter No-Op: Sync.so findet im Crop kein animierbares Gesicht
         // und gibt das Video unverändert zurück — der Kunde zahlt für „done
         // ohne Lippenbewegung". Wir stufen das deshalb als Preclip-Fehler ein,
         // damit der bestehende v187-Pfad (kein Full-Plate-Fallback, Refund)
         // unverändert greift.
-        const V329_FACE_SHARE_FLOOR = 0.12;
+        //
+        // Der letzte Aufzug-Lauf lag bei 15,5 % / 18,1 % Face-Share und wurde
+        // vom v329-Floor (0.12) durchgewunken → Morphing statt Lip-Sync.
+        // v331 hebt den Floor für Mehrsprecher-Szenen deutlich darüber an.
+        const V329_FACE_SHARE_FLOOR = speakers.length >= 2 ? 0.24 : 0.12;
         const v329Share = Number(preclipResult.faceShareInCrop);
         if (
           preclipResult.ok &&
@@ -5497,7 +5528,7 @@ serve(async (req) => {
         ) {
           console.error(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v329_preclip_face_share_too_low ` +
-            `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} ` +
+            `face_share=${v329Share.toFixed(3)} floor=${V329_FACE_SHARE_FLOOR} speakers=${speakers.length} ` +
             `geometry=${preclipResult.geometryReason ?? "?"} plate_box_w_pct=${preclipResult.plateBoxWidthPct ?? "?"} ` +
             `crop=${JSON.stringify(preclipResult.crop ?? null)} — refusing dispatch (guaranteed no-op)`,
           );
@@ -5547,8 +5578,17 @@ serve(async (req) => {
           (pass as any).preclip_plate_box_w_pct = Number.isFinite(Number(preclipResult.plateBoxWidthPct))
             ? Number(Number(preclipResult.plateBoxWidthPct).toFixed(4))
             : null;
+          // v331 — Motion-Cover-Forensik: sichtbar machen, ob und wie stark der
+          // Crop wegen einer gemessenen Bewegungsbahn geweitet wurde.
+          (pass as any).preclip_motion_applied = !!preclipResult.motionCropApplied;
+          (pass as any).preclip_motion_drift_px = Number.isFinite(Number(preclipResult.trackDriftPx))
+            ? Math.round(Number(preclipResult.trackDriftPx))
+            : null;
+          (pass as any).preclip_motion_samples = Number.isFinite(Number(preclipResult.trackSamplesUsed))
+            ? Number(preclipResult.trackSamplesUsed)
+            : null;
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct}`,
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px} v329_geometry=${(pass as any).preclip_geometry_reason} plate_box_w_pct=${(pass as any).preclip_plate_box_w_pct} v331_motion=${(pass as any).preclip_motion_applied} drift_px=${(pass as any).preclip_motion_drift_px}`,
           );
 
 
@@ -5557,11 +5597,16 @@ serve(async (req) => {
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           if (speakers.length >= 2) {
+            const speakerLabel = pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`;
             const reason = preclipResult.error === "preclip_face_share_too_low"
               // v329 — eigene, ehrliche Meldung: das ist kein Timeout, sondern
               // eine unsichere Gesichts-Geometrie auf dem Plate.
-              ? `preclip_face_share_too_low: Gesichts-Geometrie für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" ist unsicher — das Gesicht ist im erkannten Ausschnitt zu klein (${((Number(preclipResult.faceShareInCrop) || 0) * 100).toFixed(1)} %). Szene neu berechnen, damit das Lip-Sync greifen kann.`
-              : `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+              ? `preclip_face_share_too_low: Gesichts-Geometrie für „${speakerLabel}" ist unsicher — das Gesicht ist im erkannten Ausschnitt zu klein (${((Number(preclipResult.faceShareInCrop) || 0) * 100).toFixed(1)} %). Szene neu berechnen, damit das Lip-Sync greifen kann.`
+              : preclipResult.error === "motion_uncoverable"
+              // v331 — bewegter Sprecher, der nicht nachbarsicher eingefasst
+              // werden kann. Ehrlich fehlschlagen statt Full-Plate + Morphing.
+              ? `motion_uncoverable: „${speakerLabel}" bewegt sich zu weit durchs Bild (${Math.round(Number(preclipResult.trackDriftPx) || 0)} px), um ihn ohne Übergriff auf ein Nachbargesicht sauber freizustellen. Szene mit ruhigerer Kameraführung neu generieren — Credits wurden zurückerstattet.`
+              : `v187_preclip_required_no_fullplate_fallback: Preclip für „${speakerLabel}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
             console.error(
               `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
             );
@@ -8016,6 +8061,13 @@ serve(async (req) => {
                       siblingCoords: wpSiblings.length > 0 ? wpSiblings : null,
                       startSec: wpUnionStart,
                       endSec: wpUnionEnd,
+                      // v331 — Bewegung im Crop einfassen statt Full-Plate.
+                      trackPoints: slotTrackFor(
+                        isTrackUsable(parseMotionTrack((scene as any)?.motion_track), sourceClipUrl)
+                          ? parseMotionTrack((scene as any)?.motion_track)
+                          : null,
+                        Number(wp.speaker_idx ?? waitIdx),
+                      )?.points ?? null,
                     },
                     300_000,
                   );
