@@ -12340,8 +12340,8 @@ export const translations: Record<Language, any> = {
     
     // Hero section
     hero: {
-      title: "Tu Plataforma de Gestión de Redes Sociales con IA",
-      subtitle: "Crea, optimiza y analiza tu contenido – profesionalmente, eficientemente, escalable.",
+      title: "Un creador. Un estudio entero.",
+      subtitle: "Todos los modelos de IA líderes en un flujo continuo – de la idea al video terminado, sin equipo de rodaje.",
       cta: "Empezar gratis",
       demo: "Ver demo",
       login: "Iniciar Sesión",
