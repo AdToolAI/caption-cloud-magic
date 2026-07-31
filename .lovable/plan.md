@@ -1,47 +1,58 @@
-## Ursache (an Code + DB verifiziert)
+# Zurück auf den Stand vom 27.07.2026 (v169)
 
-Am 27.07. liefen 4 Sprecher sauber: `coord_source = plate-identity-cid-primary`, Methode `per-char-hungarian`, `resolved = 4/4`, Crops 394–700 px.
+## Wo wir am 27.07. standen — und was seitdem passiert ist
 
-Zwei Eingriffe aus dieser Session brechen genau diesen Pfad:
+Ich habe den Code gegen den 27.07.-Stand geprüft. Ergebnis: **die v169-Architektur liegt vollständig und aktiv im Code.** Verifiziert:
 
-1. **v325 „Plate-Invariant"** (`compose-dialog-segments`, Z. 1541–1588): verwirft persistierte Geometrie bei Clip-URL-/Dims-Abweichung und lässt nur eine *identity-only projection* (`assignmentLock`) übrig — Live-Detektion erzwungen.
-2. **v326 „Geometry-Rowmajor-Lock"** (`compose-video-clips`): schreibt Slot→Character-Locks, damit keine manuelle Face-Map nötig ist.
+- Paralleler Fan-out, `concurrencyCap = 4`, Killswitch aktiv.
+- Per-Pass-Lock aktiv.
+- Per-Slot-Schreibzugriff statt Voll-Rewrite.
+- Preclip-Pre-Fanout für Passes jenseits des Caps.
+- Jeder Pass nutzt seinen **eigenen** Preclip als Input — keine Verkettung auf den Vorgänger-Output.
+- Webhook plus Watchdog mit Reconcile und idempotentem Refund.
 
-**Der Bruch:** Die Live-Detektion liefert Gesichter **ohne** `characterId` (`resolvedCount: 0`, DB-belegt für Szene `23b381ac…`). Der Lock-Zweig (Z. 2193–2225) sucht sein Gesicht aber über `face.characterId` ⇒ greift nie ⇒ Fallback `v183-unlabeled-fallback` / `plate-persisted-mouth-positional`. Zusätzlich sind die Live-Boxen winzig (47×63 auf 1284×718), der Crop wird auf `minSize: 128` geklemmt. Der real dispatchte Clip (720×720) zeigt das Gesicht rechts angeschnitten, `face_share` 0.18/0.15 statt ≥ 0.42 — und der Gate meldet `FACE_GATE_PROBE_UNAVAILABLE` (`non_blocking`), dispatcht also blind.
+Es muss also nichts neu gebaut werden. Kaputt gemacht haben es die Schichten, die **nach** dem 27.07. daraufgesetzt wurden. Diese vier Punkte habe ich konkret nachgewiesen:
 
-## Plan v329 — Identity/Geometry-Split (Architekturfix statt Patch)
+1. **v327 kippt bei „bewegten" Sprechern den Preclip komplett weg** und schickt die volle Plate mit per-Frame-Boxen an Sync.so. Das ist exakt der Full-Frame-Pfad, den v169 abgeschafft hatte — weil der Provider dabei auf Nachbargesichter übergreift. Das ist das Morphen in deinem Aufzug-Screenshot.
+2. Der Mux **widerspricht** dem: für Mehrsprecher bricht er hart ab, wenn ein Pass keinen Crop hat. Ein v327-Tracked-Pass hat per Definition keinen. Beide Regeln können nicht gleichzeitig gelten.
+3. Dein letzter Zwei-Sprecher-Lauf lief mit **Face-Share 18,1 % und 15,5 %**. Das Face-Gate meldete für beide `probe_unavailable` — und hat trotzdem dispatcht.
+4. Die Overlay-Maske hat einen **festen Radius von 28 %** der kürzeren Bildachse. Sie deckt weit mehr als das Gesicht ab und mischt Provider-Output über Haut und Hintergrund.
 
-### A. Datenmodell trennen (Kern)
-`plate_identity` wird in zwei getrennte Felder aufgeteilt:
-- **`identity`** — `{ slot → characterId, source }`, plate-unabhängig, **überlebt jede Eviction**.
-- **`geometry`** — `{ faces[], dims, sourceClipUrl, detectedAt }`, gilt nur für genau ein Plate, wird von v325 wie bisher verworfen.
+## Umsetzung: die Post-27.07.-Schichten entfernen
 
-Verbunden werden beide **ausschließlich über den Slot-Index** (row-major, wie v242). Damit gibt es keinen Zustand mehr, in dem ein Lock existiert, aber kein auflösbares Gesicht — die Fehlerklasse verschwindet, nicht nur dieser Fall. Alle Resolver (`plate-face-identity.ts`, `plateFaceSlotRouter.ts`, `compose-dialog-segments`) lesen künftig `identity.bySlot`; `characterId` auf Face-Objekten wird zum abgeleiteten Wert, nicht zur Quelle. Legacy-Reader für alte `plate_identity`-Rows bleibt für Bestandsszenen.
+### 1. Preclip als einzige Wahrheit zurückholen
+- Zwei oder mehr Sprecher: ausnahmslos ein eigener Single-Face-Preclip pro Pass. Keine Full-Plate-Dispatches.
+- v327-Tracked-Pfad für Mehrsprecher deaktivieren.
+- Bewegung wird **innerhalb** des Preclips aufgefangen: der Crop wird so dimensioniert, dass die gemessene Bewegungsbahn des Sprechers über sein Sprechfenster mit Sicherheitsrand hineinpasst.
+- Passt ein Sprecher nicht sauber hinein: ehrlich fehlschlagen und erstatten statt morphen.
 
-### B. Untaugliche Detektion wiederholen statt hochrechnen
-Der 128-px-Floor ist kein Rundungsfehler, sondern das Signal „Detektion untauglich". Deshalb:
-- Box-Breite < 3,5 % der Plate-Breite ⇒ **Re-Detect auf 2×-hochskaliertem Frame** (Rekognition hat auf kleinen Köpfen eine harte Auflösungsgrenze).
-- Erst wenn auch das scheitert: plate-proportionales Fenster um den Mund-Landmark (22–28 % Plate-Höhe, mind. 288 px) — explizit als `coord_source: geometry-fallback-proportional` markiert, damit es in Logs sichtbar bleibt.
-- `minSize: 128` entfällt ersatzlos.
+### 2. Overlay-Maske eng ans Gesicht binden
+- Radius proportional zur tatsächlichen Gesichtsbox statt pauschal 28 % der Bildachse.
+- Harte Obergrenze relativ zum Abstand zum nächsten Nachbargesicht — zwei Overlays können sich nie überlappen.
+- Nur Mund- und Kieferbereich wird ersetzt; Stirn, Haaransatz, Hintergrund bleiben Plate.
+- Stille Freeze-Layer bleiben aus, wie im v169-Stand.
 
-### C. Face-Gate scharf schalten
-- Probe-Frames aus `composer-frames/…/motion-frames/` (v327-Client-Probe) nutzen statt sofort `probe_unavailable`.
-- Bleibt die Probe unmöglich **und** `face_share` unter dem Floor: Pass abbrechen mit Refund (`preclip_face_share_too_low`), statt einen garantiert wirkungslosen Sync.so-Job zu bezahlen. Blindes Dispatchen wird abgeschafft.
+### 3. Face-Gate scharf statt durchwinken
+- `probe_unavailable` ist bei Mehrsprecher-Szenen kein Freifahrtschein mehr.
+- Vor dem Dispatch verlangt: ausreichende Gesichtsgröße im tatsächlich gesendeten Clip, eindeutige Identität pro Slot, kein Slot doppelt belegt.
+- Grenzwert für den Gesichtsanteil deutlich über die zuletzt gemessenen 15–18 % anheben.
+- Darunter: nicht dispatchen, erstatten, klare Meldung.
 
-### D. Regressionsschutz
-Genau das fehlte v325/v326 und ist der Grund, warum der Bruch erst beim Kunden auffiel:
-- Fixture-Test (Deno) mit den echten `plate_identity`-Rows vom 27.07. **und** der kaputten Szene `23b381ac…`: prüft `resolvedCount === speakerCount` und Crop-Größe > Floor.
-- `syncso_dispatch_log`: `coord_source`, `crop.size`, `plate_box_w_pct`, `lock_applied`, `face_share` pro Pass.
-- `SceneInlinePlayer`: bei `preclip_face_share_too_low` Hinweis „Gesichts-Geometrie unsicher — Szene neu berechnen" + Retry statt Endlos-Spinner.
-- Szene `23b381ac…` nach Deploy einmalig neu dispatchen.
+### 4. Widerspruch Dispatch ↔ Mux auflösen
+- Eine gemeinsame Regel: der Mux erwartet für Mehrsprecher immer einen gültigen Crop, und der Dispatch garantiert ihn.
+- Damit entfällt der Zustand „Provider fertig, Mux bricht ab oder weicht still auf einen weichen Fallback aus".
+
+### 5. Kontrolliert verifizieren
+- Erst die Aufzug-Szene aus deinem Screenshot: zwei Sprecher, beide klar sichtbar.
+- Belege pro Pass: eigener Preclip, Gesichtsanteil über Grenzwert, korrekte Identität, kein Full-Plate-Dispatch, saubere Maskengrenzen.
+- Danach vier Sprecher, danach ein sich bewegender Sprecher.
 
 ## Technische Details
-- `supabase/functions/_shared/plate-face-identity.ts` — Split `identity` / `geometry`, Slot-Bridge, Legacy-Reader.
-- `supabase/functions/compose-dialog-segments/index.ts` — Resolver auf `identity.bySlot` (Z. 2193–2290), Geometrie-Gate, Logs.
-- `supabase/functions/compose-video-clips/index.ts` — schreibt v326-Lock ins neue `identity`-Feld.
-- `supabase/functions/_shared/pass-face-preclip.ts` — Floor raus, Re-Detect + proportionales Fenster.
-- `supabase/functions/_shared/syncso-face-gate.ts` — motion-frames als Probe-Quelle, Hard-Fail + Refund.
-- Sync.so-Payload-Shape (`sync-3`, `cut_off`, `bounding_boxes_url`) bleibt unverändert.
+- `supabase/functions/compose-dialog-segments/index.ts` — v327-Tracked-Pfad für N≥2 aus, Preclip-Pflicht zurück, Bewegungsbahn in die Crop-Berechnung, Face-Share-Grenzwert anheben.
+- `supabase/functions/_shared/pass-face-preclip.ts` — Crop deckt die Bewegungsbahn über das Sprechfenster ab.
+- `supabase/functions/_shared/face-motion-track.ts` — Track dimensioniert nur noch den Crop, ist kein Full-Plate-Schalter mehr.
+- `supabase/functions/_shared/syncso-face-gate.ts` — `probe_unavailable` bei N≥2 fail-closed.
+- `supabase/functions/render-sync-segments-audio-mux/index.ts` — Maskenradius gesichtsproportional mit Nachbarabstands-Deckel; Crop-Pflicht bleibt.
 
 ## Abwägung
-Der Split (A) ist ein Eingriff in ein Feld, das ~6 Funktionen lesen — mehr Arbeit als das Nachkleben von `characterId` an Live-Faces. Dafür ist danach strukturell ausgeschlossen, dass ein Lock ohne Trägergeometrie entsteht; die Patch-Variante würde beim nächsten Detektor-Wechsel erneut brechen. Wenn du heute nur entsperrt haben willst, kann ich A als reine Slot-Bridge in ~20 Minuten liefern und den Split nachziehen — sag dann kurz Bescheid.
+Der Preis: stark bewegte Sprecher, die sich nicht in einen stabilen Crop fassen lassen, schlagen künftig ehrlich fehl statt einen morphenden Clip zu liefern. Das halte ich für richtig — ein sauberer Fehlschlag mit Erstattung ist besser als ein Video, das du nicht ausliefern kannst. Wenn du für bewegte Sprecher lieber einen weichen Fallback willst, baue ich stattdessen ein automatisches Neu-Rendern der Plate mit fixierter Kamera ein.
