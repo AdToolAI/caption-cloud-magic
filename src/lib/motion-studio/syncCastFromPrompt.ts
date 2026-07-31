@@ -15,8 +15,27 @@
 // - Caps at 4 slots — matches Multi-Portrait Nano Banana 2 / Vidu Q2 limit.
 
 import type { CharacterShot, ComposerCharacter } from '@/types/video-composer';
+import { resolveCanonicalCharacterId } from '@/lib/video-composer/canonicalCastId';
 
 const MAX_CAST = 4;
+
+/**
+ * Set of canonical character ids already present in `shots` — resolves drifted
+ * slot ids (slug instead of UUID) so a character that is present as
+ * "samuel-dusatko" is never appended a second time as its UUID (v318).
+ */
+function presentCanonicalIds(
+  shots: CharacterShot[],
+  pool: ComposerCharacter[] | undefined,
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of shots) {
+    if (!s?.characterId) continue;
+    out.add(resolveCanonicalCharacterId(s.characterId, pool) ?? s.characterId);
+  }
+  return out;
+}
+
 
 function matchesPrompt(prompt: string, character: ComposerCharacter): boolean {
   if (!character?.name) return false;
