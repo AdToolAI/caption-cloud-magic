@@ -8052,6 +8052,13 @@ serve(async (req) => {
                       siblingCoords: wpSiblings.length > 0 ? wpSiblings : null,
                       startSec: wpUnionStart,
                       endSec: wpUnionEnd,
+                      // v331 — Bewegung im Crop einfassen statt Full-Plate.
+                      trackPoints: slotTrackFor(
+                        isTrackUsable(parseMotionTrack((scene as any)?.motion_track), sourceClipUrl)
+                          ? parseMotionTrack((scene as any)?.motion_track)
+                          : null,
+                        Number(wp.speaker_idx ?? waitIdx),
+                      )?.points ?? null,
                     },
                     300_000,
                   );
