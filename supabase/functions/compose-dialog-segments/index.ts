@@ -1519,7 +1519,56 @@ serve(async (req) => {
     // is the first dispatch after v274 anchor stage), hydrate from
     // `audio_plan.twoshot.anchor_identity` seeded by compose-video-clips.
     const _anchorIdentitySeed = ((scene as any)?.audio_plan?.twoshot?.anchor_identity ?? null) as any;
-    const persistedPlateIdentity = (((existing as any)?.plate_identity) ?? _anchorIdentitySeed ?? null) as any;
+    const _persistedPlateIdentityRaw = (((existing as any)?.plate_identity) ?? _anchorIdentitySeed ?? null) as any;
+    // ── v325 — PLATE-INVARIANT (Single Source of Truth for geometry) ─────
+    // Face geometry (bboxes / mouths / dims) may ONLY come from the plate
+    // that is actually being lip-synced. Two leaks existed:
+    //   (1) `audio_plan.twoshot.anchor_identity` is measured in ANCHOR pixel
+    //       space (Nano-Banana/Seedream still image) and was accepted as if
+    //       it were plate geometry.
+    //   (2) a persisted `plate_identity` from an EARLIER render of the same
+    //       scene (different framing after a re-render) stayed valid forever.
+    // Both produce crops that contain background instead of a face → the
+    // Sync.so pass returns the input unchanged ("kein Lip-Sync").
+    // Identity information (assignmentLock) is plate-independent and is
+    // always preserved; only geometry is invalidated.
+    const _persistedGeomClipUrl = String(_persistedPlateIdentityRaw?.sourceClipUrl ?? "");
+    const _currentClipUrl = String(sourceClipUrl ?? "");
+    const _persistedGeomDims = _persistedPlateIdentityRaw?.dims;
+    const _dimsMatchPlate =
+      !!plateDims &&
+      Number.isFinite(Number(_persistedGeomDims?.width)) &&
+      Number.isFinite(Number(_persistedGeomDims?.height)) &&
+      Math.abs(Number(_persistedGeomDims.width) - plateDims.width) <= Math.max(2, plateDims.width * 0.02) &&
+      Math.abs(Number(_persistedGeomDims.height) - plateDims.height) <= Math.max(2, plateDims.height * 0.02);
+    const _plateGeometryTrusted =
+      !!_persistedPlateIdentityRaw &&
+      _persistedGeomClipUrl.length > 0 &&
+      _currentClipUrl.length > 0 &&
+      _persistedGeomClipUrl === _currentClipUrl &&
+      (!plateDims || _dimsMatchPlate);
+    const persistedPlateIdentity = _persistedPlateIdentityRaw
+      ? (_plateGeometryTrusted
+        ? _persistedPlateIdentityRaw
+        : {
+          // identity-only projection — forces live plate re-detection
+          assignmentLock: _persistedPlateIdentityRaw.assignmentLock ?? null,
+          assignmentLockSource: _persistedPlateIdentityRaw.assignmentLockSource ?? null,
+          status: _persistedPlateIdentityRaw.status ?? null,
+          geometryEvicted: true,
+        })
+      : null;
+    if (_persistedPlateIdentityRaw && !_plateGeometryTrusted) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v325_plate_geometry_evicted ` +
+        `reason=${_persistedGeomClipUrl ? (_persistedGeomClipUrl === _currentClipUrl ? "dims_mismatch" : "clip_url_mismatch") : "no_plate_provenance"} ` +
+        `persisted_clip=${_persistedGeomClipUrl ? _persistedGeomClipUrl.slice(-48) : "none"} ` +
+        `current_clip=${_currentClipUrl ? _currentClipUrl.slice(-48) : "none"} ` +
+        `persisted_dims=${_persistedGeomDims?.width ?? "?"}x${_persistedGeomDims?.height ?? "?"} ` +
+        `plate_dims=${plateDims ? `${plateDims.width}x${plateDims.height}` : "unknown"} — forcing live plate detection`,
+      );
+    }
+
     const _persistedAssignmentLock =
       persistedPlateIdentity?.assignmentLock && typeof persistedPlateIdentity.assignmentLock === "object"
         ? persistedPlateIdentity.assignmentLock

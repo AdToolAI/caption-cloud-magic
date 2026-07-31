@@ -97,6 +97,62 @@ function peakDbFs(samples: Int16Array): number {
   return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
 }
 
+/**
+ * v325 — AUDIO-INVARIANT (unified loudness across speakers).
+ *
+ * ElevenLabs renders different voices at wildly different levels (measured
+ * -16 LUFS vs -39 LUFS in one two-shot scene). Since every speaker's PCM
+ * feeds BOTH the merged playback track AND the per-speaker Sync.so slice,
+ * that spread produced "speaker 1 shouts with a wide-open mouth, speaker 2
+ * whispers and barely moves". We therefore normalise every TTS segment
+ * bidirectionally (boost AND attenuate) to a common loudness target before
+ * it is placed on the timeline, with a peak ceiling to avoid clipping.
+ */
+function measureLufsInt16(samples: Int16Array): number {
+  if (!samples.length) return -Infinity;
+  // Gate out silence so a long pause does not drag the measurement down.
+  const gate = 0.0025; // ≈ -52 dBFS
+  let sumSq = 0;
+  let count = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = samples[i] / 32768;
+    if (Math.abs(v) < gate) continue;
+    sumSq += v * v;
+    count++;
+  }
+  if (count < 400) return -Infinity;
+  const rms = Math.sqrt(sumSq / count);
+  return rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+}
+
+function normalizeSegmentLoudnessInPlace(
+  samples: Int16Array,
+  targetLufs = -18,
+  maxBoostDb = 14,
+  maxCutDb = 14,
+  peakCeilDbFs = -1,
+): { sourceLufs: number; gainDb: number; resultLufs: number } {
+  const sourceLufs = measureLufsInt16(samples);
+  if (!Number.isFinite(sourceLufs)) return { sourceLufs, gainDb: 0, resultLufs: sourceLufs };
+  let gainDb = targetLufs - sourceLufs;
+  gainDb = Math.max(-maxCutDb, Math.min(maxBoostDb, gainDb));
+  let gain = Math.pow(10, gainDb / 20);
+  // Peak ceiling — never clip after the gain.
+  const peak = peakDbFs(samples);
+  if (Number.isFinite(peak) && peak + gainDb > peakCeilDbFs) {
+    gainDb = peakCeilDbFs - peak;
+    gain = Math.pow(10, gainDb / 20);
+  }
+  if (Math.abs(gainDb) < 0.5) return { sourceLufs, gainDb: 0, resultLufs: sourceLufs };
+  for (let i = 0; i < samples.length; i++) {
+    const v = Math.round(samples[i] * gain);
+    samples[i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
+  }
+  return { sourceLufs, gainDb, resultLufs: sourceLufs + gainDb };
+}
+
+
+
 function samplesToWav(samples: Int16Array): Uint8Array {
   const dataBytes = samples.byteLength;
   const buf = new ArrayBuffer(44 + dataBytes);
@@ -964,6 +1020,17 @@ serve(async (req) => {
       }
       const block = blocks[i];
       const { pcm, ttsDiag, voice } = res;
+      // v325 Audio-Invariant — unify loudness BEFORE the PCM is placed on
+      // the timeline. `pcm` is shared by the merged track, the per-speaker
+      // track and the Sync.so slice, so one in-place pass covers all three.
+      const loud = normalizeSegmentLoudnessInPlace(pcm);
+      if (loud.gainDb !== 0) {
+        console.log(
+          `[compose-twoshot-audio] scene ${scene_id} v325_loudness speaker=${block.speakerName} ` +
+          `src=${loud.sourceLufs.toFixed(1)}LUFS gain=${loud.gainDb.toFixed(1)}dB → ${loud.resultLufs.toFixed(1)}LUFS`,
+        );
+      }
+
       // Insert pause as PCM silence BEFORE every non-first utterance.
       if (i > 0 && INTER_SPEAKER_PAUSE_SEC > 0) {
         const pause = silenceSamples(INTER_SPEAKER_PAUSE_SEC);
