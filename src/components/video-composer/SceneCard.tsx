@@ -353,6 +353,23 @@ export default function SceneCard({
   // Library for live mention resolution preview
   const { characters: libCharacters, locations: libLocations } =
     useUnifiedMentionLibrary();
+  // v319 — identity resolution pool + outfit-look map. `outfit:<lookId>` refs
+  // and slug slots must resolve to the same avatar UUID everywhere, otherwise
+  // the same person is treated as two cast members.
+  const { outfitLookMap } = useOutfitLookMap();
+  const castResolutionPool = useMemo<ComposerCharacter[]>(() => {
+    const seen = new Set((characters ?? []).map((c) => c.id));
+    const extras = (libCharacters ?? [])
+      .filter((c: any) => c?.id && !seen.has(c.id) && !String(c.id).includes(':'))
+      .map((c: any) => ({
+        id: c.id as string,
+        name: (c.name as string) ?? '',
+        appearance: c.description ?? '',
+        signatureItems: c.signature_items ?? '',
+        referenceImageUrl: c.reference_image_url ?? undefined,
+      })) as ComposerCharacter[];
+    return [...(characters ?? []), ...extras];
+  }, [characters, libCharacters]);
   // World-asset pools for the UnifiedAssetPicker (Locations / Buildings / Props).
   const { locations: brandLocations } = useBrandLocations();
   const { buildings: brandBuildings } = useBrandBuildings();
