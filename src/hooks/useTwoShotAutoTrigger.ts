@@ -102,8 +102,11 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           (d) =>
             isDialogEngine(d.engine_override) &&
             !d.lip_sync_applied_at &&
+            // v317: never re-queue a terminally failed clip (Content-Filter).
+            d.clip_status !== 'failed' &&
             isTalkingHeadUrl(d.clip_url),
         );
+
         if (talkingHeadMasters.length > 0) {
           console.warn(
             `[useTwoShotAutoTrigger] self-heal: clearing ${talkingHeadMasters.length} talking-head master(s) for cinematic-sync`,
