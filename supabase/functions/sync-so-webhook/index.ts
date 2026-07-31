@@ -928,14 +928,64 @@ serve(async (req) => {
       if (freshDonePasses[currentPass]) {
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
-          status: "done",
+          status: "motion_probe_pending",
           output_url: rehostedUrl ?? outputUrl,
           rehosted: !!rehostedUrl,
           sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
           finished_at: nowIso,
+          motion_probe_status: "pending",
+          motion_probe_job_id: jobId,
           ...noopSuspectFlags,
         };
       }
+
+      // v337 — A provider COMPLETED status is not a quality result. Persist
+      // the isolated output for the browser mouth-band probe, but do not mark
+      // the pass done and never dispatch the mux from this webhook. The probe
+      // endpoint promotes this exact job to done after measurable movement.
+      try {
+        await supabase.rpc("update_dialog_pass_slot", {
+          _scene_id: sceneId,
+          _pass_idx: currentPass,
+          _patch: {
+            status: "motion_probe_pending",
+            output_url: rehostedUrl ?? outputUrl,
+            rehosted: !!rehostedUrl,
+            finished_at: nowIso,
+            motion_probe_status: "pending",
+            motion_probe_job_id: jobId,
+          },
+        });
+        await supabase.from("composer_scenes").update({
+          lip_sync_status: "running",
+          twoshot_stage: `motion_probe_pending_${currentPass + 1}_of_${totalPasses}`,
+          updated_at: nowIso,
+        }).eq("id", sceneId);
+      } catch (e) {
+        console.warn(`[sync-so-webhook] v337 motion-probe slot patch failed: ${(e as Error).message}`);
+        await supabase.from("composer_scenes").update({
+          dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
+          lip_sync_status: "running",
+          twoshot_stage: `motion_probe_pending_${currentPass + 1}_of_${totalPasses}`,
+          updated_at: nowIso,
+        }).eq("id", sceneId);
+      }
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId,
+        engine: "sync-segments",
+        job_id: jobId,
+        turn_idx: passTurnIdx,
+        sync_status: "MOTION_PROBE_PENDING",
+        meta: { pass_idx: currentPass, speaker_name: passSpeakerName, threshold: 4.0, output_url: rehostedUrl ?? outputUrl },
+      });
+      const providerPendingIdxs = freshDonePasses
+        .map((p: any, i: number) => (p?.status === "pending" && !p?.job_id ? i : -1))
+        .filter((i: number) => i >= 0);
+      if (providerPendingIdxs.length > 0) {
+        triggerV5Advance(supabaseUrl, serviceKey, sceneId, providerPendingIdxs[0], totalPasses);
+      }
+      console.log(`[sync-so-webhook] v337 scene=${sceneId} pass=${currentPass} job=${jobId} MOTION_PROBE_PENDING — mux blocked`);
+      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status: "MOTION_PROBE_PENDING", engine: "sync-segments" });
 
       const { doneCount, failedCount, allTerminal } = terminalV5Counts(freshDonePasses);
       const allDone = allTerminal && doneCount > 0;
