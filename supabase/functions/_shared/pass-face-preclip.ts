@@ -714,6 +714,9 @@ export async function renderPassFacePreclip(
         trackSamplesUsed,
         trackDriftPx,
         motionCropApplied,
+        motionSkipReason,
+        faceShareSource,
+
       };
     }
     if (status === "failed") {
