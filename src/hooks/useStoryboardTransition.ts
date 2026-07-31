@@ -706,31 +706,70 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
     { beat: 'CTA',    framing: 'medium',          movement: 'static',       energy: 'high' },
   ];
 
+  // v328 — Prosa-Briefings: die im Text ausgeschriebenen Szenen gewinnen,
+  // der generische Beat-Ring dient nur noch als Notnagel.
   const sceneCount = canonicalTiming?.explicitSceneCount && canonicalTiming.sceneCount
     ? canonicalTiming.sceneCount
-    : Math.max(canonicalTiming?.sceneCount ?? 0, hints.length, defaultBeats.length);
+    : hints.length > 0
+    ? hints.length
+    : Math.max(canonicalTiming?.sceneCount ?? 0, defaultBeats.length);
   const per = Math.max(1, Math.min(60, total / sceneCount));
 
+  // Szenenlängen aus dem Text („0–5 Sekunden") — auf die Gesamtdauer normiert,
+  // damit der User-Slider weiterhin die harte Obergrenze bleibt.
+  const hintDurations = Array.from({ length: sceneCount }).map((_, i) => hints[i]?.durationSec);
+  const hintSum = hintDurations.reduce<number>((acc, d) => acc + (d ?? 0), 0);
+  const allHintDurations = hintDurations.every((d) => typeof d === 'number' && d > 0);
+  const durationScale = allHintDurations && hintSum > 0 ? total / hintSum : null;
+
   const hasDialogAnywhere = hints.some((h) => !!h.dialog);
+
+  /** Ordnet ein Sprecher-Label („Person 2", „Samuel") einem Cast-Eintrag zu. */
+  const resolveSpeaker = (label?: string) => {
+    if (!label || cast.length === 0) return null;
+    const norm = label.toLowerCase().trim();
+    const byName = cast.find((c) =>
+      norm.includes(String(c.characterName ?? '').toLowerCase().split(/\s+/)[0] ?? '\u0000'),
+    );
+    if (byName) return byName;
+    const idxMatch = norm.match(/(?:person|sprecher|speaker|charakter|character)\s*(\d{1,2})/);
+    if (idxMatch) {
+      const idx = Number(idxMatch[1]) - 1;
+      if (idx >= 0 && idx < cast.length) return cast[idx];
+    }
+    return null;
+  };
 
   const scenes = Array.from({ length: sceneCount }).map((_, i) => {
     const h = hints[i];
     const fallback = defaultBeats[i] ?? defaultBeats[defaultBeats.length - 1];
     const beatLabel = h?.beat ?? fallback.beat;
+    const sceneLabel = h?.title ?? beatLabel;
     const framing = h?.framing ?? fallback.framing;
     const movement = h?.movement ?? fallback.movement;
     const lighting = h?.lighting ?? 'soft-window';
+    // Anchor-Priorität: expliziter SHOT: → Prosa aus dem Briefing → Template.
     const anchor = h?.shot
       ? h.shot
+      : h?.prose && h.prose.length >= 25
+      ? h.prose
       : `${beatLabel} beat for ${briefing.productName ?? 'the brand'}: cinematic ${framing} shot, ${movement}, ${lighting} lighting.`;
     const voiceover = h?.dialog ? { text: h.dialog } : undefined;
+    const speakerCast = resolveSpeaker(h?.dialogLines?.[0]?.speaker);
     const isRequiredEnsemble = cast.length >= 2 && (i === 0 || (sceneCount >= 6 && i === sceneCount - 1));
-    const sceneCast = isRequiredEnsemble ? cast : cast.slice(0, 1);
+    const sceneCast = isRequiredEnsemble
+      ? cast
+      : speakerCast
+      ? [speakerCast]
+      : cast.slice(0, 1);
+    const sceneDuration = durationScale && h?.durationSec
+      ? Math.max(1, Math.min(60, h.durationSec * durationScale))
+      : per;
     return {
       index: i + 1,
-      label: beatLabel,
+      label: sceneLabel,
       beat: beatLabel,
-      durationSec: per,
+      durationSec: sceneDuration,
       engine: (firstMention && (h?.dialog || !hasDialogAnywhere)) ? 'cinematic-sync' as const : 'broll' as const,
       lipSync: !!(firstMention && h?.dialog),
       cast: sceneCast,
@@ -748,6 +787,7 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
         blick: (h?.dialog || beatLabel.toLowerCase().includes('cta')) ? 'to-camera' : 'away',
         energy: fallback.energy === 'high' ? 4 : 3,
       },
+
       musicCue: { energy: fallback.energy },
       // Stage-3: surface extracted plan→storyboard fields when present.
       transition: h?.transition
