@@ -514,9 +514,42 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // filter — the only way back into the pipeline is a user-triggered
           // `reset-lipsync-scene` call. So we never clear failure markers here.
 
+          // v327 — Motion-Probe vor dem Dispatch. Misst auf der fertigen
+          // Plate, ob ein Sprecher sich bewegt. Ergebnis landet in
+          // `composer_scenes.motion_track`; `compose-dialog-segments` wählt
+          // daraufhin Preclip (static) oder Full-Plate-Tracking (moving).
+          // Fail-open: jeder Fehler → Legacy-Pfad, Dispatch läuft trotzdem.
+          const plateForProbe: string | null =
+            (d.lip_sync_source_clip_url as string | null) ?? (d.clip_url as string | null);
+          const probeKey = `${d.id}::${plateForProbe ?? ''}`;
+          if (plateForProbe && !motionProbed.current.has(probeKey)) {
+            motionProbed.current.add(probeKey);
+            try {
+              const { data: authData } = await supabase.auth.getUser();
+              const uid = authData?.user?.id;
+              if (uid) {
+                const probe = await probePlateMotion({
+                  sceneId: d.id,
+                  projectId,
+                  userId: uid,
+                  plateUrl: plateForProbe,
+                });
+                console.info(
+                  `[useTwoShotAutoTrigger] v327 motion probe scene=${d.id} ok=${probe.ok} ${
+                    probe.ok ? `slots=${probe.slots ?? '?'}` : `reason=${probe.reason}`
+                  }`,
+                );
+              }
+            } catch (probeErr) {
+              console.warn('[useTwoShotAutoTrigger] v327 motion probe failed (fail-open)', probeErr);
+            }
+            if (cancelled) return;
+          }
+
           console.info(
             `[useTwoShotAutoTrigger] invoking ${fnName} for scene ${d.id} (speakers=${speakers})`,
           );
+
           supabase.functions
             .invoke(fnName, { body: { scene_id: d.id, auto: true } })
             .then(async ({ data: lsData, error: lsErr }) => {
