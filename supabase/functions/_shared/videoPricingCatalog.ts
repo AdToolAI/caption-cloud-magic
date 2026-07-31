@@ -53,15 +53,23 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'kling-2.6':            { id: 'kling-2.6',            label: 'Kling 2.6',            unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 5,  maxDuration: 15 },
   'kling-omni':           { id: 'kling-omni',           label: 'Kling 3.0 Omni',       unit: 'per-second', sellEUR: 0.60, sellUSD: 0.60, costEUR: 0.20,  minDuration: 5,  maxDuration: 15 },
 
-  // Wan 2.5 / 2.6
+  // Wan 2.5 / 2.6 / 2.7
   'wan-standard':         { id: 'wan-standard',         label: 'Wan 2.5 Std',          unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 4,  maxDuration: 10 },
   'wan-pro':              { id: 'wan-pro',              label: 'Wan 2.5 Pro',          unit: 'per-second', sellEUR: 0.21, sellUSD: 0.21, costEUR: 0.07,  minDuration: 4,  maxDuration: 10 },
   'wan-2-6-standard':     { id: 'wan-2-6-standard',     label: 'Wan 2.6 Std',          unit: 'per-second', sellEUR: 0.12, sellUSD: 0.12, costEUR: 0.04,  minDuration: 4,  maxDuration: 15 },
   'wan-2-6-pro':          { id: 'wan-2-6-pro',          label: 'Wan 2.6 Pro',          unit: 'per-second', sellEUR: 0.21, sellUSD: 0.21, costEUR: 0.07,  minDuration: 4,  maxDuration: 15 },
+  // Wan 2.7 (MoE, natives Audio) — $0.10/s @720p, $0.15/s @1080p
+  'wan-2-7-standard':     { id: 'wan-2-7-standard',     label: 'Wan 2.7 720p',         unit: 'per-second', sellEUR: 0.30, sellUSD: 0.30, costEUR: 0.10,  minDuration: 2,  maxDuration: 15 },
+  'wan-2-7-pro':          { id: 'wan-2-7-pro',          label: 'Wan 2.7 Pro 1080p',    unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 2,  maxDuration: 15 },
 
   // Luma
   'luma-standard':        { id: 'luma-standard',        label: 'Luma Ray 2 Std',       unit: 'per-second', sellEUR: 0.21, sellUSD: 0.21, costEUR: 0.07,  minDuration: 5,  maxDuration: 9  },
   'luma-pro':             { id: 'luma-pro',             label: 'Luma Ray 2 Pro',       unit: 'per-second', sellEUR: 0.36, sellUSD: 0.36, costEUR: 0.12,  minDuration: 5,  maxDuration: 9  },
+  // Luma Ray 3.2 — Replicate bepreist pro Clip ($0.30 / 5s, $0.90 / 10s @720p).
+  // Deshalb je Clip-Länge ein eigener Tarif, damit 3.00× exakt aufgeht.
+  'luma-ray32-5s':        { id: 'luma-ray32-5s',        label: 'Luma Ray 3.2 (5s)',    unit: 'per-second', sellEUR: 0.18, sellUSD: 0.18, costEUR: 0.06,  minDuration: 5,  maxDuration: 5  },
+  'luma-ray32-10s':       { id: 'luma-ray32-10s',       label: 'Luma Ray 3.2 (10s)',   unit: 'per-second', sellEUR: 0.27, sellUSD: 0.27, costEUR: 0.09,  minDuration: 10, maxDuration: 10 },
+
 
   // LTX
   'ltx-standard':         { id: 'ltx-standard',         label: 'LTX 2.0 Std',          unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 10 },
