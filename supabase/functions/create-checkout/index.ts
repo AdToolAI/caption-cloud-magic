@@ -76,38 +76,40 @@ serve(async (req) => {
         .eq("id", user.id);
     }
 
-    // === Pro auto-coupon logic ===
-    let resolvedCoupon: string | null = couponId ?? null;
+    // === Founders-Slot ===
+    // Es gibt genau EIN Abomodell (Beta-Basic 14,99 €) — auf das Abo wird NIE
+    // automatisch ein Rabatt angewendet. Der Slot-Claim markiert lediglich den
+    // Founder-Status; der Vorteil (20 % auf jeden Credit-Kauf, 24 Monate) wird
+    // in `ai-video-purchase-credits` über FOUNDERS_CREDIT_COUPON angewendet.
+    // `couponId`/`promoCode` bleiben für manuelle Support-Fälle möglich.
     let foundersSlotReserved = false;
     let foundersSlotNumber: number | null = null;
 
-    if (!resolvedCoupon && !promoCode && PRO_PRICE_IDS.has(priceId)) {
+    if (PRO_PRICE_IDS.has(priceId)) {
       // Atomic slot claim via SQL function (advisory lock prevents races)
       const { data: claim, error: claimErr } = await supabaseAdmin.rpc("claim_founders_slot", {
         _user_id: user.id,
         _stripe_customer_id: customerId,
-        _founders_coupon: FOUNDERS_COUPON,
-        _launch_coupon: LAUNCH_COUPON,
+        _founders_coupon: FOUNDERS_SLOT_MARKER,
+        _launch_coupon: LAUNCH_SLOT_MARKER,
         _max_slots: FOUNDERS_MAX_SLOTS,
       });
 
       if (claimErr) {
         console.error("claim_founders_slot failed:", claimErr.message);
-        // Fail open: no coupon, checkout proceeds at regular price
-        resolvedCoupon = null;
+        // Fail open: checkout proceeds regardless
       } else {
         const row = Array.isArray(claim) ? claim[0] : claim;
-        resolvedCoupon = row?.coupon_id ?? null;
         foundersSlotReserved = !!row?.is_founder;
         foundersSlotNumber = row?.slot_number ?? null;
         console.log(
-          `Slot claimed: coupon=${resolvedCoupon} founder=${foundersSlotReserved} slot=${foundersSlotNumber}`,
+          `Slot claimed: founder=${foundersSlotReserved} slot=${foundersSlotNumber}`,
         );
         if (foundersSlotReserved && foundersSlotNumber) {
           await trackBusinessEvent("founders_slot_claimed", user.id, {
             slot_number: foundersSlotNumber,
             max_slots: FOUNDERS_MAX_SLOTS,
-            coupon: FOUNDERS_COUPON,
+            credit_coupon: FOUNDERS_CREDIT_COUPON,
           });
         }
       }
@@ -129,15 +131,15 @@ serve(async (req) => {
       cancel_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/pricing?canceled=true`,
       metadata: {
         userId: user.id,
-        ...(resolvedCoupon ? { applied_coupon: resolvedCoupon } : {}),
+        ...(couponId ? { applied_coupon: couponId } : {}),
         ...(foundersSlotReserved ? { founders_slot: "true" } : {}),
       },
     };
 
     if (promoCode) {
       sessionOptions.discounts = [{ promotion_code: promoCode }];
-    } else if (resolvedCoupon) {
-      sessionOptions.discounts = [{ coupon: resolvedCoupon }];
+    } else if (couponId) {
+      sessionOptions.discounts = [{ coupon: couponId }];
     }
 
     const session = await stripe.checkout.sessions.create(sessionOptions);
