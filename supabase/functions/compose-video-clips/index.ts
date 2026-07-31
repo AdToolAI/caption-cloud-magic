@@ -2997,22 +2997,28 @@ serve(async (req) => {
                             plate_identity: {
                               ...(nextDialogShotsBase.plate_identity ?? {}),
                               method: idResolved.method,
-                              status: identityStatus,
-                              assignmentLockSource,
+                              status: useGeometryLock ? "geometry" : identityStatus,
+                              assignmentLockSource: useGeometryLock
+                                ? "v326_geometry_rowmajor"
+                                : assignmentLockSource,
                               dims: idResolved.dims,
                               faces: idResolved.faces,
-                              assignmentLock: idResolved.assignmentLock,
-                              resolvedCount: resolved,
+                              assignmentLock: anchorIdentityPayload.assignmentLock,
+                              resolvedCount: useGeometryLock ? expected : resolved,
                               expectedCount: expected,
                               v278AnchorLayoutSlots: anchorFaceLayout.slots.length,
                               v278AnchorLayoutComplete: anchorLayoutComplete,
                             },
                           };
                           // v276: hard-block only on total miss (0/N) when soft-gate enabled.
+                          // v326: … and only when the geometry fallback can't resolve it either.
                           // Legacy hard-gate (any partial for N>=3) restored via V276_SOFT_GATE=false.
-                          const needsManualReview = softGateEnabled
-                            ? isTotalMiss
-                            : (expected >= 3 && (!idResolved.ok || resolved < expected));
+                          const needsManualReview = useGeometryLock
+                            ? false
+                            : softGateEnabled
+                              ? isTotalMiss
+                              : (expected >= 3 && (!idResolved.ok || resolved < expected));
+
                           await supabaseAdmin
                             .from("composer_scenes")
                             .update({
