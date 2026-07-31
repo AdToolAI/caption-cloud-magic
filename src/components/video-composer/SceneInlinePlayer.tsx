@@ -244,11 +244,18 @@ export default function SceneInlinePlayer({
               {lipsyncRunning && status === 'ready' ? 'Lip-Sync' : 'Baut'}
             </span>
           )}
-          {!isReady && !isWorking && !isFailed && (
+          {awaitingFaceMap && (
+            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 backdrop-blur text-[9px] font-semibold text-amber-300 border border-amber-500/40 flex items-center gap-1">
+              <UserCheck className="h-2.5 w-2.5" />
+              Face-Map
+            </span>
+          )}
+          {!isReady && !isWorking && !isFailed && !awaitingFaceMap && (
             <span className="px-1.5 py-0.5 rounded-md bg-muted/40 backdrop-blur text-[9px] uppercase tracking-wider text-muted-foreground border border-border/40">
               Wartet
             </span>
           )}
+
           {isFailed && (
             <span className="px-1.5 py-0.5 rounded-md bg-destructive/15 backdrop-blur text-[9px] font-semibold text-destructive border border-destructive/40">
               ✕ Fehler
