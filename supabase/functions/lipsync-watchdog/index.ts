@@ -280,7 +280,10 @@ serve(async (req) => {
       ds.passes.every((p: any) => p?.status === "done" && p?.motion_probe_status === "passed" &&
         p?.motion_probe_job_id === p?.job_id && !!p?.output_url);
     if (allMotionProbesPassed && ds?.status !== "audio_muxing" && d.lip_sync_status !== "applied") {
-      const { data: claimed } = await supabase.rpc("try_claim_mux_dispatch", { _scene_id: d.id });
+      const alreadyDispatched = !!ds?.audio_mux?.dispatched_at;
+      const { data: claimed } = alreadyDispatched
+        ? { data: false }
+        : await supabase.rpc("try_claim_mux_dispatch", { _scene_id: d.id });
       if (claimed === true) {
         const lastPass = [...ds.passes].reverse().find((p: any) => !!p?.output_url);
         const dispatchedAt = new Date().toISOString();
