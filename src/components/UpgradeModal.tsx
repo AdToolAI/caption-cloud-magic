@@ -75,16 +75,16 @@ export const UpgradeModal = ({
           <div className="space-y-2 text-sm">
             <p className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              <span>
-                {plan.features.captionsPerMonth === Infinity 
-                  ? 'Unlimited' 
-                  : plan.features.captionsPerMonth} captions per month
-              </span>
+              <span>All leading AI video, voice & music models</span>
+            </p>
+            <p className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span>Full studio workflow — idea to export</span>
             </p>
             {plan.features.analytics && (
               <p className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
-                <span>Advanced analytics</span>
+                <span>Publishing & analytics</span>
               </p>
             )}
             {plan.features.team && (

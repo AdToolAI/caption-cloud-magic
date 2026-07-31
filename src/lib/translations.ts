@@ -456,41 +456,41 @@ export const translations: Record<Language, any> = {
     onboarding: {
       welcome: {
         title: "Welcome to AdTool AI!",
-        description: "Your dashboard shows all activities and insights at a glance"
+        description: "One creator. A whole studio. Your dashboard shows every production at a glance"
       },
       features: {
-        title: "Explore Features",
-        description: "Browse through our AI-powered tools organized by category"
+        title: "Your Studio Departments",
+        description: "Idea, script, scene, sound, export — every step of the workflow in one place"
       },
       generator: {
-        title: "Create Your First Caption",
-        description: "Start with our AI Caption Generator – your most-used tool"
+        title: "Create Your First Video",
+        description: "From idea to finished video — no film crew required"
       },
       performance: {
-        title: "Track Your Success",
-        description: "Monitor your post performance and get AI insights"
+        title: "Publish and Track",
+        description: "Send your finished video to every channel and see how it performs"
       },
       back: "Back",
       next: "Next",
       finish: "Get Started",
       modal: {
         title: "Welcome to AdTool AI!",
-        subtitle: "Your AI-powered Social Media Management Platform",
+        subtitle: "One creator. A whole studio.",
         feature1: {
-          title: "AI Content Creation",
-          description: "Generate captions, hooks, and scripts instantly"
+          title: "All Leading AI Models",
+          description: "Video, voice, music and image models in one continuous workflow"
         },
         feature2: {
-          title: "Performance Analytics",
-          description: "Track and optimize your social media success"
+          title: "From Idea to Final Cut",
+          description: "Script, cast, scenes, lip-sync and sound — nothing leaves the platform"
         },
         feature3: {
-          title: "Smart Scheduling",
-          description: "Plan and organize your content calendar"
+          title: "Your Own Cast",
+          description: "Recurring characters and voices that stay consistent across every video"
         },
         feature4: {
-          title: "Brand Consistency",
-          description: "Maintain your unique voice across all platforms"
+          title: "Publish Everywhere",
+          description: "The finished video goes straight to your channels — the last step, not the product"
         },
         skip: "Skip Tour",
         startTour: "Take a Quick Tour"
@@ -1465,8 +1465,8 @@ export const translations: Record<Language, any> = {
     "pricing.free": "Free",
     "pricing.freePrice": "€0",
     "pricing.freeDesc": "Perfect for trying out AdTool AI",
-    "pricing.freeFeature1": "20 AI captions per month",
-    "pricing.freeFeature2": "Basic templates",
+    "pricing.freeFeature1": "Media credits for video, image & music",
+    "pricing.freeFeature2": "Full studio workflow — idea to export",
     "pricing.freeFeature3": "Community support",
     "pricing.tryFree": "Start for Free",
     "pricing.proMonthly": "Basic",
@@ -1475,9 +1475,9 @@ export const translations: Record<Language, any> = {
     "pricing.year": "month",
     "pricing.cancelAnytime": "Most Popular",
     "pricing.saveFortyTwo": "For Power Users",
-    "pricing.proFeature1": "200 AI captions per month",
-    "pricing.proFeature2": "All premium templates",
-    "pricing.proFeature3": "Hashtag Generator",
+    "pricing.proFeature1": "Larger media credit package",
+    "pricing.proFeature2": "All leading AI video models",
+    "pricing.proFeature3": "Lip-sync & multi-speaker scenes",
     "pricing.proFeature4": "Manage up to 2 brands",
     "pricing.proFeature5": "Priority email support",
     "pricing.startNow": "Upgrade to Basic",
@@ -1501,42 +1501,42 @@ export const translations: Record<Language, any> = {
           description: "Perfect for trying out AdTool AI",
           buttonText: "Start for Free",
           features: [
-            "20 AI captions per month",
-            "Basic templates",
+            "Media credits for video, image & music",
+            "Full studio workflow — idea to export",
+            "Cast & World characters",
+            "Voice library access",
             "Community support",
-            "Hashtag suggestions",
-            "Brand management",
-            "Analytics",
+            "Captions & hashtags included",
             "Watermark on exports",
           ],
         },
         basic: {
           title: "Basic",
           subtitle: "Most Popular",
-          description: "Best for content creators & small businesses",
+          description: "Best for creators & small teams producing regularly",
           buttonText: "Upgrade to Basic",
           features: [
-            "200 AI captions per month",
-            "All premium templates",
-            "Hashtag Generator",
+            "Larger media credit package",
+            "All leading AI video models",
+            "Lip-sync & multi-speaker scenes",
             "Manage up to 2 brands",
             "Remove watermark",
             "Priority email support",
-            "Analytics dashboard",
+            "Publishing & analytics",
             "Team collaboration",
           ],
         },
         pro: {
           title: "Pro",
           subtitle: "For Power Users",
-          description: "Perfect for agencies & teams",
+          description: "Perfect for agencies & teams without a film crew",
           buttonText: "Go Pro",
           features: [
-            "Unlimited AI captions",
+            "Highest media credit package",
             "Unlimited brands",
-            "Advanced AI models",
+            "Premium video & voice models",
+            "Director's Cut editing suite",
             "Team collaboration tools",
-            "Analytics dashboard",
             "White-label exports",
             "Priority support & onboarding",
             "Custom integrations",
@@ -1679,7 +1679,7 @@ export const translations: Record<Language, any> = {
         },
         q3: {
           question: "Can I try it for free?",
-          answer: "Yes! We offer a free plan with 20 AI-generated captions per month. No credit card required to start."
+          answer: "Yes! The free plan includes media credits so you can produce your first videos. No credit card required to start."
         },
         q4: {
           question: "What platforms are supported?",
@@ -2306,7 +2306,7 @@ export const translations: Record<Language, any> = {
       today: "Today",
       // YouTube
       ytConnectTitle: "Connect YouTube Live",
-      ytConnectDesc: "Connect your YouTube channel via the Integrations page to control live broadcasts directly from CaptionGenie.",
+      ytConnectDesc: "Connect your YouTube channel via the Integrations page to control live broadcasts directly from AdTool AI.",
       ytGoToIntegration: "Go to YouTube Integration →",
       createBroadcast: "Create Broadcast",
       titleLabel: "Title",
@@ -2484,10 +2484,10 @@ export const translations: Record<Language, any> = {
       forLargeTeams: "For large teams and agencies",
       perMonth: "month",
       popular: "POPULAR",
-      aiCaptions200: "200 AI captions per month",
-      allPremiumTemplates: "All premium templates",
-      hashtagGenerator: "Hashtag Generator",
-      unlimitedAiCaptions: "Unlimited AI captions",
+      aiCaptions200: "Larger media credit package",
+      allPremiumTemplates: "All leading AI video models",
+      hashtagGenerator: "Lip-sync & multi-speaker scenes",
+      unlimitedAiCaptions: "Highest media credit package",
       teamCollaboration: "Team collaboration",
       prioritySupport: "Priority support",
       everythingInPro: "Everything in Pro",
@@ -2904,8 +2904,8 @@ export const translations: Record<Language, any> = {
     
     // Hero section
     hero: {
-      title: "Your AI-powered Social Media Management Platform",
-      subtitle: "Create, optimize, and analyze your content — professionally, efficiently, scalably.",
+      title: "One creator. A whole studio.",
+      subtitle: "All leading AI models in one continuous workflow — from idea to finished video, without a film crew.",
       cta: "Start for free",
       demo: "View Demo",
       login: "Sign In",
@@ -4150,7 +4150,7 @@ export const translations: Record<Language, any> = {
           p4Desc: "Extra time before your account is paused.",
         },
         proFeatures: {
-          f1: "Unlimited AI captions in 25+ languages",
+          f1: "Full studio workflow in 25+ languages",
           f2: "AI image studio + smart background replace",
           f3: "Director's Cut video editor with subtitles & voiceover",
           f4: "Auto-posting to Instagram, TikTok, YouTube, Facebook",
@@ -5479,41 +5479,41 @@ export const translations: Record<Language, any> = {
     onboarding: {
       welcome: {
         title: "Willkommen bei AdTool AI!",
-        description: "Dein Dashboard zeigt alle Aktivitäten und Insights auf einen Blick"
+        description: "Ein Creator. Ein ganzes Studio. Dein Dashboard zeigt alle Produktionen auf einen Blick"
       },
       features: {
-        title: "Funktionen entdecken",
-        description: "Durchstöbere unsere KI-Tools, organisiert nach Kategorien"
+        title: "Deine Studio-Bereiche",
+        description: "Idee, Skript, Szene, Ton, Export — jeder Schritt des Workflows an einem Ort"
       },
       generator: {
-        title: "Erstelle deine erste Caption",
-        description: "Starte mit unserem KI-Caption-Generator – dein meistgenutztes Tool"
+        title: "Erstelle dein erstes Video",
+        description: "Von der Idee zum fertigen Video — ohne Filmteam"
       },
       performance: {
-        title: "Verfolge deinen Erfolg",
-        description: "Überwache deine Post-Performance und erhalte KI-Insights"
+        title: "Veröffentlichen und auswerten",
+        description: "Bring dein fertiges Video auf alle Kanäle und sieh, wie es läuft"
       },
       back: "Zurück",
       next: "Weiter",
       finish: "Loslegen",
       modal: {
         title: "Willkommen bei AdTool AI!",
-        subtitle: "Deine KI-gestützte Social Media Management Plattform",
+        subtitle: "Ein Creator. Ein ganzes Studio.",
         feature1: {
-          title: "KI-Content-Erstellung",
-          description: "Generiere Captions, Hooks und Skripte sofort"
+          title: "Alle führenden KI-Modelle",
+          description: "Video-, Stimmen-, Musik- und Bildmodelle in einem durchgängigen Workflow"
         },
         feature2: {
-          title: "Performance-Analysen",
-          description: "Verfolge und optimiere deinen Social-Media-Erfolg"
+          title: "Von der Idee zum Final Cut",
+          description: "Skript, Cast, Szenen, Lip-Sync und Ton — nichts verlässt die Plattform"
         },
         feature3: {
-          title: "Smart Scheduling",
-          description: "Plane und organisiere deinen Content-Kalender"
+          title: "Dein eigener Cast",
+          description: "Wiederkehrende Charaktere und Stimmen, die über alle Videos konsistent bleiben"
         },
         feature4: {
-          title: "Markenkonsistenz",
-          description: "Bewahre deine einzigartige Stimme auf allen Plattformen"
+          title: "Überall veröffentlichen",
+          description: "Das fertige Video geht direkt auf deine Kanäle — der letzte Schritt, nicht das Produkt"
         },
         skip: "Tour überspringen",
         startTour: "Schnelle Tour starten"
@@ -6322,8 +6322,8 @@ export const translations: Record<Language, any> = {
     "pricing.free": "Kostenlos",
     "pricing.freePrice": "€0",
     "pricing.freeDesc": "Perfekt zum Ausprobieren von AdTool AI",
-    "pricing.freeFeature1": "20 KI-Captions pro Monat",
-    "pricing.freeFeature2": "Basis-Templates",
+    "pricing.freeFeature1": "Media-Credits für Video, Bild & Musik",
+    "pricing.freeFeature2": "Kompletter Studio-Workflow — Idee bis Export",
     "pricing.freeFeature3": "Community-Support",
     "pricing.tryFree": "Kostenlos starten",
     "pricing.proMonthly": "Basic",
@@ -6332,9 +6332,9 @@ export const translations: Record<Language, any> = {
     "pricing.year": "Monat",
     "pricing.cancelAnytime": "Am beliebtesten",
     "pricing.saveFortyTwo": "Für Power-User",
-    "pricing.proFeature1": "200 KI-Captions pro Monat",
-    "pricing.proFeature2": "Alle Premium-Templates",
-    "pricing.proFeature3": "Hashtag-Generator",
+    "pricing.proFeature1": "Größeres Media-Credit-Paket",
+    "pricing.proFeature2": "Alle führenden KI-Videomodelle",
+    "pricing.proFeature3": "Lip-Sync & Mehrsprecher-Szenen",
     "pricing.proFeature4": "Bis zu 2 Marken verwalten",
     "pricing.proFeature5": "Prioritäts-E-Mail-Support",
     "pricing.startNow": "Auf Basic upgraden",
@@ -6358,42 +6358,42 @@ export const translations: Record<Language, any> = {
           description: "Perfekt zum Ausprobieren von AdTool AI",
           buttonText: "Kostenlos starten",
           features: [
-            "20 KI-Captions pro Monat",
-            "Basis-Templates",
+            "Media-Credits für Video, Bild & Musik",
+            "Kompletter Studio-Workflow — Idee bis Export",
+            "Charaktere aus Cast & World",
+            "Zugriff auf die Stimmen-Bibliothek",
             "Community-Support",
-            "Hashtag-Vorschläge",
-            "Marken-Verwaltung",
-            "Analytics",
+            "Captions & Hashtags inklusive",
             "Wasserzeichen auf Exporten",
           ],
         },
         basic: {
           title: "Basic",
           subtitle: "Am beliebtesten",
-          description: "Am besten für Content-Creator & kleine Unternehmen",
+          description: "Am besten für Creator & kleine Teams, die regelmäßig produzieren",
           buttonText: "Auf Basic upgraden",
           features: [
-            "200 KI-Captions pro Monat",
-            "Alle Premium-Templates",
-            "Hashtag-Generator",
+            "Größeres Media-Credit-Paket",
+            "Alle führenden KI-Videomodelle",
+            "Lip-Sync & Mehrsprecher-Szenen",
             "Bis zu 2 Marken verwalten",
             "Wasserzeichen entfernen",
             "Prioritäts-E-Mail-Support",
-            "Analytics-Dashboard",
+            "Veröffentlichung & Analytics",
             "Team-Zusammenarbeit",
           ],
         },
         pro: {
           title: "Pro",
           subtitle: "Für Power-User",
-          description: "Perfekt für Agenturen & Teams",
+          description: "Perfekt für Agenturen & Teams ohne eigenes Filmteam",
           buttonText: "Pro werden",
           features: [
-            "Unbegrenzte KI-Captions",
+            "Größtes Media-Credit-Paket",
             "Unbegrenzte Marken",
-            "Erweiterte KI-Modelle",
+            "Premium-Video- & Stimmenmodelle",
+            "Director's Cut Schnitt-Suite",
             "Team-Kollaborationstools",
-            "Analytics-Dashboard",
             "White-Label-Exporte",
             "Prioritäts-Support & Onboarding",
             "Individuelle Integrationen",
@@ -6530,7 +6530,7 @@ export const translations: Record<Language, any> = {
         },
         q3: {
           question: "Kann ich es kostenlos testen?",
-          answer: "Ja! Wir bieten einen kostenlosen Plan mit 20 KI-generierten Captions pro Monat. Keine Kreditkarte erforderlich."
+          answer: "Ja! Der kostenlose Plan enthält Media-Credits, damit du deine ersten Videos produzieren kannst. Keine Kreditkarte erforderlich."
         },
         q4: {
           question: "Welche Plattformen werden unterstützt?",
@@ -7150,7 +7150,7 @@ export const translations: Record<Language, any> = {
       clipNotifSent: "Clip-Benachrichtigung gesendet!",
       today: "Heute",
       ytConnectTitle: "YouTube Live verbinden",
-      ytConnectDesc: "Verbinde deinen YouTube-Kanal über die Integrationen-Seite, um Live-Broadcasts direkt aus CaptionGenie zu steuern.",
+      ytConnectDesc: "Verbinde deinen YouTube-Kanal über die Integrationen-Seite, um Live-Broadcasts direkt aus AdTool AI zu steuern.",
       ytGoToIntegration: "Zur YouTube-Integration →",
       createBroadcast: "Broadcast erstellen",
       titleLabel: "Titel",
@@ -7328,10 +7328,10 @@ export const translations: Record<Language, any> = {
     forLargeTeams: "Für große Teams und Agenturen",
     perMonth: "Monat",
     popular: "BELIEBT",
-    aiCaptions200: "200 KI-Captions pro Monat",
-    allPremiumTemplates: "Alle Premium-Templates",
-    hashtagGenerator: "Hashtag-Generator",
-    unlimitedAiCaptions: "Unbegrenzte KI-Captions",
+    aiCaptions200: "Größeres Media-Credit-Paket",
+    allPremiumTemplates: "Alle führenden KI-Videomodelle",
+    hashtagGenerator: "Lip-Sync & Mehrsprecher-Szenen",
+    unlimitedAiCaptions: "Größtes Media-Credit-Paket",
     teamCollaboration: "Team-Zusammenarbeit",
     prioritySupport: "Prioritäts-Support",
     everythingInPro: "Alles aus Pro",
@@ -7614,7 +7614,7 @@ export const translations: Record<Language, any> = {
     },
 
     footer: {
-      tagline: "KI-gestütztes Social Media Management",
+      tagline: "Ein Creator. Ein ganzes Studio.",
       legal: {
         title: "Rechtliches",
         imprint: "Impressum",
@@ -7737,8 +7737,8 @@ export const translations: Record<Language, any> = {
     
     // Hero section
     hero: {
-      title: "Deine KI-gestützte Social Media Management Plattform",
-      subtitle: "Erstelle, optimiere und analysiere deine Inhalte – professionell, effizient, skalierbar.",
+      title: "Ein Creator. Ein ganzes Studio.",
+      subtitle: "Alle führenden KI-Modelle in einem durchgängigen Workflow – von der Idee zum fertigen Video, ohne Filmteam.",
       cta: "Kostenlos starten",
       demo: "Demo ansehen",
       login: "Anmelden",
@@ -8999,7 +8999,7 @@ export const translations: Record<Language, any> = {
           p4Desc: "Zusätzliche Zeit, bevor dein Konto pausiert wird.",
         },
         proFeatures: {
-          f1: "Unbegrenzte KI-Captions in 25+ Sprachen",
+          f1: "Kompletter Studio-Workflow in 25+ Sprachen",
           f2: "AI Picture Studio + Smart Background Replace",
           f3: "Director's Cut Video-Editor mit Untertiteln & Voiceover",
           f4: "Auto-Posting zu Instagram, TikTok, YouTube, Facebook",
@@ -10340,42 +10340,42 @@ export const translations: Record<Language, any> = {
     // Onboarding
     onboarding: {
       welcome: {
-        title: "¡Bienvenido a CaptionGenie!",
-        description: "Tu panel muestra todas las actividades e insights de un vistazo"
+        title: "¡Bienvenido a AdTool AI!",
+        description: "Un creador. Un estudio entero. Tu panel muestra todas las producciones de un vistazo"
       },
       features: {
-        title: "Explora las Funciones",
-        description: "Navega por nuestras herramientas de IA organizadas por categoría"
+        title: "Tus Áreas del Estudio",
+        description: "Idea, guion, escena, sonido, exportación — cada paso del flujo en un solo lugar"
       },
       generator: {
-        title: "Crea tu Primera Caption",
-        description: "Comienza con nuestro Generador de Captions IA – tu herramienta más usada"
+        title: "Crea tu Primer Video",
+        description: "De la idea al video terminado — sin equipo de rodaje"
       },
       performance: {
-        title: "Sigue tu Éxito",
-        description: "Monitorea el rendimiento de tus posts y obtén insights de IA"
+        title: "Publica y Analiza",
+        description: "Lleva tu video terminado a todos los canales y mira cómo rinde"
       },
       back: "Atrás",
       next: "Siguiente",
       finish: "Comenzar",
       modal: {
-        title: "¡Bienvenido a CaptionGenie!",
-        subtitle: "Tu Plataforma de Gestión de Redes Sociales con IA",
+        title: "¡Bienvenido a AdTool AI!",
+        subtitle: "Un creador. Un estudio entero.",
         feature1: {
-          title: "Creación de Contenido IA",
-          description: "Genera captions, hooks y guiones al instante"
+          title: "Todos los Modelos IA Líderes",
+          description: "Modelos de video, voz, música e imagen en un flujo continuo"
         },
         feature2: {
-          title: "Análisis de Rendimiento",
-          description: "Rastrea y optimiza tu éxito en redes sociales"
+          title: "De la Idea al Corte Final",
+          description: "Guion, reparto, escenas, lip-sync y sonido — nada sale de la plataforma"
         },
         feature3: {
-          title: "Programación Inteligente",
-          description: "Planifica y organiza tu calendario de contenido"
+          title: "Tu Propio Reparto",
+          description: "Personajes y voces recurrentes que se mantienen consistentes en cada video"
         },
         feature4: {
-          title: "Consistencia de Marca",
-          description: "Mantén tu voz única en todas las plataformas"
+          title: "Publica en Todas Partes",
+          description: "El video terminado va directo a tus canales — el último paso, no el producto"
         },
         skip: "Saltar Tour",
         startTour: "Hacer un Tour Rápido"
@@ -11183,9 +11183,9 @@ export const translations: Record<Language, any> = {
     "pricing.subtitle": "Elige el plan que se adapte a tu flujo de trabajo. Comienza gratis, actualiza en cualquier momento.",
     "pricing.free": "Gratis",
     "pricing.freePrice": "€0",
-    "pricing.freeDesc": "Perfecto para probar CaptionGenie",
-    "pricing.freeFeature1": "20 captions de IA por mes",
-    "pricing.freeFeature2": "Plantillas básicas",
+    "pricing.freeDesc": "Perfecto para probar AdTool AI",
+    "pricing.freeFeature1": "Créditos de medios para video, imagen y música",
+    "pricing.freeFeature2": "Flujo de estudio completo — de la idea a la exportación",
     "pricing.freeFeature3": "Soporte comunitario",
     "pricing.tryFree": "Comenzar gratis",
     "pricing.proMonthly": "Basic",
@@ -11194,9 +11194,9 @@ export const translations: Record<Language, any> = {
     "pricing.year": "mes",
     "pricing.cancelAnytime": "Más Popular",
     "pricing.saveFortyTwo": "Para Usuarios Avanzados",
-    "pricing.proFeature1": "200 captions de IA por mes",
-    "pricing.proFeature2": "Todas las plantillas premium",
-    "pricing.proFeature3": "Generador de hashtags",
+    "pricing.proFeature1": "Paquete de créditos de medios ampliado",
+    "pricing.proFeature2": "Todos los modelos de video IA líderes",
+    "pricing.proFeature3": "Lip-sync y escenas multi-hablante",
     "pricing.proFeature4": "Gestionar hasta 2 marcas",
     "pricing.proFeature5": "Soporte prioritario por correo electrónico",
     "pricing.startNow": "Actualizar a Basic",
@@ -11207,7 +11207,7 @@ export const translations: Record<Language, any> = {
     pricingDetails: {
       header: {
         badge: "Precios Simples y Transparentes",
-        title: "Crece con CaptionGenie",
+        title: "Crece con AdTool AI",
         subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Comienza gratis, actualiza en cualquier momento.",
       },
       period: "mes",
@@ -11217,45 +11217,45 @@ export const translations: Record<Language, any> = {
         free: {
           title: "Gratis",
           subtitle: "Empezar",
-          description: "Perfecto para probar CaptionGenie",
+          description: "Perfecto para probar AdTool AI",
           buttonText: "Comenzar gratis",
           features: [
-            "20 captions de IA por mes",
-            "Plantillas básicas",
+            "Créditos de medios para video, imagen y música",
+            "Flujo de estudio completo — de la idea a la exportación",
+            "Personajes de Cast & World",
+            "Acceso a la biblioteca de voces",
             "Soporte comunitario",
-            "Sugerencias de hashtags",
-            "Gestión de marcas",
-            "Análisis",
+            "Captions y hashtags incluidos",
             "Marca de agua en exportaciones",
           ],
         },
         basic: {
           title: "Basic",
           subtitle: "Más Popular",
-          description: "Mejor para creadores de contenido y pequeñas empresas",
+          description: "Mejor para creadores y equipos pequeños que producen con regularidad",
           buttonText: "Actualizar a Basic",
           features: [
-            "200 captions de IA por mes",
-            "Todas las plantillas premium",
-            "Generador de hashtags",
+            "Paquete de créditos de medios ampliado",
+            "Todos los modelos de video IA líderes",
+            "Lip-sync y escenas multi-hablante",
             "Gestionar hasta 2 marcas",
             "Eliminar marca de agua",
             "Soporte prioritario por correo electrónico",
-            "Panel de análisis",
+            "Publicación y análisis",
             "Colaboración en equipo",
           ],
         },
         pro: {
           title: "Pro",
           subtitle: "Para Usuarios Avanzados",
-          description: "Perfecto para agencias y equipos",
+          description: "Perfecto para agencias y equipos sin equipo de rodaje",
           buttonText: "Hacerse Pro",
           features: [
-            "Captions de IA ilimitados",
+            "El mayor paquete de créditos de medios",
             "Marcas ilimitadas",
-            "Modelos de IA avanzados",
+            "Modelos premium de video y voz",
+            "Suite de edición Director's Cut",
             "Herramientas de colaboración en equipo",
-            "Panel de análisis",
             "Exportaciones de marca blanca",
             "Soporte prioritario e incorporación",
             "Integraciones personalizadas",
@@ -11323,8 +11323,8 @@ export const translations: Record<Language, any> = {
       title: "Preguntas frecuentes",
       questions: {
         q1: {
-          question: "¿Qué es CaptionGenie?",
-          answer: "CaptionGenie es una herramienta impulsada por IA que te ayuda a crear pies de foto atractivos y optimizados para tus publicaciones en redes sociales. Ahorra tiempo mientras maximiza el potencial de tu contenido."
+          question: "¿Qué es AdTool AI?",
+          answer: "AdTool AI reúne todos los modelos de IA líderes en un único flujo de producción: de la idea al guion, la escena, el sonido y el video terminado — sin equipo de rodaje."
         },
         q2: {
           question: "¿Cómo funciona la IA?",
@@ -11332,11 +11332,11 @@ export const translations: Record<Language, any> = {
         },
         q3: {
           question: "¿Puedo probarlo gratis?",
-          answer: "¡Sí! Ofrecemos un plan gratuito con 20 pies de foto generados por IA al mes. No se requiere tarjeta de crédito para comenzar."
+          answer: "¡Sí! El plan gratuito incluye créditos de medios para que produzcas tus primeros videos. No se requiere tarjeta de crédito."
         },
         q4: {
           question: "¿Qué plataformas son compatibles?",
-          answer: "CaptionGenie es compatible con Instagram, TikTok, Facebook, LinkedIn, Twitter/X y YouTube. Cada plataforma tiene su propio estilo de pie de foto optimizado."
+          answer: "Tu video terminado se publica en Instagram, TikTok, Facebook, LinkedIn, Twitter/X y YouTube — la publicación es el último paso del flujo."
         },
         q5: {
           question: "¿Puedo personalizar los pies de foto generados?",
@@ -11952,7 +11952,7 @@ export const translations: Record<Language, any> = {
       clipNotifSent: "¡Notificación de clip enviada!",
       today: "Hoy",
       ytConnectTitle: "Conectar YouTube Live",
-      ytConnectDesc: "Conecta tu canal de YouTube a través de la página de Integraciones para controlar transmisiones en vivo directamente desde CaptionGenie.",
+      ytConnectDesc: "Conecta tu canal de YouTube a través de la página de Integraciones para controlar transmisiones en vivo directamente desde AdTool AI.",
       ytGoToIntegration: "Ir a Integración de YouTube →",
       createBroadcast: "Crear Transmisión",
       titleLabel: "Título",
@@ -12114,10 +12114,10 @@ export const translations: Record<Language, any> = {
       forLargeTeams: "Para grandes equipos y agencias",
       perMonth: "mes",
       popular: "POPULAR",
-      aiCaptions200: "200 captions IA al mes",
-      allPremiumTemplates: "Todas las plantillas premium",
-      hashtagGenerator: "Generador de Hashtags",
-      unlimitedAiCaptions: "Captions IA ilimitados",
+      aiCaptions200: "Paquete de créditos de medios ampliado",
+      allPremiumTemplates: "Todos los modelos de video IA líderes",
+      hashtagGenerator: "Lip-sync y escenas multi-hablante",
+      unlimitedAiCaptions: "El mayor paquete de créditos de medios",
       teamCollaboration: "Colaboración en equipo",
       prioritySupport: "Soporte prioritario",
       everythingInPro: "Todo en Pro",
@@ -12340,8 +12340,8 @@ export const translations: Record<Language, any> = {
     
     // Hero section
     hero: {
-      title: "Tu Plataforma de Gestión de Redes Sociales con IA",
-      subtitle: "Crea, optimiza y analiza tu contenido – profesionalmente, eficientemente, escalable.",
+      title: "Un creador. Un estudio entero.",
+      subtitle: "Todos los modelos de IA líderes en un flujo continuo – de la idea al video terminado, sin equipo de rodaje.",
       cta: "Empezar gratis",
       demo: "Ver demo",
       login: "Iniciar Sesión",
@@ -13292,7 +13292,7 @@ export const translations: Record<Language, any> = {
     auth_no_account: '¿No tienes cuenta?',
     auth_have_account: '¿Ya tienes una cuenta?',
     auth_welcome_back: '¡Bienvenido de nuevo!',
-    auth_welcome_new: '¡Bienvenido a CaptionGenie!',
+    auth_welcome_new: '¡Bienvenido a AdTool AI!',
     auth_show_password: 'Mostrar contraseña',
     auth_hide_password: 'Ocultar contraseña',
     auth_remember_me: 'Recordarme',
@@ -13330,7 +13330,7 @@ export const translations: Record<Language, any> = {
     },
     // Pricing Page
     pricingPage: {
-      title: "Crece con CaptionGenie",
+      title: "Crece con AdTool AI",
       subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Mejora en cualquier momento.",
       plans: {
         basic: {

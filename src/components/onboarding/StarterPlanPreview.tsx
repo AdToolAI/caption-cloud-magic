@@ -31,9 +31,9 @@ export function StarterPlanPreview({ plans, loading, error, onComplete, onRetry 
           <Sparkles className="h-12 w-12 text-primary animate-pulse" />
           <Loader2 className="h-6 w-6 text-primary animate-spin absolute -bottom-1 -right-1" />
         </div>
-        <h3 className="text-xl font-semibold">Dein Plan wird erstellt...</h3>
+        <h3 className="text-xl font-semibold">Dein Produktionsplan wird erstellt...</h3>
         <p className="text-sm text-muted-foreground text-center max-w-md">
-          Unsere KI analysiert deine Nische und erstellt einen personalisierten Wochenplan mit optimalen Posting-Zeiten.
+          Unsere KI analysiert deine Nische und baut deinen ersten Wochenplan – Videoideen inklusive optimaler Veröffentlichungszeiten.
         </p>
       </div>
     );
@@ -51,9 +51,9 @@ export function StarterPlanPreview({ plans, loading, error, onComplete, onRetry 
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-xl font-semibold">Dein Starter-Plan ist fertig! 🎉</h3>
+        <h3 className="text-xl font-semibold">Dein Produktionsplan steht! 🎉</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          {plans.length} Posts für deine erste Woche — optimiert für maximale Reichweite
+          {plans.length} Videoideen für deine erste Woche — von der Idee bis zur Veröffentlichung
         </p>
       </div>
 

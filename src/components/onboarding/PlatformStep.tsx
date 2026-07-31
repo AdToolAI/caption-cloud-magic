@@ -22,8 +22,8 @@ export function PlatformStep({ selectedPlatforms, onToggle, onNext, onBack }: Pl
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-xl font-semibold">Auf welchen Plattformen bist du aktiv?</h3>
-        <p className="text-sm text-muted-foreground mt-1">Wähle mindestens eine Plattform aus</p>
+        <h3 className="text-xl font-semibold">Wohin sollen deine fertigen Videos?</h3>
+        <p className="text-sm text-muted-foreground mt-1">Wähle mindestens einen Kanal – wir optimieren Format und Länge dafür</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

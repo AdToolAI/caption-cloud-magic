@@ -1,74 +1,62 @@
+## Ziel
 
-# Positionierung: Ein Creator. Ein ganzes Studio.
+Die Positionierung endet aktuell an der Startseite. Nach der Anmeldung spricht das Produkt weiter die Caption-Sprache. Diese Lücke wird geschlossen — ohne Umbau der Navigation und ohne Funktionsverlust.
 
-Ziel: Die Produktkommunikation an das tatsächliche Produkt angleichen — vor dem Launch am 26.07. Redaktionsplan, Formate und Veröffentlichungsrhythmus bleiben bewusst außerhalb des Codes.
+Verbindliche Hierarchie in allen Texten:
+1. **Ein Creator. Ein ganzes Studio.** (Marke)
+2. **Alle führenden KI-Modelle. Ein durchgängiger Workflow.** (Differenzierung)
+3. **Von der Idee zum fertigen Video — ohne Filmteam.** (Nutzen)
 
-## Ausgangslage (im Code geprüft)
+Social bleibt erhalten, wird aber sprachlich als **letzter Schritt** eingeordnet: Video fertig → veröffentlichen. Nicht als eigenes Produkt.
 
-Die aktuelle Kommunikation beschreibt eine frühere Produktstufe:
+---
 
-- `src/lib/translations.ts` — Hero DE/EN/ES: „Effektives Marketing. Smarte Kampagnen." / Subline „Dein KI-gestütztes Marketing-Toolkit für Social Media."
-- `src/pages/Index.tsx` — SEO-Titel „KI Social Media Marketing Platform"
-- `index.html` — Titel „KI Social Media Manager", Keywords auf Captions ausgerichtet
-- `src/config/seo.ts` — `defaultTitle` / `defaultDescription` / `keywords` positionieren AdTool AI als **Caption Generator**; `PAGES_SEO.home` ebenso
-- `public/llms.txt` — beschreibt zuerst Captions, Video erst danach
+## 1. Onboarding: erster Eindruck bestätigt das Versprechen
 
-Es geht also nicht um eine Verfeinerung, sondern um die Angleichung an die Video-Pipeline, die seit Monaten gebaut wurde.
+Betrifft `WelcomeModal`, `OnboardingFlow`, `GettingStartedChecklist`, `ProductTour`, `StarterPlanPreview`, `GoalsStep`, `PlatformStep`.
 
-## Die Messaging-Hierarchie
+- Der erste vorgeschlagene Schritt wird **„Dein erstes Video"** statt „Create Your First Caption".
+- Die Getting-Started-Checkliste folgt dem Produktionsweg: Charakter anlegen → Szene bauen → Stimme wählen → exportieren → veröffentlichen.
+- Der Plattform-Schritt wird als Ausspielziel formuliert („Wo soll dein Video hin?"), nicht als Kanalverwaltung.
+- Die Ziel-Auswahl bekommt videoorientierte Optionen statt reiner Posting-Ziele.
 
-Diese drei Ebenen werden verbindlich und überall in dieser Reihenfolge verwendet:
+## 2. Preisdarstellung in Studio-Einheiten
 
-```text
-Ebene 1 — Markenversprechen (emotional)
-  Ein Creator. Ein ganzes Studio.
+Heute sind Features als „20 AI captions per month" gestaffelt — das widerspricht dem Versprechen und der bereits umgesetzten Umstellung auf Media Credits.
 
-Ebene 2 — Differenzierung (funktional)
-  Alle führenden KI-Modelle. Ein durchgängiger Workflow.
+- Feature-Listen in `translations.ts` und `UpgradeModal.tsx` werden auf Video-, Bild- und Musik-Einheiten sowie Studio-Zugang umformuliert.
+- Captions bleiben als Nebenleistung gelistet, nicht als Hauptmerkmal.
+- Der Beta-Preis und der Gründer-Rabatt bleiben unverändert; nur die Beschreibung ändert sich.
 
-Ebene 3 — Kundennutzen (konkret)
-  Von der Idee zum fertigen Video — ohne Filmteam und ohne
-  zwischen fünf Tools zu wechseln.
-```
+## 3. Sprach-Sweep durch die Anwendung
 
-Marktdefinition: „Für alle, die professionelle Inhalte produzieren müssen — ohne eigenes Filmteam." Solo-Creator sind kulturelle Kernzielgruppe, nicht die sprachliche Grenze.
+- Überschriften, leere Zustände, Tooltips und Erfolgs-/Fehlermeldungen, die „Social Media Manager", „Caption-Generator" oder ähnliche Formulierungen als Produktbeschreibung verwenden, werden angepasst.
+- **Wichtig:** Rein funktionale Vorkommen bleiben unberührt — ein Eingabefeld für den Begleittext eines Posts heißt weiterhin „Caption". Geändert wird nur, wo das Produkt sich selbst beschreibt.
+- Die Bereiche Composer, Coach, Calendar und Caption Insights bekommen eine kurze Einordnung als Veröffentlichungs-/Distributionsschritt.
 
-Sprache: global positioniert, deutscher Beachhead. DE-Multi-Speaker-Lip-Sync erscheint als Leistungsbeweis, nie als Zielgruppendefinition. EN- und ES-Claims werden im selben Durchgang geschrieben, nicht nachgezogen.
+## 4. E-Mails
 
-## Umfang 1 — Startseite
+Betrifft die Willkommens-, Aktivierungs-, Drip- und Rückgewinnungs-Strecken.
 
-`src/lib/translations.ts`, Block `landing.hero` in allen drei Sprachen:
+- Betreffzeilen und Einstiegsabsätze folgen der neuen Hierarchie.
+- Die Handlungsaufforderung führt in die Videoproduktion, nicht in den Caption-Generator.
+- Rechtliche Fußzeilen und Abmeldelogik bleiben unverändert.
 
-- `headline1` / `headline2` → „Ein Creator." / „Ein ganzes Studio." (EN: „One creator." / „A whole studio.", ES entsprechend)
-- `subline` → Ebene 2 + 3 verdichtet: führende Modelle, Stimmen und Lip-Sync in einem Workflow, ohne Plattformwechsel
-- `badge` → weg von „Für moderne Marketer", hin zur Produktionsaussage
-- `socialProof.creators` bleibt (Founders-Beta ist ehrlich und funktioniert)
+## 5. Drei Sprachen gleichzeitig
 
-`src/components/landing/BlackTieHero.tsx` bleibt strukturell unverändert — nur die Texte kommen aus den geänderten Keys. Kein Layout-Umbau kurz vor Launch.
+Jede Textänderung wird in **DE, EN und ES** gepflegt. Keine Sprache bleibt auf dem alten Stand — sonst entsteht genau die Inkonsistenz, die wir beheben wollen.
 
-## Umfang 2 — Metadaten und Crawler
-
-- `index.html`: `<title>`, `description`, `keywords`, `og:*` und `twitter:*` auf die Studio-/Workflow-Positionierung; Founders-Preis bleibt als Nutzenhinweis erhalten. Kein `og:image` setzen (Hosting liefert die Vorschau).
-- `src/config/seo.ts`: `defaultTitle`, `defaultDescription`, `keywords` und `PAGES_SEO.home` von Captions auf KI-Videoproduktion; Keywords auf Begriffe wie KI-Videogenerator, Lip-Sync, Avatar-Video, Videoproduktion ohne Team.
-- `src/pages/Index.tsx`: `SEO`-Props auf die neue Hierarchie.
-- `public/llms.txt`: Einleitungsabsatz stellt die Workflow-Positionierung voran, Captions werden zu einem Feature unter anderen.
-
-Titel unter 60 Zeichen, Description unter 160, genau ein H1 auf der Startseite — bleibt gewahrt.
-
-## Umfang 3 — Founders-Pitch
-
-`FoundersBenefitsDialog.tsx` erhält die Rahmung „Studio-Zugang" statt Feature-Aufzählung. Preise, Rabattlogik und Bedingungen bleiben unverändert — nur der Einleitungstext.
-
-## Umfang 4 — Positionierungs-Memory
-
-Neue Projekt-Memory `mem://brand/positioning-territory` mit: Markenversprechen, die drei Hierarchieebenen, Marktdefinition, Beachhead-Regel, die fünf Standpunkte und die Verbotsliste (keine Feature-Rundgänge, keine reinen Modelllisten, kein „KI oder echt?" bis die Lip-Sync-Artefakte sauber sind). Referenz in `mem://index.md` unter Core, damit jeder künftige Text daran gemessen wird.
-
-## Bewusst nicht in diesem Durchgang
-
-- Onboarding-Texte und E-Mail-Betreffzeilen — zweiter Durchgang nach dem Launch; die Flows laufen gerade stabil.
-- Redaktionsplan, Formate, Serien, Veröffentlichungsrhythmus — gehören in ein Marketingdokument, nicht in die Codebase.
-- Neuaufbau von Hero-, Nutzen- oder Social-Proof-Sektionen — zu großer Eingriff sechs Tage vor Launch.
+---
 
 ## Technische Hinweise
 
-Alle Änderungen sind Text- und Konfigurationsänderungen. Keine Logik, keine Backend-Migration, keine Edge-Function betroffen. `translations.ts` wird an drei Stellen parallel geändert (DE ~8753, EN ~3904, ES ~13387), damit die Sprachen nicht auseinanderlaufen. Nach den Edits: Typecheck plus ein Screenshot der Startseite zur Kontrolle, dass die längere Headline im Hero-Grid nicht umbricht.
+- Schwerpunkt liegt auf `src/lib/translations.ts` (drei Sprachblöcke), `src/components/onboarding/*` und `src/components/UpgradeModal.tsx`.
+- E-Mail-Texte liegen in den Funktionen `process-activation-emails`, `process-drip-emails`, `process-winback-emails` und `grant-welcome-bonus`.
+- Es werden keine Routen entfernt, keine Navigation umgebaut, keine Datenbankänderungen vorgenommen und keine Preise verändert. Reine Präsentationsebene.
+- `mem://brand/positioning-territory` dient als verbindliche Textquelle und wird um die Regel „Social = Distributionsschritt" ergänzt.
+
+## Nicht Teil dieses Plans
+
+- Navigation nach Workflow ordnen
+- Caption-Bereiche zurückstufen oder verstecken
+- Neue Funktionen

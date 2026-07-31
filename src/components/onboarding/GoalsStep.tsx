@@ -5,14 +5,14 @@ import { Slider } from "@/components/ui/slider";
 import { Check, TrendingUp, ShoppingCart, Palette } from "lucide-react";
 
 const goals = [
-  { id: "grow_audience", label: "Reichweite aufbauen", icon: TrendingUp, desc: "Mehr Follower & Engagement gewinnen" },
-  { id: "sell_products", label: "Produkte verkaufen", icon: ShoppingCart, desc: "Umsatz über Social Media steigern" },
-  { id: "build_brand", label: "Marke stärken", icon: Palette, desc: "Wiedererkennungswert & Vertrauen aufbauen" },
+  { id: "grow_audience", label: "Reichweite aufbauen", icon: TrendingUp, desc: "Videos, die neue Zuschauer erreichen" },
+  { id: "sell_products", label: "Werbevideos produzieren", icon: ShoppingCart, desc: "Ads, die Produkte verkaufen" },
+  { id: "build_brand", label: "Marke inszenieren", icon: Palette, desc: "Wiedererkennbarer Cast & Look in jedem Video" },
 ];
 
 const levels = [
-  { id: "beginner", label: "Anfänger", desc: "Erste Schritte im Social Media" },
-  { id: "intermediate", label: "Fortgeschritten", desc: "Regelmäßig aktiv, will optimieren" },
+  { id: "beginner", label: "Anfänger", desc: "Erste eigene Videoproduktion" },
+  { id: "intermediate", label: "Fortgeschritten", desc: "Produziert regelmäßig, will optimieren" },
   { id: "advanced", label: "Profi", desc: "Erfahren, sucht Skalierung" },
 ];
 
@@ -59,7 +59,7 @@ export function GoalsStep({
       </div>
 
       <div className="space-y-3">
-        <Label>Posts pro Woche: <span className="font-bold text-primary">{postsPerWeek}</span></Label>
+        <Label>Veröffentlichungen pro Woche: <span className="font-bold text-primary">{postsPerWeek}</span></Label>
         <Slider
           value={[postsPerWeek]}
           onValueChange={(v) => onPostsPerWeekChange(v[0])}
