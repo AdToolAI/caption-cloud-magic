@@ -871,8 +871,9 @@ serve(async (req) => {
 
 
       if (noopSuspect && !canEscalate) {
-        // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
-        // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
+        // v353 — Every proven NOOP is terminal: fail the pass cleanly
+        // (slot already released above), never mux an unanimated output.
+
         const noopReasonHard = motionStatic
           ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : motionUnverified
@@ -919,7 +920,12 @@ serve(async (req) => {
         // hint rather than a frozen-lips final output.
         const turnStart = Number(passBeforeDone?.segments?.[0]?.startTime ?? 0).toFixed(1);
         const turnEnd = Number(passBeforeDone?.segments?.[0]?.endTime ?? 0).toFixed(1);
-        const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`;
+        // v353 — klare Trennung: Provider hat nicht animiert vs. Messung
+        // war nicht möglich. Kein Retry-Karussell mehr im Text.
+        const userMsg = motionStatic
+          ? `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung erzeugt). Bitte die Szene mit größeren Gesichtern neu rendern.`
+          : `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Ergebnis konnte nicht geprüft werden (Messung nicht möglich). Bitte erneut versuchen.`;
+
         await supabase
           .from("composer_scenes")
           .update({
