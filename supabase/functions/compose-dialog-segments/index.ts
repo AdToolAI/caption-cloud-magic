@@ -5744,6 +5744,46 @@ serve(async (req) => {
             ? Number(preclipResult.mouthOffsetPx)
             : null;
           (pass as any).preclip_clamped = !!preclipResult.clamped;
+          // v367 — Overlay-Kollisions-Vertrag.
+          // Wenn zwei Sprecher denselben Bildausschnitt bekommen, landen alle
+          // lipsynced Overlays im Mux auf EINEM Gesicht (der Kunde sieht dann
+          // eine einzige Person, die sämtliche Dialoge spricht). Das ist ein
+          // harter Fehler und darf NIE stillschweigend gemuxt werden.
+          try {
+            const myCrop = (pass as any).preclip_crop as { x: number; y: number; size: number };
+            for (let oi = 0; oi < passes.length; oi++) {
+              if (oi === currentPassIdx) continue;
+              const oc = (passes[oi] as any)?.preclip_crop as
+                | { x: number; y: number; size: number }
+                | null
+                | undefined;
+              if (!oc || !Number.isFinite(Number(oc.size)) || Number(oc.size) <= 0) continue;
+              const dx = (myCrop.x + myCrop.size / 2) - (oc.x + oc.size / 2);
+              const dy = (myCrop.y + myCrop.size / 2) - (oc.y + oc.size / 2);
+              const dist = Math.hypot(dx, dy);
+              const minSep = 0.4 * Math.min(myCrop.size, Number(oc.size));
+              if (dist < minSep) {
+                throw new Error(
+                  `lipsync_overlay_collision: Sprecher ${currentPassIdx + 1} und ${oi + 1} zeigen auf denselben Bildausschnitt ` +
+                    `(Abstand ${Math.round(dist)}px < ${Math.round(minSep)}px). Die Gesichts-Zuordnung ist mehrdeutig — ` +
+                    `bitte Szene mit klar getrennten Sprechern neu generieren.`,
+                );
+              }
+            }
+          } catch (collisionErr) {
+            const msg = (collisionErr as Error).message;
+            console.error(`[compose-dialog-segments] scene=${sceneId} v367_overlay_collision ${msg}`);
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({
+                lip_sync_status: "failed",
+                clip_error: msg,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", sceneId);
+            return json({ ok: false, error: msg }, 200);
+          }
+
           console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px}`,
           );
