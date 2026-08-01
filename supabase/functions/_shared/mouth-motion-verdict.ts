@@ -37,11 +37,11 @@
  */
 
 import { awsFrameProbeAvailable, renderAwsStill } from "./aws-frame-probe.ts";
-// v350 — STATIC import. The previous dynamic `import(specifier)` loop could
-// never be resolved by the Supabase edge bundler (non-static specifier), so
-// every frame failed with `decode_failed: Module not found` and every verdict
-// degraded to `unknown`. Never make this import dynamic again.
-import { Image } from "npm:imagescript@1.3.0";
+// v352 — Pure-JS PNG decoder. `imagescript@1.3.0` selects a native Node codec
+// at module boot and crashes the Edge runtime with `unsupported arch/platform`
+// before the webhook can process a completed Sync.so job. fast-png is
+// platform-independent (pako + typed arrays) and safe to import statically.
+import { decode as decodePng } from "npm:fast-png@6.2.0";
 
 const MODEL_TAG = "v350-mouth-motion-verdict-aws";
 
@@ -477,44 +477,48 @@ async function decodeFrame(frameUrl: string, rect: MouthRect): Promise<DecodedFr
 
   const bytesHash = await sha256Hex(bytes).catch(() => null);
 
-  // v350 — statically imported decoder (see the import at the top of the
-  // file). Dynamic `import()` is NOT bundled by the edge runtime.
-  // deno-lint-ignore no-explicit-any
-  let img: any = null;
   try {
-    img = await Image.decode(bytes);
+    return { grid: decodePngLumaGrid(bytes, rect), bytesHash, error: null };
   } catch (e) {
     return { grid: null, bytesHash, error: `decode_failed:${(e as Error)?.message ?? "?"}` };
   }
-  if (!img) return { grid: null, bytesHash, error: "decode_null" };
+}
 
+/**
+ * Decode a PNG and sample its mouth rectangle into the fixed luminance grid.
+ * Exported so the Edge-compatible decoder has a focused regression test.
+ */
+export function decodePngLumaGrid(bytes: Uint8Array, rect: MouthRect): Float64Array {
+  const img = decodePng(bytes);
   const w = Number(img.width);
   const h = Number(img.height);
-  if (!(w > 1 && h > 1)) return { grid: null, bytesHash, error: `bad_dims_${w}x${h}` };
+  const channels = Number(img.channels);
+  const depth = Number(img.depth);
+  if (!(w > 1 && h > 1)) throw new Error(`bad_dims_${w}x${h}`);
+  if (![1, 2, 3, 4].includes(channels)) throw new Error(`unsupported_channels_${channels}`);
+  if (depth !== 8 && depth !== 16) throw new Error(`unsupported_depth_${depth}`);
 
   const x0 = Math.max(0, Math.floor(rect.x * w));
   const y0 = Math.max(0, Math.floor(rect.y * h));
   const bw = Math.max(2, Math.min(w - x0, Math.floor(rect.w * w)));
   const bh = Math.max(2, Math.min(h - y0, Math.floor(rect.h * h)));
 
-  try {
-    const grid = new Float64Array(GRID_W * GRID_H);
-    for (let gy = 0; gy < GRID_H; gy++) {
-      const sy = Math.min(h - 1, y0 + Math.floor((gy + 0.5) * bh / GRID_H));
-      for (let gx = 0; gx < GRID_W; gx++) {
-        const sx = Math.min(w - 1, x0 + Math.floor((gx + 0.5) * bw / GRID_W));
-        // imagescript getPixelAt is 1-indexed and returns 0xRRGGBBAA.
-        const px = img.getPixelAt(sx + 1, sy + 1) >>> 0;
-        const r = (px >>> 24) & 0xff;
-        const g = (px >>> 16) & 0xff;
-        const b = (px >>> 8) & 0xff;
-        grid[gy * GRID_W + gx] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      }
+  const maxValue = depth === 16 ? 65535 : 255;
+  const scale = 255 / maxValue;
+  const data = img.data;
+  const grid = new Float64Array(GRID_W * GRID_H);
+  for (let gy = 0; gy < GRID_H; gy++) {
+    const sy = Math.min(h - 1, y0 + Math.floor((gy + 0.5) * bh / GRID_H));
+    for (let gx = 0; gx < GRID_W; gx++) {
+      const sx = Math.min(w - 1, x0 + Math.floor((gx + 0.5) * bw / GRID_W));
+      const offset = (sy * w + sx) * channels;
+      const r = Number(data[offset]) * scale;
+      const g = channels >= 3 ? Number(data[offset + 1]) * scale : r;
+      const b = channels >= 3 ? Number(data[offset + 2]) * scale : r;
+      grid[gy * GRID_W + gx] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }
-    return { grid, bytesHash, error: null };
-  } catch (e) {
-    return { grid: null, bytesHash, error: `sample_failed:${(e as Error)?.message ?? "?"}` };
   }
+  return grid;
 }
 
 

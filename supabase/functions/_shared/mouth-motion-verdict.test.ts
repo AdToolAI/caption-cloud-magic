@@ -1,5 +1,10 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { normaliseFrameOutput, MOVED_MIN_SCORE } from "./mouth-motion-verdict.ts";
+import {
+  decodePngLumaGrid,
+  normaliseFrameOutput,
+  MOVED_MIN_SCORE,
+} from "./mouth-motion-verdict.ts";
+import { encode as encodePng } from "npm:fast-png@6.2.0";
 import { awsFrameProbeAvailable, extractStillUrl } from "./aws-frame-probe.ts";
 
 Deno.test("normaliseFrameOutput accepts string, array and FileOutput shapes", () => {
@@ -50,6 +55,31 @@ Deno.test("v347 guard: no Replicate/lucataco in the lip-sync frame path", async 
 
 Deno.test("motion threshold stays a positive luminance delta", () => {
   assert(MOVED_MIN_SCORE > 0 && MOVED_MIN_SCORE < 20);
+});
+
+Deno.test("v352 Edge-safe PNG decoder samples luminance without native codecs", () => {
+  const width = 4;
+  const height = 4;
+  const data = new Uint8Array(width * height * 4);
+  for (let i = 0; i < width * height; i++) {
+    data[i * 4] = 255;
+    data[i * 4 + 1] = 0;
+    data[i * 4 + 2] = 0;
+    data[i * 4 + 3] = 255;
+  }
+  const png = encodePng({ width, height, data, channels: 4, depth: 8 });
+  const grid = decodePngLumaGrid(png, { x: 0, y: 0, w: 1, h: 1 });
+  assertEquals(grid.length, 48 * 32);
+  assert(Math.abs(grid[0] - 54.213) < 0.01);
+});
+
+Deno.test("v352 guard: webhook motion probe must not import native ImageScript", async () => {
+  const src = await Deno.readTextFile(new URL("./mouth-motion-verdict.ts", import.meta.url));
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  assert(!code.toLowerCase().includes("imagescript"));
+  assert(code.includes('npm:fast-png@6.2.0'));
 });
 
 Deno.test("v348 still payload carries the Remotion version", async () => {
