@@ -124,6 +124,11 @@ export interface PassPreclipResult {
   mouthOffsetPx?: number;
   /** v247 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
+  /** v360 — anchor lay outside the face bbox and was repaired. */
+  anchorRepaired?: boolean;
+  /** v360 — true when the whole head fits inside the crop. */
+  headContained?: boolean;
+
   /** v359 — the moving window actually rendered, one entry per frame in
    *  source-master pixel space. Must be persisted on the pass so the mux
    *  pastes the lipsynced crop back along the identical path. */
@@ -230,6 +235,8 @@ export async function renderPassFacePreclip(
   let minSizeWidened = false;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
+  let anchorRepaired = false;
+  let headContained = true;
 
   if (useMouthAnchor) {
     const bx1 = Math.round(Number((bbox as number[])[0]));
@@ -270,9 +277,15 @@ export async function renderPassFacePreclip(
     minSizeWidened = r.minSizeWidened;
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
+    anchorRepaired = r.anchorRepaired === true;
+    headContained = r.headContained !== false;
     console.log(
       `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_mouth_anchor_preclip anchor=${anchor} mouth_source=${mouthValid ? "detector" : "bbox_lower_third"} side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} face_side_px=${faceSidePx} min_size_widened=${minSizeWidened} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v360_head_frame anchor_repaired=${anchorRepaired} head_contained=${headContained} bbox=${bx1},${by1},${bx2},${by2} anchor_pt=${mouthPoint[0]},${mouthPoint[1]} crop=${crop0X},${crop0Y},${crop0Size}`,
+    );
+
   } else {
     const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
     crop0X = cf.x;
@@ -502,6 +515,8 @@ export async function renderPassFacePreclip(
         minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        anchorRepaired,
+        headContained,
         cropPath,
         cropMode,
         cameraTravelPx,
@@ -697,6 +712,8 @@ export async function renderPassFacePreclip(
         minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        anchorRepaired,
+        headContained,
         cropPath,
         cropMode,
         cameraTravelPx,

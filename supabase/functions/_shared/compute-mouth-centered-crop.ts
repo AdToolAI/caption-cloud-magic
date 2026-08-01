@@ -44,6 +44,17 @@ export interface MouthCenteredCropResult {
   minSizeWidened: boolean;
   mouthOffsetPx: number;
   clamped: boolean;
+  /**
+   * v360 — true when the requested anchor lay outside the face bbox and was
+   * replaced by the bbox-derived mouth point (lower third). Belegter Fall:
+   * Matthew (Szene 89c5e01c) — der Anker lag 18 px UNTER dem Kinn, der
+   * 145-px-Crop begann dadurch auf Mundhöhe und schnitt Augen und Stirn ab.
+   * Sync.so bekam ein halbes Gesicht und reichte den Clip unverändert durch.
+   */
+  anchorRepaired: boolean;
+  /** v360 — true when the crop was grown/moved so the whole head fits in. */
+  headContained: boolean;
+
 }
 
 export function computeMouthCenteredCrop(
@@ -74,14 +85,38 @@ export function computeMouthCenteredCrop(
   const maxSide = Math.min(plateWidth, plateHeight);
   let size = Math.round(Math.min(maxSide, Math.max(minSize, idealSide)));
 
+  // v360 — Anker-Plausibilität. Der übergebene Punkt (Detektor-Mund oder
+  // Router-Koordinate) muss im Gesicht liegen. Liegt er darunter/daneben,
+  // ist er unbrauchbar: der quadratische Crop wandert nach unten und
+  // schneidet Augen und Stirn ab. Dann nehmen wir den aus der Bbox
+  // abgeleiteten Mundpunkt (unteres Drittel).
+  const derivedMouth: [number, number] = [
+    Math.round((x1 + x2) / 2),
+    Math.round(y1 + faceH * 0.72),
+  ];
+  const rawAnchor: [number, number] | null =
+    Array.isArray(face.mouth) &&
+      Number.isFinite(face.mouth[0]) &&
+      Number.isFinite(face.mouth[1])
+      ? [Number(face.mouth[0]), Number(face.mouth[1])]
+      : Array.isArray(face.center) &&
+          Number.isFinite(face.center[0]) &&
+          Number.isFinite(face.center[1])
+        ? [Number(face.center[0]), Number(face.center[1])]
+        : null;
+  const anchorInsideFace =
+    rawAnchor !== null &&
+    rawAnchor[0] >= x1 - faceW * 0.15 &&
+    rawAnchor[0] <= x2 + faceW * 0.15 &&
+    rawAnchor[1] >= y1 &&
+    rawAnchor[1] <= y2 + faceH * 0.1;
+  const anchorRepaired = !anchorInsideFace;
   const usingMouth =
     Array.isArray(face.mouth) &&
     Number.isFinite(face.mouth[0]) &&
     Number.isFinite(face.mouth[1]);
   const anchor: "mouth" | "face_center" = usingMouth ? "mouth" : "face_center";
-  const [ax, ay] = usingMouth
-    ? (face.mouth as [number, number])
-    : face.center;
+  const [ax, ay] = anchorInsideFace ? (rawAnchor as [number, number]) : derivedMouth;
 
   let x = Math.round(ax - size / 2);
   let y = Math.round(ay - size / 2);
@@ -103,6 +138,31 @@ export function computeMouthCenteredCrop(
     y = Math.max(0, Math.min(plateHeight - size, Math.round(ay - size / 2)));
   }
 
+  // v360 — Kopf-Containment. Sync.so braucht ein vollständiges Gesicht;
+  // ein angeschnittener Kopf ist ein belegter Passthrough-Auslöser. Wir
+  // fordern die Bbox plus 30 % Stirnrand oben und 10 % Kinnrand unten.
+  const needX1 = Math.max(0, x1 - faceW * 0.1);
+  const needX2 = Math.min(plateWidth, x2 + faceW * 0.1);
+  const needY1 = Math.max(0, y1 - faceH * 0.3);
+  const needY2 = Math.min(plateHeight, y2 + faceH * 0.1);
+  const needSide = Math.ceil(Math.max(needX2 - needX1, needY2 - needY1));
+  let headContained =
+    x <= needX1 && y <= needY1 && x + size >= needX2 && y + size >= needY2;
+  if (!headContained) {
+    size = Math.round(Math.min(maxSide, Math.max(size, needSide)));
+    const needCx = (needX1 + needX2) / 2;
+    // Anker leicht unterhalb der Mitte halten (Mund bleibt im unteren Drittel),
+    // ohne den Kopf oben abzuschneiden.
+    const desiredY = Math.min(needY1, Math.round(ay - size * 0.62));
+    x = Math.max(0, Math.min(plateWidth - size, Math.round(needCx - size / 2)));
+    y = Math.max(0, Math.min(plateHeight - size, desiredY));
+    // Falls die Box trotzdem oben/unten übersteht, hart einpassen.
+    if (y > needY1) y = Math.max(0, Math.round(needY1));
+    if (y + size < needY2) y = Math.max(0, Math.min(plateHeight - size, Math.round(needY2 - size)));
+    headContained =
+      x <= needX1 + 1 && y <= needY1 + 1 && x + size >= needX2 - 1 && y + size >= needY2 - 1;
+  }
+
   const clamped = x !== rawX || y !== rawY;
 
   const cropArea = size * size;
@@ -112,9 +172,7 @@ export function computeMouthCenteredCrop(
   const minSizeWidened = minSize > idealSide && size >= minSize;
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
-  const mouthOffsetPx = usingMouth
-    ? Math.round(Math.hypot(ax - cropCx, ay - cropCy))
-    : 0;
+  const mouthOffsetPx = Math.round(Math.hypot(ax - cropCx, ay - cropCy));
 
   return {
     crop: { x, y, size, outputSize },
@@ -125,5 +183,8 @@ export function computeMouthCenteredCrop(
     minSizeWidened,
     mouthOffsetPx,
     clamped,
+    anchorRepaired,
+    headContained,
   };
+
 }
