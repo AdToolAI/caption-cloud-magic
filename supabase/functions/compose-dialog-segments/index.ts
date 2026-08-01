@@ -404,6 +404,11 @@ async function uploadBoundingBoxesJson(
     // neighbour faces during turns this speaker is silent.
     voicedWindowsSec?: Array<[number, number]>;
     fps?: number;
+    /**
+     * v357 — Vorberechnete echte Bewegungsspur (Per-Frame-Tracking). Wenn
+     * gesetzt, hat sie Vorrang vor der statischen `box`.
+     */
+    trackedBoxes?: Array<[number, number, number, number] | null>;
   },
 ): Promise<{ url: string | null; nonNullFrames: number; totalFrames: number }> {
   try {
@@ -411,14 +416,17 @@ async function uploadBoundingBoxesJson(
     const ts = Date.now();
     const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
     const totalFrames = Math.max(1, params.frameCount);
-    const boxes = params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
-      ? buildPerFrameBoxes({
-          box: params.box,
-          frameCount: totalFrames,
-          fps: params.fps,
-          voicedWindowsSec: params.voicedWindowsSec,
-        })
-      : new Array(totalFrames).fill(params.box);
+    const boxes = params.trackedBoxes && params.trackedBoxes.length === totalFrames
+      ? params.trackedBoxes
+      : (params.fps
+        ? buildPerFrameBoxes({
+            box: params.box,
+            frameCount: totalFrames,
+            fps: params.fps,
+            voicedWindowsSec: params.voicedWindowsSec ?? [],
+          })
+        : new Array(totalFrames).fill(params.box));
+
     const nonNullFrames = boxes.reduce((acc, v) => acc + (v ? 1 : 0), 0);
     const payload = { bounding_boxes: boxes };
     // v279 — Uint8Array instead of Blob: supabase-js 2.75 in Deno silently
