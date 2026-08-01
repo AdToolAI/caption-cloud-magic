@@ -2707,9 +2707,13 @@ serve(async (req) => {
     if (speakers.length >= 2) {
       const lockVals = Object.values(finalAssignmentLock).map((v) => String(v).toLowerCase());
       const dupCid = lockVals.find((v, i) => v && lockVals.indexOf(v) !== i);
-      const centers = speakerPlateBboxes.map((b: any) =>
-        b && Number.isFinite(Number(b.width))
-          ? [Number(b.left) + Number(b.width) / 2, Number(b.top) + Number(b.height) / 2, Number(b.width)]
+      const centers = speakerPlateBboxes.map((b) =>
+        Array.isArray(b) && b.every((n) => Number.isFinite(Number(n)))
+          ? [
+              (Number(b[0]) + Number(b[2])) / 2,
+              (Number(b[1]) + Number(b[3])) / 2,
+              Math.abs(Number(b[2]) - Number(b[0])),
+            ]
           : null,
       );
       let dupBox: string | null = null;
