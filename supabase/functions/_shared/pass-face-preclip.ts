@@ -323,6 +323,88 @@ export async function renderPassFacePreclip(
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
   // ════════════════════════════════════════════════════════════════════
+  // v359 — MOVING WINDOW (Kamerapfad statt festem Rechteck)
+  //
+  // Bis v358 stand `crop` für den ganzen Turn fest. Bewegt sich die Person
+  // beim Sprechen, zeigt dieses Fenster den Ort, an dem das Gesicht einmal
+  // war — nicht den, an dem der Mund gerade ist. Genau das war der belegte
+  // Kailee-Fall: in der ersten Hälfte des Preclips nur Haare und Schulter,
+  // Sync.so fand keinen Mund und reichte das Video unverändert durch.
+  //
+  // Eine Bounding-Box kann kein Gesicht zurückholen, das der Crop bereits
+  // weggeschnitten hat. Deshalb folgt jetzt das FENSTER dem Gesicht. Der
+  // Zoom bleibt über den Turn konstant, der Pfad ist geglättet, mit
+  // Dead Zone und Look-ahead — es soll wie eine geführte Kamera aussehen,
+  // nicht wie ein zuckender Auto-Crop.
+  //
+  // Ohne Track bleibt alles exakt wie vor v359.
+  // ════════════════════════════════════════════════════════════════════
+  let cropPath: Array<{ x: number; y: number; size: number }> | undefined;
+  let cropMode: "static" | "camera_path" = "static";
+  let cameraTravelPx = 0;
+  let trackContainment: number | undefined;
+
+  const trackKeyframes = Array.isArray(input.track) ? input.track : null;
+  if (trackKeyframes && trackKeyframes.length >= 2) {
+    try {
+      const dense = buildDenseTrack({
+        keyframes: trackKeyframes.map((k) => ({ t: k.t - startSec, box: k.box })),
+        frameCount: durationInFrames,
+        fps: FPS,
+      });
+      const weights = buildSpeechWeights({
+        frameCount: durationInFrames,
+        fps: FPS,
+        voicedWindows: (input.voicedWindows ?? [[0, dur]]) as Array<[number, number]>,
+      });
+      const planned = planCameraPath({
+        boxes: dense,
+        plateWidth: sW,
+        plateHeight: sH,
+        weights,
+        // Zoom nicht enger als das statisch berechnete Fenster: die
+        // bestehende Größenlogik (Mund-Anker, Sibling-Cap, Mindestgröße)
+        // bleibt maßgeblich, v359 ändert nur die POSITION über die Zeit.
+        minSize: crop.size,
+      });
+
+      if (planned.path.length === durationInFrames && planned.moving) {
+        cropPath = planned.path.map((p) => ({ x: p.x, y: p.y, size: p.size }));
+        cropMode = "camera_path";
+        trackContainment = planned.weightedContainedRatio;
+        for (let i = 1; i < planned.path.length; i++) {
+          cameraTravelPx += Math.hypot(
+            planned.path[i].x - planned.path[i - 1].x,
+            planned.path[i].y - planned.path[i - 1].y,
+          );
+        }
+        cameraTravelPx = Math.round(cameraTravelPx);
+        // Das statische Rechteck bleibt als Repräsentant erhalten (erster
+        // Frame) — Altpfade und Telemetrie lesen es weiter.
+        crop.x = planned.path[0].x;
+        crop.y = planned.path[0].y;
+        crop.size = planned.size;
+      }
+
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v359_camera_path mode=${cropMode} ` +
+        `size=${planned.size} moving=${planned.moving} travel_px=${cameraTravelPx} ` +
+        `contained=${planned.containedRatio.toFixed(3)} weighted=${planned.weightedContainedRatio.toFixed(3)} ` +
+        `max_jump=${planned.maxJump.toFixed(3)} gap_frames=${planned.maxGapFrames} ` +
+        `interpolated=${planned.interpolatedFrames}`,
+      );
+    } catch (pathErr) {
+      // Kamerapfad ist eine Verbesserung, keine Vorbedingung: schlägt die
+      // Planung fehl, rendert der Preclip wie vor v359 statisch weiter.
+      console.warn(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v359_camera_path_failed: ${(pathErr as Error)?.message ?? String(pathErr)}`,
+      );
+    }
+  }
+
+
+
+  // ════════════════════════════════════════════════════════════════════
   // v356 — TELEMETRY ONLY. No geometric pre-dispatch block.
   //
   // Evidence from the working baseline (2026-07-27, DB-verified):
