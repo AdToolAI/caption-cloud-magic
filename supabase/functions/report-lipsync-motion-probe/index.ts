@@ -144,6 +144,8 @@ Deno.serve(async (req) => {
     const pass = passes[body.pass_idx] as Record<string, unknown> | undefined;
     if (!pass) return json({ ok: true, is_noop: isNoop, threshold: YAVG_NOOP_THRESHOLD });
 
+    const observeOnly = body.observe_only === true;
+
     try {
       await admin.rpc("update_dialog_pass_slot", {
         _scene_id: body.scene_id,
@@ -151,7 +153,10 @@ Deno.serve(async (req) => {
         _patch: {
           yavg_probed_at: nowIso,
           yavg_value: body.yavg,
-          ...(isNoop ? { motion_noop: true, motion_noop_yavg: body.yavg, motion_noop_reported_at: nowIso } : {}),
+          ...(observeOnly ? { client_probe_observe_only: true } : {}),
+          ...(isNoop && !observeOnly
+            ? { motion_noop: true, motion_noop_yavg: body.yavg, motion_noop_reported_at: nowIso }
+            : {}),
         },
       });
     } catch (e) {
@@ -165,9 +170,25 @@ Deno.serve(async (req) => {
       return json({ ok: true, is_noop: false, threshold: YAVG_NOOP_THRESHOLD });
     }
 
+    // v344 — telemetry-only reports stop here. Escalation, hard-fail and
+    // refunds are owned by the server-side verdict in `sync-so-webhook`.
+    if (observeOnly) {
+      console.log(
+        `[report-lipsync-motion-probe] v344 scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} low — observe_only, no escalation`,
+      );
+      return json({
+        ok: true,
+        is_noop: true,
+        observe_only: true,
+        escalated: false,
+        threshold: YAVG_NOOP_THRESHOLD,
+      });
+    }
+
     console.warn(
       `[report-lipsync-motion-probe] v248 scene=${body.scene_id} pass=${body.pass_idx} yavg=${body.yavg.toFixed(3)} → MOTION_NOOP (slice-4 escalation)`,
     );
+
 
     // ---------- Slice 4: NOOP-Ladder escalation ----------
     const passSpeakerName = String(pass.speaker_name ?? "Speaker");
