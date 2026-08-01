@@ -2699,6 +2699,51 @@ serve(async (req) => {
       `[compose-dialog-segments] scene=${sceneId} v277_assignment_lock ` +
       `source=${lockSource} locked_slots=${Object.keys(finalAssignmentLock).length}/${speakers.length}`,
     );
+    // v367 — Der Assignment-Lock ist ALLEINIGE Wahrheit und MUSS injektiv
+    // sein. Zwei Sprecher auf derselben characterId (oder derselben
+    // Plate-Bbox) bedeuten: alle Overlays landen später auf einem Gesicht.
+    // Lieber hier sauber scheitern als ein Video ausliefern, in dem eine
+    // Person sämtliche Dialoge spricht.
+    if (speakers.length >= 2) {
+      const lockVals = Object.values(finalAssignmentLock).map((v) => String(v).toLowerCase());
+      const dupCid = lockVals.find((v, i) => v && lockVals.indexOf(v) !== i);
+      const centers = speakerPlateBboxes.map((b: any) =>
+        b && Number.isFinite(Number(b.width))
+          ? [Number(b.left) + Number(b.width) / 2, Number(b.top) + Number(b.height) / 2, Number(b.width)]
+          : null,
+      );
+      let dupBox: string | null = null;
+      for (let i = 0; i < centers.length && !dupBox; i++) {
+        for (let j = i + 1; j < centers.length; j++) {
+          const a = centers[i], b = centers[j];
+          if (!a || !b) continue;
+          const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+          if (d < 0.4 * Math.min(a[2], b[2])) {
+            dupBox = `${i + 1}/${j + 1}`;
+            break;
+          }
+        }
+      }
+      if (dupCid || dupBox) {
+        const msg =
+          `lipsync_identity_collision: ` +
+          (dupCid
+            ? `Zwei Sprecher wurden demselben Charakter zugeordnet.`
+            : `Sprecher ${dupBox} zeigen auf dasselbe Gesicht in der Szene.`) +
+          ` Die Sprecher-Zuordnung ist mehrdeutig — bitte Szene mit klar getrennten Sprechern neu generieren.`;
+        console.error(`[compose-dialog-segments] scene=${sceneId} v367_identity_collision ${msg}`);
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            lip_sync_status: "failed",
+            clip_error: msg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        return json({ ok: false, error: msg }, 200);
+      }
+    }
+
     console.warn(
       `[compose-dialog-segments] scene=${sceneId} v158_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} mouths=${speakerPlateMouths.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
     );
