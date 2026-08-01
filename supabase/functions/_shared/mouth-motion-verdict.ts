@@ -95,7 +95,13 @@ export interface MouthMotionVerdictResult {
   reason: string;
   method: string;
   latencyMs: number;
+  /**
+   * v346 — Per-frame extractor outcome. Without this a probe failure was
+   * indistinguishable from a provider no-op in the logs.
+   */
+  frameErrors?: string[];
 }
+
 
 /**
  * Runtime secret compatibility. Lovable Cloud exposes the configured
