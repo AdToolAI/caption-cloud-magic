@@ -235,6 +235,8 @@ export async function renderPassFacePreclip(
   let minSizeWidened = false;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
+  let anchorRepaired = false;
+  let headContained = true;
 
   if (useMouthAnchor) {
     const bx1 = Math.round(Number((bbox as number[])[0]));
@@ -275,9 +277,15 @@ export async function renderPassFacePreclip(
     minSizeWidened = r.minSizeWidened;
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
+    anchorRepaired = r.anchorRepaired === true;
+    headContained = r.headContained !== false;
     console.log(
       `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_mouth_anchor_preclip anchor=${anchor} mouth_source=${mouthValid ? "detector" : "bbox_lower_third"} side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} face_side_px=${faceSidePx} min_size_widened=${minSizeWidened} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
+    console.log(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v360_head_frame anchor_repaired=${anchorRepaired} head_contained=${headContained} bbox=${bx1},${by1},${bx2},${by2} anchor_pt=${mouthPoint[0]},${mouthPoint[1]} crop=${crop0X},${crop0Y},${crop0Size}`,
+    );
+
   } else {
     const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
     crop0X = cf.x;
