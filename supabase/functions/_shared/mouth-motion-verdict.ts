@@ -78,6 +78,8 @@ export interface MouthMotionVerdictInput {
   sampleCount?: number;
   /** Overall budget. */
   timeoutMs?: number;
+  /** Square edge length of the provider output (preclip outputSize). */
+  frameSize?: number;
   /** Forensics only. */
   label?: string;
 }
