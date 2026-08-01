@@ -36,6 +36,7 @@ import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
+import { probeMp4Dims } from "./twoshot-face-map.ts";
 // v356 — the closeup contract no longer blocks here; geometry is telemetry.
 
 export interface PassPreclipInput {
@@ -85,6 +86,7 @@ export interface PassPreclipResult {
   durationSec?: number;
   fps?: number;
   frameCount?: number;
+  actualDims?: { width: number; height: number };
   /** v247/v342 — anchor used ("mouth" | "mouth_from_bbox" | "face_center"). */
   anchor?: "mouth" | "face_center" | "mouth_from_bbox";
 
@@ -110,6 +112,7 @@ const FPS = 30;
 // short renders. No cost impact; DB read only.
 const POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_MS = 90_000;
+const PRECLIP_PIPELINE_VERSION = "v358-square-space";
 
 function evenDimension(value: number, fallback: number): number {
   const n = Number(value);
@@ -345,12 +348,19 @@ export async function renderPassFacePreclip(
         composer_scene_id: sceneId,
         pass_idx: passIdx,
         face_crop: { size: crop.size },
+        preclip_pipeline_version: PRECLIP_PIPELINE_VERSION,
+        width: outW,
+        height: outH,
       })
       .gte("started_at", cutoffIso)
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (prior?.video_url) {
+      const actualDims = await probeMp4Dims(prior.video_url);
+      if (!actualDims || actualDims.width !== outW || actualDims.height !== outH) {
+        console.warn(`[pass-face-preclip] scene=${sceneId} pass=${passIdx} v358_reuse_rejected expected=${outW}x${outH} actual=${actualDims ? `${actualDims.width}x${actualDims.height}` : "unknown"}`);
+      } else {
       console.log(
         `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_reuse_hit render=${prior.render_id} url=…${String(prior.video_url).slice(-60)} dispatch_ms=0 poll_wait_ms=0 total_ms=${Date.now() - t0}`,
       );
@@ -362,6 +372,7 @@ export async function renderPassFacePreclip(
         durationSec: dur,
         fps: FPS,
         frameCount: durationInFrames,
+        actualDims,
         anchor,
         faceShareInCrop,
         faceSideShare,
@@ -370,6 +381,7 @@ export async function renderPassFacePreclip(
         mouthOffsetPx,
         clamped: clampedAnchor,
       };
+      }
     }
   } catch (reuseErr) {
     // Non-fatal — cache miss falls through to normal dispatch.
@@ -413,6 +425,7 @@ export async function renderPassFacePreclip(
         composer_scene_id: sceneId,
         pass_idx: passIdx,
         face_crop: { x: crop.x, y: crop.y, size: crop.size, outputSize: crop.outputSize },
+        preclip_pipeline_version: PRECLIP_PIPELINE_VERSION,
       },
       subtitle_config: {},
     });
@@ -442,6 +455,8 @@ export async function renderPassFacePreclip(
     bucketName: DEFAULT_BUCKET_NAME,
     width: outW,
     height: outH,
+    forceWidth: outW,
+    forceHeight: outH,
     fps: FPS,
     durationInFrames,
     frameRange: [0, durationInFrames - 1],
@@ -522,6 +537,14 @@ export async function renderPassFacePreclip(
     const status = String((row as any)?.status ?? "");
     const url = String((row as any)?.video_url ?? "");
     if (status === "completed" && url) {
+      const actualDims = await probeMp4Dims(url);
+      if (!actualDims || actualDims.width !== outW || actualDims.height !== outH) {
+        const actual = actualDims ? `${actualDims.width}x${actualDims.height}` : "unknown";
+        const mismatch = `preclip_dimension_mismatch:expected=${outW}x${outH}:actual=${actual}`;
+        await supabase.from("video_renders").update({ error_message: mismatch }).eq("render_id", renderId);
+        console.error(`[pass-face-preclip] scene=${sceneId} pass=${passIdx} v358_DIMENSION_MISMATCH expected=${outW}x${outH} actual=${actual} — refusing Sync.so dispatch`);
+        return { ok: false, error: mismatch, errorClass: "lambda_failed", preclipRenderId: renderId, crop, actualDims: actualDims ?? undefined, durationSec: dur, fps: FPS, frameCount: durationInFrames };
+      }
       console.log(
         `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v188_timing completed dispatch_ms=${dispatchMs} poll_wait_ms=${Date.now() - pollStart} total_ms=${Date.now() - t0} frames=${durationInFrames} out=${outW}x${outH}`,
       );
@@ -533,6 +556,7 @@ export async function renderPassFacePreclip(
         durationSec: dur,
         fps: FPS,
         frameCount: durationInFrames,
+        actualDims,
         anchor,
         faceShareInCrop,
         faceSideShare,
