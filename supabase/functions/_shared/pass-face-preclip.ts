@@ -124,6 +124,11 @@ export interface PassPreclipResult {
   mouthOffsetPx?: number;
   /** v247 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
+  /** v360 — anchor lay outside the face bbox and was repaired. */
+  anchorRepaired?: boolean;
+  /** v360 — true when the whole head fits inside the crop. */
+  headContained?: boolean;
+
   /** v359 — the moving window actually rendered, one entry per frame in
    *  source-master pixel space. Must be persisted on the pass so the mux
    *  pastes the lipsynced crop back along the identical path. */
