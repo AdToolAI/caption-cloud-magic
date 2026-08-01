@@ -33,6 +33,10 @@ const corsHeaders = {
 function isRetryableTransientError(predError: unknown): boolean {
   const s = String(predError ?? '').toLowerCase();
   if (!s) return false;
+  // v369 — a prompt rejection is never transient. Replicate wraps it as
+  // "Prediction failed: … InvalidParameter …", which used to match the
+  // generic 'prediction failed' token below and burned two identical retries.
+  if (classifyProviderRejection(predError) !== 'none') return false;
   return (
     s.includes('read timed out') ||
     s.includes('read timeout') ||
