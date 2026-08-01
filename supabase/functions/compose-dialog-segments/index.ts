@@ -5596,8 +5596,24 @@ serve(async (req) => {
       // reached Sync.so. Short turns cannot travel far enough to justify the
       // AWS-still fan-out; longer turns use three support frames at most.
       const turnDurationSec = Math.max(0, unionEnd - unionStart);
-      const shouldTrackPlate = !!platePassBoxForPreclip && turnDurationSec >= 2;
+      // v364 — Crash-Loop-Breaker: hat ein früherer Lauf den Worker während
+      // des Trackings verloren, wird hier ohne Tracker gerendert.
+      const trackerBlocked = (pass as any)?.plate_track_disabled === true;
+      const shouldTrackPlate = !!platePassBoxForPreclip && turnDurationSec >= 2 && !trackerBlocked;
       if (shouldTrackPlate) {
+        // v364 — Marker setzen. Stirbt der Worker im Tracker, findet der
+        // nächste Lauf `plate_track_attempted_at` ohne `..._completed_at`
+        // und überspringt das Tracking.
+        try {
+          await supabase.rpc("update_dialog_pass_slot", {
+            _scene_id: sceneId,
+            _pass_idx: currentPassIdx,
+            _patch: {
+              plate_track_attempted_at: new Date().toISOString(),
+              plate_track_completed_at: null,
+            },
+          });
+        } catch { /* best-effort */ }
         try {
           const plateTrack = await trackFaceAcrossTurn({
             videoUrl: sourceClipUrl,
@@ -5628,12 +5644,20 @@ serve(async (req) => {
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track_failed ${(trackErr as Error)?.message ?? String(trackErr)}`,
           );
         }
+        try {
+          await supabase.rpc("update_dialog_pass_slot", {
+            _scene_id: sceneId,
+            _pass_idx: currentPassIdx,
+            _patch: { plate_track_completed_at: new Date().toISOString() },
+          });
+        } catch { /* best-effort */ }
       } else if (platePassBoxForPreclip) {
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v363_plate_track_skipped ` +
-          `duration=${turnDurationSec.toFixed(2)}s reason=short_turn_resource_guard`,
+          `duration=${turnDurationSec.toFixed(2)}s reason=${trackerBlocked ? "v364_crash_loop_breaker" : "short_turn_resource_guard"}`,
         );
       }
+
 
       try {
         const preclipResult = await renderPassFacePreclip(
