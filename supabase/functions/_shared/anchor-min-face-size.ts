@@ -57,7 +57,15 @@ export interface MinFaceSizeResult {
   reason?: string;
 }
 
-const DEFAULT_MIN_WIDTH_RATIO = 0.12;
+import { requiredFaceWidthRatio } from "./lipsync-closeup-contract.ts";
+
+/**
+ * v354 — the flat 0.12 default was advisory and far below what Sync.so
+ * needs. The contract module now owns the numbers (0.30 / 0.22 / 0.16 by
+ * speaker count); this stays only as the floor for callers that pass an
+ * invalid speaker count.
+ */
+const LEGACY_MIN_WIDTH_RATIO = 0.12;
 
 /**
  * Build the framing suggestion prompt suffix given the speaker count.
