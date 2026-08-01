@@ -31,6 +31,7 @@ import {
   logSyncDispatch,
 } from "../_shared/syncso-preflight.ts";
 import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
+import { judgeMouthMotion, mouthRectFromPass } from "../_shared/mouth-motion-verdict.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 
