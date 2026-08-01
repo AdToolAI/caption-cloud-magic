@@ -7489,6 +7489,13 @@ serve(async (req) => {
           // v342 — geometry telemetry so a no-op is visible in one SQL row.
           preclip_anchor: (pass as any).preclip_anchor ?? null,
           preclip_face_share: (pass as any).preclip_face_share ?? null,
+          // v344.1 — linear share (gate metric) + source-face size.
+          preclip_side_share: (pass as any).preclip_side_share ?? null,
+          preclip_face_side_px: (pass as any).preclip_face_side_px ?? null,
+          preclip_min_size_widened: (pass as any).preclip_min_size_widened ?? null,
+          preclip_low_source_face: Number((pass as any).preclip_face_side_px) > 0
+            ? Number((pass as any).preclip_face_side_px) < 48
+            : null,
           preclip_crop_to_face_ratio: (() => {
             const c = (pass as any).preclip_crop;
             const b = speakerPlateBboxes?.[pass.speaker_idx] as number[] | null | undefined;
