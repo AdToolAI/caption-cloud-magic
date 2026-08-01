@@ -637,21 +637,51 @@ serve(async (req) => {
           turnEndSec > turnStartSec
         ? turnEndSec - turnStartSec
         : undefined;
-      const motion = await judgeMouthMotion({
+      const preclipDurSec = Number((passBeforeDone as any)?.preclip_duration_sec);
+      const probeInput = {
         outputUrl: rehostedUrl ?? outputUrl,
         // A per-pass Sync.so output always starts at t=0 with the tight turn
         // audio, so the speech window is [0, turnDuration].
         windowStartSec: 0,
         windowEndSec: turnDurSec,
+        clipDurationSec: Number.isFinite(preclipDurSec) && preclipDurSec > 0
+          ? preclipDurSec
+          : turnDurSec,
         mouthRect: mouthRectFromPass(passBeforeDone),
         sampleCount: 4,
         label: `scene=${sceneId} pass=${currentPass}`,
-      });
+      };
+      let motion = await judgeMouthMotion(probeInput);
+
+      // v346 — An `unknown` verdict is a MEASUREMENT failure, not evidence
+      // about the provider. Retry the probe once (wider sampling) before
+      // letting it drive any provider-side decision.
+      if (motion.verdict === "unknown") {
+        console.warn(
+          `[sync-so-webhook] v346 scene=${sceneId} pass=${currentPass} motion probe failed (${motion.reason}) → retrying probe once`,
+        );
+        const retryMotion = await judgeMouthMotion({
+          ...probeInput,
+          sampleCount: 6,
+          timeoutMs: 60_000,
+          label: `${probeInput.label} probe_retry`,
+        });
+        if (retryMotion.verdict !== "unknown") {
+          motion = retryMotion;
+        } else {
+          motion = {
+            ...retryMotion,
+            reason: `${retryMotion.reason}|first=${motion.reason}`,
+          };
+        }
+      }
+
       const motionStatic = motion.verdict === "static";
       const motionUnknown = motion.verdict === "unknown";
       console.log(
         `[sync-so-webhook] v344_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
       );
+
 
       // Legacy byte gate stays active ONLY while the probe is unavailable.
       const legacyByteNoop = motionUnknown && isSingleSpeakerScene &&
