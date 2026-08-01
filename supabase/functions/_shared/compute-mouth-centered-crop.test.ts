@@ -5,7 +5,7 @@
 import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
 
-Deno.test("centers on mouth when present", () => {
+Deno.test("v360: mouth stays in the lower half and the whole head fits", () => {
   const r = computeMouthCenteredCrop({
     face: { bbox: [500, 200, 700, 500], center: [600, 350], mouth: [600, 440] },
     plateWidth: 1284,
@@ -13,8 +13,28 @@ Deno.test("centers on mouth when present", () => {
   });
   assertEquals(r.anchor, "mouth");
   const cy = r.crop.y + r.crop.size / 2;
-  assert(Math.abs(cy - 440) <= 1, `mouth-y should be crop center, got offset ${Math.abs(cy - 440)}`);
+  assert(cy < 440, `mouth must sit below the crop center, got center ${cy}`);
+  assert(r.headContained, "the full head must fit inside the crop");
+  assert(r.crop.y <= 200, `crop must not cut the forehead, y=${r.crop.y}`);
 });
+
+Deno.test("v360: an anchor below the chin is repaired (Matthew-Fall)", () => {
+  // Belegte Werte aus Szene 89c5e01c, Pass 1: Anker 18 px unter dem Kinn.
+  const r = computeMouthCenteredCrop({
+    face: { bbox: [561, 176, 633, 275], center: [562, 293] },
+    plateWidth: 1928,
+    plateHeight: 1076,
+    minSize: 128,
+  });
+  assert(r.anchorRepaired, "the out-of-face anchor must be flagged as repaired");
+  assert(r.headContained, "the repaired crop must contain the whole head");
+  assert(r.crop.y <= 176, `forehead must not be cut, y=${r.crop.y}`);
+  assert(
+    r.crop.y + r.crop.size >= 275,
+    `chin must not be cut, bottom=${r.crop.y + r.crop.size}`,
+  );
+});
+
 
 Deno.test("v247 regression: small face reaches ≥35% face share", () => {
   const r = computeMouthCenteredCrop({
