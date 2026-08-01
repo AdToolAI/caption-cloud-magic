@@ -5571,7 +5571,14 @@ serve(async (req) => {
       let v359PlateTrack:
         | Array<{ t: number; box: [number, number, number, number] }>
         | null = null;
-      if (platePassBoxForPreclip) {
+      // v363 — The tracker is optional and must not consume the whole Edge
+      // worker before the actual Lambda preclip render. The failing production
+      // run exhausted worker resources while probing a 1.38 s turn and never
+      // reached Sync.so. Short turns cannot travel far enough to justify the
+      // AWS-still fan-out; longer turns use three support frames at most.
+      const turnDurationSec = Math.max(0, unionEnd - unionStart);
+      const shouldTrackPlate = !!platePassBoxForPreclip && turnDurationSec >= 2;
+      if (shouldTrackPlate) {
         try {
           const plateTrack = await trackFaceAcrossTurn({
             videoUrl: sourceClipUrl,
@@ -5580,7 +5587,8 @@ serve(async (req) => {
             startSec: unionStart,
             endSec: unionEnd,
             anchorBox: platePassBoxForPreclip as [number, number, number, number],
-            deadline: Date.now() + 60_000,
+            deadline: Date.now() + 35_000,
+            maxSamples: 3,
             logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1} v359_plate`,
           });
           if (plateTrack.ok && plateTrack.keyframes.length >= 2) {
@@ -5601,6 +5609,11 @@ serve(async (req) => {
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track_failed ${(trackErr as Error)?.message ?? String(trackErr)}`,
           );
         }
+      } else if (platePassBoxForPreclip) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v363_plate_track_skipped ` +
+          `duration=${turnDurationSec.toFixed(2)}s reason=short_turn_resource_guard`,
+        );
       }
 
       try {
