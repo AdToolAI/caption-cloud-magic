@@ -1,42 +1,39 @@
-## Kurzantwort
+## Bestätigte Ursache
 
-Nicht ganz: AWS Rekognition hat sehr wahrscheinlich **korrekt** getroffen — die Fehlstellung entsteht **nach** dem Detect, beim Zurückrechnen der normalisierten Koordinaten (0–1) auf Plate-Pixel.
+Der letzte Run für Szene `6bf4e815…` hängt **vor dem Sync.so-Aufruf**:
 
-Indizien dafür:
-- Rekognition liefert immer normalisierte Werte relativ zum *übergebenen* Bild. Die Logs zeigen abwechselnd `plate=1928x1076` und `plate=720x720` — es wird also nicht immer dasselbe Bild vermessen wie später gecroppt.
-- Die gespeicherten Boxen sind nicht zufällig verstreut, sondern **systematisch nach rechts/unten verschoben und in der Höhe gestaucht**. Ein Detektor, der danebenliegt, produziert Streuung; eine falsche Rücktransformation produziert genau dieses gleichmäßige Muster.
-- Eine Box war 22×13 px groß — das ist keine Fehldetektion, das ist eine Box, die als `[x, y, w, h]` geschrieben und als `[x1, y1, x2, y2]` gelesen wurde (oder umgekehrt).
+- `lip_sync_status = pending`
+- Pass 0 steht seit 21:29 UTC auf `rendering_preflight`
+- Es existiert weder eine Sync.so-Job-ID noch ein Eintrag in `syncso_inflight_jobs`
+- Die Sync.so-Auslastung ist daher korrekt `0/3`
+- `compose-dialog-segments` meldet wiederholt `BUSY — another dispatcher holds the (scene,pass) lock`
+- Der Watchdog erkennt den Zustand nicht, weil der erste Preclip-Lauf abbrach, bevor der vollständige v5-Fanout-Zustand gespeichert wurde
 
-Der Fehler liegt also in unserem Code zwischen Rekognition-Antwort und `plate_identity`, nicht bei AWS. Bestätigen lässt sich das nur, indem ich denselben Frame erneut vermesse und die Rohantwort mit dem Gespeicherten vergleiche — das ist Schritt 2 unten.
+Damit ist nicht Sync.so blockiert, sondern ein **verwaister Preclip-Dispatch-Lock mit einem halbfertigen `rendering_preflight`-Status**.
 
----
+## Umsetzung
 
-## Plan v361 — Koordinatenvertrag reparieren
+1. **Stale-Preflight-Recovery im Lip-Sync-Watchdog**
+   - Auch Szenen mit vorhandenem Quellclip und `pending`/`dialog_shots` scannen.
+   - Einen Pass als verwaist erkennen, wenn er länger als 3 Minuten auf `rendering_preflight` steht, keine `job_id` besitzt und somit Sync.so nie erreicht hat.
+   - Nur den betroffenen Pass atomar auf `pending` zurücksetzen; fertige oder parallele Geschwister bleiben unangetastet.
 
-### Schritt 1: Beweis fixieren (Regressionsanker)
-Test anlegen, der die gespeicherten `plate_identity`-Boxen der Szene 89c5e01c gegen die tatsächlichen Gesichtsregionen prüft (≥ 50 % Überlappung gefordert). Der Test schlägt mit dem aktuellen Datensatz fehl — genau das ist der Anker.
+2. **Verwaisten Dispatch-Lock sicher entfernen**
+   - Nur den Lock derselben `(scene_id, pass_idx)`-Kombination löschen.
+   - Frische Locks niemals übernehmen; Bereinigung ausschließlich nach derselben Stale-Schwelle.
+   - Anschließend `compose-dialog-segments` idempotent erneut anstoßen.
 
-### Schritt 2: Ursache lokalisieren und beheben
-Den Weg von der Rekognition-`BoundingBox` bis zur Pixel-Box durchgehen (AWS-Detect-Wrapper, `plateFaceSlotRouter.ts`, `pass-face-preclip.ts`). Zu klären:
-- Wird das Bild vor dem Detect skaliert oder quadratisch gepolstert? Dann muss die Rücktransformation Offset **und** Skalierung exakt invertieren.
-- Wird `[x, y, w, h]` geschrieben, aber `[x1, y1, x2, y2]` gelesen?
-- Verifikation: Skript rendert den Plate-Frame mit den neu berechneten Boxen; ich prüfe das Bild visuell, bevor etwas ausgeliefert wird.
+3. **Diagnostik und Schutz vor Endlosschleifen**
+   - Recovery-Zeitpunkt und Pipeline-Version `v362` am Pass protokollieren.
+   - Watchdog-Log `v362_stale_preflight_recovered` mit Pass, Alter und Invoke-Status ergänzen.
+   - Bestehende terminale Pass- und Szenen-Guards beibehalten.
 
-### Schritt 3: Sanity-Gate am richtigen Ort
-Statt Geometrie-Gates auf dem Crop ein Gate auf der Detektion:
-- Boxen mit unplausibler Größe (< 1 % oder > 60 % Plate-Breite) oder Seitenverhältnis außerhalb 0,5–1,6 verwerfen.
-- Zweite Rekognition **auf dem fertigen 720×720-Preclip**: kein Gesicht gefunden → Pass gar nicht erst an Sync.so, sofortiger Abbruch mit Refund, protokolliert als `preclip_no_face`.
-- `resolvedCount` darf die Sprecherzahl nicht überschreiten; doppelte `characterId` über mehrere Slots = Identitätskonflikt, Slot mit niedrigerer Confidence verwerfen.
+4. **Aktuellen festhängenden Run retten**
+   - Nach Deployment den verwaisten Pass/Lock der bestätigten Szene über denselben Recovery-Pfad bereinigen.
+   - Watchdog bzw. Dispatcher einmal auslösen.
+   - Prüfen, dass entweder eine echte Sync.so-Job-ID entsteht oder ein konkreter terminaler Preclip-Fehler statt „Lip-Sync wird gestartet…“ angezeigt wird.
 
-### Schritt 4: Dispatch-Guard im Watchdog nachziehen
-In `lipsync-watchdog/index.ts` denselben Terminal-Check wie in `compose-dialog-segments`: vor Retry/Dispatch `clip_status` lesen; ist die Szene terminal, Pass als `skipped_scene_failed` schließen, Credits erstatten, Sync.so-Slot freigeben. Die zwei hängenden Passes dieser Szene aufräumen.
-
-### Schritt 5: Kontrolllauf
-Dieselbe Vier-Sprecher-Szene neu rendern, die vier Preclips als Standbilder prüfen. Erst wenn auf allen vier ein vollständiges Gesicht mit sichtbarem Mund zu sehen ist, gilt der Fix als bestätigt.
-
----
-
-## Technische Notizen
-- Betroffene Dateien (Erwartung): AWS-Detect-Wrapper und `plateFaceSlotRouter.ts` unter `supabase/functions/_shared/`, `pass-face-preclip.ts`, ggf. `compute-mouth-centered-crop.ts`, `lipsync-watchdog/index.ts`.
-- Die v356-Entscheidung (keine geometrischen Pre-Dispatch-Blocker) bleibt bestehen. Das neue Gate misst nicht Gesichtsgröße, sondern *Gesicht vorhanden ja/nein* auf dem tatsächlich abgeschickten Bild.
-- Nebenbefund: `AWS_REGION='Global' is not a valid Rekognition region` — Fallback greift, wird aber sauber gesetzt.
+5. **Validierung**
+   - Datenbankstatus, Dispatch-Log und `syncso_inflight_jobs` kontrollieren.
+   - Sicherstellen, dass bei `0/3` freien Slots kein alter Lock weitere Aufrufe blockiert.
+   - Den Fall „Edge-Lauf stirbt nach Preflight-Claim, aber vor Provider-Dispatch“ als Regressionstest abdecken.
