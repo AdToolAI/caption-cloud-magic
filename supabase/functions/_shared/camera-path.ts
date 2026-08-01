@@ -306,7 +306,7 @@ export function planCameraPath(input: CameraPathInput): CameraPathResult {
   const filled = fillShortGaps(input.boxes);
   const boxes = filled.boxes;
 
-  const { size } = planConstantZoom({
+  const zoom = planConstantZoom({
     boxes,
     weights,
     plateWidth: input.plateWidth,
@@ -315,8 +315,31 @@ export function planCameraPath(input: CameraPathInput): CameraPathResult {
     coverage: input.coverage,
   });
 
+  // ── Zoom an die Bewegungsgeschwindigkeit anpassen ───────────────────
+  // Die Kamera darf pro Frame nur `size * MAX_PAN_PER_FRAME` wandern, sonst
+  // entstehen unnatürliche Mini-Pans. Bewegt sich das Gesicht schneller,
+  // wäre die Kamera konstruktionsbedingt zu langsam und würde anschneiden.
+  //
+  // Ein echter Kameramann löst das nicht mit einem Peitschenschwenk, sondern
+  // indem er WEITER geht. Genau das tun wir: ein größerer Ausschnitt erhöht
+  // sowohl das erlaubte Pan in Pixeln als auch die Sicherheitsmarge.
+  let peakSpeed = 0;
+  for (let i = 1; i < n; i++) {
+    const a = boxes[i - 1];
+    const b = boxes[i];
+    if (!a || !b) continue;
+    const [ax, ay] = boxCenter(a);
+    const [bx, by] = boxCenter(b);
+    peakSpeed = Math.max(peakSpeed, Math.hypot(bx - ax, by - ay));
+  }
+  const speedRequiredSize = peakSpeed / MAX_PAN_PER_FRAME;
+  const plateMax = Math.min(input.plateWidth, input.plateHeight);
+  let size = Math.round(clamp(Math.max(zoom.size, speedRequiredSize), 2, plateMax));
+  if (size % 2 !== 0) size -= 1;
+
   const maxX = Math.max(0, input.plateWidth - size);
   const maxY = Math.max(0, input.plateHeight - size);
+
 
   // Zielmittelpunkte: Gesichtsmitte, leicht nach unten versetzt.
   const rawCx: number[] = new Array(n);
