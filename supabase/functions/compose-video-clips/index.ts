@@ -36,6 +36,13 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { dedupeCharacterShots } from "../_shared/canonical-cast.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
+import {
+  assertPlateFaceContract,
+  closeupFramingSuffix,
+  closeupOnlyEnabled,
+  contractFailureMessage,
+  requiredFaceWidthRatio,
+} from "../_shared/lipsync-closeup-contract.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 
@@ -2399,7 +2406,14 @@ serve(async (req) => {
                         faceLockMode: faceLock,
                         wardrobeLock: wardrobeLockNamesCS.length > 0,
                         wardrobeLockNames: wardrobeLockNamesCS,
-                        framingSuffix,
+                        // v354 — contract framing is the DEFAULT, not a
+                        // retry-only measure: ask for close-up framing on
+                        // the very first attempt so the plate conforms by
+                        // construction.
+                        framingSuffix: framingSuffix ||
+                          (closeupOnlyEnabled()
+                            ? closeupFramingSuffix(portraitUrls.length)
+                            : ""),
                       }),
                     },
                   );
@@ -2779,6 +2793,108 @@ serve(async (req) => {
                   }
                 }
                 (scene as any).__minFaceCheck = minFaceCheck;
+
+                // ══════════════════════════════════════════════════════
+                // v354 — FACE-SIZE CONTRACT (2nd retry + HARD BLOCK)
+                //
+                // Pre-v354 the gate above was advisory: a plate with 3 %
+                // faces still went into the (paid) video render and only
+                // failed at T6 inside pass-face-preclip, after money was
+                // spent. Now: one more framing retry with the explicit
+                // close-up suffix, and if that still misses the contract
+                // we stop the scene BEFORE the video model runs.
+                // ══════════════════════════════════════════════════════
+                if (
+                  closeupOnlyEnabled() &&
+                  composedUrl &&
+                  minFaceCheck &&
+                  minFaceCheck.ok === false &&
+                  identityFailure === null
+                ) {
+                  try {
+                    await invalidateCache();
+                    const retry2Url = await composeAnchor(
+                      "attempt-5-closeup-contract",
+                      false,
+                      false,
+                      [],
+                      false,
+                      closeupFramingSuffix(expectedFaces),
+                    );
+                    if (retry2Url) {
+                      const e2 = await evaluate(retry2Url, "attempt-5-closeup-contract");
+                      const d2 = await detectFacesMediaPipe({
+                        videoUrl: retry2Url,
+                        plateWidth: 1000,
+                        plateHeight: 1000,
+                        durationSec: 0,
+                        prebuiltFrameUrls: [retry2Url],
+                      });
+                      const c2 = d2.ok && d2.faces.length > 0
+                        ? assertPlateFaceContract({
+                            faces: d2.faces.map((f) => f.bbox as [number, number, number, number]),
+                            plateWidth: 1000,
+                            speakers: expectedFaces,
+                          })
+                        : null;
+                      console.log(
+                        `[compose-video-clips] v354_contract_retry scene=${scene.id} ` +
+                        `identity=${e2.identity ?? "ok"} ok=${c2?.ok ? 1 : 0} ` +
+                        `minRatio=${c2?.minWidthRatio.toFixed(3) ?? "?"} required=${c2?.requiredRatio.toFixed(3) ?? "?"}`,
+                      );
+                      if (
+                        e2.identity === null && c2 &&
+                        c2.minWidthRatio > minFaceCheck.minWidthRatio
+                      ) {
+                        composedUrl = retry2Url;
+                        faceCount = e2.faceCount;
+                        humanCount = e2.humanCount;
+                        identityFailure = e2.identity;
+                        identityNotes = e2.notes;
+                        identityMismatched = e2.mismatched ?? [];
+                        identityMissing = e2.missing ?? [];
+                        identityDuplicated = e2.duplicated ?? [];
+                        minFaceCheck = {
+                          ok: c2.ok,
+                          minWidthRatio: c2.minWidthRatio,
+                          minWidthPx: c2.minWidthPx,
+                          suggestion: minFaceCheck.suggestion,
+                          retried: true,
+                          reason: c2.reason,
+                        };
+                        (scene as any).__minFaceCheck = minFaceCheck;
+                      }
+                    }
+                  } catch (e) {
+                    console.warn(
+                      `[compose-video-clips] v354_contract_retry scene=${scene.id} exception: ${(e as Error).message}`,
+                    );
+                  }
+
+                  if (minFaceCheck.ok === false) {
+                    const contractResult = {
+                      ok: false,
+                      minWidthRatio: minFaceCheck.minWidthRatio,
+                      minWidthPx: minFaceCheck.minWidthPx,
+                      requiredRatio: requiredFaceWidthRatio(expectedFaces),
+                      requiredPx: Math.round(requiredFaceWidthRatio(expectedFaces) * 1000),
+                      ratios: [],
+                      reason: minFaceCheck.reason,
+                    };
+                    const msg = contractFailureMessage(contractResult, expectedFaces);
+                    console.error(
+                      `[compose-video-clips] v354_contract_block scene=${scene.id} ` +
+                      `minRatio=${minFaceCheck.minWidthRatio.toFixed(3)} ` +
+                      `required=${contractResult.requiredRatio.toFixed(3)} n=${expectedFaces} — blocking BEFORE video render`,
+                    );
+                    await safeMarkSceneFailed(scene.id, msg, {
+                      isCinematicSyncScene: true,
+                      extra: { twoshot_stage: "failed" },
+                    });
+                    results.push({ sceneId: scene.id, status: "failed", error: msg });
+                    continue;
+                  }
+                }
 
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;

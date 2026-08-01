@@ -37,6 +37,12 @@ export interface MinFaceSizeInput {
   expectedSpeakers: number;
   /** Minimum face-width ratio (default 0.12 = 12 % of plate width). */
   minWidthRatio?: number;
+  /**
+   * v354 — when true the caller MUST treat `ok=false` as a hard block
+   * (no video render). Purely informational for the caller; the pure
+   * function itself has no side effects.
+   */
+  hard?: boolean;
 }
 
 export interface MinFaceSizeResult {
@@ -51,7 +57,15 @@ export interface MinFaceSizeResult {
   reason?: string;
 }
 
-const DEFAULT_MIN_WIDTH_RATIO = 0.12;
+import { requiredFaceWidthRatio } from "./lipsync-closeup-contract.ts";
+
+/**
+ * v354 — the flat 0.12 default was advisory and far below what Sync.so
+ * needs. The contract module now owns the numbers (0.30 / 0.22 / 0.16 by
+ * speaker count); this stays only as the floor for callers that pass an
+ * invalid speaker count.
+ */
+const LEGACY_MIN_WIDTH_RATIO = 0.12;
 
 /**
  * Build the framing suggestion prompt suffix given the speaker count.
@@ -103,7 +117,11 @@ export function framingSuffixFor(
 export function enforceMinFaceSize(
   input: MinFaceSizeInput,
 ): MinFaceSizeResult {
-  const minRatio = input.minWidthRatio ?? DEFAULT_MIN_WIDTH_RATIO;
+  const minRatio = input.minWidthRatio ??
+    Math.max(
+      LEGACY_MIN_WIDTH_RATIO,
+      requiredFaceWidthRatio(input.expectedSpeakers),
+    );
   const W = Math.max(1, input.plateWidth);
   const n = Math.max(1, input.expectedSpeakers);
 

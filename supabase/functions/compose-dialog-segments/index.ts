@@ -98,6 +98,11 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+import {
+  assertPlateFaceContract,
+  closeupOnlyEnabled,
+  contractFailureMessage,
+} from "../_shared/lipsync-closeup-contract.ts";
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
@@ -2709,6 +2714,70 @@ serve(async (req) => {
         422,
       );
     }
+
+    // ── v354 — FACE-SIZE CONTRACT (post-render, pre-dispatch) ────────────
+    // The anchor gate in compose-video-clips guarantees the STILL conforms,
+    // but the video model reframes: it often pulls the camera back, and the
+    // faces on the rendered plate end up far smaller than on the anchor.
+    // That drift was never measured — it only surfaced at T6 inside
+    // pass-face-preclip (crop < 144px → Sync.so passthrough → "kein
+    // Lip-Sync"), after both the video render AND a provider slot were
+    // already paid for.
+    //
+    // Here we measure the ACTUAL plate (speakerPlateBboxes are in plate
+    // pixel space) and stop before any Sync.so dispatch, with a refund.
+    if (
+      closeupOnlyEnabled() &&
+      !isAdvance &&
+      !isRetry &&
+      speakers.length >= 1 &&
+      plateDims &&
+      Number(plateDims.width) > 0
+    ) {
+      const contractBoxes = speakerPlateBboxes.filter(
+        (b): b is [number, number, number, number] =>
+          Array.isArray(b) && b.length === 4,
+      );
+      if (contractBoxes.length === speakers.length) {
+        const verdict = assertPlateFaceContract({
+          faces: contractBoxes,
+          plateWidth: Number(plateDims.width),
+          speakers: speakers.length,
+        });
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v354_plate_contract ok=${verdict.ok ? 1 : 0} ` +
+          `min_ratio=${verdict.minWidthRatio.toFixed(3)} required=${verdict.requiredRatio.toFixed(3)} ` +
+          `min_px=${verdict.minWidthPx} plate_w=${plateDims.width} n=${speakers.length}`,
+        );
+        if (!verdict.ok) {
+          const msg = contractFailureMessage(verdict, speakers.length);
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v354_plate_contract_BLOCK ` +
+            `${verdict.reason} — refunding ${totalCost} credits, no dispatch`,
+          );
+          await failLipSync({
+            supabase,
+            sceneId,
+            reason: "lipsync_face_contract_violation",
+            userId,
+            refundCredits: totalCost,
+            syncApiKey,
+          });
+          return json(
+            {
+              error: "lipsync_face_contract_violation",
+              message: msg,
+              min_width_ratio: verdict.minWidthRatio,
+              required_ratio: verdict.requiredRatio,
+              refunded: totalCost,
+            },
+            422,
+          );
+        }
+      }
+    }
+
+
 
     // ── v153.1 — Unified Pre-Flight Hard-Fail (N=1..4) ──────────────────
     // SINGLE-PATH-POLICY: jeder Sprecher MUSS eine eigene plate-native Box
