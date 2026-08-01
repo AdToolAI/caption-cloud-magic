@@ -295,6 +295,52 @@ serve(async (req) => {
             }).eq('id', composerSceneId);
           }, { ttlSeconds: 30 });
           console.log(`💋 [dialog-stitch] scene ${composerSceneId} done → ${finalOutputUrl}`);
+
+          // v367 — the stitched mux is the ONLY canonical library asset for a
+          // dialog scene (plates + preclips stay internal).
+          try {
+            const { data: sc } = await supabaseAdmin
+              .from('composer_scenes')
+              .select('project_id, order_index, duration_seconds, clip_source')
+              .eq('id', composerSceneId)
+              .maybeSingle();
+            const { data: proj } = sc?.project_id
+              ? await supabaseAdmin
+                  .from('composer_projects')
+                  .select('user_id, title')
+                  .eq('id', sc.project_id)
+                  .maybeSingle()
+              : { data: null as any };
+            if (proj?.user_id) {
+              const { data: dup } = await supabaseAdmin
+                .from('video_creations')
+                .select('id')
+                .eq('output_url', finalOutputUrl)
+                .maybeSingle();
+              if (!dup) {
+                await supabaseAdmin.from('video_creations').insert({
+                  user_id: proj.user_id,
+                  output_url: finalOutputUrl,
+                  status: 'completed',
+                  credits_used: 0,
+                  metadata: {
+                    source: 'motion-studio-clip',
+                    canonical: true,
+                    dialog_final: true,
+                    project_id: sc?.project_id ?? null,
+                    project_name: proj.title ?? null,
+                    scene_id: composerSceneId,
+                    scene_order: sc?.order_index ?? 0,
+                    model: sc?.clip_source ?? null,
+                    duration_seconds: sc?.duration_seconds ?? null,
+                    superseded: false,
+                  },
+                });
+              }
+            }
+          } catch (e) {
+            console.warn('💋 [dialog-stitch] library archive failed', (e as Error).message);
+          }
         } else {
           console.warn('💋 [dialog-stitch] success webhook without composer_scene_id');
         }
