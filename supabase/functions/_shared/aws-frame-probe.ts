@@ -23,6 +23,8 @@
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 
 export const AWS_FRAME_PROBE_TAG = "v348-aws-remotion-still";
+/** v364 — harte Obergrenze für die Kantenlänge eines Probe-Stills. */
+export const AWS_STILL_MAX_EDGE_PX = 960;
 /** Must match the deployed Remotion Lambda version (see _shared/remotion-payload.ts). */
 export const REMOTION_STILL_VERSION = "4.0.462";
 
