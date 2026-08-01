@@ -36,6 +36,9 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { dedupeCharacterShots } from "../_shared/canonical-cast.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
+// v357 — Regie-Entscheidung statt Blocker (Gruppenshot / Punch-in / Coverage).
+import { decideDialogMode, directorLabel, DIALOG_DIRECTOR_TAG } from "../_shared/dialog-director.ts";
+
 import {
   assertPlateFaceContract,
   closeupFramingSuffix,
