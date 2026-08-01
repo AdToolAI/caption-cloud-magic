@@ -7509,7 +7509,44 @@ serve(async (req) => {
       // never let logging crash dispatch
     }
 
+    // ── v360 — Dispatch-Stopp bei terminal fehlgeschlagener Szene ─────────
+    // Belegt (Szene 89c5e01c, 01.08.2026): Pass 1 fiel um 20:14 terminal aus,
+    // die Szene stand seitdem auf `failed` — trotzdem ging um 20:20 noch
+    // Pass 2 an Sync.so raus. Ergebnis: bezahlter Job, belegter Slot und die
+    // widersprüchliche UI ("Szene fehlgeschlagen" + "Lip-Sync läuft").
+    // Der bestehende Check greift erst im Webhook (`ignored_due_scene_failed`).
+    try {
+      const { data: sceneNow } = await supabase
+        .from("composer_scenes")
+        .select("clip_status, dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const sceneClipStatus = String((sceneNow as any)?.clip_status ?? "");
+      const shotsStatus = String(((sceneNow as any)?.dialog_shots as any)?.status ?? "");
+      if (sceneClipStatus === "failed" || shotsStatus === "failed") {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v360_dispatch_skipped_scene_failed clip_status=${sceneClipStatus} shots_status=${shotsStatus} — kein Sync.so-Dispatch mehr`,
+        );
+        return await failBeforeProviderDispatch(
+          "SCENE_ALREADY_FAILED",
+          "skipped_scene_failed",
+          "v360: Die Szene ist bereits terminal fehlgeschlagen — dieser Sprecher-Turn wird nicht mehr an Sync.so gesendet.",
+          200,
+          {
+            clip_status: sceneClipStatus,
+            shots_status: shotsStatus,
+            compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+          },
+        );
+      }
+    } catch (guardErr) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v360_scene_status_guard_read_failed: ${(guardErr as Error).message}`,
+      );
+    }
+
     // v169 Stage A — Stale-Job Reconcile (best-effort, ≤500ms). Frees Sync.so
+
     // concurrency slots held by zombie jobs from earlier failed runs so this
     // dispatch doesn't hit a spurious 429.
     try {
