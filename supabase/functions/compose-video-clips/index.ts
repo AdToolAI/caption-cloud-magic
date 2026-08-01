@@ -2399,7 +2399,14 @@ serve(async (req) => {
                         faceLockMode: faceLock,
                         wardrobeLock: wardrobeLockNamesCS.length > 0,
                         wardrobeLockNames: wardrobeLockNamesCS,
-                        framingSuffix,
+                        // v354 — contract framing is the DEFAULT, not a
+                        // retry-only measure: ask for close-up framing on
+                        // the very first attempt so the plate conforms by
+                        // construction.
+                        framingSuffix: framingSuffix ||
+                          (closeupOnlyEnabled()
+                            ? closeupFramingSuffix(portraitUrls.length)
+                            : ""),
                       }),
                     },
                   );
