@@ -6269,7 +6269,70 @@ serve(async (req) => {
       const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= v152UpperBound;
       (pass as any)._v152BboxAreaPct = Number(boxAreaPct.toFixed(4));
 
-      if (v147BboxValid && v152BboxSane) {
+      // ════════════════════════════════════════════════════════════════
+      // v359 — DREI HARTE STOPPS VOR DEM KOSTENPFLICHTIGEN DISPATCH
+      //
+      // Bewusst NUR drei. v344–v355 haben gezeigt, wohin weiche
+      // Qualitätsschwellen führen: sie blockieren legitime Szenen, werden
+      // gelockert, und der Passthrough kommt zurück. Diese drei Fälle sind
+      // keine Qualitätsurteile, sondern nachweisbare Widersprüche — in
+      // ihnen KANN der Provider gar nicht arbeiten, ein Dispatch wäre
+      // sicher verlorenes Geld. Alles andere bleibt Telemetrie und wird
+      // weiterhin am Ergebnis entschieden (mouth-motion-verdict).
+      // ════════════════════════════════════════════════════════════════
+      let v359HardStop: string | null = null;
+
+      if (v161UsingPreclipForBbox && v161PreclipCrop) {
+        // (1) Box-Anzahl ≠ Frame-Anzahl des tatsächlich dispatchten Videos.
+        //     Sync.so ordnet Boxen positionsweise zu; bei Versatz zeigt jede
+        //     Box auf den falschen Frame.
+        const decodedFrames = Math.round(Number((pass as any).preclip_frame_count ?? 0));
+        if (decodedFrames > 0 && frameCount !== decodedFrames) {
+          v359HardStop = `bbox_count_mismatch:boxes=${frameCount},frames=${decodedFrames}`;
+        }
+
+        // (2) Box liegt außerhalb des realen Preclip-Pixelraums.
+        if (!v359HardStop && dispatchBox) {
+          const [bx1, by1, bx2, by2] = dispatchBox;
+          const outOfBounds =
+            bx1 < 0 || by1 < 0 ||
+            bx2 > v358DispatchWidth || by2 > v358DispatchHeight ||
+            bx2 <= bx1 || by2 <= by1;
+          if (outOfBounds) {
+            v359HardStop = `bbox_out_of_clip_space:box=${JSON.stringify(dispatchBox)},space=${v358DispatchWidth}x${v358DispatchHeight}`;
+          }
+        }
+
+        // (3) Gesicht im gesamten Sprachkern nie im Ausschnitt. Nicht "zu
+        //     klein", nicht "knapp" — nie. Dann existiert kein Mund, den
+        //     Sync.so animieren könnte, und Passthrough ist garantiert.
+        const containment = (pass as any).preclip_track_containment;
+        if (
+          !v359HardStop &&
+          (pass as any).preclip_crop_mode === "camera_path" &&
+          Number.isFinite(Number(containment)) &&
+          Number(containment) <= 0
+        ) {
+          v359HardStop = "face_never_visible_in_speech_window";
+        }
+      }
+
+      if (v359HardStop) {
+        (pass as any)._v152HardFail = {
+          reason: v359HardStop,
+          errorClass: "v359_predispatch_hard_stop",
+          message:
+            `Die Szene wurde vor dem kostenpflichtigen Lip-Sync-Lauf gestoppt: ${v359HardStop}. ` +
+            `Es wurden keine Credits verbraucht.`,
+        };
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_hard_stop ${v359HardStop} ` +
+          `crop_mode=${(pass as any).preclip_crop_mode ?? "static"} travel_px=${(pass as any).preclip_camera_travel_px ?? 0}`,
+        );
+      }
+
+      if (!v359HardStop && v147BboxValid && v152BboxSane) {
+
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes_url: usedUrl!,
