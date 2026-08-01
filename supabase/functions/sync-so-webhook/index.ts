@@ -788,9 +788,12 @@ serve(async (req) => {
 
       if (motionStatic) {
         console.warn(
-          `[sync-so-webhook] v344 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → NOOP ladder`,
+          motionPassthrough
+            ? `[sync-so-webhook] v353 scene=${sceneId} pass=${currentPass} MOUTH PASSTHROUGH (output equals input inside the mouth band: outVsIn=${motion.outputVsInput} < ${3.0}; intra-clip score=${motion.score} is irrelevant here) → terminal, no retry`
+            : `[sync-so-webhook] v353 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → terminal, no retry`,
         );
       }
+
       if (motionUnknown) {
         console.warn(
           `[sync-so-webhook] v347 scene=${sceneId} pass=${currentPass} MOTION UNVERIFIED (${motion.reason}) → telemetry only; provider result is NOT penalised`,
