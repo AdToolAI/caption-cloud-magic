@@ -771,7 +771,9 @@ serve(async (req) => {
       if (noopSuspect && !canEscalate) {
         // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
         // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
-        const noopReasonHard = syncOutputResolutionRegression
+        const noopReasonHard = motionStatic
+          ? "provider_returned_static_output"
+          : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
