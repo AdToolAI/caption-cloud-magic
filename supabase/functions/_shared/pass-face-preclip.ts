@@ -303,14 +303,23 @@ export async function renderPassFacePreclip(
     faceShareInCrop = Math.min(1, (fbW * fbH) / Math.max(1, crop.size * crop.size));
     faceSideShare = Math.min(1, fbSide / Math.max(1, crop.size));
     faceSidePx = fbSide;
+    // ══════════════════════════════════════════════════════════════════
+    // v354 — ASSERTION, not a gate.
+    // The face-size contract is now enforced upstream (anchor gate in
+    // compose-video-clips + post-render plate check in
+    // compose-dialog-segments). If we still land here, an upstream stage
+    // let a non-conforming plate through — the thresholds stay, but the
+    // error names the real cause instead of pretending the preclip
+    // geometry is the problem.
+    // ══════════════════════════════════════════════════════════════════
     const FACE_SIDE_SHARE_FLOOR = 0.34;
     if (faceSideShare < FACE_SIDE_SHARE_FLOOR) {
       console.error(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_face_side_share_floor_block side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} floor=${FACE_SIDE_SHARE_FLOOR} crop=${crop.x},${crop.y},${crop.size} face=${Math.round(fbW)}x${Math.round(fbH)} anchor=${anchor}`,
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v354_${CONTRACT_VIOLATION_UPSTREAM} side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} floor=${FACE_SIDE_SHARE_FLOOR} crop=${crop.x},${crop.y},${crop.size} face=${Math.round(fbW)}x${Math.round(fbH)} anchor=${anchor}`,
       );
       return {
         ok: false,
-        error: `preclip_face_share_too_low:side_share=${(faceSideShare * 100).toFixed(1)}%_area_share=${(faceShareInCrop * 100).toFixed(1)}%_crop${crop.size}px_face${Math.round(fbW)}x${Math.round(fbH)}`,
+        error: `${CONTRACT_VIOLATION_UPSTREAM}:preclip_face_share_too_low:side_share=${(faceSideShare * 100).toFixed(1)}%_area_share=${(faceShareInCrop * 100).toFixed(1)}%_crop${crop.size}px_face${Math.round(fbW)}x${Math.round(fbH)}`,
         errorClass: "invalid_input",
       };
     }
