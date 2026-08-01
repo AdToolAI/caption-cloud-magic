@@ -1049,9 +1049,18 @@ serve(async (req) => {
         motion_verdict_reason: motion.reason,
       };
       if (freshDonePasses[currentPass]) {
+        // v346 — a pass only reaches `done` when the mouth motion was
+        // positively verified. `static` and `unknown` are handled by the
+        // ladder / hard-fail branch above; if execution still lands here,
+        // fail closed instead of silently muxing a voiceover-only clip.
+        const verifiedMoved = motion.verdict === "moved" && !noopSuspect;
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
-          status: "done",
+          status: verifiedMoved ? "done" : "failed",
+          ...(verifiedMoved ? {} : {
+            error: "sync_noop_unrecoverable",
+            last_error_class: "sync_noop_unrecoverable",
+          }),
           output_url: rehostedUrl ?? outputUrl,
           rehosted: !!rehostedUrl,
           sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
@@ -1060,6 +1069,7 @@ serve(async (req) => {
           ...noopSuspectFlags,
         };
       }
+
 
 
       const { doneCount, failedCount, allTerminal } = terminalV5Counts(freshDonePasses);
