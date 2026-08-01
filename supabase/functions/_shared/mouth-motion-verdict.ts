@@ -37,12 +37,26 @@
  */
 
 import { awsFrameProbeAvailable, renderAwsStill } from "./aws-frame-probe.ts";
+// v350 — STATIC import. The previous dynamic `import(specifier)` loop could
+// never be resolved by the Supabase edge bundler (non-static specifier), so
+// every frame failed with `decode_failed: Module not found` and every verdict
+// degraded to `unknown`. Never make this import dynamic again.
+import { Image } from "npm:imagescript@1.3.0";
 
-const MODEL_TAG = "v347-mouth-motion-verdict-aws";
+const MODEL_TAG = "v350-mouth-motion-verdict-aws";
 
 
 /** Mean |ΔY| (0..255) inside the mouth band required to call a pass "moved". */
 export const MOVED_MIN_SCORE = 1.6;
+
+/**
+ * v350 — Passthrough detection.
+ * If the provider output differs from its own INPUT preclip by no more than
+ * this (mean |ΔY| in the mouth band, at every sampled timestamp), the provider
+ * returned the input essentially unchanged — measured re-encode noise on a
+ * proven passthrough was 1.1–2.1, genuine lip-sync moves far beyond this.
+ */
+export const PASSTHROUGH_MAX_SCORE = 3.0;
 
 /** Sample grid the mouth band is resampled to before differencing. */
 const GRID_W = 48;
@@ -80,12 +94,19 @@ export interface MouthMotionVerdictInput {
   timeoutMs?: number;
   /** Square edge length of the provider output (preclip outputSize). */
   frameSize?: number;
+  /**
+   * v350 — The clip that was SENT to the provider (preclip / plate). When set,
+   * the probe additionally compares output↔input at identical timestamps and
+   * can prove a passthrough (provider handed the input back untouched), which
+   * intra-output deltas alone can never detect on a moving plate.
+   */
+  inputUrl?: string | null;
   /** Forensics only. */
   label?: string;
 }
 
 
-export type MotionVerdict = "moved" | "static" | "unknown";
+export type MotionVerdict = "moved" | "static" | "passthrough" | "unknown";
 
 export interface MouthMotionVerdictResult {
   verdict: MotionVerdict;
@@ -100,6 +121,10 @@ export interface MouthMotionVerdictResult {
   reason: string;
   method: string;
   latencyMs: number;
+  /** v350 — strongest output↔input delta in the mouth band; null when not measured. */
+  outputVsInput?: number | null;
+  /** v350 — all output↔input deltas, for forensics. */
+  outputVsInputDeltas?: number[];
   /**
    * v346 — Per-frame extractor outcome. Without this a probe failure was
    * indistinguishable from a provider no-op in the logs.
@@ -216,7 +241,12 @@ export async function judgeMouthMotion(
 
 
     const rect = normaliseRect(input.mouthRect) ?? DEFAULT_MOUTH_RECT;
-    const frames = await Promise.all(usable.map((u) => decodeFrame(u, rect)));
+    // v350 — keep the timestamp alignment intact (null where a frame is
+    // missing) so the output↔input comparison below pairs identical moments.
+    const framesByTs = await Promise.all(
+      frameResults.map((r) => r.url ? decodeFrame(r.url, rect) : Promise.resolve(null)),
+    );
+    const frames = framesByTs.filter((f): f is DecodedFrame => !!f);
     const decoded = frames.map((f) => f.grid).filter((g): g is Float64Array => !!g);
     const decodeErrors = frames.map((f) => f.error).filter((e): e is string => !!e);
     for (const err of decodeErrors) frameErrors.push(`decode:${err}`);
@@ -255,7 +285,53 @@ export async function judgeMouthMotion(
       deltas.push(meanAbsDelta(decoded[i - 1], decoded[i]));
     }
     const score = deltas.length ? Math.max(...deltas) : 0;
-    const verdict: MotionVerdict = score >= MOVED_MIN_SCORE ? "moved" : "static";
+
+    // ══════════════════════════════════════════════════════════════════
+    // v350 — PASSTHROUGH CHECK (output vs. its own input preclip).
+    // Intra-output deltas cannot distinguish "the mouth moves" from "the
+    // camera pans": a plate with camera motion scores > threshold even when
+    // the provider handed the input straight back. Measured on scene
+    // 7c11bc27 (2026-08-01): output and input mouth-band motion were 3.343
+    // vs 3.333 — identical. Comparing the two clips at the same timestamps
+    // is the only measurement that catches this.
+    // ══════════════════════════════════════════════════════════════════
+    let outputVsInput: number | null = null;
+    let outputVsInputDeltas: number[] = [];
+    const inputUrl = String(input.inputUrl ?? "");
+    if (/^https?:\/\//.test(inputUrl)) {
+      try {
+        const inputFrames = await Promise.all(
+          timestamps.map(async (t, i) => {
+            if (!framesByTs[i]?.grid) return null;
+            const r = await extractFrame(inputUrl, t, deadline, frameSize);
+            if (!r.url) {
+              frameErrors.push(`input_t=${t}:${r.error ?? "unknown"}`);
+              return null;
+            }
+            const d = await decodeFrame(r.url, rect);
+            if (!d.grid) frameErrors.push(`input_decode:${d.error ?? "unknown"}`);
+            return d.grid;
+          }),
+        );
+        for (let i = 0; i < timestamps.length; i++) {
+          const out = framesByTs[i]?.grid;
+          const inp = inputFrames[i];
+          if (out && inp) outputVsInputDeltas.push(meanAbsDelta(out, inp));
+        }
+        if (outputVsInputDeltas.length >= 2) {
+          outputVsInput = Math.max(...outputVsInputDeltas);
+        }
+      } catch (e) {
+        frameErrors.push(`input_probe_threw:${(e as Error)?.message ?? "?"}`);
+      }
+    }
+
+    const verdict: MotionVerdict =
+      outputVsInput !== null && outputVsInput < PASSTHROUGH_MAX_SCORE
+        ? "passthrough"
+        : score >= MOVED_MIN_SCORE
+          ? "moved"
+          : "static";
 
     return {
       deltas: deltas.map((d) => Number(d.toFixed(4))),
@@ -265,9 +341,14 @@ export async function judgeMouthMotion(
       method: MODEL_TAG,
       verdict,
       score: Number(score.toFixed(4)),
-      reason: verdict === "moved"
-        ? "mouth_band_motion_detected"
-        : "mouth_band_static_provider_returned_noop",
+      outputVsInput: outputVsInput === null ? null : Number(outputVsInput.toFixed(4)),
+      outputVsInputDeltas: outputVsInputDeltas.map((d) => Number(d.toFixed(4))),
+      frameErrors,
+      reason: verdict === "passthrough"
+        ? `mouth_band_passthrough_output_equals_input:max_delta=${outputVsInput?.toFixed(3)}<${PASSTHROUGH_MAX_SCORE}`
+        : verdict === "moved"
+          ? "mouth_band_motion_detected"
+          : "mouth_band_static_provider_returned_noop",
       latencyMs: Date.now() - t0,
     };
   } catch (e) {
@@ -396,22 +477,16 @@ async function decodeFrame(frameUrl: string, rect: MouthRect): Promise<DecodedFr
 
   const bytesHash = await sha256Hex(bytes).catch(() => null);
 
+  // v350 — statically imported decoder (see the import at the top of the
+  // file). Dynamic `import()` is NOT bundled by the edge runtime.
   // deno-lint-ignore no-explicit-any
   let img: any = null;
-  let error: string | null = null;
-  for (const specifier of ["npm:imagescript@1.3.0", "https://deno.land/x/imagescript@1.2.15/mod.ts"]) {
-    try {
-      const mod = await import(specifier);
-      // deno-lint-ignore no-explicit-any
-      const ImageCtor: any = (mod as any).Image ?? (mod as any).default?.Image;
-      if (!ImageCtor?.decode) { error = `no_decode_export:${specifier}`; continue; }
-      img = await ImageCtor.decode(bytes);
-      if (img) { error = null; break; }
-    } catch (e) {
-      error = `decode_failed:${(e as Error)?.message ?? "?"}`;
-    }
+  try {
+    img = await Image.decode(bytes);
+  } catch (e) {
+    return { grid: null, bytesHash, error: `decode_failed:${(e as Error)?.message ?? "?"}` };
   }
-  if (!img) return { grid: null, bytesHash, error: error ?? "decode_null" };
+  if (!img) return { grid: null, bytesHash, error: "decode_null" };
 
   const w = Number(img.width);
   const h = Number(img.height);

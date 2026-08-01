@@ -653,6 +653,11 @@ serve(async (req) => {
         // provider output to render a full, undistorted frame.
         frameSize: Number((passBeforeDone as any)?.preclip_crop?.outputSize) ||
           Number(outputDims?.width) || 512,
+        // v350 — the clip we SENT the provider. Without it a passthrough
+        // (input handed straight back) is indistinguishable from real motion
+        // on a plate with camera movement.
+        inputUrl: inputPreclipUrl ||
+          String((passBeforeDone as any)?.input_url ?? "") || null,
         label: `scene=${sceneId} pass=${currentPass}`,
       };
       let motion = await judgeMouthMotion(probeInput);
@@ -680,11 +685,56 @@ serve(async (req) => {
         }
       }
 
-      const motionStatic = motion.verdict === "static";
+      // v350 — `passthrough` is *measured* provider failure, exactly like
+      // `static`: the output equals the input inside the mouth band.
+      const motionPassthrough = motion.verdict === "passthrough";
+      const motionStatic = motion.verdict === "static" || motionPassthrough;
       const motionUnknown = motion.verdict === "unknown";
       console.log(
-        `[sync-so-webhook] v344_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
+        `[sync-so-webhook] v350_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} outVsIn=${motion.outputVsInput ?? "n/a"} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
       );
+
+      // ══════════════════════════════════════════════════════════════════
+      // v350 — PROVIDER FORENSICS. Ask Sync.so what it actually did with the
+      // job instead of guessing from pixels alone. Stored 1:1 on the pass so
+      // the next fix is based on the provider's own answer (model used, ASD
+      // outcome, warnings) rather than another payload guess.
+      // ══════════════════════════════════════════════════════════════════
+      let providerJob: Record<string, unknown> | null = null;
+      try {
+        const syncKey = Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY") ?? "";
+        if (syncKey && jobId) {
+          const jr = await fetch(
+            `https://api.sync.so/v2/generate/${encodeURIComponent(jobId)}`,
+            { headers: { "x-api-key": syncKey }, signal: AbortSignal.timeout(15_000) },
+          );
+          const jtxt = await jr.text();
+          if (jr.ok) {
+            try {
+              const parsed = JSON.parse(jtxt);
+              providerJob = {
+                status: parsed?.status ?? null,
+                model: parsed?.model ?? null,
+                error: parsed?.error ?? parsed?.errorMessage ?? null,
+                options: parsed?.options ?? null,
+                webhookUrl: undefined,
+                raw_keys: Object.keys(parsed ?? {}),
+              };
+            } catch {
+              providerJob = { parse_error: true, body: jtxt.slice(0, 400) };
+            }
+          } else {
+            providerJob = { http_status: jr.status, body: jtxt.slice(0, 400) };
+          }
+          console.log(
+            `[sync-so-webhook] v350_provider_job scene=${sceneId} pass=${currentPass} ${JSON.stringify(providerJob).slice(0, 900)}`,
+          );
+        }
+      } catch (e) {
+        providerJob = { fetch_error: (e as Error)?.message ?? "?" };
+      }
+
+
 
 
       // Legacy byte gate stays active ONLY while the probe is unavailable.
@@ -756,7 +806,7 @@ serve(async (req) => {
       }
       if (noopSuspect) {
         const noopReason = motionStatic
-          ? "provider_returned_static_output"
+          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : motionUnverified
           ? "motion_probe_unavailable"
           : syncOutputResolutionRegression
@@ -826,7 +876,7 @@ serve(async (req) => {
         // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
         // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
         const noopReasonHard = motionStatic
-          ? "provider_returned_static_output"
+          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : motionUnverified
           ? "motion_probe_unavailable"
           : syncOutputResolutionRegression
@@ -920,7 +970,7 @@ serve(async (req) => {
         const newAttemptId = crypto.randomUUID();
         const nextStep = nextRung.step + 1;
         const noopReason = motionStatic
-          ? "provider_returned_static_output"
+          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
@@ -1039,7 +1089,7 @@ serve(async (req) => {
       const noopSuspectFlags = noopSuspect ? {
         sync_noop_suspect: true,
         noop_reason: motionStatic
-          ? "provider_returned_static_output"
+          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : motionUnverified
           ? "motion_probe_unavailable"
           : syncOutputResolutionRegression
@@ -1054,15 +1104,18 @@ serve(async (req) => {
       const motionVerdictFlags = {
         motion_verdict: motion.verdict,
         motion_score: motion.score,
+        motion_output_vs_input: motion.outputVsInput ?? null,
         motion_verdict_at: nowIso,
         motion_verdict_reason: motion.reason,
+        ...(providerJob ? { provider_job: providerJob } : {}),
       };
       if (freshDonePasses[currentPass]) {
         // v347 — a pass reaches `done` unless the mouth motion was *proven*
         // static (or a hard byte/resolution no-op signal fired). An `unknown`
         // verdict is a measurement outage on our side and must never fail a
         // pass the provider completed — that was the v344–v346 regression.
-        const verifiedMoved = motion.verdict !== "static" && !noopSuspect;
+        const verifiedMoved = motion.verdict !== "static" &&
+          motion.verdict !== "passthrough" && !noopSuspect;
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
           status: verifiedMoved ? "done" : "failed",

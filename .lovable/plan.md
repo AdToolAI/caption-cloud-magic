@@ -1,49 +1,51 @@
-## Ausgangspunkt (verifiziert an Szene `7c11bc27…`, 4 Sprecher)
+## Kurze Antwort: Nein — der Decoder-Fehler ist nicht die Ursache, er ist der Grund, warum wir sie nicht sehen
 
-- Die Face-Map stammt aus dem **Anchor-Standbild**, alle 4 Slots mit exakt `matchConfidence: 0.93` — kein echtes Unterscheidungssignal.
-- Die Dispatch-Coords werden auf dem **gerenderten Clip** neu bestimmt. Sarahs Preclip-Crop (x 954–1111) enthält ihr Face-Map-Gesicht (x-Center 1149) **nicht** → ihr Audio läuft auf ein fremdes Gesicht. Kailees Crop trifft nur den Rand.
-- Alle 4 Pässe: `motion_verdict = unknown`, Grund `motion_probe_unavailable:decoded_0` — Frames kommen an, das Dekodieren scheitert zu 100 %, `frameToGrid()` verschluckt den Fehler mit `catch { return null }`.
-- Im Repo verwendet: `DetectFaces` + `CompareFaces` (Schwellwert-Matching). **Nicht** verwendet: `CreateCollection` / `IndexFaces` / `SearchFacesByImage`.
+Zwei getrennte Dinge, beide gemessen an Szene `7c11bc27…` (01.08., 4 Sprecher):
 
-Wir wissen vor dem Render, wer wo ist — geben dieses Wissen aber nirgends verbindlich weiter, sondern lassen es nach dem Render neu erraten.
+**Symptom-Ursache (das eigentliche Problem):** Sync.so gibt den Input praktisch unverändert zurück.
+- Pass 3 (Sarah): Mund-Bereich Input-Preclip = 3.333, Output = 3.343 → identisch.
+- Pass 2 (Matthew): Output 0.46 → praktisch eingefroren, sogar weniger Bewegung als der Input.
+- Die Bewegung, die man in den Outputs überhaupt misst, ist die Kamerabewegung der Platte, nicht der Mund.
 
-**Was dieser Plan garantiert und was nicht:** Die Charakter-Zuordnung wird deterministisch (A–C) — falsche Zuordnung und doppelte Charaktere sind danach ausgeschlossen bzw. werden hart geblockt. Ob danach *jede* Lippenbewegung sichtbar ist, hängt zusätzlich davon ab, ob der Provider überhaupt animiert; das können wir heute nicht messen. D stellt die Messung her, damit wir das erstmals belegen statt vermuten.
+**Diagnose-Ursache (warum es unbemerkt durchging):** `decodeFrame()` lädt den Bild-Decoder per dynamischem `import(specifier)`. Der Edge-Bundler kann nicht-statische Specifier nicht auflösen → jeder Frame `decoded_0` → jeder Verdict `unknown` → v348 lässt `unknown` bewusst durch → Passthrough-Clips werden als Erfolg gemuxt und abgerechnet.
 
----
+Und noch wichtiger: **selbst mit repariertem Decoder** hätte die aktuelle Metrik das nicht erkannt. Sie misst nur Frame-zu-Frame-Deltas *innerhalb* des Outputs. Eine schwenkende Platte erzeugt Delta > 0 → Verdict wäre `moved` gewesen, obwohl kein Mund bewegt wurde. Genau deshalb hat sich das so lange im Kreis gedreht.
 
-## Plan v349
+Nebenbefund: Das Compositing arbeitet korrekt. Alle drei Sprecher-Patches sitzen im finalen Mux exakt auf ihren Koordinaten (950,153), (676,309), (817,194). Da ist nichts kaputt.
 
-### A. Rekognition Face Collection pro Workspace (deterministische Identität)
-- Einmalig pro Nutzer eine Collection anlegen; jedes Cast-&-World-Portrait per `IndexFaces` mit `ExternalImageId = <brand_character_id>` indexieren. `FaceId`s am Charakter speichern, Re-Index nur bei Portrait-Änderung.
-- Statt `CompareFaces`-Score-Matrix + Hungarian + Gemini-Cross-Check: pro erkannter Gesichtsbox im Clip **ein** `SearchFacesByImage` → liefert direkt die `brand_character_id`.
+## Plan
 
-### B. Bekannte Geometrie verbindlich weiterreichen
-- Die Anchor-Face-Map (Slot-Boxen + Charakter-IDs) dient als Erwartungswert. `DetectFaces` auf dem Clip-Frame, jede Box per A identifiziert — nur Boxen mit passender Identität dürfen die Coords eines Sprechers setzen.
-- Kein "nächstliegende Box gewinnt" mehr, das Sarahs Crop 117 px daneben legt.
+### 1. Decoder statisch einbinden
+`supabase/functions/_shared/mouth-motion-verdict.ts`:
+- Dynamische Import-Schleife raus, stattdessen ein statischer Top-Level-Import `import { Image } from "npm:imagescript@1.3.0"`.
+- `deno.land/x/imagescript` ersatzlos streichen (Pfad existiert nicht mehr).
+- Decode-Fehler behalten ihre konkrete Ursache (`fetch_404`, `bad_dims`, `sample_failed`) statt Sammel-`decode_failed`.
 
-### C. Harte Gates vor Credit-Abzug und Dispatch
-- Zwei Sprecher auf derselben `FaceId`/Region → `v349_clip_duplicate_identity` (dein Fall).
-- Ein Sprecher ohne Treffer im Clip → `v349_clip_missing_cast`.
-- Coord außerhalb der identifizierten Box → `v349_coord_identity_mismatch`.
+### 2. Neue Metrik: Output **gegen Input** messen
+- Für jeden Pass dieselben Timestamps und dasselbe Mund-Rechteck aus **Input-Preclip** und **Output** ziehen (beide 720×720, identische Geometrie — nachgemessen).
+- Zwei Kennzahlen: `intraOutput` (Frame-zu-Frame im Output, wie bisher) und `outputVsInput` (Output-Frame ↔ Input-Frame am selben Zeitpunkt).
+- Verdicts:
+  - `outputVsInput` unter Schwelle → **`passthrough`** → Pass gilt als fehlgeschlagen,
+  - `intraOutput` unter Schwelle → `static`,
+  - sonst `moved`,
+  - Frame-/Decoder-Ausfall → `unknown`, bleibt reine Telemetrie und blockiert nichts (v348-Regel bleibt gültig).
+- Schwellen kalibriert an den gemessenen Werten dieser Szene (Passthrough-Referenz: Delta ≈ 0.01).
 
-Jeweils: Szene auf `clip_status='pending'` + `twoshot_stage='needs_clip_rerender'`, **volle Credit-Erstattung**, klare deutsche Meldung ("Der gerenderte Clip zeigt einen Charakter doppelt — Szene wird neu gerendert").
+### 3. Gates nachziehen
+- `sync-so-webhook`: `passthrough` wie `static` behandeln → kein `done`, Retry-Pfad, danach ehrlicher Fehler + Credit-Refund statt stiller Auslieferung.
+- `render-sync-segments-audio-mux`: blockt `static` **und** `passthrough`; `unknown` bleibt durchlässig mit `motion_unverified`-Log.
 
-### D. Motion-Probe messbar machen
-- `frameToGrid()` gibt Fehler aus statt sie zu schlucken: HTTP-Status, Byte-Länge, Decoder-Fehlertext pro Frame in `frameErrors` und ins Log.
-- Decoder robust: nicht mehr allein der dynamische `npm:imagescript`-Import (wahrscheinlicher Ausfallpunkt im Edge-Runtime), plus Byte-Hash-Vergleich als letzte Instanz (identische Frames = No-Op auch ohne Pixel-Decoder erkennbar).
-- Regressionstest mit zwei synthetischen Frames, erwartet `moved` bzw. `static`.
-- `unknown` bleibt vorerst durchlässig; sobald `framesDecoded ≥ 2` in den Logs steht, blockt `static` wieder hart.
+### 4. Provider-Ursache belastbar klären (vor jeder weiteren Payload-Änderung)
+- Die 4 gespeicherten Sync.so-`job_id`s über die Job-API abfragen und die Provider-Antwort (Modell, ASD-Auswertung, erkannte Gesichter, Warnungen) 1:1 ins Pass-Objekt schreiben.
+- Erst wenn dokumentiert ist, *warum* Sync.so nicht animiert (kein aktiver Sprecher in den bounding_boxes, Audio zu kurz, Modell-Fallback …), wird am Payload etwas geändert. Keine spekulativen Geometrie-Tweaks mehr.
 
-### Betroffene Dateien
-- neu: `supabase/functions/_shared/rekognition-face-collection.ts`
-- `supabase/functions/_shared/resolveIdentityViaRekognition.ts` (Collection primär, CompareFaces nur Fallback)
-- `supabase/functions/compose-dialog-segments/index.ts` (Identitätsbindung + Gates C)
-- `supabase/functions/_shared/mouth-motion-verdict.ts`, `_shared/aws-frame-probe.ts` (Decoder + Forensik)
-- Migration: `rekognition_face_ids` an `brand_characters`, inkl. GRANTs
-- Doku: `mem://architecture/lipsync/v349-rekognition-face-collection-identity`
+### 5. Doku
+`mem/architecture/lipsync/v350-…` anlegen: Decoder statisch, `passthrough`-Verdict, v348-Regel „Messausfall killt keine Szene" bleibt. Index aktualisieren.
 
-### Was dieser Plan bewusst NICHT tut
-Keine neuen Face-Share-Schwellen, keine neuen Retry-Leitern, keine Preclip-Geometrie-Änderung.
+## Technische Details
+- Dateien: `supabase/functions/_shared/mouth-motion-verdict.ts`, `supabase/functions/sync-so-webhook/index.ts`, `supabase/functions/render-sync-segments-audio-mux/index.ts`, neue Memory-Datei.
+- Frame-Extraktion bleibt AWS-only (`_shared/aws-frame-probe.ts`), Replicate bleibt gesperrt.
+- Kein Eingriff in Preclip-Geometrie, Face-Gates oder Identity-Lock in diesem Schritt.
 
-### Verifikation nach dem Deploy
-Ich rendere eine frische 4-Sprecher-Szene und melde dir drei konkrete Zahlen zurück: (1) ob jeder Sprecher eine eindeutige `FaceId` bekommen hat, (2) ob jeder Crop seine identifizierte Box enthält, (3) den tatsächlichen `motion_verdict` pro Pass. Erst danach schrauben wir weiter — nicht vorher.
+## Was dieser Plan nicht verspricht
+Er macht das Lip-Sync nicht sofort sichtbar. Er sorgt dafür, dass die Pipeline aufhört, Passthrough-Clips als Erfolg zu verkaufen, und liefert erstmals die Provider-Antwort, die zeigt, warum Sync.so nicht animiert. Das ist die Voraussetzung dafür, dass der nächste Schritt ein echter Fix ist.
