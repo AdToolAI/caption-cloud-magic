@@ -75,7 +75,25 @@ export interface PassPreclipInput {
    *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
    *  computeFaceCrop path when unset. */
   mouth?: [number, number] | null;
+  /**
+   * v359 — per-frame face track for this speaker across the turn, in
+   * source-master pixel space (from `_shared/face-track.ts`). When present
+   * the preclip is cut with a MOVING window planned by
+   * `_shared/camera-path.ts` instead of one fixed rectangle.
+   *
+   * This is the fix for the proven Kailee failure: a fixed window shows the
+   * place the face used to be, so a moving speaker walks out of frame,
+   * Sync.so finds no mouth and returns the input unchanged.
+   *
+   * Absent → unchanged pre-v359 static-crop behaviour.
+   */
+  track?: Array<{ t: number; box: [number, number, number, number] }> | null;
+  /** v359 — voiced sub-windows in clip-relative seconds. Frames inside these
+   *  windows are weighted higher when planning zoom and framing: it matters
+   *  far more that the mouth is visible while speaking than during handles. */
+  voicedWindows?: Array<[number, number]> | null;
 }
+
 
 export interface PassPreclipResult {
   ok: boolean;
