@@ -772,11 +772,9 @@ serve(async (req) => {
           },
         });
         console.warn(
-          `[sync-so-webhook] v150 scene=${sceneId} pass=${currentPass} NOOP-suspect (${noopReason}, sizeRatio=${sizeRatio.toFixed(2)}) → PASS_DONE_SUSPECT (no auto-retry, awaiting user retry)`,
+          `[sync-so-webhook] v346 scene=${sceneId} pass=${currentPass} NOOP-suspect (${noopReason}, sizeRatio=${sizeRatio.toFixed(2)}) → retry ladder or hard fail; the pass is never marked done on an unverified mouth motion.`,
         );
-        // Fall through to mark this pass `done` with `sync_noop_suspect: true`
-        // (patched in the freshDonePasses update below).
-      }
+
 
       // v134 — Deterministic NOOP escalation ladder (sync-3 only, per
       // v129.29 directive). Replaces v129.26's single-shot escalation
