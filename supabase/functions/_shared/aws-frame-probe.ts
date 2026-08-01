@@ -74,7 +74,15 @@ export async function renderAwsStill(req: AwsStillRequest): Promise<AwsStillResu
     return { url: null, error: "remotion_serve_url_missing" };
   }
 
-  const size = Math.max(64, Math.round(Number(req.frameSize) || 512));
+  // v364 — Kantenlänge deckeln. Ein Still in voller Plate-Auflösung (1928 px)
+  // wird für Rekognition komplett heruntergeladen und base64-kodiert; zwei
+  // bis drei davon haben den Edge-Worker mit `Memory limit exceeded` getötet,
+  // bevor der eigentliche Preclip überhaupt startete. Die Detektion arbeitet
+  // mit normalisierten Koordinaten, das Framing bleibt identisch — nur die
+  // Byte-Menge sinkt um ~75 %.
+  const requested = Math.max(64, Math.round(Number(req.frameSize) || 512));
+  const maxEdge = Math.max(256, Math.round(Number(req.maxEdge) || AWS_STILL_MAX_EDGE_PX));
+  const size = Math.min(requested, maxEdge);
   const t = Math.max(0.01, Number(req.timestamp) || 0.01);
 
   // The Sync.so output is a square single-face clip, so the "crop" is the
