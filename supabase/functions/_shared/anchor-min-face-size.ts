@@ -37,6 +37,12 @@ export interface MinFaceSizeInput {
   expectedSpeakers: number;
   /** Minimum face-width ratio (default 0.12 = 12 % of plate width). */
   minWidthRatio?: number;
+  /**
+   * v354 — when true the caller MUST treat `ok=false` as a hard block
+   * (no video render). Purely informational for the caller; the pure
+   * function itself has no side effects.
+   */
+  hard?: boolean;
 }
 
 export interface MinFaceSizeResult {
