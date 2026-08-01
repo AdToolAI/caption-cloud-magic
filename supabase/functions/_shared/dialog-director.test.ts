@@ -24,7 +24,7 @@ Deno.test("v357: grenzwertige Gesichter → Punch-in mit sinnvollem Zoomfaktor",
     plateWidth: 1920, plateHeight: 1080, nativePlateWidth: 1920, expectedSpeakers: 2,
   });
   assertEquals(d.mode, "punch_in");
-  assert(d.punchInZoom > 1.5 && d.punchInZoom <= 3, `Zoom unplausibel: ${d.punchInZoom}`);
+  assert(d.punchInZoom > 1.5 && d.punchInZoom <= 2, `Zoom unplausibel: ${d.punchInZoom}`);
 });
 
 Deno.test("v357: Regression 4er-Konferenz (Kailee 94px) → Coverage statt Fehlschlag", () => {

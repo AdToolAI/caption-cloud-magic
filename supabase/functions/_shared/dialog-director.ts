@@ -24,8 +24,14 @@ export type DialogMode = "group_shot" | "punch_in" | "coverage";
 export const TARGET_FACE_WIDTH_PX = 220;
 /** Darunter reicht das Bildmaterial für einen reinen Gruppenshot nicht mehr. */
 export const COMFORT_FACE_WIDTH_PX = 150;
+/**
+ * Maximaler digitaler Zoom, der auf einer nativen Plate noch echte
+ * Munddetails liefert. Darüber vergrößern wir nur Interpolationsmatsch —
+ * genau der Fall, an dem Szene 89c5e01c (Kailee, 94px) gescheitert ist.
+ */
+export const PUNCH_IN_MAX_ZOOM = 2.0;
 /** Darunter hilft auch ein digitaler Punch-in nicht mehr → Coverage. */
-export const PUNCH_IN_FLOOR_PX = 70;
+export const PUNCH_IN_FLOOR_PX = Math.ceil(TARGET_FACE_WIDTH_PX / PUNCH_IN_MAX_ZOOM);
 
 export interface DirectorFace {
   bbox: [number, number, number, number];
@@ -79,7 +85,7 @@ export function decideDialogMode(input: DirectorInput): DirectorDecision {
   }
 
   const minFaceWidthPx = Math.round(widths[0]);
-  const punchInZoom = round2(Math.min(3, TARGET_FACE_WIDTH_PX / Math.max(1, minFaceWidthPx)));
+  const punchInZoom = round2(Math.min(PUNCH_IN_MAX_ZOOM, TARGET_FACE_WIDTH_PX / Math.max(1, minFaceWidthPx)));
 
   if (minFaceWidthPx >= COMFORT_FACE_WIDTH_PX) {
     return {
