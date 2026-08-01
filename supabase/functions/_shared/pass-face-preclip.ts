@@ -518,7 +518,10 @@ export async function renderPassFacePreclip(
     cropX: crop.x,
     cropY: crop.y,
     cropSize: crop.size,
+    // v359 — bewegtes Fenster. Fehlt es, rendert die Komposition statisch.
+    ...(cropPath ? { cropPath } : {}),
   };
+
 
   const { error: insertErr } = await supabase
     .from("video_renders")
