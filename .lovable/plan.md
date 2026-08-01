@@ -1,40 +1,55 @@
-## Befund (verifiziert am laufenden Run)
+# Plan v367 — Beweis zuerst: Wer bekommt welches Overlay?
 
-Szene `6bf4e815…`, Pass 1/4 ist fertig (`done`, Output vorhanden). Pass 2 hängt seit ~21:59 auf `rendering_preflight`, ohne `job_id`; der Dispatch-Lock läuft bis 22:10.
+## Ehrlicher Stand
 
-Die Logs von `compose-dialog-segments` zeigen die Ursache eindeutig:
+Meine bisherige Erklärung (Restbewegung, Player-Verwechslung) deckt deine Beobachtung nicht ab. Wenn alle vier deutschen Dialoge exakt taktgenau auf Sarahs Mund liegen, muss entweder das Zurückkleben oder die Sprecherzuordnung kollabieren. **Diese Ursache ist derzeit nicht bewiesen** — deshalb wird sie zuerst gemessen, bevor irgendetwas umgebaut wird.
+
+## Verifizierte Fakten aus dem letzten Lauf
+
+- Vier getrennte Sync.so-Pässe mit vier deutschen Audiodateien und vier korrekten Zeitfenstern (0–1.16, 1.41–2.94, 3.19–4.96, 5.21–7.81).
+- Vier unterschiedliche Rückklebe-Rechtecke, also keine offensichtlich identischen Koordinaten.
+- Die HappyHorse-Rohplatte besitzt eine eigene Audiospur — sie erklärt Sarahs englischen Fremdtext, aber nicht die deutschen Dialoge.
+
+## Der gefundene Widerspruch
+
+Die Szene speichert **zwei sich widersprechende Gesichts-zu-Charakter-Zuordnungen**:
 
 ```text
-22:03:02  v163_preclip_render START  speaker=Matthew Dusatko window=[1.13,3.16]
-22:03:04  [face-detect/aws] rekognition primary plate=1928x1076 frames=1
-22:03:05  [face-detect/aws] rekognition ok ... ms=1033
-22:03:06  ERROR Memory limit exceeded
-22:03:06  shutdown
+Zuordnung A (Geometrie-Lock)   Zuordnung B (Vision-FaceMap)
+Platz 0 -> Samuel              Platz 0 -> Matthew
+Platz 1 -> Matthew             Platz 1 -> Kailee
+Platz 2 -> Sarah               Platz 2 -> Samuel
+Platz 3 -> Kailee              Platz 3 -> Sarah
 ```
 
-Der Worker stirbt also **im v359-Plate-Tracker**, bevor der eigentliche Lambda-Preclip und Sync.so überhaupt drankommen. v363 hat den Tracker nur auf 3 Stützbilder begrenzt — der Speicher reißt aber schon bei 2–3 Bildern, weil jedes Still in **voller Plate-Größe (1928 px)** gerendert, komplett heruntergeladen und für Rekognition base64-kodiert wird. Ein hart abgeschossener Worker kann nichts aufräumen, deshalb bleibt `rendering_preflight` + Lock stehen, und der v362-Watchdog startet exakt denselben Absturz erneut → sichtbarer Dauer-Hänger bei "Clip 2".
+Keine der beiden ist als verbindlich markiert. Welche Zuordnung greift, hängt davon ab, welcher Schritt sie zuerst liest. Genau hier kann die Zuordnung von Sprecher zu Gesicht kippen. Ob dieser Widerspruch tatsächlich die Ursache ist, muss der Nachweis unten zeigen.
 
-## Plan v364
+## 1. Nachweis (zuerst, ohne Umbau)
 
-### 1. Tracker speicherfest machen
-- `_shared/aws-frame-probe.ts`: Stills auf eine maximale Kantenlänge (960 px) deckeln, statt die Plate-Auflösung 1:1 zu rendern.
-- `_shared/face-track.ts`:
-  - Stills strikt **sequenziell** rendern und auswerten (kein `Promise.all`), jede Referenz nach der Auswertung freigeben.
-  - Boxen über den bestehenden Koordinatenvertrag (`rek-image-space.ts`, v361) aus dem verkleinerten Detektionsraum zurück in den Plate-Raum projizieren — keine neue Rechenlogik, nur korrekter Zielraum.
-  - Die Verdichtungs-Runde (`planDensifyTimestamps`) nur noch laufen lassen, wenn Zeit- **und** Sample-Budget es zulassen (max. 1 Zusatzbild).
+- Aus jedem der vier gelieferten Sync.so-Ergebnisse Standbilder im jeweils zugehörigen Dialogfenster ziehen und feststellen, welche Person darin den Mund bewegt.
+- Aus dem finalen Video zu denselben Zeitpunkten Standbilder ziehen und feststellen, an welcher Bildposition Bewegung liegt.
+- Ergebnis ist eindeutig einer von drei Fällen:
+  - **A**: Bereits die vier Provider-Ergebnisse zeigen viermal Sarah → Fehler in der Zuschnitt-Erstellung.
+  - **B**: Die Provider-Ergebnisse zeigen vier verschiedene Personen, das Finale nur Sarah → Fehler beim Zurückkleben.
+  - **C**: Beides korrekt → Fehler in der Auslieferung des angezeigten Videos.
+- Dieser Nachweis ist rein intern und erzeugt keine Kundenassets.
 
-### 2. Crash-Loop-Breaker (das eigentlich Wichtige)
-- Vor dem Tracker wird pro Pass ein Marker gesetzt (`plate_track_attempted_at`); nach erfolgreichem Preclip wieder entfernt.
-- Findet ein neuer Lauf diesen Marker vor (= letzter Versuch ist mitten im Tracking gestorben), wird der Tracker **übersprungen** und der Preclip statisch gerendert (Verhalten wie vor v359). Damit läuft jeder Pass spätestens im zweiten Anlauf durch, statt endlos denselben OOM zu wiederholen.
-- `lipsync-watchdog` zählt Preflight-Recoveries pro Pass mit und markiert den Pass beim Reset als `plate_track_disabled`.
+## 2. Fix je nach Befund
 
-### 3. Aktuellen Hänger auflösen
-- Lock für `6bf4e815…` freigeben, Pass 2 auf `pending` mit gesetztem `plate_track_disabled` zurücksetzen und einen sauberen Re-Dispatch anstoßen, damit die Szene ohne Neustart weiterläuft.
+- **Fall A**: Eine einzige verbindliche Gesichtszuordnung festlegen. Der Geometrie-Lock wird alleinige Wahrheit, die zweite Zuordnung wird nur noch als Hinweis geführt und darf keinen Zuschnitt mehr bestimmen. Vor dem Versand wird geprüft, dass jeder Sprecher genau ein eigenes Gesicht bekommt.
+- **Fall B**: Das Zurückkleben wird strikt an denselben Zuschnitt gebunden, mit dem der Sprecher ausgeschnitten wurde. Überlappen sich zwei Zielbereiche oder fehlt einer, bricht der Zusammenbau ab statt ein falsches Ergebnis zu erzeugen.
+- **Fall C**: Endgültiges Video wird zur einzigen sichtbaren Szenenversion; Rohplatten und Zwischenstände verschwinden aus der Mediathek.
 
-### 4. Verifikation
-- Logs verfolgen bis `v163_preclip_render OK` für Pass 2, danach ein Sync.so-`job_id` für Pass 2/4.
-- Kein `Memory limit exceeded` mehr in `compose-dialog-segments`.
-- Szene erreicht `syncso_fanout_4_of_4` und den Mux.
+## 3. Unabhängig davon sofort mit umgesetzt
 
-### Technischer Hinweis
-Der Tracker bleibt optional und rein qualitätssteigernd; er darf ab v364 unter keinen Umständen den Dispatch verhindern. Alle bestehenden Gates (v355 Pixel-Face-Contract, v356 Outcome-Gate, v361 Koordinatenvertrag) bleiben unverändert.
+- Dialogplatten werden bei HappyHorse ohne Provider-Audio erzeugt und vor dem Lip-Sync tonlos gemacht, damit nie wieder eine fremde englische Stimme im Material liegt.
+- Interne Zwischenstände (Rohplatte, Einzelzuschnitte, Einzelpässe) erscheinen nicht mehr in der Mediathek; nur das fertige Szenenvideo ist sichtbar.
+- Die bereits sichtbaren Doppel- und Vorgängerversionen dieser Szene werden bereinigt.
+
+## 4. Abnahme
+
+Neue Vier-Sprecher-Testszene. Für jedes der vier Dialogfenster wird nachgewiesen, dass genau die vorgesehene Person den Mund bewegt. Kein englischer Ton. Nach Neuladen genau ein Szenenvideo in der Mediathek.
+
+## Technischer Hinweis
+
+Keine Änderung an Sync.so-Parametern, Preisen oder Rückerstattungslogik. Der Umbau beschränkt sich auf Zuordnung, Zusammenbau und Sichtbarkeit von Assets.
