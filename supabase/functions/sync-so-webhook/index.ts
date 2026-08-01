@@ -689,8 +689,13 @@ serve(async (req) => {
         inBytes > 0 && outBytes > 0 &&
         sizeRatio >= 0.92 && sizeRatio <= 1.08;
 
-      const motionUnverified = motionUnknown;
-      const noopSuspect = motionStatic || motionUnverified || syncOutputUnchanged ||
+      // v347 — MEASUREMENT ERRORS NEVER COUNT AS PROVIDER EVIDENCE.
+      // An `unknown` verdict means our AWS probe could not decode frames.
+      // It must not consume the NOOP ladder, must not recommend a plate
+      // re-render and must not fail a pass. Only proven-static output or the
+      // hard byte/resolution signals do that.
+      const motionUnverified = false as boolean;
+      const noopSuspect = motionStatic || syncOutputUnchanged ||
         syncOutputResolutionRegression || legacyByteNoop;
 
       // Persist the verdict for every pass, pass or fail (Phase 4).
