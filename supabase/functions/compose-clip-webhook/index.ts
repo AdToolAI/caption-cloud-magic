@@ -207,7 +207,17 @@ serve(async (req) => {
           typeof sceneFull.clip_source === 'string' &&
           sceneFull.clip_source.startsWith('ai-');
 
-        if (sceneFull && projectMeta?.user_id && isRealAiClip) {
+        // v367 — Canonical Dialog Asset Contract:
+        // A cinematic-sync master plate is an INTERNAL intermediate. It still
+        // carries the provider's own (English/gibberish) audio and un-synced
+        // mouths. Only the final dialog-stitch mux may enter the library,
+        // otherwise the user sees 3+ "versions" of the same scene where the
+        // plate speaker appears to speak every line.
+        if (isCinematicSync) {
+          console.log(
+            `[compose-clip-webhook] v367 library archive skipped for scene ${sceneId} — cinematic-sync master plate is internal`,
+          );
+        } else if (sceneFull && projectMeta?.user_id && isRealAiClip) {
           // Mark previous active library entries for this scene as superseded
           // so that regenerations keep the older versions visible.
           const { data: previousEntries } = await supabase
