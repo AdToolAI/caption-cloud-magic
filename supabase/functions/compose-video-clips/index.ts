@@ -4631,7 +4631,13 @@ serve(async (req) => {
           // tags, dark-bedroom/3-AM/laptop-screen triggers, duplicates.
           // The Alibaba content filter rejects raw prompts with these
           // tokens BEFORE GPU spend (DataInspectionFailed).
-          const hhSan = sanitizeForHappyHorse(String(hhPromptRaw ?? ""));
+          // v369 — dialog plates (cinematic-sync) go through the aggressive
+          // sanitizer + lip-ready compressor right away: their prompts are the
+          // longest and the ones HappyHorse rejects with InvalidParameter /
+          // Green Net. Lip motion comes from Sync.so, not from this prompt.
+          const hhSan = isCinematicSyncHH
+            ? hardSanitizeForHappyHorse(String(hhPromptRaw ?? ""))
+            : sanitizeForHappyHorse(String(hhPromptRaw ?? ""));
           const hhCleanPrompt = hhSan.emptied ? String(hhPromptRaw ?? "") : hhSan.clean;
           if (hhSan.touched.length > 0) {
             console.log(
