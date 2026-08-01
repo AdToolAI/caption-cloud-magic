@@ -190,21 +190,19 @@ Deno.serve(async (req) => {
     );
 
 
-    // ---------- Slice 4: NOOP-Ladder escalation ----------
+    // ---------- v353: NOOP-Ladder abgeschafft ----------
+    // Identisch zu sync-so-webhook: ein Retry mit derselben Eingangs-
+    // bedingung liefert nachweislich dasselbe Passthrough. Der Client-Probe-
+    // Report darf deshalb keinen zweiten Dispatch mehr auslösen; er endet
+    // terminal und der Pre-Dispatch-Floor (pass-face-preclip v353) verhindert
+    // die Fälle bereits vorher.
     const passSpeakerName = String(pass.speaker_name ?? "Speaker");
     const passTurnIdx = Number(pass.idx ?? body.pass_idx);
     const noopEscalationStep = Number(pass.noop_escalation_step ?? 0);
-    const havePlateCoords = Array.isArray(pass.coords) &&
-      (pass.coords as unknown[]).length === 2;
-    const havePreclipCrop = !!pass.preclip_crop &&
-      Number.isFinite(Number((pass.preclip_crop as { size?: number }).size));
-    const haveReferenceFrame = Number.isFinite(Number(pass.reference_frame_number));
-    const faceShare = Number((pass as any).preclip_face_share);
-    const NOOP_LADDER = Number.isFinite(faceShare) && faceShare < SMALL_FACE_THRESHOLD
-      ? LADDER_SMALL_FACE
-      : LADDER_NORMAL_FACE;
-    const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
-    const canEscalate = !!nextRung && havePlateCoords && havePreclipCrop && haveReferenceFrame;
+    const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [];
+    const nextRung: { step: number; variant: string; label: string } | undefined = undefined;
+    const canEscalate = false as boolean;
+
 
     const jobId = body.job_id ?? String(pass.job_id ?? "") ?? null;
 
