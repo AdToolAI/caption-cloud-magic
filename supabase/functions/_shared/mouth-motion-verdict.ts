@@ -477,22 +477,16 @@ async function decodeFrame(frameUrl: string, rect: MouthRect): Promise<DecodedFr
 
   const bytesHash = await sha256Hex(bytes).catch(() => null);
 
+  // v350 — statically imported decoder (see the import at the top of the
+  // file). Dynamic `import()` is NOT bundled by the edge runtime.
   // deno-lint-ignore no-explicit-any
   let img: any = null;
-  let error: string | null = null;
-  for (const specifier of ["npm:imagescript@1.3.0", "https://deno.land/x/imagescript@1.2.15/mod.ts"]) {
-    try {
-      const mod = await import(specifier);
-      // deno-lint-ignore no-explicit-any
-      const ImageCtor: any = (mod as any).Image ?? (mod as any).default?.Image;
-      if (!ImageCtor?.decode) { error = `no_decode_export:${specifier}`; continue; }
-      img = await ImageCtor.decode(bytes);
-      if (img) { error = null; break; }
-    } catch (e) {
-      error = `decode_failed:${(e as Error)?.message ?? "?"}`;
-    }
+  try {
+    img = await Image.decode(bytes);
+  } catch (e) {
+    return { grid: null, bytesHash, error: `decode_failed:${(e as Error)?.message ?? "?"}` };
   }
-  if (!img) return { grid: null, bytesHash, error: error ?? "decode_null" };
+  if (!img) return { grid: null, bytesHash, error: "decode_null" };
 
   const w = Number(img.width);
   const h = Number(img.height);
