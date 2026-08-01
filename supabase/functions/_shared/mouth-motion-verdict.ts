@@ -163,9 +163,22 @@ export async function judgeMouthMotion(
     let end = Number.isFinite(rawEnd) && rawEnd > start ? rawEnd : start + 2.0;
     // Windows are provided relative to the scene; a preclip output starts at 0.
     if (end - start < 0.6) end = start + 0.6;
-    const inset = Math.min(0.18, (end - start) * 0.12);
+
+    // v346 — never sample past the end of the actual clip. A timestamp
+    // beyond the last frame makes the extractor return nothing, which the
+    // old code reported as `frames_0_of_4` — indistinguishable from an
+    // outage and enough to stall the whole scene.
+    const clipDur = Number(input.clipDurationSec);
+    if (Number.isFinite(clipDur) && clipDur > 0.2) {
+      const hardEnd = Math.max(0.1, clipDur - 0.05);
+      if (end > hardEnd) end = hardEnd;
+      if (start >= end) start = Math.max(0.02, end - 0.5);
+    }
+
+    const inset = Math.min(0.18, Math.max(0, (end - start) * 0.12));
     start += inset;
     end -= inset;
+    if (end <= start) end = start + 0.1;
 
     for (let i = 0; i < samples; i++) {
       const t = start + ((end - start) * i) / (samples - 1);
@@ -173,19 +186,31 @@ export async function judgeMouthMotion(
     }
 
     const deadline = Date.now() + budgetMs;
-    const frameUrls = await Promise.all(
+    const frameResults = await Promise.all(
       timestamps.map((t) => extractFrame(token, input.outputUrl, t, deadline)),
     );
-    const usable = frameUrls.filter((u): u is string => !!u);
+    const frameErrors = frameResults
+      .map((r, i) => (r.url ? null : `t=${timestamps[i]}:${r.error ?? "unknown"}`))
+      .filter((e): e is string => !!e);
+    const usable = frameResults
+      .map((r) => r.url)
+      .filter((u): u is string => !!u);
+    if (frameErrors.length) {
+      console.warn(
+        `[mouth-motion-verdict] ${input.label ?? ""} frame extraction issues (${usable.length}/${samples} ok): ${frameErrors.join(" | ")}`,
+      );
+    }
     if (usable.length < 2) {
       return {
         ...base,
         verdict: "unknown",
         score: 0,
+        frameErrors,
         reason: `motion_probe_unavailable:frames_${usable.length}_of_${samples}`,
         latencyMs: Date.now() - t0,
       };
     }
+
 
     const rect = normaliseRect(input.mouthRect) ?? DEFAULT_MOUTH_RECT;
     const grids = await Promise.all(usable.map((u) => frameToGrid(u, rect)));
