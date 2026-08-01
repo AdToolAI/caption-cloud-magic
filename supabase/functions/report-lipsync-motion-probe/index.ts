@@ -52,6 +52,14 @@ interface Payload {
   yavg_normalized?: number;
   frames?: number;
   method?: string;
+  /**
+   * v344 — when true, the report is persisted for forensics but MUST NOT
+   * trigger escalation, hard-fail or refund. The authoritative motion
+   * verdict is produced server-side in `sync-so-webhook` via
+   * `_shared/mouth-motion-verdict.ts`; a browser canvas probe is a
+   * best-effort signal and is not allowed to decide production outcomes.
+   */
+  observe_only?: boolean;
 }
 
 function isPayload(x: unknown): x is Payload {
