@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
     const turnEnd = Number(
       (Array.isArray(pass.segments) && (pass.segments as Array<{ endTime?: number }>)[0]?.endTime) ?? 0,
     ).toFixed(1);
-    const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`;
+    const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung). Bitte die Szene mit näherem Bildausschnitt / größeren Gesichtern neu rendern.`;
 
     await admin
       .from("composer_scenes")
@@ -250,7 +250,7 @@ Deno.serve(async (req) => {
       scene_id: body.scene_id,
       job_id: jobId,
       turn_idx: passTurnIdx,
-      sync_status: "NOOP_LADDER_EXHAUSTED",
+      sync_status: "NOOP_TERMINAL_V353",
       error_class: "sync_noop_unrecoverable",
       error_message: userMsg,
       meta: {
