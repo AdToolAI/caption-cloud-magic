@@ -362,10 +362,15 @@ serve(async (req) => {
 
   if (!scene || !sceneId) {
     console.warn(`[sync-so-webhook] no scene matched job ${jobId}`);
+    // v351 — a job we can no longer attribute must NOT keep holding a
+    // Sync.so concurrency slot. Without this every client-side reset that
+    // nulls dialog_shots permanently burns one of the 4 slots.
+    try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
     return ok({ ok: true, skipped: "no_scene_match", job_id: jobId });
   }
 
   if (scene.lip_sync_applied_at) {
+    try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
     return ok({ ok: true, skipped: "already_applied" });
   }
   // v18 Cancel-Guard: ignore late webhooks for user-cancelled scenes.
@@ -373,8 +378,10 @@ serve(async (req) => {
     (scene as any).lip_sync_status === "canceled" ||
     (scene.dialog_shots as any)?.status === "canceled"
   ) {
+    try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
     return ok({ ok: true, skipped: "canceled", scene_id: sceneId });
   }
+
 
   // v129.4a — Late-webhook guard for already-terminal scenes.
   // The webhook is the single source of truth for scene terminalisation
