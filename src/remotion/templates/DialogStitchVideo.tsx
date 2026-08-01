@@ -264,16 +264,29 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   // over ~half the crop; the master plate underneath dominates the outer
   // 22% and the identity change is invisible.
   const mask = 'radial-gradient(circle at center, #000 0%, #000 30%, rgba(0,0,0,0) 78%)';
+
+  // v359 — the paste-back rect follows the same camera path the preclip was
+  // cut with. Without a path this resolves to the static rect (pre-v359
+  // behaviour, unchanged).
+  const rect = React.useMemo(() => {
+    if (Array.isArray(path) && path.length > 0) {
+      const p = path[Math.min(Math.max(0, frame), path.length - 1)];
+      if (p && Number.isFinite(p.left) && Number.isFinite(p.top) && p.size > 0) return p;
+    }
+    return { left, top, size };
+  }, [path, frame, left, top, size]);
+
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
         style={{
           position: 'absolute',
-          left,
-          top,
-          width: size,
-          height: size,
+          left: rect.left,
+          top: rect.top,
+          width: rect.size,
+          height: rect.size,
           opacity,
+
           WebkitMaskImage: mask,
           maskImage: mask,
           WebkitMaskRepeat: 'no-repeat',
