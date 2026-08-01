@@ -2715,22 +2715,20 @@ serve(async (req) => {
       );
     }
 
-    // ── v355 — PIXEL FACE CONTRACT (post-render, pre-dispatch) ───────────
-    // This is the one binding gate. The anchor stage only steers framing;
-    // the rendered plate is what the provider actually sees, and here the
-    // measurement is in NATIVE PIXELS, not in a fraction of the frame.
+    // ── v356 — PLATE FACE GEOMETRY: TELEMETRY, NOT A GATE ────────────────
+    // v354 blocked on a ratio, v355 blocked on absolute pixels. Both were
+    // generalised from one failing scene. The database says otherwise:
+    // the 2026-07-27 runs that completed successfully (scene 0f8818ee,
+    // 4 speakers, status=done) used 128px crops at 4.8 % face-share —
+    // numbers that both contracts reject. A pre-dispatch geometry gate
+    // cannot be defined for group shots without excluding the very
+    // configuration that is proven to work.
     //
-    // v354 gated the same spot on a ratio and blocked a legitimate
-    // 4-person conference shot at 5.8 % vs 16 % — a bar four faces can
-    // never clear together. The provider evidence was always absolute:
-    // ~181 px native crop animates, ~116 px and ~102 px come back
-    // untouched. A ratio also drifts with plate resolution, so the very
-    // same shot passes at 1080p and fails at 720p for no visual reason.
-    //
-    // Blocking here still happens before any Sync.so slot is spent, and
-    // the credits are refunded in full.
+    // The binding guard now sits AFTER the run: `mouth-motion-verdict`
+    // compares provider output against input, blocks the mux on a proven
+    // passthrough and refunds. That measures what the customer sees
+    // instead of predicting what the provider can do.
     if (
-      closeupOnlyEnabled() &&
       !isAdvance &&
       !isRetry &&
       speakers.length >= 1 &&
@@ -2749,40 +2747,13 @@ serve(async (req) => {
           mode: "pixels",
         });
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v355_plate_contract ok=${verdict.ok ? 1 : 0} ` +
-          `min_px=${verdict.minWidthPx} required_px=${verdict.requiredPx} ` +
-          `min_ratio=${verdict.minWidthRatio.toFixed(3)} plate_w=${plateDims.width} n=${speakers.length}`,
+          `[compose-dialog-segments] scene=${sceneId} v356_plate_geometry_telemetry advisory_ok=${verdict.ok ? 1 : 0} ` +
+          `min_px=${verdict.minWidthPx} advisory_px=${verdict.requiredPx} ` +
+          `min_ratio=${verdict.minWidthRatio.toFixed(3)} plate_w=${plateDims.width} n=${speakers.length} — no block, verdict decides`,
         );
-        if (!verdict.ok) {
-          const msg = contractFailureMessage(verdict, speakers.length);
-          console.error(
-            `[compose-dialog-segments] scene=${sceneId} v355_plate_contract_BLOCK ` +
-            `${verdict.reason} — refunding ${totalCost} credits, no dispatch`,
-          );
-          await failLipSync({
-            supabase,
-            sceneId,
-            reason: "lipsync_face_contract_violation",
-            userId,
-            refundCredits: totalCost,
-            syncApiKey,
-          });
-          return json(
-            {
-              error: "lipsync_face_contract_violation",
-              message: msg,
-              min_width_px: verdict.minWidthPx,
-              required_px: verdict.requiredPx,
-              min_width_ratio: verdict.minWidthRatio,
-              plate_width: Number(plateDims.width),
-              refunded: totalCost,
-            },
-            422,
-          );
-
-        }
       }
     }
+
 
 
 
