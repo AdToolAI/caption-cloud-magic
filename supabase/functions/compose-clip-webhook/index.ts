@@ -539,6 +539,88 @@ serve(async (req) => {
         }
       }
 
+      // ── v369 · Prompt-Repair-Retry (exactly once) ─────────────────────────
+      // HappyHorse rejects the plate prompt either via Green Net or via
+      // "InvalidParameter - Could not process with this prompt". Re-sending the
+      // identical prompt is pointless, so we harden it once (aggressive
+      // sanitizer + lip-ready compressor) and dispatch a single repaired run
+      // before falling through to fail + refund.
+      const rejectionKind = classifyProviderRejection(enrichedError);
+      const alreadyRepaired = String((scene as any)?.clip_error ?? '')
+        .includes('[prompt_repair_retry]');
+      const originalPrompt = String(
+        (payload?.input as Record<string, unknown> | undefined)?.prompt ?? '',
+      );
+
+      if (
+        rejectionKind !== 'none' &&
+        !alreadyRepaired &&
+        originalPrompt.trim().length > 0 &&
+        (payload.model || payload.version) &&
+        payload.input &&
+        typeof payload.input === 'object'
+      ) {
+        const repaired = hardSanitizeForHappyHorse(originalPrompt);
+        const repairedPrompt = repaired.emptied ? '' : repaired.clean.trim();
+
+        if (repairedPrompt && repairedPrompt !== originalPrompt.trim()) {
+          try {
+            const replicateKey = Deno.env.get('REPLICATE_API_KEY');
+            if (!replicateKey) throw new Error('REPLICATE_API_KEY missing');
+            const replicate = new Replicate({ auth: replicateKey });
+
+            const webhookBase = appendWebhookToken(
+              `${supabaseUrl}/functions/v1/compose-clip-webhook`,
+            );
+            const newWebhook = `${webhookBase}&scene_id=${sceneId}&project_id=${projectId}`;
+
+            const repairArgs: Record<string, unknown> = {
+              input: { ...(payload.input as Record<string, unknown>), prompt: repairedPrompt },
+              webhook: newWebhook,
+              webhook_events_filter: ['completed'],
+            };
+            if (payload.model) repairArgs.model = payload.model;
+            else repairArgs.version = payload.version;
+
+            const repairedPred = await replicate.predictions.create(
+              repairArgs as Parameters<typeof replicate.predictions.create>[0],
+            );
+
+            await supabase
+              .from('composer_scenes')
+              .update({
+                clip_status: 'generating',
+                retry_count: currentRetry + 1,
+                replicate_prediction_id: repairedPred.id,
+                ai_prompt: repairedPrompt,
+                clip_error: `[prompt_repair_retry] ${rejectionKind}: ${String(enrichedError ?? '').slice(0, 200)}`,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sceneId);
+
+            console.warn(
+              `[compose-clip-webhook] v369 prompt-repair retry for scene ${sceneId} (${rejectionKind}) → pred ${repairedPred.id}; touched: ${repaired.touched.join(', ')}`,
+            );
+
+            return new Response(
+              JSON.stringify({ ok: true, retried: true, prompt_repair: true }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          } catch (repairErr) {
+            console.error(
+              '[compose-clip-webhook] v369 prompt-repair dispatch failed, falling through to refund:',
+              repairErr,
+            );
+          }
+        } else {
+          console.warn(
+            `[compose-clip-webhook] v369 prompt-repair skipped for scene ${sceneId}: sanitizer produced no change`,
+          );
+        }
+      }
+
+
+
       // ── Green-Net (Alibaba HappyHorse content filter) → tag, do NOT switch ──
       // v176: previously we silently rewrote clip_source to ai-hailuo so the
       // next "Neu rendern" click bypassed HH. That overrode the user's
