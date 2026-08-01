@@ -982,13 +982,23 @@ serve(async (req) => {
 
       const noopSuspectFlags = noopSuspect ? {
         sync_noop_suspect: true,
-        noop_reason: syncOutputResolutionRegression
+        noop_reason: motionStatic
+          ? "provider_returned_static_output"
+          : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
             : "sync_output_reencoded_passthrough_suspect",
         noop_size_ratio: sizeRatio,
       } : {};
+      // v344 — the verdict travels with the pass so the mux gate can refuse
+      // to composite a scene that contains a proven-static speaker.
+      const motionVerdictFlags = {
+        motion_verdict: motion.verdict,
+        motion_score: motion.score,
+        motion_verdict_at: nowIso,
+        motion_verdict_reason: motion.reason,
+      };
       if (freshDonePasses[currentPass]) {
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
@@ -997,9 +1007,11 @@ serve(async (req) => {
           rehosted: !!rehostedUrl,
           sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
           finished_at: nowIso,
+          ...motionVerdictFlags,
           ...noopSuspectFlags,
         };
       }
+
 
       const { doneCount, failedCount, allTerminal } = terminalV5Counts(freshDonePasses);
       const allDone = allTerminal && doneCount > 0;
