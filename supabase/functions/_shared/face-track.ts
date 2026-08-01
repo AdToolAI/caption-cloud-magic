@@ -491,5 +491,9 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
     source: "tracked",
     error: null,
     ms: Date.now() - t0,
+    detectionRatio,
+    peakMotionPx,
+    extraSamples,
   };
+
 }
