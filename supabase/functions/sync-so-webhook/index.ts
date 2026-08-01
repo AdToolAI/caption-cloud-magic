@@ -1095,6 +1095,7 @@ serve(async (req) => {
               output_url: rehostedUrl ?? outputUrl,
               rehosted: !!rehostedUrl,
               finished_at: nowIso,
+              ...motionVerdictFlags,
             },
           });
           // Top-level scene status / counters — non-slot fields, safe to UPDATE.
