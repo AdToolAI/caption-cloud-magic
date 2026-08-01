@@ -653,6 +653,11 @@ serve(async (req) => {
         // provider output to render a full, undistorted frame.
         frameSize: Number((passBeforeDone as any)?.preclip_crop?.outputSize) ||
           Number(outputDims?.width) || 512,
+        // v350 — the clip we SENT the provider. Without it a passthrough
+        // (input handed straight back) is indistinguishable from real motion
+        // on a plate with camera movement.
+        inputUrl: inputPreclipUrl ||
+          String((passBeforeDone as any)?.input_url ?? "") || null,
         label: `scene=${sceneId} pass=${currentPass}`,
       };
       let motion = await judgeMouthMotion(probeInput);
