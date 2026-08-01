@@ -53,6 +53,11 @@ const STALE_DISPATCH_RECOVERY_MS = 30_000;
 // own timeout is now 300 s (see render-sync-segments-audio-mux), so 6 min
 // gives one extra retry cycle before we hard-fail the scene.
 const STALE_AUDIO_MUX_MS = 6 * 60_000;
+// v362 — A preclip render happens before a Sync.so job exists. If the Edge
+// runtime is hard-killed during that await, neither the 420 s dispatch lock nor
+// `rendering_preflight` is cleaned up. Recover after three minutes of zero
+// provider progress; healthy preflights refresh into a provider job before this.
+const STALE_RENDERING_PREFLIGHT_MS = 3 * 60_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 
@@ -246,7 +251,10 @@ serve(async (req) => {
       "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred,master_clip,syncso_fanout_recovering,audio_muxing))," +
       "and(lip_sync_status.eq.pending,twoshot_stage.like.syncso_fanout_%)," +
       "and(lip_sync_status.eq.pending,twoshot_stage.like.syncso_retry_%)," +
-      "and(lip_sync_status.eq.pending,twoshot_stage.is.null,clip_url.is.null)",
+      "and(lip_sync_status.eq.pending,twoshot_stage.is.null,clip_url.is.null)," +
+      // v362: includes preclip zombies with a ready source clip. Previously
+      // these rows were invisible because clip_url was non-null.
+      "and(lip_sync_status.eq.pending,dialog_shots.not.is.null)",
     )
     .is("lip_sync_applied_at", null)
     .limit(200);
@@ -306,6 +314,66 @@ serve(async (req) => {
       ds?.version === 5 &&
       ds?.engine === "sync-segments" &&
       Array.isArray(ds?.passes);
+
+    // ── v362 stale preflight/lock recovery ───────────────────────────────
+    // A hard Edge-runtime timeout cannot execute compose-dialog-segments'
+    // `finally`, leaving a pass at rendering_preflight with no Sync.so job.
+    // The old watchdog only understood fully initialized v5 states, while the
+    // first preclip can die before that root state is written. Reset the stale
+    // slot atomically, remove only expired/stale dispatch locks, and trigger a
+    // fresh idempotent dispatch immediately.
+    const preflightPasses: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
+    const stalePreflightIdx = preflightPasses.findIndex((p: any) => {
+      if (String(p?.status ?? "") !== "rendering_preflight" || p?.job_id) return false;
+      const started = typeof p?.preflight_started_at === "string"
+        ? Date.parse(p.preflight_started_at)
+        : NaN;
+      return Number.isFinite(started) && now - started >= STALE_RENDERING_PREFLIGHT_MS;
+    });
+    if (stalePreflightIdx >= 0) {
+      const stalePass = preflightPasses[stalePreflightIdx] ?? {};
+      const preflightAgeMs = now - Date.parse(String(stalePass.preflight_started_at));
+      const recoveredPass = {
+        ...stalePass,
+        status: "pending",
+        job_id: null,
+        preflight_started_at: null,
+        preflight_recovered_at: new Date().toISOString(),
+        preflight_recovery_version: "v362",
+        error: null,
+      };
+      await supabase.rpc("update_dialog_pass_slot", {
+        _scene_id: d.id,
+        _pass_idx: stalePreflightIdx,
+        _patch: recoveredPass,
+      });
+      // A hard-killed invocation may leave its long-TTL row behind. Delete it
+      // only after the same staleness threshold; never steal a fresh lock.
+      await supabase
+        .from("dialog_dispatch_locks")
+        .delete()
+        .eq("scene_id", d.id)
+        .eq("pass_idx", stalePreflightIdx)
+        .lt("acquired_at", new Date(now - STALE_RENDERING_PREFLIGHT_MS).toISOString());
+
+      const invokeResp = await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({ scene_id: d.id, auto: true, recovery: true }),
+      });
+      const invokeBody = await invokeResp.text().catch(() => "");
+      console.warn(
+        `[lipsync-watchdog] v362_stale_preflight_recovered scene=${d.id} ` +
+        `pass=${stalePreflightIdx} age=${Math.round(preflightAgeMs / 1000)}s ` +
+        `invoke_status=${invokeResp.status} body=${invokeBody.slice(0, 160)}`,
+      );
+      advanced.push({ scene_id: d.id, pass_idx: stalePreflightIdx });
+      return;
+    }
 
     // ── v252 audio-mux stall guard ────────────────────────────────────────
     // `render-sync-segments-audio-mux` dispatches the final DialogStitchVideo
