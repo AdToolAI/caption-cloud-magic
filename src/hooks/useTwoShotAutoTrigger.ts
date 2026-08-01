@@ -23,6 +23,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { isRealizedScene } from '@/lib/composer/isRealizedScene';
 import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
+import { resetSceneLipSync } from '@/lib/lipsyncReset';
 
 // v94: 8s → 2.5s. Saves up to ~5.5s per stage transition (×3-4 transitions
 // per scene). DB select is filtered by project_id + indexed, load negligible.
