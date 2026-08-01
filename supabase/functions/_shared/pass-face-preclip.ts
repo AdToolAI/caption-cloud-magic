@@ -145,7 +145,7 @@ const FPS = 30;
 // short renders. No cost impact; DB read only.
 const POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_MS = 90_000;
-const PRECLIP_PIPELINE_VERSION = "v358-square-space";
+const PRECLIP_PIPELINE_VERSION = "v359-camera-path";
 
 function evenDimension(value: number, fallback: number): number {
   const n = Number(value);
