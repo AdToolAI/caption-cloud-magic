@@ -1,30 +1,29 @@
-## Bestätigte Ursache
+## Ehrliche Antwort: Nein
 
-Die Sync.so-Verarbeitung selbst ist fertig: Alle vier Jobs der Szene `7c11bc27…` melden `COMPLETED`. Der Fortschritt bleibt hängen, weil `sync-so-webhook` bei jedem Start abstürzt:
+Das Entfernen des NOOP-Retrys behebt **nicht** das Kernproblem. Es beseitigt nur die Schleife und den unnötigen Credit-Verbrauch.
 
-`imagescript@1.3.0 — unsupported arch/platform: Not supported`
+Das Kernproblem laut Messung von heute 15:18–15:20 UTC: Sync.so gibt bei mehreren Passes das Eingangsvideo im Mundbereich **unverändert** zurück (Input-vs-Output-Abstand 1.18 / 2.26 / 2.64 bei Schwelle 3.0). Bei Pass 0 und Pass 2 funktioniert es dagegen (5.81 bzw. echte Bewegung). Es liegt also nicht an unserem Messsystem, sondern daran, dass der Provider bei bestimmten Passes gar nichts animiert.
 
-Dadurch kann der Webhook die fertigen Outputs nicht in `dialog_shots.passes[]` übernehmen. Die vier Passes bleiben fälschlich auf `rendering`; der Watchdog leitet sie jede Minute erneut an denselben abstürzenden Webhook weiter.
+Auffällig an den fehlschlagenden Passes (Beispiel Pass 2 / Matthew): Das Gesicht ist auf der Platte nur **116 px** groß und wird auf 720 px hochskaliert; es existiert **kein echter Mund-Landmark**, die Box ist aus dem Gesichtsrahmen abgeleitet; das Audiofenster ist mit **1.3 s** sehr kurz. Genau diese Kombination erzeugt die Passthroughs.
 
-## Umsetzung
+## Plan
 
-1. **Inkompatiblen Decoder entfernen**
-   - Den statischen NPM-Import von `imagescript` aus `_shared/mouth-motion-verdict.ts` entfernen.
-   - Eine Edge-kompatible, plattformunabhängige Bilddecodierung einsetzen, ohne native Node-Binaries.
-   - Die bestehenden AWS-Still-Extraktion, Mund-Crops, Delta-Auswertung und `moved/static/passthrough/unknown`-Semantik unverändert lassen.
+**Schritt 1 — Ursache belegen (vor jedem weiteren Umbau)**
+- Für alle Passes der Szene gegenüberstellen: Gesichtsgröße auf der Platte, Upscale-Faktor, Landmark-Quelle, Audiolänge, Provider-Antwort, Input-vs-Output-Wert.
+- Erwartetes Ergebnis: eine klare Schwelle, unterhalb derer Sync.so nie animiert. Ohne diesen Beleg keine Änderung an der Dispatch-Logik.
 
-2. **Webhook wieder startfähig machen**
-   - `sync-so-webhook` neu deployen und unmittelbar prüfen, dass kein Boot-/Architekturfehler mehr auftritt.
-   - Einen fokussierten Decoder-/Motion-Probe-Test ergänzen, damit ein inkompatibler Import künftig vor dem Deployment auffällt.
+**Schritt 2 — Vorab-Prüfung statt Nachträglich-Reparatur**
+- Passes, die unter der belegten Schwelle liegen, gar nicht erst dispatchen.
+- Stattdessen: Platte mit größeren Gesichtern neu anfordern, bevor Credits ausgegeben werden.
 
-3. **Aktuellen Lauf retten statt neu berechnen**
-   - Den Watchdog nach dem Fix erneut laufen lassen. Er kann die vier bereits fertigen Sync.so-Jobs übernehmen; keine neue Provider-Generierung und keine erneuten Kosten.
-   - Prüfen, dass Pass 1–4 von `rendering` in terminale Zustände wechseln und anschließend Mux/Finalisierung startet.
+**Schritt 3 — Retry ersetzen**
+- Die aktuelle Ladder (`coords-pro-box`) entfernen: Sie ändert nur die Boxform und liefert nachweislich dasselbe Passthrough.
+- Ein Retry erfolgt nur noch, wenn die Eingangsbedingung tatsächlich verbessert wurde (größerer Ausschnitt, längeres Audiofenster) — sonst sofortiger, sauberer Abbruch mit Slot-Freigabe und einmaliger Rückerstattung.
 
-4. **End-to-End verifizieren**
-   - Funktions-Logs auf Webhook-Erfolg, Motion-Verdicts und Mux-Aufruf prüfen.
-   - Datenbankzustand der Szene kontrollieren: kein dauerhaftes `syncso_pass_4_of_4`, keine offenen Slot-Leases und entweder fertiges Lip-Sync-Ergebnis oder ein klarer, fachlicher Motion-Fehler statt eines Hängers.
+**Schritt 4 — Klarheit für dich**
+- Meldung im Composer trennt künftig eindeutig: „Provider hat nicht animiert" gegen „Messung nicht möglich".
+- Log-Text korrigieren: aktuell steht fälschlich „MOUTH STATIC (score 16 < 1.6)", obwohl es ein Passthrough bei hohem Score ist.
 
-## Sicherheitsgrenze
-
-Dieser Fix adressiert ausschließlich den jetzt bewiesenen Hänger. Er verändert weder Sprecherzuordnung noch Preclip-Geometrie oder Provider-Retry-Strategie.
+**Schritt 5 — Prüfen**
+- Neue Testszene mit vier Sprechern rendern und für jeden Pass den Bewegungsbefund dokumentieren.
+- Erfolgskriterium: vier Mal „bewegt" oder ein begründeter Vorab-Abbruch — kein einziger stiller Passthrough und kein Retry-Karussell.
