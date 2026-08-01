@@ -31,6 +31,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
+import { validateReprojectionPasses } from "../_shared/preclip-reprojection-contract.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 const corsHeaders = {
@@ -50,7 +51,7 @@ function json(body: unknown, status = 200) {
 // v205 mux/v169 parity — telemetry only. Mask stops live in the Remotion
 // template (`DialogStitchVideo.tsx`); this constant just tags the render so
 // operators can grep for the active mask profile.
-const OVERLAY_MASK_VERSION = "v169_parity";
+const OVERLAY_MASK_VERSION = "v368_full_face_core";
 const COLOR_MATCH_ENABLED = false;
 // v206 — Silent overlay layers (v195/v197 SilentFaceFreeze, v183 SilentFaceAnchor,
 // v193 MouthMatteFreeze) are hard-disabled to restore true v169 behaviour:
@@ -308,6 +309,28 @@ serve(async (req) => {
     const anyTight = donePasses.some((p: any) => !!p?.audio_tight);
     const isFanout = donePasses.length >= 2;
     const useOverlay = isFanout || (donePasses.length >= 1 && anyTight);
+
+    // v368 — validate the persisted pass identity + native plate crop once,
+    // before any shot is built. The 720px preclip outputSize is deliberately
+    // excluded from target placement: x/y/size are source-plate pixels.
+    if (useOverlay) {
+      const contract = validateReprojectionPasses(donePasses, width, height);
+      if (!contract.ok) {
+        const detail = `v368_reprojection_contract:${contract.errors.join(",")}`;
+        console.error(`[render-sync-segments-audio-mux] scene=${sceneId} ${detail}`);
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: { ...(state as any), status: "failed", error: detail },
+            lip_sync_status: "failed",
+            twoshot_stage: "needs_clip_rerender",
+            clip_error: "Lip-Sync-Zuordnung konnte nicht sicher bestätigt werden.",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        return json({ error: detail, code: "v368_reprojection_contract_failed" }, 409);
+      }
+    }
 
 
     const sourcePlateUrl = String((state as any).source_clip_url ?? "");
@@ -690,6 +713,8 @@ serve(async (req) => {
                 startSec: s,
                 endSec: e,
                 outputUrl: String(p.output_url),
+                speakerIdx: Number((p as any).speaker_idx),
+                characterId: String((p as any).character_id),
                 sourceTiming,
                 sourceStartSec,
                 ...(mouthMattes.length > 0 ? { mouthMattes } : {}),
@@ -764,6 +789,8 @@ serve(async (req) => {
       faceMask: shot.faceMask ?? null,
       mouthMattes: Array.isArray((shot as any).mouthMattes) ? (shot as any).mouthMattes.length : 0,
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
+      speakerIdx: shot.speakerIdx ?? null,
+      characterId: shot.characterId ?? null,
     }));
 
     // v205 mux/v169 parity telemetry + guard.
@@ -981,6 +1008,17 @@ serve(async (req) => {
     const updatedState: DialogShotsState = {
       ...state,
       status: "audio_muxing",
+      reprojection_contract: {
+        version: "v368_native_plate",
+        mask: OVERLAY_MASK_VERSION,
+        verified_at: new Date().toISOString(),
+        passes: donePasses.map((p: any) => ({
+          speaker_idx: Number(p?.speaker_idx),
+          character_id: String(p?.character_id ?? ""),
+          preclip_crop: p?.preclip_crop ?? null,
+          motion_verdict: p?.motion_verdict ?? "unknown",
+        })),
+      },
       audio_mux: {
         render_id: renderId,
         dispatched_at: new Date().toISOString(),
