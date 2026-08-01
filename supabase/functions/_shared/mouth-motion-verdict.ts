@@ -31,12 +31,15 @@
  * verdict is `unknown` — never `static`. Callers must not present an unknown
  * pass as verified lip-sync; they may retry it or stop the scene cleanly.
  *
- * No ffmpeg in the edge runtime — frames come from the same Replicate
- * extractor `extract-video-frames` already uses in production.
+ * No ffmpeg in the edge runtime — frames are rendered as stills on the
+ * project's own AWS Remotion Lambda (see `_shared/aws-frame-probe.ts`).
+ * Replicate / lucataco must never come back into this path.
  */
 
-const MODEL_TAG = "v344-mouth-motion-verdict";
-const REPLICATE_MODEL = "lucataco/ffmpeg-extract-frame";
+import { awsFrameProbeAvailable, renderAwsStill } from "./aws-frame-probe.ts";
+
+const MODEL_TAG = "v347-mouth-motion-verdict-aws";
+
 
 /** Mean |ΔY| (0..255) inside the mouth band required to call a pass "moved". */
 export const MOVED_MIN_SCORE = 1.6;
