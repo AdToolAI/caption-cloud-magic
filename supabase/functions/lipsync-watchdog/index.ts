@@ -422,7 +422,18 @@ serve(async (req) => {
     // Skip dispatching while we're parked on circuit_open — re-triggering
     // compose-dialog-segments would just hit the circuit again and reset
     // updated_at, masking the real TTL.
-    if (isV5Fanout && d.twoshot_stage !== "circuit_open") {
+    // v361 — Terminal-Guard. Ist die Szene bereits als fehlgeschlagen markiert
+    // (ein Sprecher-Pass hat z.B. Passthrough geliefert), darf der Watchdog
+    // keine weiteren Sprecher mehr zu Sync.so schicken. Genau diese Geister-
+    // Dispatches erzeugten "Lip-Sync läuft…" auf einer toten Szene.
+    const sceneTerminal =
+      String(d.lip_sync_status ?? "") === "failed" ||
+      String((d as any).status ?? "") === "failed" ||
+      String(d.twoshot_stage ?? "").startsWith("scene_failed");
+    if (sceneTerminal) {
+      skipped.push({ scene_id: d.id, reason: "skipped_scene_failed" });
+    }
+    if (!sceneTerminal && isV5Fanout && d.twoshot_stage !== "circuit_open") {
       // v126 — Also pick up `retrying` passes with no live job_id. Previously
       // a pass set to `retrying` by the webhook but with a lost re-dispatch
       // invoke would sit idle until the watchdog killed the whole scene.
