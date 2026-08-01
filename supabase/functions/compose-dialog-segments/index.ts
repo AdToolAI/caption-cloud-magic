@@ -89,6 +89,8 @@ import {
 import { detectPlateFaces, validatePlateFacesGeometry } from "../_shared/plate-face-detect.ts";
 import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
+import { CAST_IDENTITY_LOCK_TAG, resolveCastIdentityLock } from "../_shared/cast-identity-lock.ts";
+
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
