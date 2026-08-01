@@ -283,27 +283,41 @@ export async function renderPassFacePreclip(
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
-  // v342 — hard face-share floor. Recompute the share against the FINAL
-  // crop (expansion retries enlarge the box and shrink the share). Below
-  // 15% Sync.so reliably emits the input unchanged, so we refuse to pay
-  // for a job that cannot work and let the caller refund the pass.
+  // v344.1 — LINEAR face-share floor. Recompute against the FINAL crop
+  // (expansion retries enlarge the box and shrink the share). The old
+  // area-based floor (0.15) was unreachable for faces < ~50px because the
+  // `minSize` widening it complained about was self-inflicted, and it
+  // penalised non-square faces (41x55 in a 128px crop = 43% of the crop
+  // EDGE but only 13.8% of its AREA). We block only when the face is
+  // genuinely small relative to the crop edge.
   if (bboxValid) {
     const fbW = Math.max(1, Number((bbox as number[])[2]) - Number((bbox as number[])[0]));
     const fbH = Math.max(1, Number((bbox as number[])[3]) - Number((bbox as number[])[1]));
+    const fbSide = Math.max(fbW, fbH);
     faceShareInCrop = Math.min(1, (fbW * fbH) / Math.max(1, crop.size * crop.size));
-    const FACE_SHARE_FLOOR = 0.15;
-    if (faceShareInCrop < FACE_SHARE_FLOOR) {
+    faceSideShare = Math.min(1, fbSide / Math.max(1, crop.size));
+    faceSidePx = fbSide;
+    const FACE_SIDE_SHARE_FLOOR = 0.34;
+    if (faceSideShare < FACE_SIDE_SHARE_FLOOR) {
       console.error(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_face_share_floor_block face_share=${faceShareInCrop.toFixed(3)} floor=${FACE_SHARE_FLOOR} crop=${crop.x},${crop.y},${crop.size} face=${Math.round(fbW)}x${Math.round(fbH)} anchor=${anchor}`,
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_face_side_share_floor_block side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} floor=${FACE_SIDE_SHARE_FLOOR} crop=${crop.x},${crop.y},${crop.size} face=${Math.round(fbW)}x${Math.round(fbH)} anchor=${anchor}`,
       );
       return {
         ok: false,
-        error: `preclip_face_share_too_low:${(faceShareInCrop * 100).toFixed(1)}%_crop${crop.size}px_face${Math.round(fbW)}x${Math.round(fbH)}`,
+        error: `preclip_face_share_too_low:side_share=${(faceSideShare * 100).toFixed(1)}%_area_share=${(faceShareInCrop * 100).toFixed(1)}%_crop${crop.size}px_face${Math.round(fbW)}x${Math.round(fbH)}`,
         errorClass: "invalid_input",
       };
     }
+    // v344.1 — upscale reality check. A tiny source face still gets a
+    // dispatch; the server-side motion verdict decides afterwards whether
+    // Sync.so actually animated it. No speculative pre-block.
+    if (fbSide < 48) {
+      console.warn(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} preclip_low_source_face face_side_px=${Math.round(fbSide)} crop=${crop.size} upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x — dispatching anyway, motion verdict decides`,
+      );
+    }
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_face_share_final share=${faceShareInCrop.toFixed(3)} crop_size=${crop.size} face_side=${Math.round(Math.max(fbW, fbH))} ratio=${(crop.size / Math.max(1, Math.max(fbW, fbH))).toFixed(2)} anchor=${anchor}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_face_share_final side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} crop_size=${crop.size} face_side=${Math.round(fbSide)} ratio=${(crop.size / Math.max(1, fbSide)).toFixed(2)} min_size_widened=${minSizeWidened} anchor=${anchor}`,
     );
   }
 
