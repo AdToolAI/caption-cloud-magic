@@ -543,7 +543,10 @@ export async function renderPassFacePreclip(
         composer_scene_id: sceneId,
         pass_idx: passIdx,
         face_crop: { x: crop.x, y: crop.y, size: crop.size, outputSize: crop.outputSize },
+        crop_mode: cropMode,
+        camera_travel_px: cameraTravelPx,
         preclip_pipeline_version: PRECLIP_PIPELINE_VERSION,
+
       },
       subtitle_config: {},
     });
