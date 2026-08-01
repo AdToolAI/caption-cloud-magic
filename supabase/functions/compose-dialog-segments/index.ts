@@ -6075,6 +6075,69 @@ serve(async (req) => {
         );
       }
 
+      // ─── v357 — ECHTES PER-FRAME-TRACKING ─────────────────────────────
+      // Bis v356 war die "bounding_boxes_url" faktisch eine Standbox: für
+      // jeden Frame dieselben Koordinaten, nur an-/ausgeschaltet nach
+      // Voiced-Window. Bewegt sich die Figur, zeigt diese Box ins Leere,
+      // Sync 3 findet keinen Mund und liefert das Eingangsvideo unverändert
+      // zurück — genau der "Passthrough", den wir wochenlang gemessen haben.
+      // Ab hier verfolgen wir das Gesicht wirklich über die Frames des Turns.
+      let v357TrackedBoxes: Array<[number, number, number, number] | null> | null = null;
+      let v357TrackSource = "not_attempted";
+      let v357TrackMovementPx = 0;
+      if (dispatchBox && retryVariant === "bbox-url-pro") {
+        const trackW = v161UsingPreclipForBbox && v161PreclipCrop
+          ? v161PreclipCrop.outputSize
+          : Math.max(1, plateDims?.width ?? 0);
+        const trackH = v161UsingPreclipForBbox && v161PreclipCrop
+          ? v161PreclipCrop.outputSize
+          : Math.max(1, plateDims?.height ?? 0);
+        const windowStart = v124VoicedWindows.length > 0
+          ? Math.min(...v124VoicedWindows.map(([s]) => s))
+          : 0;
+        const windowEnd = v124VoicedWindows.length > 0
+          ? Math.max(...v124VoicedWindows.map(([, e]) => e))
+          : frameCount / Math.max(1, dispatchFps);
+        try {
+          const track = await trackFaceAcrossTurn({
+            videoUrl: probeUrlForBbox,
+            width: trackW,
+            height: trackH,
+            startSec: windowStart,
+            endSec: windowEnd,
+            anchorBox: dispatchBox,
+            deadline: Date.now() + 45_000,
+            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1}`,
+          });
+          v357TrackSource = track.source;
+          if (track.ok && track.keyframes.length > 0) {
+            v357TrackedBoxes = interpolateBoxes({
+              keyframes: track.keyframes,
+              frameCount,
+              fps: dispatchFps ?? ASSUMED_FPS,
+              voicedWindowsSec: v124VoicedWindows,
+            });
+            v357TrackMovementPx = trackMovementPx(v357TrackedBoxes);
+          } else {
+            // Kein Tracking möglich → Anchor-Box, aber MIT Kontextrahmen,
+            // weil Sync 3 mit Umfeld nachweislich besser arbeitet.
+            dispatchBox = withContextPadding(dispatchBox, trackW, trackH);
+          }
+        } catch (e) {
+          v357TrackSource = "track_threw";
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v357_track_failed ${(e as Error).message}`,
+          );
+        }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v357_face_track ` +
+          `source=${v357TrackSource} movement_px=${v357TrackMovementPx} frames=${frameCount} ` +
+          `space=${v161UsingPreclipForBbox ? "clip" : "plate"} dims=${trackW}x${trackH}`,
+        );
+        (pass as any)._v357TrackSource = v357TrackSource;
+        (pass as any)._v357TrackMovementPx = v357TrackMovementPx;
+      }
+
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;
       if (retryVariant === "bbox-url-pro" && dispatchBox) {
@@ -6087,10 +6150,12 @@ serve(async (req) => {
           frameCount,
           voicedWindowsSec: v124VoicedWindows,
           fps: dispatchFps,
+          trackedBoxes: v357TrackedBoxes ?? undefined,
         });
         usedUrl = up.url;
         nonNullFrames = up.nonNullFrames;
       }
+
 
 
       // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
