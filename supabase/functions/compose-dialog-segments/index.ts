@@ -2715,17 +2715,20 @@ serve(async (req) => {
       );
     }
 
-    // ── v354 — FACE-SIZE CONTRACT (post-render, pre-dispatch) ────────────
-    // The anchor gate in compose-video-clips guarantees the STILL conforms,
-    // but the video model reframes: it often pulls the camera back, and the
-    // faces on the rendered plate end up far smaller than on the anchor.
-    // That drift was never measured — it only surfaced at T6 inside
-    // pass-face-preclip (crop < 144px → Sync.so passthrough → "kein
-    // Lip-Sync"), after both the video render AND a provider slot were
-    // already paid for.
+    // ── v355 — PIXEL FACE CONTRACT (post-render, pre-dispatch) ───────────
+    // This is the one binding gate. The anchor stage only steers framing;
+    // the rendered plate is what the provider actually sees, and here the
+    // measurement is in NATIVE PIXELS, not in a fraction of the frame.
     //
-    // Here we measure the ACTUAL plate (speakerPlateBboxes are in plate
-    // pixel space) and stop before any Sync.so dispatch, with a refund.
+    // v354 gated the same spot on a ratio and blocked a legitimate
+    // 4-person conference shot at 5.8 % vs 16 % — a bar four faces can
+    // never clear together. The provider evidence was always absolute:
+    // ~181 px native crop animates, ~116 px and ~102 px come back
+    // untouched. A ratio also drifts with plate resolution, so the very
+    // same shot passes at 1080p and fails at 720p for no visual reason.
+    //
+    // Blocking here still happens before any Sync.so slot is spent, and
+    // the credits are refunded in full.
     if (
       closeupOnlyEnabled() &&
       !isAdvance &&
@@ -2743,16 +2746,17 @@ serve(async (req) => {
           faces: contractBoxes,
           plateWidth: Number(plateDims.width),
           speakers: speakers.length,
+          mode: "pixels",
         });
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v354_plate_contract ok=${verdict.ok ? 1 : 0} ` +
-          `min_ratio=${verdict.minWidthRatio.toFixed(3)} required=${verdict.requiredRatio.toFixed(3)} ` +
-          `min_px=${verdict.minWidthPx} plate_w=${plateDims.width} n=${speakers.length}`,
+          `[compose-dialog-segments] scene=${sceneId} v355_plate_contract ok=${verdict.ok ? 1 : 0} ` +
+          `min_px=${verdict.minWidthPx} required_px=${verdict.requiredPx} ` +
+          `min_ratio=${verdict.minWidthRatio.toFixed(3)} plate_w=${plateDims.width} n=${speakers.length}`,
         );
         if (!verdict.ok) {
           const msg = contractFailureMessage(verdict, speakers.length);
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} v354_plate_contract_BLOCK ` +
+            `[compose-dialog-segments] scene=${sceneId} v355_plate_contract_BLOCK ` +
             `${verdict.reason} — refunding ${totalCost} credits, no dispatch`,
           );
           await failLipSync({
@@ -2767,12 +2771,15 @@ serve(async (req) => {
             {
               error: "lipsync_face_contract_violation",
               message: msg,
+              min_width_px: verdict.minWidthPx,
+              required_px: verdict.requiredPx,
               min_width_ratio: verdict.minWidthRatio,
-              required_ratio: verdict.requiredRatio,
+              plate_width: Number(plateDims.width),
               refunded: totalCost,
             },
             422,
           );
+
         }
       }
     }

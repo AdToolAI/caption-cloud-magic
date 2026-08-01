@@ -1,13 +1,14 @@
 /**
- * closeup-contract.test.ts — v354
+ * closeup-contract.test.ts — v355
  *
  * Guards the face-size contract of the lip-sync pipeline:
- *  1. the required ratio is speaker-count aware and never below the
- *     pre-v354 advisory value,
- *  2. `assertPlateFaceContract` blocks (never warns) on small faces,
- *  3. the anchor gate inherits the contract ratios,
- *  4. the preclip thresholds remain in place, but as an ASSERTION that
- *     names the upstream stage.
+ *  1. the binding gate is measured in NATIVE PIXELS, not in a ratio,
+ *  2. a legitimate 4-person group shot is NOT blocked for being a group
+ *     (the v354 regression) as long as it carries enough real pixels,
+ *  3. ratios survive only as anchor-stage framing guidance,
+ *  4. lip-sync scenes are rendered at the highest available resolution,
+ *  5. the preclip thresholds remain in place as an ASSERTION that names
+ *     the upstream stage.
  */
 
 import {
@@ -19,50 +20,53 @@ import {
   closeupFramingSuffix,
   CONTRACT_VIOLATION_UPSTREAM,
   contractFailureMessage,
+  lipsyncPlateResolution,
+  MIN_FACE_WIDTH_PX,
   requiredFaceWidthRatio,
 } from "./lipsync-closeup-contract.ts";
 import { enforceMinFaceSize } from "./anchor-min-face-size.ts";
 
-Deno.test("required ratio is speaker-count aware", () => {
-  assertEquals(requiredFaceWidthRatio(1), 0.30);
-  assertEquals(requiredFaceWidthRatio(2), 0.22);
-  assertEquals(requiredFaceWidthRatio(3), 0.16);
-  assertEquals(requiredFaceWidthRatio(4), 0.16);
-  // never below the legacy advisory value
-  for (const n of [1, 2, 3, 4, 8]) {
-    assert(requiredFaceWidthRatio(n) >= 0.12);
-  }
+Deno.test("pixel floor matches the measured provider boundary", () => {
+  // 181px native crop animated, 116px/102px came back untouched.
+  // 120px face width ≈ 180px crop with the standard preclip margin.
+  assertEquals(MIN_FACE_WIDTH_PX, 120);
 });
 
-Deno.test("contract blocks the historical failure geometry", () => {
-  // Scene 69d56a49: 4 speakers, faces ~3 % of plate width.
+Deno.test("contract blocks the historical failure geometry (pixels)", () => {
+  // Scene 7c11bc27: 4 speakers, 74px faces on a 1284px plate.
   const r = assertPlateFaceContract({
     faces: [
-      [0, 0, 30, 40],
-      [100, 0, 130, 40],
-      [200, 0, 230, 40],
-      [300, 0, 330, 40],
+      [0, 0, 74, 96],
+      [200, 0, 274, 96],
+      [400, 0, 474, 96],
+      [600, 0, 674, 96],
     ],
-    plateWidth: 1000,
+    plateWidth: 1284,
     speakers: 4,
   });
   assertEquals(r.ok, false);
-  assert(r.minWidthRatio < 0.05);
-  assert(r.reason?.startsWith("face_width_ratio_"));
+  assertEquals(r.mode, "pixels");
+  assertEquals(r.minWidthPx, 74);
+  assert(r.reason?.startsWith("face_width_74px_below_120px"));
+  assert(contractFailureMessage(r, 4).includes("120 px"));
 });
 
-Deno.test("contract passes a conforming tight grid", () => {
+Deno.test("v354 regression: a real 4-person group shot is not blocked", () => {
+  // Same composition (faces ~9.4 % of the frame) but rendered at 1920px:
+  // 180px of real face detail — well past the provider boundary, and
+  // exactly the case v354 rejected on its 16 % ratio bar.
   const r = assertPlateFaceContract({
     faces: [
-      [0, 0, 180, 220],
-      [400, 0, 580, 220],
-      [0, 400, 180, 620],
+      [0, 0, 180, 230],
+      [400, 0, 580, 230],
+      [800, 0, 980, 230],
+      [1200, 0, 1380, 230],
     ],
-    plateWidth: 1000,
-    speakers: 3,
+    plateWidth: 1920,
+    speakers: 4,
   });
   assertEquals(r.ok, true);
-  assertEquals(r.requiredRatio, 0.16);
+  assert(r.minWidthRatio < requiredFaceWidthRatio(4), "ratio would have failed v354");
 });
 
 Deno.test("contract blocks when no face was detected", () => {
@@ -72,15 +76,29 @@ Deno.test("contract blocks when no face was detected", () => {
   assert(contractFailureMessage(r, 1).includes("kein Gesicht"));
 });
 
-Deno.test("anchor gate inherits the contract ratios", () => {
-  // 14 % face width used to pass the old advisory 12 % gate.
+Deno.test("ratio mode stays available as anchor framing guidance", () => {
+  assertEquals(requiredFaceWidthRatio(1), 0.30);
+  assertEquals(requiredFaceWidthRatio(2), 0.22);
+  assertEquals(requiredFaceWidthRatio(4), 0.16);
+  const r = assertPlateFaceContract({
+    faces: [[0, 0, 100, 130]],
+    plateWidth: 1000,
+    speakers: 1,
+    mode: "ratio",
+  });
+  assertEquals(r.ok, false);
+  assertEquals(r.mode, "ratio");
+  assert(r.reason?.startsWith("face_width_ratio_"));
+});
+
+Deno.test("anchor gate keeps steering toward tight framing", () => {
   const gate = enforceMinFaceSize({
     faces: [{ bbox: [0, 0, 140, 180] }],
     plateWidth: 1000,
     plateHeight: 1000,
     expectedSpeakers: 1,
   });
-  assertEquals(gate.ok, false, "single-speaker anchor must require 30 % face width");
+  assertEquals(gate.ok, false, "single-speaker anchor should still want 30 % face width");
 
   const ok = enforceMinFaceSize({
     faces: [{ bbox: [0, 0, 320, 400] }],
@@ -89,6 +107,15 @@ Deno.test("anchor gate inherits the contract ratios", () => {
     expectedSpeakers: 1,
   });
   assertEquals(ok.ok, true);
+});
+
+Deno.test("lip-sync scenes render at the highest available resolution", () => {
+  assertEquals(lipsyncPlateResolution(true, ["720p", "1080p"], "720p"), "1080p");
+  assertEquals(lipsyncPlateResolution(true, ["768p", "1080p"], "768p"), "1080p");
+  // no lip-sync → the caller's own quality choice is untouched
+  assertEquals(lipsyncPlateResolution(false, ["720p", "1080p"], "720p"), "720p");
+  // unknown ladder → fall back rather than invent an unsupported value
+  assertEquals(lipsyncPlateResolution(true, ["540p"], "540p"), "540p");
 });
 
 Deno.test("closeup framing suffix is present for every speaker count", () => {
@@ -109,4 +136,5 @@ Deno.test("preclip keeps its thresholds and names the upstream cause", async () 
     src.includes("CONTRACT_VIOLATION_UPSTREAM"),
     "preclip failures must be reported as an upstream contract violation",
   );
+  assert(CONTRACT_VIOLATION_UPSTREAM === "contract_violation_upstream");
 });

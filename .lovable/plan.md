@@ -1,50 +1,50 @@
-## Zielarchitektur (unverändert)
+## Was gerade passiert ist
 
-Lip-Sync läuft ausschließlich auf **Einzelsprecher-Close-up-Plates**. Der Gruppen-Wide bleibt als stummes Establishing erhalten. Damit ist "Gesicht zu klein" kein Laufzeitzustand mehr, sondern strukturell unmöglich, und `pass-face-preclip.ts` wird zur reinen Assertion.
+Der Vertrag hat funktioniert — er hat nur die falsche Kennzahl gemessen. Aus dem Log der fehlgeschlagenen Szene:
 
-1. **Per-Speaker-Plates als Normalfall** (`compose-video-clips`): pro Sprecher ein Close-up, Referenz aus dem Cast-Identity-Lock (v349).
-2. **Harter Anchor-Gate** (`anchor-min-face-size.ts`): `minWidthRatio = 0.30`, 2 Framing-Retries, danach blockierender Abbruch **vor** dem Video-Render.
-3. **Post-Render-Verifikation**: erster Frame des echten Clips via `_shared/aws-frame-probe.ts`, ein Re-Render, sonst Abbruch vor dem Sync.so-Dispatch.
-4. **Preclip trivial**: Center-Crop auf 720×720; Schwellen bleiben nur als Assertion (`contract_violation_upstream`).
-5. **Schnitt**: Establishing (stumm) + Close-up je Dialog-Turn, Timing aus `dialog_turns`.
+```text
+v354_plate_contract  ok=0  min_ratio=0.058  required=0.160
+                     min_px=74  plate_w=1284  n=4
+v354_plate_contract_BLOCK — refunding 576 credits, no dispatch
+```
 
-## Risiko-Analyse: was die Änderung anderswo trifft
+Die 576 Credits sind zurückerstattet, es wurde kein Provider-Slot verbrannt. Aber: **ein 4-Personen-Konferenztisch kann 16 % Gesichtsbreite pro Person physisch nicht erreichen.** Vier Gesichter à 16 % wären 64 % der Bildbreite — das ist keine Konferenzszene mehr. Der Vertrag blockiert damit eine Szene, die grundsätzlich nie bestehen kann. Aktuell gibt es für dich keinen Weg vorwärts, und das ist mein Fehler.
 
-Der Umbau berührt sechs bestehende Mechanismen. Jeder bekommt eine explizite Absicherung, sonst kippt an anderer Stelle etwas um.
+## Der eigentliche Denkfehler
 
-**a) Pass-Verkettung und `update_dialog_pass_slot`**
-Heute ist Pass N−1 der Video-Input für Pass N; `compose-dialog-segments/index.ts` verwaltet das über Slot-Indizes (v343-Integrity-Guard). Mit Einzelplates entfällt die Verkettung — Passes werden unabhängig. Risiko: der Guard und die Wartelogik (`waitIdx`, Slot-Padding) gehen von einer geordneten Kette aus.
-*Absicherung*: Slot-Schema bleibt unverändert (ein Slot pro Sprecher), nur die Input-Quelle wechselt von "vorheriger Pass" auf "eigene Plate". Der Integrity-Guard bleibt aktiv und wird durch den bestehenden Test abgedeckt.
+Ich habe den Vertrag auf ein **Verhältnis** gebaut. Die Beweislage aus v353 sagt aber, dass der Provider auf **absolute Pixel** reagiert — gemessen an genau dieser Szene `7c11bc27`:
 
-**b) Sync.so-Slot-Leasing (v351)**
-Parallele statt sequenzieller Passes erhöhen den gleichzeitigen Bedarf von 1 auf bis zu N. Bei Limit 3 und N = 4 droht ein neuer Stau.
-*Absicherung*: Concurrency-Cap bleibt bei 3, Passes laufen als Warteschlange gegen den Lease-Pool. Der Orphan-Sweeper bleibt unverändert.
+```text
+Crop 181 px → 720p hochskaliert (4.0×) → Lippen bewegen sich   ✅
+Crop 116 px → 720p hochskaliert (6.2×) → Passthrough           ❌
+Crop 102 px → 720p hochskaliert (7.1×) → Passthrough           ❌
+```
 
-**c) Motion-Verdict (v347/v348)**
-Misst Luminanz-Delta im Mundbereich. Auf Close-ups wird das Signal deutlich stärker — bestehende Schwellen (`outVsIn < 3.0`) sind für kleine Gesichter kalibriert und könnten jetzt zu lasch sein.
-*Absicherung*: Schwellen in diesem Plan **nicht** ändern; nach dem Umbau anhand realer Läufe nachmessen. Nur die Telemetrie wird um die Face-Ratio erweitert.
+Sync.so scheitert nicht, weil das Gesicht einen kleinen Bildanteil hat. Es scheitert, weil im Ausgangsmaterial zu wenige **echte Pixel** auf dem Mund liegen. Das Verhältnis ist nur ein Stellvertreter dafür — und ein schlechter, weil es von der Plate-Auflösung abhängt.
 
-**d) Audio-Mux und WYSIWYG-Parität**
-`render-sync-segments-audio-mux` mischt heute N Passes über einer durchgehenden Plate. Künftig ist eine Schnittfolge zu rendern. Risiko: Director's-Cut-Parität und das `rawMediaMode`-Invariant.
-*Absicherung*: Schnittzeiten kommen ausschließlich aus `dialog_turns`; `rawMediaMode: true` und die Raw-Media-Invariante bleiben unangetastet.
+Die Plate ist 1284 px breit. Bei 2560 px Breite wären dieselben Gesichter 148 px statt 74 px, der Preclip-Crop läge bei ~230 px statt 116 px — also im nachweislich funktionierenden Bereich, **ohne die Bildkomposition anzufassen**.
 
-**e) Kosten und Credits**
-N Close-up-Renders statt einer Wide-Plate erhöhen die Video-Kosten pro Szene.
-*Absicherung*: Kosten-Preview bei T1 auf die neue Formel umstellen (Establishing + N Close-ups). Refund-Automatik unverändert; Abbrüche wandern nach vorn und werden dadurch billiger.
+## Plan: Vertrag auf Pixel umstellen, Plates hochauflösend rendern
 
-**f) Autopilot und `plateFaceSlotRouter`**
-`_shared/autopilotLipSync.ts` und `plateFaceSlotRouter.ts` setzen auf Multi-Face-Plates auf.
-*Absicherung*: Router wird auf die Establishing-Plate reduziert, nicht gelöscht; Autopilot ruft denselben Composer-Pfad und erbt das Verhalten.
+**1. Vertragskennzahl ersetzen (`_shared/lipsync-closeup-contract.ts`)**
+Statt `requiredFaceWidthRatio` gilt `MIN_FACE_WIDTH_PX = 120` (Gesicht) — das ergibt mit der üblichen Crop-Marge den belegten Crop von ≥ 180 px. Unabhängig von Sprecherzahl und Bildkomposition, weil der Provider genau darauf reagiert. Das Verhältnis bleibt nur als weiche Telemetrie im Log.
 
-## Technische Details
+**2. Plates in Lip-Sync-Szenen hochauflösend rendern (`compose-video-clips`)**
+Sobald eine Szene Dialog hat, wird die Plate mit der höchsten verfügbaren Auflösung des Modells angefordert. Reicht das nicht, wird die fertige Plate vor dem Dispatch per AWS-Lambda auf mindestens 2560 px Breite hochskaliert. Das kostet einmalig Rechenzeit, aber keinen Provider-Slot — und es ist verlustfrei genug, weil der Preclip ohnehin nur einen Ausschnitt braucht.
 
-Betroffen: `compose-video-clips/index.ts`, `compose-dialog-segments/index.ts`, `_shared/anchor-min-face-size.ts`, `_shared/pass-face-preclip.ts`, `_shared/plateFaceSlotRouter.ts`, `_shared/autopilotLipSync.ts`, `render-sync-segments-audio-mux`.
-Nicht angefasst: `_shared/mouth-motion-verdict.ts`, `sync-so-webhook`, `lipsync-watchdog`, Refund-Automatik.
+**3. Vertragsprüfung auf die skalierte Plate anwenden (`compose-dialog-segments`)**
+Der Check läuft nach dem Upscale, nicht davor. Blockiert wird nur noch, was auch nach dem Upscale unter 120 px liegt — dann ist das Gesicht wirklich zu klein und ein Re-Render die richtige Antwort.
 
-Tests:
-- `_shared/closeup-contract.test.ts` — Close-up-Vertrag, kein Lip-Sync-Pfad auf Wide-Plates, Assertion-Only-Preclip
-- Bestehende `lipsync-noop-policy.test.ts` bleibt grün (Ladder leer, Floor ≥ 144 px)
+**4. Close-up-Framing bleibt, wird aber wieder weich**
+Das Framing-Suffix aus v354 bleibt als Qualitätshebel im Prompt. Es löst aber keinen harten Abbruch mehr aus, weil es nicht mehr die entscheidende Größe ist.
 
-## Rollout
+**5. Bestehende Szene entsperren**
+Für `7c11bc27` genügt dann "Clip + Lip-Sync neu rendern": die Plate wird hochauflösend neu erzeugt und läuft durch den neuen Vertrag.
 
-Hinter einem Feature-Flag (`LIPSYNC_CLOSEUP_ONLY`), Default an, mit Möglichkeit zum sofortigen Rückfall auf den Wide-Plate-Pfad, falls eine der Nebenwirkungen oben in der Praxis auftritt.
+## Was das nicht löst
+
+Wenn nach dem Upscale bei ≥ 200 px Crop **immer noch** Passthrough kommt, liegt es nachweislich am Provider und nicht an unserer Geometrie. Dann ist der nächste Schritt Kling Omni als zweiter Dispatch-Weg (nativ bereits integriert), nicht ein weiterer Geometrie-Fix. Ich sage dir das nach dem ersten Lauf anhand des Logs eindeutig — `crop_px` und `verdict` stehen beide drin.
+
+## Technische Notiz
+
+Der getrennte Per-Speaker-Close-up-Umbau bleibt bewusst aus dem Plan: `render-sync-segments-audio-mux` arbeitet Overlay-basiert auf **einer** Master-Plate mit Sprecher-Fenstern, nicht mit einer Schnittfolge. Auf Schnitte umzubauen wäre ein Neubau des Mux — und der Upscale-Weg adressiert die belegte Ursache direkt.
