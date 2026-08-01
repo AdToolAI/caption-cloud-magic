@@ -364,15 +364,16 @@ function buildPerFrameBoxes(params: {
     .filter(([fs, fe]) => Number.isFinite(fs) && Number.isFinite(fe) && fe >= fs);
   const out: Array<[number, number, number, number] | null> =
     new Array(Math.max(1, params.frameCount)).fill(null);
-  if (windows.length === 0) {
-    // No voiced windows known → preserve legacy behaviour (full-fill) so
-    // we don't accidentally produce an all-null array that would silently
-    // disable lip-sync entirely.
-    return out.map(() => params.box);
-  }
-  for (const [fs, fe] of windows) {
+  // v357 — Der alte "alle Frames dieselbe Box"-Notpfad ist entfernt. Fehlen
+  // die Voiced-Windows, gilt der gesamte Clip explizit als EIN Sprech-Fenster
+  // (statt stillschweigend eine Standbox über alles zu legen).
+  const effective = windows.length > 0
+    ? windows
+    : [[0, Math.max(0, Math.max(1, params.frameCount) - 1)] as [number, number]];
+  for (const [fs, fe] of effective) {
     for (let i = fs; i <= fe; i++) out[i] = params.box;
   }
+
   // v201 — strict turn-scoped boxes. Older builds backfilled leading/trailing
   // silence with the target box to satisfy Sync.so's validator, but that let
   // the provider reproject inactive faces outside the spoken turn. Keep every
