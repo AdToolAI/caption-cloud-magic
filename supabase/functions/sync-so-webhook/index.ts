@@ -764,7 +764,7 @@ serve(async (req) => {
       }
       if (noopSuspect) {
         const noopReason = motionStatic
-          ? "provider_returned_static_output"
+          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : motionUnverified
           ? "motion_probe_unavailable"
           : syncOutputResolutionRegression
@@ -834,7 +834,7 @@ serve(async (req) => {
         // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
         // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
         const noopReasonHard = motionStatic
-          ? "provider_returned_static_output"
+          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : motionUnverified
           ? "motion_probe_unavailable"
           : syncOutputResolutionRegression
@@ -928,7 +928,7 @@ serve(async (req) => {
         const newAttemptId = crypto.randomUUID();
         const nextStep = nextRung.step + 1;
         const noopReason = motionStatic
-          ? "provider_returned_static_output"
+          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
@@ -1047,7 +1047,7 @@ serve(async (req) => {
       const noopSuspectFlags = noopSuspect ? {
         sync_noop_suspect: true,
         noop_reason: motionStatic
-          ? "provider_returned_static_output"
+          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : motionUnverified
           ? "motion_probe_unavailable"
           : syncOutputResolutionRegression
@@ -1062,6 +1062,7 @@ serve(async (req) => {
       const motionVerdictFlags = {
         motion_verdict: motion.verdict,
         motion_score: motion.score,
+        motion_output_vs_input: motion.outputVsInput ?? null,
         motion_verdict_at: nowIso,
         motion_verdict_reason: motion.reason,
       };
@@ -1070,7 +1071,8 @@ serve(async (req) => {
         // static (or a hard byte/resolution no-op signal fired). An `unknown`
         // verdict is a measurement outage on our side and must never fail a
         // pass the provider completed — that was the v344–v346 regression.
-        const verifiedMoved = motion.verdict !== "static" && !noopSuspect;
+        const verifiedMoved = motion.verdict !== "static" &&
+          motion.verdict !== "passthrough" && !noopSuspect;
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
           status: verifiedMoved ? "done" : "failed",
