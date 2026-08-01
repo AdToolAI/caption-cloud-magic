@@ -51,3 +51,29 @@ Deno.test("v347 guard: no Replicate/lucataco in the lip-sync frame path", async 
 Deno.test("motion threshold stays a positive luminance delta", () => {
   assert(MOVED_MIN_SCORE > 0 && MOVED_MIN_SCORE < 20);
 });
+
+Deno.test("v348 still payload carries the Remotion version", async () => {
+  const src = await Deno.readTextFile(new URL("./aws-frame-probe.ts", import.meta.url));
+  assert(src.includes("version: REMOTION_STILL_VERSION"), "still payload must send `version`");
+  assert(src.includes("x-amz-function-error"), "lambda answers must be logged with forensics");
+});
+
+Deno.test("v348 mux gate blocks only measured `static` passes", async () => {
+  const src = await Deno.readTextFile(
+    new URL("../render-sync-segments-audio-mux/index.ts", import.meta.url),
+  );
+  // Extract the gate predicate area and assert the blocking condition.
+  assert(
+    src.includes("if (staticPasses.length > 0 && !forceRemux)"),
+    "only static passes may block the mux",
+  );
+  assert(
+    !src.includes("if (unverifiedPasses.length > 0 && !forceRemux)"),
+    "an unavailable measurement must never block the mux",
+  );
+  assert(
+    !src.includes("motion_verdict_unavailable"),
+    "the `measurement outage` failure code must be gone",
+  );
+});
+
