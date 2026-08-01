@@ -25,13 +25,11 @@
  *     score >= MOVED_MIN_SCORE  → `moved`
  *     score <  MOVED_MIN_SCORE  → `static`
  *
- * Fail-open contract
- * ------------------
+ * Measurement contract
+ * --------------------
  * If frames cannot be obtained (extractor down, no token, timeout) the
- * verdict is `unknown` — never `static`. A broken measurement must not fail
- * a customer render; it is logged as `motion_probe_unavailable` and the
- * caller falls back to the legacy signals. A gate may only BLOCK on
- * evidence, never PASS on the absence of it.
+ * verdict is `unknown` — never `static`. Callers must not present an unknown
+ * pass as verified lip-sync; they may retry it or stop the scene cleanly.
  *
  * No ffmpeg in the edge runtime — frames come from the same Replicate
  * extractor `extract-video-frames` already uses in production.
@@ -92,6 +90,17 @@ export interface MouthMotionVerdictResult {
 }
 
 /**
+ * Runtime secret compatibility. Lovable Cloud exposes the configured
+ * credential as REPLICATE_API_KEY; older environments used
+ * REPLICATE_API_TOKEN. Keep the alias so existing deployments remain valid.
+ */
+export function resolveReplicateCredential(
+  getEnv: (name: string) => string | undefined = (name) => Deno.env.get(name),
+): string | null {
+  return getEnv("REPLICATE_API_KEY") || getEnv("REPLICATE_API_TOKEN") || null;
+}
+
+/**
  * Measures mouth motion in a provider output clip.
  * Never throws — failures surface as `verdict: "unknown"`.
  */
@@ -109,13 +118,13 @@ export async function judgeMouthMotion(
   };
 
   try {
-    const token = Deno.env.get("REPLICATE_API_TOKEN");
+    const token = resolveReplicateCredential();
     if (!token) {
       return {
         ...base,
         verdict: "unknown",
         score: 0,
-        reason: "motion_probe_unavailable:no_replicate_token",
+        reason: "motion_probe_unavailable:no_replicate_api_key_or_token",
         latencyMs: Date.now() - t0,
       };
     }

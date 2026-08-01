@@ -1,47 +1,43 @@
-## Was der Fehler tatsächlich sagt
+# Plan v345 — Lip-Sync-Ausfall ohne weitere Geometrie-Experimente beheben
 
-```text
-preclip_face_share_too_low: 13.8 % _crop128px_face41x55
-```
+## Bestätigte Ursache
 
-Nachgerechnet aus dem Code (`_shared/compute-mouth-centered-crop.ts`, `_shared/pass-face-preclip.ts`):
+Der neue serverseitige Bewegungsprüfer sucht nach `REPLICATE_API_TOKEN`, im Backend ist jedoch `REPLICATE_API_KEY` konfiguriert. Deshalb endeten beim betroffenen Lauf alle vier Sprecher-Pässe mit `motion_verdict=unknown` und `motion_probe_unavailable:no_replicate_token`.
 
-- Samuels Gesicht auf der Plate ist **41 × 55 px** (Vierer-Shot, er sitzt weit hinten).
-- Ziel-Face-Share 0,42 ⇒ idealer Crop = `55 / sqrt(0.42)` ≈ **85 px**.
-- `minSize: 128` hebt den Crop auf **128 px** an.
-- Die Kontrolle danach rechnet **Flächenanteil**: `41*55 / 128²` = **13,8 %** < Floor 0,15 ⇒ Hard-Fail.
+Der finale Mux blockiert aktuell nur nachgewiesen statische Ausgaben. Vier unbekannte Ergebnisse wurden dadurch trotz fehlendem Bewegungsnachweis als fertige Szene mit Voiceover ausgeliefert.
 
-Das heißt: **die Geometrie ist nicht schlecht — der Gate widerspricht sich selbst.** Der Crop wurde von `minSize` künstlich vergrößert und danach genau dafür bestraft. Für jedes Gesicht unter ca. 50 px ist der Floor systematisch unerfüllbar. Zusätzlich vergleicht er eine Fläche (41×55, nicht quadratisch) gegen ein Quadrat; linear füllt das Gesicht 55/128 = **43 %** der Crop-Kante — also exakt das, was die Pipeline eigentlich will.
+Die v169-Kerninvarianten — parallele unabhängige Sprecher-Pässe, eigener Preclip pro Sprecher und keine Verkettung von Provider-Ausgaben — bleiben unangetastet.
 
-## Warum das der saubere Schnitt ist
+## Umsetzung
 
-Ein Gate darf nur blocken, was er auch wirklich misst. Deshalb: **ein** Maß, **eine** Stelle, und die endgültige Wirksamkeitsentscheidung bleibt beim serverseitigen Motion-Verdict (Phase 1), der die Realität misst statt sie zu schätzen. Keine zweite spekulative Vorab-Hürde.
+1. **Secret-Namensfehler korrigieren**
+   - Der Bewegungsprüfer verwendet primär `REPLICATE_API_KEY`.
+   - `REPLICATE_API_TOKEN` bleibt nur als abwärtskompatibler Alias erhalten.
+   - Fehlermeldung und Telemetrie nennen künftig beide akzeptierten Namen korrekt.
 
-## Fix
+2. **Fail-open-Lücke im Webhook schließen**
+   - Ein Provider-Pass wird nur als visuell bestätigt behandelt, wenn der Server `moved` misst.
+   - `static` nutzt weiterhin die bestehende NOOP-Wiederholungsleiter.
+   - `unknown` aufgrund eines technischen Messfehlers wird nicht mehr still als erfolgreicher visueller Pass freigegeben; der Pass erhält einen klaren, wiederholbaren Prüfstatus statt als fertig durchzulaufen.
 
-**1. Ein einziges, lineares Share-Maß (`_shared/compute-mouth-centered-crop.ts`)**
-Zusätzlich zu `faceShareInCrop` (Fläche, bleibt Telemetrie) wird `faceSideShare = max(faceW, faceH) / cropSize` zurückgegeben — das Maß, das der Sync.so-Wirksamkeit entspricht.
+3. **Finalen Mux absichern**
+   - Multi-Speaker-Szenen werden nur gemuxt, wenn jeder aktive Sprecher einen belastbaren Bewegungsnachweis besitzt.
+   - `static` bleibt ein harter Block.
+   - `unknown` blockiert den Mux mit einer verständlichen internen Ursache und löst den vorhandenen Retry-/Refund-Pfad aus, statt ein Voiceover-only-Video auszuliefern.
+   - Bereits vorhandene, ausdrücklich erzwungene Diagnose-Remuxes bleiben möglich.
 
-**2. Gate auf das lineare Maß umstellen (`_shared/pass-face-preclip.ts`)**
-- Floor wird `faceSideShare < 0.34` statt `faceArea/crop² < 0.15`.
-- Verletzt wird er nur, wenn der Crop wirklich zu weit ist (z. B. nach Expansion-Retries) — nie durch `minSize`.
-- `minSize` 128 → 96; wenn `idealSide < minSize`, wird das als `min_size_widened` protokolliert, nicht geblockt.
-- Fehlermeldung enthält beide Werte: `side_share=… area_share=… crop=… face=…`.
+4. **Gezielte Regressionstests**
+   - Testfälle für `REPLICATE_API_KEY`, Alias-Fallback, fehlende Secrets sowie `moved/static/unknown` ergänzen.
+   - Mux-Gate mit 1-, 2- und 4-Sprecher-Pässen prüfen.
+   - Sicherstellen, dass statische Provider-Ausgaben erneut versucht und niemals als fertiges Lip-Sync präsentiert werden.
 
-**3. Upscale-Realitätscheck statt Blindflug**
-Ein 128-px-Crop auf 720 px ist 5,6× Upscale — grenzwertig. Neu: `faceSide < 48 px` ⇒ Warnung `preclip_low_source_face` in `syncso_dispatch_log.meta`, Dispatch läuft weiter. Der Motion-Verdict entscheidet danach faktisch.
+5. **Deployment und Live-Verifikation**
+   - Nur Bewegungsprüfer, Sync-Webhook und finalen Audio-Mux deployen.
+   - Einen kontrollierten Mehrsprecher-Lauf ausführen und pro Sprecher `motion_verdict=moved`, individuelle Preclip-URL und individuellen Provider-Output verifizieren.
+   - Erst danach die Szene als erfolgreich melden; andernfalls automatischer sauberer Fehler mit Credit-Rückerstattung.
 
-**4. Kein stiller Hard-Fail der Szene**
-`v187_preclip_required_no_fullplate_fallback` bleibt nur für echte Geometriefehler (Crop enthält nachweislich kein isoliertes Gesicht). Gesichtsgröße allein löst ihn nicht mehr aus.
+## Bewusst nicht enthalten
 
-## Technische Details
-
-- `compute-mouth-centered-crop.ts`: `faceSideShare` im Result-Typ; Test für den Fall 41×55/128 ergänzen (muss durchgehen).
-- `pass-face-preclip.ts`: `FACE_SHARE_FLOOR` → `FACE_SIDE_SHARE_FLOOR = 0.34`, `minSize: 128` → `96`, Recompute nach Expansion nutzt dasselbe lineare Maß.
-- Telemetrie: `preclip_side_share`, `preclip_face_side_px`, `preclip_min_size_widened` in `syncso_dispatch_log.meta`.
-- Deploy von `compose-dialog-segments` (zieht die `_shared`-Module), danach Re-Render der Szene zur Verifikation.
-
-## Was nicht passiert
-
-- Keine neuen Tracker, keine Bewegungs-Bboxes, kein Rückgriff auf v334–v341-Geometrie.
-- Kein Anfassen von Dispatch-Payload, Webhook oder Mux-Gate (Phase 1 bleibt unverändert).
+- Keine weiteren Änderungen an Crop-Größen, Face-Share-Schwellen, Masken oder Charakter-Prompts.
+- Kein erneuter Umbau der v169-Parallelarchitektur.
+- Kein weiteres blindes Geometrie-Patching.
