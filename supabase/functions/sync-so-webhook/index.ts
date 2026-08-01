@@ -774,6 +774,9 @@ serve(async (req) => {
         console.warn(
           `[sync-so-webhook] v346 scene=${sceneId} pass=${currentPass} NOOP-suspect (${noopReason}, sizeRatio=${sizeRatio.toFixed(2)}) → retry ladder or hard fail; the pass is never marked done on an unverified mouth motion.`,
         );
+      }
+
+
 
 
       // v134 — Deterministic NOOP escalation ladder (sync-3 only, per
