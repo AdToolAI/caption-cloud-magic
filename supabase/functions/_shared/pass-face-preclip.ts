@@ -344,7 +344,7 @@ export async function renderPassFacePreclip(
       return {
         ok: false,
         error:
-          `plate_face_too_small_for_lipsync:crop=${crop.size}px_min=${MIN_NATIVE_CROP_PX}px_face=${Math.round(fbSide)}px_upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x`,
+          `${CONTRACT_VIOLATION_UPSTREAM}:plate_face_too_small_for_lipsync:crop=${crop.size}px_min=${MIN_NATIVE_CROP_PX}px_face=${Math.round(fbSide)}px_upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x`,
         errorClass: "needs_clip_rerender",
       };
     }
