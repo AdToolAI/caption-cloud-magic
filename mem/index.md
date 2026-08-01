@@ -1,6 +1,7 @@
 # Memory: index.md
 Updated: today
-- [v359 Temporaler Crop](mem://architecture/lipsync/v359-temporal-crop) — **Aktuell.** Plate-Track VOR dem Preclip; 720×720-Fenster fährt dem Gesicht per Frame nach (`camera-path.ts`); Mux klebt entlang desselben Pfades zurück. Nur drei harte Vor-Dispatch-Stopps (Boxenzahl, Clip-Raum, Containment==0) — keine neuen Ratio-Gates.
+- [v360 Kopf-Framing & Dispatch-Stopp](mem://architecture/lipsync/v360-head-frame-and-dispatch-guard) — **Aktuell.** Belegt: Passthrough kam von angeschnittenem Kopf (Anker unter dem Kinn) + 5×-Upscale. Anchor-Repair + Head-Containment im Crop; kein Sync.so-Dispatch mehr nach terminalem Szenen-Fail.
+- [v359 Temporaler Crop](mem://architecture/lipsync/v359-temporal-crop) — Plate-Track VOR dem Preclip; 720×720-Fenster fährt dem Gesicht per Frame nach (`camera-path.ts`); Mux klebt entlang desselben Pfades zurück. Nur drei harte Vor-Dispatch-Stopps (Boxenzahl, Clip-Raum, Containment==0) — keine neuen Ratio-Gates.
 - [v358 Preclip-Dimensionsvertrag](mem://architecture/lipsync/v358-preclip-dimension-contract) — Sync.so erhält ausschließlich verifizierte 720×720-Preclips; BBox, Track und Flächenrechnung nutzen deren real gemessenen Pixelraum. Cache ist dimensions-/versionsgebunden. Terminale parallele Pass-Slots können nicht mehr auf pending zurückfallen.
 
 - [v343 Pass-Slot-Integrity](mem://architecture/lipsync/v343-pass-slot-integrity) — `update_dialog_pass_slot` padded mit bare `{}` → `passes[0]` ohne `speaker_idx` → v87-Sanity-Block lieferte endlos 202, UI hing auf „Pass 4/4". Padding trägt jetzt idx/status, Slots werden beim Lesen aus dem Turn-Skeleton geheilt, Sanity-Block wird nach 3 Versuchen terminal + Refund. Invariante: jeder Pass endet terminal oder liefert Output.
