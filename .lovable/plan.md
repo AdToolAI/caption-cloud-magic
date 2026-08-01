@@ -1,53 +1,46 @@
-## Was wirklich passiert ist
+## Antwort auf die Frage: Ja, AWS wird jetzt benutzt — aber der Aufruf schlägt fehl
 
-Der Lip-Sync scheitert nicht an Sync.so, nicht an der Plate und nicht an der Geometrie. Er scheitert an einem Prüf-Baustein, der gegen unsere eigene AWS-only-Regel gebaut wurde.
-
-Belegt aus den Logs des letzten Laufs (`7c11bc27…`, alle Passes):
+Belegt aus den aktuellen Logs (Scene `7c11bc27…`, 13:01 UTC):
 
 ```
-model_lookup_404:{"detail":"Model not found."}   ← lucataco/ffmpeg-extract-frame
-→ frames_0_of_4 → verdict=unknown
-→ NOOP-suspect → Retry → "Bitte Plate neu rendern"
+[mouth-motion-verdict] pass=3 probe_retry frame extraction issues (0/6 ok):
+t=0.18:unparsable_lambda_body:  | t=0.86:unparsable_lambda_body:  | …
+verdict=unknown frames=0 … 206 ms
 ```
 
-Die Kette:
+Zwei Dinge stehen darin:
 
-1. Der Motion-Probe (v344/v346) will messen, ob sich der Mund im Sync.so-Ergebnis bewegt.
-2. Dafür wurde **Replicate/lucataco** eingebaut — obwohl die Regel „AWS-only, kein Lucataco" gilt und in `_shared/face-frame-extract.ts` sogar wörtlich dokumentiert ist.
-3. Dieses Replicate-Modell existiert nicht mehr und antwortet mit 404 — bei jedem Frame, jedem Pass, seit dem Deploy.
-4. Also nie Frames, nie eine Messung, immer `unknown`.
-5. `unknown` wird fälschlich wie ein Provider-NOOP behandelt → Retry → Hard-Fail.
+1. **Kein Replicate/lucataco mehr** — kein `model_lookup_404` in keinem Log. Die AWS-Umstellung aus v347 ist wirksam.
+2. **Der AWS-Still-Aufruf liefert nichts Verwertbares**: Lambda antwortet mit HTTP-OK, aber **leerem Body** (`unparsable_lambda_body:` ohne Inhalt), und zwar für alle 6 Frames in ~200 ms zusammen. Ein echter Still-Render dauert Sekunden — es wurde also nie gerendert; der Payload wird vom Remotion-Lambda gar nicht erst angenommen.
 
-Zwei Verstöße gleichzeitig, und das ist auch der Grund für das Im-Kreis-Drehen:
+Der Unterschied zur funktionierenden Strecke: Preclips und Plates gehen über `invoke-remotion-render` (Payload-Sanitizing, Rate-Limit-Retry, Event-Fallback, Status über `video_renders`). Der neue Probe ruft Lambda direkt und roh auf — ohne diese Absicherung und ohne die Felder, die diese Strecke mitliefert.
 
-- **Verstoß gegen AWS-only**: Der Regelbruch wurde nicht bemerkt, weil er in einem neuen Shared-Modul steckte statt im bereits gesäuberten `face-frame-extract.ts`.
-- **Verstoß gegen den v169-Fehlerkontrakt**: v169 kennt nur *transient* und *terminal*. Die neue dritte Klasse „Messung nicht verfügbar" wurde auf *terminal* gemappt und verbrennt echte Sync.so-Versuche.
+### Und deshalb scheitert die Szene trotz v347
 
-## Fix v347 — AWS statt Replicate
+v347 hat den Webhook entschärft (`unknown` = nur Telemetrie). Das **Mux-Gate wurde aber nicht mitgezogen**: `render-sync-segments-audio-mux` blockiert weiterhin jeden Pass, dessen Verdict nicht exakt `moved` ist — genau daher der Text im Screenshot: „Die Mundbewegung konnte für Samuel Dusatko, Matthew Dusatko, Sarah Dusatko, Kailee nicht serverseitig bestätigt werden." Solange die Messung kaputt ist, kann kein Pass jemals `moved` erreichen, also fällt jede Szene.
 
-1. **Replicate vollständig aus der Bewegungsprüfung entfernen**
-   - `lucataco/ffmpeg-extract-frame` und der komplette Replicate-Aufrufpfad fliegen aus `_shared/mouth-motion-verdict.ts` raus.
-   - Ersatz: die bereits produktive **AWS-Strecke** (Remotion Lambda, `REMOTION_SERVE_URL`), mit der wir ohnehin schon Preclips und Plates rendern. Sie liefert die Probe-Frames des Sync.so-Ergebnisses aus AWS, ohne neuen Fremdanbieter.
-   - Die Frames landen in unserer Storage; die Luminanz-Differenz im Mundband wird unverändert wie bisher berechnet.
-   - Ergebnis: In der gesamten Lip-Sync-Pipeline existiert kein Replicate-Frame-Extractor mehr.
+## Fix v348
 
-2. **Messfehler dürfen keine Lip-Sync-Versuche mehr verbrennen**
-   - `static` = echter Provider-NOOP → weiterhin Ladder, danach Hard-Fail. Unverändert streng.
-   - `unknown` = unsere Messung ausgefallen → wird protokolliert, zählt **nicht** als Versuch, setzt **nicht** `needs_clip_rerender`, zeigt dem Kunden **nicht** „Plate neu rendern".
-   - Unverifizierte Passes werden trotzdem nicht stillschweigend gemuxt.
+1. **Still-Rendering über die bewährte Strecke statt Roh-Invoke**
+   - `_shared/aws-frame-probe.ts` dispatcht künftig wie `pass-face-preclip`: `video_renders`-Zeile mit eigener `source: "dialog-pass-motion-probe"`, Aufruf über `invoke-remotion-render`, Ergebnis über Polling/Storage-URL.
+   - Bevor die Antwort verworfen wird, werden HTTP-Status, `X-Amz-Function-Error` und Body-Länge geloggt — damit ein leerer Body nie wieder als anonymer „unparsable" endet.
+   - `remotion-webhook` bekommt für die neue `source` einen No-Op-Zweig (nur `video_renders` abschließen, keine Szenen-Patches).
 
-3. **Regel technisch absichern, nicht nur dokumentieren**
-   - Guard-Test, der die gesamte Lip-Sync-Pipeline nach `lucataco`, `replicate.com/v1/predictions` und `ffmpeg-extract-frame` durchsucht und fehlschlägt, sobald es wieder auftaucht.
-   - Damit kann dieser Regelbruch nicht ein 51. Mal unbemerkt hineinrutschen.
-   - Zusätzlich Tests: 404/Timeout ändert weder `noop_escalation_step` noch `twoshot_stage`; nur echte Frames unter der Schwelle ergeben `static`.
+2. **Widerspruch im Mux-Gate auflösen**
+   - `static` (echte Messung, keine Bewegung) → blockiert weiterhin hart. Unverändert streng.
+   - `unknown` (Messung ausgefallen) → blockiert **nicht** mehr. Die Szene wird gemuxt, das Pass-Ergebnis wird als `motion_unverified` markiert und im Log/Diagnosefeld geführt.
+   - Begründung: eine ausgefallene Eigenmessung darf ein erfolgreiches Provider-Ergebnis nicht in einen Kundenfehler verwandeln — genau das passiert seit v344.
 
-4. **Projekt-Memory aktualisieren**
-   - Harte Regel als `constraint` speichern: keine Replicate-/Lucataco-Frame-Extraktion in der Lip-Sync-Pipeline, AWS-only, inklusive Begründung.
+3. **Regression absichern**
+   - Test: `unknown` in allen Passes ⇒ Mux läuft, Szene wird nicht `failed`, kein `needs_clip_rerender`.
+   - Test: ein `static`-Pass ⇒ Mux blockiert weiterhin.
+   - Bestehender Guard-Test gegen `lucataco`/`replicate.com` bleibt.
 
-5. **Deploy und Verifikation**
-   - Nur `sync-so-webhook` plus geteiltes Modul.
-   - Prüfen: Frames > 0, echter Verdict, kein 404, kein falscher Retry.
+4. **Deploy und Verifikation**
+   - Deploy: `render-sync-segments-audio-mux`, `sync-so-webhook`, `remotion-webhook`.
+   - Danach an einer echten Szene prüfen: Frames > 0 oder — falls AWS weiter zickt — Szene läuft trotzdem mit Lip-Sync durch statt zu scheitern.
 
-## Offen und wichtig
+## Technische Details
 
-Erst nach diesem Fix haben wir überhaupt wieder eine funktionierende Messung. Sollte dann ein Pass echtes `static` liefern, reden wir zum ersten Mal seit Tagen über ein reales Sync.so- oder Plate-Thema — bisher war jede darauf aufgebaute Geometrie-Änderung Blindflug.
+- Betroffen: `supabase/functions/_shared/aws-frame-probe.ts`, `supabase/functions/render-sync-segments-audio-mux/index.ts` (Zeilen 198–232), `supabase/functions/remotion-webhook/index.ts`, `supabase/functions/_shared/mouth-motion-verdict.test.ts`.
+- Kein Bundle-Redeploy nötig: `DialogTurnFaceCropVideo` existiert im aktuellen `REMOTION_SERVE_URL`-Bundle.
