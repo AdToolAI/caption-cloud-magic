@@ -44,6 +44,17 @@ export interface MouthCenteredCropResult {
   minSizeWidened: boolean;
   mouthOffsetPx: number;
   clamped: boolean;
+  /**
+   * v360 — true when the requested anchor lay outside the face bbox and was
+   * replaced by the bbox-derived mouth point (lower third). Belegter Fall:
+   * Matthew (Szene 89c5e01c) — der Anker lag 18 px UNTER dem Kinn, der
+   * 145-px-Crop begann dadurch auf Mundhöhe und schnitt Augen und Stirn ab.
+   * Sync.so bekam ein halbes Gesicht und reichte den Clip unverändert durch.
+   */
+  anchorRepaired: boolean;
+  /** v360 — true when the crop was grown/moved so the whole head fits in. */
+  headContained: boolean;
+
 }
 
 export function computeMouthCenteredCrop(
