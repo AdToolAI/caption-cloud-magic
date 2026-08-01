@@ -223,6 +223,17 @@ interface CroppedOverlayProps {
   top: number;
   size: number;
   holdToEnd?: boolean;
+  /**
+   * v359 — moving crop. When the preclip was rendered with a camera path,
+   * the region it was cut from moves per frame, so the region it is pasted
+   * back onto must move by exactly the same amount. Pasting a moving crop
+   * at a fixed rect would smear the face across the plate.
+   *
+   * Entries are in COMPOSITION space and indexed by the segment-local frame
+   * (identical indexing to the preclip, which starts at the turn start).
+   * Frames past the end clamp to the last entry.
+   */
+  path?: Array<{ left: number; top: number; size: number }>;
 }
 const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   src,
@@ -232,7 +243,9 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   top,
   size,
   holdToEnd,
+  path,
 }) => {
+
   const frame = useCurrentFrame();
   const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
   const fadeOut = holdToEnd ? 0 : fadeIn;
