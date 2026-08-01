@@ -1049,11 +1049,11 @@ serve(async (req) => {
         motion_verdict_reason: motion.reason,
       };
       if (freshDonePasses[currentPass]) {
-        // v346 — a pass only reaches `done` when the mouth motion was
-        // positively verified. `static` and `unknown` are handled by the
-        // ladder / hard-fail branch above; if execution still lands here,
-        // fail closed instead of silently muxing a voiceover-only clip.
-        const verifiedMoved = motion.verdict === "moved" && !noopSuspect;
+        // v347 — a pass reaches `done` unless the mouth motion was *proven*
+        // static (or a hard byte/resolution no-op signal fired). An `unknown`
+        // verdict is a measurement outage on our side and must never fail a
+        // pass the provider completed — that was the v344–v346 regression.
+        const verifiedMoved = motion.verdict !== "static" && !noopSuspect;
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
           status: verifiedMoved ? "done" : "failed",
