@@ -649,6 +649,10 @@ serve(async (req) => {
           : turnDurSec,
         mouthRect: mouthRectFromPass(passBeforeDone),
         sampleCount: 4,
+        // v347 — the AWS still renderer needs the square edge length of the
+        // provider output to render a full, undistorted frame.
+        frameSize: Number((passBeforeDone as any)?.preclip_crop?.outputSize) ||
+          Number(outputDims?.width) || 512,
         label: `scene=${sceneId} pass=${currentPass}`,
       };
       let motion = await judgeMouthMotion(probeInput);
