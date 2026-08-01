@@ -14904,6 +14904,9 @@ export type Database = {
           meta: Json | null
           meta_yavg_probe: Json | null
           mode: string | null
+          motion_probe_meta: Json | null
+          motion_score: number | null
+          motion_verdict: string | null
           mouth_center_offset_px: number | null
           noop_mouth_yavg: number | null
           preflight_repairs: Json | null
@@ -14943,6 +14946,9 @@ export type Database = {
           meta?: Json | null
           meta_yavg_probe?: Json | null
           mode?: string | null
+          motion_probe_meta?: Json | null
+          motion_score?: number | null
+          motion_verdict?: string | null
           mouth_center_offset_px?: number | null
           noop_mouth_yavg?: number | null
           preflight_repairs?: Json | null
@@ -14982,6 +14988,9 @@ export type Database = {
           meta?: Json | null
           meta_yavg_probe?: Json | null
           mode?: string | null
+          motion_probe_meta?: Json | null
+          motion_score?: number | null
+          motion_verdict?: string | null
           mouth_center_offset_px?: number | null
           noop_mouth_yavg?: number | null
           preflight_repairs?: Json | null

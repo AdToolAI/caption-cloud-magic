@@ -987,6 +987,10 @@ export interface SyncDispatchLogRow {
   noop_mouth_yavg?: number | null;
   detector_used?: string | null;
   retry_count?: number | null;
+  // v344 — server-side mouth-motion verdict (Phase 1)
+  motion_verdict?: "moved" | "static" | "unknown" | null;
+  motion_score?: number | null;
+  motion_probe_meta?: Record<string, unknown> | null;
 }
 
 /** Best-effort fire-and-forget log. Never throws. */

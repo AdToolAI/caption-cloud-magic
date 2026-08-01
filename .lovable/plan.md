@@ -1,61 +1,60 @@
-## Was ich in der Datenbank gefunden habe (Szene 69d56a49, heute 23:08–23:18)
+# Lip-Sync-Pipeline: Stabilisierungsplan
 
-Das ist kein Geometrie-Problem mehr. Der Hänger hat eine ganz banale Ursache:
+## Ausgangslage (belegt)
 
-| Slot in `dialog_shots.passes` | Inhalt |
-|---|---|
-| **[0]** | **`{}` — komplett leer.** Kein `idx`, kein `speaker_idx`, kein `status`, keine `input_url` |
-| [1] | `done`, job `7d34de71…`, output vorhanden |
-| [2] | `done`, job `6baa9534…`, output vorhanden |
-| [3] | `done`, job `a4a420f9…`, output vorhanden |
+Für Szene `69d56a49…` zeigt `syncso_dispatch_log` vier erfolgreiche Dispatches mit Face-Share bis 30,9 %. Die Pixel-Analyse der Sync.so-Ergebnisse ergab eine Änderung von nur 0,36–2,59/255 gegenüber dem Input: **der Provider liefert No-Op-Clips und meldet trotzdem `completed`**. Die Bewegungsprüfung lief bisher nur clientseitig (Best-Effort) und wurde nicht ausgelöst — also wurden statische Clips als `done` akzeptiert und gemuxt.
 
-`total_passes = 4`, `current_pass = 3`. Drei von vier Passes sind sauber fertig — Pass 0 wurde um **23:09:05 erfolgreich dispatcht** (`DISPATCHED`, face_share 0.307, Variante `bbox-url-pro`), und **danach wurde sein Slot überschrieben und geleert**.
+Kernproblem ist damit nicht die Geometrie, sondern: **wir vertrauen dem Provider-Statuscode statt dem tatsächlichen Bild.** Alle bisherigen Einzel-Fixes (v33x–v34x) haben an Gates gedreht, ohne diese eine Lücke zu schließen.
 
-Ab diesem Moment passiert Folgendes bei jedem Wiederanlauf (belegbar um 23:10:58 und 23:12:14 im `syncso_dispatch_log`):
+## Leitprinzipien
 
-```
-HEURISTIC_BLOCKED  coords_heuristic_unverified
-pass=0 speaker_idx=undefined source=none
-```
+1. Einzige Wahrheit für „Lip-Sync ist gelungen" ist ein **serverseitig gemessenes Mundbewegungs-Signal**, nicht der Provider-Status.
+2. Gates dürfen nur **blocken**, nie **freigeben**. Kein Gate darf ohne Messung „trusted" sagen.
+3. Jeder Abbruch ist **terminal, sichtbar und rückerstattet** — kein stiller Hänger.
+4. Keine neuen Heuristiken ohne Messwert, der sie widerlegen kann.
 
-Das ist der v87-Sanity-Block in `compose-dialog-segments/index.ts` (~Z. 4396). Er liest `passes[0].speaker_idx` → `undefined` → `coordSources[-1]` → `"none"` → **Abbruch mit HTTP 202 `awaiting_face_detection`**. 202 ist "alles ok, später nochmal" — also:
+## Phase 1 — Server-Motion-Verdict (der eigentliche Fix)
 
-- kein Terminal-Status auf dem Pass
-- keine Zeile in `syncso_inflight_jobs` (Tabelle für die Szene ist leer)
-- der Watchdog hat nichts zu rekonzilieren
-- die UI bleibt ewig auf „Lip-Sync läuft… Pass 4/4"
+Neue geteilte Komponente `_shared/mouth-motion-verdict.ts` plus Ausführung in `render-sync-segments-audio-mux` **vor** dem Mux und **vor** dem Setzen von `status = 'done'`:
 
-Die Szene kann in diesem Zustand **nie** fertig werden und auch nie fehlschlagen. Genau das siehst du.
+- Frames aus dem Sync.so-Output an N Zeitpunkten innerhalb des Sprechfensters ziehen (bestehende `face-frame-extract.ts`-Infrastruktur nutzen).
+- Für jeden Sprecher-Slot die Mundregion aus der bekannten Preclip-Geometrie ausschneiden und die **Differenz-Varianz gegenüber dem Input-Plate an denselben Zeitpunkten** berechnen.
+- Verdikt pro Pass: `moved` / `static`. Schwelle einmalig kalibriert an einem bekannt-guten Clip vom 27.07. und als Konstante hinterlegt, nicht pro Szene getunt.
+- `static` ⇒ Pass gilt als fehlgeschlagen, unabhängig vom Provider-Status.
 
-## Fix — drei Schritte, keine neue Geometrie
+Der clientseitige Probe-Hook in `SceneClipProgress` wird auf reine Anzeige reduziert und trifft keine Freigabeentscheidung mehr.
 
-**1. Ursache des Slot-Wipes finden und schließen (zuerst)**
-Es gibt zwei Stellen, die den Slot komplett ersetzen (`passes[currentPassIdx] = pass`, Z. 5984 und 7133) plus die Webhook-Schreibpfade. Der in der v169-Doku beschriebene atomare Per-Slot-RPC **`update_dialog_shot_pass` existiert in dieser Datenbank nicht** (`pg_proc` liefert null Zeilen) — geschrieben wird stattdessen per Read-Modify-Write auf dem ganzen `passes`-Array. Bei parallelen Webhooks (23:12:04 kamen Pass 1 und 2 innerhalb von 84 ms zurück) überschreibt der langsamere Writer das Array mit seinem älteren Stand — Lost Update. Ich instrumentiere die drei Writer, reproduziere das an der vorhandenen Szene und mache den Schreibpfad dann konfliktfrei: entweder der RPC aus der v169-Spec (`update_dialog_shot_pass(scene_id, pass_idx, patch)` mit `jsonb_set` in einer einzigen Anweisung) oder ein `FOR UPDATE`-Read direkt vor dem Write.
+## Phase 2 — Deterministische Preclip-Geometrie
 
-**2. Slot-Integritäts-Guard (schützt sofort, unabhängig von 1)**
-Vor jedem Schreiben eines Pass-Slots: hat das Objekt kein `idx`/`speaker_idx`, wird nicht geschrieben, sondern der Slot aus den `dialog_turns` neu aufgebaut. Beim Einlesen genauso: ein leerer Slot wird aus dem Turn rekonstruiert statt als „speaker_idx undefined" weiterzureichen. Damit läuft eine Szene wie diese von selbst weiter, statt zu blockieren.
+Ein einziger Pfad in `pass-face-preclip.ts`, der aus echten Landmarks bzw. Face-Bbox eine Crop-Box mit garantiertem Face-Share erzeugt. Dazu:
 
-**3. Der v87-Block darf nicht mehr endlos 202 zurückgeben**
-Der Block bekommt denselben Zähler wie sein großer Bruder weiter oben (`face_detect_retry_count`, 3 Versuche): danach `lip_sync_status='failed'`, klare Meldung, idempotenter Credit-Refund. Ein Pass, der nicht dispatcht werden kann, endet damit **immer** terminal — die UI hängt nie wieder unbegrenzt, und der Watchdog sieht einen Zustand, den er beenden kann.
+- Sämtliche parallelen Rettungs-/Synthetik-Pfade und konkurrierenden Face-Share-Floors aus v33x–v34x konsolidieren auf **einen** Floor und **eine** Berechnungsfunktion.
+- `syncso-face-gate.ts` verliert alle „trust ohne Probe"-Ausnahmen. Fehlt die Messung, wird nicht dispatcht.
+- Geometrie jedes Passes wird persistiert, damit Phase 1 exakt dieselbe Mundregion messen kann wie beim Zuschnitt verwendet.
 
-## Abgleich mit deinem v169-Guide
+## Phase 3 — Retry und Provider-Fallback
 
-| v169-Invariante | Ist-Zustand |
-|---|---|
-| Parallel-Fanout, eigener Preclip pro Pass | ✅ erfüllt (3 Passes parallel um 23:09:06) |
-| Deterministisches ASD, nie `auto_detect` bei N≥2 | ✅ erfüllt (`bbox-url-pro`) |
-| Per-Pass-Lock | ✅ vorhanden |
-| **Per-Slot-RPC `update_dialog_shot_pass` statt Array-Rewrite** | ❌ **fehlt — genau das ist der Bug** |
-| Watchdog beendet hängende Passes | ⚠️ greift nicht, weil kein Inflight-Row und kein Status existiert |
+- Pass mit Verdikt `static`: **ein** automatischer Retry mit engerem Crop (höherer Face-Share).
+- Zweites `static`: Fallback auf den alternativen Lip-Sync-Provider für genau diesen Pass.
+- Auch dann `static`: Szene terminal auf `failed` mit klarer Ursache `provider_returned_static_output`, automatischer Credit-Refund, kein Mux.
+- `lipsync-watchdog` bleibt Sicherheitsnetz gegen Hänger, ist aber nicht mehr der einzige Ausweg.
 
-Dein Guide hat den Fehler also bereits benannt: „Per-slot RPC write — never full-row rewrite." Der Punkt ist beim Umbau verloren gegangen. Schritt 1 stellt ihn wieder her.
+## Phase 4 — Observability und Regressionsschutz
 
-## Was ich nicht anfasse
+- Jede Pass-Auswertung schreibt Verdikt, Messwert, Face-Share und Provider in `syncso_dispatch_log`.
+- Kleine Admin-Ansicht: letzte 50 Passes mit Verdikt und Ursache — damit „trifft kein Lip-Sync" künftig in einer Minute statt in einer Session beantwortbar ist.
+- Ein Referenzclip als Golden Sample: liefert das Verdict-Modul dort nicht `moved`, ist die Messung selbst kaputt.
 
-Preclip-Geometrie, Face-Share-Schwellen, Retry-Ladder, Provider-Payload, Mux, Motion Studio UI. Die Werte von 23:09 (face_share 0.29–0.32, alle vier Dispatches angenommen) zeigen, dass dieser Teil funktioniert.
+## Reihenfolge und Abnahme
 
-## Verifikation
+Phase 1 zuerst und isoliert testen — ab da kann kein statischer Clip mehr als fertig gelten. Danach 2, 3, 4.
 
-- Die hängende Szene 69d56a49 wird repariert (Slot 0 rekonstruiert) und läuft durch — oder scheitert terminal mit Refund.
-- Neue 4-Sprecher-Szene: alle vier Slots behalten nach dem letzten Webhook `idx`/`speaker_idx`/`status`; keine `HEURISTIC_BLOCKED`-Zeile mit `speaker_idx=undefined` mehr im Log.
-- Kein Pass bleibt länger als der Watchdog-Timeout ohne Terminalzustand.
+Abnahmekriterium: eine Vier-Sprecher-Szene erzeugt entweder ein Video mit messbarer Mundbewegung in allen vier Slots, oder einen klar begründeten, rückerstatteten Fehlschlag. Ein stiller Erfolg ohne Bewegung ist danach technisch nicht mehr möglich.
+
+## Technische Details
+
+- Neu: `supabase/functions/_shared/mouth-motion-verdict.ts`
+- Geändert: `render-sync-segments-audio-mux`, `pass-face-preclip.ts`, `syncso-face-gate.ts`, `compose-dialog-segments`, `lipsync-watchdog`
+- Entfernt/zusammengeführt: konkurrierende Face-Share-Floors und Trust-Ausnahmen aus v334–v342
+- Client: `SceneClipProgress` nur noch Anzeige
+- Migration: Verdikt-Felder in `syncso_dispatch_log`

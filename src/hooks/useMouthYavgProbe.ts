@@ -56,6 +56,9 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
       if (!pass.output_url) continue;
       if (pass.motion_noop === true) continue;      // already flagged server-side
       if (pass.yavg_probed_at) continue;             // already probed server-side
+      // v344 — the server-side verdict is authoritative. If it already ran,
+      // the client has nothing to add.
+      if ((pass as { motion_verdict?: string }).motion_verdict) continue;
       const key = `${scene.id}::${pass.idx}`;
       if (probedThisSession.has(key)) continue;
       if (inflightRef.current.has(key)) continue;
@@ -88,6 +91,9 @@ export function useMouthYavgProbe(scene: ComposerScene | null | undefined) {
               yavg_normalized: result.yavgNormalized,
               frames: result.frames,
               method: result.method,
+              // v344 — telemetry only. A browser-side best-effort measurement
+              // must never decide whether a production render is released.
+              observe_only: true,
             },
           });
         } catch (err) {

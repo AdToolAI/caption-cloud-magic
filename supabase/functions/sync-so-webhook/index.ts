@@ -31,6 +31,7 @@ import {
   logSyncDispatch,
 } from "../_shared/syncso-preflight.ts";
 import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
+import { judgeMouthMotion, mouthRectFromPass } from "../_shared/mouth-motion-verdict.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 
@@ -615,27 +616,86 @@ serve(async (req) => {
       const reencodedPassthroughSuspect_DEPRECATED = !syncOutputUnchanged &&
         sizeRatio >= 0.65 && sizeRatio <= 1.35;
       const reencodedPassthroughSuspect = false; // v150: disabled, see comment above
-      // v231 — Motion Content Gate für Einzelsprecher (N=1).
-      // Für Multi-Cast ist die bytes-Heuristik ein False-Positive-Generator
-      // (v150-Kommentar oben). Für N=1 gibt es aber KEINE Kaskaden-Risiken:
-      // ein statischer Sync.so-Output („Noop") lässt den Sprecher eingefroren
-      // erscheinen und der Kunde bekommt sichtbar keine Lippenbewegung.
-      // Deshalb reaktivieren wir den byte-basierten Gate GEZIELT und nur mit
-      // einem sehr engen Passthrough-Band (0.92–1.08), das nur echte
-      // Beinahe-Identitäts-Outputs trifft (real animiertes Lip-Sync
-      // produziert typischerweise sizeRatio ≤ 0.90 durch veränderte
-      // Keyframes im Mund-Bereich).
+      // ══════════════════════════════════════════════════════════════════
+      // v344 Phase 1 — SERVER-SIDE MOUTH-MOTION VERDICT
+      // ══════════════════════════════════════════════════════════════════
+      // Single source of truth for "did lip-sync actually happen". Byte /
+      // etag / sizeRatio heuristics (v128, v150, v231) are demoted to
+      // forensics: they either missed real no-ops (multi-speaker) or hard-
+      // failed good passes (single-speaker tight band).
+      //
+      // The verdict looks at the pixels of the provider output inside the
+      // mouth band we cropped for the dispatch:
+      //   moved   → pass is genuinely animated, continue
+      //   static  → provider returned a no-op, feed the NOOP ladder
+      //   unknown → measurement unavailable, fall back to legacy signals
+      //             (a broken probe must never fail a customer render)
       const isSingleSpeakerScene = totalPasses === 1;
-      const singleSpeakerMotionNoop = isSingleSpeakerScene &&
+      const turnStartSec = Number(passBeforeDone?.segments?.[0]?.startTime);
+      const turnEndSec = Number(passBeforeDone?.segments?.[0]?.endTime);
+      const turnDurSec = Number.isFinite(turnStartSec) && Number.isFinite(turnEndSec) &&
+          turnEndSec > turnStartSec
+        ? turnEndSec - turnStartSec
+        : undefined;
+      const motion = await judgeMouthMotion({
+        outputUrl: rehostedUrl ?? outputUrl,
+        // A per-pass Sync.so output always starts at t=0 with the tight turn
+        // audio, so the speech window is [0, turnDuration].
+        windowStartSec: 0,
+        windowEndSec: turnDurSec,
+        mouthRect: mouthRectFromPass(passBeforeDone),
+        sampleCount: 4,
+        label: `scene=${sceneId} pass=${currentPass}`,
+      });
+      const motionStatic = motion.verdict === "static";
+      const motionUnknown = motion.verdict === "unknown";
+      console.log(
+        `[sync-so-webhook] v344_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
+      );
+
+      // Legacy byte gate stays active ONLY while the probe is unavailable.
+      const legacyByteNoop = motionUnknown && isSingleSpeakerScene &&
         !syncOutputUnchanged &&
         inBytes > 0 && outBytes > 0 &&
         sizeRatio >= 0.92 && sizeRatio <= 1.08;
-      const noopSuspect = syncOutputUnchanged || syncOutputResolutionRegression || singleSpeakerMotionNoop;
-      if (singleSpeakerMotionNoop) {
+
+      const noopSuspect = motionStatic || syncOutputUnchanged ||
+        syncOutputResolutionRegression || legacyByteNoop;
+
+      // Persist the verdict for every pass, pass or fail (Phase 4).
+      try {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          engine: "sync-segments",
+          job_id: jobId,
+          turn_idx: Number(passBeforeDone?.idx ?? currentPass),
+          sync_status: `MOTION_VERDICT_${motion.verdict.toUpperCase()}`,
+          error_class: motionStatic ? "sync_output_motion_static" : null,
+          motion_verdict: motion.verdict,
+          motion_score: motion.score,
+          motion_probe_meta: {
+            ...motion,
+            pass_idx: currentPass,
+            speaker_name: passBeforeDone?.speaker_name ?? null,
+            preclip_face_share: passBeforeDone?.preclip_face_share ?? null,
+            size_ratio: sizeRatio,
+            provider_status: status,
+          },
+          meta: { v344_motion_verdict: true, pass_idx: currentPass },
+        });
+      } catch { /* forensics must never break the webhook */ }
+
+      if (motionStatic) {
         console.warn(
-          `[sync-so-webhook] v231_n1_motion_gate scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(3)} → NOOP suspect (single-speaker tight-band)`,
+          `[sync-so-webhook] v344 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → NOOP ladder`,
         );
       }
+      if (legacyByteNoop) {
+        console.warn(
+          `[sync-so-webhook] v231_n1_motion_gate scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(3)} → NOOP suspect (probe unavailable, legacy fallback)`,
+        );
+      }
+
       // v150 — Diagnostik-Log auch wenn nur die alte (jetzt deaktivierte)
       // bytes-Heuristik anschlagen würde. So sehen wir in den Logs, ob die
       // alte v128 noch täglich False-Positives produziert hätte — ohne dass
@@ -711,7 +771,9 @@ serve(async (req) => {
       if (noopSuspect && !canEscalate) {
         // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
         // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
-        const noopReasonHard = syncOutputResolutionRegression
+        const noopReasonHard = motionStatic
+          ? "provider_returned_static_output"
+          : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
@@ -801,7 +863,9 @@ serve(async (req) => {
       if (canEscalate && nextRung) {
         const newAttemptId = crypto.randomUUID();
         const nextStep = nextRung.step + 1;
-        const noopReason = syncOutputResolutionRegression
+        const noopReason = motionStatic
+          ? "provider_returned_static_output"
+          : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
@@ -918,13 +982,23 @@ serve(async (req) => {
 
       const noopSuspectFlags = noopSuspect ? {
         sync_noop_suspect: true,
-        noop_reason: syncOutputResolutionRegression
+        noop_reason: motionStatic
+          ? "provider_returned_static_output"
+          : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
             : "sync_output_reencoded_passthrough_suspect",
         noop_size_ratio: sizeRatio,
       } : {};
+      // v344 — the verdict travels with the pass so the mux gate can refuse
+      // to composite a scene that contains a proven-static speaker.
+      const motionVerdictFlags = {
+        motion_verdict: motion.verdict,
+        motion_score: motion.score,
+        motion_verdict_at: nowIso,
+        motion_verdict_reason: motion.reason,
+      };
       if (freshDonePasses[currentPass]) {
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
@@ -933,9 +1007,11 @@ serve(async (req) => {
           rehosted: !!rehostedUrl,
           sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
           finished_at: nowIso,
+          ...motionVerdictFlags,
           ...noopSuspectFlags,
         };
       }
+
 
       const { doneCount, failedCount, allTerminal } = terminalV5Counts(freshDonePasses);
       const allDone = allTerminal && doneCount > 0;
@@ -1019,6 +1095,7 @@ serve(async (req) => {
               output_url: rehostedUrl ?? outputUrl,
               rehosted: !!rehostedUrl,
               finished_at: nowIso,
+              ...motionVerdictFlags,
             },
           });
           // Top-level scene status / counters — non-slot fields, safe to UPDATE.
