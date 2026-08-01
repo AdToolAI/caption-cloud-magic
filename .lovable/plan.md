@@ -1,60 +1,47 @@
-# Lip-Sync-Pipeline: Stabilisierungsplan
+## Was der Fehler tatsächlich sagt
 
-## Ausgangslage (belegt)
+```text
+preclip_face_share_too_low: 13.8 % _crop128px_face41x55
+```
 
-Für Szene `69d56a49…` zeigt `syncso_dispatch_log` vier erfolgreiche Dispatches mit Face-Share bis 30,9 %. Die Pixel-Analyse der Sync.so-Ergebnisse ergab eine Änderung von nur 0,36–2,59/255 gegenüber dem Input: **der Provider liefert No-Op-Clips und meldet trotzdem `completed`**. Die Bewegungsprüfung lief bisher nur clientseitig (Best-Effort) und wurde nicht ausgelöst — also wurden statische Clips als `done` akzeptiert und gemuxt.
+Nachgerechnet aus dem Code (`_shared/compute-mouth-centered-crop.ts`, `_shared/pass-face-preclip.ts`):
 
-Kernproblem ist damit nicht die Geometrie, sondern: **wir vertrauen dem Provider-Statuscode statt dem tatsächlichen Bild.** Alle bisherigen Einzel-Fixes (v33x–v34x) haben an Gates gedreht, ohne diese eine Lücke zu schließen.
+- Samuels Gesicht auf der Plate ist **41 × 55 px** (Vierer-Shot, er sitzt weit hinten).
+- Ziel-Face-Share 0,42 ⇒ idealer Crop = `55 / sqrt(0.42)` ≈ **85 px**.
+- `minSize: 128` hebt den Crop auf **128 px** an.
+- Die Kontrolle danach rechnet **Flächenanteil**: `41*55 / 128²` = **13,8 %** < Floor 0,15 ⇒ Hard-Fail.
 
-## Leitprinzipien
+Das heißt: **die Geometrie ist nicht schlecht — der Gate widerspricht sich selbst.** Der Crop wurde von `minSize` künstlich vergrößert und danach genau dafür bestraft. Für jedes Gesicht unter ca. 50 px ist der Floor systematisch unerfüllbar. Zusätzlich vergleicht er eine Fläche (41×55, nicht quadratisch) gegen ein Quadrat; linear füllt das Gesicht 55/128 = **43 %** der Crop-Kante — also exakt das, was die Pipeline eigentlich will.
 
-1. Einzige Wahrheit für „Lip-Sync ist gelungen" ist ein **serverseitig gemessenes Mundbewegungs-Signal**, nicht der Provider-Status.
-2. Gates dürfen nur **blocken**, nie **freigeben**. Kein Gate darf ohne Messung „trusted" sagen.
-3. Jeder Abbruch ist **terminal, sichtbar und rückerstattet** — kein stiller Hänger.
-4. Keine neuen Heuristiken ohne Messwert, der sie widerlegen kann.
+## Warum das der saubere Schnitt ist
 
-## Phase 1 — Server-Motion-Verdict (der eigentliche Fix)
+Ein Gate darf nur blocken, was er auch wirklich misst. Deshalb: **ein** Maß, **eine** Stelle, und die endgültige Wirksamkeitsentscheidung bleibt beim serverseitigen Motion-Verdict (Phase 1), der die Realität misst statt sie zu schätzen. Keine zweite spekulative Vorab-Hürde.
 
-Neue geteilte Komponente `_shared/mouth-motion-verdict.ts` plus Ausführung in `render-sync-segments-audio-mux` **vor** dem Mux und **vor** dem Setzen von `status = 'done'`:
+## Fix
 
-- Frames aus dem Sync.so-Output an N Zeitpunkten innerhalb des Sprechfensters ziehen (bestehende `face-frame-extract.ts`-Infrastruktur nutzen).
-- Für jeden Sprecher-Slot die Mundregion aus der bekannten Preclip-Geometrie ausschneiden und die **Differenz-Varianz gegenüber dem Input-Plate an denselben Zeitpunkten** berechnen.
-- Verdikt pro Pass: `moved` / `static`. Schwelle einmalig kalibriert an einem bekannt-guten Clip vom 27.07. und als Konstante hinterlegt, nicht pro Szene getunt.
-- `static` ⇒ Pass gilt als fehlgeschlagen, unabhängig vom Provider-Status.
+**1. Ein einziges, lineares Share-Maß (`_shared/compute-mouth-centered-crop.ts`)**
+Zusätzlich zu `faceShareInCrop` (Fläche, bleibt Telemetrie) wird `faceSideShare = max(faceW, faceH) / cropSize` zurückgegeben — das Maß, das der Sync.so-Wirksamkeit entspricht.
 
-Der clientseitige Probe-Hook in `SceneClipProgress` wird auf reine Anzeige reduziert und trifft keine Freigabeentscheidung mehr.
+**2. Gate auf das lineare Maß umstellen (`_shared/pass-face-preclip.ts`)**
+- Floor wird `faceSideShare < 0.34` statt `faceArea/crop² < 0.15`.
+- Verletzt wird er nur, wenn der Crop wirklich zu weit ist (z. B. nach Expansion-Retries) — nie durch `minSize`.
+- `minSize` 128 → 96; wenn `idealSide < minSize`, wird das als `min_size_widened` protokolliert, nicht geblockt.
+- Fehlermeldung enthält beide Werte: `side_share=… area_share=… crop=… face=…`.
 
-## Phase 2 — Deterministische Preclip-Geometrie
+**3. Upscale-Realitätscheck statt Blindflug**
+Ein 128-px-Crop auf 720 px ist 5,6× Upscale — grenzwertig. Neu: `faceSide < 48 px` ⇒ Warnung `preclip_low_source_face` in `syncso_dispatch_log.meta`, Dispatch läuft weiter. Der Motion-Verdict entscheidet danach faktisch.
 
-Ein einziger Pfad in `pass-face-preclip.ts`, der aus echten Landmarks bzw. Face-Bbox eine Crop-Box mit garantiertem Face-Share erzeugt. Dazu:
-
-- Sämtliche parallelen Rettungs-/Synthetik-Pfade und konkurrierenden Face-Share-Floors aus v33x–v34x konsolidieren auf **einen** Floor und **eine** Berechnungsfunktion.
-- `syncso-face-gate.ts` verliert alle „trust ohne Probe"-Ausnahmen. Fehlt die Messung, wird nicht dispatcht.
-- Geometrie jedes Passes wird persistiert, damit Phase 1 exakt dieselbe Mundregion messen kann wie beim Zuschnitt verwendet.
-
-## Phase 3 — Retry und Provider-Fallback
-
-- Pass mit Verdikt `static`: **ein** automatischer Retry mit engerem Crop (höherer Face-Share).
-- Zweites `static`: Fallback auf den alternativen Lip-Sync-Provider für genau diesen Pass.
-- Auch dann `static`: Szene terminal auf `failed` mit klarer Ursache `provider_returned_static_output`, automatischer Credit-Refund, kein Mux.
-- `lipsync-watchdog` bleibt Sicherheitsnetz gegen Hänger, ist aber nicht mehr der einzige Ausweg.
-
-## Phase 4 — Observability und Regressionsschutz
-
-- Jede Pass-Auswertung schreibt Verdikt, Messwert, Face-Share und Provider in `syncso_dispatch_log`.
-- Kleine Admin-Ansicht: letzte 50 Passes mit Verdikt und Ursache — damit „trifft kein Lip-Sync" künftig in einer Minute statt in einer Session beantwortbar ist.
-- Ein Referenzclip als Golden Sample: liefert das Verdict-Modul dort nicht `moved`, ist die Messung selbst kaputt.
-
-## Reihenfolge und Abnahme
-
-Phase 1 zuerst und isoliert testen — ab da kann kein statischer Clip mehr als fertig gelten. Danach 2, 3, 4.
-
-Abnahmekriterium: eine Vier-Sprecher-Szene erzeugt entweder ein Video mit messbarer Mundbewegung in allen vier Slots, oder einen klar begründeten, rückerstatteten Fehlschlag. Ein stiller Erfolg ohne Bewegung ist danach technisch nicht mehr möglich.
+**4. Kein stiller Hard-Fail der Szene**
+`v187_preclip_required_no_fullplate_fallback` bleibt nur für echte Geometriefehler (Crop enthält nachweislich kein isoliertes Gesicht). Gesichtsgröße allein löst ihn nicht mehr aus.
 
 ## Technische Details
 
-- Neu: `supabase/functions/_shared/mouth-motion-verdict.ts`
-- Geändert: `render-sync-segments-audio-mux`, `pass-face-preclip.ts`, `syncso-face-gate.ts`, `compose-dialog-segments`, `lipsync-watchdog`
-- Entfernt/zusammengeführt: konkurrierende Face-Share-Floors und Trust-Ausnahmen aus v334–v342
-- Client: `SceneClipProgress` nur noch Anzeige
-- Migration: Verdikt-Felder in `syncso_dispatch_log`
+- `compute-mouth-centered-crop.ts`: `faceSideShare` im Result-Typ; Test für den Fall 41×55/128 ergänzen (muss durchgehen).
+- `pass-face-preclip.ts`: `FACE_SHARE_FLOOR` → `FACE_SIDE_SHARE_FLOOR = 0.34`, `minSize: 128` → `96`, Recompute nach Expansion nutzt dasselbe lineare Maß.
+- Telemetrie: `preclip_side_share`, `preclip_face_side_px`, `preclip_min_size_widened` in `syncso_dispatch_log.meta`.
+- Deploy von `compose-dialog-segments` (zieht die `_shared`-Module), danach Re-Render der Szene zur Verifikation.
+
+## Was nicht passiert
+
+- Keine neuen Tracker, keine Bewegungs-Bboxes, kein Rückgriff auf v334–v341-Geometrie.
+- Kein Anfassen von Dispatch-Payload, Webhook oder Mux-Gate (Phase 1 bleibt unverändert).

@@ -87,8 +87,14 @@ export interface PassPreclipResult {
   /** v247/v342 — anchor used ("mouth" | "mouth_from_bbox" | "face_center"). */
   anchor?: "mouth" | "face_center" | "mouth_from_bbox";
 
-  /** v247 — face bbox area / crop area after clamping (0..1). */
+  /** v247 — face bbox area / crop area after clamping (0..1). Telemetry. */
   faceShareInCrop?: number;
+  /** v344.1 — LINEAR share: longest face side / crop side. Gate metric. */
+  faceSideShare?: number;
+  /** v344.1 — longest face side in plate pixels. */
+  faceSidePx?: number;
+  /** v344.1 — true when minSize (not the target share) sized the crop. */
+  minSizeWidened?: boolean;
   /** v247 — distance (px) between mouth and crop center. */
   mouthOffsetPx?: number;
   /** v247 — true when clamping forced the crop off the ideal anchor. */
@@ -182,6 +188,9 @@ export async function renderPassFacePreclip(
   let crop0Y: number;
   let anchor: "mouth" | "face_center" | "mouth_from_bbox" = "face_center";
   let faceShareInCrop = 0;
+  let faceSideShare = 0;
+  let faceSidePx = 0;
+  let minSizeWidened = false;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
 
@@ -207,7 +216,11 @@ export async function renderPassFacePreclip(
       plateWidth: sW,
       plateHeight: sH,
       targetFaceShare: 0.42,
-      minSize: 128,
+      // v344.1 — was 128. A 128px floor around a 41x55px face produced an
+      // area-share of 13.8% and tripped the (area-based) gate that this very
+      // widening had caused. 96 keeps Lambda-safe geometry without inventing
+      // an unreachable share.
+      minSize: 96,
       outputSize: 720,
     });
     crop0X = r.crop.x;
@@ -215,10 +228,13 @@ export async function renderPassFacePreclip(
     crop0Size = r.crop.size;
     anchor = mouthValid ? r.anchor : "mouth_from_bbox";
     faceShareInCrop = r.faceShareInCrop;
+    faceSideShare = r.faceSideShare;
+    faceSidePx = r.faceSidePx;
+    minSizeWidened = r.minSizeWidened;
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_mouth_anchor_preclip anchor=${anchor} mouth_source=${mouthValid ? "detector" : "bbox_lower_third"} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_mouth_anchor_preclip anchor=${anchor} mouth_source=${mouthValid ? "detector" : "bbox_lower_third"} side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} face_side_px=${faceSidePx} min_size_widened=${minSizeWidened} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
   } else {
     const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
@@ -273,27 +289,41 @@ export async function renderPassFacePreclip(
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
-  // v342 — hard face-share floor. Recompute the share against the FINAL
-  // crop (expansion retries enlarge the box and shrink the share). Below
-  // 15% Sync.so reliably emits the input unchanged, so we refuse to pay
-  // for a job that cannot work and let the caller refund the pass.
+  // v344.1 — LINEAR face-share floor. Recompute against the FINAL crop
+  // (expansion retries enlarge the box and shrink the share). The old
+  // area-based floor (0.15) was unreachable for faces < ~50px because the
+  // `minSize` widening it complained about was self-inflicted, and it
+  // penalised non-square faces (41x55 in a 128px crop = 43% of the crop
+  // EDGE but only 13.8% of its AREA). We block only when the face is
+  // genuinely small relative to the crop edge.
   if (bboxValid) {
     const fbW = Math.max(1, Number((bbox as number[])[2]) - Number((bbox as number[])[0]));
     const fbH = Math.max(1, Number((bbox as number[])[3]) - Number((bbox as number[])[1]));
+    const fbSide = Math.max(fbW, fbH);
     faceShareInCrop = Math.min(1, (fbW * fbH) / Math.max(1, crop.size * crop.size));
-    const FACE_SHARE_FLOOR = 0.15;
-    if (faceShareInCrop < FACE_SHARE_FLOOR) {
+    faceSideShare = Math.min(1, fbSide / Math.max(1, crop.size));
+    faceSidePx = fbSide;
+    const FACE_SIDE_SHARE_FLOOR = 0.34;
+    if (faceSideShare < FACE_SIDE_SHARE_FLOOR) {
       console.error(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_face_share_floor_block face_share=${faceShareInCrop.toFixed(3)} floor=${FACE_SHARE_FLOOR} crop=${crop.x},${crop.y},${crop.size} face=${Math.round(fbW)}x${Math.round(fbH)} anchor=${anchor}`,
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_face_side_share_floor_block side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} floor=${FACE_SIDE_SHARE_FLOOR} crop=${crop.x},${crop.y},${crop.size} face=${Math.round(fbW)}x${Math.round(fbH)} anchor=${anchor}`,
       );
       return {
         ok: false,
-        error: `preclip_face_share_too_low:${(faceShareInCrop * 100).toFixed(1)}%_crop${crop.size}px_face${Math.round(fbW)}x${Math.round(fbH)}`,
+        error: `preclip_face_share_too_low:side_share=${(faceSideShare * 100).toFixed(1)}%_area_share=${(faceShareInCrop * 100).toFixed(1)}%_crop${crop.size}px_face${Math.round(fbW)}x${Math.round(fbH)}`,
         errorClass: "invalid_input",
       };
     }
+    // v344.1 — upscale reality check. A tiny source face still gets a
+    // dispatch; the server-side motion verdict decides afterwards whether
+    // Sync.so actually animated it. No speculative pre-block.
+    if (fbSide < 48) {
+      console.warn(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} preclip_low_source_face face_side_px=${Math.round(fbSide)} crop=${crop.size} upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x — dispatching anyway, motion verdict decides`,
+      );
+    }
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_face_share_final share=${faceShareInCrop.toFixed(3)} crop_size=${crop.size} face_side=${Math.round(Math.max(fbW, fbH))} ratio=${(crop.size / Math.max(1, Math.max(fbW, fbH))).toFixed(2)} anchor=${anchor}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_face_share_final side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} crop_size=${crop.size} face_side=${Math.round(fbSide)} ratio=${(crop.size / Math.max(1, fbSide)).toFixed(2)} min_size_widened=${minSizeWidened} anchor=${anchor}`,
     );
   }
 
@@ -337,6 +367,9 @@ export async function renderPassFacePreclip(
         frameCount: durationInFrames,
         anchor,
         faceShareInCrop,
+        faceSideShare,
+        faceSidePx,
+        minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
       };
@@ -505,6 +538,9 @@ export async function renderPassFacePreclip(
         frameCount: durationInFrames,
         anchor,
         faceShareInCrop,
+        faceSideShare,
+        faceSidePx,
+        minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
       };

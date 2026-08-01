@@ -31,3 +31,18 @@ Deno.test("v247 regression: small face reaches ≥35% face share", () => {
     `expected faceShareInCrop ≥ 0.35, got ${r.faceShareInCrop}`,
   );
 });
+
+Deno.test("v344.1: 41x55px face in a minSize-widened crop passes the linear floor", () => {
+  const r = computeMouthCenteredCrop({
+    face: { bbox: [820, 300, 861, 355], center: [840, 327], mouth: [840, 340] },
+    plateWidth: 1284,
+    plateHeight: 718,
+    minSize: 96,
+  });
+  assert(r.minSizeWidened, "minSize should be what sized this crop");
+  assert(
+    r.faceSideShare >= 0.34,
+    `expected faceSideShare ≥ 0.34, got ${r.faceSideShare} (crop=${r.crop.size})`,
+  );
+  assert(r.faceSidePx === 55, `expected faceSidePx 55, got ${r.faceSidePx}`);
+});

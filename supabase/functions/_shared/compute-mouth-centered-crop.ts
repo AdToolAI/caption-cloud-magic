@@ -30,7 +30,18 @@ export interface MouthCenteredCropInput {
 export interface MouthCenteredCropResult {
   crop: { x: number; y: number; size: number; outputSize: number };
   anchor: "mouth" | "face_center";
+  /** Area ratio (faceW*faceH / size²) — telemetry only. */
   faceShareInCrop: number;
+  /**
+   * v344.1 — LINEAR share: max(faceW, faceH) / cropSize. This is the metric
+   * that correlates with Sync.so actually animating the mouth; the area
+   * ratio penalises non-square faces and small `minSize`-widened crops.
+   */
+  faceSideShare: number;
+  /** Longest face side in plate pixels. */
+  faceSidePx: number;
+  /** True when `minSize` (not the target share) determined the crop size. */
+  minSizeWidened: boolean;
   mouthOffsetPx: number;
   clamped: boolean;
 }
@@ -97,6 +108,8 @@ export function computeMouthCenteredCrop(
   const cropArea = size * size;
   const faceArea = faceW * faceH;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
+  const faceSideShare = Math.min(1, faceSide / Math.max(1, size));
+  const minSizeWidened = minSize > idealSide && size >= minSize;
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
   const mouthOffsetPx = usingMouth
@@ -107,6 +120,9 @@ export function computeMouthCenteredCrop(
     crop: { x, y, size, outputSize },
     anchor,
     faceShareInCrop,
+    faceSideShare,
+    faceSidePx: faceSide,
+    minSizeWidened,
     mouthOffsetPx,
     clamped,
   };

@@ -45,8 +45,17 @@ export interface MouthCenteredCropResult {
   crop: { x: number; y: number; size: number; outputSize: number };
   /** Anchor used ("mouth" | "face_center"). */
   anchor: "mouth" | "face_center";
-  /** Actual ratio of face bbox area to crop area after clamping. */
+  /** Actual ratio of face bbox area to crop area after clamping. Telemetry. */
   faceShareInCrop: number;
+  /**
+   * v344.1 — LINEAR share: max(faceW, faceH) / cropSize. Gate metric; the
+   * area ratio penalises non-square faces and minSize-widened crops.
+   */
+  faceSideShare: number;
+  /** v344.1 — longest face side in plate pixels. */
+  faceSidePx: number;
+  /** v344.1 — true when minSize (not the target share) sized the crop. */
+  minSizeWidened: boolean;
   /** Distance in pixels between mouth and crop center (0 when anchor=mouth and no clamp). */
   mouthOffsetPx: number;
   /** True when clamping forced the crop away from the ideal center. */
@@ -132,6 +141,8 @@ export function computeMouthCenteredCrop(
   const cropArea = size * size;
   const faceArea = faceW * faceH;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
+  const faceSideShare = Math.min(1, faceSide / Math.max(1, size));
+  const minSizeWidened = minSize > idealSide && size >= minSize;
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
   const mouthOffsetPx = usingMouth
@@ -142,6 +153,9 @@ export function computeMouthCenteredCrop(
     crop: { x, y, size, outputSize },
     anchor,
     faceShareInCrop,
+    faceSideShare,
+    faceSidePx: faceSide,
+    minSizeWidened,
     mouthOffsetPx,
     clamped,
   };
