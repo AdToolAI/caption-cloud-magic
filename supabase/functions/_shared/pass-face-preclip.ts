@@ -87,8 +87,14 @@ export interface PassPreclipResult {
   /** v247/v342 — anchor used ("mouth" | "mouth_from_bbox" | "face_center"). */
   anchor?: "mouth" | "face_center" | "mouth_from_bbox";
 
-  /** v247 — face bbox area / crop area after clamping (0..1). */
+  /** v247 — face bbox area / crop area after clamping (0..1). Telemetry. */
   faceShareInCrop?: number;
+  /** v344.1 — LINEAR share: longest face side / crop side. Gate metric. */
+  faceSideShare?: number;
+  /** v344.1 — longest face side in plate pixels. */
+  faceSidePx?: number;
+  /** v344.1 — true when minSize (not the target share) sized the crop. */
+  minSizeWidened?: boolean;
   /** v247 — distance (px) between mouth and crop center. */
   mouthOffsetPx?: number;
   /** v247 — true when clamping forced the crop off the ideal anchor. */
