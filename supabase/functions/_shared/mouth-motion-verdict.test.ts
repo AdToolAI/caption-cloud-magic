@@ -17,3 +17,11 @@ Deno.test("resolveReplicateCredential supports legacy token alias", () => {
 Deno.test("resolveReplicateCredential returns null without either secret", () => {
   assertEquals(resolveReplicateCredential(() => undefined), null);
 });
+Deno.test("normaliseFrameOutput accepts string, array and FileOutput shapes", () => {
+  assertEquals(normaliseFrameOutput("https://cdn/x.jpg"), "https://cdn/x.jpg");
+  assertEquals(normaliseFrameOutput(["https://cdn/a.jpg"]), "https://cdn/a.jpg");
+  assertEquals(normaliseFrameOutput({ url: () => "https://cdn/b.jpg" }), "https://cdn/b.jpg");
+  assertEquals(normaliseFrameOutput({ url: "https://cdn/c.jpg" }), "https://cdn/c.jpg");
+  assertEquals(normaliseFrameOutput(null), null);
+  assertEquals(normaliseFrameOutput({ url: "not-a-url" }), null);
+});
