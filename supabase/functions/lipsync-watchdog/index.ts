@@ -793,7 +793,7 @@ serve(async (req) => {
     `[lipsync-watchdog] scanned=${rows?.length ?? 0} polled=${polled.length} advanced=${advanced.length} failed=${failed.length}`,
   );
   return new Response(
-    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, failed }),
+    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, skipped, failed }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
