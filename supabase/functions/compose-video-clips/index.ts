@@ -40,7 +40,7 @@ import {
   assertPlateFaceContract,
   closeupFramingSuffix,
   closeupOnlyEnabled,
-  contractFailureMessage,
+  lipsyncPlateResolution,
   requiredFaceWidthRatio,
 } from "../_shared/lipsync-closeup-contract.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
@@ -2795,14 +2795,20 @@ serve(async (req) => {
                 (scene as any).__minFaceCheck = minFaceCheck;
 
                 // ══════════════════════════════════════════════════════
-                // v354 — FACE-SIZE CONTRACT (2nd retry + HARD BLOCK)
+                // v355 — ANCHOR FRAMING RETRY (advisory, never fatal)
                 //
-                // Pre-v354 the gate above was advisory: a plate with 3 %
-                // faces still went into the (paid) video render and only
-                // failed at T6 inside pass-face-preclip, after money was
-                // spent. Now: one more framing retry with the explicit
-                // close-up suffix, and if that still misses the contract
-                // we stop the scene BEFORE the video model runs.
+                // v354 turned this into a hard block on a RATIO and
+                // immediately proved itself wrong: a 4-person conference
+                // table was stopped at 5.8 % against a required 16 %, a
+                // threshold four faces together can never reach.
+                //
+                // The anchor is a still whose pixel dimensions say nothing
+                // about the final render, so the only meaningful check
+                // here is compositional: is the framing tight enough to be
+                // worth another try? One retry with the close-up suffix,
+                // then we continue either way. The binding gate is the
+                // PIXEL contract on the rendered plate
+                // (compose-dialog-segments), where the numbers are real.
                 // ══════════════════════════════════════════════════════
                 if (
                   closeupOnlyEnabled() &&
@@ -2835,10 +2841,11 @@ serve(async (req) => {
                             faces: d2.faces.map((f) => f.bbox as [number, number, number, number]),
                             plateWidth: 1000,
                             speakers: expectedFaces,
+                            mode: "ratio",
                           })
                         : null;
                       console.log(
-                        `[compose-video-clips] v354_contract_retry scene=${scene.id} ` +
+                        `[compose-video-clips] v355_framing_retry scene=${scene.id} ` +
                         `identity=${e2.identity ?? "ok"} ok=${c2?.ok ? 1 : 0} ` +
                         `minRatio=${c2?.minWidthRatio.toFixed(3) ?? "?"} required=${c2?.requiredRatio.toFixed(3) ?? "?"}`,
                       );
@@ -2867,34 +2874,23 @@ serve(async (req) => {
                     }
                   } catch (e) {
                     console.warn(
-                      `[compose-video-clips] v354_contract_retry scene=${scene.id} exception: ${(e as Error).message}`,
+                      `[compose-video-clips] v355_framing_retry scene=${scene.id} exception: ${(e as Error).message}`,
                     );
                   }
 
                   if (minFaceCheck.ok === false) {
-                    const contractResult = {
-                      ok: false,
-                      minWidthRatio: minFaceCheck.minWidthRatio,
-                      minWidthPx: minFaceCheck.minWidthPx,
-                      requiredRatio: requiredFaceWidthRatio(expectedFaces),
-                      requiredPx: Math.round(requiredFaceWidthRatio(expectedFaces) * 1000),
-                      ratios: [],
-                      reason: minFaceCheck.reason,
-                    };
-                    const msg = contractFailureMessage(contractResult, expectedFaces);
-                    console.error(
-                      `[compose-video-clips] v354_contract_block scene=${scene.id} ` +
+                    // Advisory only — the scene proceeds. The rendered
+                    // plate is measured in real pixels before any provider
+                    // credit is spent.
+                    console.warn(
+                      `[compose-video-clips] v355_framing_advisory scene=${scene.id} ` +
                       `minRatio=${minFaceCheck.minWidthRatio.toFixed(3)} ` +
-                      `required=${contractResult.requiredRatio.toFixed(3)} n=${expectedFaces} — blocking BEFORE video render`,
+                      `guideline=${requiredFaceWidthRatio(expectedFaces).toFixed(3)} n=${expectedFaces} — ` +
+                      `continuing; pixel contract decides on the rendered plate`,
                     );
-                    await safeMarkSceneFailed(scene.id, msg, {
-                      isCinematicSyncScene: true,
-                      extra: { twoshot_stage: "failed" },
-                    });
-                    results.push({ sceneId: scene.id, status: "failed", error: msg });
-                    continue;
                   }
                 }
+
 
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
@@ -3909,18 +3905,31 @@ serve(async (req) => {
           // otherwise render 6s. Previously `>= 8 ? 10 : 6` silently rounded
           // 8s/9s scenes up to 10s and triggered Pro+10s API rejections.
           const duration = Number(scene.durationSeconds) === 10 ? 10 : 6;
+          const isI2V = !!scene.referenceImageUrl;
+          const isCinematicSyncScene =
+            (scene.engineOverride ?? "auto") === "cinematic-sync" ||
+            (scene.engineOverride ?? "auto") === "sync-segments";
           // Hailuo API constraint: 1080p is only accepted for 6s. 10s requires 768p.
-          const resolution =
-            duration === 10 ? "768p" : quality === "pro" ? "1080p" : "768p";
+          // v355 — lip-sync scenes take the highest resolution the constraint
+          // allows, because the face contract is measured in native pixels.
+          const resolution = duration === 10
+            ? "768p"
+            : lipsyncPlateResolution(
+                isCinematicSyncScene,
+                ["768p", "1080p"],
+                quality === "pro" ? "1080p" : "768p",
+              );
           if (quality === "pro" && duration === 10) {
             console.warn(
               `[compose-video-clips] Hailuo Pro+10s API-incompatible — downgrading resolution to 768p (Scene ${scene.id}).`,
             );
           }
-          const isI2V = !!scene.referenceImageUrl;
-          const isCinematicSyncScene =
-            (scene.engineOverride ?? "auto") === "cinematic-sync" ||
-            (scene.engineOverride ?? "auto") === "sync-segments";
+          if (isCinematicSyncScene) {
+            console.log(
+              `[compose-video-clips] v355_lipsync_resolution scene=${scene.id} hailuo=${resolution} duration=${duration}s`,
+            );
+          }
+
 
           await supabaseAdmin
             .from("composer_scenes")
@@ -4571,7 +4580,22 @@ serve(async (req) => {
             15,
             Math.max(3, Math.round(scene.durationSeconds)),
           );
-          const hhResolution = quality === "pro" ? "1080p" : "720p";
+          // v355 — Lip-sync scenes always render at the model's highest
+          // resolution. The contract is measured in NATIVE face pixels, and
+          // resolution is the only lever that adds real mouth detail
+          // without changing the director's framing: at identical framing
+          // 1080p carries 1.5× the face pixels of 720p (a 74 px face on the
+          // failed 1284 px plate becomes ~111 px at 1920 px).
+          const hhResolution = lipsyncPlateResolution(
+            isCinematicSyncHH,
+            ["720p", "1080p"],
+            quality === "pro" ? "1080p" : "720p",
+          );
+          if (isCinematicSyncHH && hhResolution !== (quality === "pro" ? "1080p" : "720p")) {
+            console.log(
+              `[compose-video-clips] v355_lipsync_resolution scene=${scene.id} forced=${hhResolution} (quality=${quality})`,
+            );
+          }
           const hhPromptRaw = isCinematicSyncHH
             ? buildCinematicSyncMasterPrompt(scene)
             : scene.aiPrompt;
