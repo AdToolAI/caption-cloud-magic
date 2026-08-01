@@ -35,6 +35,7 @@ import { extractFunctionsError } from '@/lib/functionsError';
 // The standalone /talking-head module still owns that hook.
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
+import { resetSceneLipSync } from '@/lib/lipsyncReset';
 import { parseDialogScript, uniqueSpeakers, type DialogBlock } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
