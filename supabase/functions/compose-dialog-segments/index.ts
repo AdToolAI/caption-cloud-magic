@@ -5644,8 +5644,17 @@ serve(async (req) => {
             size: preclipResult.crop.size,
             outputSize: preclipResult.crop.outputSize,
           };
+          // v359 — der bewegte Ausschnitt. Der Mux MUSS den lipsynced Crop
+          // entlang exakt dieses Pfades zurücklegen, sonst schmiert das
+          // Gesicht über die Plate. Fehlt der Pfad, bleibt `preclip_crop`
+          // maßgeblich (statisches Verhalten wie vor v359).
+          (pass as any).preclip_crop_path = preclipResult.cropPath ?? null;
+          (pass as any).preclip_crop_mode = preclipResult.cropMode ?? "static";
+          (pass as any).preclip_camera_travel_px = preclipResult.cameraTravelPx ?? 0;
+          (pass as any).preclip_track_containment = preclipResult.trackContainment ?? null;
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
+
           // v163 — persist the exact Remotion render frame count. Sync.so
           // requires `bounding_boxes_url.bounding_boxes.length` to match the
           // dispatched video frames exactly; duration-derived `round(dur*fps)`
