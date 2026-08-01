@@ -238,7 +238,7 @@ serve(async (req) => {
         })
         .eq("id", sceneId);
       console.error(
-        `[render-sync-segments-audio-mux] v345_mux_gate scene=${sceneId} BLOCKED code=${blockedCode} speakers=${names}`,
+        `[render-sync-segments-audio-mux] v348_mux_gate scene=${sceneId} BLOCKED code=${blockedCode} speakers=${names}`,
       );
       return json({
         ok: false,
