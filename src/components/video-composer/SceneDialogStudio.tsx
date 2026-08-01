@@ -1843,20 +1843,16 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           // Persist the engine + audio-embed flag so the player auto-unmutes
           // as soon as the lip-synced clip lands (otherwise the embedded VO
           // is inaudible until the user manually unmutes).
-          await supabase
-            .from('composer_scenes')
-            .update({
-              engine_override: 'cinematic-sync',
-              lip_sync_with_voiceover: true,
-              lip_sync_status: 'pending',
-              // Re-Run: alten Abschluss-Zustand wegräumen, sonst verwirft der
-              // Auto-Trigger die Szene als „bereits angewendet".
-              lip_sync_applied_at: null,
-              dialog_shots: null,
-              lip_sync_source_clip_url: null,
-              twoshot_stage: null,
-            })
-            .eq('id', sceneIdFinal);
+          // v351 — Re-Run: alten Abschluss-Zustand wegräumen, aber laufende
+          // Sync.so-Jobs vorher sauber canceln (Slot-Leak-Schutz).
+          await resetSceneLipSync(sceneIdFinal, (scene as any).dialogShots ?? null, {
+            engine_override: 'cinematic-sync',
+            lip_sync_with_voiceover: true,
+            lip_sync_status: 'pending',
+            lip_sync_applied_at: null,
+            lip_sync_source_clip_url: null,
+            twoshot_stage: null,
+          });
           const { error: invokeErr } = await supabase.functions.invoke('compose-video-clips', {
             body: { projectId: pidFinal, scenes: [scenePayload], characters },
           });
