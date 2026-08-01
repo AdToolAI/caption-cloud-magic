@@ -5442,6 +5442,14 @@ serve(async (req) => {
           (pass as any).preclip_face_share = Number.isFinite(Number(preclipResult.faceShareInCrop))
             ? Number(preclipResult.faceShareInCrop)
             : null;
+          // v344.1 — linear share is the gate metric; persist it alongside.
+          (pass as any).preclip_side_share = Number.isFinite(Number(preclipResult.faceSideShare))
+            ? Number(preclipResult.faceSideShare)
+            : null;
+          (pass as any).preclip_face_side_px = Number.isFinite(Number(preclipResult.faceSidePx))
+            ? Number(preclipResult.faceSidePx)
+            : null;
+          (pass as any).preclip_min_size_widened = !!preclipResult.minSizeWidened;
           (pass as any).preclip_mouth_offset_px = Number.isFinite(Number(preclipResult.mouthOffsetPx))
             ? Number(preclipResult.mouthOffsetPx)
             : null;
