@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { resolveReplicateCredential } from "./mouth-motion-verdict.ts";
+import { resolveReplicateCredential, normaliseFrameOutput } from "./mouth-motion-verdict.ts";
 
 Deno.test("resolveReplicateCredential prefers REPLICATE_API_KEY", () => {
   const values: Record<string, string> = {
