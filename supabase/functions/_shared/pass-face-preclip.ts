@@ -464,9 +464,16 @@ export async function renderPassFacePreclip(
         pass_idx: passIdx,
         face_crop: { size: crop.size },
         preclip_pipeline_version: PRECLIP_PIPELINE_VERSION,
+        // v359 — ein statisch gerenderter Preclip darf nicht für einen
+        // Kamerapfad-Plan wiederverwendet werden: der Mux würde den Crop
+        // dann entlang eines Pfades zurücklegen, mit dem er nie geschnitten
+        // wurde, und das Gesicht über die Plate schmieren.
+        crop_mode: cropMode,
+        camera_travel_px: cameraTravelPx,
         width: outW,
         height: outH,
       })
+
       .gte("started_at", cutoffIso)
       .order("started_at", { ascending: false })
       .limit(1)
