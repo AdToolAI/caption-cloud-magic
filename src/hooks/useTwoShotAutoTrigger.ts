@@ -117,6 +117,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               inflight.current.delete(d.id);
               inflight.current.delete(`audio-prep:${d.id}`);
               // Mutate in place so this tick's downstream filters see the reset.
+              const prevShots = d.dialog_shots;
               d.clip_url = null;
               d.clip_status = 'pending';
               d.lip_sync_status = 'pending';
@@ -125,22 +126,19 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               d.twoshot_stage = null;
               d.dialog_shots = null;
               d.replicate_prediction_id = null;
-              return supabase
-                .from('composer_scenes')
-                .update({
-                  clip_url: null,
-                  clip_status: 'pending',
-                  lip_sync_status: 'pending',
-                  lip_sync_source_clip_url: null,
-                  lip_sync_applied_at: null,
-                  twoshot_stage: null,
-                  dialog_shots: null,
-                  replicate_prediction_id: null,
-                  clip_error:
-                    'auto-reset: talking_head_master_invalid_for_cinematic_sync — bitte Clip neu generieren',
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', d.id);
+              // v351 — route through reset-lipsync-scene when passes are live
+              // so Sync.so slots are released instead of leaked.
+              return resetSceneLipSync(d.id, prevShots, {
+                clip_url: null,
+                clip_status: 'pending',
+                lip_sync_status: 'pending',
+                lip_sync_source_clip_url: null,
+                lip_sync_applied_at: null,
+                twoshot_stage: null,
+                replicate_prediction_id: null,
+                clip_error:
+                  'auto-reset: talking_head_master_invalid_for_cinematic_sync — bitte Clip neu generieren',
+              });
             }),
           );
         }
