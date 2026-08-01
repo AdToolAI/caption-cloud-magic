@@ -241,7 +241,12 @@ export async function judgeMouthMotion(
 
 
     const rect = normaliseRect(input.mouthRect) ?? DEFAULT_MOUTH_RECT;
-    const frames = await Promise.all(usable.map((u) => decodeFrame(u, rect)));
+    // v350 — keep the timestamp alignment intact (null where a frame is
+    // missing) so the output↔input comparison below pairs identical moments.
+    const framesByTs = await Promise.all(
+      frameResults.map((r) => r.url ? decodeFrame(r.url, rect) : Promise.resolve(null)),
+    );
+    const frames = framesByTs.filter((f): f is DecodedFrame => !!f);
     const decoded = frames.map((f) => f.grid).filter((g): g is Float64Array => !!g);
     const decodeErrors = frames.map((f) => f.error).filter((e): e is string => !!e);
     for (const err of decodeErrors) frameErrors.push(`decode:${err}`);
@@ -280,7 +285,53 @@ export async function judgeMouthMotion(
       deltas.push(meanAbsDelta(decoded[i - 1], decoded[i]));
     }
     const score = deltas.length ? Math.max(...deltas) : 0;
-    const verdict: MotionVerdict = score >= MOVED_MIN_SCORE ? "moved" : "static";
+
+    // ══════════════════════════════════════════════════════════════════
+    // v350 — PASSTHROUGH CHECK (output vs. its own input preclip).
+    // Intra-output deltas cannot distinguish "the mouth moves" from "the
+    // camera pans": a plate with camera motion scores > threshold even when
+    // the provider handed the input straight back. Measured on scene
+    // 7c11bc27 (2026-08-01): output and input mouth-band motion were 3.343
+    // vs 3.333 — identical. Comparing the two clips at the same timestamps
+    // is the only measurement that catches this.
+    // ══════════════════════════════════════════════════════════════════
+    let outputVsInput: number | null = null;
+    let outputVsInputDeltas: number[] = [];
+    const inputUrl = String(input.inputUrl ?? "");
+    if (/^https?:\/\//.test(inputUrl)) {
+      try {
+        const inputFrames = await Promise.all(
+          timestamps.map(async (t, i) => {
+            if (!framesByTs[i]?.grid) return null;
+            const r = await extractFrame(inputUrl, t, deadline, frameSize);
+            if (!r.url) {
+              frameErrors.push(`input_t=${t}:${r.error ?? "unknown"}`);
+              return null;
+            }
+            const d = await decodeFrame(r.url, rect);
+            if (!d.grid) frameErrors.push(`input_decode:${d.error ?? "unknown"}`);
+            return d.grid;
+          }),
+        );
+        for (let i = 0; i < timestamps.length; i++) {
+          const out = framesByTs[i]?.grid;
+          const inp = inputFrames[i];
+          if (out && inp) outputVsInputDeltas.push(meanAbsDelta(out, inp));
+        }
+        if (outputVsInputDeltas.length >= 2) {
+          outputVsInput = Math.max(...outputVsInputDeltas);
+        }
+      } catch (e) {
+        frameErrors.push(`input_probe_threw:${(e as Error)?.message ?? "?"}`);
+      }
+    }
+
+    const verdict: MotionVerdict =
+      outputVsInput !== null && outputVsInput < PASSTHROUGH_MAX_SCORE
+        ? "passthrough"
+        : score >= MOVED_MIN_SCORE
+          ? "moved"
+          : "static";
 
     return {
       deltas: deltas.map((d) => Number(d.toFixed(4))),
@@ -290,9 +341,14 @@ export async function judgeMouthMotion(
       method: MODEL_TAG,
       verdict,
       score: Number(score.toFixed(4)),
-      reason: verdict === "moved"
-        ? "mouth_band_motion_detected"
-        : "mouth_band_static_provider_returned_noop",
+      outputVsInput: outputVsInput === null ? null : Number(outputVsInput.toFixed(4)),
+      outputVsInputDeltas: outputVsInputDeltas.map((d) => Number(d.toFixed(4))),
+      frameErrors,
+      reason: verdict === "passthrough"
+        ? `mouth_band_passthrough_output_equals_input:max_delta=${outputVsInput?.toFixed(3)}<${PASSTHROUGH_MAX_SCORE}`
+        : verdict === "moved"
+          ? "mouth_band_motion_detected"
+          : "mouth_band_static_provider_returned_noop",
       latencyMs: Date.now() - t0,
     };
   } catch (e) {
