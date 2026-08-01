@@ -42,10 +42,28 @@ export const MAX_TRACK_SAMPLES = 6;
 /** Unter dieser Turn-Dauer lohnt Tracking nicht (kaum Bewegung möglich). */
 export const MIN_TRACK_DURATION_SEC = 0.6;
 
+/**
+ * v359 — Zusätzliche Stützstellen für risikobasierte Verdichtung.
+ *
+ * Ein echter dichter Tracker (optischer Fluss, KLT, CSRT) ist im Edge-Runtime
+ * nicht lauffähig: es gibt kein OpenCV, und die Frame-Extraktion läuft per
+ * harter Projektregel (v347) ausschließlich über AWS-Stills mit je einem
+ * Lambda-Roundtrip. Statt gleichmäßig mehr Stills zu ziehen, verdichten wir
+ * gezielt DORT, wo der Track zwischen zwei Ankern stark wandert — dort ist
+ * die Interpolation unsicher und dort schneidet der Crop an.
+ */
+export const MAX_EXTRA_SAMPLES = 4;
+
+/** Ab dieser Wanderung zwischen zwei Ankern (Anteil der Boxseite) wird
+ *  zwischen ihnen nachverdichtet. */
+export const DENSIFY_MOTION_RATIO = 0.6;
+
 export interface TrackSample {
   timestamp: number;
   box: Box | null;
   error?: string;
+  /** v359 — true, wenn dieser Sample aus der Nachverdichtung stammt. */
+  extra?: boolean;
 }
 
 export type FaceTrackSource = "tracked" | "anchor_fallback";
@@ -58,7 +76,14 @@ export interface FaceTrackResult {
   source: FaceTrackSource;
   error: string | null;
   ms: number;
+  /** v359 — Anteil Stützstellen mit erkanntem Gesicht. Telemetrie. */
+  detectionRatio?: number;
+  /** v359 — größte gemessene Wanderung zwischen zwei Ankern, in Pixeln. */
+  peakMotionPx?: number;
+  /** v359 — Anzahl nachverdichteter Stützstellen. */
+  extraSamples?: number;
 }
+
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
