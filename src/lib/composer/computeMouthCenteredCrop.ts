@@ -132,6 +132,8 @@ export function computeMouthCenteredCrop(
   const cropArea = size * size;
   const faceArea = faceW * faceH;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
+  const faceSideShare = Math.min(1, faceSide / Math.max(1, size));
+  const minSizeWidened = minSize > idealSide && size >= minSize;
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
   const mouthOffsetPx = usingMouth
@@ -142,6 +144,9 @@ export function computeMouthCenteredCrop(
     crop: { x, y, size, outputSize },
     anchor,
     faceShareInCrop,
+    faceSideShare,
+    faceSidePx: faceSide,
+    minSizeWidened,
     mouthOffsetPx,
     clamped,
   };
