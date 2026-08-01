@@ -1,46 +1,49 @@
-## Antwort auf die Frage: Ja, AWS wird jetzt benutzt — aber der Aufruf schlägt fehl
+## Ausgangspunkt (verifiziert an Szene `7c11bc27…`, 4 Sprecher)
 
-Belegt aus den aktuellen Logs (Scene `7c11bc27…`, 13:01 UTC):
+- Die Face-Map stammt aus dem **Anchor-Standbild**, alle 4 Slots mit exakt `matchConfidence: 0.93` — kein echtes Unterscheidungssignal.
+- Die Dispatch-Coords werden auf dem **gerenderten Clip** neu bestimmt. Sarahs Preclip-Crop (x 954–1111) enthält ihr Face-Map-Gesicht (x-Center 1149) **nicht** → ihr Audio läuft auf ein fremdes Gesicht. Kailees Crop trifft nur den Rand.
+- Alle 4 Pässe: `motion_verdict = unknown`, Grund `motion_probe_unavailable:decoded_0` — Frames kommen an, das Dekodieren scheitert zu 100 %, `frameToGrid()` verschluckt den Fehler mit `catch { return null }`.
+- Im Repo verwendet: `DetectFaces` + `CompareFaces` (Schwellwert-Matching). **Nicht** verwendet: `CreateCollection` / `IndexFaces` / `SearchFacesByImage`.
 
-```
-[mouth-motion-verdict] pass=3 probe_retry frame extraction issues (0/6 ok):
-t=0.18:unparsable_lambda_body:  | t=0.86:unparsable_lambda_body:  | …
-verdict=unknown frames=0 … 206 ms
-```
+Wir wissen vor dem Render, wer wo ist — geben dieses Wissen aber nirgends verbindlich weiter, sondern lassen es nach dem Render neu erraten.
 
-Zwei Dinge stehen darin:
+**Was dieser Plan garantiert und was nicht:** Die Charakter-Zuordnung wird deterministisch (A–C) — falsche Zuordnung und doppelte Charaktere sind danach ausgeschlossen bzw. werden hart geblockt. Ob danach *jede* Lippenbewegung sichtbar ist, hängt zusätzlich davon ab, ob der Provider überhaupt animiert; das können wir heute nicht messen. D stellt die Messung her, damit wir das erstmals belegen statt vermuten.
 
-1. **Kein Replicate/lucataco mehr** — kein `model_lookup_404` in keinem Log. Die AWS-Umstellung aus v347 ist wirksam.
-2. **Der AWS-Still-Aufruf liefert nichts Verwertbares**: Lambda antwortet mit HTTP-OK, aber **leerem Body** (`unparsable_lambda_body:` ohne Inhalt), und zwar für alle 6 Frames in ~200 ms zusammen. Ein echter Still-Render dauert Sekunden — es wurde also nie gerendert; der Payload wird vom Remotion-Lambda gar nicht erst angenommen.
+---
 
-Der Unterschied zur funktionierenden Strecke: Preclips und Plates gehen über `invoke-remotion-render` (Payload-Sanitizing, Rate-Limit-Retry, Event-Fallback, Status über `video_renders`). Der neue Probe ruft Lambda direkt und roh auf — ohne diese Absicherung und ohne die Felder, die diese Strecke mitliefert.
+## Plan v349
 
-### Und deshalb scheitert die Szene trotz v347
+### A. Rekognition Face Collection pro Workspace (deterministische Identität)
+- Einmalig pro Nutzer eine Collection anlegen; jedes Cast-&-World-Portrait per `IndexFaces` mit `ExternalImageId = <brand_character_id>` indexieren. `FaceId`s am Charakter speichern, Re-Index nur bei Portrait-Änderung.
+- Statt `CompareFaces`-Score-Matrix + Hungarian + Gemini-Cross-Check: pro erkannter Gesichtsbox im Clip **ein** `SearchFacesByImage` → liefert direkt die `brand_character_id`.
 
-v347 hat den Webhook entschärft (`unknown` = nur Telemetrie). Das **Mux-Gate wurde aber nicht mitgezogen**: `render-sync-segments-audio-mux` blockiert weiterhin jeden Pass, dessen Verdict nicht exakt `moved` ist — genau daher der Text im Screenshot: „Die Mundbewegung konnte für Samuel Dusatko, Matthew Dusatko, Sarah Dusatko, Kailee nicht serverseitig bestätigt werden." Solange die Messung kaputt ist, kann kein Pass jemals `moved` erreichen, also fällt jede Szene.
+### B. Bekannte Geometrie verbindlich weiterreichen
+- Die Anchor-Face-Map (Slot-Boxen + Charakter-IDs) dient als Erwartungswert. `DetectFaces` auf dem Clip-Frame, jede Box per A identifiziert — nur Boxen mit passender Identität dürfen die Coords eines Sprechers setzen.
+- Kein "nächstliegende Box gewinnt" mehr, das Sarahs Crop 117 px daneben legt.
 
-## Fix v348
+### C. Harte Gates vor Credit-Abzug und Dispatch
+- Zwei Sprecher auf derselben `FaceId`/Region → `v349_clip_duplicate_identity` (dein Fall).
+- Ein Sprecher ohne Treffer im Clip → `v349_clip_missing_cast`.
+- Coord außerhalb der identifizierten Box → `v349_coord_identity_mismatch`.
 
-1. **Still-Rendering über die bewährte Strecke statt Roh-Invoke**
-   - `_shared/aws-frame-probe.ts` dispatcht künftig wie `pass-face-preclip`: `video_renders`-Zeile mit eigener `source: "dialog-pass-motion-probe"`, Aufruf über `invoke-remotion-render`, Ergebnis über Polling/Storage-URL.
-   - Bevor die Antwort verworfen wird, werden HTTP-Status, `X-Amz-Function-Error` und Body-Länge geloggt — damit ein leerer Body nie wieder als anonymer „unparsable" endet.
-   - `remotion-webhook` bekommt für die neue `source` einen No-Op-Zweig (nur `video_renders` abschließen, keine Szenen-Patches).
+Jeweils: Szene auf `clip_status='pending'` + `twoshot_stage='needs_clip_rerender'`, **volle Credit-Erstattung**, klare deutsche Meldung ("Der gerenderte Clip zeigt einen Charakter doppelt — Szene wird neu gerendert").
 
-2. **Widerspruch im Mux-Gate auflösen**
-   - `static` (echte Messung, keine Bewegung) → blockiert weiterhin hart. Unverändert streng.
-   - `unknown` (Messung ausgefallen) → blockiert **nicht** mehr. Die Szene wird gemuxt, das Pass-Ergebnis wird als `motion_unverified` markiert und im Log/Diagnosefeld geführt.
-   - Begründung: eine ausgefallene Eigenmessung darf ein erfolgreiches Provider-Ergebnis nicht in einen Kundenfehler verwandeln — genau das passiert seit v344.
+### D. Motion-Probe messbar machen
+- `frameToGrid()` gibt Fehler aus statt sie zu schlucken: HTTP-Status, Byte-Länge, Decoder-Fehlertext pro Frame in `frameErrors` und ins Log.
+- Decoder robust: nicht mehr allein der dynamische `npm:imagescript`-Import (wahrscheinlicher Ausfallpunkt im Edge-Runtime), plus Byte-Hash-Vergleich als letzte Instanz (identische Frames = No-Op auch ohne Pixel-Decoder erkennbar).
+- Regressionstest mit zwei synthetischen Frames, erwartet `moved` bzw. `static`.
+- `unknown` bleibt vorerst durchlässig; sobald `framesDecoded ≥ 2` in den Logs steht, blockt `static` wieder hart.
 
-3. **Regression absichern**
-   - Test: `unknown` in allen Passes ⇒ Mux läuft, Szene wird nicht `failed`, kein `needs_clip_rerender`.
-   - Test: ein `static`-Pass ⇒ Mux blockiert weiterhin.
-   - Bestehender Guard-Test gegen `lucataco`/`replicate.com` bleibt.
+### Betroffene Dateien
+- neu: `supabase/functions/_shared/rekognition-face-collection.ts`
+- `supabase/functions/_shared/resolveIdentityViaRekognition.ts` (Collection primär, CompareFaces nur Fallback)
+- `supabase/functions/compose-dialog-segments/index.ts` (Identitätsbindung + Gates C)
+- `supabase/functions/_shared/mouth-motion-verdict.ts`, `_shared/aws-frame-probe.ts` (Decoder + Forensik)
+- Migration: `rekognition_face_ids` an `brand_characters`, inkl. GRANTs
+- Doku: `mem://architecture/lipsync/v349-rekognition-face-collection-identity`
 
-4. **Deploy und Verifikation**
-   - Deploy: `render-sync-segments-audio-mux`, `sync-so-webhook`, `remotion-webhook`.
-   - Danach an einer echten Szene prüfen: Frames > 0 oder — falls AWS weiter zickt — Szene läuft trotzdem mit Lip-Sync durch statt zu scheitern.
+### Was dieser Plan bewusst NICHT tut
+Keine neuen Face-Share-Schwellen, keine neuen Retry-Leitern, keine Preclip-Geometrie-Änderung.
 
-## Technische Details
-
-- Betroffen: `supabase/functions/_shared/aws-frame-probe.ts`, `supabase/functions/render-sync-segments-audio-mux/index.ts` (Zeilen 198–232), `supabase/functions/remotion-webhook/index.ts`, `supabase/functions/_shared/mouth-motion-verdict.test.ts`.
-- Kein Bundle-Redeploy nötig: `DialogTurnFaceCropVideo` existiert im aktuellen `REMOTION_SERVE_URL`-Bundle.
+### Verifikation nach dem Deploy
+Ich rendere eine frische 4-Sprecher-Szene und melde dir drei konkrete Zahlen zurück: (1) ob jeder Sprecher eine eindeutige `FaceId` bekommen hat, (2) ob jeder Crop seine identifizierte Box enthält, (3) den tatsächlichen `motion_verdict` pro Pass. Erst danach schrauben wir weiter — nicht vorher.

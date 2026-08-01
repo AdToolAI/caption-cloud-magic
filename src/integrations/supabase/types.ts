@@ -2790,6 +2790,10 @@ export type Database = {
           published_at: string | null
           reference_image_url: string
           rejection_reason: string | null
+          rekognition_collection_id: string | null
+          rekognition_face_ids: string[]
+          rekognition_indexed_at: string | null
+          rekognition_portrait_hash: string | null
           revenue_share_percent: number
           reviewed_at: string | null
           reviewed_by: string | null
@@ -2837,6 +2841,10 @@ export type Database = {
           published_at?: string | null
           reference_image_url: string
           rejection_reason?: string | null
+          rekognition_collection_id?: string | null
+          rekognition_face_ids?: string[]
+          rekognition_indexed_at?: string | null
+          rekognition_portrait_hash?: string | null
           revenue_share_percent?: number
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -2884,6 +2892,10 @@ export type Database = {
           published_at?: string | null
           reference_image_url?: string
           rejection_reason?: string | null
+          rekognition_collection_id?: string | null
+          rekognition_face_ids?: string[]
+          rekognition_indexed_at?: string | null
+          rekognition_portrait_hash?: string | null
           revenue_share_percent?: number
           reviewed_at?: string | null
           reviewed_by?: string | null

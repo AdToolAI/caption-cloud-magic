@@ -89,6 +89,8 @@ import {
 import { detectPlateFaces, validatePlateFacesGeometry } from "../_shared/plate-face-detect.ts";
 import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
+import { CAST_IDENTITY_LOCK_TAG, resolveCastIdentityLock } from "../_shared/cast-identity-lock.ts";
+
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -1861,11 +1863,89 @@ serve(async (req) => {
       // when: N < 3 (legacy is cheap and reliable there), the anchor
       // layout is missing (older scenes), face-count mismatch, or the
       // AWS DetectFaces call fails.
+      // ── v349 — CAST IDENTITY LOCK (AWS Rekognition Face Collection) ──
+      // Deterministic identity BEFORE any similarity ranking runs: every
+      // Cast & World portrait is indexed once under
+      // `ExternalImageId = brand_character_id`, and the anchor faces are
+      // looked up by FaceId instead of being ranked by a confidence score.
+      // Two speakers can no longer inherit the same face, and a character
+      // rendered twice (or missing entirely) is detected instead of being
+      // silently mapped to "the nearest box".
+      if (!plateIdentityMap && anchorUrl && characters.length === speakers.length) {
+        try {
+          const castLock = await resolveCastIdentityLock({
+            supabase,
+            userId,
+            frameUrl: anchorUrl,
+            frameWidth: plateDims.width,
+            frameHeight: plateDims.height,
+            cast: speakers.map((sp, idx) => {
+              const cid = String(sp.character_id ?? "");
+              const portrait = characters.find((c) => c.characterId === cid)?.portraitUrl ?? "";
+              return { characterId: cid, portraitUrl: portrait, speakerIdx: idx, name: sp.speaker };
+            }).filter((m) => !!m.characterId),
+          });
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v349_cast_identity_lock verdict=${castLock.verdict} ` +
+            `resolved=${castLock.resolvedCount}/${speakers.length} detected=${castLock.detectedCount} ` +
+            `indexed=${castLock.indexedCount} dup=[${castLock.duplicateCharacterIds.join(",")}] ` +
+            `missing=[${castLock.missingCharacterIds.join(",")}] ms=${castLock.msTotal} reason=${castLock.reason ?? "-"}`,
+          );
+          if (castLock.verdict === "ok" && castLock.resolvedCount === speakers.length) {
+            plateIdentityMap = {
+              faces: castLock.faces.map((f) => ({
+                bbox: f.bbox,
+                center: [
+                  Math.round((f.bbox[0] + f.bbox[2]) / 2),
+                  Math.round((f.bbox[1] + f.bbox[3]) / 2),
+                ] as [number, number],
+                slot: f.slot,
+                confidence: (f.similarity ?? 100) / 100,
+                characterId: f.characterId,
+                matchConfidence: (f.similarity ?? 100) / 100,
+              })),
+              width: plateDims.width,
+              height: plateDims.height,
+              detector: CAST_IDENTITY_LOCK_TAG,
+              cached: false,
+              resolvedCount: castLock.resolvedCount,
+              identityMethod: "rekognition-face-collection",
+              assignmentLock: castLock.assignmentLock,
+              assignmentLockSource: "v349_cast_identity_lock",
+              anchorLayoutSource,
+              minConfidence: Math.min(
+                ...castLock.faces
+                  .filter((f) => f.characterId)
+                  .map((f) => (f.similarity ?? 100) / 100),
+              ),
+              minMargin: 1,
+              ambiguous: false,
+              // deno-lint-ignore no-explicit-any
+            } as any;
+          } else if (castLock.verdict === "duplicate" || castLock.verdict === "missing") {
+            // Hard evidence that the rendered anchor does not show the cast
+            // one-to-one. Ranking-based fallbacks would now guess — log the
+            // forensic detail and let the downstream sanity gates decide.
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} v349_identity_integrity_violation ` +
+              `type=${castLock.verdict} dup=[${castLock.duplicateCharacterIds.join(",")}] ` +
+              `missing=[${castLock.missingCharacterIds.join(",")}]`,
+            );
+          }
+        } catch (err) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v349_cast_identity_lock threw: ${(err as Error)?.message}`,
+          );
+        }
+      }
+
       if (
+        !plateIdentityMap &&
         hasCompleteV278AnchorLayout &&
         anchorLayoutRaw
       ) {
         try {
+
           const routed = await routePlateFacesToAnchor({
             // v278.2 — Anchor-First router: AWS Rekognition cannot detect faces
             // from MP4 bytes. Route on the still anchor/reference image, then
