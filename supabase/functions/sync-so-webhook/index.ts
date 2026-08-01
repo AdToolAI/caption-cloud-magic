@@ -863,7 +863,9 @@ serve(async (req) => {
       if (canEscalate && nextRung) {
         const newAttemptId = crypto.randomUUID();
         const nextStep = nextRung.step + 1;
-        const noopReason = syncOutputResolutionRegression
+        const noopReason = motionStatic
+          ? "provider_returned_static_output"
+          : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
