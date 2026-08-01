@@ -333,15 +333,24 @@ serve(async (req) => {
     if (stalePreflightIdx >= 0) {
       const stalePass = preflightPasses[stalePreflightIdx] ?? {};
       const preflightAgeMs = now - Date.parse(String(stalePass.preflight_started_at));
+      // v364 — Jede Preflight-Recovery zählt als Absturzindiz. Ab der ersten
+      // Wiederholung läuft der Pass ohne Plate-Tracker, damit der Worker nicht
+      // erneut am selben Speicherlimit stirbt.
+      const preflightRecoveries = Number(stalePass.preflight_recoveries ?? 0) + 1;
       const recoveredPass = {
         ...stalePass,
         status: "pending",
         job_id: null,
         preflight_started_at: null,
         preflight_recovered_at: new Date().toISOString(),
-        preflight_recovery_version: "v362",
+        preflight_recovery_version: "v364",
+        preflight_recoveries: preflightRecoveries,
+        plate_track_disabled: true,
+        plate_track_attempted_at: null,
+        plate_track_completed_at: null,
         error: null,
       };
+
       await supabase.rpc("update_dialog_pass_slot", {
         _scene_id: d.id,
         _pass_idx: stalePreflightIdx,

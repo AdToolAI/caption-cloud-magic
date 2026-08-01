@@ -1,39 +1,40 @@
-## Bestätigte Ursache
+## Befund (verifiziert am laufenden Run)
 
-Der letzte Run für Szene `6bf4e815…` hängt **vor dem Sync.so-Aufruf**:
+Szene `6bf4e815…`, Pass 1/4 ist fertig (`done`, Output vorhanden). Pass 2 hängt seit ~21:59 auf `rendering_preflight`, ohne `job_id`; der Dispatch-Lock läuft bis 22:10.
 
-- `lip_sync_status = pending`
-- Pass 0 steht seit 21:29 UTC auf `rendering_preflight`
-- Es existiert weder eine Sync.so-Job-ID noch ein Eintrag in `syncso_inflight_jobs`
-- Die Sync.so-Auslastung ist daher korrekt `0/3`
-- `compose-dialog-segments` meldet wiederholt `BUSY — another dispatcher holds the (scene,pass) lock`
-- Der Watchdog erkennt den Zustand nicht, weil der erste Preclip-Lauf abbrach, bevor der vollständige v5-Fanout-Zustand gespeichert wurde
+Die Logs von `compose-dialog-segments` zeigen die Ursache eindeutig:
 
-Damit ist nicht Sync.so blockiert, sondern ein **verwaister Preclip-Dispatch-Lock mit einem halbfertigen `rendering_preflight`-Status**.
+```text
+22:03:02  v163_preclip_render START  speaker=Matthew Dusatko window=[1.13,3.16]
+22:03:04  [face-detect/aws] rekognition primary plate=1928x1076 frames=1
+22:03:05  [face-detect/aws] rekognition ok ... ms=1033
+22:03:06  ERROR Memory limit exceeded
+22:03:06  shutdown
+```
 
-## Umsetzung
+Der Worker stirbt also **im v359-Plate-Tracker**, bevor der eigentliche Lambda-Preclip und Sync.so überhaupt drankommen. v363 hat den Tracker nur auf 3 Stützbilder begrenzt — der Speicher reißt aber schon bei 2–3 Bildern, weil jedes Still in **voller Plate-Größe (1928 px)** gerendert, komplett heruntergeladen und für Rekognition base64-kodiert wird. Ein hart abgeschossener Worker kann nichts aufräumen, deshalb bleibt `rendering_preflight` + Lock stehen, und der v362-Watchdog startet exakt denselben Absturz erneut → sichtbarer Dauer-Hänger bei "Clip 2".
 
-1. **Stale-Preflight-Recovery im Lip-Sync-Watchdog**
-   - Auch Szenen mit vorhandenem Quellclip und `pending`/`dialog_shots` scannen.
-   - Einen Pass als verwaist erkennen, wenn er länger als 3 Minuten auf `rendering_preflight` steht, keine `job_id` besitzt und somit Sync.so nie erreicht hat.
-   - Nur den betroffenen Pass atomar auf `pending` zurücksetzen; fertige oder parallele Geschwister bleiben unangetastet.
+## Plan v364
 
-2. **Verwaisten Dispatch-Lock sicher entfernen**
-   - Nur den Lock derselben `(scene_id, pass_idx)`-Kombination löschen.
-   - Frische Locks niemals übernehmen; Bereinigung ausschließlich nach derselben Stale-Schwelle.
-   - Anschließend `compose-dialog-segments` idempotent erneut anstoßen.
+### 1. Tracker speicherfest machen
+- `_shared/aws-frame-probe.ts`: Stills auf eine maximale Kantenlänge (960 px) deckeln, statt die Plate-Auflösung 1:1 zu rendern.
+- `_shared/face-track.ts`:
+  - Stills strikt **sequenziell** rendern und auswerten (kein `Promise.all`), jede Referenz nach der Auswertung freigeben.
+  - Boxen über den bestehenden Koordinatenvertrag (`rek-image-space.ts`, v361) aus dem verkleinerten Detektionsraum zurück in den Plate-Raum projizieren — keine neue Rechenlogik, nur korrekter Zielraum.
+  - Die Verdichtungs-Runde (`planDensifyTimestamps`) nur noch laufen lassen, wenn Zeit- **und** Sample-Budget es zulassen (max. 1 Zusatzbild).
 
-3. **Diagnostik und Schutz vor Endlosschleifen**
-   - Recovery-Zeitpunkt und Pipeline-Version `v362` am Pass protokollieren.
-   - Watchdog-Log `v362_stale_preflight_recovered` mit Pass, Alter und Invoke-Status ergänzen.
-   - Bestehende terminale Pass- und Szenen-Guards beibehalten.
+### 2. Crash-Loop-Breaker (das eigentlich Wichtige)
+- Vor dem Tracker wird pro Pass ein Marker gesetzt (`plate_track_attempted_at`); nach erfolgreichem Preclip wieder entfernt.
+- Findet ein neuer Lauf diesen Marker vor (= letzter Versuch ist mitten im Tracking gestorben), wird der Tracker **übersprungen** und der Preclip statisch gerendert (Verhalten wie vor v359). Damit läuft jeder Pass spätestens im zweiten Anlauf durch, statt endlos denselben OOM zu wiederholen.
+- `lipsync-watchdog` zählt Preflight-Recoveries pro Pass mit und markiert den Pass beim Reset als `plate_track_disabled`.
 
-4. **Aktuellen festhängenden Run retten**
-   - Nach Deployment den verwaisten Pass/Lock der bestätigten Szene über denselben Recovery-Pfad bereinigen.
-   - Watchdog bzw. Dispatcher einmal auslösen.
-   - Prüfen, dass entweder eine echte Sync.so-Job-ID entsteht oder ein konkreter terminaler Preclip-Fehler statt „Lip-Sync wird gestartet…“ angezeigt wird.
+### 3. Aktuellen Hänger auflösen
+- Lock für `6bf4e815…` freigeben, Pass 2 auf `pending` mit gesetztem `plate_track_disabled` zurücksetzen und einen sauberen Re-Dispatch anstoßen, damit die Szene ohne Neustart weiterläuft.
 
-5. **Validierung**
-   - Datenbankstatus, Dispatch-Log und `syncso_inflight_jobs` kontrollieren.
-   - Sicherstellen, dass bei `0/3` freien Slots kein alter Lock weitere Aufrufe blockiert.
-   - Den Fall „Edge-Lauf stirbt nach Preflight-Claim, aber vor Provider-Dispatch“ als Regressionstest abdecken.
+### 4. Verifikation
+- Logs verfolgen bis `v163_preclip_render OK` für Pass 2, danach ein Sync.so-`job_id` für Pass 2/4.
+- Kein `Memory limit exceeded` mehr in `compose-dialog-segments`.
+- Szene erreicht `syncso_fanout_4_of_4` und den Mux.
+
+### Technischer Hinweis
+Der Tracker bleibt optional und rein qualitätssteigernd; er darf ab v364 unter keinen Umständen den Dispatch verhindern. Alle bestehenden Gates (v355 Pixel-Face-Contract, v356 Outcome-Gate, v361 Koordinatenvertrag) bleiben unverändert.

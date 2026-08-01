@@ -401,24 +401,30 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
   const timestamps = sampleTimestamps(req.startSec, req.endSec, req.maxSamples ?? MAX_TRACK_SAMPLES);
   const frameSize = Math.max(req.width, req.height);
 
-  /** Rendert Stills und erkennt darauf Gesichter — Reihenfolge bleibt stabil. */
+  /**
+   * Rendert Stills und erkennt darauf Gesichter — Reihenfolge bleibt stabil.
+   *
+   * v364 — STRIKT SEQUENZIELL. Das parallele `Promise.all` hielt alle Stills
+   * gleichzeitig im Speicher (Download + base64 für Rekognition) und hat den
+   * Edge-Worker mit `Memory limit exceeded` abgeschossen, bevor der Preclip
+   * überhaupt gerendert wurde. Ein Still nach dem anderen, Referenz sofort
+   * wieder freigeben.
+   */
   const probe = async (ts: number[], extra: boolean): Promise<TrackSample[]> => {
-    const stills = await Promise.all(
-      ts.map(async (timestamp) => {
-        const still = await renderAwsStill({
-          videoUrl: req.videoUrl,
-          timestamp,
-          frameSize,
-          deadline: req.deadline,
-        });
-        return { timestamp, url: still.url, error: still.error };
-      }),
-    );
-
     const out: TrackSample[] = [];
-    for (const s of stills) {
-      if (!s.url) {
-        out.push({ timestamp: s.timestamp, box: null, error: s.error ?? "still_missing", extra });
+    for (const timestamp of ts) {
+      if (Date.now() > req.deadline - 4_000) {
+        out.push({ timestamp, box: null, error: "budget_exhausted", extra });
+        continue;
+      }
+      const still = await renderAwsStill({
+        videoUrl: req.videoUrl,
+        timestamp,
+        frameSize,
+        deadline: req.deadline,
+      });
+      if (!still.url) {
+        out.push({ timestamp, box: null, error: still.error ?? "still_missing", extra });
         continue;
       }
       const det = await detectFacesMediaPipe({
@@ -426,7 +432,7 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
         plateWidth: req.width,
         plateHeight: req.height,
         durationSec: dur,
-        prebuiltFrameUrls: [s.url],
+        prebuiltFrameUrls: [still.url],
       });
       const candidates = (det.faces ?? [])
         .map((f) => f.bbox as Box)
@@ -434,7 +440,7 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
       const picked = pickTrackedBox(candidates, reference);
       if (picked) reference = picked;
       out.push({
-        timestamp: s.timestamp,
+        timestamp,
         box: picked,
         error: picked ? undefined : (det.error ?? "no_face_in_still"),
         extra,
@@ -449,10 +455,11 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
   // ── v359 — Risikobasierte Verdichtung ───────────────────────────────
   // Nur dort nachmessen, wo die Spur zwischen zwei Ankern weit gewandert
   // ist. Ruhige Abschnitte kosten keine zusätzlichen Lambda-Stills.
+  // v364: höchstens EIN Zusatz-Still, und nur bei klarem Zeitbudget.
   let extraSamples = 0;
-  const budgetLeft = req.deadline - Date.now() > 12_000;
+  const budgetLeft = req.deadline - Date.now() > 15_000;
   if (budgetLeft) {
-    const densify = planDensifyTimestamps(samples);
+    const densify = planDensifyTimestamps(samples).slice(0, 1);
     if (densify.length > 0) {
       const more = await probe(densify, true);
       samples.push(...more);
@@ -460,6 +467,7 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
       extraSamples = more.length;
     }
   }
+
 
   const hits = samples.filter((s) => s.box);
   if (hits.length === 0) return fallback("no_face_tracked");
