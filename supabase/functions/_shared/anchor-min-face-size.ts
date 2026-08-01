@@ -117,7 +117,11 @@ export function framingSuffixFor(
 export function enforceMinFaceSize(
   input: MinFaceSizeInput,
 ): MinFaceSizeResult {
-  const minRatio = input.minWidthRatio ?? DEFAULT_MIN_WIDTH_RATIO;
+  const minRatio = input.minWidthRatio ??
+    Math.max(
+      LEGACY_MIN_WIDTH_RATIO,
+      requiredFaceWidthRatio(input.expectedSpeakers),
+    );
   const W = Math.max(1, input.plateWidth);
   const n = Math.max(1, input.expectedSpeakers);
 
