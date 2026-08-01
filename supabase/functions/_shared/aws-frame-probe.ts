@@ -22,7 +22,10 @@
 
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 
-export const AWS_FRAME_PROBE_TAG = "v347-aws-remotion-still";
+export const AWS_FRAME_PROBE_TAG = "v348-aws-remotion-still";
+/** Must match the deployed Remotion Lambda version (see _shared/remotion-payload.ts). */
+export const REMOTION_STILL_VERSION = "4.0.462";
+
 
 export interface AwsStillRequest {
   /** Video to sample (the Sync.so per-pass output). */
