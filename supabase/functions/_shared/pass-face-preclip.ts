@@ -36,6 +36,7 @@ import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
+import { CONTRACT_VIOLATION_UPSTREAM } from "./lipsync-closeup-contract.ts";
 
 export interface PassPreclipInput {
   sceneId: string;
