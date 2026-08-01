@@ -6369,6 +6369,7 @@ serve(async (req) => {
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v279_BBOX_INLINE_FALLBACK reason=${degradeReason} speaker=${pass.speaker_name} box=${JSON.stringify(dispatchBox ?? box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} area_pct=${(boxAreaPct * 100).toFixed(2)}`,
         );
       } else {
+      } else if (!v359HardStop) {
         // v152 — Hard-Fail nur noch für echte Datenprobleme (zero voiced frames
         // oder geometrisch unsinnige Boxen). Upload-Fehler werden oben durch
         // v279 Inline-Fallback abgefangen.
@@ -6383,6 +6384,7 @@ serve(async (req) => {
         (pass as any)._v152HardFail = {
           reason: v152FailReason,
           errorClass: "v152_bbox_hard_fail",
+
           message:
             `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" konnte nicht vorbereitet werden ` +
             `(${v152FailReason}). Bitte Szene neu rendern — Sprecher muss frontal und unverdeckt im Bild sein. ` +
