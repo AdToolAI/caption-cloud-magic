@@ -186,8 +186,9 @@ export async function judgeMouthMotion(
     }
 
     const deadline = Date.now() + budgetMs;
+    const frameSize = clampInt(input.frameSize ?? 512, 64, 2048);
     const frameResults = await Promise.all(
-      timestamps.map((t) => extractFrame(token, input.outputUrl, t, deadline)),
+      timestamps.map((t) => extractFrame(input.outputUrl, t, deadline, frameSize)),
     );
     const frameErrors = frameResults
       .map((r, i) => (r.url ? null : `t=${timestamps[i]}:${r.error ?? "unknown"}`))
