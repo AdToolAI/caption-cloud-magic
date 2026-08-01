@@ -292,35 +292,126 @@ export function mouthRectFromPass(pass: Record<string, unknown> | null | undefin
 
 // ────────────────────────── internals ──────────────────────────
 
+export interface FrameExtractResult {
+  url: string | null;
+  /** Human-readable failure cause; null on success. */
+  error: string | null;
+}
+
+/**
+ * v346 — Normalises every shape the extractor can return.
+ * Replicate has returned a bare string, an array of strings and a
+ * FileOutput-like object with a `url` getter/method across SDK versions;
+ * the previous implementation silently produced `null` for two of them.
+ */
+export function normaliseFrameOutput(out: unknown): string | null {
+  if (!out) return null;
+  let url = "";
+  if (typeof out === "string") {
+    url = out;
+  } else if (Array.isArray(out)) {
+    const first = out.find((v) => !!v);
+    url = typeof first === "string" ? first : normaliseFrameOutput(first) ?? "";
+  } else if (typeof out === "object") {
+    // deno-lint-ignore no-explicit-any
+    const o = out as any;
+    const candidate = typeof o.url === "function" ? o.url() : o.url ?? o.output ?? o.href;
+    url = typeof candidate === "string" ? candidate : String(candidate ?? "");
+  }
+  return /^https?:\/\//.test(url) ? url : null;
+}
+
+/** Cached model version id so we don't resolve it per frame. */
+let cachedModelVersion: string | null = null;
+
+async function resolveModelVersion(token: string, signal: AbortSignal): Promise<string | null> {
+  if (cachedModelVersion) return cachedModelVersion;
+  const res = await fetch(`https://api.replicate.com/v1/models/${REPLICATE_MODEL}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`model_lookup_${res.status}:${body.slice(0, 120)}`);
+  }
+  const json = await res.json();
+  const version = String(json?.latest_version?.id ?? "");
+  if (!version) throw new Error("model_lookup_no_version");
+  cachedModelVersion = version;
+  return version;
+}
+
+/**
+ * Extracts a single frame via Replicate's prediction API.
+ * Mirrors the production path used by `extract-video-frames`, but surfaces
+ * the provider status/body instead of collapsing every failure to `null`.
+ */
 async function extractFrame(
   token: string,
   videoUrl: string,
   timestamp: number,
   deadline: number,
-): Promise<string | null> {
+): Promise<FrameExtractResult> {
   const remaining = deadline - Date.now();
-  if (remaining <= 2_000) return null;
+  if (remaining <= 2_000) return { url: null, error: "budget_exhausted" };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), remaining);
   try {
-    const { default: Replicate } = await import("npm:replicate@0.25.2");
-    const replicate = new Replicate({ auth: token });
-    const out = await Promise.race([
-      replicate.run(REPLICATE_MODEL as `${string}/${string}`, {
+    const version = await resolveModelVersion(token, controller.signal);
+    const createRes = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Prefer: "wait=55",
+      },
+      body: JSON.stringify({
+        version,
         input: { video: videoUrl, timestamp },
       }),
-      new Promise((resolve) => setTimeout(() => resolve(null), remaining)),
-    ]);
-    if (!out) return null;
-    const url = typeof out === "string"
-      ? out
-      : Array.isArray(out)
-      ? String(out[0] ?? "")
-      // deno-lint-ignore no-explicit-any
-      : String((out as any)?.url?.() ?? (out as any)?.url ?? "");
-    return /^https?:\/\//.test(url) ? url : null;
-  } catch {
-    return null;
+      signal: controller.signal,
+    });
+    if (!createRes.ok) {
+      const body = await createRes.text().catch(() => "");
+      return { url: null, error: `create_${createRes.status}:${body.slice(0, 160)}` };
+    }
+    let prediction = await createRes.json();
+
+    // `Prefer: wait` usually returns a terminal prediction. Poll otherwise.
+    while (
+      prediction?.status &&
+      !["succeeded", "failed", "canceled"].includes(String(prediction.status)) &&
+      Date.now() < deadline - 1_000
+    ) {
+      await new Promise((r) => setTimeout(r, 1_200));
+      const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      if (!pollRes.ok) {
+        return { url: null, error: `poll_${pollRes.status}` };
+      }
+      prediction = await pollRes.json();
+    }
+
+    if (String(prediction?.status) !== "succeeded") {
+      const detail = String(prediction?.error ?? prediction?.status ?? "no_status");
+      return { url: null, error: `prediction_${String(prediction?.status ?? "pending")}:${detail.slice(0, 120)}` };
+    }
+
+    const url = normaliseFrameOutput(prediction?.output);
+    return url ? { url, error: null } : { url: null, error: "unparsable_output" };
+  } catch (e) {
+    const msg = (e as Error)?.name === "AbortError"
+      ? "timeout"
+      : (e as Error)?.message ?? String(e);
+    return { url: null, error: msg.slice(0, 160) };
+  } finally {
+    clearTimeout(timer);
   }
 }
+
 
 /** Fetches a frame, crops the mouth band and resamples it to a luminance grid. */
 async function frameToGrid(frameUrl: string, rect: MouthRect): Promise<Float64Array | null> {
