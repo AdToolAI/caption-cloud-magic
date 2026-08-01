@@ -5553,10 +5553,20 @@ serve(async (req) => {
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           if (speakers.length >= 2) {
-            const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
-            console.error(
-              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
+            // v353 — the native-crop floor is a *pre-dispatch* block, not a
+            // timeout. Tell the user exactly what to change instead of the
+            // generic "Preclip nicht rechtzeitig fertig".
+            const tooSmall = String(preclipResult.error ?? "").startsWith(
+              "plate_face_too_small_for_lipsync",
             );
+            const speakerLabel = pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`;
+            const reason = tooSmall
+              ? `v353_plate_face_too_small: „${speakerLabel}" ist auf der Szene zu klein im Bild, dafür erzeugt der Lip-Sync-Anbieter nachweislich keine Mundbewegung (${preclipResult.error}). Bitte die Szene mit näherem Bildausschnitt / größeren Gesichtern neu rendern.`
+              : `v187_preclip_required_no_fullplate_fallback: Preclip für „${speakerLabel}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ${tooSmall ? "v353_plate_face_too_small" : "v187_preclip_required_no_fullplate_fallback"} speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing dispatch`,
+            );
+
             await logSyncDispatch(supabase, {
               scene_id: sceneId,
               user_id: userId,

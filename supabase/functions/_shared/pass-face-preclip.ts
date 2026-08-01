@@ -314,14 +314,32 @@ export async function renderPassFacePreclip(
         errorClass: "invalid_input",
       };
     }
-    // v344.1 — upscale reality check. A tiny source face still gets a
-    // dispatch; the server-side motion verdict decides afterwards whether
-    // Sync.so actually animated it. No speculative pre-block.
-    if (fbSide < 48) {
-      console.warn(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} preclip_low_source_face face_side_px=${Math.round(fbSide)} crop=${crop.size} upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x — dispatching anyway, motion verdict decides`,
+    // ══════════════════════════════════════════════════════════════════
+    // v353 — NATIVE-SOURCE FLOOR (evidence-based pre-block).
+    // Measured on scene 7c11bc27 (2026-08-01, 4 speakers, identical
+    // pipeline, identical ASD shape):
+    //   crop 181px → 720p (4.0x upscale) → verdict "moved"    ✅
+    //   crop 116px → 720p (6.2x upscale) → verdict passthrough ❌
+    //   crop 102px → 720p (7.1x upscale) → verdict passthrough ❌
+    // Audio length is NOT the discriminator (1.54s worked, 3.86s failed).
+    // Sync.so silently returns the input unchanged once the native crop is
+    // this small. Dispatching anyway burns credits + a provider slot and
+    // ends in the NOOP hard-fail either way, so we block BEFORE dispatch
+    // and ask for a plate with larger faces.
+    const MIN_NATIVE_CROP_PX = 144;
+    if (crop.size < MIN_NATIVE_CROP_PX) {
+      console.error(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v353_native_crop_floor_block crop=${crop.size}px floor=${MIN_NATIVE_CROP_PX}px ` +
+          `face_side_px=${Math.round(fbSide)} upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x — provider returns passthrough below this, not dispatching`,
       );
+      return {
+        ok: false,
+        error:
+          `plate_face_too_small_for_lipsync:crop=${crop.size}px_min=${MIN_NATIVE_CROP_PX}px_face=${Math.round(fbSide)}px_upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x`,
+        errorClass: "needs_clip_rerender",
+      };
     }
+
     console.log(
       `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_face_share_final side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} crop_size=${crop.size} face_side=${Math.round(fbSide)} ratio=${(crop.size / Math.max(1, fbSide)).toFixed(2)} min_size_widened=${minSizeWidened} anchor=${anchor}`,
     );

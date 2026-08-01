@@ -788,9 +788,12 @@ serve(async (req) => {
 
       if (motionStatic) {
         console.warn(
-          `[sync-so-webhook] v344 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → NOOP ladder`,
+          motionPassthrough
+            ? `[sync-so-webhook] v353 scene=${sceneId} pass=${currentPass} MOUTH PASSTHROUGH (output equals input inside the mouth band: outVsIn=${motion.outputVsInput} < ${3.0}; intra-clip score=${motion.score} is irrelevant here) → terminal, no retry`
+            : `[sync-so-webhook] v353 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → terminal, no retry`,
         );
       }
+
       if (motionUnknown) {
         console.warn(
           `[sync-so-webhook] v347 scene=${sceneId} pass=${currentPass} MOTION UNVERIFIED (${motion.reason}) → telemetry only; provider result is NOT penalised`,
@@ -845,43 +848,32 @@ serve(async (req) => {
 
 
 
-      // v134 — Deterministic NOOP escalation ladder (sync-3 only, per
-      // v129.29 directive). Replaces v129.26's single-shot escalation
-      // to `coords-pro` (which dispatched IDENTICAL input and produced
-      // the same NOOP). The ladder varies the ASD-shape — the only
-      // input axis Sync.so actually responds to — and hard-fails after
-      // step 2 instead of silently muxing a NOOP output (which made
-      // Speaker 2 in 4-speaker scenes appear frozen).
+      // ══════════════════════════════════════════════════════════════════
+      // v353 — NOOP-LADDER ABGESCHAFFT.
+      // Die Ladder hat nur die ASD-Form gewechselt (bbox-url-pro →
+      // coords-pro-box), NICHT die Eingangsbedingung. Messung Szene
+      // 7c11bc27 (01.08.2026): identischer Input → identisches Passthrough
+      // (outVsIn 2.26 → 2.64, Schwelle 3.0), danach Hard-Fail. Der Retry
+      // hat also nur Slot + Zeit + Credits verbrannt.
       //
-      // Step 0 (1st NOOP)  → variant `bbox-url-pro`   (per-frame bounding_boxes_url, sync-3 conform)
-      // Step 1 (2nd NOOP)  → variant `coords-pro-box` (bounding-box ASD on plate coords)
-      // Step 2 (3rd NOOP)  → HARD FAIL + idempotent refund + `needs_clip_rerender`
-      //
-      // All three steps stay on `sync-3`. No model swap. ASD is rebuilt
-      // by compose-dialog-segments' v130 buildAsdStrategy() based on the
-      // new retry_variant — single source of truth.
+      // Ein Retry ist ab jetzt nur zulässig, wenn die EINGANGSBEDINGUNG
+      // messbar besser wird (größerer nativer Crop, längeres Audiofenster).
+      // Das passiert vor dem Dispatch in `_shared/pass-face-preclip.ts`
+      // (v353 native-crop floor). Auf Webhook-Ebene ist ein bewiesener
+      // NOOP/Passthrough daher terminal.
       const noopEscalationStep = Number(passBeforeDone?.noop_escalation_step ?? 0);
-      const havePlateCoords = Array.isArray(passBeforeDone?.coords) &&
-        passBeforeDone.coords.length === 2;
-      const havePreclipCrop = !!passBeforeDone?.preclip_crop &&
-        Number.isFinite(Number(passBeforeDone.preclip_crop.size));
       const passSpeakerName = String(passBeforeDone?.speaker_name ?? "Speaker");
       const passTurnIdx = Number(passBeforeDone?.idx ?? currentPass);
 
-      // v150 — Step 0 (bbox-url-pro) entfernt: ist nach v147+v150-B bereits
-      // PRIMARY auf Fresh-Dispatch für Multi-Speaker. Ein erneuter Retry mit
-      // derselben Variante produziert garantiert dasselbe Ergebnis. Nur noch
-      // 1 echte Eskalations-Stufe (coords-pro-box), danach Hard-Fail.
-      const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [
-        { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
-      ];
-      const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
-      const canEscalate = noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
-        Number.isFinite(Number(passBeforeDone?.reference_frame_number));
+      const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [];
+      const nextRung: { step: number; variant: string; label: string } | undefined = undefined;
+      const canEscalate = false as boolean;
+
 
       if (noopSuspect && !canEscalate) {
-        // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
-        // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
+        // v353 — Every proven NOOP is terminal: fail the pass cleanly
+        // (slot already released above), never mux an unanimated output.
+
         const noopReasonHard = motionStatic
           ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
           : motionUnverified
@@ -928,7 +920,12 @@ serve(async (req) => {
         // hint rather than a frozen-lips final output.
         const turnStart = Number(passBeforeDone?.segments?.[0]?.startTime ?? 0).toFixed(1);
         const turnEnd = Number(passBeforeDone?.segments?.[0]?.endTime ?? 0).toFixed(1);
-        const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`;
+        // v353 — klare Trennung: Provider hat nicht animiert vs. Messung
+        // war nicht möglich. Kein Retry-Karussell mehr im Text.
+        const userMsg = motionStatic
+          ? `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung erzeugt). Bitte die Szene mit größeren Gesichtern neu rendern.`
+          : `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Ergebnis konnte nicht geprüft werden (Messung nicht möglich). Bitte erneut versuchen.`;
+
         await supabase
           .from("composer_scenes")
           .update({
@@ -975,125 +972,6 @@ serve(async (req) => {
         });
       }
 
-      if (canEscalate && nextRung) {
-        const newAttemptId = crypto.randomUUID();
-        const nextStep = nextRung.step + 1;
-        const noopReason = motionStatic
-          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
-          : syncOutputResolutionRegression
-          ? "sync_output_resolution_regression"
-          : syncOutputUnchanged
-            ? "sync_output_unchanged"
-            : "sync_output_reencoded_passthrough_suspect";
-        // v184 retry-forensics: append a FIFO entry (max 8) to
-        // pass.retry_history so we can reconstruct why a run took 15 min.
-        const _prevHistory = Array.isArray((freshDonePasses[currentPass] as any)?.retry_history)
-          ? ((freshDonePasses[currentPass] as any).retry_history as any[]).slice(-7)
-          : [];
-        const _newRetryEntry = {
-          ts: nowIso,
-          reason: "noop_ladder_escalation",
-          from_variant: passBeforeDone?.retry_variant ?? null,
-          to_variant: nextRung.variant,
-          step: nextStep,
-          noop_reason: noopReason,
-          size_ratio: sizeRatio,
-        };
-        const escalationPatch = {
-          ...freshDonePasses[currentPass],
-          status: "pending",
-          job_id: null,
-          output_url: null,
-          finished_at: null,
-          retry_variant: nextRung.variant,
-          noop_escalation_step: nextStep,
-          noop_retry_attempted: true, // kept for back-compat with v131 watchdog
-          noop_retry_attempt_id: newAttemptId,
-          noop_retry_reason: noopReason,
-          previous_noop_output_url: rehostedUrl ?? outputUrl,
-          previous_noop_size_ratio: sizeRatio,
-          retry_history: [..._prevHistory, _newRetryEntry],
-        };
-        freshDonePasses[currentPass] = escalationPatch;
-        try {
-          await supabase.rpc("update_dialog_pass_slot", {
-            _scene_id: sceneId,
-            _pass_idx: currentPass,
-            _patch: {
-              status: "pending",
-              job_id: null,
-              output_url: null,
-              finished_at: null,
-              retry_variant: nextRung.variant,
-              noop_escalation_step: nextStep,
-              noop_retry_attempted: true,
-              noop_retry_attempt_id: newAttemptId,
-            },
-          });
-        } catch (e) {
-          await supabase
-            .from("composer_scenes")
-            .update({
-              dialog_shots: { ...freshDoneState, passes: freshDonePasses, updated_at: nowIso },
-              updated_at: nowIso,
-            })
-            .eq("id", sceneId);
-        }
-        // Forensics: explicit per-pass log with turn_idx + speaker_name (v134 §3).
-        await logSyncDispatch(supabase, {
-          scene_id: sceneId,
-          engine: "sync-segments",
-          job_id: jobId,
-          turn_idx: passTurnIdx,
-          sync_status: "NOOP_ESCALATING",
-          error_class: "sync_completed_noop",
-          meta: {
-            v134_ladder: true,
-            pass_idx: currentPass,
-            speaker_name: passSpeakerName,
-            noop_escalation_step: nextStep,
-            from_variant: passBeforeDone?.retry_variant ?? null,
-            to_variant: nextRung.variant,
-            rung_label: nextRung.label,
-            noop_reason: noopReason,
-            size_ratio: sizeRatio,
-            attempt_id: newAttemptId,
-          },
-        });
-        // Fire-and-forget re-dispatch with user_retry_flag so the
-        // safe-entry guard lets us back through.
-        try {
-          fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-            body: JSON.stringify({
-              scene_id: sceneId,
-              retry: true,
-              pass_idx: currentPass,
-              retry_variant: nextRung.variant,
-              user_retry_flag: true,
-              new_attempt_id: newAttemptId,
-              credit_charge_result: "skip",
-              noop_auto_escalation: true,
-              noop_escalation_step: nextStep,
-            }),
-          }).catch(() => {});
-        } catch { /* ignore */ }
-        console.warn(
-          `[sync-so-webhook] v134 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" NOOP → escalating step ${nextStep} variant=${nextRung.variant} (${nextRung.label}) attempt_id=${newAttemptId}`,
-        );
-        return ok({
-          ok: true,
-          scene_id: sceneId,
-          job_id: jobId,
-          status,
-          engine: "sync-segments",
-          escalated: `noop_ladder_step_${nextStep}_v134`,
-          pass_idx: currentPass,
-          speaker_name: passSpeakerName,
-          variant: nextRung.variant,
-        });
-      }
 
       const noopSuspectFlags = noopSuspect ? {
         sync_noop_suspect: true,
