@@ -216,18 +216,39 @@ export async function judgeMouthMotion(
 
 
     const rect = normaliseRect(input.mouthRect) ?? DEFAULT_MOUTH_RECT;
-    const grids = await Promise.all(usable.map((u) => frameToGrid(u, rect)));
-    const decoded = grids.filter((g): g is Float64Array => !!g);
+    const frames = await Promise.all(usable.map((u) => decodeFrame(u, rect)));
+    const decoded = frames.map((f) => f.grid).filter((g): g is Float64Array => !!g);
+    const decodeErrors = frames.map((f) => f.error).filter((e): e is string => !!e);
+    for (const err of decodeErrors) frameErrors.push(`decode:${err}`);
+
     if (decoded.length < 2) {
+      // v349 — byte-hash fallback: identical PNG bytes across distinct
+      // timestamps can only mean the provider returned a frozen clip. That is
+      // hard evidence of `static`, even without pixel decoding.
+      const hashes = frames.map((f) => f.bytesHash).filter((h): h is string => !!h);
+      if (hashes.length >= 2 && hashes.every((h) => h === hashes[0])) {
+        return {
+          ...base,
+          verdict: "static",
+          score: 0,
+          framesDecoded: decoded.length,
+          frameErrors,
+          reason: "mouth_band_static_identical_frame_bytes",
+          latencyMs: Date.now() - t0,
+        };
+      }
       return {
         ...base,
         verdict: "unknown",
         score: 0,
         framesDecoded: decoded.length,
-        reason: `motion_probe_unavailable:decoded_${decoded.length}`,
+        frameErrors,
+        reason: `motion_probe_unavailable:decoded_${decoded.length}_of_${frames.length}` +
+          (decodeErrors.length ? `:${decodeErrors[0].slice(0, 80)}` : ""),
         latencyMs: Date.now() - t0,
       };
     }
+
 
     const deltas: number[] = [];
     for (let i = 1; i < decoded.length; i++) {
