@@ -94,12 +94,19 @@ export interface MouthMotionVerdictInput {
   timeoutMs?: number;
   /** Square edge length of the provider output (preclip outputSize). */
   frameSize?: number;
+  /**
+   * v350 — The clip that was SENT to the provider (preclip / plate). When set,
+   * the probe additionally compares output↔input at identical timestamps and
+   * can prove a passthrough (provider handed the input back untouched), which
+   * intra-output deltas alone can never detect on a moving plate.
+   */
+  inputUrl?: string | null;
   /** Forensics only. */
   label?: string;
 }
 
 
-export type MotionVerdict = "moved" | "static" | "unknown";
+export type MotionVerdict = "moved" | "static" | "passthrough" | "unknown";
 
 export interface MouthMotionVerdictResult {
   verdict: MotionVerdict;
@@ -114,6 +121,10 @@ export interface MouthMotionVerdictResult {
   reason: string;
   method: string;
   latencyMs: number;
+  /** v350 — strongest output↔input delta in the mouth band; null when not measured. */
+  outputVsInput?: number | null;
+  /** v350 — all output↔input deltas, for forensics. */
+  outputVsInputDeltas?: number[];
   /**
    * v346 — Per-frame extractor outcome. Without this a probe failure was
    * indistinguishable from a provider no-op in the logs.
