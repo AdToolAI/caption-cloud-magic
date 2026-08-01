@@ -32,6 +32,7 @@ echo "🔧 Building Remotion bundle from $PROJECT_ROOT/src/remotion ..."
 cd "$PROJECT_ROOT"
 npx remotion bundle \
   --entry-point src/remotion/index.ts \
+  --public-path "/$S3_SITE_PATH/" \
   --log=verbose
 
 if [ ! -f "$BUNDLE_DIR/index.html" ]; then
@@ -66,6 +67,15 @@ aws s3 cp "$BUNDLE_DIR/index.html" "s3://$S3_BUCKET/$S3_SITE_PATH/index.html" \
   --region "$AWS_REGION" \
   --cache-control "no-cache, no-store, must-revalidate" \
   --content-type "text/html"
+
+# bundle.js is the stable webpack entry filename. It must never inherit the
+# immutable cache policy used for content-addressed chunks, otherwise Lambda
+# can load a new index.html with an old entry script and report that
+# window.getStaticCompositions is missing.
+aws s3 cp "$BUNDLE_DIR/bundle.js" "s3://$S3_BUCKET/$S3_SITE_PATH/bundle.js" \
+  --region "$AWS_REGION" \
+  --cache-control "no-cache, no-store, must-revalidate" \
+  --content-type "application/javascript"
 
 aws s3 cp "$VERSION_FILE" "s3://$S3_BUCKET/$S3_SITE_PATH/bundle-version.json" \
   --region "$AWS_REGION" \

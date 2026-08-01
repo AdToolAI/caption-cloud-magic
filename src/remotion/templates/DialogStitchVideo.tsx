@@ -70,6 +70,9 @@ const ShotSchema = z.object({
   endSec: z.number().min(0),
   /** Sync.so per-turn output (already lipsynced to this window). */
   outputUrl: z.string().url(),
+  /** v368: immutable forensic identity carried from the persisted pass. */
+  speakerIdx: z.number().int().min(0).optional(),
+  characterId: z.string().min(1).optional(),
   /** 'absolute' = output deckt komplette Master-Timeline ab (legacy
    *  segments_secs-Pfad) → mit startFrom=startFrame ausrichten.
    *  'relative' = output ist kurzer Preclip ab t=0 (v10 Artlist-Pipeline)
@@ -226,7 +229,8 @@ interface CroppedOverlayProps {
   /** Pixel rect in composition space (already mapped from source-master). */
   left: number;
   top: number;
-  size: number;
+  width: number;
+  height: number;
   holdToEnd?: boolean;
   /**
    * v359 — moving crop. When the preclip was rendered with a camera path,
@@ -238,7 +242,7 @@ interface CroppedOverlayProps {
    * (identical indexing to the preclip, which starts at the turn start).
    * Frames past the end clamp to the last entry.
    */
-  path?: Array<{ left: number; top: number; size: number }>;
+  path?: Array<{ left: number; top: number; width: number; height: number }>;
 }
 const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   src,
@@ -246,7 +250,8 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   startFrom,
   left,
   top,
-  size,
+  width,
+  height,
   holdToEnd,
   path,
 }) => {
@@ -262,13 +267,11 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
         [0, 1, 1, 0],
         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
       );
-  // v205 mux/v169 parity: wide, symmetric alpha-feather over the whole
-  // square crop. Hard discs (v196–v198) put the seam on skin where 1–3%
-  // H.264 quantization drift between Sync.so output and live plate produced
-  // a visible outline. A soft gradient from 30%→78% bleeds the transition
-  // over ~half the crop; the master plate underneath dominates the outer
-  // 22% and the identity change is invisible.
-  const mask = 'radial-gradient(circle at center, #000 0%, #000 30%, rgba(0,0,0,0) 78%)';
+  // v368: the old 30% opaque core hid off-centre mouths in profile crops.
+  // Keep the full face window opaque through 72% and feather only the outer
+  // edge. This lets every verified Sync.so mouth replace the moving plate
+  // mouth while retaining a soft seam beyond the face.
+  const mask = 'radial-gradient(circle at center, #000 0%, #000 72%, rgba(0,0,0,0) 100%)';
 
   // v359 — the paste-back rect follows the same camera path the preclip was
   // cut with. Without a path this resolves to the static rect (pre-v359
@@ -276,10 +279,10 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   const rect = React.useMemo(() => {
     if (Array.isArray(path) && path.length > 0) {
       const p = path[Math.min(Math.max(0, frame), path.length - 1)];
-      if (p && Number.isFinite(p.left) && Number.isFinite(p.top) && p.size > 0) return p;
+      if (p && Number.isFinite(p.left) && Number.isFinite(p.top) && p.width > 0 && p.height > 0) return p;
     }
-    return { left, top, size };
-  }, [path, frame, left, top, size]);
+    return { left, top, width, height };
+  }, [path, frame, left, top, width, height]);
 
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
@@ -288,8 +291,8 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
           position: 'absolute',
           left: rect.left,
           top: rect.top,
-          width: rect.size,
-          height: rect.size,
+          width: rect.width,
+          height: rect.height,
           opacity,
 
           WebkitMaskImage: mask,
@@ -842,17 +845,18 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
           // Map source-master pixel rect → composition pixel rect.
           const left = crop.x * scaleX;
           const top = crop.y * scaleY;
-          // Use uniform scale (avoids stretching the face); pick max scale
-          // so output covers original face region without gaps. Visual mask
-          // edge feathers the slight excess on the off-axis.
-          const overlayScale = Math.max(scaleX, scaleY);
-          const size = crop.size * overlayScale;
+          // v368: preclips are square native-plate regions. Preserve their
+          // exact x/y footprint per axis; using max(scaleX, scaleY) enlarged
+          // the tile on one axis whenever source and composition differed.
+          const width = crop.size * scaleX;
+          const height = crop.size * scaleY;
           // v359 — map the per-frame camera path into composition space.
           const overlayPath = Array.isArray(shot.cropPath) && shot.cropPath.length > 0
             ? shot.cropPath.map((p) => ({
                 left: p.x * scaleX,
                 top: p.y * scaleY,
-                size: p.size * overlayScale,
+                width: p.size * scaleX,
+                height: p.size * scaleY,
               }))
             : undefined;
           return (
@@ -870,7 +874,8 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 startFrom={startFromForRelative}
                 left={left}
                 top={top}
-                size={size}
+                width={width}
+                height={height}
                 path={overlayPath}
                 holdToEnd={!!shot.holdToEnd}
               />
