@@ -1,6 +1,7 @@
 # Memory: index.md
 Updated: today
-- [v360 Kopf-Framing & Dispatch-Stopp](mem://architecture/lipsync/v360-head-frame-and-dispatch-guard) — **Aktuell.** Belegt: Passthrough kam von angeschnittenem Kopf (Anker unter dem Kinn) + 5×-Upscale. Anchor-Repair + Head-Containment im Crop; kein Sync.so-Dispatch mehr nach terminalem Szenen-Fail.
+- [v361 Rekognition-Koordinatenvertrag](mem://architecture/lipsync/v361-rekognition-coordinate-contract) — **Aktuell.** Belegt: Boxen wurden im Anchor-Raum (1:1) detektiert, aber mit Plate-Dimensionen (16:9) skaliert → Crops auf Möbeln. Detektionsraum = gesendete Bytes; Projektion nur über `_shared/rek-image-space.ts`; implausible Boxen verworfen.
+- [v360 Kopf-Framing & Dispatch-Stopp](mem://architecture/lipsync/v360-head-frame-and-dispatch-guard) — Anchor-Repair + Head-Containment im Crop; kein Sync.so-Dispatch mehr nach terminalem Szenen-Fail.
 - [v359 Temporaler Crop](mem://architecture/lipsync/v359-temporal-crop) — Plate-Track VOR dem Preclip; 720×720-Fenster fährt dem Gesicht per Frame nach (`camera-path.ts`); Mux klebt entlang desselben Pfades zurück. Nur drei harte Vor-Dispatch-Stopps (Boxenzahl, Clip-Raum, Containment==0) — keine neuen Ratio-Gates.
 - [v358 Preclip-Dimensionsvertrag](mem://architecture/lipsync/v358-preclip-dimension-contract) — Sync.so erhält ausschließlich verifizierte 720×720-Preclips; BBox, Track und Flächenrechnung nutzen deren real gemessenen Pixelraum. Cache ist dimensions-/versionsgebunden. Terminale parallele Pass-Slots können nicht mehr auf pending zurückfallen.
 

@@ -28,6 +28,7 @@ import {
   indexCharacterPortrait,
   type IdentifiedFace,
 } from "./rekognition-face-collection.ts";
+import { compareAspect, projectNormBox } from "./rek-image-space.ts";
 
 export const CAST_IDENTITY_LOCK_TAG = "v349-cast-identity-lock";
 
@@ -190,12 +191,41 @@ export async function resolveCastIdentityLock(params: {
     };
   }
 
+  // ── v361 KOORDINATENVERTRAG ──────────────────────────────────────────
+  // `identifyFacesInFrame` liefert Boxen im Raum des GESENDETEN Bildes
+  // (`ident.sourceDims`). Der Aufrufer will sie im Zielraum
+  // (`frameWidth`/`frameHeight`, i.d.R. die Plate). Bis v360 wurde diese
+  // Projektion stillschweigend übersprungen — die Boxen landeten dadurch
+  // verschoben auf der Plate und die Preclips zeigten Möbel statt Gesichter.
+  const targetDims = {
+    width: Math.max(1, Math.round(params.frameWidth)),
+    height: Math.max(1, Math.round(params.frameHeight)),
+  };
+  const sourceDims = ident.sourceDims;
+  const needsProjection =
+    sourceDims.width !== targetDims.width || sourceDims.height !== targetDims.height;
+  const aspect = compareAspect(sourceDims, targetDims);
+  if (needsProjection) {
+    console.log(
+      `[cast-identity-lock] v361_project source=${sourceDims.width}x${sourceDims.height} ` +
+      `target=${targetDims.width}x${targetDims.height} aspect_match=${aspect.aspectMatch} ` +
+      `dims_source=${ident.dimsSource}`,
+    );
+  }
+  const projectFace = (f: IdentifiedFace): IdentifiedFace =>
+    needsProjection
+      ? { ...f, bbox: projectNormBox(f.normBbox, sourceDims, targetDims).pixels }
+      : f;
+
+  const projectedFaces = ident.faces.map(projectFace);
+
   const assignmentLock: Record<string, string> = {};
   const facesBySpeaker: Record<string, IdentifiedFace> = {};
   const missing: string[] = [];
   for (const member of params.cast) {
-    const face = ident.byCharacter[member.characterId];
-    if (!face) { missing.push(member.characterId); continue; }
+    const raw = ident.byCharacter[member.characterId];
+    if (!raw) { missing.push(member.characterId); continue; }
+    const face = projectedFaces.find((f) => f.characterId === member.characterId) ?? projectFace(raw);
     assignmentLock[String(member.speakerIdx)] = member.characterId;
     facesBySpeaker[String(member.speakerIdx)] = face;
   }
@@ -212,7 +242,7 @@ export async function resolveCastIdentityLock(params: {
     method: CAST_IDENTITY_LOCK_TAG,
     assignmentLock,
     facesBySpeaker,
-    faces: ident.faces,
+    faces: projectedFaces,
     duplicateCharacterIds: ident.duplicateCharacterIds,
     missingCharacterIds: missing,
     indexedCount: sync.indexed,

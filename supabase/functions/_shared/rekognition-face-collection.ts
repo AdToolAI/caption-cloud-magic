@@ -29,6 +29,9 @@
  * from AWS instead of being re-derived by IoU.
  */
 
+import { probeImageDims, normToPixels, isPlausibleFaceBox } from "./rek-image-space.ts";
+
+
 const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
 const DEFAULT_REKOGNITION_REGION = "eu-central-1";
 
@@ -248,8 +251,15 @@ export async function deleteFaces(collectionId: string, faceIds: string[]): Prom
 export interface IdentifiedFace {
   /** Row-major slot index (top→bottom, then left→right). */
   slot: number;
-  /** Pixel-space [x1,y1,x2,y2] in the supplied frame. */
+  /**
+   * Pixel-space [x1,y1,x2,y2] — IM RAUM DES TATSÄCHLICH GESENDETEN BILDES
+   * (siehe `IdentifyFrameResult.sourceDims`). v361: das ist NICHT
+   * automatisch der Plate-Raum. Wer Plate-Pixel braucht, projiziert
+   * `normBbox` explizit über `projectNormBox`.
+   */
   bbox: [number, number, number, number];
+  /** v361 — normalisierte Box [l,t,r,b] in 0..1 des gesendeten Bildes. */
+  normBbox: [number, number, number, number];
   /** Normalised centre [x,y] in 0..1. */
   normCenter: [number, number];
   characterId: string | null;
@@ -269,6 +279,10 @@ export interface IdentifyFrameResult {
   resolvedCount: number;
   /** characterIds that appeared as the best match for more than one face. */
   duplicateCharacterIds: string[];
+  /** v361 — Raum, in dem `bbox` gilt. */
+  sourceDims: { width: number; height: number };
+  /** v361 — kamen die Dimensionen aus den Bildbytes oder vom Aufrufer? */
+  dimsSource: "probed" | "caller";
   reason?: string;
   msTotal: number;
 }
@@ -278,13 +292,19 @@ export interface IdentifyFrameResult {
  *
  * `knownCharacterIds` scopes the search: matches to characters that are not
  * part of this scene are ignored instead of stealing a slot.
+ *
+ * v361 — `frameWidth`/`frameHeight` sind nur noch ein FALLBACK. Die
+ * Detektionsdimensionen werden aus den Bildbytes gelesen, weil Rekognition
+ * relativ zum gesendeten Bild normalisiert. Alles andere erzeugt
+ * systematisch verschobene Boxen (Szene 89c5e01c, 01.08.2026).
  */
 export async function identifyFacesInFrame(params: {
   collectionId: string;
   imageUrl?: string;
   imageBytes?: Uint8Array;
-  frameWidth: number;
-  frameHeight: number;
+  /** Fallback-Dimensionen, falls die Bytes nicht sondierbar sind. */
+  frameWidth?: number;
+  frameHeight?: number;
   knownCharacterIds: string[];
   maxFaces?: number;
 }): Promise<IdentifyFrameResult> {
@@ -297,6 +317,11 @@ export async function identifyFacesInFrame(params: {
     detectedCount: 0,
     resolvedCount: 0,
     duplicateCharacterIds: [],
+    sourceDims: {
+      width: Math.max(1, Math.round(params.frameWidth ?? 0)),
+      height: Math.max(1, Math.round(params.frameHeight ?? 0)),
+    },
+    dimsSource: "caller",
     msTotal: 0,
   };
   if (!faceCollectionAvailable()) {
@@ -306,8 +331,25 @@ export async function identifyFacesInFrame(params: {
   const bytes = params.imageBytes ?? (params.imageUrl ? await fetchBytes(params.imageUrl) : null);
   if (!bytes) return { ...base, reason: "frame_fetch_failed", msTotal: Date.now() - t0 };
 
-  const W = Math.max(1, Math.round(params.frameWidth));
-  const H = Math.max(1, Math.round(params.frameHeight));
+  // v361 — Koordinatenvertrag: Detektionsraum = Raum der gesendeten Bytes.
+  const probed = probeImageDims(bytes);
+  const dimsSource: "probed" | "caller" = probed ? "probed" : "caller";
+  const W = Math.max(1, Math.round(probed?.width ?? params.frameWidth ?? 1024));
+  const H = Math.max(1, Math.round(probed?.height ?? params.frameHeight ?? 1024));
+  if (
+    probed &&
+    Number.isFinite(Number(params.frameWidth)) &&
+    Number(params.frameWidth) > 0 &&
+    (Math.abs(probed.width - Number(params.frameWidth)) > 2 ||
+      Math.abs(probed.height - Number(params.frameHeight)) > 2)
+  ) {
+    console.warn(
+      `[face-collection] v361_dims_mismatch caller=${params.frameWidth}x${params.frameHeight} ` +
+      `probed=${probed.width}x${probed.height} — using probed (Rekognition normalises to the sent image)`,
+    );
+  }
+  base.sourceDims = { width: W, height: H };
+  base.dimsSource = dimsSource;
   const known = new Set(params.knownCharacterIds.filter(Boolean));
 
   // 1) Index the frame's faces temporarily — this yields FaceId + BoundingBox
@@ -382,10 +424,13 @@ export async function identifyFacesInFrame(params: {
     }));
 
     const faces: IdentifiedFace[] = entries.map((e, i) => {
-      const x1 = Math.round(e.left * W);
-      const y1 = Math.round(e.top * H);
-      const x2 = Math.round((e.left + e.width) * W);
-      const y2 = Math.round((e.top + e.height) * H);
+      const normBbox: [number, number, number, number] = [
+        e.left,
+        e.top,
+        e.left + e.width,
+        e.top + e.height,
+      ];
+      const [x1, y1, x2, y2] = normToPixels(normBbox, { width: W, height: H });
       const scored = searched[i];
       const best = scored[0] ?? null;
       const second = scored[1] ?? null;
@@ -394,17 +439,32 @@ export async function identifyFacesInFrame(params: {
       const clear = margin === null || margin >= COLLECTION_MARGIN_MIN;
       return {
         slot: i,
-        bbox: [x1, y1, x2, y2],
+        bbox: [x1, y1, x2, y2] as [number, number, number, number],
+        normBbox: normBbox.map((v) => Number(v.toFixed(5))) as [number, number, number, number],
         normCenter: [
           Number((e.left + e.width / 2).toFixed(4)),
           Number((e.top + e.height / 2).toFixed(4)),
-        ],
+        ] as [number, number],
         characterId: strong && clear ? best!.characterId : null,
         similarity: best ? Number(best.similarity.toFixed(2)) : null,
         margin,
         ambiguous: !!best && (!strong || !clear),
       };
-    });
+    })
+      // v361 — physikalisch unmögliche Boxen verwerfen. Eine 22x13-px-Box auf
+      // einer 1928-px-Plate ist keine Fehldetektion, sondern das Symptom
+      // einer kaputten Rücktransformation. Sie darf nie einen Crop steuern.
+      .filter((f) => {
+        const plausible = isPlausibleFaceBox(f.bbox, { width: W, height: H });
+        if (!plausible) {
+          console.warn(
+            `[face-collection] v361_implausible_box_dropped bbox=[${f.bbox.join(",")}] ` +
+            `space=${W}x${H} char=${f.characterId ?? "-"}`,
+          );
+        }
+        return plausible;
+      })
+      .map((f, i) => ({ ...f, slot: i }));
 
     // 3) Bijection guard: a character may own at most one face. When the same
     //    character wins two faces (the "character rendered twice" case) the
@@ -435,6 +495,8 @@ export async function identifyFacesInFrame(params: {
       detectedCount: faces.length,
       resolvedCount: bestByChar.size,
       duplicateCharacterIds: [...duplicates],
+      sourceDims: { width: W, height: H },
+      dimsSource,
       msTotal: Date.now() - t0,
     };
   } finally {

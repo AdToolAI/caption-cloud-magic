@@ -262,6 +262,8 @@ serve(async (req) => {
   const failed: Array<{ scene_id: string; reason: string }> = [];
   const polled: Array<{ scene_id: string; job_id: string; status: string }> = [];
   const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
+  // v361 — Szenen, deren Dispatch bewusst unterdrückt wurde (Terminal-Guard).
+  const skipped: Array<{ scene_id: string; reason: string }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
     // v128 Phase B3 — wrap every mutation on this scene in the per-scene
@@ -422,7 +424,18 @@ serve(async (req) => {
     // Skip dispatching while we're parked on circuit_open — re-triggering
     // compose-dialog-segments would just hit the circuit again and reset
     // updated_at, masking the real TTL.
-    if (isV5Fanout && d.twoshot_stage !== "circuit_open") {
+    // v361 — Terminal-Guard. Ist die Szene bereits als fehlgeschlagen markiert
+    // (ein Sprecher-Pass hat z.B. Passthrough geliefert), darf der Watchdog
+    // keine weiteren Sprecher mehr zu Sync.so schicken. Genau diese Geister-
+    // Dispatches erzeugten "Lip-Sync läuft…" auf einer toten Szene.
+    const sceneTerminal =
+      String(d.lip_sync_status ?? "") === "failed" ||
+      String((d as any).status ?? "") === "failed" ||
+      String(d.twoshot_stage ?? "").startsWith("scene_failed");
+    if (sceneTerminal) {
+      skipped.push({ scene_id: d.id, reason: "skipped_scene_failed" });
+    }
+    if (!sceneTerminal && isV5Fanout && d.twoshot_stage !== "circuit_open") {
       // v126 — Also pick up `retrying` passes with no live job_id. Previously
       // a pass set to `retrying` by the webhook but with a lost re-dispatch
       // invoke would sit idle until the watchdog killed the whole scene.
@@ -780,7 +793,7 @@ serve(async (req) => {
     `[lipsync-watchdog] scanned=${rows?.length ?? 0} polled=${polled.length} advanced=${advanced.length} failed=${failed.length}`,
   );
   return new Response(
-    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, failed }),
+    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, skipped, failed }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

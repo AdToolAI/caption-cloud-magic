@@ -1,44 +1,42 @@
-## Was im letzten Lauf wirklich passiert ist
+## Kurzantwort
 
-Szene `89c5e01c` (4 Sprecher, HappyHorse-Plate), 01.08.2026, 20:12–20:20 UTC:
+Nicht ganz: AWS Rekognition hat sehr wahrscheinlich **korrekt** getroffen — die Fehlstellung entsteht **nach** dem Detect, beim Zurückrechnen der normalisierten Koordinaten (0–1) auf Plate-Pixel.
 
-```text
-20:12:33  Pass 1 (Matthew)  dispatch → Sync.so
-20:12:33  Pass 3 (Kailee)   dispatch → Sync.so
-20:13:34  Pass 0 (Turn 1)   COMPLETED · verdict=moved (score 19.0) ✔
-20:14:42  Pass 1 (Matthew)  COMPLETED · verdict=passthrough (outVsIn 0.57 < 3) ✘
-20:14:43  Pass 1            NOOP-Ladder exhausted → hard fail → SZENE = failed
-20:16:24  Pass 3 (Kailee)   COMPLETED · verdict=passthrough (outVsIn 1.95 < 3) ✘
-20:16:25  Pass 3            hard fail → Fehlertext "Kailee (Turn 5.0–7.2s)"
-20:16:37  fremder Webhook   ignored_due_scene_failed
-20:20:12  Pass 2 (Sarah)    NEU dispatcht → status=rendering  ← trotz failed Szene
-```
+Indizien dafür:
+- Rekognition liefert immer normalisierte Werte relativ zum *übergebenen* Bild. Die Logs zeigen abwechselnd `plate=1928x1076` und `plate=720x720` — es wird also nicht immer dasselbe Bild vermessen wie später gecroppt.
+- Die gespeicherten Boxen sind nicht zufällig verstreut, sondern **systematisch nach rechts/unten verschoben und in der Höhe gestaucht**. Ein Detektor, der danebenliegt, produziert Streuung; eine falsche Rücktransformation produziert genau dieses gleichmäßige Muster.
+- Eine Box war 22×13 px groß — das ist keine Fehldetektion, das ist eine Box, die als `[x, y, w, h]` geschrieben und als `[x1, y1, x2, y2]` gelesen wurde (oder umgekehrt).
 
-Damit sind die beiden Beobachtungen erklärt — und beide sind echte Defekte:
+Der Fehler liegt also in unserem Code zwischen Rekognition-Antwort und `plate_identity`, nicht bei AWS. Bestätigen lässt sich das nur, indem ich denselben Frame erneut vermesse und die Rohantwort mit dem Gespeicherten vergleiche — das ist Schritt 2 unten.
 
-**1. "Szene früh fehlgeschlagen, aber Lip-Sync läuft trotzdem"**
-Sync.so *wurde* aufgerufen (Pass 0/1/3). Der Kailee-Text stammt aus Pass 3. Danach hat der Dispatcher um 20:20 Pass 2 (Sarah) trotzdem noch an Sync.so geschickt, obwohl die Szene seit 20:14 terminal `failed` ist. Der Fehler-Check greift beim Webhook (`ignored_due_scene_failed`), aber **nicht** vor dem Dispatch. Ergebnis: bezahlte Sync.so-Jobs nach dem Abbruch, belegte Slots und die widersprüchliche UI ("Szene fehlgeschlagen" + "Lip-Sync läuft").
+---
 
-**2. v359 (mitziehender Crop) war in diesem Lauf gar nicht aktiv**
-Log: `v359_camera_path mode=static size=396 moving=false travel_px=0 contained=1.000`, Track: `detection_ratio=1.00 peak_motion_px=10`. Das Gesicht bewegt sich hier nur 10 px — der Planer fällt korrekt auf statisch zurück, und die Abdeckung ist 100 %. **Der Passthrough hat in diesem Lauf also nichts mit Bewegung/Crop zu tun.** Die v359-Hypothese ist für diese Szene widerlegt.
+## Plan v361 — Koordinatenvertrag reparieren
 
-Offen und unbewiesen: warum Sync.so bei Pass 1/3 nicht animiert — bzw. ob es überhaupt Passthrough ist. Auffällig ist `sizeRatio 3.18/3.22`: Sync.so hat neu enkodiert, das Mundband aber laut Messung nicht verändert. Der Verdict misst das Band an fixer Relativposition; bei Crop-Größe 396 → 720 hochskaliert kann das Band danebenliegen und einen **falschen** Passthrough melden. Genau das muss zuerst geklärt werden, bevor wieder an der Pipeline geschraubt wird.
+### Schritt 1: Beweis fixieren (Regressionsanker)
+Test anlegen, der die gespeicherten `plate_identity`-Boxen der Szene 89c5e01c gegen die tatsächlichen Gesichtsregionen prüft (≥ 50 % Überlappung gefordert). Der Test schlägt mit dem aktuellen Datensatz fehl — genau das ist der Anker.
 
-## Plan v360
+### Schritt 2: Ursache lokalisieren und beheben
+Den Weg von der Rekognition-`BoundingBox` bis zur Pixel-Box durchgehen (AWS-Detect-Wrapper, `plateFaceSlotRouter.ts`, `pass-face-preclip.ts`). Zu klären:
+- Wird das Bild vor dem Detect skaliert oder quadratisch gepolstert? Dann muss die Rücktransformation Offset **und** Skalierung exakt invertieren.
+- Wird `[x, y, w, h]` geschrieben, aber `[x1, y1, x2, y2]` gelesen?
+- Verifikation: Skript rendert den Plate-Frame mit den neu berechneten Boxen; ich prüfe das Bild visuell, bevor etwas ausgeliefert wird.
 
-**Schritt 1 — Forensik zuerst (kein Code-Fix)**
-Frames aus Pass-1-Input (`p2-preclip-…mp4`) und dem Sync.so-Output an denselben Zeitpunkten ziehen und nebeneinander ansehen: bewegt sich der Mund im Output sichtbar oder nicht?
-- Bewegt er sich → der Verdict ist falsch (Mundband-Position), und wir haben funktionierende Passes fälschlich verworfen.
-- Bewegt er sich nicht → echter Provider-Passthrough; dann Vergleich der Payload von Pass 0 (moved) vs. Pass 1/3 (passthrough): BBox-JSON, Audio-Länge, Segment-Fenster, Crop-Größe.
+### Schritt 3: Sanity-Gate am richtigen Ort
+Statt Geometrie-Gates auf dem Crop ein Gate auf der Detektion:
+- Boxen mit unplausibler Größe (< 1 % oder > 60 % Plate-Breite) oder Seitenverhältnis außerhalb 0,5–1,6 verwerfen.
+- Zweite Rekognition **auf dem fertigen 720×720-Preclip**: kein Gesicht gefunden → Pass gar nicht erst an Sync.so, sofortiger Abbruch mit Refund, protokolliert als `preclip_no_face`.
+- `resolvedCount` darf die Sprecherzahl nicht überschreiten; doppelte `characterId` über mehrere Slots = Identitätskonflikt, Slot mit niedrigerer Confidence verwerfen.
 
-**Schritt 2 — Dispatch-Stopp bei terminaler Szene**
-In `compose-dialog-segments` und im Retry-/Watchdog-Pfad vor jedem Sync.so-Dispatch den aktuellen Szenenstatus lesen; ist `dialog_shots.status` bzw. `clip_status` terminal `failed`, den Pass als `skipped_scene_failed` markieren, Slot freigeben und **nicht** dispatchen. Verhindert bezahlte Jobs nach dem Abbruch und die widersprüchliche UI.
+### Schritt 4: Dispatch-Guard im Watchdog nachziehen
+In `lipsync-watchdog/index.ts` denselben Terminal-Check wie in `compose-dialog-segments`: vor Retry/Dispatch `clip_status` lesen; ist die Szene terminal, Pass als `skipped_scene_failed` schließen, Credits erstatten, Sync.so-Slot freigeben. Die zwei hängenden Passes dieser Szene aufräumen.
 
-**Schritt 3 — Ergebnis aus Schritt 1 umsetzen**
-- Fall "Verdict falsch": Mundband aus den tatsächlich persistierten Preclip-Bboxen (Clip-Raum) ableiten statt aus der Konstante (0.5/0.6), plus Skalierungsfaktor Crop→720. Danach die Szene neu bewerten, ohne neu zu rendern.
-- Fall "echter Passthrough": Unterschied Pass 0 ↔ Pass 1/3 isolieren und gezielt angleichen; keine neuen Geometrie-Gates.
+### Schritt 5: Kontrolllauf
+Dieselbe Vier-Sprecher-Szene neu rendern, die vier Preclips als Standbilder prüfen. Erst wenn auf allen vier ein vollständiges Gesicht mit sichtbarem Mund zu sehen ist, gilt der Fix als bestätigt.
 
-**Was ich bewusst nicht tue:** keine neue Schwelle, kein zusätzliches Vor-Dispatch-Gate und keine Änderung an der Camera-Path-Logik — die hat in diesem Lauf korrekt statisch entschieden.
+---
 
-### Technische Notiz
-Betroffene Dateien voraussichtlich: `supabase/functions/_shared/mouth-motion-verdict.ts` (Mundband-Ableitung), `supabase/functions/compose-dialog-segments/index.ts` (Dispatch-Guard), `supabase/functions/lipsync-watchdog/index.ts` (Retry-Guard). Schritt 1 ist reine Analyse ohne Codeänderung.
+## Technische Notizen
+- Betroffene Dateien (Erwartung): AWS-Detect-Wrapper und `plateFaceSlotRouter.ts` unter `supabase/functions/_shared/`, `pass-face-preclip.ts`, ggf. `compute-mouth-centered-crop.ts`, `lipsync-watchdog/index.ts`.
+- Die v356-Entscheidung (keine geometrischen Pre-Dispatch-Blocker) bleibt bestehen. Das neue Gate misst nicht Gesichtsgröße, sondern *Gesicht vorhanden ja/nein* auf dem tatsächlich abgeschickten Bild.
+- Nebenbefund: `AWS_REGION='Global' is not a valid Rekognition region` — Fallback greift, wird aber sauber gesetzt.
