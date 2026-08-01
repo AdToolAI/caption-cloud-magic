@@ -36,6 +36,9 @@ import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 import { dedupeCharacterShots } from "../_shared/canonical-cast.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
+// v357 — Regie-Entscheidung statt Blocker (Gruppenshot / Punch-in / Coverage).
+import { decideDialogMode, directorLabel, DIALOG_DIRECTOR_TAG } from "../_shared/dialog-director.ts";
+
 import {
   assertPlateFaceContract,
   closeupFramingSuffix,
@@ -2684,6 +2687,27 @@ serve(async (req) => {
                         plateHeight: 1000,
                         expectedSpeakers: expectedFaces,
                       });
+                      // v357 — DIALOG DIRECTOR: Die Gesichtsgröße auf dem
+                      // Anchor entscheidet nicht mehr über "läuft / läuft
+                      // nicht", sondern über die Bildregie. Es gibt hier
+                      // bewusst KEINEN Abbruch — nur eine Entscheidung
+                      // zwischen Gruppenshot, Punch-in und Coverage. Das
+                      // passiert VOR dem Videorender, also bevor Kosten
+                      // entstehen.
+                      const director = decideDialogMode({
+                        faces: detect.faces.map((f) => ({ bbox: f.bbox })),
+                        plateWidth: 1000,
+                        plateHeight: 1000,
+                        nativePlateWidth: 1920,
+                        expectedSpeakers: expectedFaces,
+                      });
+                      (scene as any).__dialogDirector = director;
+                      console.log(
+                        `[compose-video-clips] ${DIALOG_DIRECTOR_TAG} scene=${scene.id} ` +
+                        `mode=${director.mode} min_face_px=${director.minFaceWidthPx} ` +
+                        `zoom=${director.punchInZoom} reason=${director.reason} ` +
+                        `label="${directorLabel(director.mode)}"`,
+                      );
                       console.log(
                         `[compose-video-clips] v262_min_face_gate scene=${scene.id} ` +
                         `ok=${check.ok ? 1 : 0} minRatio=${check.minWidthRatio.toFixed(3)} ` +
@@ -2698,10 +2722,13 @@ serve(async (req) => {
                         retried: false,
                         reason: check.reason,
                       };
-                      if (!check.ok) {
+                      // Neuer Anchor-Versuch, sobald der Director eine
+                      // engere Einstellung verlangt (Punch-in oder Coverage).
+                      const v357NeedsReframe = director.mode !== "group_shot";
+                      if (!check.ok || v357NeedsReframe) {
                         console.log(
-                          `[compose-video-clips] v262_framing_retry scene=${scene.id} ` +
-                          `→ re-composing anchor with framing suffix (${check.suggestion})`,
+                          `[compose-video-clips] v357_framing_retry scene=${scene.id} ` +
+                          `→ neuer Anchor für Modus ${director.mode} (${directorLabel(director.mode)})`,
                         );
                         await invalidateCache();
                         const retryUrl = await composeAnchor(
@@ -2710,8 +2737,9 @@ serve(async (req) => {
                           false,
                           [],
                           false,
-                          check.framingSuffix,
+                          director.framingSuffix || check.framingSuffix,
                         );
+
                         if (retryUrl) {
                           // Re-audit the retry: identity + size.
                           const eRetry = await evaluate(retryUrl, "attempt-4-framing");

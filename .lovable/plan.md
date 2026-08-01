@@ -1,53 +1,52 @@
-## Der Beweis liegt in der Datenbank — und er widerlegt meine eigene These
+## Meine Bewertung: der Kern stimmt, drei Punkte sind bereits erledigt
 
-Ich habe die Szenen vom 27.07. ausgelesen, die sauber durchliefen. Das sind ihre Preclip-Geometrien:
+Ich habe deinen Vorschlag gegen den echten Code geprüft. Das Ergebnis ist gut für uns – ein Teil dessen, was du forderst, ist schon gebaut. Der wertvolle Teil deines Vorschlags ist genau der, den wir noch nicht haben.
+
+**Was du vorschlägst, aber bereits existiert:**
+
+- **Keine serielle Kette.** Der Kopfkommentar in der Datei behauptet zwar noch eine Kette („pass N's video input = pass N-1's output"), der Code macht aber längst das, was du forderst: jeder Sprecher wird aus dem **unveränderten Original-Plate** abgeleitet, und bis zu vier Passes laufen **parallel**. Generationen-Akkumulation gibt es also nicht. Der Kommentar ist veraltet und irreführend – der muss weg.
+- **Turn-Extraktion existiert.** Jeder Pass rendert bereits nur sein eigenes Sprech-Fenster, nicht den ganzen Clip.
+- **Timeline-Assembly ist bereits Overlay am Originalort.** Wir verketten nichts, wir legen den lipgesyncten Ausschnitt an seiner absoluten Originalzeit zurück auf die Master-Plate.
+
+**Wo du absolut ins Schwarze triffst – und das ist die eigentliche Ursache:**
+
+1. **Unsere „per-frame Bounding Boxes" sind gar keine.** Wir laden zwar eine `bounding_boxes_url` hoch, füllen sie aber mit **immer derselben Box**, nur an- und ausgeschaltet nach Sprechfenster. Es gibt kein echtes Frame-zu-Frame-Tracking. Bewegt sich die Figur, zeigt unsere Box ins Leere – und Sync 3 findet nichts zum Animieren. Genau das ist der Fall, den wir seit Wochen als „Passthrough" sehen.
+2. **Der Anchor-Check ist zahnlos.** Es gibt ihn, aber er ist rein beratend (Ratio, 12 %) und blockiert nichts. Der harte Pixel-Check greift erst auf der fertig gerenderten Plate – also nachdem das Video schon bezahlt ist.
+3. **Es fehlt jede Umregie.** Wir haben nur „geht" oder „Fehlermeldung". Kein Punch-in, keine Coverage.
+
+**Wo ich dir widerspreche:** Der Zielwert von 220 px darf kein neuer Blocker werden. Genau daran sind v344 bis v355 gescheitert. Er wird eine **Regie-Entscheidung** (welcher Modus), niemals ein Abbruchgrund.
+
+## Umsetzung — Dialog Director
+
+**Schritt 1 — Echtes Gesichts-Tracking pro Frame**
+Der größte Hebel und die wahrscheinlichste Ursache der Fehlschläge. Statt einer wiederholten Standbox wird die Gesichtsposition über die Frames des Turns tatsächlich verfolgt, leicht geglättet und als echte Bewegungsspur an Sync geschickt. Der Kontextrahmen wird großzügiger (rund ein Viertel Aufschlag nach oben, zur Seite und unter das Kinn), weil Sync 3 mit Umfeld besser arbeitet als mit engem Mundausschnitt. Der „alle Frames dieselbe Box"-Notpfad wird entfernt.
+
+**Schritt 2 — Anchor-Dialogvertrag mit Regie-Entscheidung (kein Blocker)**
+Direkt nach dem Anchor-Bild, also **bevor Videokosten entstehen**, werden Anzahl der Gesichter, Identitätszuordnung, native Gesichtsgröße, Mundsichtbarkeit und Schärfe geprüft. Ergebnis ist immer eine Entscheidung, nie ein Abbruch:
 
 ```text
-Szene 0f8818ee (27.07., 4 Sprecher, status=done)
-  Pass 0  crop 128 px → 720p   face-share  4.8 %
-  Pass 1  crop 128 px → 720p   face-share  8.5 %
-  Pass 2  crop 128 px → 720p   face-share 17.4 %
-  Pass 3  crop 128 px → 720p   face-share 12.9 %
-
-Szene c01d339d (27.07., 4 Sprecher, status=done)
-  crop 384 / 339 / 165 / 540 px   share 15–21 %
+alle Gesichter groß      → Modus A  Gruppen-Dialogshot (wie bisher)
+grenzwertig              → Modus B  automatischer Punch-in auf den Sprecher
+zu klein                 → Modus C  Coverage: Totale + engere Zweier-Shots
+Anchor unbrauchbar       → Anchor neu, max. 2 Versuche, dann Modus C
 ```
 
-Das heißt: **am 27.07. lief die Pipeline mit exakt den Werten durch, die heute jeden Lauf blockieren.** 128 px Crop bei 4,8 % Face-Share — heute verlangen wir 144 px Crop, 34 % Side-Share und 120 px Gesichtsbreite auf der Plate. Jede einzelne dieser Julischen Erfolgs-Szenen würde von der aktuellen Pipeline abgelehnt.
+**Schritt 3 — Modus B: Automatischer Punch-in**
+Während ein Sprecher spricht, fährt das Bild digital näher an ihn heran, danach zurück auf die Gruppe. Damit steigt die Gesichtsgröße im verarbeiteten Bild deutlich, ohne dass das Videomodell etwas anders rendern muss. Wirkt wie normale Bildregie, kein Notbehelf.
 
-Damit ist meine Pixel-Theorie aus v353/v355 als Blockierkriterium widerlegt. Die 181/116/102-px-Messung von gestern war eine Momentaufnahme einer einzelnen Szene, kein Naturgesetz des Providers. Ich habe daraus eine harte Regel gemacht — und die Regel sperrt jetzt genau die Konfiguration aus, die nachweislich funktioniert hat.
+**Schritt 4 — Modus C: Coverage**
+Statt einer unbrauchbaren Vierer-Totale werden mehrere Einstellungen erzeugt: kurze Gruppen-Totale zum Etablieren, dann engere Aufnahmen für die Dialogzeilen, Abschluss auf der Gruppe. Der Kunde bekommt weiterhin „vier Sprecher in einer Szene", der Dialog wird aber in technisch sicheren Einstellungen produziert. Die Figuren bleiben über die bestehende Charakter-Bindung identisch.
 
-## Wie andere Anbieter es lösen
+**Schritt 5 — Handles an den Turn-Grenzen**
+Jeder Turn wird mit rund 200 ms Vor- und Nachlauf verarbeitet, eingesetzt wird nur der Kern. Dazu ein sehr kurzer Bildübergang. Damit verschwinden sichtbare Sprünge zwischen den Sprecherabschnitten.
 
-Nicht über Geometrie-Vorabprüfungen. Der Industrie-Ansatz ist **outcome-based**: dispatchen, das Ergebnis messen, und nur bei nachgewiesenem Passthrough eingreifen. Geometrische Vorab-Gates sind bei Gruppenszenen strukturell unmöglich sauber zu definieren — genau das erleben wir seit v341.
+**Schritt 6 — Aufräumen und Klarstellen**
+Der irreführende „serielle Kette"-Kommentar wird korrigiert. Das Hochskalieren auf 720p bleibt, wird aber ausdrücklich als reine Formatanpassung markiert und nicht länger als Qualitätsmaßnahme behandelt.
 
-## Plan v356 — Zurück auf die belegte Julikonfiguration, Guard nur am Ergebnis
+**Was unangetastet bleibt:** Charakter-Identitätssperre, Slot-Leasing, Vorabprüfung von Audio und Dateien, Bewegungs-Verdikt nach dem Lauf, Passthrough-Erkennung, automatische Rückerstattungen, Watchdog und Telemetrie. Alles davon passt zur neuen Architektur.
 
-**1. Alle geometrischen Vorab-Blocker entfernen**
-- `MIN_NATIVE_CROP_PX = 144` (v353) → entfällt.
-- `FACE_SIDE_SHARE_FLOOR = 0.34` (v344.1) → entfällt.
-- `v355_plate_contract` Pixel-Block in `compose-dialog-segments` → wird von „blockieren" auf „loggen" umgestellt.
-- Der Anchor-Ratio-Check in `compose-video-clips` bleibt als reiner Framing-Hebel ohne Abbruch.
+**Regressionstests:** Bewegte Figur erzeugt eine sich bewegende Boxspur, keine Standbox. Ein Anchor mit vier kleinen Gesichtern landet in Modus C statt in einem Fehlschlag. Ein Anchor mit großen Gesichtern läuft unverändert in Modus A und kostet nichts extra.
 
-Alle vier Werte bleiben als Telemetrie im Log erhalten, damit wir weiter messen können — sie fällen nur keine Entscheidung mehr.
+## Reihenfolge
 
-**2. Crop-Geometrie exakt auf den Julistand zurücksetzen**
-`minSize` zurück auf 128 px, `targetFaceShare` 0.42, `outputSize` 720 — das ist die Konfiguration der nachweislich erfolgreichen Szenen. Kein `minSize: 96`, keine nachträgliche Share-Neuberechnung gegen den expandierten Crop.
-
-**3. Einziger verbleibender Guard: der Motion-Verdict nach dem Lauf**
-Der Vergleich Output gegen Input (`mouth-motion-verdict`) bleibt scharf. Liefert Sync.so ein unverändertes Video, wird nicht gemuxt und erstattet. Das ist der Guard, der tatsächlich misst, was der Kunde sieht — statt vorherzusagen, was der Provider können wird.
-
-**4. Plate-Auflösung: 1080p bleibt, aber freiwillig**
-Höhere Plate-Auflösung schadet nicht und gibt dem Crop mehr Substanz. Sie bleibt aktiv, ist aber an keine Bedingung geknüpft.
-
-**5. Regressionstest gegen die Julidaten**
-Die Tests in `_shared/closeup-contract.test.ts` und `lipsync-noop-policy.test.ts` werden umgedreht: sie prüfen künftig, dass ein 128-px-Crop mit 4,8 % Share **nicht** blockiert wird — mit den echten Werten aus Szene `0f8818ee` als Fixture. Damit kann kein künftiger Fix diese Klasse erneut aussperren.
-
-## Was wir dann wissen
-
-Nach dem ersten Lauf mit v356 gibt es genau zwei mögliche Ergebnisse, und beide sind aussagekräftig:
-
-- **Lippen bewegen sich** → die Ursache waren unsere eigenen Gates, nicht der Provider. Fall geschlossen.
-- **Passthrough trotz Julikonfiguration** → dann hat sich zwischen 27.07. und heute etwas beim Provider oder in der Payload geändert. Dann vergleiche ich die Sync.so-Request-Payload einer erfolgreichen Julizeile mit der aktuellen Feld für Feld — nicht die Geometrie.
-
-Ich schlage keine weitere Schwelle vor, bevor dieser Lauf nicht gemessen ist.
+Ich würde mit **Schritt 1 allein** starten und einen Testlauf machen. Wenn die Standbox tatsächlich die Ursache war, sehen wir das sofort am Bewegungs-Verdikt – und die Regie-Modi werden dann zur Absicherung der Randfälle, statt zur Rettung des Normalfalls.

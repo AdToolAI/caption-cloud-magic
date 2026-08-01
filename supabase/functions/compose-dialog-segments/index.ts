@@ -21,9 +21,15 @@
 
  *
  * The only stable multi-speaker pattern is the one v4 used: one Sync.so
- * call per speaker, each with single-coord ASD pointing at THAT speaker's
- * face. We chain them: pass N's video input = pass N-1's output. The final
- * pass's output has every speaker correctly lip-synced.
+ * call per speaker, each with single-face ASD pointing at THAT speaker.
+ * v357 — KORREKTUR EINES VERALTETEN KOMMENTARS: Die Passes sind NICHT
+ * verkettet. Jeder Pass nutzt das UNVERÄNDERTE Original-Plate als Input
+ * (`passInputUrl = sourceClipUrl`), und bis zu `concurrencyCap` Passes
+ * laufen parallel (v193 fan-out). Es gibt keine Generationen-Akkumulation.
+ * Die lipgesyncten Crops werden anschließend an ihrer absoluten
+ * Original-Zeitposition zurück auf die Master-Plate gelegt (Overlay,
+ * kein Concat).
+
  *
  * State model (dialog_shots, multi-pass):
  *  {
@@ -105,6 +111,14 @@ import {
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
+// v357 — echtes Per-Frame-Gesichts-Tracking statt wiederholter Standbox.
+import {
+  trackFaceAcrossTurn,
+  interpolateBoxes,
+  withContextPadding,
+  trackMovementPx,
+} from "../_shared/face-track.ts";
+
 import {
   buildAsdStrategy,
   type PreflightFaceResult,
@@ -364,15 +378,16 @@ function buildPerFrameBoxes(params: {
     .filter(([fs, fe]) => Number.isFinite(fs) && Number.isFinite(fe) && fe >= fs);
   const out: Array<[number, number, number, number] | null> =
     new Array(Math.max(1, params.frameCount)).fill(null);
-  if (windows.length === 0) {
-    // No voiced windows known → preserve legacy behaviour (full-fill) so
-    // we don't accidentally produce an all-null array that would silently
-    // disable lip-sync entirely.
-    return out.map(() => params.box);
-  }
-  for (const [fs, fe] of windows) {
+  // v357 — Der alte "alle Frames dieselbe Box"-Notpfad ist entfernt. Fehlen
+  // die Voiced-Windows, gilt der gesamte Clip explizit als EIN Sprech-Fenster
+  // (statt stillschweigend eine Standbox über alles zu legen).
+  const effective = windows.length > 0
+    ? windows
+    : [[0, Math.max(0, Math.max(1, params.frameCount) - 1)] as [number, number]];
+  for (const [fs, fe] of effective) {
     for (let i = fs; i <= fe; i++) out[i] = params.box;
   }
+
   // v201 — strict turn-scoped boxes. Older builds backfilled leading/trailing
   // silence with the target box to satisfy Sync.so's validator, but that let
   // the provider reproject inactive faces outside the spoken turn. Keep every
@@ -403,6 +418,11 @@ async function uploadBoundingBoxesJson(
     // neighbour faces during turns this speaker is silent.
     voicedWindowsSec?: Array<[number, number]>;
     fps?: number;
+    /**
+     * v357 — Vorberechnete echte Bewegungsspur (Per-Frame-Tracking). Wenn
+     * gesetzt, hat sie Vorrang vor der statischen `box`.
+     */
+    trackedBoxes?: Array<[number, number, number, number] | null>;
   },
 ): Promise<{ url: string | null; nonNullFrames: number; totalFrames: number }> {
   try {
@@ -410,14 +430,17 @@ async function uploadBoundingBoxesJson(
     const ts = Date.now();
     const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
     const totalFrames = Math.max(1, params.frameCount);
-    const boxes = params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
-      ? buildPerFrameBoxes({
-          box: params.box,
-          frameCount: totalFrames,
-          fps: params.fps,
-          voicedWindowsSec: params.voicedWindowsSec,
-        })
-      : new Array(totalFrames).fill(params.box);
+    const boxes = params.trackedBoxes && params.trackedBoxes.length === totalFrames
+      ? params.trackedBoxes
+      : (params.fps
+        ? buildPerFrameBoxes({
+            box: params.box,
+            frameCount: totalFrames,
+            fps: params.fps,
+            voicedWindowsSec: params.voicedWindowsSec ?? [],
+          })
+        : new Array(totalFrames).fill(params.box));
+
     const nonNullFrames = boxes.reduce((acc, v) => acc + (v ? 1 : 0), 0);
     const payload = { bounding_boxes: boxes };
     // v279 — Uint8Array instead of Blob: supabase-js 2.75 in Deno silently
@@ -5514,8 +5537,15 @@ serve(async (req) => {
       body?.noop_auto_escalation !== true;
 
     if (v161PreclipEligible) {
-      const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
-      const unionEnd = Math.min(totalSec, Math.max(...speakerWindowsSecs.map(([, e]) => e)));
+      // v357 Schritt 5 — Handles an den Turn-Grenzen: 200 ms Vor-/Nachlauf,
+      // damit Sync.so den Mundansatz vor dem ersten Laut und das Schließen
+      // nach dem letzten Laut mitbekommt. Ohne Handles springt der Mund an
+      // der Fenstergrenze sichtbar. Der Mux legt den Clip weiterhin exakt
+      // an `preclip_start_sec` zurück, die Zeitlage bleibt also korrekt.
+      const V357_HANDLE_SEC = 0.2;
+      const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)) - V357_HANDLE_SEC);
+      const unionEnd = Math.min(totalSec, Math.max(...speakerWindowsSecs.map(([, e]) => e)) + V357_HANDLE_SEC);
+
       const siblingCoords: Array<[number, number]> = [];
       for (let i = 0; i < speakers.length; i++) {
         if (i === pass.speaker_idx) continue;
@@ -6066,6 +6096,69 @@ serve(async (req) => {
         );
       }
 
+      // ─── v357 — ECHTES PER-FRAME-TRACKING ─────────────────────────────
+      // Bis v356 war die "bounding_boxes_url" faktisch eine Standbox: für
+      // jeden Frame dieselben Koordinaten, nur an-/ausgeschaltet nach
+      // Voiced-Window. Bewegt sich die Figur, zeigt diese Box ins Leere,
+      // Sync 3 findet keinen Mund und liefert das Eingangsvideo unverändert
+      // zurück — genau der "Passthrough", den wir wochenlang gemessen haben.
+      // Ab hier verfolgen wir das Gesicht wirklich über die Frames des Turns.
+      let v357TrackedBoxes: Array<[number, number, number, number] | null> | null = null;
+      let v357TrackSource = "not_attempted";
+      let v357TrackMovementPx = 0;
+      if (dispatchBox && retryVariant === "bbox-url-pro") {
+        const trackW = v161UsingPreclipForBbox && v161PreclipCrop
+          ? v161PreclipCrop.outputSize
+          : Math.max(1, plateDims?.width ?? 0);
+        const trackH = v161UsingPreclipForBbox && v161PreclipCrop
+          ? v161PreclipCrop.outputSize
+          : Math.max(1, plateDims?.height ?? 0);
+        const windowStart = v124VoicedWindows.length > 0
+          ? Math.min(...v124VoicedWindows.map(([s]) => s))
+          : 0;
+        const windowEnd = v124VoicedWindows.length > 0
+          ? Math.max(...v124VoicedWindows.map(([, e]) => e))
+          : frameCount / Math.max(1, dispatchFps);
+        try {
+          const track = await trackFaceAcrossTurn({
+            videoUrl: probeUrlForBbox,
+            width: trackW,
+            height: trackH,
+            startSec: windowStart,
+            endSec: windowEnd,
+            anchorBox: dispatchBox,
+            deadline: Date.now() + 45_000,
+            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1}`,
+          });
+          v357TrackSource = track.source;
+          if (track.ok && track.keyframes.length > 0) {
+            v357TrackedBoxes = interpolateBoxes({
+              keyframes: track.keyframes,
+              frameCount,
+              fps: dispatchFps ?? ASSUMED_FPS,
+              voicedWindowsSec: v124VoicedWindows,
+            });
+            v357TrackMovementPx = trackMovementPx(v357TrackedBoxes);
+          } else {
+            // Kein Tracking möglich → Anchor-Box, aber MIT Kontextrahmen,
+            // weil Sync 3 mit Umfeld nachweislich besser arbeitet.
+            dispatchBox = withContextPadding(dispatchBox, trackW, trackH);
+          }
+        } catch (e) {
+          v357TrackSource = "track_threw";
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v357_track_failed ${(e as Error).message}`,
+          );
+        }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v357_face_track ` +
+          `source=${v357TrackSource} movement_px=${v357TrackMovementPx} frames=${frameCount} ` +
+          `space=${v161UsingPreclipForBbox ? "clip" : "plate"} dims=${trackW}x${trackH}`,
+        );
+        (pass as any)._v357TrackSource = v357TrackSource;
+        (pass as any)._v357TrackMovementPx = v357TrackMovementPx;
+      }
+
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;
       if (retryVariant === "bbox-url-pro" && dispatchBox) {
@@ -6078,10 +6171,12 @@ serve(async (req) => {
           frameCount,
           voicedWindowsSec: v124VoicedWindows,
           fps: dispatchFps,
+          trackedBoxes: v357TrackedBoxes ?? undefined,
         });
         usedUrl = up.url;
         nonNullFrames = up.nonNullFrames;
       }
+
 
 
       // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
