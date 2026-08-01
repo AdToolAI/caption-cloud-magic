@@ -328,13 +328,8 @@ export default function SceneInlinePlayer({
                   } else if (lipSyncStatus === 'audio_muxing' || twoshotStage === 'audio_muxing') {
                     title = 'Audio wird gemischt…';
                     sub = 'Letzter Schritt';
-                  } else if (activeNoopRetry) {
-                    const sp = String(activeNoopRetry.speaker_name ?? `Sprecher ${Number(activeNoopRetry.idx ?? 0) + 1}`);
-                    const step = Number(activeNoopRetry.noop_escalation_step ?? 1);
-                    const variantLabel = step === 1 ? 'bounding_boxes_url' : step === 2 ? 'bounding-box ASD' : 'fallback';
-                    title = `NOOP-Retry läuft (Stufe ${step}/2)…`;
-                    sub = `${sp} · sync-3 ${variantLabel} · max. 2 Stufen, dann Hard-Fail`;
                   } else if (lipSyncStatus === 'running' && hasProviderJob) {
+
                     title = 'Lip-Sync läuft…';
                     sub = totalPasses > 0
                       ? `Sync.so · Pass ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
