@@ -341,24 +341,67 @@ async function extractFrame(
 
 
 
-/** Fetches a frame, crops the mouth band and resamples it to a luminance grid. */
-async function frameToGrid(frameUrl: string, rect: MouthRect): Promise<Float64Array | null> {
+interface DecodedFrame {
+  grid: Float64Array | null;
+  /** SHA-256 of the raw frame bytes — used as a last-resort static detector. */
+  bytesHash: string | null;
+  error: string | null;
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * v349 — decode with forensics.
+ * Previous versions swallowed every decoder failure into `null`, which made
+ * `decoded_0` indistinguishable from "frame URL 404" or "PNG unsupported".
+ * We now keep the concrete error AND a byte hash so the caller can still
+ * prove a *static* clip even when pixel decoding is impossible.
+ */
+async function decodeFrame(frameUrl: string, rect: MouthRect): Promise<DecodedFrame> {
+  let bytes: Uint8Array | null = null;
   try {
     const res = await fetch(frameUrl, { signal: AbortSignal.timeout(15_000) });
-    if (!res.ok) return null;
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const { Image } = await import("npm:imagescript@1.3.0");
-    // deno-lint-ignore no-explicit-any
-    const img: any = await (Image as any).decode(bytes);
-    const w = Number(img.width);
-    const h = Number(img.height);
-    if (!(w > 1 && h > 1)) return null;
+    if (!res.ok) return { grid: null, bytesHash: null, error: `fetch_${res.status}` };
+    bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength === 0) return { grid: null, bytesHash: null, error: "empty_body" };
+  } catch (e) {
+    return { grid: null, bytesHash: null, error: `fetch_threw:${(e as Error)?.message ?? "?"}` };
+  }
 
-    const x0 = Math.max(0, Math.floor(rect.x * w));
-    const y0 = Math.max(0, Math.floor(rect.y * h));
-    const bw = Math.max(2, Math.min(w - x0, Math.floor(rect.w * w)));
-    const bh = Math.max(2, Math.min(h - y0, Math.floor(rect.h * h)));
+  const bytesHash = await sha256Hex(bytes).catch(() => null);
 
+  // deno-lint-ignore no-explicit-any
+  let img: any = null;
+  let error: string | null = null;
+  for (const specifier of ["npm:imagescript@1.3.0", "https://deno.land/x/imagescript@1.2.15/mod.ts"]) {
+    try {
+      const mod = await import(specifier);
+      // deno-lint-ignore no-explicit-any
+      const ImageCtor: any = (mod as any).Image ?? (mod as any).default?.Image;
+      if (!ImageCtor?.decode) { error = `no_decode_export:${specifier}`; continue; }
+      img = await ImageCtor.decode(bytes);
+      if (img) { error = null; break; }
+    } catch (e) {
+      error = `decode_failed:${(e as Error)?.message ?? "?"}`;
+    }
+  }
+  if (!img) return { grid: null, bytesHash, error: error ?? "decode_null" };
+
+  const w = Number(img.width);
+  const h = Number(img.height);
+  if (!(w > 1 && h > 1)) return { grid: null, bytesHash, error: `bad_dims_${w}x${h}` };
+
+  const x0 = Math.max(0, Math.floor(rect.x * w));
+  const y0 = Math.max(0, Math.floor(rect.y * h));
+  const bw = Math.max(2, Math.min(w - x0, Math.floor(rect.w * w)));
+  const bh = Math.max(2, Math.min(h - y0, Math.floor(rect.h * h)));
+
+  try {
     const grid = new Float64Array(GRID_W * GRID_H);
     for (let gy = 0; gy < GRID_H; gy++) {
       const sy = Math.min(h - 1, y0 + Math.floor((gy + 0.5) * bh / GRID_H));
@@ -372,11 +415,12 @@ async function frameToGrid(frameUrl: string, rect: MouthRect): Promise<Float64Ar
         grid[gy * GRID_W + gx] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
       }
     }
-    return grid;
-  } catch {
-    return null;
+    return { grid, bytesHash, error: null };
+  } catch (e) {
+    return { grid: null, bytesHash, error: `sample_failed:${(e as Error)?.message ?? "?"}` };
   }
 }
+
 
 function meanAbsDelta(a: Float64Array, b: Float64Array): number {
   let sum = 0;
