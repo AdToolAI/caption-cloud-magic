@@ -4748,6 +4748,22 @@ serve(async (req) => {
         } catch { /* best-effort */ }
         return json({ ok: true, skipped: "v193_pass_already_active", pass_idx: currentPassIdx, status: liveStatus }, 202);
       }
+      // ── v364 — Crash-Loop-Breaker für den Plate-Tracker ─────────────────
+      // Der v359-Tracker lief bis v363 in vollem Plate-Maßstab und hat den
+      // Edge-Worker mit `Memory limit exceeded` getötet, BEVOR der Preclip
+      // startete. Ein hart abgeschossener Worker räumt nichts auf: der Pass
+      // bleibt auf `rendering_preflight`, der Watchdog startet exakt denselben
+      // Absturz erneut. Findet ein neuer Lauf einen Tracker-Marker ohne
+      // Abschluss vor, wird das Tracking übersprungen und der Preclip statisch
+      // gerendert (Verhalten vor v359). Qualität > 0 schlägt Endlos-Hänger.
+      const trackCrashSuspected =
+        !!livePass?.plate_track_attempted_at && !livePass?.plate_track_completed_at;
+      const plateTrackDisabled = trackCrashSuspected || livePass?.plate_track_disabled === true;
+      if (plateTrackDisabled) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v364_plate_track_disabled reason=${trackCrashSuspected ? "previous_worker_crash" : "flagged"}`,
+        );
+      }
       try {
         await supabase.rpc("update_dialog_pass_slot", {
           _scene_id: sceneId,
@@ -4756,6 +4772,7 @@ serve(async (req) => {
             status: "rendering_preflight",
             preflight_started_at: new Date().toISOString(),
             preflight_claim_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
+            plate_track_disabled: plateTrackDisabled,
           },
         });
       } catch (claimErr) {
@@ -4764,8 +4781,10 @@ serve(async (req) => {
         );
       }
       (pass as any).preflight_started_at = new Date().toISOString();
+      (pass as any).plate_track_disabled = plateTrackDisabled;
       pass.status = "rendering_preflight";
     }
+
 
     // ── v193 — Batch preclip all sibling passes immediately ──────────────
     // v192 only prefetched passes beyond the Sync.so concurrency cap. With cap=4
