@@ -290,13 +290,25 @@ export async function renderPassFacePreclip(
   const outH = crop.outputSize;
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
-  // v344.1 — LINEAR face-share floor. Recompute against the FINAL crop
-  // (expansion retries enlarge the box and shrink the share). The old
-  // area-based floor (0.15) was unreachable for faces < ~50px because the
-  // `minSize` widening it complained about was self-inflicted, and it
-  // penalised non-square faces (41x55 in a 128px crop = 43% of the crop
-  // EDGE but only 13.8% of its AREA). We block only when the face is
-  // genuinely small relative to the crop edge.
+  // ════════════════════════════════════════════════════════════════════
+  // v356 — TELEMETRY ONLY. No geometric pre-dispatch block.
+  //
+  // Evidence from the working baseline (2026-07-27, DB-verified):
+  //   scene 0f8818ee, 4 speakers, status=done
+  //     crop 128px → 720p, face-share 4.8 % / 8.5 % / 17.4 % / 12.9 %
+  //   scene c01d339d, 4 speakers, status=done
+  //     crop 165–540px, face-share 15–21 %
+  //
+  // Every one of those PASSING passes would be rejected by the v344.1
+  // side-share floor (0.34) and by the v353 native-crop floor (144px).
+  // The floors were generalised from a single failing scene and turned
+  // into a law the provider never obeyed. They are removed; the numbers
+  // stay in the log so we keep measuring without deciding.
+  //
+  // The only remaining guard is outcome-based: `mouth-motion-verdict`
+  // compares the provider OUTPUT against the INPUT after the run and
+  // blocks the mux + refunds on a proven passthrough.
+  // ════════════════════════════════════════════════════════════════════
   if (bboxValid) {
     const fbW = Math.max(1, Number((bbox as number[])[2]) - Number((bbox as number[])[0]));
     const fbH = Math.max(1, Number((bbox as number[])[3]) - Number((bbox as number[])[1]));
@@ -304,56 +316,13 @@ export async function renderPassFacePreclip(
     faceShareInCrop = Math.min(1, (fbW * fbH) / Math.max(1, crop.size * crop.size));
     faceSideShare = Math.min(1, fbSide / Math.max(1, crop.size));
     faceSidePx = fbSide;
-    // ══════════════════════════════════════════════════════════════════
-    // v354 — ASSERTION, not a gate.
-    // The face-size contract is now enforced upstream (anchor gate in
-    // compose-video-clips + post-render plate check in
-    // compose-dialog-segments). If we still land here, an upstream stage
-    // let a non-conforming plate through — the thresholds stay, but the
-    // error names the real cause instead of pretending the preclip
-    // geometry is the problem.
-    // ══════════════════════════════════════════════════════════════════
-    const FACE_SIDE_SHARE_FLOOR = 0.34;
-    if (faceSideShare < FACE_SIDE_SHARE_FLOOR) {
-      console.error(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v354_${CONTRACT_VIOLATION_UPSTREAM} side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} floor=${FACE_SIDE_SHARE_FLOOR} crop=${crop.x},${crop.y},${crop.size} face=${Math.round(fbW)}x${Math.round(fbH)} anchor=${anchor}`,
-      );
-      return {
-        ok: false,
-        error: `${CONTRACT_VIOLATION_UPSTREAM}:preclip_face_share_too_low:side_share=${(faceSideShare * 100).toFixed(1)}%_area_share=${(faceShareInCrop * 100).toFixed(1)}%_crop${crop.size}px_face${Math.round(fbW)}x${Math.round(fbH)}`,
-        errorClass: "invalid_input",
-      };
-    }
-    // ══════════════════════════════════════════════════════════════════
-    // v353 — NATIVE-SOURCE FLOOR (evidence-based pre-block).
-    // Measured on scene 7c11bc27 (2026-08-01, 4 speakers, identical
-    // pipeline, identical ASD shape):
-    //   crop 181px → 720p (4.0x upscale) → verdict "moved"    ✅
-    //   crop 116px → 720p (6.2x upscale) → verdict passthrough ❌
-    //   crop 102px → 720p (7.1x upscale) → verdict passthrough ❌
-    // Audio length is NOT the discriminator (1.54s worked, 3.86s failed).
-    // Sync.so silently returns the input unchanged once the native crop is
-    // this small. Dispatching anyway burns credits + a provider slot and
-    // ends in the NOOP hard-fail either way, so we block BEFORE dispatch
-    // and ask for a plate with larger faces.
-    const MIN_NATIVE_CROP_PX = 144;
-    if (crop.size < MIN_NATIVE_CROP_PX) {
-      console.error(
-        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v353_native_crop_floor_block crop=${crop.size}px floor=${MIN_NATIVE_CROP_PX}px ` +
-          `face_side_px=${Math.round(fbSide)} upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x — provider returns passthrough below this, not dispatching`,
-      );
-      return {
-        ok: false,
-        error:
-          `${CONTRACT_VIOLATION_UPSTREAM}:plate_face_too_small_for_lipsync:crop=${crop.size}px_min=${MIN_NATIVE_CROP_PX}px_face=${Math.round(fbSide)}px_upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x`,
-        errorClass: "needs_clip_rerender",
-      };
-    }
 
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_face_share_final side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} crop_size=${crop.size} face_side=${Math.round(fbSide)} ratio=${(crop.size / Math.max(1, fbSide)).toFixed(2)} min_size_widened=${minSizeWidened} anchor=${anchor}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v356_geometry_telemetry side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} crop_size=${crop.size} face_side=${Math.round(fbSide)} upscale=${(crop.outputSize / Math.max(1, crop.size)).toFixed(1)}x ratio=${(crop.size / Math.max(1, fbSide)).toFixed(2)} min_size_widened=${minSizeWidened} anchor=${anchor} — no block, verdict decides`,
     );
   }
+
+
 
 
   const t0 = Date.now();
