@@ -628,8 +628,8 @@ serve(async (req) => {
       // mouth band we cropped for the dispatch:
       //   moved   → pass is genuinely animated, continue
       //   static  → provider returned a no-op, feed the NOOP ladder
-      //   unknown → measurement unavailable, fall back to legacy signals
-      //             (a broken probe must never fail a customer render)
+      //   unknown → measurement unavailable; retry/stop cleanly. Never mark
+      //             an unverified pass done or ship a voiceover-only scene.
       const isSingleSpeakerScene = totalPasses === 1;
       const turnStartSec = Number(passBeforeDone?.segments?.[0]?.startTime);
       const turnEndSec = Number(passBeforeDone?.segments?.[0]?.endTime);
@@ -659,7 +659,8 @@ serve(async (req) => {
         inBytes > 0 && outBytes > 0 &&
         sizeRatio >= 0.92 && sizeRatio <= 1.08;
 
-      const noopSuspect = motionStatic || syncOutputUnchanged ||
+      const motionUnverified = motionUnknown;
+      const noopSuspect = motionStatic || motionUnverified || syncOutputUnchanged ||
         syncOutputResolutionRegression || legacyByteNoop;
 
       // Persist the verdict for every pass, pass or fail (Phase 4).
@@ -670,7 +671,11 @@ serve(async (req) => {
           job_id: jobId,
           turn_idx: Number(passBeforeDone?.idx ?? currentPass),
           sync_status: `MOTION_VERDICT_${motion.verdict.toUpperCase()}`,
-          error_class: motionStatic ? "sync_output_motion_static" : null,
+          error_class: motionStatic
+            ? "sync_output_motion_static"
+            : motionUnverified
+              ? "sync_output_motion_unverified"
+              : null,
           motion_verdict: motion.verdict,
           motion_score: motion.score,
           motion_probe_meta: {
@@ -690,6 +695,11 @@ serve(async (req) => {
           `[sync-so-webhook] v344 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → NOOP ladder`,
         );
       }
+      if (motionUnverified) {
+        console.warn(
+          `[sync-so-webhook] v345 scene=${sceneId} pass=${currentPass} MOTION UNVERIFIED (${motion.reason}) → retry/terminal ladder; pass will not be marked done`,
+        );
+      }
       if (legacyByteNoop) {
         console.warn(
           `[sync-so-webhook] v231_n1_motion_gate scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(3)} → NOOP suspect (probe unavailable, legacy fallback)`,
@@ -706,7 +716,11 @@ serve(async (req) => {
         );
       }
       if (noopSuspect) {
-        const noopReason = syncOutputResolutionRegression
+        const noopReason = motionStatic
+          ? "provider_returned_static_output"
+          : motionUnverified
+          ? "motion_probe_unavailable"
+          : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : "sync_output_unchanged";
         await logSyncDispatch(supabase, {
@@ -773,6 +787,8 @@ serve(async (req) => {
         // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
         const noopReasonHard = motionStatic
           ? "provider_returned_static_output"
+          : motionUnverified
+          ? "motion_probe_unavailable"
           : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
@@ -984,6 +1000,8 @@ serve(async (req) => {
         sync_noop_suspect: true,
         noop_reason: motionStatic
           ? "provider_returned_static_output"
+          : motionUnverified
+          ? "motion_probe_unavailable"
           : syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged

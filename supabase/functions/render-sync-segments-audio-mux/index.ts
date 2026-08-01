@@ -196,27 +196,31 @@ serve(async (req) => {
     const passes = Array.isArray((state as any).passes) ? (state as any).passes : [];
 
     // ══════════════════════════════════════════════════════════════════
-    // v344 Phase 1 — MUX GATE. Never composite a scene that contains a
-    // speaker whose provider output was measured as static. The webhook's
-    // NOOP ladder already retried and, once exhausted, failed that pass —
-    // if a proven-static pass still reaches this point (e.g. through a
-    // legacy code path or a manual re-dispatch) we stop here rather than
-    // shipping a video with frozen lips.
+    // v345 — MUX GATE. Every active provider pass needs positive server-side
+    // mouth-motion evidence. `static` and `unknown` both stop normal muxing:
+    // unknown is not evidence of failure, but it is also not permission to
+    // present a voiceover-only scene as successful lip-sync.
     // ══════════════════════════════════════════════════════════════════
     const staticPasses = passes.filter(
       (p: any) => p?.status === "done" && String(p?.motion_verdict ?? "") === "static",
     );
-    if (staticPasses.length > 0 && !forceRemux) {
-      const names = staticPasses
+    const unverifiedPasses = passes.filter(
+      (p: any) => p?.status === "done" && String(p?.motion_verdict ?? "") !== "moved",
+    );
+    if (unverifiedPasses.length > 0 && !forceRemux) {
+      const names = unverifiedPasses
         .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`)
         .join(", ");
-      const gateMsg =
-        `Lip-Sync abgebrochen: Für ${names} hat der Provider ein Video ohne messbare Mundbewegung geliefert. ` +
-        `Die Szene wurde nicht zusammengesetzt, damit kein Video mit eingefrorenen Lippen entsteht.`;
+      const blockedCode = staticPasses.length > 0
+        ? "provider_returned_static_output"
+        : "motion_verdict_unavailable";
+      const gateMsg = staticPasses.length > 0
+        ? `Lip-Sync abgebrochen: Für ${names} hat der Provider ein Video ohne messbare Mundbewegung geliefert. Die Szene wurde nicht zusammengesetzt.`
+        : `Lip-Sync abgebrochen: Die Mundbewegung konnte für ${names} nicht serverseitig bestätigt werden. Die Szene wurde nicht als fertiges Lip-Sync ausgegeben.`;
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: { ...(state as any), status: "failed", error: "provider_returned_static_output" },
+          dialog_shots: { ...(state as any), status: "failed", error: blockedCode },
           lip_sync_status: "failed",
           twoshot_stage: "needs_clip_rerender",
           clip_error: gateMsg,
@@ -224,13 +228,13 @@ serve(async (req) => {
         })
         .eq("id", sceneId);
       console.error(
-        `[render-sync-segments-audio-mux] v344_mux_gate scene=${sceneId} BLOCKED — static passes: ${names}`,
+        `[render-sync-segments-audio-mux] v345_mux_gate scene=${sceneId} BLOCKED code=${blockedCode} speakers=${names}`,
       );
       return json({
         ok: false,
-        blocked: "provider_returned_static_output",
+        blocked: blockedCode,
         scene_id: sceneId,
-        static_speakers: names,
+        affected_speakers: names,
       }, 200);
     }
 
