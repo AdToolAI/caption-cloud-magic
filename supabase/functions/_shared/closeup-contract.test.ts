@@ -106,7 +106,7 @@ Deno.test("preclip keeps its thresholds and names the upstream cause", async () 
   assert(src.includes("MIN_NATIVE_CROP_PX = 144"), "native crop floor must stay at 144px");
   assert(src.includes("FACE_SIDE_SHARE_FLOOR = 0.34"), "side-share floor must stay at 0.34");
   assert(
-    src.includes(CONTRACT_VIOLATION_UPSTREAM),
+    src.includes("CONTRACT_VIOLATION_UPSTREAM"),
     "preclip failures must be reported as an upstream contract violation",
   );
 });
