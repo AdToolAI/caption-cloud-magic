@@ -84,6 +84,11 @@ const ShotSchema = z.object({
   /** v21: when present the output is a square face-crop in source-master
    *  pixel space; overlay positioned/scaled to (x,y,size) with soft mask. */
   crop: CropSchema.optional().nullable(),
+  /** v359: when the preclip was cut with a moving camera path, the paste-back
+   *  rect must follow the identical path. One entry per preclip frame, in
+   *  source-master pixel space. Absent → static `crop` (pre-v359 behaviour). */
+  cropPath: z.array(CropSchema).optional().nullable(),
+
   /** v25 fan-out: when present the output is a FULL-frame Sync.so render
    *  with only this speaker's lips moving; composite via soft circular
    *  mask around (cx,cy) with feathered radius. Spans the full scene. */
