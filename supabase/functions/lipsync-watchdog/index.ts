@@ -23,7 +23,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
-import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
+import {
+  getSyncApiKey,
+  releaseInflightSyncJob,
+  reconcileStaleSyncJobs,
+  sweepOrphanInflightSyncJobs,
+} from "../_shared/syncso-preflight.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
