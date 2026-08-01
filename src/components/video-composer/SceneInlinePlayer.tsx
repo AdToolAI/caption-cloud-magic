@@ -312,14 +312,11 @@ export default function SceneInlinePlayer({
                   !!ds?.sync_job_id ||
                   (Array.isArray(ds?.shots) && ds.shots.some((s: any) => s?.sync_job_id)) ||
                   (Array.isArray(ds?.passes) && ds.passes.some((p: any) => p?.job_id));
-                // v134 — Surface NOOP-Eskalation transparenz: zeigt User, dass die Pipeline
-                // erkannt hat, dass Sync.so eine Pass unverändert zurückgegeben hat, und nun
-                // einen härteren ASD-Modus probiert (bbox-url-pro → coords-pro-box). Sieht
-                // er statt eines stummen Spinners.
+                // v353 — Die NOOP-Retry-Stufen wurden abgeschafft: ein
+                // nachgewiesenes Passthrough ist sofort terminal. Es gibt
+                // daher keinen "NOOP-Retry läuft"-Zustand mehr.
                 const passesArr: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
-                const activeNoopRetry = passesArr.find(
-                  (p: any) => Number(p?.noop_escalation_step ?? 0) > 0 && (p?.status === "pending" || p?.status === "rendering"),
-                );
+
                 const totalPasses = passesArr.length;
                 const donePasses = passesArr.filter((p: any) => p?.status === "done" || p?.status === "failed").length;
                 let title = 'Szene wird gebaut…';
