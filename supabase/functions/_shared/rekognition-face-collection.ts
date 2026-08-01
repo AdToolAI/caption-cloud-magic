@@ -495,6 +495,8 @@ export async function identifyFacesInFrame(params: {
       detectedCount: faces.length,
       resolvedCount: bestByChar.size,
       duplicateCharacterIds: [...duplicates],
+      sourceDims: { width: W, height: H },
+      dimsSource,
       msTotal: Date.now() - t0,
     };
   } finally {
