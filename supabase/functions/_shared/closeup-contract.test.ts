@@ -1,5 +1,5 @@
 /**
- * closeup-contract.test.ts — v355
+ * closeup-contract.test.ts — v356
  *
  * Guards the face-size contract of the lip-sync pipeline:
  *  1. the binding gate is measured in NATIVE PIXELS, not in a ratio,
@@ -7,8 +7,8 @@
  *     (the v354 regression) as long as it carries enough real pixels,
  *  3. ratios survive only as anchor-stage framing guidance,
  *  4. lip-sync scenes are rendered at the highest available resolution,
- *  5. the preclip thresholds remain in place as an ASSERTION that names
- *     the upstream stage.
+ *  5. the preclip carries NO geometric pre-dispatch block (v356) — the
+ *     DB-verified 2026-07-27 baseline passed at 128px / 4.8 % share.
  */
 
 import {
@@ -32,7 +32,7 @@ Deno.test("pixel floor matches the measured provider boundary", () => {
   assertEquals(MIN_FACE_WIDTH_PX, 120);
 });
 
-Deno.test("contract blocks the historical failure geometry (pixels)", () => {
+Deno.test("contract flags the historical failure geometry (advisory)", () => {
   // Scene 7c11bc27: 4 speakers, 74px faces on a 1284px plate.
   const r = assertPlateFaceContract({
     faces: [
@@ -126,15 +126,26 @@ Deno.test("closeup framing suffix is present for every speaker count", () => {
   }
 });
 
-Deno.test("preclip keeps its thresholds and names the upstream cause", async () => {
+Deno.test("v356 — preclip carries NO geometric pre-dispatch block", async () => {
   const src = await Deno.readTextFile(
     new URL("./pass-face-preclip.ts", import.meta.url),
   );
-  assert(src.includes("MIN_NATIVE_CROP_PX = 144"), "native crop floor must stay at 144px");
-  assert(src.includes("FACE_SIDE_SHARE_FLOOR = 0.34"), "side-share floor must stay at 0.34");
-  assert(
-    src.includes("CONTRACT_VIOLATION_UPSTREAM"),
-    "preclip failures must be reported as an upstream contract violation",
-  );
+  // DB-verified baseline (2026-07-27, scene 0f8818ee, status=done):
+  // crop 128px, face-share 4.8 % — both former floors rejected it.
+  assert(!src.includes("MIN_NATIVE_CROP_PX"), "144px crop floor must stay removed");
+  assert(!src.includes("FACE_SIDE_SHARE_FLOOR"), "0.34 side-share floor must stay removed");
+  assert(src.includes("v356_geometry_telemetry"), "geometry must still be measured");
+  assert(src.includes("minSize: 128"), "crop minSize must match the July baseline");
   assert(CONTRACT_VIOLATION_UPSTREAM === "contract_violation_upstream");
+});
+
+Deno.test("v356 — the plate contract is advisory only at the call site", async () => {
+  const src = await Deno.readTextFile(
+    new URL("../compose-dialog-segments/index.ts", import.meta.url),
+  );
+  assert(src.includes("v356_plate_geometry_telemetry"));
+  assert(
+    !src.includes("lipsync_face_contract_violation"),
+    "a scene must not be failed on plate geometry before dispatch",
+  );
 });

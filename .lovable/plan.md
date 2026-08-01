@@ -1,50 +1,53 @@
-## Was gerade passiert ist
+## Der Beweis liegt in der Datenbank — und er widerlegt meine eigene These
 
-Der Vertrag hat funktioniert — er hat nur die falsche Kennzahl gemessen. Aus dem Log der fehlgeschlagenen Szene:
-
-```text
-v354_plate_contract  ok=0  min_ratio=0.058  required=0.160
-                     min_px=74  plate_w=1284  n=4
-v354_plate_contract_BLOCK — refunding 576 credits, no dispatch
-```
-
-Die 576 Credits sind zurückerstattet, es wurde kein Provider-Slot verbrannt. Aber: **ein 4-Personen-Konferenztisch kann 16 % Gesichtsbreite pro Person physisch nicht erreichen.** Vier Gesichter à 16 % wären 64 % der Bildbreite — das ist keine Konferenzszene mehr. Der Vertrag blockiert damit eine Szene, die grundsätzlich nie bestehen kann. Aktuell gibt es für dich keinen Weg vorwärts, und das ist mein Fehler.
-
-## Der eigentliche Denkfehler
-
-Ich habe den Vertrag auf ein **Verhältnis** gebaut. Die Beweislage aus v353 sagt aber, dass der Provider auf **absolute Pixel** reagiert — gemessen an genau dieser Szene `7c11bc27`:
+Ich habe die Szenen vom 27.07. ausgelesen, die sauber durchliefen. Das sind ihre Preclip-Geometrien:
 
 ```text
-Crop 181 px → 720p hochskaliert (4.0×) → Lippen bewegen sich   ✅
-Crop 116 px → 720p hochskaliert (6.2×) → Passthrough           ❌
-Crop 102 px → 720p hochskaliert (7.1×) → Passthrough           ❌
+Szene 0f8818ee (27.07., 4 Sprecher, status=done)
+  Pass 0  crop 128 px → 720p   face-share  4.8 %
+  Pass 1  crop 128 px → 720p   face-share  8.5 %
+  Pass 2  crop 128 px → 720p   face-share 17.4 %
+  Pass 3  crop 128 px → 720p   face-share 12.9 %
+
+Szene c01d339d (27.07., 4 Sprecher, status=done)
+  crop 384 / 339 / 165 / 540 px   share 15–21 %
 ```
 
-Sync.so scheitert nicht, weil das Gesicht einen kleinen Bildanteil hat. Es scheitert, weil im Ausgangsmaterial zu wenige **echte Pixel** auf dem Mund liegen. Das Verhältnis ist nur ein Stellvertreter dafür — und ein schlechter, weil es von der Plate-Auflösung abhängt.
+Das heißt: **am 27.07. lief die Pipeline mit exakt den Werten durch, die heute jeden Lauf blockieren.** 128 px Crop bei 4,8 % Face-Share — heute verlangen wir 144 px Crop, 34 % Side-Share und 120 px Gesichtsbreite auf der Plate. Jede einzelne dieser Julischen Erfolgs-Szenen würde von der aktuellen Pipeline abgelehnt.
 
-Die Plate ist 1284 px breit. Bei 2560 px Breite wären dieselben Gesichter 148 px statt 74 px, der Preclip-Crop läge bei ~230 px statt 116 px — also im nachweislich funktionierenden Bereich, **ohne die Bildkomposition anzufassen**.
+Damit ist meine Pixel-Theorie aus v353/v355 als Blockierkriterium widerlegt. Die 181/116/102-px-Messung von gestern war eine Momentaufnahme einer einzelnen Szene, kein Naturgesetz des Providers. Ich habe daraus eine harte Regel gemacht — und die Regel sperrt jetzt genau die Konfiguration aus, die nachweislich funktioniert hat.
 
-## Plan: Vertrag auf Pixel umstellen, Plates hochauflösend rendern
+## Wie andere Anbieter es lösen
 
-**1. Vertragskennzahl ersetzen (`_shared/lipsync-closeup-contract.ts`)**
-Statt `requiredFaceWidthRatio` gilt `MIN_FACE_WIDTH_PX = 120` (Gesicht) — das ergibt mit der üblichen Crop-Marge den belegten Crop von ≥ 180 px. Unabhängig von Sprecherzahl und Bildkomposition, weil der Provider genau darauf reagiert. Das Verhältnis bleibt nur als weiche Telemetrie im Log.
+Nicht über Geometrie-Vorabprüfungen. Der Industrie-Ansatz ist **outcome-based**: dispatchen, das Ergebnis messen, und nur bei nachgewiesenem Passthrough eingreifen. Geometrische Vorab-Gates sind bei Gruppenszenen strukturell unmöglich sauber zu definieren — genau das erleben wir seit v341.
 
-**2. Plates in Lip-Sync-Szenen hochauflösend rendern (`compose-video-clips`)**
-Sobald eine Szene Dialog hat, wird die Plate mit der höchsten verfügbaren Auflösung des Modells angefordert. Reicht das nicht, wird die fertige Plate vor dem Dispatch per AWS-Lambda auf mindestens 2560 px Breite hochskaliert. Das kostet einmalig Rechenzeit, aber keinen Provider-Slot — und es ist verlustfrei genug, weil der Preclip ohnehin nur einen Ausschnitt braucht.
+## Plan v356 — Zurück auf die belegte Julikonfiguration, Guard nur am Ergebnis
 
-**3. Vertragsprüfung auf die skalierte Plate anwenden (`compose-dialog-segments`)**
-Der Check läuft nach dem Upscale, nicht davor. Blockiert wird nur noch, was auch nach dem Upscale unter 120 px liegt — dann ist das Gesicht wirklich zu klein und ein Re-Render die richtige Antwort.
+**1. Alle geometrischen Vorab-Blocker entfernen**
+- `MIN_NATIVE_CROP_PX = 144` (v353) → entfällt.
+- `FACE_SIDE_SHARE_FLOOR = 0.34` (v344.1) → entfällt.
+- `v355_plate_contract` Pixel-Block in `compose-dialog-segments` → wird von „blockieren" auf „loggen" umgestellt.
+- Der Anchor-Ratio-Check in `compose-video-clips` bleibt als reiner Framing-Hebel ohne Abbruch.
 
-**4. Close-up-Framing bleibt, wird aber wieder weich**
-Das Framing-Suffix aus v354 bleibt als Qualitätshebel im Prompt. Es löst aber keinen harten Abbruch mehr aus, weil es nicht mehr die entscheidende Größe ist.
+Alle vier Werte bleiben als Telemetrie im Log erhalten, damit wir weiter messen können — sie fällen nur keine Entscheidung mehr.
 
-**5. Bestehende Szene entsperren**
-Für `7c11bc27` genügt dann "Clip + Lip-Sync neu rendern": die Plate wird hochauflösend neu erzeugt und läuft durch den neuen Vertrag.
+**2. Crop-Geometrie exakt auf den Julistand zurücksetzen**
+`minSize` zurück auf 128 px, `targetFaceShare` 0.42, `outputSize` 720 — das ist die Konfiguration der nachweislich erfolgreichen Szenen. Kein `minSize: 96`, keine nachträgliche Share-Neuberechnung gegen den expandierten Crop.
 
-## Was das nicht löst
+**3. Einziger verbleibender Guard: der Motion-Verdict nach dem Lauf**
+Der Vergleich Output gegen Input (`mouth-motion-verdict`) bleibt scharf. Liefert Sync.so ein unverändertes Video, wird nicht gemuxt und erstattet. Das ist der Guard, der tatsächlich misst, was der Kunde sieht — statt vorherzusagen, was der Provider können wird.
 
-Wenn nach dem Upscale bei ≥ 200 px Crop **immer noch** Passthrough kommt, liegt es nachweislich am Provider und nicht an unserer Geometrie. Dann ist der nächste Schritt Kling Omni als zweiter Dispatch-Weg (nativ bereits integriert), nicht ein weiterer Geometrie-Fix. Ich sage dir das nach dem ersten Lauf anhand des Logs eindeutig — `crop_px` und `verdict` stehen beide drin.
+**4. Plate-Auflösung: 1080p bleibt, aber freiwillig**
+Höhere Plate-Auflösung schadet nicht und gibt dem Crop mehr Substanz. Sie bleibt aktiv, ist aber an keine Bedingung geknüpft.
 
-## Technische Notiz
+**5. Regressionstest gegen die Julidaten**
+Die Tests in `_shared/closeup-contract.test.ts` und `lipsync-noop-policy.test.ts` werden umgedreht: sie prüfen künftig, dass ein 128-px-Crop mit 4,8 % Share **nicht** blockiert wird — mit den echten Werten aus Szene `0f8818ee` als Fixture. Damit kann kein künftiger Fix diese Klasse erneut aussperren.
 
-Der getrennte Per-Speaker-Close-up-Umbau bleibt bewusst aus dem Plan: `render-sync-segments-audio-mux` arbeitet Overlay-basiert auf **einer** Master-Plate mit Sprecher-Fenstern, nicht mit einer Schnittfolge. Auf Schnitte umzubauen wäre ein Neubau des Mux — und der Upscale-Weg adressiert die belegte Ursache direkt.
+## Was wir dann wissen
+
+Nach dem ersten Lauf mit v356 gibt es genau zwei mögliche Ergebnisse, und beide sind aussagekräftig:
+
+- **Lippen bewegen sich** → die Ursache waren unsere eigenen Gates, nicht der Provider. Fall geschlossen.
+- **Passthrough trotz Julikonfiguration** → dann hat sich zwischen 27.07. und heute etwas beim Provider oder in der Payload geändert. Dann vergleiche ich die Sync.so-Request-Payload einer erfolgreichen Julizeile mit der aktuellen Feld für Feld — nicht die Geometrie.
+
+Ich schlage keine weitere Schwelle vor, bevor dieser Lauf nicht gemessen ist.
