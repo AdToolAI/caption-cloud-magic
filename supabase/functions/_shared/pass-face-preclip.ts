@@ -367,6 +367,9 @@ export async function renderPassFacePreclip(
         frameCount: durationInFrames,
         anchor,
         faceShareInCrop,
+        faceSideShare,
+        faceSidePx,
+        minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
       };
