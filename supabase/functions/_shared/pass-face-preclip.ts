@@ -685,7 +685,12 @@ export async function renderPassFacePreclip(
         minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        cropPath,
+        cropMode,
+        cameraTravelPx,
+        trackContainment,
       };
+
     }
     if (status === "failed") {
       console.log(
