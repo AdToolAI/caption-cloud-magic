@@ -629,8 +629,16 @@ serve(async (req) => {
       const isGreenNet =
         isGreenNetRejection(enrichedError) &&
         String((scene as any)?.clip_source ?? '') === 'ai-happyhorse';
-      const taggedError = (isGreenNet ? '[green_net_rejected] ' : '') +
-        (String(enrichedError ?? '').slice(0, 480) || 'unknown_error');
+      // v369 — distinguish the two rejection channels for the UI copy and mark
+      // whether the automatic prompt repair had already been tried.
+      const rejectionTag = isGreenNet
+        ? (rejectionKind === 'invalid_prompt'
+            ? '[invalid_prompt_rejected] '
+            : '[green_net_rejected] ')
+        : '';
+      const repairTag = alreadyRepaired ? '[prompt_repair_exhausted] ' : '';
+      const taggedError = rejectionTag + repairTag +
+        (String(enrichedError ?? '').slice(0, 440) || 'unknown_error');
 
       await supabase
         .from('composer_scenes')
