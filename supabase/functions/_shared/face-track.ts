@@ -249,6 +249,105 @@ export function interpolateBoxes(params: {
   return out;
 }
 
+/**
+ * v359 — Wählt zusätzliche Stützstellen für die risikobasierte Verdichtung.
+ *
+ * Verdichtet wird nur zwischen Ankerpaaren, zwischen denen das Gesicht weit
+ * gewandert ist. Dort ist die lineare Interpolation unsicher — sie kann durch
+ * eine Position laufen, an der das Gesicht nie war (Richtungswechsel, kurze
+ * Verdeckung). Ruhige Abschnitte kosten keine zusätzlichen Lambda-Stills.
+ */
+export function planDensifyTimestamps(
+  samples: TrackSample[],
+  maxExtra: number = MAX_EXTRA_SAMPLES,
+): number[] {
+  const hits = samples.filter((s) => s.box).sort((a, b) => a.timestamp - b.timestamp);
+  if (hits.length < 2 || maxExtra <= 0) return [];
+
+  const gaps: Array<{ t: number; motion: number }> = [];
+  for (let i = 1; i < hits.length; i++) {
+    const a = hits[i - 1].box as Box;
+    const b = hits[i].box as Box;
+    const [ax, ay] = boxCenter(a);
+    const [bx, by] = boxCenter(b);
+    const motion = Math.hypot(bx - ax, by - ay);
+    const side = Math.max(a[2] - a[0], a[3] - a[1], 1);
+    if (motion / side >= DENSIFY_MOTION_RATIO) {
+      gaps.push({
+        t: Number(((hits[i - 1].timestamp + hits[i].timestamp) / 2).toFixed(3)),
+        motion,
+      });
+    }
+  }
+
+  gaps.sort((a, b) => b.motion - a.motion);
+  const existing = new Set(samples.map((s) => s.timestamp));
+  const out: number[] = [];
+  for (const g of gaps) {
+    if (out.length >= maxExtra) break;
+    if (existing.has(g.t)) continue;
+    out.push(g.t);
+    existing.add(g.t);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/**
+ * v359 — Dichte Per-Frame-Spur für den Kamerapfad.
+ *
+ * Anders als `interpolateBoxes` wird hier NICHT nach Voiced-Windows genullt:
+ * der Kamerapfad braucht auch in Lead-in und Tail Geometrie, sonst springt
+ * der Ausschnitt an den Fenstergrenzen.
+ *
+ * Über zeitliche Lücken, die länger als `maxGapSec` sind, wird bewusst nicht
+ * interpoliert. Bei einer langen Lücke kann sich die Person gedreht haben
+ * oder aus dem Bild gelaufen sein — eine geratene Box führt die Kamera dann
+ * zuverlässig an die falsche Stelle.
+ */
+export function buildDenseTrack(params: {
+  keyframes: Array<{ t: number; box: Box }>;
+  frameCount: number;
+  fps: number;
+  maxGapSec?: number;
+}): Array<Box | null> {
+  const frameCount = Math.max(1, Math.floor(params.frameCount));
+  const fps = params.fps > 0 ? params.fps : 30;
+  const maxGap = params.maxGapSec ?? 1.2;
+  const kf = [...params.keyframes].sort((a, b) => a.t - b.t);
+  const out: Array<Box | null> = new Array(frameCount).fill(null);
+  if (kf.length === 0) return out;
+
+  for (let i = 0; i < frameCount; i++) {
+    const t = i / fps;
+    if (t <= kf[0].t) {
+      out[i] = kf[0].box;
+      continue;
+    }
+    if (t >= kf[kf.length - 1].t) {
+      out[i] = kf[kf.length - 1].box;
+      continue;
+    }
+    let j = 0;
+    while (j < kf.length - 2 && kf[j + 1].t < t) j++;
+    const a = kf[j];
+    const b = kf[j + 1];
+    if (b.t - a.t > maxGap) {
+      out[i] = null;
+      continue;
+    }
+    const span = Math.max(1e-6, b.t - a.t);
+    const f = clamp((t - a.t) / span, 0, 1);
+    out[i] = [
+      a.box[0] + (b.box[0] - a.box[0]) * f,
+      a.box[1] + (b.box[1] - a.box[1]) * f,
+      a.box[2] + (b.box[2] - a.box[2]) * f,
+      a.box[3] + (b.box[3] - a.box[3]) * f,
+    ];
+  }
+  return out;
+}
+
+
 /** True, wenn die Spur sich tatsächlich bewegt (Diagnose / Regressionstest). */
 export function trackMovementPx(boxes: Array<Box | null>): number {
   const pts = boxes.filter((b): b is Box => !!b).map(boxCenter);
