@@ -182,6 +182,9 @@ export async function renderPassFacePreclip(
   let crop0Y: number;
   let anchor: "mouth" | "face_center" | "mouth_from_bbox" = "face_center";
   let faceShareInCrop = 0;
+  let faceSideShare = 0;
+  let faceSidePx = 0;
+  let minSizeWidened = false;
   let mouthOffsetPx = 0;
   let clampedAnchor = false;
 
@@ -207,7 +210,11 @@ export async function renderPassFacePreclip(
       plateWidth: sW,
       plateHeight: sH,
       targetFaceShare: 0.42,
-      minSize: 128,
+      // v344.1 — was 128. A 128px floor around a 41x55px face produced an
+      // area-share of 13.8% and tripped the (area-based) gate that this very
+      // widening had caused. 96 keeps Lambda-safe geometry without inventing
+      // an unreachable share.
+      minSize: 96,
       outputSize: 720,
     });
     crop0X = r.crop.x;
@@ -215,10 +222,13 @@ export async function renderPassFacePreclip(
     crop0Size = r.crop.size;
     anchor = mouthValid ? r.anchor : "mouth_from_bbox";
     faceShareInCrop = r.faceShareInCrop;
+    faceSideShare = r.faceSideShare;
+    faceSidePx = r.faceSidePx;
+    minSizeWidened = r.minSizeWidened;
     mouthOffsetPx = r.mouthOffsetPx;
     clampedAnchor = r.clamped;
     console.log(
-      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v342_mouth_anchor_preclip anchor=${anchor} mouth_source=${mouthValid ? "detector" : "bbox_lower_third"} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v344_mouth_anchor_preclip anchor=${anchor} mouth_source=${mouthValid ? "detector" : "bbox_lower_third"} side_share=${faceSideShare.toFixed(3)} area_share=${faceShareInCrop.toFixed(3)} face_side_px=${faceSidePx} min_size_widened=${minSizeWidened} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
   } else {
     const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
