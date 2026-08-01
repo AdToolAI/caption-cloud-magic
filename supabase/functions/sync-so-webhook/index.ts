@@ -953,7 +953,9 @@ serve(async (req) => {
             noop_escalation_step: noopEscalationStep,
             noop_reason: noopReasonHard,
             ladder_size: NOOP_LADDER.length,
-            canonical_lipsync_pipeline: speakerCount >= 2 ? "v204_preclip_bbox_clipspace" : null,
+            canonical_lipsync_pipeline: freshDonePasses.length >= 2
+              ? "v204_preclip_bbox_clipspace"
+              : null,
             previous_noop_output_url: rehostedUrl ?? outputUrl,
             size_ratio: sizeRatio,
           },
