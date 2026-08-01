@@ -203,14 +203,17 @@ serve(async (req) => {
     //               turn a successful lip-sync into a customer-facing error.
     //               The pass is muxed and flagged `motion_unverified`.
     // ══════════════════════════════════════════════════════════════════
+    // v350 — `passthrough` (output == input inside the mouth band) is proven
+    // provider failure just like `static` and must block the mux too.
+    const BLOCKING_VERDICTS = new Set(["static", "passthrough"]);
     const staticPasses = passes.filter(
-      (p: any) => p?.status === "done" && String(p?.motion_verdict ?? "") === "static",
+      (p: any) => p?.status === "done" && BLOCKING_VERDICTS.has(String(p?.motion_verdict ?? "")),
     );
     const unverifiedPasses = passes.filter(
       (p: any) =>
         p?.status === "done" &&
         String(p?.motion_verdict ?? "") !== "moved" &&
-        String(p?.motion_verdict ?? "") !== "static",
+        !BLOCKING_VERDICTS.has(String(p?.motion_verdict ?? "")),
     );
     if (unverifiedPasses.length > 0) {
       console.warn(
@@ -223,7 +226,11 @@ serve(async (req) => {
       const names = staticPasses
         .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`)
         .join(", ");
-      const blockedCode = "provider_returned_static_output";
+      const blockedCode = staticPasses.some(
+          (p: any) => String(p?.motion_verdict ?? "") === "passthrough",
+        )
+        ? "provider_returned_passthrough_output"
+        : "provider_returned_static_output";
       const gateMsg =
         `Lip-Sync abgebrochen: Für ${names} hat der Provider ein Video ohne messbare Mundbewegung geliefert. Die Szene wurde nicht zusammengesetzt.`;
 
