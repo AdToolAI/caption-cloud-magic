@@ -104,14 +104,12 @@ export interface MouthMotionVerdictResult {
 
 
 /**
- * Runtime secret compatibility. Lovable Cloud exposes the configured
- * credential as REPLICATE_API_KEY; older environments used
- * REPLICATE_API_TOKEN. Keep the alias so existing deployments remain valid.
+ * v347 — the probe no longer touches Replicate at all. Kept as a named export
+ * only so a stale import cannot break a deploy; it always returns null.
+ * @deprecated Frame extraction runs on AWS Remotion Lambda.
  */
-export function resolveReplicateCredential(
-  getEnv: (name: string) => string | undefined = (name) => Deno.env.get(name),
-): string | null {
-  return getEnv("REPLICATE_API_KEY") || getEnv("REPLICATE_API_TOKEN") || null;
+export function resolveReplicateCredential(): null {
+  return null;
 }
 
 /**
@@ -132,13 +130,12 @@ export async function judgeMouthMotion(
   };
 
   try {
-    const token = resolveReplicateCredential();
-    if (!token) {
+    if (!awsFrameProbeAvailable()) {
       return {
         ...base,
         verdict: "unknown",
         score: 0,
-        reason: "motion_probe_unavailable:no_replicate_api_key_or_token",
+        reason: "motion_probe_unavailable:aws_remotion_not_configured",
         latencyMs: Date.now() - t0,
       };
     }
