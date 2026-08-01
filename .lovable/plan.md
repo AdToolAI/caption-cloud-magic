@@ -1,51 +1,45 @@
-## Kurze Antwort: Nein — der Decoder-Fehler ist nicht die Ursache, er ist der Grund, warum wir sie nicht sehen
+## Ehrliche Einordnung
 
-Zwei getrennte Dinge, beide gemessen an Szene `7c11bc27…` (01.08., 4 Sprecher):
+Nein — das ist **nicht** der Lip-Sync-Durchbruch. Es ist ein anderes, klar beweisbares Problem: die Szene wird gar nicht erst zu Sync.so geschickt, weil alle Concurrency-Slots durch Leichen blockiert sind. Das erklärt den aktuellen Hänger („Wartet auf Sync.so-Slot… 4/3"), nicht die Frage, ob die Lippen sich am Ende bewegen. Diese Frage bleibt offen, bis nach dem Fix wieder echte Passes durchlaufen.
 
-**Symptom-Ursache (das eigentliche Problem):** Sync.so gibt den Input praktisch unverändert zurück.
-- Pass 3 (Sarah): Mund-Bereich Input-Preclip = 3.333, Output = 3.343 → identisch.
-- Pass 2 (Matthew): Output 0.46 → praktisch eingefroren, sogar weniger Bewegung als der Input.
-- Die Bewegung, die man in den Outputs überhaupt misst, ist die Kamerabewegung der Platte, nicht der Mund.
+## Befund (in der Datenbank verifiziert)
 
-**Diagnose-Ursache (warum es unbemerkt durchging):** `decodeFrame()` lädt den Bild-Decoder per dynamischem `import(specifier)`. Der Edge-Bundler kann nicht-statische Specifier nicht auflösen → jeder Frame `decoded_0` → jeder Verdict `unknown` → v348 lässt `unknown` bewusst durch → Passthrough-Clips werden als Erfolg gemuxt und abgerechnet.
+Szene `7c11bc27…` (Scene 1):
+- `syncso_dispatch_log`: 14:24–14:25 vier Passes `DISPATCHED` (Jobs `b9fc3bd3`, `00c3885a`, `8b171ca5`, `ee34482f`), um 14:28:49 dann `DEFERRED` / `error_class = rate_limited`.
+- `composer_scenes`: `twoshot_stage = 'deferred'`, `lip_sync_status = 'pending'`, **`dialog_shots` ist NULL** — obwohl vier Jobs laufen.
+- `syncso_inflight_jobs`: 4 aktive Zeilen, `MAX_INFLIGHT = 4` → jeder weitere Dispatch wird abgelehnt.
+- `provider_circuit_state`: `closed` — kein Circuit-Breaker-Problem.
 
-Und noch wichtiger: **selbst mit repariertem Decoder** hätte die aktuelle Metrik das nicht erkannt. Sie misst nur Frame-zu-Frame-Deltas *innerhalb* des Outputs. Eine schwenkende Platte erzeugt Delta > 0 → Verdict wäre `moved` gewesen, obwohl kein Mund bewegt wurde. Genau deshalb hat sich das so lange im Kreis gedreht.
+Ursache: Slots werden ausschließlich vom Webhook freigegeben, und der Webhook findet die Szene nur über `dialog_shots.passes[].job_id`. Mehrere Client-Pfade (`useTwoShotAutoTrigger.ts`, `SceneDialogStudio.tsx`, `useSceneGenerate.ts`) setzen `dialog_shots: null`, während Jobs noch laufen → Webhook loggt `no_scene_match` → Slot bleibt für immer belegt. `reconcileStaleSyncJobs` läuft nur innerhalb eines Dispatch-Versuchs (500 ms Budget, erst ab 6 min Alter); ein periodischer Aufräumer existiert nicht.
 
-Nebenbefund: Das Compositing arbeitet korrekt. Alle drei Sprecher-Patches sitzen im finalen Mux exakt auf ihren Koordinaten (950,153), (676,309), (817,194). Da ist nichts kaputt.
+## Fix
 
-## Plan
+### 1. Sofort-Entsperrung (Daten)
+Die 4 verwaisten Zeilen in `syncso_inflight_jobs` löschen, damit die laufende Produktion sofort weiterläuft.
 
-### 1. Decoder statisch einbinden
-`supabase/functions/_shared/mouth-motion-verdict.ts`:
-- Dynamische Import-Schleife raus, stattdessen ein statischer Top-Level-Import `import { Image } from "npm:imagescript@1.3.0"`.
-- `deno.land/x/imagescript` ersatzlos streichen (Pfad existiert nicht mehr).
-- Decode-Fehler behalten ihre konkrete Ursache (`fetch_404`, `bad_dims`, `sample_failed`) statt Sammel-`decode_failed`.
+### 2. Orphan-Slot-Sweep (`supabase/functions/_shared/syncso-preflight.ts`)
+Neue Funktion `sweepOrphanInflightSyncJobs()`:
+- löscht Zeilen mit abgelaufenem `expires_at`
+- löscht Zeilen älter als 4 min, deren `job_id` nicht mehr in der zugehörigen Szene referenziert ist (Szene fehlt, `dialog_shots` NULL, Job-ID nicht in `passes[]`/`sync_job_id`)
+- best-effort, geloggt als `ORPHAN_SLOT_FREED`
 
-### 2. Neue Metrik: Output **gegen Input** messen
-- Für jeden Pass dieselben Timestamps und dasselbe Mund-Rechteck aus **Input-Preclip** und **Output** ziehen (beide 720×720, identische Geometrie — nachgemessen).
-- Zwei Kennzahlen: `intraOutput` (Frame-zu-Frame im Output, wie bisher) und `outputVsInput` (Output-Frame ↔ Input-Frame am selben Zeitpunkt).
-- Verdicts:
-  - `outputVsInput` unter Schwelle → **`passthrough`** → Pass gilt als fehlgeschlagen,
-  - `intraOutput` unter Schwelle → `static`,
-  - sonst `moved`,
-  - Frame-/Decoder-Ausfall → `unknown`, bleibt reine Telemetrie und blockiert nichts (v348-Regel bleibt gültig).
-- Schwellen kalibriert an den gemessenen Werten dieser Szene (Passthrough-Referenz: Delta ≈ 0.01).
+### 3. Webhook gibt Slots immer frei (`supabase/functions/sync-so-webhook/index.ts`)
+`releaseInflightSyncJob(jobId)` zusätzlich in den Skip-Pfaden `no_scene_match`, `already_applied` und `canceled`.
 
-### 3. Gates nachziehen
-- `sync-so-webhook`: `passthrough` wie `static` behandeln → kein `done`, Retry-Pfad, danach ehrlicher Fehler + Credit-Refund statt stiller Auslieferung.
-- `render-sync-segments-audio-mux`: blockt `static` **und** `passthrough`; `unknown` bleibt durchlässig mit `motion_unverified`-Log.
+### 4. Periodischer Sweep im Watchdog (`supabase/functions/lipsync-watchdog/index.ts`)
+Zu Beginn jedes Laufs (Cron minütlich) `sweepOrphanInflightSyncJobs()` plus `reconcileStaleSyncJobs()` je betroffenem User → Slot-Leaks heilen künftig in ≤ 1 Minute statt erst nach 15 min `expires_at`.
 
-### 4. Provider-Ursache belastbar klären (vor jeder weiteren Payload-Änderung)
-- Die 4 gespeicherten Sync.so-`job_id`s über die Job-API abfragen und die Provider-Antwort (Modell, ASD-Auswertung, erkannte Gesichter, Warnungen) 1:1 ins Pass-Objekt schreiben.
-- Erst wenn dokumentiert ist, *warum* Sync.so nicht animiert (kein aktiver Sprecher in den bounding_boxes, Audio zu kurz, Modell-Fallback …), wird am Payload etwas geändert. Keine spekulativen Geometrie-Tweaks mehr.
-
-### 5. Doku
-`mem/architecture/lipsync/v350-…` anlegen: Decoder statisch, `passthrough`-Verdict, v348-Regel „Messausfall killt keine Szene" bleibt. Index aktualisieren.
+### 5. Client-Resets härten
+`dialog_shots: null` wird nur noch geschrieben, wenn keine aktiven Passes existieren; sonst läuft der Reset über die bestehende Edge-Function `reset-lipsync-scene`, die Jobs canceled, Slots freigibt und Credits erstattet.
 
 ## Technische Details
-- Dateien: `supabase/functions/_shared/mouth-motion-verdict.ts`, `supabase/functions/sync-so-webhook/index.ts`, `supabase/functions/render-sync-segments-audio-mux/index.ts`, neue Memory-Datei.
-- Frame-Extraktion bleibt AWS-only (`_shared/aws-frame-probe.ts`), Replicate bleibt gesperrt.
-- Kein Eingriff in Preclip-Geometrie, Face-Gates oder Identity-Lock in diesem Schritt.
+- Kein Eingriff in Geometrie, Face-Gate, Motion-Probe oder Dispatch-Payload — reine Slot-Buchhaltung.
+- `MAX_INFLIGHT` (4) bleibt unverändert; das Limit war nicht das Problem, die nicht freigegebenen Slots waren es.
+- Deploy: `sync-so-webhook`, `lipsync-watchdog` (plus Shared-Modul).
 
-## Was dieser Plan nicht verspricht
-Er macht das Lip-Sync nicht sofort sichtbar. Er sorgt dafür, dass die Pipeline aufhört, Passthrough-Clips als Erfolg zu verkaufen, und liefert erstmals die Provider-Antwort, die zeigt, warum Sync.so nicht animiert. Das ist die Voraussetzung dafür, dass der nächste Schritt ein echter Fix ist.
+## Verifikation nach Deploy
+```sql
+select count(*) from syncso_inflight_jobs where expires_at > now();
+-- Szene neu dispatchen: erwartet DISPATCHED statt DEFERRED/rate_limited
+```
+Danach messen wir die Motion-Verdicts der vier Passes — erst das beantwortet die Lip-Sync-Frage.

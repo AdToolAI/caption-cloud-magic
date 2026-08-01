@@ -23,6 +23,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { isRealizedScene } from '@/lib/composer/isRealizedScene';
 import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
+import { resetSceneLipSync } from '@/lib/lipsyncReset';
 
 // v94: 8s → 2.5s. Saves up to ~5.5s per stage transition (×3-4 transitions
 // per scene). DB select is filtered by project_id + indexed, load negligible.
@@ -117,6 +118,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               inflight.current.delete(d.id);
               inflight.current.delete(`audio-prep:${d.id}`);
               // Mutate in place so this tick's downstream filters see the reset.
+              const prevShots = d.dialog_shots;
               d.clip_url = null;
               d.clip_status = 'pending';
               d.lip_sync_status = 'pending';
@@ -125,22 +127,19 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               d.twoshot_stage = null;
               d.dialog_shots = null;
               d.replicate_prediction_id = null;
-              return supabase
-                .from('composer_scenes')
-                .update({
-                  clip_url: null,
-                  clip_status: 'pending',
-                  lip_sync_status: 'pending',
-                  lip_sync_source_clip_url: null,
-                  lip_sync_applied_at: null,
-                  twoshot_stage: null,
-                  dialog_shots: null,
-                  replicate_prediction_id: null,
-                  clip_error:
-                    'auto-reset: talking_head_master_invalid_for_cinematic_sync — bitte Clip neu generieren',
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', d.id);
+              // v351 — route through reset-lipsync-scene when passes are live
+              // so Sync.so slots are released instead of leaked.
+              return resetSceneLipSync(d.id, prevShots, {
+                clip_url: null,
+                clip_status: 'pending',
+                lip_sync_status: 'pending',
+                lip_sync_source_clip_url: null,
+                lip_sync_applied_at: null,
+                twoshot_stage: null,
+                replicate_prediction_id: null,
+                clip_error:
+                  'auto-reset: talking_head_master_invalid_for_cinematic_sync — bitte Clip neu generieren',
+              });
             }),
           );
         }
@@ -246,17 +245,14 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
           await Promise.all(
             orphanReruns.map((d) => {
+              const prevShots = d.dialog_shots;
               d.lip_sync_applied_at = null;
               d.dialog_shots = null;
               d.lip_sync_source_clip_url = null;
-              return supabase
-                .from('composer_scenes')
-                .update({
-                  lip_sync_applied_at: null,
-                  dialog_shots: null,
-                  lip_sync_source_clip_url: null,
-                })
-                .eq('id', d.id);
+              return resetSceneLipSync(d.id, prevShots, {
+                lip_sync_applied_at: null,
+                lip_sync_source_clip_url: null,
+              });
             }),
           );
         }

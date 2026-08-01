@@ -13,6 +13,7 @@
  */
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { resetSceneLipSync } from '@/lib/lipsyncReset';
 import { toast } from '@/hooks/use-toast';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
@@ -135,7 +136,6 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
                 lip_sync_with_voiceover: true,
                 lip_sync_status: 'pending',
                 twoshot_stage: 'audio',
-                dialog_shots: null,
                 lip_sync_source_clip_url: null,
               });
               workingScene = {
@@ -153,7 +153,17 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
                 twoshotStage: 'audio',
               });
             }
-            await supabase.from('composer_scenes').update(preMark).eq('id', workingScene.id);
+            if (forceCinematicSync) {
+              // v351 — clear dialog_shots via the safe path so any in-flight
+              // Sync.so job is cancelled and its slot released first.
+              await resetSceneLipSync(
+                workingScene.id,
+                (workingScene as any).dialogShots ?? null,
+                preMark,
+              );
+            } else {
+              await supabase.from('composer_scenes').update(preMark).eq('id', workingScene.id);
+            }
           } catch (preErr) {
             console.warn('[useSceneGenerate] pre-mark failed', preErr);
           }

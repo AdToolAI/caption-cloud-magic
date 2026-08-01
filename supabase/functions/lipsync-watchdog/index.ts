@@ -23,7 +23,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
-import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
+import {
+  getSyncApiKey,
+  releaseInflightSyncJob,
+  reconcileStaleSyncJobs,
+  sweepOrphanInflightSyncJobs,
+} from "../_shared/syncso-preflight.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
@@ -178,6 +183,41 @@ serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceKey);
   const syncApiKey = getSyncApiKey() || null;
+
+  // v351 — Orphan-Slot Sweep. Sync.so slots are freed by the webhook only,
+  // which needs `dialog_shots.passes[].job_id` to attribute a job. Any reset
+  // that nulls dialog_shots while jobs are in flight leaks a slot forever
+  // (observed: 4 inflight rows, MAX_INFLIGHT=4 → every dispatch DEFERRED
+  // with rate_limited). This sweep runs every cron tick, so a leak now heals
+  // in ≤ 1 minute instead of waiting out the 15-min expires_at.
+  let orphanSlotsFreed = 0;
+  try {
+    orphanSlotsFreed = await sweepOrphanInflightSyncJobs(supabase);
+    if (syncApiKey) {
+      const { data: inflightUsers } = await supabase
+        .from("syncso_inflight_jobs")
+        .select("user_id")
+        .not("user_id", "is", null)
+        .limit(100);
+      const userIds = [
+        ...new Set(((inflightUsers ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)),
+      ];
+      for (const uid of userIds) {
+        orphanSlotsFreed += await reconcileStaleSyncJobs(supabase, {
+          userId: uid,
+          syncApiKey,
+          budgetMs: 1_500,
+        });
+      }
+    }
+    if (orphanSlotsFreed > 0) {
+      console.log(`[lipsync-watchdog] v351 slots_freed=${orphanSlotsFreed}`);
+    }
+  } catch (e) {
+    console.warn(`[lipsync-watchdog] v351 sweep crash: ${(e as Error).message}`);
+  }
+
+
 
   // v32: widen the scan. The previous `lip_sync_status IN ('running','audio_muxing')`
   // filter missed scenes that compose-dialog-segments parked at
