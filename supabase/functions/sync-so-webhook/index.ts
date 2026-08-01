@@ -734,9 +734,9 @@ serve(async (req) => {
           `[sync-so-webhook] v344 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → NOOP ladder`,
         );
       }
-      if (motionUnverified) {
+      if (motionUnknown) {
         console.warn(
-          `[sync-so-webhook] v345 scene=${sceneId} pass=${currentPass} MOTION UNVERIFIED (${motion.reason}) → retry/terminal ladder; pass will not be marked done`,
+          `[sync-so-webhook] v347 scene=${sceneId} pass=${currentPass} MOTION UNVERIFIED (${motion.reason}) → telemetry only; provider result is NOT penalised`,
         );
       }
       if (legacyByteNoop) {
