@@ -469,7 +469,7 @@ serve(async (req) => {
       // Get current retry count
       const { data: scene } = await supabase
         .from('composer_scenes')
-        .select('retry_count, clip_source, clip_quality, engine_override')
+        .select('retry_count, clip_source, clip_quality, engine_override, clip_error')
         .eq('id', sceneId)
         .single();
 
