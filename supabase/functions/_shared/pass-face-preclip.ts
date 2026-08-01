@@ -37,6 +37,10 @@ import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
 import { probeMp4Dims } from "./twoshot-face-map.ts";
+// v359 — temporaler Crop: der Preclip-Ausschnitt folgt dem Gesicht.
+import { planCameraPath, buildSpeechWeights } from "./camera-path.ts";
+import { buildDenseTrack } from "./face-track.ts";
+
 // v356 — the closeup contract no longer blocks here; geometry is telemetry.
 
 export interface PassPreclipInput {
@@ -75,7 +79,25 @@ export interface PassPreclipInput {
    *  enforce faceShareInCrop ≥ ~42%. Falls back to the legacy
    *  computeFaceCrop path when unset. */
   mouth?: [number, number] | null;
+  /**
+   * v359 — per-frame face track for this speaker across the turn, in
+   * source-master pixel space (from `_shared/face-track.ts`). When present
+   * the preclip is cut with a MOVING window planned by
+   * `_shared/camera-path.ts` instead of one fixed rectangle.
+   *
+   * This is the fix for the proven Kailee failure: a fixed window shows the
+   * place the face used to be, so a moving speaker walks out of frame,
+   * Sync.so finds no mouth and returns the input unchanged.
+   *
+   * Absent → unchanged pre-v359 static-crop behaviour.
+   */
+  track?: Array<{ t: number; box: [number, number, number, number] }> | null;
+  /** v359 — voiced sub-windows in clip-relative seconds. Frames inside these
+   *  windows are weighted higher when planning zoom and framing: it matters
+   *  far more that the mouth is visible while speaking than during handles. */
+  voicedWindows?: Array<[number, number]> | null;
 }
+
 
 export interface PassPreclipResult {
   ok: boolean;
@@ -102,9 +124,20 @@ export interface PassPreclipResult {
   mouthOffsetPx?: number;
   /** v247 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
+  /** v359 — the moving window actually rendered, one entry per frame in
+   *  source-master pixel space. Must be persisted on the pass so the mux
+   *  pastes the lipsynced crop back along the identical path. */
+  cropPath?: Array<{ x: number; y: number; size: number }>;
+  /** v359 — how the window was planned. Telemetry for the benchmark. */
+  cropMode?: "static" | "camera_path";
+  /** v359 — total camera travel in plate pixels across the turn. */
+  cameraTravelPx?: number;
+  /** v359 — share of frames whose tracked face lies inside the window. */
+  trackContainment?: number;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
+
 
 
 const FPS = 30;
@@ -112,7 +145,7 @@ const FPS = 30;
 // short renders. No cost impact; DB read only.
 const POLL_INTERVAL_MS = 1_000;
 const DEFAULT_POLL_TIMEOUT_MS = 90_000;
-const PRECLIP_PIPELINE_VERSION = "v358-square-space";
+const PRECLIP_PIPELINE_VERSION = "v359-camera-path";
 
 function evenDimension(value: number, fallback: number): number {
   const n = Number(value);
@@ -294,6 +327,88 @@ export async function renderPassFacePreclip(
   const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
 
   // ════════════════════════════════════════════════════════════════════
+  // v359 — MOVING WINDOW (Kamerapfad statt festem Rechteck)
+  //
+  // Bis v358 stand `crop` für den ganzen Turn fest. Bewegt sich die Person
+  // beim Sprechen, zeigt dieses Fenster den Ort, an dem das Gesicht einmal
+  // war — nicht den, an dem der Mund gerade ist. Genau das war der belegte
+  // Kailee-Fall: in der ersten Hälfte des Preclips nur Haare und Schulter,
+  // Sync.so fand keinen Mund und reichte das Video unverändert durch.
+  //
+  // Eine Bounding-Box kann kein Gesicht zurückholen, das der Crop bereits
+  // weggeschnitten hat. Deshalb folgt jetzt das FENSTER dem Gesicht. Der
+  // Zoom bleibt über den Turn konstant, der Pfad ist geglättet, mit
+  // Dead Zone und Look-ahead — es soll wie eine geführte Kamera aussehen,
+  // nicht wie ein zuckender Auto-Crop.
+  //
+  // Ohne Track bleibt alles exakt wie vor v359.
+  // ════════════════════════════════════════════════════════════════════
+  let cropPath: Array<{ x: number; y: number; size: number }> | undefined;
+  let cropMode: "static" | "camera_path" = "static";
+  let cameraTravelPx = 0;
+  let trackContainment: number | undefined;
+
+  const trackKeyframes = Array.isArray(input.track) ? input.track : null;
+  if (trackKeyframes && trackKeyframes.length >= 2) {
+    try {
+      const dense = buildDenseTrack({
+        keyframes: trackKeyframes.map((k) => ({ t: k.t - startSec, box: k.box })),
+        frameCount: durationInFrames,
+        fps: FPS,
+      });
+      const weights = buildSpeechWeights({
+        frameCount: durationInFrames,
+        fps: FPS,
+        voicedWindows: (input.voicedWindows ?? [[0, dur]]) as Array<[number, number]>,
+      });
+      const planned = planCameraPath({
+        boxes: dense,
+        plateWidth: sW,
+        plateHeight: sH,
+        weights,
+        // Zoom nicht enger als das statisch berechnete Fenster: die
+        // bestehende Größenlogik (Mund-Anker, Sibling-Cap, Mindestgröße)
+        // bleibt maßgeblich, v359 ändert nur die POSITION über die Zeit.
+        minSize: crop.size,
+      });
+
+      if (planned.path.length === durationInFrames && planned.moving) {
+        cropPath = planned.path.map((p) => ({ x: p.x, y: p.y, size: p.size }));
+        cropMode = "camera_path";
+        trackContainment = planned.weightedContainedRatio;
+        for (let i = 1; i < planned.path.length; i++) {
+          cameraTravelPx += Math.hypot(
+            planned.path[i].x - planned.path[i - 1].x,
+            planned.path[i].y - planned.path[i - 1].y,
+          );
+        }
+        cameraTravelPx = Math.round(cameraTravelPx);
+        // Das statische Rechteck bleibt als Repräsentant erhalten (erster
+        // Frame) — Altpfade und Telemetrie lesen es weiter.
+        crop.x = planned.path[0].x;
+        crop.y = planned.path[0].y;
+        crop.size = planned.size;
+      }
+
+      console.log(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v359_camera_path mode=${cropMode} ` +
+        `size=${planned.size} moving=${planned.moving} travel_px=${cameraTravelPx} ` +
+        `contained=${planned.containedRatio.toFixed(3)} weighted=${planned.weightedContainedRatio.toFixed(3)} ` +
+        `max_jump=${planned.maxJump.toFixed(3)} gap_frames=${planned.maxGapFrames} ` +
+        `interpolated=${planned.interpolatedFrames}`,
+      );
+    } catch (pathErr) {
+      // Kamerapfad ist eine Verbesserung, keine Vorbedingung: schlägt die
+      // Planung fehl, rendert der Preclip wie vor v359 statisch weiter.
+      console.warn(
+        `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v359_camera_path_failed: ${(pathErr as Error)?.message ?? String(pathErr)}`,
+      );
+    }
+  }
+
+
+
+  // ════════════════════════════════════════════════════════════════════
   // v356 — TELEMETRY ONLY. No geometric pre-dispatch block.
   //
   // Evidence from the working baseline (2026-07-27, DB-verified):
@@ -349,9 +464,16 @@ export async function renderPassFacePreclip(
         pass_idx: passIdx,
         face_crop: { size: crop.size },
         preclip_pipeline_version: PRECLIP_PIPELINE_VERSION,
+        // v359 — ein statisch gerenderter Preclip darf nicht für einen
+        // Kamerapfad-Plan wiederverwendet werden: der Mux würde den Crop
+        // dann entlang eines Pfades zurücklegen, mit dem er nie geschnitten
+        // wurde, und das Gesicht über die Plate schmieren.
+        crop_mode: cropMode,
+        camera_travel_px: cameraTravelPx,
         width: outW,
         height: outH,
       })
+
       .gte("started_at", cutoffIso)
       .order("started_at", { ascending: false })
       .limit(1)
@@ -380,7 +502,12 @@ export async function renderPassFacePreclip(
         minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        cropPath,
+        cropMode,
+        cameraTravelPx,
+        trackContainment,
       };
+
       }
     }
   } catch (reuseErr) {
@@ -403,7 +530,10 @@ export async function renderPassFacePreclip(
     cropX: crop.x,
     cropY: crop.y,
     cropSize: crop.size,
+    // v359 — bewegtes Fenster. Fehlt es, rendert die Komposition statisch.
+    ...(cropPath ? { cropPath } : {}),
   };
+
 
   const { error: insertErr } = await supabase
     .from("video_renders")
@@ -425,7 +555,10 @@ export async function renderPassFacePreclip(
         composer_scene_id: sceneId,
         pass_idx: passIdx,
         face_crop: { x: crop.x, y: crop.y, size: crop.size, outputSize: crop.outputSize },
+        crop_mode: cropMode,
+        camera_travel_px: cameraTravelPx,
         preclip_pipeline_version: PRECLIP_PIPELINE_VERSION,
+
       },
       subtitle_config: {},
     });
@@ -564,7 +697,12 @@ export async function renderPassFacePreclip(
         minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        cropPath,
+        cropMode,
+        cameraTravelPx,
+        trackContainment,
       };
+
     }
     if (status === "failed") {
       console.log(

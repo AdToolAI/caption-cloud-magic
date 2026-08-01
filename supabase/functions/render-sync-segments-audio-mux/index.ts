@@ -619,6 +619,20 @@ serve(async (req) => {
           // v190 — per-shot silent slots removed. Silent-face anchors are
           // now rendered globally (see `globalSilentSlots` on inputProps),
           // so the active overlay only needs to carry its own crop/mask.
+          // v359 — bewegter Ausschnitt. Wurde der Preclip mit Kamerafahrt
+          // geschnitten, MUSS das Zurückkleben demselben Pfad folgen; ein
+          // statisches Rechteck würde das mitgezogene Gesicht über die Plate
+          // schmieren. Ohne Pfad bleibt es exakt beim v358-Verhalten.
+          const rawCropPath = (p as any).preclip_crop_path;
+          const cropPath = Array.isArray(rawCropPath)
+            ? rawCropPath
+                .filter((c: any) =>
+                  Number.isFinite(Number(c?.x)) &&
+                  Number.isFinite(Number(c?.y)) &&
+                  Number(c?.size) > 0
+                )
+                .map((c: any) => ({ x: Number(c.x), y: Number(c.y), size: Number(c.size) }))
+            : [];
           const overlayPayload: Record<string, unknown> = hasPreclipCrop
             ? {
                 crop: {
@@ -626,6 +640,7 @@ serve(async (req) => {
                   y: Number(preclipCrop.y),
                   size: Number(preclipCrop.size),
                 },
+                ...(cropPath.length > 0 ? { cropPath } : {}),
               }
             : {
                 faceMask: {
@@ -634,6 +649,7 @@ serve(async (req) => {
                   radius: radiusForCount,
                 },
               };
+
 
           const mouthMattes = listenerMouthMatteEnabled && isFanout
             ? Array.from(mouthMatteBySpeakerIdx.entries())

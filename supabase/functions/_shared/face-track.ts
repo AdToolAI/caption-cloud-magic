@@ -42,10 +42,28 @@ export const MAX_TRACK_SAMPLES = 6;
 /** Unter dieser Turn-Dauer lohnt Tracking nicht (kaum Bewegung möglich). */
 export const MIN_TRACK_DURATION_SEC = 0.6;
 
+/**
+ * v359 — Zusätzliche Stützstellen für risikobasierte Verdichtung.
+ *
+ * Ein echter dichter Tracker (optischer Fluss, KLT, CSRT) ist im Edge-Runtime
+ * nicht lauffähig: es gibt kein OpenCV, und die Frame-Extraktion läuft per
+ * harter Projektregel (v347) ausschließlich über AWS-Stills mit je einem
+ * Lambda-Roundtrip. Statt gleichmäßig mehr Stills zu ziehen, verdichten wir
+ * gezielt DORT, wo der Track zwischen zwei Ankern stark wandert — dort ist
+ * die Interpolation unsicher und dort schneidet der Crop an.
+ */
+export const MAX_EXTRA_SAMPLES = 4;
+
+/** Ab dieser Wanderung zwischen zwei Ankern (Anteil der Boxseite) wird
+ *  zwischen ihnen nachverdichtet. */
+export const DENSIFY_MOTION_RATIO = 0.6;
+
 export interface TrackSample {
   timestamp: number;
   box: Box | null;
   error?: string;
+  /** v359 — true, wenn dieser Sample aus der Nachverdichtung stammt. */
+  extra?: boolean;
 }
 
 export type FaceTrackSource = "tracked" | "anchor_fallback";
@@ -58,7 +76,14 @@ export interface FaceTrackResult {
   source: FaceTrackSource;
   error: string | null;
   ms: number;
+  /** v359 — Anteil Stützstellen mit erkanntem Gesicht. Telemetrie. */
+  detectionRatio?: number;
+  /** v359 — größte gemessene Wanderung zwischen zwei Ankern, in Pixeln. */
+  peakMotionPx?: number;
+  /** v359 — Anzahl nachverdichteter Stützstellen. */
+  extraSamples?: number;
 }
+
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -224,6 +249,105 @@ export function interpolateBoxes(params: {
   return out;
 }
 
+/**
+ * v359 — Wählt zusätzliche Stützstellen für die risikobasierte Verdichtung.
+ *
+ * Verdichtet wird nur zwischen Ankerpaaren, zwischen denen das Gesicht weit
+ * gewandert ist. Dort ist die lineare Interpolation unsicher — sie kann durch
+ * eine Position laufen, an der das Gesicht nie war (Richtungswechsel, kurze
+ * Verdeckung). Ruhige Abschnitte kosten keine zusätzlichen Lambda-Stills.
+ */
+export function planDensifyTimestamps(
+  samples: TrackSample[],
+  maxExtra: number = MAX_EXTRA_SAMPLES,
+): number[] {
+  const hits = samples.filter((s) => s.box).sort((a, b) => a.timestamp - b.timestamp);
+  if (hits.length < 2 || maxExtra <= 0) return [];
+
+  const gaps: Array<{ t: number; motion: number }> = [];
+  for (let i = 1; i < hits.length; i++) {
+    const a = hits[i - 1].box as Box;
+    const b = hits[i].box as Box;
+    const [ax, ay] = boxCenter(a);
+    const [bx, by] = boxCenter(b);
+    const motion = Math.hypot(bx - ax, by - ay);
+    const side = Math.max(a[2] - a[0], a[3] - a[1], 1);
+    if (motion / side >= DENSIFY_MOTION_RATIO) {
+      gaps.push({
+        t: Number(((hits[i - 1].timestamp + hits[i].timestamp) / 2).toFixed(3)),
+        motion,
+      });
+    }
+  }
+
+  gaps.sort((a, b) => b.motion - a.motion);
+  const existing = new Set(samples.map((s) => s.timestamp));
+  const out: number[] = [];
+  for (const g of gaps) {
+    if (out.length >= maxExtra) break;
+    if (existing.has(g.t)) continue;
+    out.push(g.t);
+    existing.add(g.t);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/**
+ * v359 — Dichte Per-Frame-Spur für den Kamerapfad.
+ *
+ * Anders als `interpolateBoxes` wird hier NICHT nach Voiced-Windows genullt:
+ * der Kamerapfad braucht auch in Lead-in und Tail Geometrie, sonst springt
+ * der Ausschnitt an den Fenstergrenzen.
+ *
+ * Über zeitliche Lücken, die länger als `maxGapSec` sind, wird bewusst nicht
+ * interpoliert. Bei einer langen Lücke kann sich die Person gedreht haben
+ * oder aus dem Bild gelaufen sein — eine geratene Box führt die Kamera dann
+ * zuverlässig an die falsche Stelle.
+ */
+export function buildDenseTrack(params: {
+  keyframes: Array<{ t: number; box: Box }>;
+  frameCount: number;
+  fps: number;
+  maxGapSec?: number;
+}): Array<Box | null> {
+  const frameCount = Math.max(1, Math.floor(params.frameCount));
+  const fps = params.fps > 0 ? params.fps : 30;
+  const maxGap = params.maxGapSec ?? 1.2;
+  const kf = [...params.keyframes].sort((a, b) => a.t - b.t);
+  const out: Array<Box | null> = new Array(frameCount).fill(null);
+  if (kf.length === 0) return out;
+
+  for (let i = 0; i < frameCount; i++) {
+    const t = i / fps;
+    if (t <= kf[0].t) {
+      out[i] = kf[0].box;
+      continue;
+    }
+    if (t >= kf[kf.length - 1].t) {
+      out[i] = kf[kf.length - 1].box;
+      continue;
+    }
+    let j = 0;
+    while (j < kf.length - 2 && kf[j + 1].t < t) j++;
+    const a = kf[j];
+    const b = kf[j + 1];
+    if (b.t - a.t > maxGap) {
+      out[i] = null;
+      continue;
+    }
+    const span = Math.max(1e-6, b.t - a.t);
+    const f = clamp((t - a.t) / span, 0, 1);
+    out[i] = [
+      a.box[0] + (b.box[0] - a.box[0]) * f,
+      a.box[1] + (b.box[1] - a.box[1]) * f,
+      a.box[2] + (b.box[2] - a.box[2]) * f,
+      a.box[3] + (b.box[3] - a.box[3]) * f,
+    ];
+  }
+  return out;
+}
+
+
 /** True, wenn die Spur sich tatsächlich bewegt (Diagnose / Regressionstest). */
 export function trackMovementPx(boxes: Array<Box | null>): number {
   const pts = boxes.filter((b): b is Box => !!b).map(boxCenter);
@@ -277,42 +401,64 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
   const timestamps = sampleTimestamps(req.startSec, req.endSec, req.maxSamples ?? MAX_TRACK_SAMPLES);
   const frameSize = Math.max(req.width, req.height);
 
-  const stills = await Promise.all(
-    timestamps.map(async (timestamp) => {
-      const still = await renderAwsStill({
-        videoUrl: req.videoUrl,
-        timestamp,
-        frameSize,
-        deadline: req.deadline,
-      });
-      return { timestamp, url: still.url, error: still.error };
-    }),
-  );
+  /** Rendert Stills und erkennt darauf Gesichter — Reihenfolge bleibt stabil. */
+  const probe = async (ts: number[], extra: boolean): Promise<TrackSample[]> => {
+    const stills = await Promise.all(
+      ts.map(async (timestamp) => {
+        const still = await renderAwsStill({
+          videoUrl: req.videoUrl,
+          timestamp,
+          frameSize,
+          deadline: req.deadline,
+        });
+        return { timestamp, url: still.url, error: still.error };
+      }),
+    );
 
-  const samples: TrackSample[] = [];
-  let reference: Box = anchor;
-  for (const s of stills) {
-    if (!s.url) {
-      samples.push({ timestamp: s.timestamp, box: null, error: s.error ?? "still_missing" });
-      continue;
+    const out: TrackSample[] = [];
+    for (const s of stills) {
+      if (!s.url) {
+        out.push({ timestamp: s.timestamp, box: null, error: s.error ?? "still_missing", extra });
+        continue;
+      }
+      const det = await detectFacesMediaPipe({
+        videoUrl: req.videoUrl,
+        plateWidth: req.width,
+        plateHeight: req.height,
+        durationSec: dur,
+        prebuiltFrameUrls: [s.url],
+      });
+      const candidates = (det.faces ?? [])
+        .map((f) => f.bbox as Box)
+        .filter((b) => Array.isArray(b) && boxArea(b) > 16);
+      const picked = pickTrackedBox(candidates, reference);
+      if (picked) reference = picked;
+      out.push({
+        timestamp: s.timestamp,
+        box: picked,
+        error: picked ? undefined : (det.error ?? "no_face_in_still"),
+        extra,
+      });
     }
-    const det = await detectFacesMediaPipe({
-      videoUrl: req.videoUrl,
-      plateWidth: req.width,
-      plateHeight: req.height,
-      durationSec: dur,
-      prebuiltFrameUrls: [s.url],
-    });
-    const candidates = (det.faces ?? [])
-      .map((f) => f.bbox as Box)
-      .filter((b) => Array.isArray(b) && boxArea(b) > 16);
-    const picked = pickTrackedBox(candidates, reference);
-    if (picked) reference = picked;
-    samples.push({
-      timestamp: s.timestamp,
-      box: picked,
-      error: picked ? undefined : (det.error ?? "no_face_in_still"),
-    });
+    return out;
+  };
+
+  let reference: Box = anchor;
+  const samples: TrackSample[] = await probe(timestamps, false);
+
+  // ── v359 — Risikobasierte Verdichtung ───────────────────────────────
+  // Nur dort nachmessen, wo die Spur zwischen zwei Ankern weit gewandert
+  // ist. Ruhige Abschnitte kosten keine zusätzlichen Lambda-Stills.
+  let extraSamples = 0;
+  const budgetLeft = req.deadline - Date.now() > 12_000;
+  if (budgetLeft) {
+    const densify = planDensifyTimestamps(samples);
+    if (densify.length > 0) {
+      const more = await probe(densify, true);
+      samples.push(...more);
+      samples.sort((a, b) => a.timestamp - b.timestamp);
+      extraSamples = more.length;
+    }
   }
 
   const hits = samples.filter((s) => s.box);
@@ -323,10 +469,20 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
     box: withContextPadding(s.box as Box, req.width, req.height),
   }));
 
+  let peakMotionPx = 0;
+  for (let i = 1; i < keyframes.length; i++) {
+    const [ax, ay] = boxCenter(keyframes[i - 1].box);
+    const [bx, by] = boxCenter(keyframes[i].box);
+    peakMotionPx = Math.max(peakMotionPx, Math.round(Math.hypot(bx - ax, by - ay)));
+  }
+  const detectionRatio = samples.length > 0 ? hits.length / samples.length : 0;
+
   console.log(
     `[${tag}] ${FACE_TRACK_TAG} samples=${samples.length} hits=${hits.length} ` +
+    `extra=${extraSamples} detection_ratio=${detectionRatio.toFixed(2)} peak_motion_px=${peakMotionPx} ` +
     `span=${req.startSec.toFixed(2)}-${req.endSec.toFixed(2)}s ms=${Date.now() - t0}`,
   );
+
 
   return {
     ok: true,
@@ -335,5 +491,9 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
     source: "tracked",
     error: null,
     ms: Date.now() - t0,
+    detectionRatio,
+    peakMotionPx,
+    extraSamples,
   };
+
 }

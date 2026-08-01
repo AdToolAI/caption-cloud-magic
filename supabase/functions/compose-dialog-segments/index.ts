@@ -5558,6 +5558,51 @@ serve(async (req) => {
       console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
       );
+
+      // ─── v359 — PLATE-TRACK VOR DEM PRECLIP ──────────────────────────
+      // Bis v358 wurde das Gesicht erst NACH dem Preclip verfolgt (v357,
+      // im Clip-Raum) — der Ausschnitt selbst stand da längst fest. Genau
+      // deshalb konnte die belegte Kailee-Szene scheitern: die Spur wusste,
+      // wo der Mund ist, aber der Schnitt hatte ihn schon weggeschnitten.
+      //
+      // Der Track läuft jetzt VORHER auf der Plate, damit das Fenster dem
+      // Gesicht folgen kann. Schlägt er fehl, rendert der Preclip statisch
+      // wie vor v359 — ein fehlender Track darf keine Szene blockieren.
+      let v359PlateTrack:
+        | Array<{ t: number; box: [number, number, number, number] }>
+        | null = null;
+      if (platePassBoxForPreclip) {
+        try {
+          const plateTrack = await trackFaceAcrossTurn({
+            videoUrl: sourceClipUrl,
+            width: plateDims.width,
+            height: plateDims.height,
+            startSec: unionStart,
+            endSec: unionEnd,
+            anchorBox: platePassBoxForPreclip as [number, number, number, number],
+            deadline: Date.now() + 60_000,
+            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1} v359_plate`,
+          });
+          if (plateTrack.ok && plateTrack.keyframes.length >= 2) {
+            v359PlateTrack = plateTrack.keyframes.map((k) => ({
+              t: k.t,
+              box: k.box as [number, number, number, number],
+            }));
+          }
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track ` +
+            `source=${plateTrack.source} keyframes=${plateTrack.keyframes.length} ` +
+            `detection_ratio=${(plateTrack.detectionRatio ?? 0).toFixed(2)} ` +
+            `peak_motion_px=${plateTrack.peakMotionPx ?? 0} extra=${plateTrack.extraSamples ?? 0} ` +
+            `ms=${plateTrack.ms}`,
+          );
+        } catch (trackErr) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track_failed ${(trackErr as Error)?.message ?? String(trackErr)}`,
+          );
+        }
+      }
+
       try {
         const preclipResult = await renderPassFacePreclip(
           supabase,
@@ -5577,9 +5622,17 @@ serve(async (req) => {
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
+            track: v359PlateTrack,
+            // Sprachfenster relativ zum Preclip-Start — Sichtbarkeit während
+            // der tatsächlichen Sprachframes wiegt schwerer als in Handles.
+            voicedWindows: speakerWindowsSecs.map(([s, e]) => [
+              Math.max(0, s - unionStart),
+              Math.max(0, e - unionStart),
+            ]) as Array<[number, number]>,
           },
           300_000,
         );
+
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
           usePassPreclip = true;
@@ -5591,8 +5644,17 @@ serve(async (req) => {
             size: preclipResult.crop.size,
             outputSize: preclipResult.crop.outputSize,
           };
+          // v359 — der bewegte Ausschnitt. Der Mux MUSS den lipsynced Crop
+          // entlang exakt dieses Pfades zurücklegen, sonst schmiert das
+          // Gesicht über die Plate. Fehlt der Pfad, bleibt `preclip_crop`
+          // maßgeblich (statisches Verhalten wie vor v359).
+          (pass as any).preclip_crop_path = preclipResult.cropPath ?? null;
+          (pass as any).preclip_crop_mode = preclipResult.cropMode ?? "static";
+          (pass as any).preclip_camera_travel_px = preclipResult.cameraTravelPx ?? 0;
+          (pass as any).preclip_track_containment = preclipResult.trackContainment ?? null;
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
+
           // v163 — persist the exact Remotion render frame count. Sync.so
           // requires `bounding_boxes_url.bounding_boxes.length` to match the
           // dispatched video frames exactly; duration-derived `round(dur*fps)`
@@ -6207,7 +6269,70 @@ serve(async (req) => {
       const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= v152UpperBound;
       (pass as any)._v152BboxAreaPct = Number(boxAreaPct.toFixed(4));
 
-      if (v147BboxValid && v152BboxSane) {
+      // ════════════════════════════════════════════════════════════════
+      // v359 — DREI HARTE STOPPS VOR DEM KOSTENPFLICHTIGEN DISPATCH
+      //
+      // Bewusst NUR drei. v344–v355 haben gezeigt, wohin weiche
+      // Qualitätsschwellen führen: sie blockieren legitime Szenen, werden
+      // gelockert, und der Passthrough kommt zurück. Diese drei Fälle sind
+      // keine Qualitätsurteile, sondern nachweisbare Widersprüche — in
+      // ihnen KANN der Provider gar nicht arbeiten, ein Dispatch wäre
+      // sicher verlorenes Geld. Alles andere bleibt Telemetrie und wird
+      // weiterhin am Ergebnis entschieden (mouth-motion-verdict).
+      // ════════════════════════════════════════════════════════════════
+      let v359HardStop: string | null = null;
+
+      if (v161UsingPreclipForBbox && v161PreclipCrop) {
+        // (1) Box-Anzahl ≠ Frame-Anzahl des tatsächlich dispatchten Videos.
+        //     Sync.so ordnet Boxen positionsweise zu; bei Versatz zeigt jede
+        //     Box auf den falschen Frame.
+        const decodedFrames = Math.round(Number((pass as any).preclip_frame_count ?? 0));
+        if (decodedFrames > 0 && frameCount !== decodedFrames) {
+          v359HardStop = `bbox_count_mismatch:boxes=${frameCount},frames=${decodedFrames}`;
+        }
+
+        // (2) Box liegt außerhalb des realen Preclip-Pixelraums.
+        if (!v359HardStop && dispatchBox) {
+          const [bx1, by1, bx2, by2] = dispatchBox;
+          const outOfBounds =
+            bx1 < 0 || by1 < 0 ||
+            bx2 > v358DispatchWidth || by2 > v358DispatchHeight ||
+            bx2 <= bx1 || by2 <= by1;
+          if (outOfBounds) {
+            v359HardStop = `bbox_out_of_clip_space:box=${JSON.stringify(dispatchBox)},space=${v358DispatchWidth}x${v358DispatchHeight}`;
+          }
+        }
+
+        // (3) Gesicht im gesamten Sprachkern nie im Ausschnitt. Nicht "zu
+        //     klein", nicht "knapp" — nie. Dann existiert kein Mund, den
+        //     Sync.so animieren könnte, und Passthrough ist garantiert.
+        const containment = (pass as any).preclip_track_containment;
+        if (
+          !v359HardStop &&
+          (pass as any).preclip_crop_mode === "camera_path" &&
+          Number.isFinite(Number(containment)) &&
+          Number(containment) <= 0
+        ) {
+          v359HardStop = "face_never_visible_in_speech_window";
+        }
+      }
+
+      if (v359HardStop) {
+        (pass as any)._v152HardFail = {
+          reason: v359HardStop,
+          errorClass: "v359_predispatch_hard_stop",
+          message:
+            `Die Szene wurde vor dem kostenpflichtigen Lip-Sync-Lauf gestoppt: ${v359HardStop}. ` +
+            `Es wurden keine Credits verbraucht.`,
+        };
+        console.error(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_hard_stop ${v359HardStop} ` +
+          `crop_mode=${(pass as any).preclip_crop_mode ?? "static"} travel_px=${(pass as any).preclip_camera_travel_px ?? 0}`,
+        );
+      }
+
+      if (!v359HardStop && v147BboxValid && v152BboxSane) {
+
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes_url: usedUrl!,
@@ -6216,12 +6341,15 @@ serve(async (req) => {
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
       } else if (
-        retryVariant === "coords-pro-box" ||
-        // v279 — Graceful-Degrade: wenn NUR der Storage-Upload gescheitert ist,
-        // aber Geometrie sane und voiced-frames vorhanden → inline bboxes statt
-        // Hard-Fail/Refund. Entspricht dem in v82 dokumentierten Default-Pfad.
-        (!usedUrl && v152BboxSane && dispatchBox)
+        !v359HardStop && (
+          retryVariant === "coords-pro-box" ||
+          // v279 — Graceful-Degrade: wenn NUR der Storage-Upload gescheitert ist,
+          // aber Geometrie sane und voiced-frames vorhanden → inline bboxes statt
+          // Hard-Fail/Refund. Entspricht dem in v82 dokumentierten Default-Pfad.
+          (!usedUrl && v152BboxSane && dispatchBox)
+        )
       ) {
+
         const boundingBoxes: ([number, number, number, number] | null)[] =
           v124VoicedWindows.length > 0
             ? buildPerFrameBoxes({
@@ -6240,7 +6368,8 @@ serve(async (req) => {
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v279_BBOX_INLINE_FALLBACK reason=${degradeReason} speaker=${pass.speaker_name} box=${JSON.stringify(dispatchBox ?? box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} area_pct=${(boxAreaPct * 100).toFixed(2)}`,
         );
-      } else {
+      } else if (!v359HardStop) {
+
         // v152 — Hard-Fail nur noch für echte Datenprobleme (zero voiced frames
         // oder geometrisch unsinnige Boxen). Upload-Fehler werden oben durch
         // v279 Inline-Fallback abgefangen.
@@ -6255,6 +6384,7 @@ serve(async (req) => {
         (pass as any)._v152HardFail = {
           reason: v152FailReason,
           errorClass: "v152_bbox_hard_fail",
+
           message:
             `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" konnte nicht vorbereitet werden ` +
             `(${v152FailReason}). Bitte Szene neu rendern — Sprecher muss frontal und unverdeckt im Bild sein. ` +

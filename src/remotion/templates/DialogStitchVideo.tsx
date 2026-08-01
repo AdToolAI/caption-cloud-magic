@@ -84,6 +84,11 @@ const ShotSchema = z.object({
   /** v21: when present the output is a square face-crop in source-master
    *  pixel space; overlay positioned/scaled to (x,y,size) with soft mask. */
   crop: CropSchema.optional().nullable(),
+  /** v359: when the preclip was cut with a moving camera path, the paste-back
+   *  rect must follow the identical path. One entry per preclip frame, in
+   *  source-master pixel space. Absent → static `crop` (pre-v359 behaviour). */
+  cropPath: z.array(CropSchema).optional().nullable(),
+
   /** v25 fan-out: when present the output is a FULL-frame Sync.so render
    *  with only this speaker's lips moving; composite via soft circular
    *  mask around (cx,cy) with feathered radius. Spans the full scene. */
@@ -223,6 +228,17 @@ interface CroppedOverlayProps {
   top: number;
   size: number;
   holdToEnd?: boolean;
+  /**
+   * v359 — moving crop. When the preclip was rendered with a camera path,
+   * the region it was cut from moves per frame, so the region it is pasted
+   * back onto must move by exactly the same amount. Pasting a moving crop
+   * at a fixed rect would smear the face across the plate.
+   *
+   * Entries are in COMPOSITION space and indexed by the segment-local frame
+   * (identical indexing to the preclip, which starts at the turn start).
+   * Frames past the end clamp to the last entry.
+   */
+  path?: Array<{ left: number; top: number; size: number }>;
 }
 const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   src,
@@ -232,7 +248,9 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   top,
   size,
   holdToEnd,
+  path,
 }) => {
+
   const frame = useCurrentFrame();
   const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
   const fadeOut = holdToEnd ? 0 : fadeIn;
@@ -251,16 +269,29 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   // over ~half the crop; the master plate underneath dominates the outer
   // 22% and the identity change is invisible.
   const mask = 'radial-gradient(circle at center, #000 0%, #000 30%, rgba(0,0,0,0) 78%)';
+
+  // v359 — the paste-back rect follows the same camera path the preclip was
+  // cut with. Without a path this resolves to the static rect (pre-v359
+  // behaviour, unchanged).
+  const rect = React.useMemo(() => {
+    if (Array.isArray(path) && path.length > 0) {
+      const p = path[Math.min(Math.max(0, frame), path.length - 1)];
+      if (p && Number.isFinite(p.left) && Number.isFinite(p.top) && p.size > 0) return p;
+    }
+    return { left, top, size };
+  }, [path, frame, left, top, size]);
+
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       <div
         style={{
           position: 'absolute',
-          left,
-          top,
-          width: size,
-          height: size,
+          left: rect.left,
+          top: rect.top,
+          width: rect.size,
+          height: rect.size,
           opacity,
+
           WebkitMaskImage: mask,
           maskImage: mask,
           WebkitMaskRepeat: 'no-repeat',
@@ -816,6 +847,14 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
           // edge feathers the slight excess on the off-axis.
           const overlayScale = Math.max(scaleX, scaleY);
           const size = crop.size * overlayScale;
+          // v359 — map the per-frame camera path into composition space.
+          const overlayPath = Array.isArray(shot.cropPath) && shot.cropPath.length > 0
+            ? shot.cropPath.map((p) => ({
+                left: p.x * scaleX,
+                top: p.y * scaleY,
+                size: p.size * overlayScale,
+              }))
+            : undefined;
           return (
             <Sequence
               key={`shot-${idx}-${startFrame}`}
@@ -832,10 +871,12 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 left={left}
                 top={top}
                 size={size}
+                path={overlayPath}
                 holdToEnd={!!shot.holdToEnd}
               />
             </Sequence>
           );
+
         }
 
         return (
