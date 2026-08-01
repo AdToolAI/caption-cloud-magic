@@ -20,7 +20,6 @@
  * produced with cropX/cropY = 0 and cropSize = outputSize.
  */
 
-import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 
 export const AWS_FRAME_PROBE_TAG = "v347-aws-remotion-still";
@@ -114,6 +113,7 @@ export async function renderAwsStill(req: AwsStillRequest): Promise<AwsStillResu
     forceHeight: size,
   };
 
+  const { AwsClient } = await import("npm:aws4fetch@1.0.18");
   const aws = new AwsClient({ accessKeyId, secretAccessKey, sessionToken, region: AWS_REGION });
   const lambdaUrl =
     `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${getLambdaFunctionName()}/invocations`;
