@@ -38,6 +38,8 @@ export interface AwsStillRequest {
   frameSize: number;
   /** Absolute wall-clock deadline for the whole probe. */
   deadline: number;
+  /** v364 — optionale Obergrenze der Kantenlänge (Default AWS_STILL_MAX_EDGE_PX). */
+  maxEdge?: number;
 }
 
 export interface AwsStillResult {
