@@ -36,7 +36,7 @@ import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
-import { CONTRACT_VIOLATION_UPSTREAM } from "./lipsync-closeup-contract.ts";
+// v356 — the closeup contract no longer blocks here; geometry is telemetry.
 
 export interface PassPreclipInput {
   sceneId: string;
@@ -217,12 +217,12 @@ export async function renderPassFacePreclip(
       plateWidth: sW,
       plateHeight: sH,
       targetFaceShare: 0.42,
-      // v344.1 — was 128. A 128px floor around a 41x55px face produced an
-      // area-share of 13.8% and tripped the (area-based) gate that this very
-      // widening had caused. 96 keeps Lambda-safe geometry without inventing
-      // an unreachable share.
-      minSize: 96,
+      // v356 — back to the 2026-07-27 baseline value. The v344.1 change to
+      // 96 was made to satisfy the area-share floor that v356 removes; the
+      // DB-verified working runs all used 128.
+      minSize: 128,
       outputSize: 720,
+
     });
     crop0X = r.crop.x;
     crop0Y = r.crop.y;
