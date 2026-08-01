@@ -718,6 +718,76 @@ export async function releaseInflightSyncJob(
 }
 
 /**
+ * v351 — Orphan-Slot Sweep.
+ *
+ * Slots are only released by the webhook, which resolves a job through
+ * `composer_scenes.dialog_shots.passes[].job_id`. Any reset that nulls
+ * `dialog_shots` while jobs are still in flight orphans those rows: the
+ * webhook logs `no_scene_match`, the slot is never freed and every later
+ * dispatch is deferred with `rate_limited` (observed as "4/3").
+ *
+ * Provider-independent and authoritative:
+ *   1. delete rows past `expires_at`
+ *   2. delete rows older than `minAgeMs` whose `job_id` is no longer
+ *      referenced by their scene (scene gone, `dialog_shots` null, or the
+ *      job id is absent from `passes[]` / `sync_job_id`)
+ *
+ * Returns the number of freed rows.
+ */
+export async function sweepOrphanInflightSyncJobs(
+  supabase: { from: (t: string) => any },
+  opts: { minAgeMs?: number; maxJobs?: number } = {},
+): Promise<number> {
+  const minAgeMs = opts.minAgeMs ?? 4 * 60 * 1000;
+  const maxJobs = opts.maxJobs ?? 50;
+  let freed = 0;
+  try {
+    // (1) hard-expired rows
+    const { data: expired } = await supabase
+      .from("syncso_inflight_jobs")
+      .delete()
+      .lt("expires_at", new Date().toISOString())
+      .select("job_id");
+    freed += Array.isArray(expired) ? expired.length : 0;
+
+    // (2) orphaned rows — nobody references the job any more
+    const cutoff = new Date(Date.now() - minAgeMs).toISOString();
+    const { data: rows } = await supabase
+      .from("syncso_inflight_jobs")
+      .select("job_id, scene_id, started_at")
+      .lt("started_at", cutoff)
+      .limit(maxJobs);
+    for (const r of (rows ?? []) as Array<Record<string, unknown>>) {
+      const jobId = String((r as any).job_id ?? "");
+      const sceneId = (r as any).scene_id ? String((r as any).scene_id) : null;
+      if (!jobId) continue;
+      let referenced = false;
+      if (sceneId) {
+        const { data: scene } = await supabase
+          .from("composer_scenes")
+          .select("dialog_shots")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const ds = (scene as any)?.dialog_shots ?? null;
+        const passes = Array.isArray(ds?.passes) ? ds.passes : [];
+        referenced = ds?.sync_job_id === jobId ||
+          passes.some((p: any) => p?.job_id === jobId);
+      }
+      if (!referenced) {
+        await supabase.from("syncso_inflight_jobs").delete().eq("job_id", jobId);
+        freed++;
+        console.log(
+          `[syncso-preflight] ORPHAN_SLOT_FREED job=${jobId} scene=${sceneId ?? "n/a"}`,
+        );
+      }
+    }
+  } catch (e) {
+    console.warn(`[syncso-preflight] orphan sweep crash: ${(e as Error).message}`);
+  }
+  return freed;
+}
+
+/**
  * v169 Stage A — Stale-Job Reconcile.
  * Sync.so concurrency slots are blocked by jobs that locally already failed
  * but are still "processing" on the provider side. Before a fresh dispatch
