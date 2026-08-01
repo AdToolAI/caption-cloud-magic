@@ -409,15 +409,18 @@ export function planCameraPath(input: CameraPathInput): CameraPathResult {
   let velY = 0;
 
   for (let i = 0; i < n; i++) {
-    let targetX = cx[i];
-    let targetY = cy[i];
+    // ── Dead Zone ──────────────────────────────────────────────────
+    // Nicht "Ziel ≈ aktuelle Position → gar nicht bewegen": das würde bei
+    // gleichmäßiger Bewegung JEDE Nachführung blockieren, weil der Zuwachs
+    // pro Frame immer klein ist. Stattdessen darf der Fehler bis zur
+    // Zonengröße anwachsen; darüber hinaus folgt die Kamera und hält den
+    // Fehler an der Zonengrenze. Mikrobewegungen bleiben folgenlos,
+    // echte Bewegung wird sauber verfolgt.
+    const errX = cx[i] - prevX;
+    const errY = cy[i] - prevY;
+    let wantVelX = Math.abs(errX) <= deadX ? 0 : errX - Math.sign(errX) * deadX;
+    let wantVelY = Math.abs(errY) <= deadY ? 0 : errY - Math.sign(errY) * deadY;
 
-    // Dead Zone: Mikrobewegungen werden nicht nachgeführt.
-    if (Math.abs(targetX - prevX) < deadX * 0.5) targetX = prevX;
-    if (Math.abs(targetY - prevY) < deadY * 0.5) targetY = prevY;
-
-    let wantVelX = targetX - prevX;
-    let wantVelY = targetY - prevY;
 
     // Beschleunigung begrenzen, dann Geschwindigkeit begrenzen.
     wantVelX = clamp(wantVelX, velX - maxAccel, velX + maxAccel);
