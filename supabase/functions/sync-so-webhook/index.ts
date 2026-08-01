@@ -1107,6 +1107,7 @@ serve(async (req) => {
         motion_output_vs_input: motion.outputVsInput ?? null,
         motion_verdict_at: nowIso,
         motion_verdict_reason: motion.reason,
+        ...(providerJob ? { provider_job: providerJob } : {}),
       };
       if (freshDonePasses[currentPass]) {
         // v347 — a pass reaches `done` unless the mouth motion was *proven*
