@@ -6341,12 +6341,15 @@ serve(async (req) => {
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
       } else if (
-        retryVariant === "coords-pro-box" ||
-        // v279 — Graceful-Degrade: wenn NUR der Storage-Upload gescheitert ist,
-        // aber Geometrie sane und voiced-frames vorhanden → inline bboxes statt
-        // Hard-Fail/Refund. Entspricht dem in v82 dokumentierten Default-Pfad.
-        (!usedUrl && v152BboxSane && dispatchBox)
+        !v359HardStop && (
+          retryVariant === "coords-pro-box" ||
+          // v279 — Graceful-Degrade: wenn NUR der Storage-Upload gescheitert ist,
+          // aber Geometrie sane und voiced-frames vorhanden → inline bboxes statt
+          // Hard-Fail/Refund. Entspricht dem in v82 dokumentierten Default-Pfad.
+          (!usedUrl && v152BboxSane && dispatchBox)
+        )
       ) {
+
         const boundingBoxes: ([number, number, number, number] | null)[] =
           v124VoicedWindows.length > 0
             ? buildPerFrameBoxes({
