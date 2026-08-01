@@ -20,7 +20,7 @@ Deno.test("v357: große Gesichter → Gruppenshot, kein Extra-Aufwand", () => {
 
 Deno.test("v357: grenzwertige Gesichter → Punch-in mit sinnvollem Zoomfaktor", () => {
   const d = decideDialogMode({
-    faces: [face(0, 100), face(400, 130)],
+    faces: [face(0, 130), face(400, 160)],
     plateWidth: 1920, plateHeight: 1080, nativePlateWidth: 1920, expectedSpeakers: 2,
   });
   assertEquals(d.mode, "punch_in");
