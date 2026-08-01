@@ -4778,15 +4778,18 @@ serve(async (req) => {
     // Variant (bbox-url-pro → coords-pro-box). Wenn ein Preclip existiert,
     // greift jedoch Rule 0 (v131.2 auto_detect_unconditional_on_preclip) und
     // kollabiert den Dispatch wieder auf `auto_detect` — die exakt selbe
-    // ASD-Shape, die gerade NOOP'd hat. Resultat: 2 identische Dispatches,
-    // Ladder erschöpft, Hard-Fail.
+    // ASD-Shape, die gerade NOOP'd hat.
     //
-    // Fix: Bei einer NOOP-Eskalation mit deterministischem Variant droppen
-    // wir den per-Pass Preclip lokal (analog v120), damit der Full-Plate
-    // bbox-url-pro / coords-pro-box Pfad greift. Rule 0 wird so für genau
-    // diesen eskalierten Pass übergangen, nicht generell.
+    // v346 — HARTE EINSCHRÄNKUNG AUF N=1.
+    // Bei N≥2 blockiert das v204-Gate wenige Zeilen weiter unten JEDEN
+    // Full-Plate-Dispatch (`v204_preclip_required`). Der alte Bypass hat den
+    // Preclip also genau dann verworfen, wenn er zwingend gebraucht wird —
+    // die Pipeline erzeugte einen Retry, den ihr eigenes nächstes Gate
+    // garantiert ablehnt (Scene 7c11bc27, 01.08.2026). Multi-Speaker-Retries
+    // bleiben deshalb im v204/v169-konformen Preclip-Pfad.
     const v148NoopBypassEligible =
       body?.noop_auto_escalation === true &&
+      speakers.length < 2 &&
       (requestedRetryVariant === "bbox-url-pro" || requestedRetryVariant === "coords-pro-box") &&
       !!(pass as any).preclip_url;
     if (v148NoopBypassEligible) {
@@ -4794,9 +4797,18 @@ serve(async (req) => {
       (pass as any).preclip_render_id = null;
       (pass as any).preclip_crop = null;
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v148_noop_bypass_preclip step=${body?.noop_escalation_step ?? "?"} variant=${requestedRetryVariant} speaker=${pass.speaker_name ?? "?"} — dropping preclip to allow full-plate deterministic ASD`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v148_noop_bypass_preclip step=${body?.noop_escalation_step ?? "?"} variant=${requestedRetryVariant} speaker=${pass.speaker_name ?? "?"} — dropping preclip to allow full-plate deterministic ASD (N=1 only)`,
+      );
+    } else if (
+      body?.noop_auto_escalation === true &&
+      speakers.length >= 2 &&
+      !!(pass as any).preclip_url
+    ) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v346_preclip_retained_on_retry speakers=${speakers.length} variant=${requestedRetryVariant} — v148 full-plate bypass disabled for multi-speaker (v204 would block it)`,
       );
     }
+
 
     // ── v153.1 — Single-Path bbox-url-pro Pipeline (N=1..4 einheitlich) ──
     // PRECLIP IS DEAD. Es gibt nur noch einen einzigen Dispatch-Pfad:
