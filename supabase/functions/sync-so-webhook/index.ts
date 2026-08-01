@@ -685,10 +685,13 @@ serve(async (req) => {
         }
       }
 
-      const motionStatic = motion.verdict === "static";
+      // v350 — `passthrough` is *measured* provider failure, exactly like
+      // `static`: the output equals the input inside the mouth band.
+      const motionPassthrough = motion.verdict === "passthrough";
+      const motionStatic = motion.verdict === "static" || motionPassthrough;
       const motionUnknown = motion.verdict === "unknown";
       console.log(
-        `[sync-so-webhook] v344_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
+        `[sync-so-webhook] v350_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} outVsIn=${motion.outputVsInput ?? "n/a"} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
       );
 
 
