@@ -5558,6 +5558,51 @@ serve(async (req) => {
       console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
       );
+
+      // ─── v359 — PLATE-TRACK VOR DEM PRECLIP ──────────────────────────
+      // Bis v358 wurde das Gesicht erst NACH dem Preclip verfolgt (v357,
+      // im Clip-Raum) — der Ausschnitt selbst stand da längst fest. Genau
+      // deshalb konnte die belegte Kailee-Szene scheitern: die Spur wusste,
+      // wo der Mund ist, aber der Schnitt hatte ihn schon weggeschnitten.
+      //
+      // Der Track läuft jetzt VORHER auf der Plate, damit das Fenster dem
+      // Gesicht folgen kann. Schlägt er fehl, rendert der Preclip statisch
+      // wie vor v359 — ein fehlender Track darf keine Szene blockieren.
+      let v359PlateTrack:
+        | Array<{ t: number; box: [number, number, number, number] }>
+        | null = null;
+      if (platePassBoxForPreclip) {
+        try {
+          const plateTrack = await trackFaceAcrossTurn({
+            videoUrl: sourceClipUrl,
+            width: plateDims.width,
+            height: plateDims.height,
+            startSec: unionStart,
+            endSec: unionEnd,
+            anchorBox: platePassBoxForPreclip as [number, number, number, number],
+            deadline: Date.now() + 60_000,
+            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1} v359_plate`,
+          });
+          if (plateTrack.ok && plateTrack.keyframes.length >= 2) {
+            v359PlateTrack = plateTrack.keyframes.map((k) => ({
+              t: k.t,
+              box: k.box as [number, number, number, number],
+            }));
+          }
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track ` +
+            `source=${plateTrack.source} keyframes=${plateTrack.keyframes.length} ` +
+            `detection_ratio=${(plateTrack.detectionRatio ?? 0).toFixed(2)} ` +
+            `peak_motion_px=${plateTrack.peakMotionPx ?? 0} extra=${plateTrack.extraSamples ?? 0} ` +
+            `ms=${plateTrack.ms}`,
+          );
+        } catch (trackErr) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track_failed ${(trackErr as Error)?.message ?? String(trackErr)}`,
+          );
+        }
+      }
+
       try {
         const preclipResult = await renderPassFacePreclip(
           supabase,
@@ -5577,9 +5622,17 @@ serve(async (req) => {
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
+            track: v359PlateTrack,
+            // Sprachfenster relativ zum Preclip-Start — Sichtbarkeit während
+            // der tatsächlichen Sprachframes wiegt schwerer als in Handles.
+            voicedWindows: speakerWindowsSecs.map(([s, e]) => [
+              Math.max(0, s - unionStart),
+              Math.max(0, e - unionStart),
+            ]) as Array<[number, number]>,
           },
           300_000,
         );
+
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
           usePassPreclip = true;
