@@ -12,6 +12,10 @@
  *   3. Clamps to plate bounds without ever cutting the mouth off — if the
  *      requested crop cannot fit while keeping the mouth inside, the crop
  *      shrinks and re-centers on the mouth.
+ *
+ * Mirror of supabase/functions/_shared/compute-mouth-centered-crop.ts —
+ * keep both files in sync (v360: anchor repair + head containment).
+ */
 export interface FaceGeometry {
   bbox: [number, number, number, number];
   center: [number, number];
