@@ -120,9 +120,20 @@ export interface PassPreclipResult {
   mouthOffsetPx?: number;
   /** v247 — true when clamping forced the crop off the ideal anchor. */
   clamped?: boolean;
+  /** v359 — the moving window actually rendered, one entry per frame in
+   *  source-master pixel space. Must be persisted on the pass so the mux
+   *  pastes the lipsynced crop back along the identical path. */
+  cropPath?: Array<{ x: number; y: number; size: number }>;
+  /** v359 — how the window was planned. Telemetry for the benchmark. */
+  cropMode?: "static" | "camera_path";
+  /** v359 — total camera travel in plate pixels across the turn. */
+  cameraTravelPx?: number;
+  /** v359 — share of frames whose tracked face lies inside the window. */
+  trackContainment?: number;
   error?: string;
   errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
 }
+
 
 
 const FPS = 30;
