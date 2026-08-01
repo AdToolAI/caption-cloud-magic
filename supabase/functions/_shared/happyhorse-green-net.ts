@@ -356,10 +356,36 @@ export function hardSanitizeForHappyHorse(input: string): GreenNetSanitizeResult
 
 
 /**
- * Classify a Replicate / provider error message as a Green-Net rejection.
- * Used by webhooks and error handlers to trigger refund + auto-fallback.
+ * v369 — Provider prompt-rejection classification.
+ *
+ * HappyHorse rejects prompts through two distinct channels:
+ *  - Green Net (CAC content filter): `DataInspectionFailed - Green net check
+ *    failed for text (input)`
+ *  - Parameter validation: `InvalidParameter - Could not process with this
+ *    prompt.` (arrives wrapped in "Happy Horse I2V failed: …")
+ *
+ * Both mean "the prompt as sent is not acceptable" — never retry unchanged.
+ */
+export type ProviderRejectionKind = "none" | "greennet" | "invalid_prompt";
+
+export function classifyProviderRejection(err: unknown): ProviderRejectionKind {
+  const msg = typeof err === "string" ? err : (err as any)?.message ?? String(err ?? "");
+  if (!msg) return "none";
+  if (/DataInspectionFailed|Green\s?net|inappropriate content|content policy|risk control/i.test(msg)) {
+    return "greennet";
+  }
+  if (/InvalidParameter|Could not process with this prompt|invalid\s*prompt/i.test(msg)) {
+    return "invalid_prompt";
+  }
+  return "none";
+}
+
+/**
+ * Classify a Replicate / provider error message as a prompt rejection
+ * (Green-Net or InvalidParameter). Used by webhooks and error handlers to
+ * trigger prompt repair, refund and UI tagging.
  */
 export function isGreenNetRejection(err: unknown): boolean {
-  const msg = typeof err === "string" ? err : (err as any)?.message ?? String(err ?? "");
-  return /DataInspectionFailed|Green\s?net|inappropriate content/i.test(msg);
+  return classifyProviderRejection(err) !== "none";
 }
+
