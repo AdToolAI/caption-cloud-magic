@@ -502,7 +502,12 @@ export async function renderPassFacePreclip(
         minSizeWidened,
         mouthOffsetPx,
         clamped: clampedAnchor,
+        cropPath,
+        cropMode,
+        cameraTravelPx,
+        trackContainment,
       };
+
       }
     }
   } catch (reuseErr) {
