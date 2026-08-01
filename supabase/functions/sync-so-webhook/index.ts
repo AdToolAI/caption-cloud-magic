@@ -848,39 +848,27 @@ serve(async (req) => {
 
 
 
-      // v134 — Deterministic NOOP escalation ladder (sync-3 only, per
-      // v129.29 directive). Replaces v129.26's single-shot escalation
-      // to `coords-pro` (which dispatched IDENTICAL input and produced
-      // the same NOOP). The ladder varies the ASD-shape — the only
-      // input axis Sync.so actually responds to — and hard-fails after
-      // step 2 instead of silently muxing a NOOP output (which made
-      // Speaker 2 in 4-speaker scenes appear frozen).
+      // ══════════════════════════════════════════════════════════════════
+      // v353 — NOOP-LADDER ABGESCHAFFT.
+      // Die Ladder hat nur die ASD-Form gewechselt (bbox-url-pro →
+      // coords-pro-box), NICHT die Eingangsbedingung. Messung Szene
+      // 7c11bc27 (01.08.2026): identischer Input → identisches Passthrough
+      // (outVsIn 2.26 → 2.64, Schwelle 3.0), danach Hard-Fail. Der Retry
+      // hat also nur Slot + Zeit + Credits verbrannt.
       //
-      // Step 0 (1st NOOP)  → variant `bbox-url-pro`   (per-frame bounding_boxes_url, sync-3 conform)
-      // Step 1 (2nd NOOP)  → variant `coords-pro-box` (bounding-box ASD on plate coords)
-      // Step 2 (3rd NOOP)  → HARD FAIL + idempotent refund + `needs_clip_rerender`
-      //
-      // All three steps stay on `sync-3`. No model swap. ASD is rebuilt
-      // by compose-dialog-segments' v130 buildAsdStrategy() based on the
-      // new retry_variant — single source of truth.
+      // Ein Retry ist ab jetzt nur zulässig, wenn die EINGANGSBEDINGUNG
+      // messbar besser wird (größerer nativer Crop, längeres Audiofenster).
+      // Das passiert vor dem Dispatch in `_shared/pass-face-preclip.ts`
+      // (v353 native-crop floor). Auf Webhook-Ebene ist ein bewiesener
+      // NOOP/Passthrough daher terminal.
       const noopEscalationStep = Number(passBeforeDone?.noop_escalation_step ?? 0);
-      const havePlateCoords = Array.isArray(passBeforeDone?.coords) &&
-        passBeforeDone.coords.length === 2;
-      const havePreclipCrop = !!passBeforeDone?.preclip_crop &&
-        Number.isFinite(Number(passBeforeDone.preclip_crop.size));
       const passSpeakerName = String(passBeforeDone?.speaker_name ?? "Speaker");
       const passTurnIdx = Number(passBeforeDone?.idx ?? currentPass);
 
-      // v150 — Step 0 (bbox-url-pro) entfernt: ist nach v147+v150-B bereits
-      // PRIMARY auf Fresh-Dispatch für Multi-Speaker. Ein erneuter Retry mit
-      // derselben Variante produziert garantiert dasselbe Ergebnis. Nur noch
-      // 1 echte Eskalations-Stufe (coords-pro-box), danach Hard-Fail.
-      const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [
-        { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
-      ];
-      const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
-      const canEscalate = noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
-        Number.isFinite(Number(passBeforeDone?.reference_frame_number));
+      const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [];
+      const nextRung: { step: number; variant: string; label: string } | undefined = undefined;
+      const canEscalate = false as boolean;
+
 
       if (noopSuspect && !canEscalate) {
         // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
