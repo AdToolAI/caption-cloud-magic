@@ -37,12 +37,26 @@
  */
 
 import { awsFrameProbeAvailable, renderAwsStill } from "./aws-frame-probe.ts";
+// v350 — STATIC import. The previous dynamic `import(specifier)` loop could
+// never be resolved by the Supabase edge bundler (non-static specifier), so
+// every frame failed with `decode_failed: Module not found` and every verdict
+// degraded to `unknown`. Never make this import dynamic again.
+import { Image } from "npm:imagescript@1.3.0";
 
-const MODEL_TAG = "v347-mouth-motion-verdict-aws";
+const MODEL_TAG = "v350-mouth-motion-verdict-aws";
 
 
 /** Mean |ΔY| (0..255) inside the mouth band required to call a pass "moved". */
 export const MOVED_MIN_SCORE = 1.6;
+
+/**
+ * v350 — Passthrough detection.
+ * If the provider output differs from its own INPUT preclip by no more than
+ * this (mean |ΔY| in the mouth band, at every sampled timestamp), the provider
+ * returned the input essentially unchanged — measured re-encode noise on a
+ * proven passthrough was 1.1–2.1, genuine lip-sync moves far beyond this.
+ */
+export const PASSTHROUGH_MAX_SCORE = 3.0;
 
 /** Sample grid the mouth band is resampled to before differencing. */
 const GRID_W = 48;
