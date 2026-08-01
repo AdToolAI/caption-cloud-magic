@@ -21,9 +21,15 @@
 
  *
  * The only stable multi-speaker pattern is the one v4 used: one Sync.so
- * call per speaker, each with single-coord ASD pointing at THAT speaker's
- * face. We chain them: pass N's video input = pass N-1's output. The final
- * pass's output has every speaker correctly lip-synced.
+ * call per speaker, each with single-face ASD pointing at THAT speaker.
+ * v357 — KORREKTUR EINES VERALTETEN KOMMENTARS: Die Passes sind NICHT
+ * verkettet. Jeder Pass nutzt das UNVERÄNDERTE Original-Plate als Input
+ * (`passInputUrl = sourceClipUrl`), und bis zu `concurrencyCap` Passes
+ * laufen parallel (v193 fan-out). Es gibt keine Generationen-Akkumulation.
+ * Die lipgesyncten Crops werden anschließend an ihrer absoluten
+ * Original-Zeitposition zurück auf die Master-Plate gelegt (Overlay,
+ * kein Concat).
+
  *
  * State model (dialog_shots, multi-pass):
  *  {
