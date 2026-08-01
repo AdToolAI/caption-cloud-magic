@@ -245,17 +245,14 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
           await Promise.all(
             orphanReruns.map((d) => {
+              const prevShots = d.dialog_shots;
               d.lip_sync_applied_at = null;
               d.dialog_shots = null;
               d.lip_sync_source_clip_url = null;
-              return supabase
-                .from('composer_scenes')
-                .update({
-                  lip_sync_applied_at: null,
-                  dialog_shots: null,
-                  lip_sync_source_clip_url: null,
-                })
-                .eq('id', d.id);
+              return resetSceneLipSync(d.id, prevShots, {
+                lip_sync_applied_at: null,
+                lip_sync_source_clip_url: null,
+              });
             }),
           );
         }
