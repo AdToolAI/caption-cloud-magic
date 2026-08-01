@@ -262,6 +262,8 @@ serve(async (req) => {
   const failed: Array<{ scene_id: string; reason: string }> = [];
   const polled: Array<{ scene_id: string; job_id: string; status: string }> = [];
   const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
+  // v361 — Szenen, deren Dispatch bewusst unterdrückt wurde (Terminal-Guard).
+  const skipped: Array<{ scene_id: string; reason: string }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
     // v128 Phase B3 — wrap every mutation on this scene in the per-scene
