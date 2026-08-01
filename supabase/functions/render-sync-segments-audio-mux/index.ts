@@ -196,27 +196,37 @@ serve(async (req) => {
     const passes = Array.isArray((state as any).passes) ? (state as any).passes : [];
 
     // ══════════════════════════════════════════════════════════════════
-    // v345 — MUX GATE. Every active provider pass needs positive server-side
-    // mouth-motion evidence. `static` and `unknown` both stop normal muxing:
-    // unknown is not evidence of failure, but it is also not permission to
-    // present a voiceover-only scene as successful lip-sync.
+    // v348 — MUX GATE. Only *measured* failure blocks the mux.
+    //   `static`  → the provider really returned a motionless mouth: block.
+    //   `unknown` → OUR measurement was unavailable (AWS still probe outage).
+    //               That is not evidence against the provider and must never
+    //               turn a successful lip-sync into a customer-facing error.
+    //               The pass is muxed and flagged `motion_unverified`.
     // ══════════════════════════════════════════════════════════════════
     const staticPasses = passes.filter(
       (p: any) => p?.status === "done" && String(p?.motion_verdict ?? "") === "static",
     );
     const unverifiedPasses = passes.filter(
-      (p: any) => p?.status === "done" && String(p?.motion_verdict ?? "") !== "moved",
+      (p: any) =>
+        p?.status === "done" &&
+        String(p?.motion_verdict ?? "") !== "moved" &&
+        String(p?.motion_verdict ?? "") !== "static",
     );
-    if (unverifiedPasses.length > 0 && !forceRemux) {
-      const names = unverifiedPasses
+    if (unverifiedPasses.length > 0) {
+      console.warn(
+        `[render-sync-segments-audio-mux] v348 scene=${sceneId} motion_unverified passes=${
+          unverifiedPasses.map((p: any) => p?.speaker_name ?? p?.speaker_idx).join(",")
+        } → muxing anyway (measurement outage, provider not penalised)`,
+      );
+    }
+    if (staticPasses.length > 0 && !forceRemux) {
+      const names = staticPasses
         .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`)
         .join(", ");
-      const blockedCode = staticPasses.length > 0
-        ? "provider_returned_static_output"
-        : "motion_verdict_unavailable";
-      const gateMsg = staticPasses.length > 0
-        ? `Lip-Sync abgebrochen: Für ${names} hat der Provider ein Video ohne messbare Mundbewegung geliefert. Die Szene wurde nicht zusammengesetzt.`
-        : `Lip-Sync abgebrochen: Die Mundbewegung konnte für ${names} nicht serverseitig bestätigt werden. Die Szene wurde nicht als fertiges Lip-Sync ausgegeben.`;
+      const blockedCode = "provider_returned_static_output";
+      const gateMsg =
+        `Lip-Sync abgebrochen: Für ${names} hat der Provider ein Video ohne messbare Mundbewegung geliefert. Die Szene wurde nicht zusammengesetzt.`;
+
       await supabase
         .from("composer_scenes")
         .update({
