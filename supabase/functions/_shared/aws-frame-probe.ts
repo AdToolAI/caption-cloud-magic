@@ -89,15 +89,21 @@ export async function renderAwsStill(req: AwsStillRequest): Promise<AwsStillResu
     cropSize: size,
   };
 
+  const outName = `mouth-probe/${crypto.randomUUID()}.png`;
   const payload = {
     type: "still",
+    // v348 — Remotion Lambda rejects payloads without a matching `version`
+    // field. Without it the invocation returns an empty body, which v347
+    // logged as the anonymous `unparsable_lambda_body:` with no detail.
+    version: REMOTION_STILL_VERSION,
     serveUrl,
     composition: "DialogTurnFaceCropVideo",
     inputProps: { type: "payload", payload: JSON.stringify(inputProps) },
     imageFormat: "png",
+    jpegQuality: 80,
     privacy: "public",
     bucketName: DEFAULT_BUCKET_NAME,
-    outName: `mouth-probe/${crypto.randomUUID()}.png`,
+    outName,
     frame: 0,
     attempt: 1,
     maxRetries: 0,
@@ -105,12 +111,14 @@ export async function renderAwsStill(req: AwsStillRequest): Promise<AwsStillResu
     logLevel: "warn",
     envVariables: {},
     chromiumOptions: {},
+    dumpBrowserLogs: false,
     offthreadVideoCacheSizeInBytes: null,
     deleteAfter: "1-day",
     timeoutInMilliseconds: Math.min(120_000, Math.max(15_000, remaining - 2_000)),
     downloadBehavior: { type: "play-in-browser" },
     forceWidth: size,
     forceHeight: size,
+    forceBucketName: DEFAULT_BUCKET_NAME,
   };
 
   const { AwsClient } = await import("npm:aws4fetch@1.0.18");
@@ -123,30 +131,48 @@ export async function renderAwsStill(req: AwsStillRequest): Promise<AwsStillResu
   try {
     const res = await aws.fetch(lambdaUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Amz-Invocation-Type": "RequestResponse" },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
     const body = await res.text();
+    // v348 — full forensics on every non-usable answer. `unparsable_lambda_body`
+    // with no content told us nothing in v347.
+    const diag =
+      `status=${res.status} fnError=${res.headers.get("x-amz-function-error") ?? "none"} ` +
+      `reqId=${res.headers.get("x-amzn-requestid") ?? "none"} bytes=${body.length}`;
     if (!res.ok) {
-      return { url: null, error: `lambda_${res.status}:${body.slice(0, 160)}` };
+      return { url: null, error: `lambda_${res.status}:${diag}:${body.slice(0, 160)}` };
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(body);
-    } catch {
-      return { url: null, error: `unparsable_lambda_body:${body.slice(0, 120)}` };
+    let parsed: unknown = null;
+    if (body.trim().length > 0) {
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        return { url: null, error: `unparsable_lambda_body:${diag}:${body.slice(0, 120)}` };
+      }
     }
 
-    const url = extractStillUrl(parsed);
+    const url = parsed ? extractStillUrl(parsed) : null;
     if (url) return { url, error: null };
 
-    const errObj = parsed as Record<string, unknown> | null;
+    // Fallback: the still is written to a deterministic public S3 key. If the
+    // Lambda answered without a usable body but the object exists, use it.
+    const s3Url =
+      `https://${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${outName}`;
+    try {
+      const head = await fetch(s3Url, { method: "HEAD" });
+      if (head.ok) return { url: s3Url, error: null };
+    } catch {
+      // ignore — reported as measurement outage below
+    }
+
+    const errObj = (parsed ?? {}) as Record<string, unknown>;
     const detail = String(
       errObj?.errorMessage ?? errObj?.message ?? errObj?.errorType ?? "no_output_url",
     );
-    return { url: null, error: `lambda_still_failed:${detail.slice(0, 160)}` };
+    return { url: null, error: `lambda_still_failed:${diag}:${detail.slice(0, 160)}` };
   } catch (e) {
     const msg = (e as Error)?.name === "AbortError"
       ? "timeout"
@@ -156,6 +182,7 @@ export async function renderAwsStill(req: AwsStillRequest): Promise<AwsStillResu
     clearTimeout(timer);
   }
 }
+
 
 /**
  * Reads the still URL out of a Remotion Lambda `still` response.
