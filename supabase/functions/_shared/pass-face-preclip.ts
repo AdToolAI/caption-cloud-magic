@@ -37,6 +37,10 @@ import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
 import { probeMp4Dims } from "./twoshot-face-map.ts";
+// v359 — temporaler Crop: der Preclip-Ausschnitt folgt dem Gesicht.
+import { planCameraPath, buildSpeechWeights } from "./camera-path.ts";
+import { buildDenseTrack } from "./face-track.ts";
+
 // v356 — the closeup contract no longer blocks here; geometry is telemetry.
 
 export interface PassPreclipInput {
