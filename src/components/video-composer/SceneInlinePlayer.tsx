@@ -415,14 +415,20 @@ export default function SceneInlinePlayer({
           const lower = rawErr.toLowerCase();
           // Map silent/opaque model fails to actionable text.
           let friendly: string;
+          const isInvalidPrompt =
+            lower.includes('invalid_prompt_rejected') ||
+            lower.includes('invalidparameter') ||
+            lower.includes('could not process with this prompt');
           const isGreenNet =
             lower.includes('green_net_rejected') ||
             lower.includes('datainspectionfailed') ||
             lower.includes('green net check failed') ||
             lower.includes('inappropriate content');
-          if (isGreenNet) {
-            friendly =
-              'HappyHorse-Inhaltsfilter (Alibaba „Green Net") hat den Prompt blockiert. Wir haben den Provider automatisch auf Hailuo umgestellt – klicke „Neu rendern", um es erneut zu versuchen.';
+          const repairExhausted = lower.includes('prompt_repair_exhausted');
+          if (isGreenNet || isInvalidPrompt) {
+            friendly = repairExhausted
+              ? 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter) – auch der automatisch entschärfte Prompt wurde blockiert. Die Credits wurden zurückerstattet. Kürze den Prompt oder wechsle den Provider (z. B. Hailuo) und starte neu.'
+              : 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter). Der Prompt wurde automatisch entschärft und einmal erneut versucht. Die Credits wurden zurückerstattet – du kannst „Neu rendern" klicken oder den Provider wechseln.';
           } else if (!rawErr) {
             friendly = 'Render fehlgeschlagen.';
           } else if (
