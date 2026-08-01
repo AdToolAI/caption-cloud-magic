@@ -62,6 +62,13 @@ export interface MouthMotionVerdictInput {
   windowStartSec?: number;
   /** End of the speech window inside the output clip, seconds. */
   windowEndSec?: number;
+  /**
+   * v346 — Real duration of the clip being judged (the preclip / provider
+   * output). Sample timestamps are clamped inside it; asking the extractor
+   * for a timestamp past the last frame returns nothing and silently
+   * degraded the whole probe to `frames_0_of_N`.
+   */
+  clipDurationSec?: number;
   /** Normalised mouth rectangle inside the clip. Defaults to the face-preclip band. */
   mouthRect?: MouthRect | null;
   /** How many frames to sample. 4 keeps latency ~8-12s and is enough for a verdict. */
@@ -71,6 +78,7 @@ export interface MouthMotionVerdictInput {
   /** Forensics only. */
   label?: string;
 }
+
 
 export type MotionVerdict = "moved" | "static" | "unknown";
 
