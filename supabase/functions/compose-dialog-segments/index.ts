@@ -5537,8 +5537,15 @@ serve(async (req) => {
       body?.noop_auto_escalation !== true;
 
     if (v161PreclipEligible) {
-      const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
-      const unionEnd = Math.min(totalSec, Math.max(...speakerWindowsSecs.map(([, e]) => e)));
+      // v357 Schritt 5 — Handles an den Turn-Grenzen: 200 ms Vor-/Nachlauf,
+      // damit Sync.so den Mundansatz vor dem ersten Laut und das Schließen
+      // nach dem letzten Laut mitbekommt. Ohne Handles springt der Mund an
+      // der Fenstergrenze sichtbar. Der Mux legt den Clip weiterhin exakt
+      // an `preclip_start_sec` zurück, die Zeitlage bleibt also korrekt.
+      const V357_HANDLE_SEC = 0.2;
+      const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)) - V357_HANDLE_SEC);
+      const unionEnd = Math.min(totalSec, Math.max(...speakerWindowsSecs.map(([, e]) => e)) + V357_HANDLE_SEC);
+
       const siblingCoords: Array<[number, number]> = [];
       for (let i = 0; i < speakers.length; i++) {
         if (i === pass.speaker_idx) continue;
