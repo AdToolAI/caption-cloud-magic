@@ -40,7 +40,9 @@ Updated: today
 
 ## Memories
 - **Lip-Sync Restore 2026-07-31**: Pipeline wurde selektiv auf den Stand vom 27.07.2026 (Commit `58060cff`) zurückgesetzt. Alles aus v317–v341 (Preclip-Trust-Contract, Preclip-Geometry, Differential-Motion-Probe, Motion-Tracking, Alias-ID-Resolution) ist entfernt — nicht wieder einführen ohne explizite Freigabe. Einzige bewusste Abweichung: Export-Qualitätsprofil in `render-sync-segments-audio-mux` (crf 16, preset medium, jpegQuality 95, Audio 256k).
+- [v349 Cast Identity Lock](mem://architecture/lipsync/v349-cast-identity-lock) — **Aktuell.** Identität via AWS Rekognition Face Collection (FaceId-Lookup statt Similarity-Ranking), Verdicts ok/duplicate/missing/unavailable; Motion-Probe mit Decoder-Forensik + Byte-Hash-Fallback (`identical_frame_bytes` = static).
 - [v317 Terminal Clip-Failure Gate](mem://architecture/lipsync/v317-terminal-clip-failure-gate) — Kein Lip-Sync-Dispatch ohne fertigen Master-Clip; Content-Filter-Fails (Green Net/E005) und ≥2 Render-Retries werden terminal statt auf `pending` zurückgesetzt.
+
 
 - [v209 Risky Provider Consent](mem://architecture/lipsync/v209-risky-provider-consent) — Kling ignoriert Plate-Prompt bei N≥2 → Ghost-Mouthing. Kein Auto-Migrate. In-Dialog Warn-Block + Consent-Checkbox + Persistenz in `composer_scenes.scene_assets.risky_provider_consent`; Refund-Ausschluss nur für Lipsync-Artefakte. `LIPSYNC_SAFE_PROVIDERS = [hailuo, happyhorse]`.
 - [v208 Root-Cause Isolation](mem://architecture/lipsync/v208-rootcause-isolation) — Debug view `/debug/lipsync/:sceneId` rendert 4 Layer (Master Plate / Preclip / Pass-Output / Final Mux) aus `composer_scenes.dialog_shots`; Matrix mappt Symptom → genau eine Fix-Phase (2A/B/C/D). Keine weiteren Overlay-Layer, kein v167-Prompt-Rollback.
