@@ -5604,6 +5604,10 @@ serve(async (req) => {
           (pass as any).preclip_duration_sec = Number(
             (preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3),
           );
+          (pass as any).preclip_dims = preclipResult.actualDims ?? {
+            width: preclipResult.crop.outputSize,
+            height: preclipResult.crop.outputSize,
+          };
           (pass as any).preclip_error = null;
           // v247 — mouth-anchor observability, flowed into syncso_dispatch_log via meta.
           (pass as any).preclip_anchor = preclipResult.anchor ?? null;
@@ -6017,6 +6021,15 @@ serve(async (req) => {
         | { x: number; y: number; size: number; outputSize: number }
         | undefined : undefined;
       const v161UsingPreclipForBbox = usePassPreclip && !!passPreclipUrl && !!v161PreclipCrop;
+      const v358ActualPreclipDims = v161UsingPreclipForBbox
+        ? (pass as any).preclip_dims as { width?: number; height?: number } | undefined
+        : undefined;
+      const v358DispatchWidth = v161UsingPreclipForBbox
+        ? Math.max(1, Number(v358ActualPreclipDims?.width ?? v161PreclipCrop?.outputSize ?? 0))
+        : Math.max(1, Number(plateDims?.width ?? videoDims.width));
+      const v358DispatchHeight = v161UsingPreclipForBbox
+        ? Math.max(1, Number(v358ActualPreclipDims?.height ?? v161PreclipCrop?.outputSize ?? 0))
+        : Math.max(1, Number(plateDims?.height ?? videoDims.height));
       // v204 — Preclip is the canonical multi-speaker path again. No hard-fail here.
       const probeUrlForBbox = v161UsingPreclipForBbox ? (passPreclipUrl as string) : passInputUrl;
       const v161PreclipStartSec = v161UsingPreclipForBbox
@@ -6079,17 +6092,19 @@ serve(async (req) => {
       // Box in the dispatched video's pixel space.
       let dispatchBox: [number, number, number, number] | null = box;
       if (v161UsingPreclipForBbox && box && v161PreclipCrop) {
-        const scale = v161PreclipCrop.outputSize / Math.max(1, v161PreclipCrop.size);
-        const cx1 = Math.max(0, Math.round((box[0] - v161PreclipCrop.x) * scale));
-        const cy1 = Math.max(0, Math.round((box[1] - v161PreclipCrop.y) * scale));
-        const cx2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[2] - v161PreclipCrop.x) * scale));
-        const cy2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[3] - v161PreclipCrop.y) * scale));
+        const scaleX = v358DispatchWidth / Math.max(1, v161PreclipCrop.size);
+        const scaleY = v358DispatchHeight / Math.max(1, v161PreclipCrop.size);
+        const cx1 = Math.max(0, Math.round((box[0] - v161PreclipCrop.x) * scaleX));
+        const cy1 = Math.max(0, Math.round((box[1] - v161PreclipCrop.y) * scaleY));
+        const cx2 = Math.min(v358DispatchWidth, Math.round((box[2] - v161PreclipCrop.x) * scaleX));
+        const cy2 = Math.min(v358DispatchHeight, Math.round((box[3] - v161PreclipCrop.y) * scaleY));
         if (cx2 > cx1 + 4 && cy2 > cy1 + 4) {
           dispatchBox = [cx1, cy1, cx2, cy2];
         } else {
           // Fallback: most of the preclip IS the face.
-          const pad = Math.max(2, Math.round(v161PreclipCrop.outputSize * 0.08));
-          dispatchBox = [pad, pad, v161PreclipCrop.outputSize - pad, v161PreclipCrop.outputSize - pad];
+          const padX = Math.max(2, Math.round(v358DispatchWidth * 0.08));
+          const padY = Math.max(2, Math.round(v358DispatchHeight * 0.08));
+          dispatchBox = [padX, padY, v358DispatchWidth - padX, v358DispatchHeight - padY];
         }
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
@@ -6107,12 +6122,8 @@ serve(async (req) => {
       let v357TrackSource = "not_attempted";
       let v357TrackMovementPx = 0;
       if (dispatchBox && retryVariant === "bbox-url-pro") {
-        const trackW = v161UsingPreclipForBbox && v161PreclipCrop
-          ? v161PreclipCrop.outputSize
-          : Math.max(1, plateDims?.width ?? 0);
-        const trackH = v161UsingPreclipForBbox && v161PreclipCrop
-          ? v161PreclipCrop.outputSize
-          : Math.max(1, plateDims?.height ?? 0);
+        const trackW = v358DispatchWidth;
+        const trackH = v358DispatchHeight;
         const windowStart = v124VoicedWindows.length > 0
           ? Math.min(...v124VoicedWindows.map(([s]) => s))
           : 0;
@@ -6188,7 +6199,7 @@ serve(async (req) => {
       // Preclip-Modus ist die Box-Fläche praktisch das ganze Bild (≈ 60-95 %),
       // also wird der upper-bound für Preclip auf 0.98 angehoben.
       const dispatchDimsArea = v161UsingPreclipForBbox && v161PreclipCrop
-        ? Math.max(1, v161PreclipCrop.outputSize * v161PreclipCrop.outputSize)
+        ? Math.max(1, v358DispatchWidth * v358DispatchHeight)
         : Math.max(1, (plateDims?.width ?? 0) * (plateDims?.height ?? 0));
       const boxArea = dispatchBox ? Math.max(0, (dispatchBox[2] - dispatchBox[0]) * (dispatchBox[3] - dispatchBox[1])) : 0;
       const boxAreaPct = boxArea / dispatchDimsArea;
