@@ -401,42 +401,64 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
   const timestamps = sampleTimestamps(req.startSec, req.endSec, req.maxSamples ?? MAX_TRACK_SAMPLES);
   const frameSize = Math.max(req.width, req.height);
 
-  const stills = await Promise.all(
-    timestamps.map(async (timestamp) => {
-      const still = await renderAwsStill({
-        videoUrl: req.videoUrl,
-        timestamp,
-        frameSize,
-        deadline: req.deadline,
-      });
-      return { timestamp, url: still.url, error: still.error };
-    }),
-  );
+  /** Rendert Stills und erkennt darauf Gesichter — Reihenfolge bleibt stabil. */
+  const probe = async (ts: number[], extra: boolean): Promise<TrackSample[]> => {
+    const stills = await Promise.all(
+      ts.map(async (timestamp) => {
+        const still = await renderAwsStill({
+          videoUrl: req.videoUrl,
+          timestamp,
+          frameSize,
+          deadline: req.deadline,
+        });
+        return { timestamp, url: still.url, error: still.error };
+      }),
+    );
 
-  const samples: TrackSample[] = [];
-  let reference: Box = anchor;
-  for (const s of stills) {
-    if (!s.url) {
-      samples.push({ timestamp: s.timestamp, box: null, error: s.error ?? "still_missing" });
-      continue;
+    const out: TrackSample[] = [];
+    for (const s of stills) {
+      if (!s.url) {
+        out.push({ timestamp: s.timestamp, box: null, error: s.error ?? "still_missing", extra });
+        continue;
+      }
+      const det = await detectFacesMediaPipe({
+        videoUrl: req.videoUrl,
+        plateWidth: req.width,
+        plateHeight: req.height,
+        durationSec: dur,
+        prebuiltFrameUrls: [s.url],
+      });
+      const candidates = (det.faces ?? [])
+        .map((f) => f.bbox as Box)
+        .filter((b) => Array.isArray(b) && boxArea(b) > 16);
+      const picked = pickTrackedBox(candidates, reference);
+      if (picked) reference = picked;
+      out.push({
+        timestamp: s.timestamp,
+        box: picked,
+        error: picked ? undefined : (det.error ?? "no_face_in_still"),
+        extra,
+      });
     }
-    const det = await detectFacesMediaPipe({
-      videoUrl: req.videoUrl,
-      plateWidth: req.width,
-      plateHeight: req.height,
-      durationSec: dur,
-      prebuiltFrameUrls: [s.url],
-    });
-    const candidates = (det.faces ?? [])
-      .map((f) => f.bbox as Box)
-      .filter((b) => Array.isArray(b) && boxArea(b) > 16);
-    const picked = pickTrackedBox(candidates, reference);
-    if (picked) reference = picked;
-    samples.push({
-      timestamp: s.timestamp,
-      box: picked,
-      error: picked ? undefined : (det.error ?? "no_face_in_still"),
-    });
+    return out;
+  };
+
+  let reference: Box = anchor;
+  const samples: TrackSample[] = await probe(timestamps, false);
+
+  // ── v359 — Risikobasierte Verdichtung ───────────────────────────────
+  // Nur dort nachmessen, wo die Spur zwischen zwei Ankern weit gewandert
+  // ist. Ruhige Abschnitte kosten keine zusätzlichen Lambda-Stills.
+  let extraSamples = 0;
+  const budgetLeft = req.deadline - Date.now() > 12_000;
+  if (budgetLeft) {
+    const densify = planDensifyTimestamps(samples);
+    if (densify.length > 0) {
+      const more = await probe(densify, true);
+      samples.push(...more);
+      samples.sort((a, b) => a.timestamp - b.timestamp);
+      extraSamples = more.length;
+    }
   }
 
   const hits = samples.filter((s) => s.box);
@@ -447,10 +469,20 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
     box: withContextPadding(s.box as Box, req.width, req.height),
   }));
 
+  let peakMotionPx = 0;
+  for (let i = 1; i < keyframes.length; i++) {
+    const [ax, ay] = boxCenter(keyframes[i - 1].box);
+    const [bx, by] = boxCenter(keyframes[i].box);
+    peakMotionPx = Math.max(peakMotionPx, Math.round(Math.hypot(bx - ax, by - ay)));
+  }
+  const detectionRatio = samples.length > 0 ? hits.length / samples.length : 0;
+
   console.log(
     `[${tag}] ${FACE_TRACK_TAG} samples=${samples.length} hits=${hits.length} ` +
+    `extra=${extraSamples} detection_ratio=${detectionRatio.toFixed(2)} peak_motion_px=${peakMotionPx} ` +
     `span=${req.startSec.toFixed(2)}-${req.endSec.toFixed(2)}s ms=${Date.now() - t0}`,
   );
+
 
   return {
     ok: true,
