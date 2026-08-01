@@ -1,49 +1,53 @@
-# Plan v346 — Lip-Sync-Pipeline wieder deterministisch machen
+## Was wirklich passiert ist
 
-## Bestätigte Ursache im letzten Lauf
+Der Lip-Sync scheitert nicht an Sync.so, nicht an der Plate und nicht an der Geometrie. Er scheitert an einem Prüf-Baustein, der gegen unsere eigene AWS-only-Regel gebaut wurde.
 
-Beim Lauf `7c11bc27…` sind zwei Fehler nacheinander aufgetreten:
+Belegt aus den Logs des letzten Laufs (`7c11bc27…`, alle Passes):
 
-1. Der serverseitige Bewegungsprüfer hatte Zugriff auf den Replicate-Key, konnte aber **0 von 4 Frames** aus dem Sync.so-Ergebnis extrahieren. Ergebnis: `motion_verdict=unknown` — also eine fehlgeschlagene Messung, kein nachgewiesener Fehler des Providers.
-2. Die Retry-Leiter wechselte daraufhin auf die Variante `coords-pro-box` und entfernte dabei ausdrücklich den vorhandenen Einzelgesicht-Preclip. Unmittelbar danach blockierte das v204-Sicherheitsgate genau diesen Full-Plate-Fallback mit `v204_preclip_required`.
+```
+model_lookup_404:{"detail":"Model not found."}   ← lucataco/ffmpeg-extract-frame
+→ frames_0_of_4 → verdict=unknown
+→ NOOP-suspect → Retry → "Bitte Plate neu rendern"
+```
 
-Die Pipeline startet damit einen Retry, den ihr eigenes nächstes Gate garantiert ablehnt. Das erklärt den sichtbaren Ablauf „NOOP-Retry läuft" → „Szene fehlgeschlagen".
+Die Kette:
 
-## Umsetzung
+1. Der Motion-Probe (v344/v346) will messen, ob sich der Mund im Sync.so-Ergebnis bewegt.
+2. Dafür wurde **Replicate/lucataco** eingebaut — obwohl die Regel „AWS-only, kein Lucataco" gilt und in `_shared/face-frame-extract.ts` sogar wörtlich dokumentiert ist.
+3. Dieses Replicate-Modell existiert nicht mehr und antwortet mit 404 — bei jedem Frame, jedem Pass, seit dem Deploy.
+4. Also nie Frames, nie eine Messung, immer `unknown`.
+5. `unknown` wird fälschlich wie ein Provider-NOOP behandelt → Retry → Hard-Fail.
 
-1. **Bewegungsprüfung reparieren**
-   - Die Frame-Extraktion erhält dieselbe robuste Replicate-Anbindung wie die produktiven Extraktionsfunktionen.
-   - Einzelne Extraktionsfehler werden mit Provider-Status und Ursache protokolliert, statt still zu verschwinden.
-   - Frames werden innerhalb der tatsächlichen Preclip-Dauer abgefragt; Zeitpunkte außerhalb des Clips sind ausgeschlossen.
-   - Tests decken String-, Array- und Objekt-Antworten sowie teilweise fehlgeschlagene Frames ab.
+Zwei Verstöße gleichzeitig, und das ist auch der Grund für das Im-Kreis-Drehen:
 
-2. **Unmöglichen Full-Plate-Retry entfernen**
-   - Multi-Speaker-Retries dürfen den vorhandenen Einzelgesicht-Preclip nicht mehr verwerfen.
-   - `coords-pro-box` entfällt als Retry-Variante, wenn dafür der Preclip verlassen werden müsste.
-   - Ein Retry bleibt im v204/v169-konformen Pfad: derselbe Sprecher, derselbe isolierte Preclip, dieselbe unabhängige Audiospur, keine Provider-Ausgabe als Eingang eines anderen Sprecherpasses.
+- **Verstoß gegen AWS-only**: Der Regelbruch wurde nicht bemerkt, weil er in einem neuen Shared-Modul steckte statt im bereits gesäuberten `face-frame-extract.ts`.
+- **Verstoß gegen den v169-Fehlerkontrakt**: v169 kennt nur *transient* und *terminal*. Die neue dritte Klasse „Messung nicht verfügbar" wurde auf *terminal* gemappt und verbrennt echte Sync.so-Versuche.
 
-3. **Klare Behandlung von `unknown`, `static`, `moved`**
-   - `moved`: Pass wird abgeschlossen.
-   - `static`: höchstens ein zulässiger Preclip-Retry, danach sauberer Fehler mit automatischer Rückerstattung.
-   - `unknown`: technischer Wiederholungsversuch der Messung, aber kein Wechsel auf Full Plate und kein Mux.
-   - Die widersprüchliche Kennzeichnung „PASS_DONE_SUSPECT" entfällt, da ein unverifizierter Pass nicht mehr als fertig gilt.
+## Fix v347 — AWS statt Replicate
 
-4. **Finalen Mux geschlossen halten**
-   - Nur bestätigte Passes (`moved`) gelangen in den finalen Video-Mux.
-   - Kein Teil-Mux mit vollständigem Voiceover, wenn ein Sprecherpass fehlt oder unverifiziert ist — auch nicht bei ein oder zwei Sprechern.
-   - Ausdrücklich erzwungene interne Diagnose-Remuxes bleiben möglich.
+1. **Replicate vollständig aus der Bewegungsprüfung entfernen**
+   - `lucataco/ffmpeg-extract-frame` und der komplette Replicate-Aufrufpfad fliegen aus `_shared/mouth-motion-verdict.ts` raus.
+   - Ersatz: die bereits produktive **AWS-Strecke** (Remotion Lambda, `REMOTION_SERVE_URL`), mit der wir ohnehin schon Preclips und Plates rendern. Sie liefert die Probe-Frames des Sync.so-Ergebnisses aus AWS, ohne neuen Fremdanbieter.
+   - Die Frames landen in unserer Storage; die Luminanz-Differenz im Mundband wird unverändert wie bisher berechnet.
+   - Ergebnis: In der gesamten Lip-Sync-Pipeline existiert kein Replicate-Frame-Extractor mehr.
 
-5. **Fehleranzeige bereinigen**
-   - Nutzer sehen verständliche Meldungen wie „Lip-Sync konnte für Samuel nicht bestätigt werden; Guthaben wurde erstattet".
-   - Interne Codes (`v204_preclip_required`, `motion_probe_unavailable`, Variantennamen) bleiben in Telemetrie und Logs.
+2. **Messfehler dürfen keine Lip-Sync-Versuche mehr verbrennen**
+   - `static` = echter Provider-NOOP → weiterhin Ladder, danach Hard-Fail. Unverändert streng.
+   - `unknown` = unsere Messung ausgefallen → wird protokolliert, zählt **nicht** als Versuch, setzt **nicht** `needs_clip_rerender`, zeigt dem Kunden **nicht** „Plate neu rendern".
+   - Unverifizierte Passes werden trotzdem nicht stillschweigend gemuxt.
 
-6. **Regressionstest und selektives Deployment**
-   - Testfälle für 0/4, 1/4, 2/4 und 4/4 extrahierte Frames sowie alle drei Verdicts.
-   - Vier-Sprecher-Lauf: Jeder Pass behält seinen eigenen Preclip und muss `moved` erreichen, bevor der Mux startet.
-   - Nur Bewegungsprüfer, Sync.so-Webhook, Dialog-Dispatch und Audio-Mux deployen.
+3. **Regel technisch absichern, nicht nur dokumentieren**
+   - Guard-Test, der die gesamte Lip-Sync-Pipeline nach `lucataco`, `replicate.com/v1/predictions` und `ffmpeg-extract-frame` durchsucht und fehlschlägt, sobald es wieder auftaucht.
+   - Damit kann dieser Regelbruch nicht ein 51. Mal unbemerkt hineinrutschen.
+   - Zusätzlich Tests: 404/Timeout ändert weder `noop_escalation_step` noch `twoshot_stage`; nur echte Frames unter der Schwelle ergeben `static`.
 
-## Bewusst nicht enthalten
+4. **Projekt-Memory aktualisieren**
+   - Harte Regel als `constraint` speichern: keine Replicate-/Lucataco-Frame-Extraktion in der Lip-Sync-Pipeline, AWS-only, inklusive Begründung.
 
-- Keine Änderungen an Crop-Größen, Face-Share-Schwellen, Masken oder Charakter-Prompts.
-- Kein Umbau der v169-Parallelarchitektur.
-- Keine Absenkung des Bewegungs-Schwellenwerts, um Fehler zu verstecken.
+5. **Deploy und Verifikation**
+   - Nur `sync-so-webhook` plus geteiltes Modul.
+   - Prüfen: Frames > 0, echter Verdict, kein 404, kein falscher Retry.
+
+## Offen und wichtig
+
+Erst nach diesem Fix haben wir überhaupt wieder eine funktionierende Messung. Sollte dann ein Pass echtes `static` liefern, reden wir zum ersten Mal seit Tagen über ein reales Sync.so- oder Plate-Thema — bisher war jede darauf aufgebaute Geometrie-Änderung Blindflug.

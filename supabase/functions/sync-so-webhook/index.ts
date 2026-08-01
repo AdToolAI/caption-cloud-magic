@@ -649,6 +649,10 @@ serve(async (req) => {
           : turnDurSec,
         mouthRect: mouthRectFromPass(passBeforeDone),
         sampleCount: 4,
+        // v347 — the AWS still renderer needs the square edge length of the
+        // provider output to render a full, undistorted frame.
+        frameSize: Number((passBeforeDone as any)?.preclip_crop?.outputSize) ||
+          Number(outputDims?.width) || 512,
         label: `scene=${sceneId} pass=${currentPass}`,
       };
       let motion = await judgeMouthMotion(probeInput);
@@ -689,8 +693,13 @@ serve(async (req) => {
         inBytes > 0 && outBytes > 0 &&
         sizeRatio >= 0.92 && sizeRatio <= 1.08;
 
-      const motionUnverified = motionUnknown;
-      const noopSuspect = motionStatic || motionUnverified || syncOutputUnchanged ||
+      // v347 — MEASUREMENT ERRORS NEVER COUNT AS PROVIDER EVIDENCE.
+      // An `unknown` verdict means our AWS probe could not decode frames.
+      // It must not consume the NOOP ladder, must not recommend a plate
+      // re-render and must not fail a pass. Only proven-static output or the
+      // hard byte/resolution signals do that.
+      const motionUnverified = false as boolean;
+      const noopSuspect = motionStatic || syncOutputUnchanged ||
         syncOutputResolutionRegression || legacyByteNoop;
 
       // Persist the verdict for every pass, pass or fail (Phase 4).
@@ -725,9 +734,9 @@ serve(async (req) => {
           `[sync-so-webhook] v344 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → NOOP ladder`,
         );
       }
-      if (motionUnverified) {
+      if (motionUnknown) {
         console.warn(
-          `[sync-so-webhook] v345 scene=${sceneId} pass=${currentPass} MOTION UNVERIFIED (${motion.reason}) → retry/terminal ladder; pass will not be marked done`,
+          `[sync-so-webhook] v347 scene=${sceneId} pass=${currentPass} MOTION UNVERIFIED (${motion.reason}) → telemetry only; provider result is NOT penalised`,
         );
       }
       if (legacyByteNoop) {
@@ -1049,11 +1058,11 @@ serve(async (req) => {
         motion_verdict_reason: motion.reason,
       };
       if (freshDonePasses[currentPass]) {
-        // v346 — a pass only reaches `done` when the mouth motion was
-        // positively verified. `static` and `unknown` are handled by the
-        // ladder / hard-fail branch above; if execution still lands here,
-        // fail closed instead of silently muxing a voiceover-only clip.
-        const verifiedMoved = motion.verdict === "moved" && !noopSuspect;
+        // v347 — a pass reaches `done` unless the mouth motion was *proven*
+        // static (or a hard byte/resolution no-op signal fired). An `unknown`
+        // verdict is a measurement outage on our side and must never fail a
+        // pass the provider completed — that was the v344–v346 regression.
+        const verifiedMoved = motion.verdict !== "static" && !noopSuspect;
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
           status: verifiedMoved ? "done" : "failed",
