@@ -847,6 +847,14 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
           // edge feathers the slight excess on the off-axis.
           const overlayScale = Math.max(scaleX, scaleY);
           const size = crop.size * overlayScale;
+          // v359 — map the per-frame camera path into composition space.
+          const overlayPath = Array.isArray(shot.cropPath) && shot.cropPath.length > 0
+            ? shot.cropPath.map((p) => ({
+                left: p.x * scaleX,
+                top: p.y * scaleY,
+                size: p.size * overlayScale,
+              }))
+            : undefined;
           return (
             <Sequence
               key={`shot-${idx}-${startFrame}`}
@@ -863,10 +871,12 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 left={left}
                 top={top}
                 size={size}
+                path={overlayPath}
                 holdToEnd={!!shot.holdToEnd}
               />
             </Sequence>
           );
+
         }
 
         return (
