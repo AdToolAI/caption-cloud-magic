@@ -878,7 +878,6 @@ serve(async (req) => {
       framesPerLambda: muxFramesPerLambda,
       frameRange: [0, durationInFrames - 1],
       muted: false,
-      audioCodec: "aac",
       scale: 1,
       envVariables: {},
       chromiumOptions: {},
