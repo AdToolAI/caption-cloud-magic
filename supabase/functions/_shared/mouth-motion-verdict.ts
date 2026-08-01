@@ -62,6 +62,13 @@ export interface MouthMotionVerdictInput {
   windowStartSec?: number;
   /** End of the speech window inside the output clip, seconds. */
   windowEndSec?: number;
+  /**
+   * v346 — Real duration of the clip being judged (the preclip / provider
+   * output). Sample timestamps are clamped inside it; asking the extractor
+   * for a timestamp past the last frame returns nothing and silently
+   * degraded the whole probe to `frames_0_of_N`.
+   */
+  clipDurationSec?: number;
   /** Normalised mouth rectangle inside the clip. Defaults to the face-preclip band. */
   mouthRect?: MouthRect | null;
   /** How many frames to sample. 4 keeps latency ~8-12s and is enough for a verdict. */
@@ -71,6 +78,7 @@ export interface MouthMotionVerdictInput {
   /** Forensics only. */
   label?: string;
 }
+
 
 export type MotionVerdict = "moved" | "static" | "unknown";
 
@@ -87,7 +95,13 @@ export interface MouthMotionVerdictResult {
   reason: string;
   method: string;
   latencyMs: number;
+  /**
+   * v346 — Per-frame extractor outcome. Without this a probe failure was
+   * indistinguishable from a provider no-op in the logs.
+   */
+  frameErrors?: string[];
 }
+
 
 /**
  * Runtime secret compatibility. Lovable Cloud exposes the configured
@@ -149,9 +163,22 @@ export async function judgeMouthMotion(
     let end = Number.isFinite(rawEnd) && rawEnd > start ? rawEnd : start + 2.0;
     // Windows are provided relative to the scene; a preclip output starts at 0.
     if (end - start < 0.6) end = start + 0.6;
-    const inset = Math.min(0.18, (end - start) * 0.12);
+
+    // v346 — never sample past the end of the actual clip. A timestamp
+    // beyond the last frame makes the extractor return nothing, which the
+    // old code reported as `frames_0_of_4` — indistinguishable from an
+    // outage and enough to stall the whole scene.
+    const clipDur = Number(input.clipDurationSec);
+    if (Number.isFinite(clipDur) && clipDur > 0.2) {
+      const hardEnd = Math.max(0.1, clipDur - 0.05);
+      if (end > hardEnd) end = hardEnd;
+      if (start >= end) start = Math.max(0.02, end - 0.5);
+    }
+
+    const inset = Math.min(0.18, Math.max(0, (end - start) * 0.12));
     start += inset;
     end -= inset;
+    if (end <= start) end = start + 0.1;
 
     for (let i = 0; i < samples; i++) {
       const t = start + ((end - start) * i) / (samples - 1);
@@ -159,19 +186,31 @@ export async function judgeMouthMotion(
     }
 
     const deadline = Date.now() + budgetMs;
-    const frameUrls = await Promise.all(
+    const frameResults = await Promise.all(
       timestamps.map((t) => extractFrame(token, input.outputUrl, t, deadline)),
     );
-    const usable = frameUrls.filter((u): u is string => !!u);
+    const frameErrors = frameResults
+      .map((r, i) => (r.url ? null : `t=${timestamps[i]}:${r.error ?? "unknown"}`))
+      .filter((e): e is string => !!e);
+    const usable = frameResults
+      .map((r) => r.url)
+      .filter((u): u is string => !!u);
+    if (frameErrors.length) {
+      console.warn(
+        `[mouth-motion-verdict] ${input.label ?? ""} frame extraction issues (${usable.length}/${samples} ok): ${frameErrors.join(" | ")}`,
+      );
+    }
     if (usable.length < 2) {
       return {
         ...base,
         verdict: "unknown",
         score: 0,
+        frameErrors,
         reason: `motion_probe_unavailable:frames_${usable.length}_of_${samples}`,
         latencyMs: Date.now() - t0,
       };
     }
+
 
     const rect = normaliseRect(input.mouthRect) ?? DEFAULT_MOUTH_RECT;
     const grids = await Promise.all(usable.map((u) => frameToGrid(u, rect)));
@@ -253,35 +292,126 @@ export function mouthRectFromPass(pass: Record<string, unknown> | null | undefin
 
 // ────────────────────────── internals ──────────────────────────
 
+export interface FrameExtractResult {
+  url: string | null;
+  /** Human-readable failure cause; null on success. */
+  error: string | null;
+}
+
+/**
+ * v346 — Normalises every shape the extractor can return.
+ * Replicate has returned a bare string, an array of strings and a
+ * FileOutput-like object with a `url` getter/method across SDK versions;
+ * the previous implementation silently produced `null` for two of them.
+ */
+export function normaliseFrameOutput(out: unknown): string | null {
+  if (!out) return null;
+  let url = "";
+  if (typeof out === "string") {
+    url = out;
+  } else if (Array.isArray(out)) {
+    const first = out.find((v) => !!v);
+    url = typeof first === "string" ? first : normaliseFrameOutput(first) ?? "";
+  } else if (typeof out === "object") {
+    // deno-lint-ignore no-explicit-any
+    const o = out as any;
+    const candidate = typeof o.url === "function" ? o.url() : o.url ?? o.output ?? o.href;
+    url = typeof candidate === "string" ? candidate : String(candidate ?? "");
+  }
+  return /^https?:\/\//.test(url) ? url : null;
+}
+
+/** Cached model version id so we don't resolve it per frame. */
+let cachedModelVersion: string | null = null;
+
+async function resolveModelVersion(token: string, signal: AbortSignal): Promise<string | null> {
+  if (cachedModelVersion) return cachedModelVersion;
+  const res = await fetch(`https://api.replicate.com/v1/models/${REPLICATE_MODEL}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`model_lookup_${res.status}:${body.slice(0, 120)}`);
+  }
+  const json = await res.json();
+  const version = String(json?.latest_version?.id ?? "");
+  if (!version) throw new Error("model_lookup_no_version");
+  cachedModelVersion = version;
+  return version;
+}
+
+/**
+ * Extracts a single frame via Replicate's prediction API.
+ * Mirrors the production path used by `extract-video-frames`, but surfaces
+ * the provider status/body instead of collapsing every failure to `null`.
+ */
 async function extractFrame(
   token: string,
   videoUrl: string,
   timestamp: number,
   deadline: number,
-): Promise<string | null> {
+): Promise<FrameExtractResult> {
   const remaining = deadline - Date.now();
-  if (remaining <= 2_000) return null;
+  if (remaining <= 2_000) return { url: null, error: "budget_exhausted" };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), remaining);
   try {
-    const { default: Replicate } = await import("npm:replicate@0.25.2");
-    const replicate = new Replicate({ auth: token });
-    const out = await Promise.race([
-      replicate.run(REPLICATE_MODEL as `${string}/${string}`, {
+    const version = await resolveModelVersion(token, controller.signal);
+    const createRes = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Prefer: "wait=55",
+      },
+      body: JSON.stringify({
+        version,
         input: { video: videoUrl, timestamp },
       }),
-      new Promise((resolve) => setTimeout(() => resolve(null), remaining)),
-    ]);
-    if (!out) return null;
-    const url = typeof out === "string"
-      ? out
-      : Array.isArray(out)
-      ? String(out[0] ?? "")
-      // deno-lint-ignore no-explicit-any
-      : String((out as any)?.url?.() ?? (out as any)?.url ?? "");
-    return /^https?:\/\//.test(url) ? url : null;
-  } catch {
-    return null;
+      signal: controller.signal,
+    });
+    if (!createRes.ok) {
+      const body = await createRes.text().catch(() => "");
+      return { url: null, error: `create_${createRes.status}:${body.slice(0, 160)}` };
+    }
+    let prediction = await createRes.json();
+
+    // `Prefer: wait` usually returns a terminal prediction. Poll otherwise.
+    while (
+      prediction?.status &&
+      !["succeeded", "failed", "canceled"].includes(String(prediction.status)) &&
+      Date.now() < deadline - 1_000
+    ) {
+      await new Promise((r) => setTimeout(r, 1_200));
+      const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      if (!pollRes.ok) {
+        return { url: null, error: `poll_${pollRes.status}` };
+      }
+      prediction = await pollRes.json();
+    }
+
+    if (String(prediction?.status) !== "succeeded") {
+      const detail = String(prediction?.error ?? prediction?.status ?? "no_status");
+      return { url: null, error: `prediction_${String(prediction?.status ?? "pending")}:${detail.slice(0, 120)}` };
+    }
+
+    const url = normaliseFrameOutput(prediction?.output);
+    return url ? { url, error: null } : { url: null, error: "unparsable_output" };
+  } catch (e) {
+    const msg = (e as Error)?.name === "AbortError"
+      ? "timeout"
+      : (e as Error)?.message ?? String(e);
+    return { url: null, error: msg.slice(0, 160) };
+  } finally {
+    clearTimeout(timer);
   }
 }
+
 
 /** Fetches a frame, crops the mouth band and resamples it to a luminance grid. */
 async function frameToGrid(frameUrl: string, rect: MouthRect): Promise<Float64Array | null> {

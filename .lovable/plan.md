@@ -1,43 +1,49 @@
-# Plan v345 — Lip-Sync-Ausfall ohne weitere Geometrie-Experimente beheben
+# Plan v346 — Lip-Sync-Pipeline wieder deterministisch machen
 
-## Bestätigte Ursache
+## Bestätigte Ursache im letzten Lauf
 
-Der neue serverseitige Bewegungsprüfer sucht nach `REPLICATE_API_TOKEN`, im Backend ist jedoch `REPLICATE_API_KEY` konfiguriert. Deshalb endeten beim betroffenen Lauf alle vier Sprecher-Pässe mit `motion_verdict=unknown` und `motion_probe_unavailable:no_replicate_token`.
+Beim Lauf `7c11bc27…` sind zwei Fehler nacheinander aufgetreten:
 
-Der finale Mux blockiert aktuell nur nachgewiesen statische Ausgaben. Vier unbekannte Ergebnisse wurden dadurch trotz fehlendem Bewegungsnachweis als fertige Szene mit Voiceover ausgeliefert.
+1. Der serverseitige Bewegungsprüfer hatte Zugriff auf den Replicate-Key, konnte aber **0 von 4 Frames** aus dem Sync.so-Ergebnis extrahieren. Ergebnis: `motion_verdict=unknown` — also eine fehlgeschlagene Messung, kein nachgewiesener Fehler des Providers.
+2. Die Retry-Leiter wechselte daraufhin auf die Variante `coords-pro-box` und entfernte dabei ausdrücklich den vorhandenen Einzelgesicht-Preclip. Unmittelbar danach blockierte das v204-Sicherheitsgate genau diesen Full-Plate-Fallback mit `v204_preclip_required`.
 
-Die v169-Kerninvarianten — parallele unabhängige Sprecher-Pässe, eigener Preclip pro Sprecher und keine Verkettung von Provider-Ausgaben — bleiben unangetastet.
+Die Pipeline startet damit einen Retry, den ihr eigenes nächstes Gate garantiert ablehnt. Das erklärt den sichtbaren Ablauf „NOOP-Retry läuft" → „Szene fehlgeschlagen".
 
 ## Umsetzung
 
-1. **Secret-Namensfehler korrigieren**
-   - Der Bewegungsprüfer verwendet primär `REPLICATE_API_KEY`.
-   - `REPLICATE_API_TOKEN` bleibt nur als abwärtskompatibler Alias erhalten.
-   - Fehlermeldung und Telemetrie nennen künftig beide akzeptierten Namen korrekt.
+1. **Bewegungsprüfung reparieren**
+   - Die Frame-Extraktion erhält dieselbe robuste Replicate-Anbindung wie die produktiven Extraktionsfunktionen.
+   - Einzelne Extraktionsfehler werden mit Provider-Status und Ursache protokolliert, statt still zu verschwinden.
+   - Frames werden innerhalb der tatsächlichen Preclip-Dauer abgefragt; Zeitpunkte außerhalb des Clips sind ausgeschlossen.
+   - Tests decken String-, Array- und Objekt-Antworten sowie teilweise fehlgeschlagene Frames ab.
 
-2. **Fail-open-Lücke im Webhook schließen**
-   - Ein Provider-Pass wird nur als visuell bestätigt behandelt, wenn der Server `moved` misst.
-   - `static` nutzt weiterhin die bestehende NOOP-Wiederholungsleiter.
-   - `unknown` aufgrund eines technischen Messfehlers wird nicht mehr still als erfolgreicher visueller Pass freigegeben; der Pass erhält einen klaren, wiederholbaren Prüfstatus statt als fertig durchzulaufen.
+2. **Unmöglichen Full-Plate-Retry entfernen**
+   - Multi-Speaker-Retries dürfen den vorhandenen Einzelgesicht-Preclip nicht mehr verwerfen.
+   - `coords-pro-box` entfällt als Retry-Variante, wenn dafür der Preclip verlassen werden müsste.
+   - Ein Retry bleibt im v204/v169-konformen Pfad: derselbe Sprecher, derselbe isolierte Preclip, dieselbe unabhängige Audiospur, keine Provider-Ausgabe als Eingang eines anderen Sprecherpasses.
 
-3. **Finalen Mux absichern**
-   - Multi-Speaker-Szenen werden nur gemuxt, wenn jeder aktive Sprecher einen belastbaren Bewegungsnachweis besitzt.
-   - `static` bleibt ein harter Block.
-   - `unknown` blockiert den Mux mit einer verständlichen internen Ursache und löst den vorhandenen Retry-/Refund-Pfad aus, statt ein Voiceover-only-Video auszuliefern.
-   - Bereits vorhandene, ausdrücklich erzwungene Diagnose-Remuxes bleiben möglich.
+3. **Klare Behandlung von `unknown`, `static`, `moved`**
+   - `moved`: Pass wird abgeschlossen.
+   - `static`: höchstens ein zulässiger Preclip-Retry, danach sauberer Fehler mit automatischer Rückerstattung.
+   - `unknown`: technischer Wiederholungsversuch der Messung, aber kein Wechsel auf Full Plate und kein Mux.
+   - Die widersprüchliche Kennzeichnung „PASS_DONE_SUSPECT" entfällt, da ein unverifizierter Pass nicht mehr als fertig gilt.
 
-4. **Gezielte Regressionstests**
-   - Testfälle für `REPLICATE_API_KEY`, Alias-Fallback, fehlende Secrets sowie `moved/static/unknown` ergänzen.
-   - Mux-Gate mit 1-, 2- und 4-Sprecher-Pässen prüfen.
-   - Sicherstellen, dass statische Provider-Ausgaben erneut versucht und niemals als fertiges Lip-Sync präsentiert werden.
+4. **Finalen Mux geschlossen halten**
+   - Nur bestätigte Passes (`moved`) gelangen in den finalen Video-Mux.
+   - Kein Teil-Mux mit vollständigem Voiceover, wenn ein Sprecherpass fehlt oder unverifiziert ist — auch nicht bei ein oder zwei Sprechern.
+   - Ausdrücklich erzwungene interne Diagnose-Remuxes bleiben möglich.
 
-5. **Deployment und Live-Verifikation**
-   - Nur Bewegungsprüfer, Sync-Webhook und finalen Audio-Mux deployen.
-   - Einen kontrollierten Mehrsprecher-Lauf ausführen und pro Sprecher `motion_verdict=moved`, individuelle Preclip-URL und individuellen Provider-Output verifizieren.
-   - Erst danach die Szene als erfolgreich melden; andernfalls automatischer sauberer Fehler mit Credit-Rückerstattung.
+5. **Fehleranzeige bereinigen**
+   - Nutzer sehen verständliche Meldungen wie „Lip-Sync konnte für Samuel nicht bestätigt werden; Guthaben wurde erstattet".
+   - Interne Codes (`v204_preclip_required`, `motion_probe_unavailable`, Variantennamen) bleiben in Telemetrie und Logs.
+
+6. **Regressionstest und selektives Deployment**
+   - Testfälle für 0/4, 1/4, 2/4 und 4/4 extrahierte Frames sowie alle drei Verdicts.
+   - Vier-Sprecher-Lauf: Jeder Pass behält seinen eigenen Preclip und muss `moved` erreichen, bevor der Mux startet.
+   - Nur Bewegungsprüfer, Sync.so-Webhook, Dialog-Dispatch und Audio-Mux deployen.
 
 ## Bewusst nicht enthalten
 
-- Keine weiteren Änderungen an Crop-Größen, Face-Share-Schwellen, Masken oder Charakter-Prompts.
-- Kein erneuter Umbau der v169-Parallelarchitektur.
-- Kein weiteres blindes Geometrie-Patching.
+- Keine Änderungen an Crop-Größen, Face-Share-Schwellen, Masken oder Charakter-Prompts.
+- Kein Umbau der v169-Parallelarchitektur.
+- Keine Absenkung des Bewegungs-Schwellenwerts, um Fehler zu verstecken.

@@ -238,6 +238,41 @@ serve(async (req) => {
       }, 200);
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    // v346 — NO PARTIAL MUX. Previously a scene with 4 speakers muxed
+    // happily when only 1 pass survived, producing exactly the symptom the
+    // user reported: voiceover plays, most mouths never move. A scene is
+    // only composited when every speaking pass is `done`.
+    // ══════════════════════════════════════════════════════════════════
+    const failedPasses = passes.filter((p: any) => p?.status === "failed");
+    if (failedPasses.length > 0 && !forceRemux) {
+      const failedNames = failedPasses
+        .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`)
+        .join(", ");
+      const partialMsg =
+        `Lip-Sync abgebrochen: Für ${failedNames} konnte keine Mundbewegung erzeugt werden. Die Szene wurde nicht zusammengesetzt — bitte die Szene neu rendern.`;
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: { ...(state as any), status: "failed", error: "incomplete_passes" },
+          lip_sync_status: "failed",
+          twoshot_stage: "needs_clip_rerender",
+          clip_error: partialMsg,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      console.error(
+        `[render-sync-segments-audio-mux] v346_no_partial_mux scene=${sceneId} BLOCKED failed=${failedPasses.length}/${passes.length} speakers=${failedNames}`,
+      );
+      return json({
+        ok: false,
+        blocked: "incomplete_passes",
+        scene_id: sceneId,
+        affected_speakers: failedNames,
+      }, 200);
+    }
+
+
     const donePasses = passes.filter(
       (p: any) =>
         p?.status === "done" &&
