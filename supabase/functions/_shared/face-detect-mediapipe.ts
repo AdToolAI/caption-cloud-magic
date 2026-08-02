@@ -73,7 +73,10 @@ export interface MediaPipeDetectResult {
   source: "aws_rekognition" | "error";
   ms: number;
   error?: string;
+  /** v397 — Detector lief sauber, fand aber kein Gesicht (kein Ausfall). */
+  zeroFaces?: boolean;
 }
+
 
 function withTimeout<T>(p: Promise<T>, ms: number, tag: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -351,12 +354,21 @@ export async function detectFacesMediaPipe(opts: {
   const allFaces = perFrameResults.flat();
 
   if (allFaces.length === 0) {
+    // v397 — Ein sauber gelaufener Rekognition-Call ohne Treffer ist ein
+    // MESSERGEBNIS, kein Ausfall. Früher stand hier `ok:false`; das
+    // Face-Gate machte daraus `probe_unavailable` und behauptete eine
+    // Messstörung, obwohl gemessen wurde. `error` bleibt ab jetzt echten
+    // Ausfällen vorbehalten (Credentials, Fetch, HTTP, Timeout).
+    console.log(
+      `[face-detect/aws] rekognition ok plate=${W}x${H} frames=${validFrames.length} faces=0 (zero_faces)`,
+    );
     return {
-      ok: false, faces: [], framesScanned: validFrames.length, unionBbox: null,
-      source: "error", ms: Date.now() - t0,
-      error: "rekognition_zero_faces",
+      ok: true, faces: [], framesScanned: validFrames.length, unionBbox: null,
+      source: "aws_rekognition", ms: Date.now() - t0,
+      zeroFaces: true,
     };
   }
+
 
   // Cluster faces across frames by center distance (same person seen in
   // 2 frames -> 1 cluster; identical to v129.21 behaviour).

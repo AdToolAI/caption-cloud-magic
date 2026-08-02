@@ -1,6 +1,8 @@
 # Memory: index.md
 Updated: today
-- [v373 Harter Neustart & Generations-Vertrag](mem://architecture/lipsync/v373-hard-reset-generation-contract) — **Aktuell.** „Clip generieren" löscht den alten Job vollständig (Jobs abbrechen, Slots frei, Credits zurück, Artefakte purgen) und zählt `plate_generation` hoch. Lip-Sync läuft nur, wenn `plate_ready_generation === plate_generation`.
+- [v397 Zero-Face-Konsens & Still-Sanity](mem://architecture/lipsync/v397-zero-face-consensus) — **Aktuell.** Rekognition-Nulltreffer = Messergebnis (`ok:true, zeroFaces`), leeres/schwarzes Probe-Still = Messausfall (`still-sanity.ts`). `no_face` nur bei Konsens aus ≥2 auswertbaren Stills; `probe_degraded` nur bei validiertem Preclip + grünem v396-Roundtrip.
+- [v373 Harter Neustart & Generations-Vertrag](mem://architecture/lipsync/v373-hard-reset-generation-contract) — „Clip generieren" löscht den alten Job vollständig (Jobs abbrechen, Slots frei, Credits zurück, Artefakte purgen) und zählt `plate_generation` hoch. Lip-Sync läuft nur, wenn `plate_ready_generation === plate_generation`.
+
 - [v372 Padding genau einmal](mem://architecture/lipsync/v372-single-padding-responsibility) — Belegt: `anchor_fallback` weitete die bereits kontextualisierte Box ein zweites Mal auf (84.86 % vs. 38–41 % bei den funktionierenden Sprechern) → Passthrough. Tracker liefert rohe Boxen; Kontextaufschlag nur an der Dispatch-Aufrufstelle; `clampBoxArea` auf 0.55 statt Abbruch.
 
 - [v361 Rekognition-Koordinatenvertrag](mem://architecture/lipsync/v361-rekognition-coordinate-contract) — Belegt: Boxen wurden im Anchor-Raum (1:1) detektiert, aber mit Plate-Dimensionen (16:9) skaliert → Crops auf Möbeln. Detektionsraum = gesendete Bytes; Projektion nur über `_shared/rek-image-space.ts`; implausible Boxen verworfen.

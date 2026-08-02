@@ -4,7 +4,11 @@ Deno.test("v395 — exact preclip mouth gate fails closed", async () => {
   const gate = await Deno.readTextFile(new URL("./syncso-face-gate.ts", import.meta.url));
   assert(gate.includes('? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_aws_credentials" }'));
   assert(gate.includes('? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_video_url" }'));
-  assert(gate.includes("timestamp: 0.05"));
+  // v396/v397 — der feste 0.05 s-Fallback ist abgeschafft; Zeitstempel folgen
+  // ausschliesslich dem geprüften lokalen Preclip-Frameindex.
+  assert(!gate.includes("timestamp: 0.05"));
+  assert(gate.includes("timestamp: (idx + 0.5) / fps"));
+
 });
 
 Deno.test("v395 — plate-only diagnostics remain non-blocking", async () => {

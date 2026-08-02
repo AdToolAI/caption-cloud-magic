@@ -1,136 +1,37 @@
-## Korrekturen übernommen
+## Befund (verifiziert im Code)
 
-Alle neun Punkte sind eingearbeitet. Die zentrale Umbenennung: es ist **nicht** Fall A, sondern `source_geometry_drift` — die Transformation ist korrekt, sie transformiert veraltete Ausgangskoordinaten aus der Anchor-Face-Map.
+Der Fehler `face_gate_probe_unavailable:exact_preclip_face_probe_error:rekognition_zero_faces` entsteht aus zwei Ursachen, die gerade vermischt sind:
 
-Der Autoritätsvertrag lautet ab jetzt:
+1. **Semantik-Fehler.** `_shared/face-detect-mediapipe.ts` (Zeile 353–359) meldet „Rekognition hat sauber gelaufen, aber 0 Gesichter gefunden" als **Fehler** (`ok:false, error:"rekognition_zero_faces"`). Das Gate (`_shared/syncso-face-gate.ts`, Zeile 379–390) prüft nur `rek.ok` und macht daraus `probe_unavailable` — obwohl darunter (Zeile 393) längst ein korrekter `no_face`-Pfad existiert. Die Szene stirbt mit einer Meldung, die eine Messstörung behauptet, obwohl eine Messung stattgefunden hat.
 
-```text
-Anchor-Geometrie   -> Seed: Identität und grober Suchbereich
-Plate-Geometrie    -> plant den Crop
-Preclip-Geometrie  -> bestimmt den Provider-Payload
-```
+2. **Wahrscheinlich leeres Still.** Der Preclip ist beim Rendern mit `preclip_face_count = 1` validiert worden. Dass exakt dieses Artefakt plötzlich 0 Gesichter zeigt, deutet auf ein leeres/schwarzes Still aus `renderAwsStill` hin (Seek per `startSec` in `DialogTurnFaceCropVideo`, Frame 0). Das wird heute nirgends geprüft — ein schwarzes PNG erzeugt zuverlässig „zero faces".
 
-Der Anchor liefert künftig **Identität, nie endgültige Position**. Die 57 Plate-Pixel (≈41 Anchor-Pixel) werden nicht mehr als Skalierungsrauschen erklärt, sondern als das, was sie sind: eine Anchor-Bbox ist keine Positionsmessung im generierten Video.
+## Was gebaut wird
 
-## Scope
+**1. Nulltreffer ist ein Messergebnis, kein Ausfall**
+- `detectFacesMediaPipe` gibt bei erfolgreicher Rekognition-Antwort ohne Treffer `ok: true, faces: []` zurück (neues Feld `zeroFaces: true`). `error` bleibt nur für echte Ausfälle (Credentials, Fetch, HTTP).
+- Alle Aufrufer, die `!rek.ok` als „keine Gesichter" interpretieren, werden auf `faces.length` umgestellt (Suche über `supabase/functions`).
+- Das Gate liefert dann `no_face` statt `probe_unavailable` — Fehlermeldung im UI wird eindeutig.
 
-**v396 = T8–T10.** T1–T7 und T11–T14 bleiben unangetastet. T15 wird ausdrücklich **nicht** in v396 geändert; die Matrizen werden nur persistiert, konsumiert werden sie dort erst in v397. Damit ist der Widerspruch aufgelöst.
+**2. Blank-Frame-Erkennung vor dem Urteil**
+- Neues Modul `_shared/still-sanity.ts`: lädt das gerenderte Still, prüft Bytegröße und Luminanz-Varianz (nahezu uniformes/schwarzes Bild → `still_blank`).
+- Ein `still_blank` ist ausdrücklich **kein** `no_face`, sondern ein Messausfall und löst den Retry aus.
 
-## Reihenfolge der Umsetzung
+**3. Konsens statt Einzelframe**
+- Vor einem harten `no_face` probt das Gate bis zu 3 Frames (geprüfter Index, sowie ±15 % der dekodierten Preclip-Länge, alle über `checkPreclipFrame` validiert).
+- `no_face` nur, wenn mindestens zwei auswertbare (nicht-blanke) Stills übereinstimmend 0 Gesichter zeigen.
+- Sind alle Stills blank/nicht ladbar: Verdikt `probe_unavailable` mit präziser Ursache (`still_blank_all` statt `rekognition_zero_faces`).
 
-### 1. Frame-Räume hart typisieren
+**4. Degradierter Vertrauenspfad (eng begrenzt)**
+- Nur wenn (a) alle Stills blank sind, (b) `preclip_face_count === 1` und (c) die v396-Geometrie-Roundtrip-Prüfung des Passes grün war, wird der Dispatch mit `probe_degraded` freigegeben und im Pass-Forensikobjekt markiert. Die Passthrough-Bewertung nach dem Lauf bleibt scharf und fängt einen Fehlgriff weiterhin ab.
+- In allen anderen Fällen bleibt es fail-closed mit Refund wie bisher.
 
-Gebrandete Typen, Vermischung wird zum Compile-Fehler:
+**5. Forensik**
+- Pro Pass werden `probe_still_urls`, `probe_still_bytes`, `probe_frame_indices`, `probe_verdicts` persistiert, damit der nächste Fehlerfall am Bild statt am Fehlertext untersucht werden kann.
 
-```ts
-type PlateFrameIndex   = number & { readonly __brand: "PlateFrameIndex" };
-type PreclipFrameIndex = number & { readonly __brand: "PreclipFrameIndex" };
-```
+## Technische Details
 
-Zusätzlich Runtime-Guard `0 ≤ preclip_frame < decoded_preclip_frame_count`. Der belegte Fall `frame_number = 102` gegen einen 68-Frame-Preclip wird dadurch blockiert statt vom Sekunden-Fallback verdeckt.
-
-Keine Extraktion mehr über Sekunden. Statt `t = 0.05 s` künftig „extrahiere Preclip-Frame k". `plate_frame`, `preclip_frame` und PTS werden getrennt persistiert.
-
-### 2. Overlay und Forensik-Logging
-
-Annotiertes PNG pro Pass: projizierte Face-Bbox, projizierter Mund, alle AWS-Gesichter mit Mundpunkten und Identität, dazu `preclip_frame`, `source_plate_frame`, `crop_rect`. Angehängt an `syncso_dispatch_log`, sichtbar im Forensik-Sheet.
-
-### 3. Identitätsprüfung technisch belastbar machen
-
-„Genau ein Gesicht erkannt" gilt **nicht** als Identitätsbeweis — es könnte das letzte verbliebene Nachbargesicht sein, während die Zielperson den Crop bereits verlassen hat.
-
-Der Assignment-Lock (Character-UUID → Face-Slot) wird um eine echte Referenz erweitert: Face-Embedding aus dem zugeordneten Anchor plus Character-Referenzbild. Persistiert wird:
-
-```text
-expected_character_uuid
-matched_character_uuid
-identity_score
-second_best_score
-identity_margin
-reference_asset_id
-```
-
-Fehlerklassen getrennt: `wrong_identity`, `face_not_detected`, `identity_ambiguous`.
-
-### 4. Reacquisition auf echten Plate-Frames
-
-Kein Wiederanschalten des alten ungezügelten Plate-Trackings. Begrenztes Verfahren innerhalb des Sprachfensters: einige echte Plate-Frames decodieren, Gesichter erkennen, gegen die erwartete Identität matchen, robusten Track bzw. Track-Hülle bilden, daraus den ersten Crop berechnen.
-
-Damit kann die Zielperson gar nicht erst vollständig aus dem Preclip fallen — der Fall, in dem T10 sie auch nicht mehr retten könnte.
-
-### 5. Preclip rendern und auf dem echten Preclip tracken
-
-```text
-Plate-Reacquisition -> Crop-Planung -> echten 720x720-Preclip rendern
-   -> Gesicht AUF DIESEM Preclip tracken -> diese Boxen an Sync.so
-```
-
-Die projizierte Plate-Box ist nur noch Planungs-Startwert, nie Dispatch-Inhalt.
-
-### 6. Provider-Boxen aus geglättetem Track
-
-Keine unabhängigen Rohmessungen pro Frame (Box-Jitter). Stattdessen: Detektion auf mehreren belastbaren Frames → Identitätsbindung → zeitlicher Track → kurze Lücken interpolieren → Center und Boxgröße glätten → genau ein validierter Eintrag pro decodiertem Frame.
-
-Harte Prüfung `boxes.length === decodierte Framezahl`, ermittelt per **ffprobe am fertig encodierten Preclip** — nicht die geplante Remotion-Framezahl. CFR wird erzwungen, damit Frameindex, FPS und Zeitbasis eindeutig bleiben.
-
-### 7. Geometrievertrag: zwei Tests, nicht einer
-
-Persistiert pro Frame: `preclip_frame`, `source_plate_frame`, `crop_rect`, `forward_matrix`, `inverse_matrix`.
-
-- **Roundtrip-Assertion** `P → M → M⁻¹ → P`, Toleranz < 0,5 px. Notwendig, aber **nicht hinreichend** — eine falsche, sauber invertierte Matrix besteht ihn.
-- **Renderer-Conformance-Test**: bekannte Plate mit vier sichtbaren Kontrollmarkern. Nach dem Crop müssen deren tatsächliche Preclip-Positionen den durch M vorhergesagten entsprechen. Erst das beweist, dass Remotion und Matrixvertrag dieselbe Rasterisierung verwenden.
-
-### 8. Drift-Messung über stabile Merkmale, nicht über den Mund
-
-Der Mund bewegt sich beim Sprechen; ein schwankender Mundfehler beweist keinen Frame-Mapping-Fehler.
-
-```text
-Geometriefehler = beobachtetes Face-Zentrum - projiziertes Face-Zentrum
-```
-
-Gemessen über Augenmittelpunkt, Nasenrücken und Face-Bbox-Zentrum, robust über mehrere Frames gemittelt. Der Mund wird ausschließlich für die Safe-Region-Prüfung verwendet und darf sich relativ dazu bewegen.
-
-### 9. Einmaliger, minimaler Recrop über Safe-Region
-
-Kein Verschieben des Mundes auf einen festen Zielpunkt — das schneidet Stirn, Hinterkopf oder Kinn ab. Stattdessen Safe-Region (`safe_left/top/right/bottom`), und der Crop wird nur so weit verschoben, dass gilt:
-
-- das gesamte Mundfenster liegt in der Safe-Region,
-- die Face-Bbox bleibt vollständig enthalten,
-- kein Nachbargesicht gerät in den erlaubten Providerbereich,
-- der Crop bleibt innerhalb der Plate.
-
-Reicht Translation nicht, wird der Crop **vergrößert**. Erst wenn auch das scheitert, gilt `crop_not_viable`.
-
-Fehlerpfad für den belegten Fall:
-
-```text
-source_geometry_drift -> recrop_required -> (erst nach erfolglosem Recrop) terminal
-```
-
-`mouth_at_edge` wird aufgeteilt in: `wrong_identity`, `face_not_detected`, `identity_ambiguous`, `frame_mapping_failed`, `transform_contract_failed`, `source_geometry_drift`, `crop_not_viable`.
-
-### 10. Erst danach Dispatch öffnen
-
-Sync.so wird erst freigegeben, wenn Frametypen, Identität, Preclip-Track, Boxzahl und beide Geometrietests grün sind.
-
-## Regressionstests
-
-- `frame_number = 102` gegen 68-Frame-Preclip wird abgewiesen (`frame_mapping_failed`)
-- Kontrollmarker-Plate: Renderer-Conformance hält, verfälschte Matrix fällt durch
-- Roundtrip besteht bei falscher, aber konsistent invertierter Matrix — und der Conformance-Test fängt sie
-- Anchor-Bbox weicht +57/+33 px vom echten Plate-Gesicht ab → `source_geometry_drift`, kein Dispatch mit Altgeometrie
-- einziges erkanntes Gesicht mit zu geringer `identity_margin` → `identity_ambiguous`, nicht „ok"
-- Nachbargesicht im Crop → `wrong_identity`
-- Recrop verschiebt minimal, hält Face-Bbox vollständig, vergrößert bei Bedarf
-- `boxes.length` gegen ffprobe-Framezahl, nicht gegen Remotion-Plan
-- korrigierter Crop invalidiert den Preclip-Cache über den Geometrie-Fingerprint
-
-## Live-Verifikation
-
-Frischer Vier-Sprecher-Lauf. Pro Pass belegt: Overlay-Still, `identity_score` und `identity_margin`, Roundtrip < 0,5 px, bestandener Conformance-Test, ffprobe-verifizierte Boxzahl, Sync.so-Job-ID, Pixelurteil.
-
-Erfolgskriterium: entweder vier identitätsgeprüfte Münder gehen an Sync.so, oder der Lauf stoppt vor dem Provider mit genau einer benannten Ursache aus der neuen Fehlerklassifikation.
-
-## v397 (separat, nicht Teil dieser Umsetzung)
-
-T15 reprojiziert ausschließlich über die persistierte inverse Matrix, mit Geometry-Fingerprint-Abgleich.
+- Dateien: `_shared/face-detect-mediapipe.ts`, `_shared/syncso-face-gate.ts`, neu `_shared/still-sanity.ts`, `compose-dialog-segments/index.ts` (Persistenz + Verdikt-Mapping, Bereich ab Zeile 7668).
+- Neue Gate-Codes: `still_blank`, `probe_degraded`; `no_face` bleibt bestehen und wird jetzt korrekt getroffen.
+- Tests: Erweiterung der v396-Regressionssuite um Fälle „zero faces mit gültigem Still", „alle Stills blank", „Konsens 1 von 3".
+- Kein Eingriff in Crop-/Transformationslogik von v396 — die bleibt unverändert.
