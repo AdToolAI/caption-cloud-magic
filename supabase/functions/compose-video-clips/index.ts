@@ -472,11 +472,12 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
-            pipeline_state: "plate_rendering",
             clip_error: null,
             updated_at: new Date().toISOString(),
           })
           .in("id", earlyAiSceneIds);
+        // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+        await enterPlateRendering(supabaseAdmin, earlyAiSceneIds);
       }
     } catch (preMarkErr) {
       console.warn(
@@ -1655,11 +1656,12 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
-            pipeline_state: "plate_rendering",
             clip_error: null,
             updated_at: new Date().toISOString(),
           })
           .in("id", aiSceneIds);
+        // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+        await enterPlateRendering(supabaseAdmin, aiSceneIds);
       }
     } catch (preMarkErr) {
       console.warn(
@@ -4017,7 +4019,6 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               ...(isCinematicSyncScene
                 ? {
@@ -4028,6 +4029,8 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const masterPrompt = isCinematicSyncScene
             ? buildCinematicSyncMasterPrompt(scene)
@@ -4074,12 +4077,13 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-kling", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           // Kling 3 Omni: Replicate accepts 3–15s. Snap to Toolkit-aligned buckets.
           const klingDuration = snapDuration(scene.durationSeconds, [3, 5, 8, 10, 15]);
@@ -4145,11 +4149,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const enrichedPrompt = enrichPrompt(
             scene.aiPrompt,
@@ -4205,12 +4210,13 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-wan", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const wanModel = isI2V
             ? "wan-video/wan-2.5-i2v"
@@ -4257,7 +4263,6 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim(
                 "ai-seedance",
@@ -4266,6 +4271,8 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           // Seedance Lite supports 5/8/10/12s (Toolkit ground-truth) — snap to nearest.
           const seedDuration = snapDuration(scene.durationSeconds, [5, 8, 10, 12]);
@@ -4308,12 +4315,13 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-luma", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           // Luma Ray 2 only supports 5 or 9 seconds — snap to nearest allowed value
           const lumaDuration = snapDuration(scene.durationSeconds, [5, 9]);
@@ -4362,12 +4370,13 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-veo", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const veoModel =
             quality === "pro" ? "google/veo-3.1" : "google/veo-3.1-fast";
@@ -4442,11 +4451,12 @@ serve(async (req) => {
             await supabaseAdmin
               .from("composer_scenes")
               .update({
-                pipeline_state: "plate_rendering",
                 clip_quality: "standard",
                 replicate_prediction_id: fallbackPred.id,
               })
               .eq("id", scene.id);
+            // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+            await enterPlateRendering(supabaseAdmin, scene.id);
             results.push({
               sceneId: scene.id,
               status: "generating",
@@ -4458,11 +4468,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const runwayDuration = scene.durationSeconds >= 8 ? 10 : 5;
           const runwayResp = await fetch(
@@ -4525,12 +4536,13 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-pika", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const pikaDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const pikaResp = await fetch(
@@ -4624,7 +4636,6 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              pipeline_state: "plate_rendering",
               clip_quality: quality,
               ...(isCinematicSyncHH
                 ? {
@@ -4641,6 +4652,8 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
+          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const hhDuration = Math.min(
             15,
