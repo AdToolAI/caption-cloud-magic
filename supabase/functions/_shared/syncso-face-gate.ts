@@ -34,8 +34,9 @@ import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
 import { measurePreclipMouth } from "./preclip-mouth-geometry.ts";
 import { awsFrameProbeAvailable, renderAwsStill } from "./aws-frame-probe.ts";
 import { checkPreclipFrame } from "./frame-space.ts";
+import { inspectStill } from "./still-sanity.ts";
 
-const GATE_VERSION = "v396-authority-contract";
+const GATE_VERSION = "v397-zero-face-consensus";
 
 
 export type FaceGateCode =
@@ -57,9 +58,13 @@ export type FaceGateCode =
   | "source_geometry_drift"
   | "recrop_required"
   | "crop_not_viable"
+  // ── v397 — Messausfall (leeres/schwarzes Still) vs. degradierter Pass.
+  | "still_blank"
+  | "probe_degraded"
   | "skipped"
   | "probe_unavailable"
   | "unparsed";
+
 
 
 
