@@ -29,6 +29,13 @@ import {
   readIdOnlyEnabled,
   type DialogTurn,
 } from "../_shared/scene-dialog-turns.ts";
+import {
+  buildTwoshotPlanFromMetadata,
+  hashTwoshotAudioInput,
+  isCompleteTwoshotPlan,
+  isReusableTwoshotAudio,
+  TWOSHOT_AUDIO_PLAN_VERSION,
+} from "../_shared/twoshot-audio-contract.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -821,6 +828,21 @@ serve(async (req) => {
       { voiceId?: string; elevenlabsVoiceId?: string; isCustom?: boolean }
     >;
 
+    // v390 — scene_id survives regeneration and is therefore not provenance.
+    // Bind generated audio to the exact run, plate generation and authored
+    // audio inputs before allowing idempotent reuse.
+    const audioInputHash = await hashTwoshotAudioInput({
+      dialogScript,
+      dialogTurns: rawTurns,
+      dialogVoices,
+      durationSeconds: Number((scene as any).duration_seconds ?? 0),
+    });
+    const audioIdentity = {
+      activeRunId: String((scene as any).active_run_id ?? ""),
+      plateGeneration: Number((scene as any).plate_generation ?? 1),
+      inputHash: audioInputHash,
+    };
+
     // Idempotency: if we already have a merged voice clip for this scene,
     // return it (unless caller wants a fresh one).
     if (!force_regenerate) {
@@ -838,7 +860,7 @@ serve(async (req) => {
         // byte-based CBR math that caused lip-sync drift) — fall through to
         // regenerate as WAV.
         const isCurrentPipeline = url.includes("/twoshot-vo/") && url.endsWith(".wav");
-        if (isCurrentPipeline) {
+        if (isCurrentPipeline && isReusableTwoshotAudio((existing[0] as any).metadata, audioIdentity)) {
           const existingSceneDur = Number((existing[0] as any)?.metadata?.scene_duration_seconds ?? 0);
           const requestedSceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
           const sceneClipSource = String((scene as any).clip_source ?? "");
@@ -852,20 +874,49 @@ serve(async (req) => {
               `[compose-twoshot-audio] existing Hailuo twoshot WAV duration ${existingSceneDur}s != scene ${requestedSceneDur}s — regenerating instead of reusing stale 10s audio_plan.`,
             );
           } else {
-            await transitionScene(supabase, scene_id, "audio_ready", {
+            const reusedPlan = buildTwoshotPlanFromMetadata(
+              (existing[0] as any).metadata,
+              url,
+              Number(existing[0].duration ?? 0),
+            );
+            if (!isCompleteTwoshotPlan(reusedPlan)) {
+              console.warn(`[compose-twoshot-audio] v390 incomplete same-run metadata scene=${scene_id}; regenerating`);
+            } else {
+              const latestPlan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
+              const { error: persistReuseError } = await supabase
+                .from("composer_scenes")
+                .update({
+                  character_audio_url: url,
+                  audio_plan: {
+                    ...latestPlan,
+                    twoshot: { ...((latestPlan.twoshot ?? {}) as Record<string, unknown>), ...reusedPlan },
+                  },
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", scene_id)
+                .eq("active_run_id", audioIdentity.activeRunId)
+                .eq("plate_generation", audioIdentity.plateGeneration);
+              if (persistReuseError) {
+                throw new Error(`audio_reuse_plan_persist_failed:${persistReuseError.message}`);
+              }
+              const ready = await transitionScene(supabase, scene_id, "audio_ready", {
               from: ["audio_prep", "plate_ready"],
               detail: "audio_reused",
-            });
-            return json({
-              success: true,
-              already: true,
-              url,
-              duration: existing[0].duration,
-              speakers: Array.isArray((existing[0] as any)?.metadata?.speakers)
-                ? (existing[0] as any).metadata.speakers
-                : blocks.length,
-            });
+                runId: audioIdentity.activeRunId,
+                generation: audioIdentity.plateGeneration,
+              });
+              if (!ready.applied) throw new Error(`audio_reuse_transition_rejected:${ready.reason ?? ready.state}`);
+              return json({
+                success: true,
+                already: true,
+                url,
+                duration: existing[0].duration,
+                speakers: (existing[0] as any).metadata.speakers,
+              });
+            }
           }
+        } else if (isCurrentPipeline) {
+          console.info(`[compose-twoshot-audio] v390 stale audio row ignored scene=${scene_id} current_run=${audioIdentity.activeRunId} generation=${audioIdentity.plateGeneration}`);
         }
       }
     }
@@ -1410,6 +1461,10 @@ serve(async (req) => {
         total_samples: totalSamples,
         segments: publicSegments,
         speakers: publicSpeakerTracks,
+        active_run_id: audioIdentity.activeRunId,
+        plate_generation: audioIdentity.plateGeneration,
+        audio_plan_version: TWOSHOT_AUDIO_PLAN_VERSION,
+        audio_input_hash: audioInputHash,
       },
     });
     if (insertRes.error) {
@@ -1477,17 +1532,26 @@ serve(async (req) => {
     if (!isHailuoScene && dialogOverflowExtended && totalSec > originalSceneDur + 0.05) {
       sceneUpdate.duration_seconds = Math.round(totalSec * 1000) / 1000;
     }
-    await supabase
+    if (!isCompleteTwoshotPlan((sceneUpdate.audio_plan as any)?.twoshot)) {
+      throw new Error("audio_plan_incomplete_before_ready");
+    }
+    const { error: sceneUpdateError } = await supabase
       .from("composer_scenes")
       .update(sceneUpdate)
-      .eq("id", scene_id);
+      .eq("id", scene_id)
+      .eq("active_run_id", audioIdentity.activeRunId)
+      .eq("plate_generation", audioIdentity.plateGeneration);
+    if (sceneUpdateError) throw new Error(`audio_plan_persist_failed:${sceneUpdateError.message}`);
 
     // v384 — Audio liegt vor: Zustand weiterschalten. Der Dispatcher liest
     // ausschliesslich diesen Zustand, kein `twoshot_stage`-Freitext mehr.
-    await transitionScene(supabase, scene_id, "audio_ready", {
+    const ready = await transitionScene(supabase, scene_id, "audio_ready", {
       from: ["audio_prep", "plate_ready"],
       detail: "audio_ready",
+      runId: audioIdentity.activeRunId,
+      generation: audioIdentity.plateGeneration,
     });
+    if (!ready.applied) throw new Error(`audio_ready_transition_rejected:${ready.reason ?? ready.state}`);
 
     return json({
       success: true,

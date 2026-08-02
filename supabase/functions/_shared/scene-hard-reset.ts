@@ -538,6 +538,20 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     /* non-fatal */
   }
 
+  // v390 — generated voiceover has two references: the storage object and a
+  // scene_audio_clips row. Purging only storage left a dangling DB row that the
+  // next generation incorrectly reused by stable scene_id.
+  try {
+    const { error } = await supabase
+      .from("scene_audio_clips")
+      .delete()
+      .eq("scene_id", sceneId)
+      .eq("kind", "voiceover");
+    if (error) errors.push(`audio_rows:${(error as any).message ?? "unknown"}`);
+  } catch (e) {
+    errors.push(`audio_rows:${(e as Error).message}`.slice(0, 120));
+  }
+
   // ── 4. PHYSICAL CLEANUP ─────────────────────────────────────────────────
   // Purge artifacts (plate, preclips, anchors, tracking, pass videos, VO).
   // Safe to run late: the scene is already logically invalidated, so nothing
