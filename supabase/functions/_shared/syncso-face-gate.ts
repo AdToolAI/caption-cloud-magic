@@ -31,8 +31,9 @@
 
 import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
+import { measurePreclipMouth } from "./preclip-mouth-geometry.ts";
 
-const GATE_VERSION = "v252-aws-face-gate-primary";
+const GATE_VERSION = "v393-mouth-geometry-gate";
 
 
 export type FaceGateCode =
@@ -41,9 +42,12 @@ export type FaceGateCode =
   | "no_face"
   | "not_at_coord"
   | "multiple_faces"
+  | "mouth_missing"
+  | "mouth_at_edge"
   | "skipped"
   | "probe_unavailable"
   | "unparsed";
+
 
 export interface FaceGateResult {
   ok: boolean;
