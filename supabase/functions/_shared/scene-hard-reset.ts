@@ -356,7 +356,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   }
 
   console.log(
-    `[v373_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} objects_deleted=${deletedObjects} errors=${errors.length}`,
+    `[v373_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
   );
 
   return {
@@ -365,8 +365,10 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     generation: nextGeneration,
     deletedObjects,
     canceledJobs: jobIds.length,
+    refundDecision: refund.decision,
     errors,
   };
+
 }
 
 /**
