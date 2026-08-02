@@ -230,25 +230,47 @@ serve(async (req) => {
       return jsonResponse({ error: "DB_ERROR", message: scenesErr.message }, 500);
     }
 
+    // v380 — Single-Run-Vertrag: auch der Autopilot-Pfad muss pro Szene einen
+    // atomaren Lauf erwerben, sonst weist `compose-video-clips` den Dispatch
+    // mit `missing_run_context` ab. Schlägt der Erwerb fehl, wird die Szene
+    // nicht dispatcht (kein bezahlter Render ohne gültigen Lauf).
+    const runContext: Record<string, { generation: number; run_id: string }> = {};
+    const dispatchScenes: any[] = [];
+    for (const s of insertedScenes ?? []) {
+      try {
+        const run = await startSceneRun(supabaseAdmin as any, s.id);
+        runContext[s.id] = { generation: run.generation, run_id: run.runId };
+        dispatchScenes.push(s);
+      } catch (e) {
+        console.error(
+          `[auto-director] start_run_failed scene=${s.id}: ${(e as Error).message}`,
+        );
+      }
+    }
+
     // Trigger compose-video-clips asynchronously (fire-and-forget — caller polls scene status)
     const clipsPayload = {
       projectId: project.id,
-      scenes: (insertedScenes ?? []).map((s: any) => ({
+      scenes: dispatchScenes.map((s: any) => ({
         id: s.id,
         clipSource: s.clip_source,
         clipQuality: s.clip_quality,
         aiPrompt: s.ai_prompt,
         durationSeconds: Number(s.duration_seconds),
       })),
+      run_context: runContext,
     };
 
     // Async invoke without awaiting result — clips run in background
-    supabaseClient.functions.invoke('compose-video-clips', {
-      body: clipsPayload,
-      headers: { Authorization: authHeader },
-    }).catch((err) => {
-      console.error('[auto-director] async clips invoke error:', err);
-    });
+    if (dispatchScenes.length > 0) {
+      supabaseClient.functions.invoke('compose-video-clips', {
+        body: clipsPayload,
+        headers: { Authorization: authHeader },
+      }).catch((err) => {
+        console.error('[auto-director] async clips invoke error:', err);
+      });
+    }
+
 
     return jsonResponse({
       ok: true,
