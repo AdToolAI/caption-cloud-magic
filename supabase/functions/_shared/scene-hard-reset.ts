@@ -269,10 +269,47 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
 
   const refund = decideRefund({ scene, knownJobIds: jobIds, hasInflightRows });
 
-  // 2. Cancel provider jobs + free inflight slots. Credits are refunded ONLY
-  //    for an open job we are about to cancel (v374). `failLipSync` prefers
-  //    the persisted cost over the hint, so a non-refund is expressed by
-  //    withholding the userId — that is the flag it gates the payout on.
+  const nextGeneration = Number(scene?.plate_generation ?? 1) + 1;
+
+  // ── 2. v376 — INVALIDATE LOGICALLY FIRST ────────────────────────────────
+  // Provider cancellation is never fully reliable: the job may already be past
+  // the cancel window, the API call may fail, the network may drop. So the
+  // generation bump — not the cancel — is the wall. It is written and committed
+  // BEFORE any best-effort teardown, so from this instant on every in-flight
+  // callback of the previous run is structurally unable to write to the scene
+  // (`plate_attempts` rows are tombstoned by the `supersede_plate_attempts`
+  // trigger, and the webhook write is generation-scoped).
+  let supersededAttempts = 0;
+  try {
+    const { error } = await supabase
+      .from("composer_scenes")
+      .update({
+        plate_generation: nextGeneration,
+        plate_generation_started_at: nowIso,
+        plate_ready_generation: null,
+        plate_ready_at: null,
+        updated_at: nowIso,
+      })
+      .eq("id", sceneId);
+    if (error) errors.push(`invalidate:${(error as any).message ?? "unknown"}`);
+  } catch (e) {
+    errors.push(`invalidate:${(e as Error).message}`.slice(0, 120));
+  }
+
+  // The DB trigger already supersedes open attempts on the bump; this call is
+  // the belt-and-braces path for rows the trigger could not see (and it gives
+  // us the count for the audit log).
+  supersededAttempts = await supersedeOpenPlateAttempts(
+    supabase,
+    sceneId,
+    nextGeneration,
+  );
+
+  // ── 3. BEST-EFFORT TEARDOWN ─────────────────────────────────────────────
+  // Cancel provider jobs + free inflight slots. Credits are refunded ONLY
+  // for an open job we are about to cancel (v374). `failLipSync` prefers
+  // the persisted cost over the hint, so a non-refund is expressed by
+  // withholding the userId — that is the flag it gates the payout on.
   try {
     await failLipSync({
       supabase,
@@ -288,7 +325,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   }
 
 
-  // 3. Drop dispatch locks so the next run is never blocked by a stale lease.
+  // Drop dispatch locks so the next run is never blocked by a stale lease.
   try {
     await supabase.from("dialog_dispatch_locks").delete().eq("scene_id", sceneId);
   } catch {
