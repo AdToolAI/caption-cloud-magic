@@ -59,7 +59,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, canDispatchLipsync, transitionScene, failSceneState, type SceneState } from "../_shared/scene-state.ts";
+import { sceneState, canDispatchLipsync, canContinueLipsync, transitionScene, failSceneState, type SceneState } from "../_shared/scene-state.ts";
 import { canonicalizeAssignmentLock, stripVariantPrefix } from "../_shared/assignment-lock.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
@@ -836,6 +836,16 @@ serve(async (req) => {
     // or a scene without an active v377 run may never reach preclip/provider
     // work. Only a user-triggered composer-start-scene-generation call can mint
     // a fresh run and clear the terminal state.
+    //
+    // v394 — Start und Fortsetzung sind zwei Vertraege. Der Szenenzustand
+    // beschreibt die Phase, der Pass-Slot die Arbeitseinheit. Sobald Pass 1 die
+    // Szene auf `lipsync_running` hebt, ist der START-Vertrag nicht mehr
+    // erfuellt — Fan-out-Geschwister, Webhook-Advance und Watchdog sind aber
+    // legitime FORTSETZUNGEN und wurden bis v393 faelschlich mit 409 abgewiesen
+    // (Pipeline blieb bei Pass 1/N stehen).
+    const bodyPassIdxRaw = Number(body?.pass_idx);
+    const hasExplicitPassIdx = Number.isFinite(bodyPassIdxRaw) && bodyPassIdxRaw >= 0;
+    const guardMode: "start" | "continue" = (isAdvance || hasExplicitPassIdx) ? "continue" : "start";
     const terminalClipError =
       typeof (scene as any).clip_error === "string" &&
       (scene as any).clip_error.length > 0 &&
@@ -844,15 +854,19 @@ serve(async (req) => {
         "audio_prep_transient_retry",
         "syncso_concurrency_deferred",
       ].some((marker) => String((scene as any).clip_error).startsWith(marker));
+    const stateGateOk = guardMode === "continue"
+      ? canContinueLipsync(scene)
+      : canDispatchLipsync(scene);
     const terminalScene =
       // v385 — Zustand kommt ausschließlich aus `pipeline_state`.
-      !canDispatchLipsync(scene) ||
+      !stateGateOk ||
       terminalClipError ||
       ["failed", "canceled"].includes(String((scene as any).dialog_shots?.status ?? ""));
     if (!(scene as any).active_run_id || terminalScene) {
       console.warn(
         `[compose-dialog-segments] v378_terminal_guard scene=${sceneId} ` +
-          `run=${(scene as any).active_run_id ?? "none"} state=${sceneState(scene)}`,
+          `run=${(scene as any).active_run_id ?? "none"} state=${sceneState(scene)} ` +
+          `mode=${guardMode} pass=${hasExplicitPassIdx ? Math.floor(bodyPassIdxRaw) : "-"}`,
       );
       return json(
         {
@@ -864,6 +878,33 @@ serve(async (req) => {
         409,
       );
     }
+
+    // v394 — Pass-Ebenen-Vertrag: eine Fortsetzung darf niemals einen bereits
+    // gelieferten Pass anfassen (v141-Invariante: ein Pass mit `output_url` ist
+    // terminal). Ein expliziter Retry (`retry: true`) der Retry-Leiter bleibt
+    // erlaubt — er adressiert bewusst einen fehlgeschlagenen Pass.
+    if (guardMode === "continue" && hasExplicitPassIdx && !isRetry) {
+      const guardPassIdx = Math.floor(bodyPassIdxRaw);
+      const guardPasses = Array.isArray((scene as any).dialog_shots?.passes)
+        ? (scene as any).dialog_shots.passes
+        : [];
+      const guardPass = guardPasses[guardPassIdx];
+      const guardPassStatus = String(guardPass?.status ?? "");
+      if (
+        guardPass &&
+        (guardPass.output_url || ["done", "done_suspect"].includes(guardPassStatus))
+      ) {
+        console.warn(
+          `[compose-dialog-segments] v394_pass_already_terminal scene=${sceneId} ` +
+            `pass=${guardPassIdx} status=${guardPassStatus || "-"} has_output=${!!guardPass.output_url}`,
+        );
+        return json(
+          { error: "pass_already_terminal", scene_id: sceneId, pass_idx: guardPassIdx, status: guardPassStatus },
+          409,
+        );
+      }
+    }
+
 
     // v388 — Phasenwechsel laufen ausschliesslich ueber den geprueften Weg:
     // atomar, mit Freigabeliste sowie Lauf- und Generations-Fence.

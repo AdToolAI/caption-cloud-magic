@@ -1,58 +1,47 @@
-## Warum die Messwerte von vornherein so niedrig sind
+## Was wirklich kaputt ist (belegt, Szene `9eded574-…`)
 
-Die Zahl, an der alles hängt (`outVsIn` = 1.4–1.9), ist nicht „schlechtes Provider-Verhalten in Zahlen", sondern das Ergebnis von vier Verdünnungsschritten in unserer eigenen Messung. Jeder einzelne drückt das Nutzsignal, während das Rauschen konstant bleibt.
+Pass 1/4 ist sauber fertig (`verdict=moved`, `output_url` gesetzt). Pässe 2–4 stehen auf `pending` **ohne** `job_id` — nie an Sync.so geschickt. Slots 0/3, also kein Provider-Stau.
 
-**1. Das Messfenster liegt gar nicht auf dem Mund.**
-Auf allen vier Passes des letzten Laufs sind `mouth_center` und `mouth_rect` leer — die Preclip-Stufe berechnet den Mundanker, schreibt ihn aber nicht auf den Pass. Gemessen wird deshalb immer ein festes Standardrechteck (x 0.24 / y 0.52 / Breite 0.52 / Höhe 0.36 des Bildes). Das ist über ein Drittel des Bildes: Mund, Kinn, Wangen, Hals, Hintergrund. Der Mund selbst macht darin grob 10–15 % der Fläche aus.
+```
+19:15:43  Pass 1 dispatcht        (Szene noch lipsync_dispatched)
+19:15:47  Szene -> lipsync_running
+19:15:49  fanout self_invoke pass=2,3,4 -> 3x HTTP 409
+          v378_terminal_guard ... state=lipsync_running
+19:16–19:21 Watchdog alle 60 s -> jedes Mal derselbe 409
+```
 
-**2. Es wird gemittelt, nicht gemessen.**
-Das Band wird auf ein 48×32-Raster heruntergerechnet und dann der **Mittelwert** der Helligkeitsdifferenz über alle 1536 Zellen gebildet. Eine echte Lippenbewegung verändert vielleicht 100 dieser Zellen stark (Differenz 30–60), die übrigen 1400 gar nicht. Der Mittelwert davon liegt bei ~2–4. Genau in diesem Bereich liegen unsere Messwerte — sie beweisen also nicht, dass nichts passiert ist; sie können ein echtes Signal gar nicht sichtbar machen.
+`canDispatchLipsync()` erlaubt nur `audio_ready` und `lipsync_dispatched`. Sobald Pass 1 die Szene auf `lipsync_running` hebt, hält der v378-Guard **jede weitere Pass-Invocation** für eine terminale Szene. Der Fan-out feuert 2 Sekunden nach dem Zustandswechsel — daher reproduzierbar Stillstand bei 1/4 bzw. 2/4.
 
-**3. Es fehlt ein Nullpunkt.**
-Jede H.264-Neukodierung erzeugt für sich schon 1–2 Punkte Differenz. Wir vergleichen unsere Messwerte aber gegen eine feste Zahl (1.8) statt gegen dieses Grundrauschen im selben Bild. Damit ist die Messung nicht kalibriert: Ein dunkler Clip, ein anderer Encoder oder eine andere Bitrate verschieben das Ergebnis, ohne dass sich am Lip-Sync irgendetwas geändert hätte.
+## Die saubere Lösung: zwei Verträge trennen, nicht den Guard aufweichen
 
-**4. Zu wenige Stichproben.**
-Vier Frames über einen 2,8-Sekunden-Turn. `Math.max` über drei Differenzen ist statistisch nahezu bedeutungslos — Pass 1 und Pass 2 unterschieden sich am Ende um 0.15 Punkte, und das entschied über „fertig" gegen „Szene fehlgeschlagen".
+Der Denkfehler ist eine Ebenenverwechslung: der **Szenen-Zustand** beschreibt die Phase (läuft Lip-Sync?), der **Pass-Slot** beschreibt die Arbeitseinheit (ist dieser Pass offen?). Heute prüft der Pass-Dispatch den Szenen-Zustand, als wäre er ein Pass-Zustand.
 
-**Fazit:** Die Werte sind nicht schlecht, weil der Provider schlecht arbeitet, sondern weil die Messung ein starkes lokales Signal in einer großen, überwiegend unbeteiligten Fläche ertränkt. Und parallel dazu gibt es das echte Problem: die ASD-Box, die wir Sync 3 mitschicken, liegt nachweislich in der linken unteren Bildecke (`[0, 266, 373, 720]` im mundzentrierten 720×720-Preclip, an zwei Rändern angeschlagen) — dort ist kein Gesicht.
+Deshalb *nicht*: `lipsync_running` einfach in `canDispatchLipsync` aufnehmen (verwischt Start und Fortsetzung), und *nicht*: den Zustandswechsel nach hinten schieben (Race bleibt, nur mit anderem Zeitfenster).
 
-## Ja, die Messwerte lassen sich strukturell hochziehen
+Stattdessen ein expliziter zweiter Vertrag:
 
-Ziel ist ein Signal-Rausch-Abstand, bei dem echtes Lip-Sync **um ein Vielfaches** über dem Encoder-Rauschen liegt statt um 0.15 Punkte darunter. Vier Hebel, alle ohne neue Provider-Kosten:
+1. **`_shared/scene-state.ts`**
+   - `canDispatchLipsync` bleibt exakt wie heute — Start-Gate (`audio_ready`, `lipsync_dispatched`).
+   - Neu `canContinueLipsync(row)` — Fortsetzungs-Gate: `lipsync_dispatched` **oder** `lipsync_running`, weiterhin nur mit `isRealizedScene` (Plate der aktuellen Generation). `failed`, `canceled`, `complete`, `lipsync_muxing` bleiben ausgeschlossen.
+   - Der Frontend-Zwilling `src/lib/composer/sceneState.ts` bekommt dieselbe Funktion, damit beide Seiten semantisch identisch bleiben.
 
-- **Fenster verkleinern und richtig setzen.** Mundanker am Pass festschreiben und nur die Lippenregion vermessen statt das halbe Bild. Erwarteter Signalgewinn: Faktor 3–5, allein durch Wegfall der unbeteiligten Fläche.
-- **Vom Mittelwert auf Perzentil wechseln.** Nicht „wie stark hat sich das Band im Schnitt verändert", sondern „wie stark haben sich die am stärksten veränderten 10 % der Zellen verändert". Das ist die Größe, die Lippenbewegung tatsächlich erzeugt. Erwarteter Gewinn: nochmals Faktor 5–10.
-- **Kontrollband als Nullpunkt.** Dieselbe Messung auf einer Region, die sich bei Lip-Sync nicht ändern darf (Stirn/oberer Gesichtsbereich). Bewertet wird das Verhältnis Mund zu Kontrolle. Damit wird die Messung encoder-, helligkeits- und bitratenunabhängig — der Nullpunkt kommt aus demselben Bild.
-- **Auflösung und Stichprobenzahl anheben.** Feineres Raster in der Lippenregion und mindestens acht Stichproben über das Sprachfenster, verteilt auf die lautesten Audioabschnitte statt gleichmäßig (dort ist Mundbewegung garantiert vorhanden, falls überhaupt welche existiert).
+2. **`compose-dialog-segments/index.ts`** — der v378-Guard bekommt einen expliziten Modus statt einer impliziten Annahme:
+   - `mode = (advance === true || pass_idx != null) ? "continue" : "start"`.
+   - `start` prüft gegen `canDispatchLipsync`, `continue` gegen `canContinueLipsync`.
+   - Unverändert scharf bleiben: `active_run_id`-Fence, Generations-Fence (`plate_ready_generation === plate_generation`) und Abbruch bei `dialog_shots.status ∈ {failed, canceled}` — eine fehlgeschlagene Szene startet und setzt weiterhin nichts fort.
+   - Zusätzliche Pass-Ebenen-Prüfung im `continue`-Pfad: der adressierte Pass muss existieren und nicht-terminal sein (kein `output_url`, Status nicht `done`/`failed`/`canceled`) — sonst 409 mit `pass_already_terminal`. Damit kann ein verspäteter Retry keinen fertigen Pass mehr anfassen (v141-Invariante).
+   - Logzeile um `mode=` und `pass=` erweitert; ein 409 ist danach ohne Ratespiel zuzuordnen.
 
-Zusammen verschiebt das die Trennschärfe von „1.74 gegen 1.89" auf Größenordnungen — echte Animation landet dann bei einem Mund-zu-Kontroll-Verhältnis deutlich über 2, ein Passthrough bei ~1. Erst dann ist die Aussage „unverändert zurückgegeben" ein Beweis und keine Vermutung.
+3. **Kein Zombie-Lock**: bricht der Guard einen Fortsetzungs-Aufruf ab, wird der vorher belegte `v168_per_pass_lock` im `finally` freigegeben. Heute bleibt er bis zum TTL liegen und blockiert den nächsten Watchdog-Versuch zusätzlich.
 
-**Wichtig zur Erwartung:** Bessere Messung beseitigt die *Fehlurteile*. Sie beseitigt nicht das dahinterliegende Problem, dass Sync 3 auf eine Box neben dem Gesicht schaut. Beides gehört in denselben Umbau, in dieser Reihenfolge.
+4. **`lipsync-watchdog/index.ts`**: der Rettungspfad ruft `advance` immer mit explizitem `pass_idx` des ältesten `pending`-Passes ohne `job_id` auf — damit läuft die Recovery über denselben, jetzt korrekten Fortsetzungsvertrag statt über einen impliziten Neustart.
 
----
+5. **Regressionstest** `_shared/scene-state.test.ts`: `lipsync_running` darf nicht starten, aber fortsetzen; `failed`/`canceled`/veraltete Generation dürfen weder noch. Dazu ein Dispatcher-Test, der den Fan-out-Selbstaufruf im Zustand `lipsync_running` simuliert und 2xx erwartet.
 
-## Vorgehen: Beweis zuerst, Umbau danach
+6. **Deploy & Recovery**: `compose-dialog-segments`, `lipsync-watchdog`, `sync-so-webhook` deployen, danach die hängende Szene `9eded574…` über den Watchdog-Pfad nachlaufen lassen — ohne dass der Kunde erneut auf „Clip generieren" klickt und ohne neue Plate-Kosten.
 
-**Schritt 1 — Geometrie-Beweis am realen Fall (kein Produktionscode).**
-Frames des versendeten Preclips ziehen, die ausgelieferten ASD-Boxen darauflegen. Ergebnis ist ein Bildbeleg für eine von zwei Aussagen: Box liegt neben dem Gesicht (unsere Geometrie ist die Ursache) oder Box sitzt korrekt (dann ist der Provider die Ursache).
+## Technische Hinweise
 
-**Schritt 2 — Messung kalibrieren, bevor sie irgendetwas entscheidet.**
-Die neue Messgröße (Perzentil im Mundband gegen Kontrollband) wird an drei bekannten Fällen geeicht: ein nachweislich animierter Clip, eine reine Neukodierung desselben Clips, ein echter Passthrough. Erst wenn die drei Fälle sauber auseinanderliegen, darf die Größe über Szenen entscheiden.
-
-**Schritt 3 — A/B gegen Sync.so.** Derselbe Preclip, dieselbe Audiospur, zwei Jobs: einmal mit unserer Box, einmal mit `auto_detect`. Die geeichte Messung entscheidet objektiv, welcher Weg animiert.
-
-**Schritt 4 — Umbau nach vier Prinzipien**, im Umfang, den Schritt 1–3 belegen:
-1. Die ASD-Entscheidung richtet sich nach dem Inhalt des *versendeten* Clips, nicht nach der Sprecherzahl der Szene. Einsprecher-Preclip = ein Gesicht = `auto_detect`.
-2. Eine ASD-Box geht nur raus, wenn sie vorher am echten Frame verifiziert wurde. Nicht bestanden = fallenlassen, nicht blind mitschicken.
-3. Die Messung misst, was sie behauptet: Mundgeometrie am Pass, Perzentil statt Mittelwert, Kontrollband als Nullpunkt.
-4. Zweifel trifft nie den Kunden: terminal sind nur harte Signale und ein eindeutiges Verhältnis; alles dazwischen ist Telemetrie. Ein Hard-Fail bricht laufende Geschwisterpasses sauber ab.
-
-**Schritt 5 — Rückrechnung und Regressionstests.** Alle gespeicherten Verdikt-Datensätze gegen die neue Bewertung nachrechnen (kein hartes Fehlurteil auf bekannt guten Passes), Unit-Tests für Boxprüfung, Mundband, Kontrollband und Entscheidungslogik, Abschluss mit einem realen Vier-Sprecher-Lauf.
-
-## Technische Berührungspunkte
-
-- `supabase/functions/_shared/mouth-motion-verdict.ts` — Perzentil-Metrik, Kontrollband, Verhältnis-Kriterium, feineres Raster, ≥8 audio-gewichtete Stichproben; absolute Schwellen (1.8 / 2.0 / 1.5) entfallen als Entscheidungsgrößen.
-- `supabase/functions/_shared/pass-face-preclip.ts` — `mouth_center` / `mouth_rect` am Pass persistieren.
-- `supabase/functions/_shared/asd-strategy.ts` — Entscheidungsgrundlage auf die Gesichtszahl im dispatched Clip umstellen.
-- `supabase/functions/compose-dialog-segments/index.ts` — Vorab-Verifikation der Dispatch-Box, Verwerfen statt Mitschicken, Geschwister-Abbruch bei Hard-Fail.
-- Kein Schemawechsel; neue Felder leben in `dialog_shots.passes[]`.
+- Keine Änderung an `composer_scene_transition()` und an der Übergangstabelle. Die Szene bleibt während aller Pässe korrekt `lipsync_running`; erst der letzte Pass führt nach `lipsync_muxing`.
+- Der Fix ist strukturell, nicht zeitabhängig: er greift für N=2…4, für die Retry-Leiter und für den Watchdog, weil alle drei denselben `advance`-Pfad benutzen.
+- Nach dem Deploy prüfbar an einem einzigen Signal: im Log erscheinen für dieselbe Szene vier `v193_fanout_self_invoke … status=200` statt `409`.

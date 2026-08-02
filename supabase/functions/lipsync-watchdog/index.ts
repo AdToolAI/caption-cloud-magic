@@ -419,7 +419,16 @@ serve(async (req) => {
           apikey: serviceKey,
           Authorization: `Bearer ${serviceKey}`,
         },
-        body: JSON.stringify({ scene_id: d.id, auto: true, recovery: true }),
+        // v394 — Fortsetzung eines laufenden Lip-Syncs, kein Neustart:
+        // explizit mit `advance` + `pass_idx`, damit der Dispatcher gegen den
+        // Fortsetzungsvertrag prueft statt gegen das Start-Gate.
+        body: JSON.stringify({
+          scene_id: d.id,
+          auto: true,
+          recovery: true,
+          advance: true,
+          pass_idx: stalePreflightIdx,
+        }),
       });
       const invokeBody = await invokeResp.text().catch(() => "");
       console.warn(
