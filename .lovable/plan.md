@@ -1,78 +1,43 @@
-# v387 — Stabilisierung statt Umbau
+Ja — mit einer Einschränkung, die ich offen sagen will: Schritt 2 (der Datenbank-Wächter) ist der eigentliche Kern. Ohne ihn ist alles andere wieder nur Konvention, und Konvention hat uns die letzten Wochen gekostet. Mit ihm ist der Rückfall technisch unmöglich.
 
-Ziel: keine neuen Features, keine weitere Architekturwelle. Wir schließen genau zwei bestätigte Brüche, verifizieren einen dritten, und frieren die Pipeline danach ein.
+## Warum das der saubere Weg ist
 
-## Status: was gesichert ist und was nicht
+Das Problem ist nicht, dass die Pipeline falsch rechnet. Sie rechnet an ~50 Stellen **getrennt voneinander richtig**. Jede dieser Stellen hat ihre eigene handgeschriebene Prüfung auf Lauf-ID, Generation und Endzustand nachgebaut. Das ist kein Uhrwerk, das sind 50 Uhren, die zufällig gleich gehen — und jedes Mal, wenn eine nicht mitgezogen wurde, hattest du wieder einen Sprung im Ablauf.
 
-**Bestätigt (aus den Function-Logs des letzten Laufs):**
-`compose-video-clips` setzt bei aktiviertem Dialog/Lip-Sync den Zustand direkt auf `audio_prep`/`audio_ready` und ruft die Audio-Function auf, **bevor** die Plate fertig ist. Diese Updates umgehen `composer_scene_transition()`. Das ist die Ursache für „Lip-Sync startet, obwohl die Szene noch gebaut wird".
+Die Alternative wäre ein Neubau der Pipeline. Davon rate ich ab: die Logik selbst ist inzwischen korrekt (siehe Audit unten), nur die Durchsetzung ist verteilt. Ein Neubau würde funktionierende Logik wegwerfen, um dasselbe Ziel zu erreichen.
 
-**Noch nicht bestätigt:**
-Der aktuelle Fehler `lipsync_identity_collision` („Zwei Sprecher wurden demselben Charakter zugeordnet"). Erster Schritt ist deshalb eine Datenprüfung, kein Codefix — dazu unten Schritt 1.
+## Was das Audit ergeben hat
 
-## Schritt 1 — Sprecher-Kollision forensisch klären (vor jedem Fix)
+**Sauber und bestätigt:**
+- Genau ein Einstiegspunkt — alle 11 Klick-Pfade laufen über den Server-Endpunkt, keiner ruft direkt an
+- Reset und Generations-Hochzählung passieren vor jedem Provider-Aufruf; scheitert der Reset, bricht der Lauf ohne Kosten ab
+- Veraltete Rückmeldungen werden fünffach abgelehnt (überholt, doppelt, fertig, falsche Generation, falscher Lauf)
+- Lip-Sync kann auf einer fehlgeschlagenen Szene nicht mehr starten; ein Callback belebt sie nicht wieder
+- Erstattungen sind idempotent und feuern nie für geliefertes Material
+- Die Freigabeliste der erlaubten Zustandswechsel ist lückenlos
+- Die Oberfläche kann nicht mehr "Lip-Sync läuft" zeigen, während die Plate rendert
 
-Für die betroffene Szene auslesen:
+**Der eine systemische Widerspruch:** Der Code sagt "Zustandswechsel laufen ausschließlich über die geprüfte Übergangsfunktion". Tatsächlich tun das nur ~10 von ~60 Schreibvorgängen (Plate: 13 Umgehungen, Dialog: 28, Sync-Webhook: 10, Mux: 6).
 
-- `dialog_turns` — welche Sprecher-UUIDs stehen dort wirklich
-- `assignment_lock` — auf welchen Face-Slot zeigt jede UUID
-- Cast-Liste der Szene — die UI zeigt vier Sprecher, sichtbar sind drei Chips
-- die Rekognition-FaceIds des aktuellen Plate-Attempts
+**Kleinere Abweichungen:** Zwei UI-Komponenten entscheiden noch an Alt-Feldern; der Player zeigt nach 9 Minuten eigenmächtig "Fehler", obwohl der Server die Szene als laufend führt; der Client stößt parallel zum Server an (serverseitig abgesichert); der Watchdog prüft vor dem Anstoßen nicht selbst auf Generation.
 
-Damit wird eindeutig, welcher der drei möglichen Fälle vorliegt:
+## Der Plan
 
-1. zwei Dialog-Turns tragen dieselbe Charakter-UUID (Fehler entsteht schon im Briefing/Skript)
-2. zwei unterschiedliche UUIDs zeigen auf denselben Face-Slot (Fehler im Assignment-Lock)
-3. die Plate enthält tatsächlich nur drei unterscheidbare Gesichter für vier Sprecher (Fehler im Plate-Prompt/Cast-Block)
+**Schritt 1 — Ein einziger Schreibweg.** Alle direkten Zustandsschreibungen in den vier Backend-Funktionen auf die geprüfte Übergangsfunktion umstellen. Jeder Wechsel bekommt damit automatisch Zeilensperre, Freigabeprüfung und Lauf-/Generations-Abgleich. Die 50 handgeschriebenen Einzelprüfungen werden dadurch überflüssig statt weiter dupliziert.
 
-Erst danach wird gefixt — und nur der Fall, der tatsächlich vorliegt.
+**Schritt 2 — Den Schreibweg erzwingen.** Ein Datenbank-Wächter weist jede Zustandsänderung ab, die nicht aus der Übergangsfunktion kommt. Ab hier ist die Regel physikalisch, nicht mehr nur dokumentiert. Das ist der Schritt, der die Fehlerklasse endgültig schließt.
 
-## Schritt 2 — Den bestätigten Zustandsbruch schließen
+**Schritt 3 — Watchdog absichern.** Er prüft Generation und Lauf-ID selbst, bevor er etwas erneut anstößt, statt sich auf die Zielfunktion zu verlassen.
 
-- Den kompletten Audio-/Lip-Sync-Vorgriff aus `compose-video-clips` entfernen. Diese Function darf ausschließlich `plate_queued → plate_rendering` steuern und nichts nachgelagertes aufrufen.
-- Audio-Prep wird nur noch nach bestätigtem `plate_ready` ausgelöst, also durch den Provider-Callback mit passendem Run und passender Generation.
-- Verbleibende direkte Enum-Schreibstellen für `audio_prep`, `audio_ready`, `lipsync_*` und `complete` in Webhooks, Mux und Dialog-Dispatch auf die Transition-Funktion umstellen.
+**Schritt 4 — UI angleichen.** Beide Komponenten vollständig auf den Pipeline-Zustand umstellen; die 9-Minuten-Eigenanzeige entfernen.
 
-Verbindliche Reihenfolge, ohne Abkürzung:
+**Schritt 5 — Verifikation.** Ein Vertragstest, der den Build bricht, sobald irgendwo wieder am Vertrag vorbeigeschrieben wird, plus ein echter 4-Sprecher-Durchlauf mit Protokollprüfung an allen sieben Stationen.
 
-```text
-plate_rendering → plate_ready → audio_prep → audio_ready → lipsync_dispatched → lipsync_running → lipsync_muxing → complete
-```
+### Technische Details
 
-## Schritt 3 — Kollision abhängig vom Befund beheben
+- Betroffen: `compose-video-clips`, `compose-dialog-segments`, `sync-so-webhook`, `render-sync-segments-audio-mux` — jeweils `transitionScene(...)` mit `from`, `runId`, `generation` statt `.update({ pipeline_state })`
+- Schritt 2 als Migration: BEFORE-UPDATE-Trigger, der `pipeline_state`-Änderungen ohne die Sitzungsmarkierung der Übergangsfunktion abweist; die Funktion setzt die Markierung innerhalb ihrer Transaktion
+- Fehlerpfade bleiben bei `failLipSync` — bereits vertragskonform und idempotent
+- Kein Schema-Umbau, keine Datenmigration, keine Änderung an der Freigabeliste
 
-Je nach Ergebnis aus Schritt 1 genau eine Korrektur:
-
-- **Fall 1:** Dedup der Sprecher-UUIDs beim Erzeugen der Dialog-Turns; doppelte Zuweisung wird beim Speichern abgelehnt, nicht erst kurz vor Sync.so.
-- **Fall 2:** Der Assignment-Lock vergibt jeden Face-Slot exakt einmal; ein zweiter Anspruch auf denselben Slot führt zu einer klaren, frühen Fehlermeldung mit Nennung der betroffenen Namen.
-- **Fall 3:** Der Cast-Block der Plate erzwingt so viele klar getrennte Gesichter wie Sprecher; passt das Ergebnis nicht, schlägt die Szene **vor** dem Lip-Sync fehl und die Credits werden erstattet.
-
-In allen Fällen gilt: die Meldung nennt die konkreten Sprechernamen und den nächsten Schritt, nicht nur einen internen Fehlercode.
-
-## Schritt 4 — Kein stiller Geldverbrauch
-
-- Jeder Abbruch vor dem ersten Provider-Aufruf erstattet automatisch und idempotent.
-- Ein Abbruch wegen Kollision oder fehlender Plate darf nie als „fertig" enden und nie Lip-Sync anzeigen.
-
-## Schritt 5 — Freeze und Regressionsnetz
-
-Nach diesen Korrekturen wird der Lip-Sync-Pfad eingefroren. Es kommen nur noch Tests dazu:
-
-1. Dialog-Run bleibt während des Provider-Renders ausschließlich in `plate_rendering`.
-2. Vor `plate_ready` gibt es keinen Audio- und keinen Sync.so-Aufruf.
-3. Vier Sprecher ergeben vier verschiedene Face-Slots; doppelte Zuordnung wird früh abgelehnt.
-4. Verspätete Callbacks eines alten Runs bleiben wirkungslos.
-5. Provider-Fehler ist terminal, mit Erstattung, ohne Folge-Function.
-
-Änderungen an dieser Kette danach nur noch mit vorheriger Absprache.
-
-## Verifikation am echten Lauf
-
-Ein 4-Sprecher-Testlauf, protokolliert nach Zeit:
-
-- zuerst sichtbare Plate mit vier getrennten Gesichtern
-- danach genau ein Audio-Claim
-- danach genau ein Lip-Sync-Dispatch
-- Ergebnis visuell prüfen: alle vier Sprecher bewegen die Lippen zu ihrem eigenen Text
-
-Schlägt einer dieser Punkte fehl, wird nicht weitergebaut, sondern der Punkt einzeln geklärt.
+Aufwand liegt fast vollständig in Schritt 1+2. Danach ist der Zustandsautomat nachweisbar der einzige Taktgeber — und Abweichungen scheitern beim Build statt beim Kunden.
