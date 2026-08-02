@@ -3706,18 +3706,27 @@ serve(async (req) => {
         .update(
           giveUp
             ? {
-                pipeline_state: "failed",
                 clip_error:
                   "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
                 dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: 0 }),
               }
             : {
-                pipeline_state: "audio_ready",
                 clip_error: `awaiting_face_detection_retry_${nextRetryCount}_of_3`,
                 dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: nextRetryCount }),
               },
         )
         .eq("id", sceneId);
+      // v388 — Aufgeben bzw. Warten auf den nächsten Versuch über den Vertrag.
+      await transitionScene(
+        supabase,
+        sceneId,
+        giveUp ? "failed" : "audio_ready",
+        {
+          detail: giveUp
+            ? "v388_no_face_map_after_3_retries"
+            : `v388_awaiting_face_detection_retry_${nextRetryCount}`,
+        },
+      );
 
       await logSyncDispatch(supabase, {
         scene_id: sceneId,
@@ -4543,11 +4552,15 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            pipeline_state: "audio_ready",
             clip_error: `syncso_concurrency_deferred:${inflightCount}`,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
+        // v388 — Parken auf `audio_ready` läuft über den Vertrag.
+        await transitionScene(supabase, sceneId, "audio_ready", {
+          from: ["audio_prep", "audio_ready", "lipsync_dispatched"],
+          detail: "v388_syncso_concurrency_deferred",
+        });
       }
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
