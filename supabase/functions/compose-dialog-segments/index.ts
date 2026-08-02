@@ -6336,6 +6336,11 @@ serve(async (req) => {
       let v357TrackedBoxes: Array<[number, number, number, number] | null> | null = null;
       let v357TrackSource = "not_attempted";
       let v357TrackMovementPx = 0;
+      // v372 — Forensik: Geometrie vor/nach Padding und Clamp, damit beim
+      // nächsten Fall in EINER Zeile sichtbar ist, ob Geometrie oder Provider
+      // die Ursache war.
+      const v372BoxBeforeTrack = dispatchBox ? ([...dispatchBox] as [number, number, number, number]) : null;
+      let v372Clamped = false;
       if (dispatchBox && retryVariant === "bbox-url-pro") {
         const trackW = v358DispatchWidth;
         const trackH = v358DispatchHeight;
@@ -6358,32 +6363,69 @@ serve(async (req) => {
           });
           v357TrackSource = track.source;
           if (track.ok && track.keyframes.length > 0) {
+            // v372 — Kontextaufschlag GENAU HIER, auf die rohen Tracker-Boxen.
+            // Das ist die einzige Stelle, an der die Dispatch-Geometrie ihren
+            // Kontext bekommt.
             v357TrackedBoxes = interpolateBoxes({
-              keyframes: track.keyframes,
+              keyframes: track.keyframes.map((k) => ({
+                t: k.t,
+                box: withContextPadding(k.box, trackW, trackH),
+              })),
               frameCount,
               fps: dispatchFps ?? ASSUMED_FPS,
               voicedWindowsSec: v124VoicedWindows,
             });
             v357TrackMovementPx = trackMovementPx(v357TrackedBoxes);
-          } else {
-            // Kein Tracking möglich → Anchor-Box, aber MIT Kontextrahmen,
-            // weil Sync 3 mit Umfeld nachweislich besser arbeitet.
-            dispatchBox = withContextPadding(dispatchBox, trackW, trackH);
           }
+          // v372 — Kein `else` mehr. Die Anchor-Box wurde oben bereits aus der
+          // kontextualisierten Plate-Face-Box in den Clip-Raum überführt; ein
+          // zweiter Aufschlag machte aus Samuels gültiger 40%-Box eine
+          // 84.86%-Fast-Vollbildbox (Szene 6bf4e815) und Sync.so gab den
+          // Preclip unverändert zurück. Tracking-Ausfall darf die Geometrie
+          // nicht systematisch verändern.
         } catch (e) {
           v357TrackSource = "track_threw";
           console.warn(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v357_track_failed ${(e as Error).message}`,
           );
         }
+
+        // v372 — Entartungen zurückschneiden statt abbrechen. Ein Hard-Fail
+        // würde Credits vernichten, obwohl die Geometrie korrigierbar ist.
+        const clampedAnchor = clampBoxArea(dispatchBox, trackW, trackH);
+        if (clampedAnchor.clamped) {
+          dispatchBox = clampedAnchor.box;
+          v372Clamped = true;
+        }
+        if (v357TrackedBoxes) {
+          let anyClamped = false;
+          v357TrackedBoxes = v357TrackedBoxes.map((b) => {
+            if (!b) return b;
+            const c = clampBoxArea(b, trackW, trackH);
+            if (c.clamped) anyClamped = true;
+            return c.box;
+          });
+          if (anyClamped) v372Clamped = true;
+        }
+
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v357_face_track ` +
           `source=${v357TrackSource} movement_px=${v357TrackMovementPx} frames=${frameCount} ` +
           `space=${v161UsingPreclipForBbox ? "clip" : "plate"} dims=${trackW}x${trackH}`,
         );
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v372_box_geometry ` +
+          `source=${v357TrackSource} anchor_in=${JSON.stringify(v372BoxBeforeTrack)} ` +
+          `anchor_out=${JSON.stringify(dispatchBox)} clamped=${v372Clamped} ` +
+          `max_area_frac=${MAX_DISPATCH_BOX_AREA_FRAC}`,
+        );
         (pass as any)._v357TrackSource = v357TrackSource;
         (pass as any)._v357TrackMovementPx = v357TrackMovementPx;
+        (pass as any)._v372BoxIn = v372BoxBeforeTrack;
+        (pass as any)._v372BoxOut = dispatchBox;
+        (pass as any)._v372Clamped = v372Clamped;
       }
+
 
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;
