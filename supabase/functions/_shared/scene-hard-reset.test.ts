@@ -8,7 +8,7 @@
  */
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { decideRefund } from "./scene-hard-reset.ts";
+import { decideRefund, stripDerivedAudioPlan } from "./scene-hard-reset.ts";
 
 Deno.test("v374: offener Sync.so-Job wird erstattet", () => {
   const r = decideRefund({
@@ -119,4 +119,44 @@ Deno.test("v374: veraltete clip_url einer Vorgeneration blockiert die Erstattung
 Deno.test("v374: fehlende Szene wird nie erstattet", () => {
   const r = decideRefund({ scene: null, knownJobIds: [], hasInflightRows: false });
   assertEquals(r.decision, "nothing_open");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v377 — audio_plan purge contract.
+//
+// The regression these guard: a scene restarted with `faceMap` / `preclips`
+// still in `audio_plan` fed the lip-sync chain crops computed from the
+// PREVIOUS plate, which is how "Kailee" kept being cut out of yesterday's
+// render while the new plate was still being produced.
+// ─────────────────────────────────────────────────────────────────────────────
+
+Deno.test("v377: derived pipeline keys are stripped from audio_plan", () => {
+  const cleaned = stripDerivedAudioPlan({
+    voices: { sarah: "voice-1" },
+    turns: [{ speaker: "sarah", text: "Hallo" }],
+    totalDurationSeconds: 15,
+    faceMap: { sarah: "face-abc" },
+    preclips: [{ url: "https://old/preclip.mp4" }],
+    twoshot: { syncJobs: { jobs: [{ id: "job-1" }] } },
+    lipsync: { pass: 4 },
+    tracking: { boxes: [] },
+    run_id: "old-run",
+    generatedAt: "2026-08-01T10:00:00Z",
+  });
+
+  assertEquals(cleaned, {
+    voices: { sarah: "voice-1" },
+    turns: [{ speaker: "sarah", text: "Hallo" }],
+    totalDurationSeconds: 15,
+  });
+});
+
+Deno.test("v377: a plan without derived keys survives untouched", () => {
+  const plan = { voices: { a: "v" }, turns: [] };
+  assertEquals(stripDerivedAudioPlan(plan), plan);
+});
+
+Deno.test("v377: missing plan clears the column instead of writing {}", () => {
+  assertEquals(stripDerivedAudioPlan(null), null);
+  assertEquals(stripDerivedAudioPlan(undefined), null);
 });
