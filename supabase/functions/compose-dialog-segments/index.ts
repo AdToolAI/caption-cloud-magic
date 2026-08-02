@@ -7634,6 +7634,18 @@ serve(async (req) => {
       const gateCoord: [number, number] | null = Array.isArray(gateAsd?.coordinates) && gateAsd.coordinates.length >= 2
         ? [Number(gateAsd.coordinates[0]), Number(gateAsd.coordinates[1])]
         : null;
+      // ── v396 — Framevertrag. `preclip_frame_count` stammt aus dem real
+      // gerenderten und encodierten Preclip. Ohne diese Zahl darf das Gate
+      // keinen Frame mehr über Sekunden raten; mit ihr wird ein absoluter
+      // Plate-Frame als `frame_mapping_failed` blockiert statt still auf
+      // t=0.05s zurückzufallen (belegter Fall: 102 gegen 68 Frames).
+      const decodedPreclipFrames = Number.isFinite(Number((pass as any).preclip_frame_count))
+        ? Math.round(Number((pass as any).preclip_frame_count))
+        : 0;
+      const preclipLocalFrame = usePassPreclip && decodedPreclipFrames > 0
+        ? (gateFrame != null && gateFrame >= 0 && gateFrame < decodedPreclipFrames ? gateFrame : 0)
+        : undefined;
+
       const gateMulti = speakers.length >= 2;
       const preclipDimsForGate = (pass as any).preclip_dims ?? null;
       const preclipCropForGate = (pass as any).preclip_crop ?? null;
