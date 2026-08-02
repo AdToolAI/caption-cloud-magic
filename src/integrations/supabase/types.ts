@@ -10434,6 +10434,59 @@ export type Database = {
         }
         Relationships: []
       }
+      plate_attempts: {
+        Row: {
+          clip_url: string | null
+          completed_at: string | null
+          created_at: string
+          expected_plate_generation: number
+          id: string
+          provider: string | null
+          provider_job_id: string | null
+          scene_id: string
+          status: string
+          superseded_at: string | null
+          superseded_by_generation: number | null
+          updated_at: string
+        }
+        Insert: {
+          clip_url?: string | null
+          completed_at?: string | null
+          created_at?: string
+          expected_plate_generation: number
+          id?: string
+          provider?: string | null
+          provider_job_id?: string | null
+          scene_id: string
+          status?: string
+          superseded_at?: string | null
+          superseded_by_generation?: number | null
+          updated_at?: string
+        }
+        Update: {
+          clip_url?: string | null
+          completed_at?: string | null
+          created_at?: string
+          expected_plate_generation?: number
+          id?: string
+          provider?: string | null
+          provider_job_id?: string | null
+          scene_id?: string
+          status?: string
+          superseded_at?: string | null
+          superseded_by_generation?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plate_attempts_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "composer_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_announcements: {
         Row: {
           author_id: string
