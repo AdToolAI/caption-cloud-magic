@@ -181,8 +181,6 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
       .from("composer_scenes")
       .update({
         dialog_shots: patchedState,
-        lip_sync_status: "failed",
-        twoshot_stage: "failed",
         clip_error: safeReason,
         replicate_prediction_id: null,
         updated_at: nowIso,
@@ -192,6 +190,14 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
     console.warn(`[failLipSync] scene update crash: ${(e as Error).message}`);
     return { ok: false, refunded: didRefund, scene_id: sceneId, reason: safeReason };
   }
+
+  // v385 — Zustand ausschließlich über die Zustandsmaschine.
+  try {
+    await transitionScene(supabase, sceneId, "failed", { detail: safeReason });
+  } catch (e) {
+    console.warn(`[failLipSync] transition crash: ${(e as Error).message}`);
+  }
+
 
   console.log(
     `[failLipSync] scene=${sceneId} reason="${safeReason}" jobs=${ids.length} refunded=${didRefund}/${refundAmount}`,
