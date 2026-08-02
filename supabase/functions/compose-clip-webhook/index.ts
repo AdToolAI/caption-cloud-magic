@@ -429,7 +429,6 @@ serve(async (req) => {
               .update({
                 lip_sync_status: 'failed',
                 twoshot_stage: 'failed',
-                clip_error: `dialog_audio_handoff_failed:${message.slice(0, 300)}`,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', sceneId)
