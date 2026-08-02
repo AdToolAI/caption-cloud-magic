@@ -8057,6 +8057,17 @@ serve(async (req) => {
     });
     await recordCircuitSuccess(supabase, "sync.so");
 
+    // v391 — Zustandsvertrag einhalten. Vorher sprang der Dispatch direkt von
+    // `audio_ready` nach `lipsync_running`; diese Kante ist in der DB bewusst
+    // verboten, der Wechsel wurde still abgelehnt (`transition_not_allowed`)
+    // und die Szene blieb dauerhaft auf "Lip-Sync wird gestartet" stehen,
+    // obwohl Sync.so bereits arbeitete. Der Zwischenzustand wird jetzt
+    // tatsaechlich durchlaufen. Bei paralleler Fan-out-Dispatch greift nur der
+    // erste Uebergang; spaetere sind wirkungslos (idempotent).
+    await advanceScene("lipsync_dispatched", ["audio_ready"]);
+
+
+
     pass.job_id = jobId;
     passes[currentPassIdx] = pass;
 
