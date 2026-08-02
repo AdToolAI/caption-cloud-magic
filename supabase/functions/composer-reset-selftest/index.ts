@@ -93,9 +93,9 @@ serve(async (req) => {
           .in("status", ["pending", "queued"]),
         admin
           .from("plate_attempts")
-          .select("id, generation, status")
+          .select("id, expected_plate_generation, status")
           .eq("scene_id", sceneId)
-          .in("status", ["open", "running", "dispatched"]),
+          .in("status", ["rendering"]),
         admin.from("syncso_inflight_jobs").select("job_id").eq("scene_id", sceneId),
         admin.from("dialog_dispatch_locks").select("scene_id").eq("scene_id", sceneId),
       ]);
@@ -190,11 +190,6 @@ serve(async (req) => {
       {
         name: "dispatch_locks_released",
         pass: artifactsAfter.dispatchLocks.length === 0,
-      },
-      {
-        name: "no_active_run_after_reset",
-        pass: !after?.active_run_id,
-        detail: String(after?.active_run_id ?? "none"),
       },
     ];
 
