@@ -307,6 +307,27 @@ serve(async (req) => {
         );
         return;
       }
+
+      // ── v391 Letztes Netz ──────────────────────────────────────────────
+      // Eine Szene, die noch auf `audio_ready` steht, obwohl bereits ein
+      // Provider-Job registriert ist, hat einen Zustandswechsel verloren.
+      // Frueher blieb sie dadurch unbegrenzt auf "Lip-Sync wird gestartet".
+      // Wir ziehen den Zustand kontrolliert nach, ohne neu zu dispatchen.
+      if (pipeState === "audio_ready") {
+        const dsHere: any = d.dialog_shots ?? {};
+        const hasProviderJob = Array.isArray(dsHere?.passes) &&
+          dsHere.passes.some((p: any) => typeof p?.job_id === "string" && p.job_id.length > 0);
+        if (hasProviderJob) {
+          console.warn(
+            `[lipsync-watchdog] v391_state_catchup scene=${d.id} audio_ready trotz Provider-Job — ziehe Zustand nach`,
+          );
+          await transitionScene(supabase, d.id, "lipsync_running", {
+            runId: String(runId),
+            generation: gen != null ? Number(gen) : null,
+            detail: "v391_watchdog_state_catchup",
+          });
+        }
+      }
     }
 
     // v129.4a — Terminal no-op guard.
