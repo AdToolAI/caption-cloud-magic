@@ -11,11 +11,18 @@ import {
   boxIou,
   pickTrackedBox,
   withContextPadding,
+  clampBoxArea,
+  MAX_DISPATCH_BOX_AREA_FRAC,
   sampleTimestamps,
   interpolateBoxes,
   trackMovementPx,
   CONTEXT_PAD_X,
 } from "./face-track.ts";
+
+/** Flächenanteil einer Box am Bild — die Zahl, an der v372 gemessen wird. */
+const areaFrac = (b: Box, w: number, h: number) =>
+  ((b[2] - b[0]) * (b[3] - b[1])) / (w * h);
+
 
 Deno.test("v357: bewegte Keyframes erzeugen eine bewegte Spur, keine Standbox", () => {
   const boxes = interpolateBoxes({
