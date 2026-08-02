@@ -7680,7 +7680,14 @@ serve(async (req) => {
         // oder klebt er am Rand, animiert Sync.so nichts und reicht den
         // Clip unveraendert durch. Lieber hier scheitern als nach dem Lauf.
         requireMouth: usePassPreclip,
+        fps: Number.isFinite(Number((pass as any).preclip_fps)) && Number((pass as any).preclip_fps) > 0
+          ? Number((pass as any).preclip_fps)
+          : undefined,
+        // v396 — Framevertrag statt Sekunden-Fallback.
+        decodedPreclipFrameCount: usePassPreclip && decodedPreclipFrames > 0 ? decodedPreclipFrames : undefined,
+        preclipFrameIndex: preclipLocalFrame,
       });
+
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
         (pass as any).probe_frame_cached = !!gate.frame_cached;
