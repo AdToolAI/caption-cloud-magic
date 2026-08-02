@@ -54,8 +54,14 @@ export interface MouthCenteredCropResult {
   anchorRepaired: boolean;
   /** v360 — true when the crop was grown/moved so the whole head fits in. */
   headContained: boolean;
-
+  /** v393 — vertical mouth position inside the crop (0 = top, 1 = bottom). */
+  mouthBandY: number;
+  /** v393 — pixels between the mouth anchor and the lower crop edge. */
+  mouthMarginBelowPx: number;
+  /** v393 — mouth anchor lies inside the crop with usable margin. */
+  mouthInsideCrop: boolean;
 }
+
 
 export function computeMouthCenteredCrop(
   input: MouthCenteredCropInput,
