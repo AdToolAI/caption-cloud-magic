@@ -236,8 +236,9 @@ serve(async (req) => {
   const { data: rows, error } = await supabase
     .from("composer_scenes")
     .select(
-      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
+      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at, pipeline_state, active_run_id, plate_generation, plate_ready_generation",
     )
+
     // v141 — Widen filter to include the zombie state observed on
     // 2026-06-20: `pending + twoshot_stage=syncso_fanout_3_of_4`.
     // After a watchdog auto-retry reset a `rendering` pass to `pending`
