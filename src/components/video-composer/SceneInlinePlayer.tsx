@@ -23,6 +23,7 @@ import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { ComposerScene } from '@/types/video-composer';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
+import { isInFlightState, sceneState } from '@/lib/composer/sceneState';
 
 interface Props {
   scene: ComposerScene;
@@ -66,6 +67,7 @@ export default function SceneInlinePlayer({
   // bleed into every not-yet-rendered scene, faking a render result.
   const posterUrl = scene.firstFrameUrl || scene.lastFrameUrl || undefined;
   const status = scene.clipStatus;
+  const pipelineState = sceneState(scene);
 
   // Pipeline-Vollständigkeit: Bei Cinematic-Sync/Dialog-/Talking-Head-Szenen
   // ist der Clip erst dann "wirklich fertig", wenn auch der Lip-Sync sauber
@@ -73,31 +75,22 @@ export default function SceneInlinePlayer({
   const dialogVoiceCount = scene.dialogVoices ? countSceneSpeakers(scene) : 0;
   const needsLipsync =
     scene.engineOverride === 'cinematic-sync' ||
-    !!(scene as any).twoshotStage ||
+    isLipSyncIntentional(scene) ||
     dialogVoiceCount > 1;
   const lipSyncStatus = (scene as any).lipSyncStatus as string | null | undefined;
   const twoshotStage = (scene as any).twoshotStage as string | null | undefined;
   const lipSyncAppliedAt = (scene as any).lipSyncAppliedAt as string | null | undefined;
   const dialogShots: any =
     (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
-  const lipsyncCanceled = lipSyncStatus === 'canceled' || dialogShots?.status === 'canceled';
+  const lipsyncCanceled = pipelineState === 'canceled';
   const lipsyncDone =
     lipsyncCanceled ||
     !needsLipsync ||
-    (lipSyncStatus === 'done' && !!lipSyncAppliedAt) ||
-    twoshotStage === 'done' ||
-    twoshotStage === 'complete';
-  const lipsyncFailed = lipSyncStatus === 'failed' || twoshotStage === 'failed';
+    pipelineState === 'complete';
+  const lipsyncFailed = pipelineState === 'failed';
   const lipsyncRunning =
     needsLipsync &&
-    !lipsyncDone &&
-    !lipsyncFailed &&
-    !lipsyncCanceled &&
-    (lipSyncStatus === 'running' ||
-      lipSyncStatus === 'stitching' ||
-      lipSyncStatus === 'audio_muxing' ||
-      (twoshotStage && !['failed', 'done', 'complete', 'canceled'].includes(twoshotStage)) ||
-      status === 'ready'); // clip ready, lip-sync still pending
+    ['audio_prep', 'audio_ready', 'lipsync_dispatched', 'lipsync_running', 'lipsync_muxing'].includes(pipelineState);
 
   // v131.7 — Stale-Lipsync-Detection (Realtime-Backstop).
   // Wenn Lipsync >9 min läuft, ohne dass `lipSyncAppliedAt` gesetzt wurde
@@ -115,22 +108,18 @@ export default function SceneInlinePlayer({
     return Date.now() - startedMs > 9 * 60_000;
   })();
 
-  const isReady = status === 'ready' && !!clipUrl && lipsyncDone && !lipsyncFailed;
-  const isFailed = status === 'failed' || lipsyncFailed || lipsyncStaleByAge;
+  const isReady = !!clipUrl && (needsLipsync ? pipelineState === 'complete' : ['plate_ready', 'complete'].includes(pipelineState));
+  const isFailed = pipelineState === 'failed' || lipsyncStaleByAge;
   // Stage 6 self-heal: a scene marked `generating` is only really working if
   // there is an actual backend handle (Replicate prediction, sync.so job,
   // twoshot stage in flight). Otherwise it's a stale optimistic patch from a
   // previous session — show "Wartet" + Generieren-CTA instead of a fake
   // "Baut…" overlay that never resolves.
-  const hasActiveBackendJob =
-    !lipsyncCanceled &&
-    (!!(scene as any).replicatePredictionId ||
-      lipSyncStatus === 'running' ||
-      (twoshotStage && !['failed', 'done', 'complete', 'canceled'].includes(twoshotStage)));
+  const hasActiveBackendJob = !lipsyncCanceled && isInFlightState(pipelineState);
   const isWorking =
     !isFailed && (
       isGenerating ||
-      (status === 'generating' && hasActiveBackendJob) ||
+      hasActiveBackendJob ||
       lipsyncRunning
     );
 
@@ -150,7 +139,7 @@ export default function SceneInlinePlayer({
       dialogShots.passes.some((p: any) => p?.job_id));
   const inStartLimbo =
     lipsyncRunning &&
-    twoshotStage === 'master_clip' &&
+    pipelineState === 'audio_ready' &&
     !hasProviderJobForLimbo;
   const limboSinceRef = useRef<number | null>(null);
   const [limboStuck, setLimboStuck] = useState(false);
@@ -321,20 +310,17 @@ export default function SceneInlinePlayer({
                 const donePasses = passesArr.filter((p: any) => p?.status === "done" || p?.status === "failed").length;
                 let title = 'Szene wird gebaut…';
                 let sub = isLipSyncIntentional(scene) ? 'VO & Lip-Sync inklusive' : 'Nur Bild-Render';
-                if (status === 'ready' && lipsyncRunning) {
-                  if (lipSyncStatus === 'stitching' || twoshotStage === 'dialog_stitching') {
+                if (lipsyncRunning) {
+                  if (pipelineState === 'lipsync_muxing') {
                     title = 'Lip-Sync wird zusammengesetzt…';
                     sub = 'Finaler Render läuft';
-                  } else if (lipSyncStatus === 'audio_muxing' || twoshotStage === 'audio_muxing') {
-                    title = 'Audio wird gemischt…';
-                    sub = 'Letzter Schritt';
-                  } else if (lipSyncStatus === 'running' && hasProviderJob) {
+                  } else if (pipelineState === 'lipsync_running' && hasProviderJob) {
 
                     title = 'Lip-Sync läuft…';
                     sub = totalPasses > 0
                       ? `Sync.so · Pass ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
                       : 'Sync.so · ~60 s pro Sprecher-Turn';
-                  } else if (twoshotStage === 'audio') {
+                  } else if (pipelineState === 'audio_prep') {
                     if (audioUrl) {
                       title = 'Audio fertig — Lip-Sync wird gestartet…';
                       sub = 'Gleich geht\'s los';
@@ -342,16 +328,10 @@ export default function SceneInlinePlayer({
                       title = 'Audio wird vorbereitet…';
                       sub = 'Voiceover wird generiert';
                     }
-                  } else if (twoshotStage === 'deferred' || twoshotStage === 'circuit_open') {
-                    title = 'Wartet auf Sync.so-Slot…';
-                    sub = 'Sobald frei, geht es weiter';
-                  } else if (
-                    (twoshotStage === 'master_clip' || (typeof twoshotStage === 'string' && twoshotStage.startsWith('syncso_'))) &&
-                    hasProviderJob
-                  ) {
+                  } else if (pipelineState === 'lipsync_dispatched' && hasProviderJob) {
                     title = 'Lip-Sync läuft…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
-                  } else if (twoshotStage === 'master_clip' && !hasProviderJob) {
+                  } else if (pipelineState === 'audio_ready' && !hasProviderJob) {
                     // Recovery-Fenster: server-watchdog dispatcht spätestens nach 3 min.
                     if (limboStuck) {
                       title = 'Start hängt — wird neu angestoßen';
@@ -360,7 +340,7 @@ export default function SceneInlinePlayer({
                       title = 'Lip-Sync wird gestartet…';
                       sub = 'Bereit, Sync.so wird angestoßen';
                     }
-                  } else if (!twoshotStage && audioUrl) {
+                  } else if (pipelineState === 'audio_ready' && audioUrl) {
                     title = 'Lip-Sync wird gestartet…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
                   } else {

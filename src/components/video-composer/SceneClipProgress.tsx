@@ -11,6 +11,7 @@ import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
 import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 import { FaceMapReviewDialog } from './FaceMapReviewDialog';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
+import { sceneState } from '@/lib/composer/sceneState';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
@@ -43,6 +44,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const previewStatus = scene.previewStatus ?? 'idle';
   const hasPreview = !!scene.previewClipUrl && previewStatus === 'ready';
   const hqReady = scene.clipUrl && scene.clipStatus === 'ready';
+  const pipelineState = sceneState(scene);
 
   const [busy, setBusy] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
@@ -119,7 +121,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   // Each speaker turn becomes its own Hailuo plate + Sync.so lipsync.
   const isCinematic = scene.engineOverride === 'cinematic-sync';
   const dialogShotsState = (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
-  const lipSyncCanceled = scene.lipSyncStatus === 'canceled' || dialogShotsState?.status === 'canceled';
+  const lipSyncCanceled = pipelineState === 'canceled';
   const shouldBeSceneLipsync =
     !lipSyncCanceled &&
     (isCinematic ||
@@ -127,7 +129,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       scene.lipSyncWithVoiceover === true);
   const wrongTalkingHeadReady =
     shouldBeSceneLipsync &&
-    scene.clipStatus === 'ready' &&
+    ['plate_ready', 'complete'].includes(pipelineState) &&
     typeof scene.clipUrl === 'string' &&
     scene.clipUrl.includes('/talking-head-renders/');
   // v264 — Never show a Lip-Sync spinner when the clip itself is marked
@@ -136,8 +138,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const lipSyncRunning =
     isCinematic &&
     !lipSyncCanceled &&
-    scene.clipStatus !== 'failed' &&
-    scene.lipSyncStatus === 'running';
+    ['audio_prep', 'audio_ready', 'lipsync_dispatched', 'lipsync_running', 'lipsync_muxing'].includes(pipelineState);
 
   const resetWrongRenderPath = async () => {
     if (busy) return;

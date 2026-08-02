@@ -1789,7 +1789,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           clipSource: masterProvider,
           engineOverride: 'cinematic-sync',
           clipStatus: 'generating',
-          twoshotStage: 'audio',
+          pipelineState: 'plate_queued',
           lipSyncWithVoiceover: true,
         });
 
@@ -1803,7 +1803,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           const pidFinal = (persisted?.pid || projectId || scene.projectId || '').trim();
           const sceneIdFinal = persisted?.sceneId || scene.id;
           if (!pidFinal) {
-            onUpdate({ clipStatus: 'pending', twoshotStage: null as any });
+            onUpdate({ clipStatus: 'pending', pipelineState: 'idle' });
             toast({
               title: t.failed,
               description: 'Projekt konnte nicht gespeichert werden — bitte erneut versuchen.',
@@ -1854,7 +1854,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         } catch (invokeErr) {
           console.error('[SceneDialogStudio] compose-video-clips invoke failed', invokeErr);
           // Roll back the optimistic generating state so user can retry.
-          onUpdate({ clipStatus: 'pending', twoshotStage: null as any });
+          onUpdate({ clipStatus: 'pending', pipelineState: 'idle' });
           const realMsg = await extractFunctionsError(invokeErr);
           toast({
             title: t.failed,

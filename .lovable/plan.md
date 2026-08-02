@@ -1,41 +1,97 @@
-## Kurze Antwort
+# v386 — Welle D: Enum-State im gesamten Composer-Client verbindlich machen
 
-Ja — bis einschließlich Plate-Fertigstellung läuft es jetzt sauber, danach hängt es weiter am Bridge-Trigger.
+## Bestätigte Ursache
 
-Verifiziert in diesem Turn:
-- `compose-dialog-segments` (61), `sync-so-webhook` (22), `render-sync-segments-audio-mux` (12), `lipsync-watchdog` (8) enthalten weiterhin ausschließlich Legacy-Schreibstellen; `pipeline_state` / `transitionScene` kommt in keiner dieser Dateien vor.
-- Der DB-Trigger `composer_scene_state_bridge` spiegelt in beide Richtungen. Der Lip-Sync-Teil funktioniert deshalb weiter, ist aber noch nicht validiert: veraltete Callbacks können den Zustand dort weiterhin ohne Run-/Generations-Prüfung setzen.
+Der aktuelle Run der betroffenen Szene ist im Backend korrekt:
 
-## Eine echte Lücke, die dabei aufgefallen ist
+- `pipeline_state = plate_rendering`
+- `plate_generation = 4`
+- `clip_url = null`
+- kein Audio-Plan und kein Sync.so-Job
+- ein aktiver HappyHorse-Plate-Render für Generation 4
 
-Der Bridge-Trigger zieht die Legacy-Spalten **nur** nach, wenn im selben Statement keine Legacy-Spalte (inkl. `clip_url`) verändert wurde. Zwei in Welle B migrierte Stellen in `compose-video-clips` (Upload-Pfad und Stock-Pfad) schreiben `clip_url` und `pipeline_state: 'plate_ready'` in **einem** Statement — dort bleibt `clip_status` auf dem alten Wert stehen, während `pipeline_state` bereits `plate_ready` ist. Legacy-Leser sehen dann einen veralteten Status.
+Der sichtbare Sprung zu „Lip-Sync startet“ ist ein Client-Fehler. Die serverseitige Enum-Migration ist fertig, aber zentrale UI-Reader verwenden noch `clip_status`, `twoshot_stage`, `lip_sync_status`, `dialog_shots` und alte persistierte Fortschrittswerte. Zudem schreibt die allgemeine Szenen-Persistenz lokale Lifecycle-Spiegel weiterhin zurück in die Datenbank. Damit kann ein neuer Run korrekt `plate_rendering` sein, während die Oberfläche einen alten Lip-Sync-Status anzeigt oder wiederbelebt.
 
-## Plan — Welle C (Dialog-/Lip-Sync-Pfad)
+## Umsetzung
 
-### C0 — Bridge-Lücke schließen (zuerst, klein)
-- In `compose-video-clips` Upload-/Stock-Pfad: `clip_url` schreiben, Übergang danach per `transitionScene(..., 'plate_ready')` — zwei Statements, wie im Webhook.
-- Regel dokumentieren: Nutzdaten und Zustandsübergang nie im selben Update.
+### 1. Enum-Zustand vollständig in das Client-Modell übernehmen
 
-### C1 — `compose-dialog-segments`
-- Audio-/Dispatch-Kette auf `transitionScene` umstellen: `audio_ready` → `lipsync_dispatched`.
-- Vorbedingung nicht mehr über `twoshot_stage`-Strings, sondern über `canDispatchLipsync()` aus `_shared/scene-state.ts`.
-- Jeder Übergang mit `runId` + `generation`; abgelehnte Übergänge als `v385_stale_transition` loggen statt still zu ignorieren.
+- `ComposerScene` um `pipelineState`, `pipelineStateAt`, `pipelineStateRunId`, `activeRunId`, `plateGeneration` und `plateReadyGeneration` erweitern.
+- Alle DB→Client-Mapper in `VideoComposerDashboard` und `ClipsTab` um diese Felder ergänzen.
+- Bei Realtime-/Tab-Refreshes `clip_url = null` respektieren; niemals auf eine alte lokale URL zurückfallen.
 
-### C2 — `sync-so-webhook`
-- `lipsync_running` → `lipsync_muxing` → `complete`, Fehlerpfade über `transitionScene(..., 'failed')`.
-- Verdict-Gate (Passthrough/Static) bleibt inhaltlich unverändert, schreibt aber nur noch `clip_error` als Anzeigetext.
+### 2. Lifecycle-Spalten für den Client schreibgeschützt machen
 
-### C3 — `render-sync-segments-audio-mux` und `compose-stitch-and-handoff`
-- Mux-Start → `lipsync_muxing`, Mux-Erfolg → `complete`, Mux-Fehler → `failed`.
+- `useComposerPersistence` darf bei normalen Prompt-, Cast- oder Layout-Edits keine Lifecycle-Felder mehr schreiben:
+  - `clip_url`
+  - `clip_status`
+  - `pipeline_state`
+  - `twoshot_stage`
+  - `lip_sync_status`
+  - Run-/Generationsfelder
+- Diese Felder werden ausschließlich durch `composer-start-scene-generation`, State-Transitions und generation-gebundene Webhooks geändert.
+- Optimistische UI-Updates bleiben lokal, können aber keinen alten Run mehr in die Datenbank zurückschreiben.
 
-### C4 — `report-lipsync-motion-probe`, `compose-video-assemble`
-- Nur noch Telemetrie bzw. `failed`-Übergang; keine direkten Stage-Strings mehr.
+### 3. `SceneInlinePlayer` vollständig auf `sceneState()` umstellen
 
-### Technische Details
-- Alle Übergänge laufen über die vorhandene RPC `composer_scene_transition` (Run-/Generations-Prüfung).
-- Legacy-Spalten werden in Welle C ausschließlich noch vom Trigger gepflegt.
-- Keine Schema-Änderung nötig; der Reject-Trigger kommt erst in Welle E.
+- Anzeigezustände ausschließlich aus dem Enum ableiten:
+  - Plate-Aufbau: `plate_queued`, `plate_rendering`
+  - Audio: `audio_prep`, `audio_ready`
+  - Lip-Sync: `lipsync_dispatched`, `lipsync_running`, `lipsync_muxing`
+  - Fertig: `complete`
+  - Terminal: `failed`, `canceled`
+- `status === ready`, alte `twoshotStage`-Werte oder alte `lipSyncStatus`-Werte dürfen Lip-Sync nicht mehr sichtbar starten.
+- Provider-/Pass-Daten bleiben nur Detailinformationen innerhalb eines bereits enum-bestätigten Lip-Sync-Zustands.
 
-### Prüfung nach Welle C
-- Ein realer Dialoglauf mit 2 und mit 4 Sprechern.
-- Kontrolle, dass `pipeline_state` und Legacy-Spiegel zu jedem Zeitpunkt konsistent sind (`composer-reset-selftest`).
+### 4. Globalen Fortschrittsbalken generation-sicher machen
+
+- `usePipelineProgress` für Clips, Audio, Lip-Sync, Erfolg und Fehler ausschließlich über `sceneState()` ableiten.
+- Ein Plate-Run darf niemals die Lip-Sync-Phase aktivieren.
+- Persistierte Session-Snapshots an `sceneId + plateGeneration + activeRunId` binden.
+- Bei neuer Generation oder neuem Run alle Floors, Event-Flags und den alten 99%-Stand verwerfen.
+- Legacy-Events dürfen eine Phase nur anzeigen, wenn der aktuelle Enum-Zustand diese Phase bestätigt.
+
+### 5. Auto-Trigger strikt an Enum-Transitions koppeln
+
+- `useTwoShotAutoTrigger` nutzt:
+  - Audio-Prep nur bei `plate_ready`
+  - Lip-Sync-Dispatch nur bei `audio_ready`
+  - sichtbare Lip-Sync-Arbeit nur bei `lipsync_dispatched|lipsync_running|lipsync_muxing`
+- Alte clientseitige Self-Heals, die `twoshot_stage` oder `lip_sync_status` direkt schreiben, entfernen.
+- Fehler werden nicht mehr clientseitig über Legacy-Spalten terminal gesetzt; die jeweilige Edge Function besitzt den Transition-Claim.
+
+### 6. Weitere sichtbare Statuskomponenten migrieren
+
+- `SceneClipProgress` auf den Enum umstellen.
+- Reset-/Fehlerbuttons im globalen Fortschrittsbalken über `pipeline_state === failed` bestimmen.
+- Legacy-Felder dürfen nur noch als Diagnose-/Kompatibilitätsdaten angezeigt, aber nicht zur Steuerung verwendet werden.
+
+### 7. Alte Plate-Versuche sauber klassifizieren
+
+Für die betroffene Szene existieren zwei abgeschlossene ältere `plate_attempts`, die noch nicht als `superseded` markiert sind. Sie sind durch Generation/Run bereits wirkungslos, werden aber zur forensischen Eindeutigkeit beim Start einer neuen Generation als `superseded` markiert. Abgeschlossene historische Ergebnisse werden nicht gelöscht; sie dürfen nur nie wieder als aktuelle Provenienz gelten.
+
+### 8. Lockout nach erfolgreicher Migration
+
+- Repository-Audit aller verbleibenden Client-Lese- und Schreibstellen für die vier Legacy-Lifecycle-Spalten.
+- Verbleibende Steuerlogik auf `sceneState()` migrieren.
+- Schutztest hinzufügen, der fehlschlägt, wenn Composer-Clientcode Lifecycle-Spalten direkt schreibt oder Lip-Sync aus Legacy-Spalten startet.
+
+## Verifikation
+
+1. Neue Generierung einer zuvor erfolgreich lip-synchronisierten Szene starten.
+2. Sofort prüfen:
+   - Enum ist `plate_queued|plate_rendering`
+   - Clip-URL leer
+   - UI zeigt ausschließlich „Szene wird gebaut“
+   - Lip-Sync-Phase ist inaktiv
+   - Fortschritt startet für die neue Generation neu, nicht bei 99 %
+3. Während des Provider-Renders sicherstellen, dass kein `compose-dialog-segments`-Aufruf erfolgt.
+4. Erst nach `plate_ready → audio_prep → audio_ready` darf der Dispatch erfolgen.
+5. Erst nach `lipsync_dispatched` darf „Lip-Sync startet“ erscheinen.
+6. Fehlgeschlagene Plate-Generierung muss terminal bleiben und darf Audio/Lip-Sync nie aktivieren.
+7. F5/Tabwechsel darf weder alte URL noch alten Fortschritt noch alten Lip-Sync-Zustand wiederherstellen.
+8. Selektive Tests für `sceneState`, Progress, Auto-Trigger und Persistenz ausführen.
+
+## Ergebnis
+
+Nach Welle D gibt es für Steuerlogik nur noch eine Wahrheit: `pipeline_state` des aktuellen `active_run_id` und der aktuellen `plate_generation`. Die Legacy-Spalten bleiben vorübergehend Spiegel für Kompatibilität, können aber weder die UI noch einen neuen Pipeline-Schritt auslösen.
