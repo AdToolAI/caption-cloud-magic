@@ -1105,11 +1105,9 @@ serve(async (req) => {
           // Top-level scene status / counters — non-slot fields, safe to UPDATE.
           await supabase
             .from("composer_scenes")
-            .update({
-              pipeline_state: "lipsync_running",
-              updated_at: nowIso,
-            })
+            .update({ updated_at: nowIso })
             .eq("id", sceneId);
+          await advanceScene("lipsync_running");
         } catch (e) {
           // RPC failure → fall back to the legacy full-array write so a
           // missing/migration-pending RPC never strands a scene.
@@ -1118,11 +1116,12 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
-              pipeline_state: "lipsync_running",
               updated_at: nowIso,
             })
             .eq("id", sceneId);
+          await advanceScene("lipsync_running");
         }
+
         console.log(`[sync-so-webhook] v25/plan_d scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
 
         // v94 — Lambda warm-ping. When second-to-last pass completes, wake
