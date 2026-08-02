@@ -563,7 +563,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   }
 
   console.log(
-    `[v376_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} attempts_superseded=${supersededAttempts} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
+    `[v380_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} attempts_superseded=${supersededAttempts} renders_superseded=${supersededRenders} assets_cleared=${cleanedAssets === null ? "all" : "derived"} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
   );
 
   return {
