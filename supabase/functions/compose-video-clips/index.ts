@@ -74,6 +74,34 @@ import {
 } from "../_shared/asset-ref.ts";
 const ANCHOR_AUDIT_VERSION = 15;
 
+/**
+ * v388 — Plate-Pfad-Vertrag.
+ *
+ * Der Plate-Pfad hat den Zustand bisher an 13 Stellen direkt geschrieben.
+ * Ein direkter Schreibvorgang kennt weder Zeilensperre noch Lauf-/Generations-
+ * Abgleich — genau darüber sind Szenen verfrüht weitergerückt. Ab hier läuft
+ * jeder Wechsel nach `plate_rendering` über die geprüfte Übergangsfunktion.
+ *
+ * Nebenfelder (clip_quality, replicate_prediction_id, …) bleiben in ihrem
+ * eigenen `.update()` — der Zustandswechsel folgt danach als letztes,
+ * verbindliches Signal.
+ */
+async function enterPlateRendering(
+  supabaseAdmin: any,
+  sceneIdOrIds: string | string[],
+): Promise<void> {
+  const ids = Array.isArray(sceneIdOrIds) ? sceneIdOrIds : [sceneIdOrIds];
+  for (const id of ids) {
+    if (!id) continue;
+    await transitionScene(supabaseAdmin, id, "plate_rendering", {
+      from: ["idle", "plate_queued", "plate_rendering"],
+      detail: "v388_plate_dispatch",
+    });
+  }
+}
+
+
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
