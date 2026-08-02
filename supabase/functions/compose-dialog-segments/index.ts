@@ -813,7 +813,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets",
+        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets, plate_generation, plate_ready_generation",
       )
       .eq("id", sceneId)
       .single();
@@ -1040,6 +1040,35 @@ serve(async (req) => {
         );
       }
     }
+
+    // ── v373 Generations-Vertrag ─────────────────────────────────────────
+    // Lip-Sync darf ausschließlich auf der Plate DES AKTUELLEN Laufs
+    // arbeiten. Am 02.08. schnitt diese Kette um 11:04:42 Preclips aus der
+    // Plate von 21:28 des Vortages, während der neue Render erst um 11:06:08
+    // startete → Passthrough-Fehlschlag auf untauglichem Altmaterial.
+    // `plate_ready_generation` wird per DB-Trigger gesetzt, sobald eine neue
+    // `clip_url` geschrieben wird; stimmt sie nicht mit `plate_generation`
+    // überein, ist die Plate von einem älteren Lauf → hart abbrechen.
+    {
+      const curGen = Number((scene as any).plate_generation ?? 1);
+      const readyGen = (scene as any).plate_ready_generation;
+      if (readyGen === null || readyGen === undefined || Number(readyGen) !== curGen) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v373_stale_plate_blocked gen=${curGen} ready_gen=${readyGen}`,
+        );
+        return json(
+          {
+            error: "v373_stale_plate_blocked",
+            message:
+              "Die Szene wird gerade neu gerendert — Lip-Sync startet automatisch, sobald die neue Plate fertig ist.",
+            plate_generation: curGen,
+            plate_ready_generation: readyGen ?? null,
+          },
+          409,
+        );
+      }
+    }
+
 
     // Pick the master plate for lipsync. CRITICAL: for cinematic-sync we
     // must NEVER use a `talking-head-renders/...` URL as the source — that

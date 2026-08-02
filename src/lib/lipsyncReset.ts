@@ -64,3 +64,37 @@ export async function resetSceneLipSync(
     })
     .eq('id', sceneId);
 }
+
+/**
+ * v373 — "Clip generieren" = harter Neustart.
+ *
+ * Bricht alle laufenden Provider-Jobs ab, gibt Slots frei, erstattet Credits,
+ * löscht sämtliche Artefakte (Plate, Preclips, Anchors, Tracking, Voiceover)
+ * und erhöht die Generationsnummer der Szene.
+ *
+ * MUSS vor jedem neuen Render-Dispatch abgewartet werden. Erst danach darf
+ * `compose-video-clips` aufgerufen werden — sonst schneidet die Lip-Sync-Kette
+ * Preclips aus der Plate des vorherigen Laufs.
+ *
+ * Gibt `true` zurück, wenn der Reset serverseitig bestätigt wurde.
+ */
+export async function hardResetSceneJob(
+  sceneId: string,
+  reason = 'user_regenerate',
+): Promise<boolean> {
+  if (!/^[0-9a-f-]{36}$/i.test(sceneId)) return false;
+  try {
+    const { data, error } = await supabase.functions.invoke('composer-hard-reset-scene', {
+      body: { scene_id: sceneId, reason },
+    });
+    if (error) {
+      console.warn('[lipsyncReset] hard reset failed', sceneId, error);
+      return false;
+    }
+    return (data as any)?.ok === true;
+  } catch (e) {
+    console.warn('[lipsyncReset] hard reset crash', sceneId, e);
+    return false;
+  }
+}
+
