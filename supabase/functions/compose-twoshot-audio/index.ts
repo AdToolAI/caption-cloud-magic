@@ -852,6 +852,10 @@ serve(async (req) => {
               `[compose-twoshot-audio] existing Hailuo twoshot WAV duration ${existingSceneDur}s != scene ${requestedSceneDur}s — regenerating instead of reusing stale 10s audio_plan.`,
             );
           } else {
+            await transitionScene(supabase, scene_id, "audio_ready", {
+              from: ["audio_prep", "plate_ready"],
+              detail: "audio_reused",
+            });
             return json({
               success: true,
               already: true,
@@ -1477,6 +1481,13 @@ serve(async (req) => {
       .from("composer_scenes")
       .update(sceneUpdate)
       .eq("id", scene_id);
+
+    // v384 — Audio liegt vor: Zustand weiterschalten. Der Dispatcher liest
+    // ausschliesslich diesen Zustand, kein `twoshot_stage`-Freitext mehr.
+    await transitionScene(supabase, scene_id, "audio_ready", {
+      from: ["audio_prep", "plate_ready"],
+      detail: "audio_ready",
+    });
 
     return json({
       success: true,
