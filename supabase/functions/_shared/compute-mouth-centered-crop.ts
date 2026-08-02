@@ -203,6 +203,10 @@ export function computeMouthCenteredCrop(
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
   const mouthOffsetPx = Math.round(Math.hypot(ax - cropCx, ay - cropCy));
+  const mouthBandY = (ay - y) / Math.max(1, size);
+  const mouthMarginBelowPx = Math.round(y + size - ay);
+  const mouthInsideCrop =
+    ax >= x && ax <= x + size && mouthBandY > 0.2 && mouthBandY < 0.9;
 
   return {
     crop: { x, y, size, outputSize },
@@ -215,6 +219,10 @@ export function computeMouthCenteredCrop(
     clamped,
     anchorRepaired,
     headContained,
+    mouthBandY,
+    mouthMarginBelowPx,
+    mouthInsideCrop,
   };
+
 
 }
