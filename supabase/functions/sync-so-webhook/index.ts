@@ -1249,11 +1249,12 @@ serve(async (req) => {
               dispatched_at: nowIso,
             },
           },
-          pipeline_state: "lipsync_muxing",
           clip_error: null,
           updated_at: nowIso,
         })
         .eq("id", sceneId);
+      await advanceScene("lipsync_muxing");
+
       console.log(`[sync-so-webhook] v25 scene=${sceneId} ALL ${totalPasses} passes done → dispatching fan-in compositor`);
       try {
         fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
