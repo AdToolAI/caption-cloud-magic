@@ -124,7 +124,10 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         // edge function's own pre-mark. Without this, an old
         // `talking_head_master_invalid_for_cinematic_sync` marker keeps the
         // UI on "Wartet" forever for 1-speaker cinematic-sync scenes.
-        if (/^[0-9a-f-]{36}$/i.test(workingScene.id) && workingScene.clipSource?.startsWith('ai-')) {
+        const scenePersisted =
+          /^[0-9a-f-]{36}$/i.test(workingScene.id) &&
+          !!workingScene.clipSource?.startsWith('ai-');
+        if (scenePersisted) {
           try {
             const preMark: Record<string, unknown> = {
               clip_status: 'generating',
@@ -153,14 +156,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
                 twoshotStage: 'audio',
               });
             }
-            // v373 — "Clip generieren" ist ein HARTER Neustart: erst alle
-            // Provider-Jobs abbrechen, Slots freigeben, Credits erstatten und
-            // sämtliche Artefakte des vorherigen Laufs löschen, DANN erst den
-            // neuen Job starten. Ohne dieses await schnitt die Lip-Sync-Kette
-            // Preclips aus der Plate des vorherigen Laufs (Race vom 02.08.).
-            await hardResetSceneJob(workingScene.id, 'user_regenerate');
             await supabase.from('composer_scenes').update(preMark).eq('id', workingScene.id);
-
           } catch (preErr) {
             console.warn('[useSceneGenerate] pre-mark failed', preErr);
           }
@@ -171,37 +167,55 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         // because we sent the raw scene.aiPrompt.
         const composedInvoke = buildInvokePrompt(workingScene, opts.characters, 'en');
 
-        const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-          body: {
-            projectId: pid,
-            visualStyle: opts.visualStyle,
-            characters: opts.characters,
-            scenes: [
-              {
-                id: workingScene.id,
-                clipSource: workingScene.clipSource,
-                clipQuality: workingScene.clipQuality || 'standard',
-                aiPrompt: composedInvoke.aiPrompt,
-                negativePrompt: composedInvoke.negativePrompt,
-                stockKeywords: workingScene.stockKeywords,
-                uploadUrl: workingScene.uploadUrl,
-                referenceImageUrl: workingScene.referenceImageUrl,
-                durationSeconds: workingScene.durationSeconds,
-                characterShot: workingScene.characterShot,
-                characterShots: workingScene.characterShots,
-                dialogScript: workingScene.dialogScript,
-                dialogVoices: workingScene.dialogVoices,
-                engineOverride: forceCinematicSync ? 'cinematic-sync' : (workingScene.engineOverride ?? 'auto'),
-                lipSyncWithVoiceover: forceCinematicSync || workingScene.lipSyncWithVoiceover === true,
-                dialogMode: workingScene.dialogMode === true,
-                withAudio: workingScene.withAudio !== false,
-                shotDirector: workingScene.shotDirector,
-                directorModifiers: workingScene.directorModifiers,
-              },
-            ],
-          },
-        });
-        if (error) throw error;
+        const composeBody = {
+          projectId: pid,
+          visualStyle: opts.visualStyle,
+          characters: opts.characters,
+          scenes: [
+            {
+              id: workingScene.id,
+              clipSource: workingScene.clipSource,
+              clipQuality: workingScene.clipQuality || 'standard',
+              aiPrompt: composedInvoke.aiPrompt,
+              negativePrompt: composedInvoke.negativePrompt,
+              stockKeywords: workingScene.stockKeywords,
+              uploadUrl: workingScene.uploadUrl,
+              referenceImageUrl: workingScene.referenceImageUrl,
+              durationSeconds: workingScene.durationSeconds,
+              characterShot: workingScene.characterShot,
+              characterShots: workingScene.characterShots,
+              dialogScript: workingScene.dialogScript,
+              dialogVoices: workingScene.dialogVoices,
+              engineOverride: forceCinematicSync ? 'cinematic-sync' : (workingScene.engineOverride ?? 'auto'),
+              lipSyncWithVoiceover: forceCinematicSync || workingScene.lipSyncWithVoiceover === true,
+              dialogMode: workingScene.dialogMode === true,
+              withAudio: workingScene.withAudio !== false,
+              shotDirector: workingScene.shotDirector,
+              directorModifiers: workingScene.directorModifiers,
+            },
+          ],
+        };
+
+        // v377 — reset + dispatch are ONE server-side operation. The previous
+        // two-step client flow (hard reset here, render there) could continue
+        // even when the reset failed, which is how a scene ended up running two
+        // generations at once.
+        let data: any;
+        if (scenePersisted) {
+          const started = await startSceneGeneration({
+            sceneIds: [workingScene.id],
+            compose: composeBody,
+            reason: 'user_regenerate',
+          });
+          data = started.compose;
+        } else {
+          const res = await supabase.functions.invoke('compose-video-clips', {
+            body: composeBody,
+          });
+          if (res.error) throw res.error;
+          data = res.data;
+        }
+
 
         // The edge function now returns HTTP 200 with `{ok:false, error, stage}`
         // on early-phase crashes (so supabase-js doesn't bury the message
