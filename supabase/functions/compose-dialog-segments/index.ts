@@ -880,10 +880,10 @@ serve(async (req) => {
     }
 
     // v394 — Pass-Ebenen-Vertrag: eine Fortsetzung darf niemals einen bereits
-    // terminalen Pass anfassen (v141-Invariante: ein Pass mit `output_url` ist
-    // terminal). Verspaetete Retries laufen hier hart ins Leere statt einen
-    // fertigen Pass zurueckzusetzen.
-    if (guardMode === "continue" && hasExplicitPassIdx) {
+    // gelieferten Pass anfassen (v141-Invariante: ein Pass mit `output_url` ist
+    // terminal). Ein expliziter Retry (`retry: true`) der Retry-Leiter bleibt
+    // erlaubt — er adressiert bewusst einen fehlgeschlagenen Pass.
+    if (guardMode === "continue" && hasExplicitPassIdx && !isRetry) {
       const guardPassIdx = Math.floor(bodyPassIdxRaw);
       const guardPasses = Array.isArray((scene as any).dialog_shots?.passes)
         ? (scene as any).dialog_shots.passes
@@ -892,8 +892,7 @@ serve(async (req) => {
       const guardPassStatus = String(guardPass?.status ?? "");
       if (
         guardPass &&
-        (guardPass.output_url ||
-          ["done", "done_suspect", "failed", "canceled", "canceled_by_scene_failure"].includes(guardPassStatus))
+        (guardPass.output_url || ["done", "done_suspect"].includes(guardPassStatus))
       ) {
         console.warn(
           `[compose-dialog-segments] v394_pass_already_terminal scene=${sceneId} ` +
