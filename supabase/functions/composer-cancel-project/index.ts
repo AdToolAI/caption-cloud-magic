@@ -166,43 +166,34 @@ serve(async (req) => {
 
     const nowIso = new Date().toISOString();
 
-    // Cancel lipsync scenes
-    if (sceneIdsWithLipsync.length > 0) {
+    // v385 — ein Abbruch = ein Zustandswechsel. Legacy-Spalten spiegelt der
+    // Bridge-Trigger, hier bleibt nur der Anzeigetext.
+    const cancelIds = Array.from(
+      new Set([...sceneIdsWithLipsync, ...sceneIdsWithClip]),
+    );
+    if (cancelIds.length > 0) {
       try {
         await supabase
           .from("composer_scenes")
           .update({
-            lip_sync_status: "canceled",
-            twoshot_stage: null,
             clip_error: "canceled_by_user_new_project",
             replicate_prediction_id: null,
             updated_at: nowIso,
           })
-          .in("id", sceneIdsWithLipsync);
+          .in("id", cancelIds);
       } catch (e) {
         console.warn(
-          `[composer-cancel-project] lipsync update failed: ${(e as Error).message}`,
+          `[composer-cancel-project] scene update failed: ${(e as Error).message}`,
         );
+      }
+
+      for (const id of cancelIds) {
+        await transitionScene(supabase, id, "canceled", {
+          detail: "canceled_by_user_new_project",
+        });
       }
     }
 
-    // Cancel pending/generating clips
-    if (sceneIdsWithClip.length > 0) {
-      try {
-        await supabase
-          .from("composer_scenes")
-          .update({
-            clip_status: "canceled",
-            clip_error: "canceled_by_user_new_project",
-            updated_at: nowIso,
-          })
-          .in("id", sceneIdsWithClip);
-      } catch (e) {
-        console.warn(
-          `[composer-cancel-project] clip update failed: ${(e as Error).message}`,
-        );
-      }
-    }
 
     // Mark project canceled
     try {
