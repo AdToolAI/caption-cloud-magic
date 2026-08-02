@@ -203,7 +203,9 @@ export async function judgeMouthMotion(
       };
     }
 
-    const samples = clampInt(input.sampleCount ?? 4, 3, 8);
+    // v371 — 4 samples made `Math.max` over the output↔input deltas a lottery.
+    // 6 samples inside the speech window is the new floor.
+    const samples = clampInt(input.sampleCount ?? 6, 3, 8);
     const budgetMs = clampInt(input.timeoutMs ?? 45_000, 10_000, 120_000);
 
     // Sampling window: stay inside the speech portion, away from the very
