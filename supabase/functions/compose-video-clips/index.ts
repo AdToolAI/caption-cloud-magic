@@ -4942,11 +4942,12 @@ serve(async (req) => {
             await admin
               .from("composer_scenes")
               .update({
-                pipeline_state: "failed",
                 clip_error: `[${__stage}] ${msg}`.slice(0, 500),
                 updated_at: new Date().toISOString(),
               })
               .in("id", safeToFail);
+            // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+            await failSceneState(admin, safeToFail, "failed");
             const cinematicSafeToFail = cinematicFailedSceneIds.filter((id) =>
               safeToFail.includes(id),
             );

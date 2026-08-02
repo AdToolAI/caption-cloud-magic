@@ -1029,11 +1029,12 @@ serve(async (req) => {
           await supabase
             .from("composer_scenes")
             .update({
-              pipeline_state: "failed",
               clip_error: `id_only_dialog_turns_required:${ensuredTurns.reason}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", sceneId);
+          // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+          await failSceneState(supabase, sceneId, "failed");
           return json({ error: "id_only_dialog_turns_required", reason: ensuredTurns.reason, details: ensuredTurns.details ?? null }, 422);
         }
       }
@@ -1321,10 +1322,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: "failed",
           clip_error: "dialog_pipeline_no_turns",
         })
         .eq("id", sceneId);
+      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+      await failSceneState(supabase, sceneId, "failed");
       return json({ error: "no_turns" }, 422);
     }
 
@@ -1352,10 +1354,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: "failed",
           clip_error: `segments_invalid_${segValidation.reason}`,
         })
         .eq("id", sceneId);
+      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+      await failSceneState(supabase, sceneId, "failed");
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "SEGMENTS_INVALID", error_class: "segments_invalid",
@@ -2892,11 +2895,12 @@ serve(async (req) => {
               error: "v387_identity_collision",
               finished_at: new Date().toISOString(),
             }),
-            pipeline_state: "failed",
             clip_error: msg,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
+        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+        await failSceneState(supabase, sceneId, "failed");
         return json(
           { ok: false, error: msg, refunded: alreadyRefundedIC ? 0 : totalCost },
           200,
@@ -3865,10 +3869,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: "failed",
           clip_error: "speaker_count_mismatch: Zwei Cast-Mitglieder teilen denselben Character-Slot. Bitte vollen Namen verwenden oder eindeutige Cast-IDs zuweisen, dann 'Sauber neu starten'.",
         })
         .eq("id", sceneId);
+      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+      await failSceneState(supabase, sceneId, "failed");
       return json(
         {
           error: "speaker_count_mismatch",
@@ -3896,10 +3901,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: "failed",
           clip_error: "dialog_pipeline_no_per_speaker_tracks",
         })
         .eq("id", sceneId);
+      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+      await failSceneState(supabase, sceneId, "failed");
       return json(
         {
           error: "no_per_speaker_tracks",
@@ -4164,10 +4170,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: "failed",
           clip_error: `syncso_segments_preflight_${badProbe}`,
         })
         .eq("id", sceneId);
+      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+      await failSceneState(supabase, sceneId, "failed");
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_source_kind: "segments", video_url: sourceClipUrl,
@@ -4493,10 +4500,11 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            pipeline_state: "failed",
             clip_error: reason,
           })
           .eq("id", sceneId);
+        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+        await failSceneState(supabase, sceneId, "failed");
         return json(
           {
             error: strict && hadFaces ? "plate_target_face_missing" : "face_validation_failed",
@@ -4871,10 +4879,11 @@ serve(async (req) => {
               refunded: !alreadyRefundedSanity,
               finished_at: new Date().toISOString(),
             }),
-            pipeline_state: "failed",
             clip_error: sanityReason,
           })
           .eq("id", sceneId);
+        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+        await failSceneState(supabase, sceneId, "failed");
 
         return json(
           {
@@ -5986,11 +5995,12 @@ serve(async (req) => {
             await supabase
               .from("composer_scenes")
               .update({
-                pipeline_state: "failed",
                 clip_error: msg,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", sceneId);
+            // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+            await failSceneState(supabase, sceneId, "failed");
             return json({ ok: false, error: msg }, 200);
           }
 

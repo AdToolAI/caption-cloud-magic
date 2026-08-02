@@ -929,11 +929,12 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            pipeline_state: "failed",
             clip_error: userMsg,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
+        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+        await failSceneState(supabase, sceneId, "failed");
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
           engine: "sync-segments",

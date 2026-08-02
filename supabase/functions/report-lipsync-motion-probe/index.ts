@@ -239,11 +239,12 @@ Deno.serve(async (req) => {
     await admin
       .from("composer_scenes")
       .update({
-        pipeline_state: "failed",
         clip_error: userMsg,
         updated_at: nowIso,
       })
       .eq("id", body.scene_id);
+    // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+    await failSceneState(admin, body.scene_id, "failed");
 
     await logDispatch(admin, {
       scene_id: body.scene_id,
