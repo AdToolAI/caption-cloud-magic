@@ -1029,10 +1029,15 @@ serve(async (req) => {
       .from("composer_scenes")
       .update({
         dialog_shots: updatedState,
-        pipeline_state: "lipsync_muxing",
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
+    // v388 — Phasenwechsel nur ueber den geprueften Weg (Lauf-/Generations-Fence).
+    await transitionScene(supabase, sceneId, "lipsync_muxing", {
+      runId: String((scene as any).active_run_id ?? "") || null,
+      generation: Number((scene as any).plate_generation ?? 1),
+    });
+
 
     const invokeResp = await fetch(
       `${supabaseUrl}/functions/v1/invoke-remotion-render`,
