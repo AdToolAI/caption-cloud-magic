@@ -1112,6 +1112,34 @@ serve(async (req) => {
       }
     }
 
+    // ── v381 Provenance-Wächter (plate_load) ─────────────────────────────
+    // Erster Punkt, an dem ein Asset in die Lip-Sync-Kette geht. Der Marker
+    // `v381_generation_provenance` belegt für jeden Lauf, aus welcher
+    // Generation die verwendete Plate stammt.
+    {
+      const prov = await assertGenerationProvenance({
+        supabase,
+        sceneId,
+        stage: "plate_load",
+        expectedGeneration: Number((scene as any).plate_generation ?? 1),
+        expectedRunId: String((scene as any).active_run_id),
+        note: `plate=…${String((scene as any).clip_url ?? "").slice(-48)}`,
+      });
+      if (!prov.ok) {
+        return json(
+          {
+            error: prov.code,
+            message: provenanceMessage(prov.code),
+            plate_generation: prov.generation,
+            plate_ready_generation: prov.readyGeneration,
+          },
+          409,
+        );
+      }
+    }
+
+
+
 
     // Pick the master plate for lipsync. CRITICAL: for cinematic-sync we
     // must NEVER use a `talking-head-renders/...` URL as the source — that
