@@ -1448,12 +1448,33 @@ serve(async (req) => {
       console.log(`[compose-dialog-segments] scene=${sceneId} auto-tuner prefers source_kind=${tunerKind}`);
     }
 
+    // ── v381 Provenance-Wächter (sync_dispatch) ──────────────────────────
+    // Letzter Punkt vor dem bezahlten Provider-Dispatch. Zwischen Plate-Load
+    // und hier liegen Face-Map, Preclips und Credits — wurde die Szene in der
+    // Zwischenzeit neu gestartet, darf hier nichts mehr rausgehen.
+    {
+      const prov = await assertGenerationProvenance({
+        supabase,
+        sceneId,
+        stage: "sync_dispatch",
+        expectedGeneration: Number((scene as any).plate_generation ?? 1),
+        expectedRunId: String((scene as any).active_run_id),
+      });
+      if (!prov.ok) {
+        return json(
+          { error: prov.code, message: provenanceMessage(prov.code) },
+          409,
+        );
+      }
+    }
+
     // ── Webhook URL ──────────────────────────────────────────────────────
     const webhookUrl = appendWebhookToken(
       `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
         `&generation=${encodeURIComponent(String((scene as any).plate_generation))}` +
         `&run_id=${encodeURIComponent(String((scene as any).active_run_id))}`,
     );
+
 
     // ── Face-targeting (resolve per-speaker coords) ──────────────────────
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
