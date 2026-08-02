@@ -294,12 +294,13 @@ export async function verifyFaceBeforeDispatch(
         reason: `AWS Rekognition saw ${faceCount} faces on a multi-speaker plate — Sync.so cannot disambiguate from a single coordinate.`,
         raw_reply: rawReply,
         ...baseMeta,
+      ...mouthMeta,
       };
     }
     // Single-speaker preclip: extra faces (e.g. background extra) are a
     // soft pass — the preclip crop guarantees the target face dominates.
     console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} single_speaker → soft pass`);
-    return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
+    return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
   }
 
   // Exactly one face — check coord tolerance if we have both coord + plate dims.
@@ -316,7 +317,7 @@ export async function verifyFaceBeforeDispatch(
         `[face-gate] ${GATE_VERSION} ok face=[${Math.round(faceCx)},${Math.round(faceCy)}] ` +
         `coord=[${coord[0]},${coord[1]}] dist=${Math.round(dist)}px tol=${Math.round(tolPx)}px`,
       );
-      return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
+      return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
     }
 
     // Off-coord: attempt auto-snap when the face is inside the 5-95% safe zone.
@@ -339,6 +340,7 @@ export async function verifyFaceBeforeDispatch(
         original_coord: [coord[0], coord[1]],
         snap_distance_px: Math.round(dist),
         ...baseMeta,
+      ...mouthMeta,
       };
     }
 
@@ -352,11 +354,12 @@ export async function verifyFaceBeforeDispatch(
       reason: `Face exists but not at active_speaker_detection coord [${coord[0]},${coord[1]}] — Sync.so would return generation_unknown_error.`,
       raw_reply: rawReply,
       ...baseMeta,
+      ...mouthMeta,
     };
   }
 
   // No coord or no plate dims → 1 face is a green light.
   console.log(`[face-gate] ${GATE_VERSION} ok face_count=1 (no coord check)`);
-  return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
+  return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
 
 }
