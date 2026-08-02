@@ -11,7 +11,7 @@ import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
 import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 import { FaceMapReviewDialog } from './FaceMapReviewDialog';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
-import { sceneState } from '@/lib/composer/sceneState';
+import { sceneState, isRealizedState } from '@/lib/composer/sceneState';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
