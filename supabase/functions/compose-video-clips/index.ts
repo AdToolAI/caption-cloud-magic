@@ -4024,7 +4024,6 @@ serve(async (req) => {
               ...(isCinematicSyncScene
                 ? {
                     lip_sync_source_clip_url: null,
-                    pipeline_state: "audio_ready",
                   }
                 : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-hailuo", isI2V),
@@ -4063,7 +4062,6 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               replicate_prediction_id: prediction.id,
-              ...(isCinematicSyncScene ? { twoshot_stage: "master_clip" } : {}),
             })
             .eq("id", scene.id);
 
@@ -4645,7 +4643,6 @@ serve(async (req) => {
               ...(isCinematicSyncHH
                 ? {
                     lip_sync_source_clip_url: null,
-                    pipeline_state: "audio_ready",
                     dialog_shots: null,
                     replicate_prediction_id: null,
                     lip_sync_applied_at: null,
