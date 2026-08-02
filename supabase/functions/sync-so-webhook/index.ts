@@ -922,15 +922,21 @@ serve(async (req) => {
         const turnEnd = Number(passBeforeDone?.segments?.[0]?.endTime ?? 0).toFixed(1);
         // v353 — klare Trennung: Provider hat nicht animiert vs. Messung
         // war nicht möglich. Kein Retry-Karussell mehr im Text.
+        const evidence =
+          `outVsIn=${motion.outputVsInput ?? "n/a"} median=${(motion as any).outputVsInputMedian ?? "n/a"} score=${motion.score} frames=${motion.framesDecoded}`;
         const userMsg = motionStatic
-          ? `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung erzeugt). Bitte die Szene mit größeren Gesichtern neu rendern.`
-          : `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Ergebnis konnte nicht geprüft werden (Messung nicht möglich). Bitte erneut versuchen.`;
+          ? `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung erzeugt, ${evidence}). Bitte die Szene mit größeren Gesichtern neu rendern.`
+          : `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Ergebnis konnte nicht geprüft werden (Messung nicht möglich, ${evidence}). Bitte erneut versuchen.`;
 
         await supabase
           .from("composer_scenes")
           .update({
             lip_sync_status: "failed",
             twoshot_stage: "needs_clip_rerender",
+            // v371 — ohne clip_status='failed' zeigte die UI die Szene
+            // gleichzeitig als "fertig" (clip_url gesetzt) und als
+            // fehlgeschlagen an, und der Fortschrittsbalken lief weiter.
+            clip_status: "failed",
             clip_error: userMsg,
             updated_at: nowIso,
           })
