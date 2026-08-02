@@ -1,10 +1,15 @@
 /**
  * Central, idempotent lip-sync failure helper.
  *
+ * v385: der Zustandswechsel läuft ausschließlich über die Zustandsmaschine
+ * (`transitionScene(... 'failed')`). Die Legacy-Spalten `lip_sync_status` und
+ * `twoshot_stage` werden hier NICHT mehr geschrieben — sie werden vom
+ * Bridge-Trigger aus `pipeline_state` gespiegelt. `clip_error` bleibt reiner
+ * Anzeigetext.
+ *
  * Used by every dialog/lip-sync edge function so a failure always ends with:
  *   - dialog_shots.status = 'failed' (+ error reason)
- *   - lip_sync_status     = 'failed'
- *   - twoshot_stage       = 'failed'
+ *   - pipeline_state      = 'failed'
  *   - clip_error          = <human-friendly reason>
  *   - replicate_prediction_id = null
  *   - inflight Sync.so jobs (per scene + extra ids) removed from registry
@@ -17,9 +22,13 @@
  * (callers may still return their own HTTP response).
  */
 
+import { transitionScene } from "./scene-state.ts";
+
 type SupabaseLike = {
   from: (t: string) => any;
+  rpc?: (fn: string, params: Record<string, unknown>) => any;
 };
+
 
 export interface FailLipSyncArgs {
   supabase: SupabaseLike;
