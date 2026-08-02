@@ -43,8 +43,10 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const hasPrompt = !!(scene.aiPrompt && scene.aiPrompt.trim().length >= 4);
   const previewStatus = scene.previewStatus ?? 'idle';
   const hasPreview = !!scene.previewClipUrl && previewStatus === 'ready';
-  const hqReady = scene.clipUrl && scene.clipStatus === 'ready';
+  // v388 — Anzeige leitet sich ausschliesslich aus dem Pipeline-Zustand ab.
   const pipelineState = sceneState(scene);
+  const hqReady = !!scene.clipUrl && isRealizedState(pipelineState);
+
 
   const [busy, setBusy] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
