@@ -1877,8 +1877,11 @@ serve(async (req) => {
             .update({
               engine_override: "cinematic-sync",
               lip_sync_with_voiceover: true,
-              pipeline_state: "audio_prep",
+              // v387 — KEIN Zustandssprung hier. Diese Function baut nur die
+              // Plate; `audio_prep` darf ausschliesslich nach bestaetigtem
+              // `plate_ready` (Provider-Callback) gesetzt werden.
               clip_error: null,
+
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
