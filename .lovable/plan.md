@@ -1,37 +1,49 @@
-## Befund (verifiziert im Code)
+## Ziel
 
-Der Fehler `face_gate_probe_unavailable:exact_preclip_face_probe_error:rekognition_zero_faces` entsteht aus zwei Ursachen, die gerade vermischt sind:
+Nur die Lip-Sync-Kette auf den Stand vom 27.07.2026 zurückholen. Alles andere aus der letzten Woche bleibt zu 100 % erhalten: Voice Library, Autopilot & Production Lounge, Landing-Page-Overhaul, Stripe/Gründer-Rabatt, Music Studio, Cast & World, UCC-Fixes, Branding.
 
-1. **Semantik-Fehler.** `_shared/face-detect-mediapipe.ts` (Zeile 353–359) meldet „Rekognition hat sauber gelaufen, aber 0 Gesichter gefunden" als **Fehler** (`ok:false, error:"rekognition_zero_faces"`). Das Gate (`_shared/syncso-face-gate.ts`, Zeile 379–390) prüft nur `rek.ok` und macht daraus `probe_unavailable` — obwohl darunter (Zeile 393) längst ein korrekter `no_face`-Pfad existiert. Die Szene stirbt mit einer Meldung, die eine Messstörung behauptet, obwohl eine Messung stattgefunden hat.
+## Warum kein History-Revert
 
-2. **Wahrscheinlich leeres Still.** Der Preclip ist beim Rendern mit `preclip_face_count = 1` validiert worden. Dass exakt dieses Artefakt plötzlich 0 Gesichter zeigt, deutet auf ein leeres/schwarzes Still aus `renderAwsStill` hin (Seek per `startSec` in `DialogTurnFaceCropVideo`, Frame 0). Das wird heute nirgends geprüft — ein schwarzes PNG erzeugt zuverlässig „zero faces".
+Ein Revert über die Versions-History setzt das **gesamte** Projekt zurück – also auch alles oben Genannte. Deshalb machen wir stattdessen einen chirurgischen Rückbau: nur die Dateien der Lip-Sync-Kette werden auf ihren damaligen Inhalt gesetzt, Datei für Datei.
 
-## Was gebaut wird
+## Vorgehen
 
-**1. Nulltreffer ist ein Messergebnis, kein Ausfall**
-- `detectFacesMediaPipe` gibt bei erfolgreicher Rekognition-Antwort ohne Treffer `ok: true, faces: []` zurück (neues Feld `zeroFaces: true`). `error` bleibt nur für echte Ausfälle (Credentials, Fetch, HTTP).
-- Alle Aufrufer, die `!rek.ok` als „keine Gesichter" interpretieren, werden auf `faces.length` umgestellt (Suche über `supabase/functions`).
-- Das Gate liefert dann `no_face` statt `probe_unavailable` — Fehlermeldung im UI wird eindeutig.
+### Schritt 1 – Betroffene Dateien exakt bestimmen
+Ich ermittle die vollständige Dateiliste der Lip-Sync-Kette und vergleiche jede Datei mit ihrem Stand vom 27.07.2026. Erwarteter Umfang (wird verifiziert, nicht angenommen):
 
-**2. Blank-Frame-Erkennung vor dem Urteil**
-- Neues Modul `_shared/still-sanity.ts`: lädt das gerenderte Still, prüft Bytegröße und Luminanz-Varianz (nahezu uniformes/schwarzes Bild → `still_blank`).
-- Ein `still_blank` ist ausdrücklich **kein** `no_face`, sondern ein Messausfall und löst den Retry aus.
+- `supabase/functions/compose-dialog-segments/`
+- `supabase/functions/lipsync-watchdog/`
+- Sync.so-Webhook-Function
+- `supabase/functions/_shared/` – nur die Lip-Sync-Module: Face-Gate, Preclip, Frame-Space, Motion-Verdict, Face-Track, Camera-Path, Rekognition-Helfer, Geometrie- und Contract-Module
 
-**3. Konsens statt Einzelframe**
-- Vor einem harten `no_face` probt das Gate bis zu 3 Frames (geprüfter Index, sowie ±15 % der dekodierten Preclip-Länge, alle über `checkPreclipFrame` validiert).
-- `no_face` nur, wenn mindestens zwei auswertbare (nicht-blanke) Stills übereinstimmend 0 Gesichter zeigen.
-- Sind alle Stills blank/nicht ladbar: Verdikt `probe_unavailable` mit präziser Ursache (`still_blank_all` statt `rekognition_zero_faces`).
+**Ergebnis von Schritt 1: eine konkrete Liste, die du siehst und freigibst, bevor eine einzige Datei angefasst wird.** Dateien, die auch von anderen Features genutzt werden (z. B. gemeinsame Storage- oder Auth-Helfer), markiere ich separat – die werden **nicht** zurückgesetzt, sondern einzeln geprüft.
 
-**4. Degradierter Vertrauenspfad (eng begrenzt)**
-- Nur wenn (a) alle Stills blank sind, (b) `preclip_face_count === 1` und (c) die v396-Geometrie-Roundtrip-Prüfung des Passes grün war, wird der Dispatch mit `probe_degraded` freigegeben und im Pass-Forensikobjekt markiert. Die Passthrough-Bewertung nach dem Lauf bleibt scharf und fängt einen Fehlgriff weiterhin ab.
-- In allen anderen Fällen bleibt es fail-closed mit Refund wie bisher.
+### Schritt 2 – Abhängigkeiten prüfen
+Für jede Datei auf der Liste prüfe ich, wer sie sonst noch importiert. Wenn ein neues Feature (z. B. Autopilot oder UCC) ein Lip-Sync-Modul mitbenutzt, wird diese Datei nicht blind zurückgesetzt, sondern so angepasst, dass die alte Lip-Sync-Logik zurückkommt und die neue Schnittstelle erhalten bleibt.
 
-**5. Forensik**
-- Pro Pass werden `probe_still_urls`, `probe_still_bytes`, `probe_frame_indices`, `probe_verdicts` persistiert, damit der nächste Fehlerfall am Bild statt am Fehlertext untersucht werden kann.
+### Schritt 3 – Rückbau der Dateien
+Die freigegebene Liste wird auf den 27.07.-Inhalt gesetzt. Nach v34x eingeführte Module, die es damals nicht gab, werden gelöscht – aber nur, wenn Schritt 2 bestätigt, dass sie nichts anderes benutzt.
 
-## Technische Details
+### Schritt 4 – Schema-Verträglichkeit herstellen
+Die Patches der letzten Wochen haben auch Datenbank-Objekte eingeführt (u. a. `pipeline_state`-Enum, `plate_attempts`, `composer_scene_transition()`, Guard-Trigger). Ich lese das aktuelle Schema aus und liste, welche davon den alten Code blockieren würden.
 
-- Dateien: `_shared/face-detect-mediapipe.ts`, `_shared/syncso-face-gate.ts`, neu `_shared/still-sanity.ts`, `compose-dialog-segments/index.ts` (Persistenz + Verdikt-Mapping, Bereich ab Zeile 7668).
-- Neue Gate-Codes: `still_blank`, `probe_degraded`; `no_face` bleibt bestehen und wird jetzt korrekt getroffen.
-- Tests: Erweiterung der v396-Regressionssuite um Fälle „zero faces mit gültigem Still", „alle Stills blank", „Konsens 1 von 3".
-- Kein Eingriff in Crop-/Transformationslogik von v396 — die bleibt unverändert.
+Danach **eine einzige Migration**, die du vorher liest und freigibst:
+- Guard-Trigger, die den alten Code blockieren → entfernen
+- Tabellen/Spalten, die der alte Code nicht kennt → stehen lassen (stören nicht)
+- Enum-Spalten, auf die der alte Code Textwerte schreibt → kompatibel machen
+
+Keine Nutzdaten werden gelöscht.
+
+### Schritt 5 – Deploy
+Nur die zurückgesetzten Edge Functions werden neu deployt. Alle anderen bleiben unberührt.
+
+### Schritt 6 – Laufzeit säubern und ein Testlauf
+Hängende Runs und Sync.so-Slot-Leases einmalig auf einen Endzustand setzen. Dann **ein** kontrollierter Testlauf mit 2 Sprechern. Bewertet wird nur: trifft das Lip-Sync? Kein Nebenbei-Patchen.
+
+## Sicherheitsnetz
+
+Vor Schritt 3 markieren wir den aktuellen Stand in der History. Falls der Rückbau nicht das gewünschte Ergebnis bringt, kommen wir mit einem Klick auf den heutigen Stand zurück – ohne irgendetwas verloren zu haben.
+
+## Was in diesem Plan nicht passiert
+
+Keine Änderung an Frontend, Landing Page, Stripe, Voice Library, Autopilot, Music Studio oder Cast & World. Keine neuen Gates, Verdicts oder Contract-Module. Reiner, eingegrenzter Rückbau.
