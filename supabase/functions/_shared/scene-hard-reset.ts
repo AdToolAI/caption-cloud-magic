@@ -517,6 +517,18 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   // payload from the previous generation must never survive the reset.
   const prevPlan = (scene?.audio_plan ?? null) as Record<string, unknown> | null;
   const cleanedPlan = stripDerivedAudioPlan(prevPlan);
+  // v380 — dasselbe für `scene_assets`: Plate-, Preclip-, Tracking- und
+  // FaceMap-Referenzen der Vorgeneration verlassen die Szene hier.
+  const cleanedAssets = stripDerivedSceneAssets(
+    (scene?.scene_assets ?? null) as Record<string, unknown> | null,
+  );
+  // v380 — offene Renders der Vorgeneration schließen, bevor der neue Lauf
+  // startet (sonst kann der Reuse-Lookup ein Ergebnis von gestern ziehen).
+  const supersededRenders = await supersedeOpenRenders(
+    supabase,
+    sceneId,
+    nextGeneration,
+  );
 
 
   try {
@@ -538,6 +550,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
         dialog_shots: null,
         dialog_takes: null,
         audio_plan: cleanedPlan,
+        scene_assets: cleanedAssets,
 
         replicate_prediction_id: null,
         retry_count: 0,
