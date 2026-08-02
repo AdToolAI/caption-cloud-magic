@@ -342,7 +342,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             lipSyncTargets.push(scene.id);
           }
         }
-        if (scene.clipStatus === 'generating' && dbScene.clip_status === 'failed') {
+        if (scene.clipStatus === 'generating' && dbClipStatus === 'failed') {
           toast({ title: `Szene ${idx + 1} fehlgeschlagen`, variant: 'destructive' });
         }
         // Cinematic-Sync: notify when Sync.so step finishes
