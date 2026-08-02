@@ -81,6 +81,22 @@ export function AnchorPreviewGate({
     setAnchorUrl(null);
     setAudit(null);
     setErrMsg(null);
+    runReadyRef.current = false;
+
+    // v377 — den Run HIER übernehmen, nicht erst beim Bestätigen.
+    // Dieses Gate war der Pfad, der bisher komplett am harten Neustart
+    // vorbeilief. Der Teardown muss vor der Anchor-Vorschau laufen, weil er
+    // sonst genau den Anchor löschen würde, den der Nutzer gerade bestätigt.
+    try {
+      await prepareSceneRuns({ sceneIds: [sceneId], reason: "anchor_preview" });
+      runReadyRef.current = true;
+    } catch (e: any) {
+      setPhase("error");
+      setErrMsg(
+        e?.message || "Der vorherige Lauf dieser Szene konnte nicht beendet werden.",
+      );
+      return;
+    }
 
     // Clear any stale preview state so the poll picks up the fresh one.
     await supabase
@@ -98,6 +114,7 @@ export function AnchorPreviewGate({
       body: { ...composeBody, previewOnly: true },
     });
     if (error) {
+
       setPhase("error");
       setErrMsg(error.message || "Preview konnte nicht gestartet werden.");
       return;
