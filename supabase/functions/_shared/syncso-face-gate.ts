@@ -31,8 +31,9 @@
 
 import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
+import { measurePreclipMouth } from "./preclip-mouth-geometry.ts";
 
-const GATE_VERSION = "v252-aws-face-gate-primary";
+const GATE_VERSION = "v393-mouth-geometry-gate";
 
 
 export type FaceGateCode =
@@ -41,9 +42,12 @@ export type FaceGateCode =
   | "no_face"
   | "not_at_coord"
   | "multiple_faces"
+  | "mouth_missing"
+  | "mouth_at_edge"
   | "skipped"
   | "probe_unavailable"
   | "unparsed";
+
 
 export interface FaceGateResult {
   ok: boolean;
@@ -67,7 +71,22 @@ export interface FaceGateResult {
   original_coord?: [number, number];
   /** v129.22.3 — Pixel distance between original and snapped coord. */
   snap_distance_px?: number;
+  /** v393 — Mundmittelpunkt auf dem dispatchten Bild, in Clip-Pixeln. */
+  mouth_center?: [number, number];
+  /** v393 — Messfenster um den Mund [x1,y1,x2,y2] in Clip-Pixeln. */
+  mouth_rect?: [number, number, number, number];
+  /** v393 — Kontrollfenster (Stirn) fuer die Rausch-Normalisierung. */
+  control_rect?: [number, number, number, number];
+  /** v393 — normalisierte (0..1) Messfenster fuer die Passthrough-Bewertung. */
+  mouth_rect_norm?: { x: number; y: number; w: number; h: number };
+  control_rect_norm?: { x: number; y: number; w: number; h: number };
+  /** v393 — Bildmasse, in denen die Pixel-Fenster gelten. */
+  mouth_frame_dims?: [number, number];
+  /** v393 — kleinster Abstand des Mundfensters zum Bildrand. */
+  mouth_edge_margin_px?: number;
+
 }
+
 
 function hasAwsCreds(): boolean {
   return Boolean(Deno.env.get("AWS_ACCESS_KEY_ID") && Deno.env.get("AWS_SECRET_ACCESS_KEY"));
@@ -96,6 +115,14 @@ export interface FaceGateInput {
   passIdx?: number;
   /** True when the preclip was already validated as exactly one clean face. */
   preclipTrusted?: boolean;
+  /**
+   * v393 — Mund-Vorbedingung. Fuer Preclips (Single-Face-Crop, der direkt an
+   * Sync.so geht) muss der Mund nachweislich im Bild liegen und Abstand zum
+   * Rand haben. Ohne Mund kann der Provider nichts animieren und reicht den
+   * Clip unveraendert durch — genau der belegte Passthrough-Fall.
+   */
+  requireMouth?: boolean;
+
   /** v129.22.3 — Plate pixel dims required for AWS Rekognition auto-snap.
    *  When omitted, "yes_but_not_at_coord" stays a hard fail (legacy v129.11
    *  behaviour). Callers with plate dims handy should pass them to enable
@@ -226,6 +253,54 @@ export async function verifyFaceBeforeDispatch(
     };
   }
 
+  // ── v393 — Mundgeometrie auf genau diesem Bild ───────────────────
+  // Ein Gesicht ohne sichtbaren Mund ist fuer Sync.so wertlos. Wir messen
+  // hier einmal und geben die Fenster zurueck, damit die spaetere
+  // Passthrough-Bewertung nicht mehr auf einem generischen Grossbereich
+  // raten muss.
+  const mouthGeo = measurePreclipMouth({
+    faces: (rek.faces ?? []).map((f: any) => ({
+      bbox: f.bbox,
+      center: f.center,
+      landmarks: f.landmarks,
+    })),
+    width: rekW,
+    height: rekH,
+  });
+  // Pixel- UND normalisierte Fassung: Pixel fuer die Forensik, normalisiert
+  // fuer die spaetere Passthrough-Messung, die in 0..1 rechnet.
+  const toNorm = (r?: [number, number, number, number]) =>
+    r && rekW > 0 && rekH > 0
+      ? { x: r[0] / rekW, y: r[1] / rekH, w: (r[2] - r[0]) / rekW, h: (r[3] - r[1]) / rekH }
+      : undefined;
+  const mouthMeta = {
+    mouth_center: mouthGeo.mouthCenter,
+    mouth_rect: mouthGeo.mouthRect,
+    control_rect: mouthGeo.controlRect,
+    mouth_rect_norm: toNorm(mouthGeo.mouthRect),
+    control_rect_norm: toNorm(mouthGeo.controlRect),
+    mouth_frame_dims: [rekW, rekH] as [number, number],
+    mouth_edge_margin_px: mouthGeo.edgeMarginPx,
+  } as const;
+
+  console.log(
+    `[face-gate] ${GATE_VERSION} mouth_geometry code=${mouthGeo.code} derived=${mouthGeo.derived} ` +
+    `center=${mouthGeo.mouthCenter?.join(",") ?? "-"} band_y=${mouthGeo.bandY?.toFixed(3) ?? "-"} ` +
+    `edge_margin=${mouthGeo.edgeMarginPx ?? "-"}px frame=${rekW}x${rekH} require_mouth=${input.requireMouth === true}`,
+  );
+  if (input.requireMouth === true && !mouthGeo.ok) {
+    return {
+      ok: false,
+      code: mouthGeo.code === "no_face" ? "no_face" : (mouthGeo.code as FaceGateCode),
+      reason: `Preclip mouth check failed: ${mouthGeo.reason ?? mouthGeo.code}`,
+      raw_reply: rawReply,
+      ...baseMeta,
+      ...mouthMeta,
+    };
+  }
+
+
+
   if (faceCount > 1) {
     if (input.isMultiSpeakerContext) {
       console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} multi_speaker=true → hard fail`);
@@ -235,12 +310,13 @@ export async function verifyFaceBeforeDispatch(
         reason: `AWS Rekognition saw ${faceCount} faces on a multi-speaker plate — Sync.so cannot disambiguate from a single coordinate.`,
         raw_reply: rawReply,
         ...baseMeta,
+      ...mouthMeta,
       };
     }
     // Single-speaker preclip: extra faces (e.g. background extra) are a
     // soft pass — the preclip crop guarantees the target face dominates.
     console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} single_speaker → soft pass`);
-    return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
+    return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
   }
 
   // Exactly one face — check coord tolerance if we have both coord + plate dims.
@@ -257,7 +333,7 @@ export async function verifyFaceBeforeDispatch(
         `[face-gate] ${GATE_VERSION} ok face=[${Math.round(faceCx)},${Math.round(faceCy)}] ` +
         `coord=[${coord[0]},${coord[1]}] dist=${Math.round(dist)}px tol=${Math.round(tolPx)}px`,
       );
-      return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
+      return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
     }
 
     // Off-coord: attempt auto-snap when the face is inside the 5-95% safe zone.
@@ -280,6 +356,7 @@ export async function verifyFaceBeforeDispatch(
         original_coord: [coord[0], coord[1]],
         snap_distance_px: Math.round(dist),
         ...baseMeta,
+      ...mouthMeta,
       };
     }
 
@@ -293,11 +370,12 @@ export async function verifyFaceBeforeDispatch(
       reason: `Face exists but not at active_speaker_detection coord [${coord[0]},${coord[1]}] — Sync.so would return generation_unknown_error.`,
       raw_reply: rawReply,
       ...baseMeta,
+      ...mouthMeta,
     };
   }
 
   // No coord or no plate dims → 1 face is a green light.
   console.log(`[face-gate] ${GATE_VERSION} ok face_count=1 (no coord check)`);
-  return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
+  return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
 
 }

@@ -1,33 +1,58 @@
-## Kurz: Ja — aber mit einer Präzisierung
+## Warum die Messwerte von vornherein so niedrig sind
 
-Es gibt zwei denkbare Lösungen:
+Die Zahl, an der alles hängt (`outVsIn` = 1.4–1.9), ist nicht „schlechtes Provider-Verhalten in Zahlen", sondern das Ergebnis von vier Verdünnungsschritten in unserer eigenen Messung. Jeder einzelne drückt das Nutzsignal, während das Rauschen konstant bleibt.
 
-1. **Die Übergangstabelle aufweichen** und `audio_ready → lipsync_running` erlauben.
-2. **Den Aufrufer korrigieren**, sodass der Zustand `lipsync_dispatched` tatsächlich durchlaufen wird.
+**1. Das Messfenster liegt gar nicht auf dem Mund.**
+Auf allen vier Passes des letzten Laufs sind `mouth_center` und `mouth_rect` leer — die Preclip-Stufe berechnet den Mundanker, schreibt ihn aber nicht auf den Pass. Gemessen wird deshalb immer ein festes Standardrechteck (x 0.24 / y 0.52 / Breite 0.52 / Höhe 0.36 des Bildes). Das ist über ein Drittel des Bildes: Mund, Kinn, Wangen, Hals, Hintergrund. Der Mund selbst macht darin grob 10–15 % der Fläche aus.
 
-Variante 1 wäre die schnelle, aber schlechte Lösung: `lipsync_dispatched` verlöre seine Bedeutung, und Watchdog sowie Fortschrittsanzeige könnten „an Provider übergeben" nicht mehr von „Provider arbeitet" unterscheiden. Variante 2 ist sauber — der Zustandsvertrag bleibt unangetastet, der fehlerhafte Sprung wird beseitigt.
+**2. Es wird gemittelt, nicht gemessen.**
+Das Band wird auf ein 48×32-Raster heruntergerechnet und dann der **Mittelwert** der Helligkeitsdifferenz über alle 1536 Zellen gebildet. Eine echte Lippenbewegung verändert vielleicht 100 dieser Zellen stark (Differenz 30–60), die übrigen 1400 gar nicht. Der Mittelwert davon liegt bei ~2–4. Genau in diesem Bereich liegen unsere Messwerte — sie beweisen also nicht, dass nichts passiert ist; sie können ein echtes Signal gar nicht sichtbar machen.
 
-Ergänzend gehört dazu eine strukturelle Absicherung, damit dieser Klassenfehler nicht an anderer Stelle erneut auftritt.
+**3. Es fehlt ein Nullpunkt.**
+Jede H.264-Neukodierung erzeugt für sich schon 1–2 Punkte Differenz. Wir vergleichen unsere Messwerte aber gegen eine feste Zahl (1.8) statt gegen dieses Grundrauschen im selben Bild. Damit ist die Messung nicht kalibriert: Ein dunkler Clip, ein anderer Encoder oder eine andere Bitrate verschieben das Ergebnis, ohne dass sich am Lip-Sync irgendetwas geändert hätte.
 
-## Umsetzung v391
+**4. Zu wenige Stichproben.**
+Vier Frames über einen 2,8-Sekunden-Turn. `Math.max` über drei Differenzen ist statistisch nahezu bedeutungslos — Pass 1 und Pass 2 unterschieden sich am Ende um 0.15 Punkte, und das entschied über „fertig" gegen „Szene fehlgeschlagen".
 
-**1. Dispatch-Zustand an der richtigen Stelle setzen**
-- Unmittelbar nachdem Sync.so einen gültigen Job angenommen und dieser registriert wurde: atomarer Wechsel `audio_ready → lipsync_dispatched`.
-- Der Wechsel nach `lipsync_running` erfolgt erst danach bzw. durch den Webhook.
-- Parallele Sprecher-Pässe sind idempotent: nur der erste Übergang greift, spätere setzen nichts zurück.
+**Fazit:** Die Werte sind nicht schlecht, weil der Provider schlecht arbeitet, sondern weil die Messung ein starkes lokales Signal in einer großen, überwiegend unbeteiligten Fläche ertränkt. Und parallel dazu gibt es das echte Problem: die ASD-Box, die wir Sync 3 mitschicken, liegt nachweislich in der linken unteren Bildecke (`[0, 266, 373, 720]` im mundzentrierten 720×720-Preclip, an zwei Rändern angeschlagen) — dort ist kein Gesicht.
 
-**2. Klassenfehler strukturell verhindern**
-- Der zentrale Übergangs-Helfer erkennt, wenn ein Ziel nur über genau einen erlaubten Zwischenzustand erreichbar ist, und protokolliert das eindeutig statt still `applied=false` zurückzugeben.
-- Jedes abgelehnte `applied=false` wird als Warnung mit Ausgangs- und Zielzustand geloggt, damit ein blockierter Übergang sofort sichtbar ist und nicht erst als Endlos-Status beim Kunden auffällt.
+## Ja, die Messwerte lassen sich strukturell hochziehen
 
-**3. Watchdog als letztes Netz**
-- Szenen, die länger als eine definierte Frist in `audio_ready` stehen, obwohl bereits Sync.so-Jobs registriert sind, werden erkannt und korrekt nachgezogen — statt unbegrenzt hängen zu bleiben.
+Ziel ist ein Signal-Rausch-Abstand, bei dem echtes Lip-Sync **um ein Vielfaches** über dem Encoder-Rauschen liegt statt um 0.15 Punkte darunter. Vier Hebel, alle ohne neue Provider-Kosten:
 
-**4. Aktuell festhängenden Lauf retten**
-- Der laufende Vier-Sprecher-Lauf wird anhand von `active_run_id` und `plate_generation` sauber nachgezogen.
-- Fertige Pass-Ergebnisse bleiben erhalten; keine erneute Abbuchung, kein neuer Plate-Render.
+- **Fenster verkleinern und richtig setzen.** Mundanker am Pass festschreiben und nur die Lippenregion vermessen statt das halbe Bild. Erwarteter Signalgewinn: Faktor 3–5, allein durch Wegfall der unbeteiligten Fläche.
+- **Vom Mittelwert auf Perzentil wechseln.** Nicht „wie stark hat sich das Band im Schnitt verändert", sondern „wie stark haben sich die am stärksten veränderten 10 % der Zellen verändert". Das ist die Größe, die Lippenbewegung tatsächlich erzeugt. Erwarteter Gewinn: nochmals Faktor 5–10.
+- **Kontrollband als Nullpunkt.** Dieselbe Messung auf einer Region, die sich bei Lip-Sync nicht ändern darf (Stirn/oberer Gesichtsbereich). Bewertet wird das Verhältnis Mund zu Kontrolle. Damit wird die Messung encoder-, helligkeits- und bitratenunabhängig — der Nullpunkt kommt aus demselben Bild.
+- **Auflösung und Stichprobenzahl anheben.** Feineres Raster in der Lippenregion und mindestens acht Stichproben über das Sprachfenster, verteilt auf die lautesten Audioabschnitte statt gleichmäßig (dort ist Mundbewegung garantiert vorhanden, falls überhaupt welche existiert).
 
-**5. Verifikation**
-- Edge-Function deployen.
-- Contract-Test für die Folge `audio_ready → lipsync_dispatched → lipsync_running → lipsync_muxing`.
-- Nachweis am realen Lauf: Zustand schreitet fort und endet entweder in einem fertigen Clip oder in einem echten, benannten Fehler — nie mehr in einem stehenden Status.
+Zusammen verschiebt das die Trennschärfe von „1.74 gegen 1.89" auf Größenordnungen — echte Animation landet dann bei einem Mund-zu-Kontroll-Verhältnis deutlich über 2, ein Passthrough bei ~1. Erst dann ist die Aussage „unverändert zurückgegeben" ein Beweis und keine Vermutung.
+
+**Wichtig zur Erwartung:** Bessere Messung beseitigt die *Fehlurteile*. Sie beseitigt nicht das dahinterliegende Problem, dass Sync 3 auf eine Box neben dem Gesicht schaut. Beides gehört in denselben Umbau, in dieser Reihenfolge.
+
+---
+
+## Vorgehen: Beweis zuerst, Umbau danach
+
+**Schritt 1 — Geometrie-Beweis am realen Fall (kein Produktionscode).**
+Frames des versendeten Preclips ziehen, die ausgelieferten ASD-Boxen darauflegen. Ergebnis ist ein Bildbeleg für eine von zwei Aussagen: Box liegt neben dem Gesicht (unsere Geometrie ist die Ursache) oder Box sitzt korrekt (dann ist der Provider die Ursache).
+
+**Schritt 2 — Messung kalibrieren, bevor sie irgendetwas entscheidet.**
+Die neue Messgröße (Perzentil im Mundband gegen Kontrollband) wird an drei bekannten Fällen geeicht: ein nachweislich animierter Clip, eine reine Neukodierung desselben Clips, ein echter Passthrough. Erst wenn die drei Fälle sauber auseinanderliegen, darf die Größe über Szenen entscheiden.
+
+**Schritt 3 — A/B gegen Sync.so.** Derselbe Preclip, dieselbe Audiospur, zwei Jobs: einmal mit unserer Box, einmal mit `auto_detect`. Die geeichte Messung entscheidet objektiv, welcher Weg animiert.
+
+**Schritt 4 — Umbau nach vier Prinzipien**, im Umfang, den Schritt 1–3 belegen:
+1. Die ASD-Entscheidung richtet sich nach dem Inhalt des *versendeten* Clips, nicht nach der Sprecherzahl der Szene. Einsprecher-Preclip = ein Gesicht = `auto_detect`.
+2. Eine ASD-Box geht nur raus, wenn sie vorher am echten Frame verifiziert wurde. Nicht bestanden = fallenlassen, nicht blind mitschicken.
+3. Die Messung misst, was sie behauptet: Mundgeometrie am Pass, Perzentil statt Mittelwert, Kontrollband als Nullpunkt.
+4. Zweifel trifft nie den Kunden: terminal sind nur harte Signale und ein eindeutiges Verhältnis; alles dazwischen ist Telemetrie. Ein Hard-Fail bricht laufende Geschwisterpasses sauber ab.
+
+**Schritt 5 — Rückrechnung und Regressionstests.** Alle gespeicherten Verdikt-Datensätze gegen die neue Bewertung nachrechnen (kein hartes Fehlurteil auf bekannt guten Passes), Unit-Tests für Boxprüfung, Mundband, Kontrollband und Entscheidungslogik, Abschluss mit einem realen Vier-Sprecher-Lauf.
+
+## Technische Berührungspunkte
+
+- `supabase/functions/_shared/mouth-motion-verdict.ts` — Perzentil-Metrik, Kontrollband, Verhältnis-Kriterium, feineres Raster, ≥8 audio-gewichtete Stichproben; absolute Schwellen (1.8 / 2.0 / 1.5) entfallen als Entscheidungsgrößen.
+- `supabase/functions/_shared/pass-face-preclip.ts` — `mouth_center` / `mouth_rect` am Pass persistieren.
+- `supabase/functions/_shared/asd-strategy.ts` — Entscheidungsgrundlage auf die Gesichtszahl im dispatched Clip umstellen.
+- `supabase/functions/compose-dialog-segments/index.ts` — Vorab-Verifikation der Dispatch-Box, Verwerfen statt Mitschicken, Geschwister-Abbruch bei Hard-Fail.
+- Kein Schemawechsel; neue Felder leben in `dialog_shots.passes[]`.

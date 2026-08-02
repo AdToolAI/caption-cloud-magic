@@ -121,9 +121,11 @@ import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 // v357 — echtes Per-Frame-Gesichts-Tracking statt wiederholter Standbox.
 import {
   trackFaceAcrossTurn,
+  detectAnchorBoxOnClip,
   interpolateBoxes,
   withContextPadding,
   clampBoxArea,
+
   MAX_DISPATCH_BOX_AREA_FRAC,
   trackMovementPx,
 } from "../_shared/face-track.ts";
@@ -6577,6 +6579,41 @@ serve(async (req) => {
           );
         }
 
+        // ─── v393.2 — ANCHOR-RESCUE AUF DEM PRECLIP ────────────────────
+        // Ohne Track gilt sonst die aus dem Plate-Raum reprojizierte Box
+        // weiter. Genau die war in den Passthrough-Faellen entartet (am
+        // Rand geclamped, Mund ausserhalb). Auf einem Einzelsprecher-
+        // Preclip ist genau EIN Gesicht im Bild: ein AWS-Still misst die
+        // wahre Box, statt sie zu raten.
+        let v393AnchorRescue = "not_needed";
+        if (!v357TrackedBoxes && v161UsingPreclipForBbox) {
+          const rescueAt = Math.max(
+            0,
+            (v124VoicedWindows.length > 0 ? Math.min(...v124VoicedWindows.map(([s]) => s)) : 0) + 0.15,
+          );
+          const rescued = await detectAnchorBoxOnClip({
+            videoUrl: probeUrlForBbox,
+            width: trackW,
+            height: trackH,
+            atSec: rescueAt,
+            deadline: Date.now() + 20_000,
+            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1}`,
+          });
+          if (rescued.box) {
+            dispatchBox = withContextPadding(rescued.box, trackW, trackH);
+            v393AnchorRescue = `rescued_faces_${rescued.faces}`;
+          } else {
+            v393AnchorRescue = `rescue_failed:${rescued.error ?? "unknown"}`;
+          }
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v393_anchor_rescue ` +
+            `result=${v393AnchorRescue} box=${JSON.stringify(dispatchBox)} track_source=${v357TrackSource}`,
+          );
+          (pass as any)._v393AnchorRescue = v393AnchorRescue;
+        }
+
+
+
         // v372 — Entartungen zurückschneiden statt abbrechen. Ein Hard-Fail
         // würde Credits vernichten, obwohl die Geometrie korrigierbar ist.
         const clampedAnchor = clampBoxArea(dispatchBox, trackW, trackH);
@@ -7586,11 +7623,31 @@ serve(async (req) => {
         sceneId,
         passIdx: currentPassIdx,
         preclipTrusted: preclipTrustedForGate,
+        // v393 — auf einem Preclip ist der Mund die Vorbedingung: fehlt er
+        // oder klebt er am Rand, animiert Sync.so nichts und reicht den
+        // Clip unveraendert durch. Lieber hier scheitern als nach dem Lauf.
+        requireMouth: usePassPreclip,
       });
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
         (pass as any).probe_frame_cached = !!gate.frame_cached;
       }
+      // v393 — Messfenster persistieren: die Passthrough-Bewertung misst
+      // damit den Mund statt eines generischen Grossbereichs.
+      if (Array.isArray(gate.mouth_center)) {
+        (pass as any).mouth_center = gate.mouth_center;
+        // `mouth_rect` MUSS normalisiert sein — `mouthRectFromPass()` rechnet
+        // in 0..1. Die Pixelfassung wandert getrennt mit, fuer die Forensik.
+        (pass as any).mouth_rect = gate.mouth_rect_norm ?? null;
+        (pass as any).mouth_control_rect = gate.control_rect_norm ?? null;
+        (pass as any).mouth_rect_px = gate.mouth_rect ?? null;
+        (pass as any).mouth_control_rect_px = gate.control_rect ?? null;
+        (pass as any).mouth_frame_dims = gate.mouth_frame_dims ?? null;
+        (pass as any).mouth_edge_margin_px = gate.mouth_edge_margin_px ?? null;
+        (pass as any).mouth_geometry_space = usePassPreclip ? "preclip" : "plate";
+      }
+
+
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v129.23.2_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} preclip_trusted=${preclipTrustedForGate} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
