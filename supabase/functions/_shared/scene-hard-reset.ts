@@ -68,6 +68,8 @@ export interface HardResetResult {
   generation: number;
   deletedObjects: number;
   canceledJobs: number;
+  /** v376 — open plate attempts tombstoned by this reset. */
+  supersededAttempts: number;
   refundDecision: RefundDecision;
   errors: string[];
 }
