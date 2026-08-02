@@ -261,12 +261,22 @@ export async function verifyFaceBeforeDispatch(
     width: rekW,
     height: rekH,
   });
+  // Pixel- UND normalisierte Fassung: Pixel fuer die Forensik, normalisiert
+  // fuer die spaetere Passthrough-Messung, die in 0..1 rechnet.
+  const toNorm = (r?: [number, number, number, number]) =>
+    r && rekW > 0 && rekH > 0
+      ? { x: r[0] / rekW, y: r[1] / rekH, w: (r[2] - r[0]) / rekW, h: (r[3] - r[1]) / rekH }
+      : undefined;
   const mouthMeta = {
     mouth_center: mouthGeo.mouthCenter,
     mouth_rect: mouthGeo.mouthRect,
     control_rect: mouthGeo.controlRect,
+    mouth_rect_norm: toNorm(mouthGeo.mouthRect),
+    control_rect_norm: toNorm(mouthGeo.controlRect),
+    mouth_frame_dims: [rekW, rekH] as [number, number],
     mouth_edge_margin_px: mouthGeo.edgeMarginPx,
   } as const;
+
   console.log(
     `[face-gate] ${GATE_VERSION} mouth_geometry code=${mouthGeo.code} derived=${mouthGeo.derived} ` +
     `center=${mouthGeo.mouthCenter?.join(",") ?? "-"} band_y=${mouthGeo.bandY?.toFixed(3) ?? "-"} ` +
