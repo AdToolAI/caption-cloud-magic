@@ -33,8 +33,9 @@ import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
 import { measurePreclipMouth } from "./preclip-mouth-geometry.ts";
 import { awsFrameProbeAvailable, renderAwsStill } from "./aws-frame-probe.ts";
+import { checkPreclipFrame } from "./frame-space.ts";
 
-const GATE_VERSION = "v393-mouth-geometry-gate";
+const GATE_VERSION = "v396-authority-contract";
 
 
 export type FaceGateCode =
@@ -45,9 +46,21 @@ export type FaceGateCode =
   | "multiple_faces"
   | "mouth_missing"
   | "mouth_at_edge"
+  // ── v396 — `mouth_at_edge` war ein Sammelbecken für völlig verschiedene
+  // Ursachen. Sie sind jetzt getrennt; nur `crop_not_viable` heisst wirklich
+  // "richtige Person, richtiger Frame, korrekte Transformation, trotzdem am Rand".
+  | "frame_mapping_failed"
+  | "transform_contract_failed"
+  | "face_not_detected"
+  | "identity_ambiguous"
+  | "wrong_identity"
+  | "source_geometry_drift"
+  | "recrop_required"
+  | "crop_not_viable"
   | "skipped"
   | "probe_unavailable"
   | "unparsed";
+
 
 
 export interface FaceGateResult {
@@ -130,6 +143,20 @@ export interface FaceGateInput {
    *  self-healing. */
   plateWidth?: number;
   plateHeight?: number;
+
+  /**
+   * v396 — REAL dekodierte Framezahl des encodierten Preclips. Pflicht,
+   * sobald `requireMouth` gesetzt ist. Ohne sie kann `frameNumber` nicht
+   * geprüft werden und wir wiederholen den belegten Fehler: ein absoluter
+   * Plate-Frame (102) wurde gegen einen 68-Frame-Preclip geprüft und der
+   * Vertragsbruch blieb hinter dem stillen `t = 0.05 s`-Fallback verborgen.
+   */
+  decodedPreclipFrameCount?: number;
+  /**
+   * v396 — Frames der Zielperson dürfen NICHT über Sekunden adressiert
+   * werden. Ist dieser Index gesetzt, wird genau er extrahiert.
+   */
+  preclipFrameIndex?: number;
 }
 
 export async function verifyFaceBeforeDispatch(
@@ -152,8 +179,57 @@ export async function verifyFaceBeforeDispatch(
     ? [Number(input.coord[0]), Number(input.coord[1])] as [number, number]
     : null;
 
+  // ── v396 Stage 0 — Framevertrag, VOR jeder Extraktion ────────────
+  // Auf einem Preclip ist `frameNumber` ein LOKALER Index. Wird hier ein
+  // absoluter Plate-Frame durchgereicht, ist das ein Vertragsbruch und kein
+  // Anlass, still auf einen Zeitstempel auszuweichen.
+  const decodedFrameCount = Number.isFinite(input.decodedPreclipFrameCount)
+    ? Number(input.decodedPreclipFrameCount)
+    : null;
+  let verifiedPreclipFrame: number | null = null;
+  if (input.requireMouth === true) {
+    const requested = Number.isFinite(input.preclipFrameIndex)
+      ? Number(input.preclipFrameIndex)
+      : frame;
+    if (decodedFrameCount === null || !(decodedFrameCount > 0)) {
+      return {
+        ok: false,
+        code: "frame_mapping_failed",
+        reason:
+          "decoded_preclip_frame_count is unknown — refusing to probe a preclip frame by timestamp " +
+          "(v396: no more seconds-based extraction)",
+      };
+    }
+    if (requested !== null) {
+      const checked = checkPreclipFrame(requested, decodedFrameCount);
+      if (!checked.ok) {
+        console.warn(`[face-gate] ${GATE_VERSION} frame_mapping_failed ${checked.reason}`);
+        return { ok: false, code: "frame_mapping_failed", reason: checked.reason };
+      }
+      verifiedPreclipFrame = Number(checked.frame);
+    } else {
+      verifiedPreclipFrame = 0;
+    }
+  }
+
+  /**
+   * v396 — Zeitstempel wird AUSSCHLIESSLICH aus dem geprüften lokalen
+   * Preclip-Frameindex abgeleitet. Der frühere feste Wert `0.05 s` war der
+   * stille Fallback, hinter dem sich der "102 aus 68"-Vertragsbruch
+   * versteckt hat.
+   */
+  const exactProbeTimestamp = (): number => {
+    const fps = Number.isFinite(input.fps) && Number(input.fps) > 0 ? Number(input.fps) : 30;
+    const idx = verifiedPreclipFrame ?? 0;
+    // Mitte des Frames treffen, damit Rundung im Decoder nicht auf den
+    // Nachbarframe kippt.
+    return (idx + 0.5) / fps;
+  };
+
+
   // ── Stage 1 — resolve a real still image of the ASD frame ───────
   // Client-canvas frames are authoritative. Server extraction only checks
+
   // the deterministic cache path; it never calls Replicate/lucataco.
   let frameJpegUrl: string | undefined;
   let frameCached = false;
@@ -164,7 +240,10 @@ export async function verifyFaceBeforeDispatch(
   } else if (frame != null) {
     const extracted = await extractFrameForFaceProbe({
       videoUrl: input.videoUrl,
-      frameNumber: frame,
+      // v396 — auf einem Preclip zählt der geprüfte LOKALE Index, nie der
+      // durchgereichte absolute Plate-Frame.
+      frameNumber: verifiedPreclipFrame ?? frame,
+
       fps: input.fps ?? 30,
       userId: input.userId,
       projectId: input.projectId,
@@ -180,13 +259,14 @@ export async function verifyFaceBeforeDispatch(
       if (input.requireMouth === true && awsFrameProbeAvailable()) {
         const exactStill = await renderAwsStill({
           videoUrl: input.videoUrl,
-          // gateFrame may be an absolute plate frame while videoUrl is the
-          // short preclip. Frame 0.05s is guaranteed to belong to the exact
-          // provider artifact and avoids sampling past its duration.
-          timestamp: 0.05,
+          // v396 — kein Sekunden-Raten mehr. `verifiedPreclipFrame` ist ein
+          // gegen die dekodierte Framezahl geprüfter LOKALER Preclip-Index;
+          // der Zeitstempel wird nur noch daraus abgeleitet.
+          timestamp: exactProbeTimestamp(),
           frameSize: Math.max(64, Number(input.plateWidth ?? input.plateHeight ?? 720)),
           deadline: Date.now() + Math.max(15_000, input.timeoutMs ?? 45_000),
         });
+
         if (exactStill.url) {
           frameJpegUrl = exactStill.url;
           frameCached = false;
@@ -219,7 +299,7 @@ export async function verifyFaceBeforeDispatch(
     if (input.requireMouth === true && awsFrameProbeAvailable()) {
       const exactStill = await renderAwsStill({
         videoUrl: input.videoUrl,
-        timestamp: 0.05,
+        timestamp: exactProbeTimestamp(),
         frameSize: Math.max(64, Number(input.plateWidth ?? input.plateHeight ?? 720)),
         deadline: Date.now() + Math.max(15_000, input.timeoutMs ?? 45_000),
       });
