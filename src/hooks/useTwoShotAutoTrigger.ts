@@ -88,7 +88,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, lip_sync_with_voiceover, dialog_mode, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id, plate_generation, plate_ready_generation')
+          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, lip_sync_with_voiceover, dialog_mode, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id, plate_generation, plate_ready_generation, pipeline_state')
           .eq('project_id', projectId);
         if (error || !data) return;
 
@@ -345,40 +345,42 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         });
         for (const d of needsAudioPrep) {
           inflight.current.add(`audio-prep:${d.id}`);
-          d.twoshot_stage = 'audio'; // optimistisch — UI zeigt sofort den Stage
-          await supabase
-            .from('composer_scenes')
-            .update({ twoshot_stage: 'audio', updated_at: new Date().toISOString() })
-            .eq('id', d.id);
+          // v384 — der Client schreibt keinen Pipeline-Zustand mehr.
+          // `compose-twoshot-audio` beansprucht die Szene serverseitig und
+          // atomar (`plate_ready` -> `audio_prep`); doppelte Ticks aus
+          // mehreren Tabs koennen dadurch keinen zweiten TTS-Lauf ausloesen.
+          d.twoshot_stage = 'audio'; // rein optimistische UI-Anzeige
           console.info(
             `[useTwoShotAutoTrigger] self-heal: invoking compose-twoshot-audio for ${d.id}`,
           );
           supabase.functions
             .invoke('compose-twoshot-audio', { body: { scene_id: d.id } })
             .then(async ({ data: aData, error: aErr }) => {
+              // 202 `audio_prep_already_running`: ein anderer Tab/Tick haelt
+              // den Claim. Kein Fehler — nur freigeben und weiterpollen.
+              if (!aErr && aData && !aData.success && aData.error === 'audio_prep_already_running') {
+                inflight.current.delete(`audio-prep:${d.id}`);
+                return;
+              }
               if (aErr || !aData?.success) {
                 const realMsg = aErr ? await extractFunctionsError(aErr) : (aData?.error ?? 'unknown');
                 const msgStr = String(realMsg ?? '');
                 const isTransient =
                   (aErr as any)?.name === 'FunctionsFetchError' ||
-                  /Failed to send a request|Failed to fetch|NetworkError|load failed|ECONNRESET|ETIMEDOUT|\b(502|503|504)\b/i.test(msgStr);
+                  /Failed to send a request|Failed to fetch|NetworkError|load failed|ECONNRESET|ETIMEDOUT|\b(502|503|504)\b/i.test(msgStr) ||
+                  // Serverseitig nicht-terminale Antworten
+                  /audio_prep_already_running|scene_not_realized_no_lipsync/i.test(msgStr);
                 const retryKey = `audio-prep-net:${d.id}`;
                 if (isTransient && !autoRetried.current.has(retryKey)) {
                   autoRetried.current.add(retryKey);
                   console.warn(
-                    `[useTwoShotAutoTrigger] audio-prep transient fetch error for ${d.id} — auto-retry:`,
+                    `[useTwoShotAutoTrigger] audio-prep transient for ${d.id} — auto-retry:`,
                     msgStr,
                   );
-                  await supabase
-                    .from('composer_scenes')
-                    .update({
-                      twoshot_stage: null,
-                      clip_error: 'audio_prep_transient_retry',
-                      updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', d.id);
-                  // Sofort freigeben, damit der nächste Poll-Tick (2.5s)
-                  // die Szene wieder aufnimmt.
+                  // v384 — KEIN `clip_error`-Marker mehr. Genau dieser
+                  // Diagnosetext ('audio_prep_transient_retry') liess den
+                  // Server-Guard die Szene als nicht-realisiert werten und
+                  // erzeugte `scene_not_realized_no_lipsync`.
                   inflight.current.delete(`audio-prep:${d.id}`);
                   return;
                 }
@@ -386,6 +388,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                   `[useTwoShotAutoTrigger] audio-prep failed for ${d.id}:`,
                   msgStr,
                 );
+                // Nur Diagnosetext — den terminalen Zustand setzt der Server.
                 await supabase
                   .from('composer_scenes')
                   .update({
@@ -395,16 +398,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                   })
                   .eq('id', d.id);
               } else {
-                // Direkt nach Erfolg: stage auf 'master_clip' setzen, damit der
-                // nächste Tick v5 startet (statt erst auf den DB-Refresh zu
-                // warten, der die optimistische 'audio'-Markierung überschreibt).
                 console.info(
                   `[useTwoShotAutoTrigger] audio-prep OK for ${d.id} — advancing to master_clip`,
                 );
-                await supabase
-                  .from('composer_scenes')
-                  .update({ twoshot_stage: 'master_clip', updated_at: new Date().toISOString() })
-                  .eq('id', d.id);
               }
             })
             .finally(() => {
