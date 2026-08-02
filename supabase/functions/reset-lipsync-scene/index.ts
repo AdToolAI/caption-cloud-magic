@@ -18,6 +18,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
+import { transitionScene } from "../_shared/scene-state.ts";
+
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
