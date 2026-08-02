@@ -28,16 +28,22 @@
 type SupabaseLike = { from: (t: string) => any };
 
 export type PlateAttemptVerdict =
-  /** attempt matches the scene's current generation — the write may proceed */
+  /** attempt matches the scene's current generation + run — the write may proceed */
   | "current"
   /** the attempt was tombstoned by a hard reset / newer generation */
   | "superseded"
   /** attempt exists but points at an older generation */
   | "generation_mismatch"
+  /** v377 — attempt belongs to a previous run of the same generation */
+  | "run_mismatch"
+  /** v377 — a second dispatch that was never the open attempt */
+  | "duplicate"
   /** attempt already produced a result — duplicate callback */
   | "already_completed"
   /** no attempt row (pre-v375 job or non-provider route) — do not block */
   | "unregistered"
+  /** v377 — no attempt row although the scene runs under the new contract */
+  | "unregistered_stale"
   /** the scene row is gone */
   | "scene_missing";
 
@@ -47,7 +53,10 @@ export interface PlateAttemptCheck {
   attemptId: string | null;
   expectedGeneration: number | null;
   currentGeneration: number | null;
+  /** v377 — the run the attempt was dispatched under. */
+  runId?: string | null;
 }
+
 
 /**
  * Pure decision function — kept separate from IO so it can be unit tested
