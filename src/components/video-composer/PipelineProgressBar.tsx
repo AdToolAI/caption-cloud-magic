@@ -16,6 +16,7 @@ import { usePipelineProgress } from '@/hooks/usePipelineProgress';
 import { supabase } from '@/integrations/supabase/client';
 import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
+import { sceneState } from '@/lib/composer/sceneState';
 
 const SYNCSO_MAX_SLOTS = 3;
 
@@ -196,10 +197,7 @@ export default function PipelineProgressBar({
 function ResetFailedButton({ scenes }: { scenes: ComposerScene[] }) {
   const { reset, resettingId } = useResetLipSync();
   const failed = scenes.find(
-    (s) =>
-      (s as any).lipSyncStatus === 'failed' ||
-      (s as any).twoshotStage === 'failed' ||
-      (s as any).twoshotStage === 'audio_mux_failed',
+    (s) => sceneState(s) === 'failed',
   );
   if (!failed) return null;
   const busy = resettingId === failed.id;
