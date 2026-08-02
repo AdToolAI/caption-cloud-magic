@@ -7711,12 +7711,23 @@ serve(async (req) => {
         // v396 — Framevertrag statt Sekunden-Fallback.
         decodedPreclipFrameCount: usePassPreclip && decodedPreclipFrames > 0 ? decodedPreclipFrames : undefined,
         preclipFrameIndex: preclipLocalFrame,
+        // v397 — Voraussetzung für den eng begrenzten degradierten Pfad.
+        geometryContractOk: geometryContractOkPre,
       });
 
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
         (pass as any).probe_frame_cached = !!gate.frame_cached;
       }
+      // ── v397 — Probe-Forensik persistieren: welche Stills wurden mit
+      // welchem Ergebnis angeschaut? Ohne das lässt sich ein späteres
+      // "kein Gesicht" nicht mehr am Bild überprüfen.
+      (pass as any).probe_still_urls = gate.probe_still_urls ?? null;
+      (pass as any).probe_still_bytes = gate.probe_still_bytes ?? null;
+      (pass as any).probe_frame_indices = gate.probe_frame_indices ?? null;
+      (pass as any).probe_verdicts = gate.probe_verdicts ?? null;
+      (pass as any).probe_degraded = gate.code === "probe_degraded";
+
       // v393 — Messfenster persistieren: die Passthrough-Bewertung misst
       // damit den Mund statt eines generischen Grossbereichs.
       if (Array.isArray(gate.mouth_center)) {
