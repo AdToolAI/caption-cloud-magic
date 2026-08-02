@@ -438,7 +438,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   }
 
   // FAILED (HQ) → red error state (preserve fast-preview retry)
-  if (scene.clipStatus === 'failed') {
+  if (pipelineState === 'failed') {
     return (
       <div className="relative w-full h-full bg-destructive/10 border border-destructive/30 flex flex-col items-center justify-center gap-1">
         <XCircle className="h-5 w-5 text-destructive" />
