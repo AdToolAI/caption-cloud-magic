@@ -50,13 +50,33 @@ const MODEL_TAG = "v350-mouth-motion-verdict-aws";
 export const MOVED_MIN_SCORE = 1.6;
 
 /**
- * v350 — Passthrough detection.
- * If the provider output differs from its own INPUT preclip by no more than
- * this (mean |ΔY| in the mouth band, at every sampled timestamp), the provider
- * returned the input essentially unchanged — measured re-encode noise on a
- * proven passthrough was 1.1–2.1, genuine lip-sync moves far beyond this.
+ * v371 — Passthrough detection (evidence-based, no single magic threshold).
+ *
+ * v350 used one number (`outVsIn < 3.0`) to hard-fail a pass. Scene 6bf4e815
+ * (2026-08-02, pass 4 "Kailee") was killed with `outVsIn=2.31` while its own
+ * intra-clip mouth motion was `score=84` — by far the STRONGEST of all four
+ * passes. 2.31 sits inside the measured re-encode noise band (1.1–2.1), so the
+ * number proved nothing; it was a coin flip.
+ *
+ * A passthrough is now only declared when several independent criteria agree:
+ *   max(outVsIn)    < PASSTHROUGH_HARD_MAX   (real re-encode noise)
+ *   median(outVsIn) < PASSTHROUGH_MEDIAN_MAX (not a single outlier frame)
+ *   and no self-motion veto (see STRONG_MOTION_SCORE).
+ * Everything in between becomes `unknown` → telemetry only, never a hard fail.
  */
-export const PASSTHROUGH_MAX_SCORE = 3.0;
+export const PASSTHROUGH_MAX_SCORE = 3.0; // kept for back-compat imports
+export const PASSTHROUGH_HARD_MAX = 2.0;
+export const PASSTHROUGH_MEDIAN_MAX = 1.5;
+
+/**
+ * Intra-output mouth-band motion above this is strong, unambiguous animation.
+ * A provider that handed the input straight back cannot produce both a heavily
+ * moving mouth band AND a measurable distance to that same input.
+ */
+export const STRONG_MOTION_SCORE = 12;
+/** Distance to the input that must at least be present for the veto to apply. */
+export const STRONG_MOTION_MIN_OUT_VS_IN = 1.8;
+
 
 /** Sample grid the mouth band is resampled to before differencing. */
 const GRID_W = 48;
