@@ -135,8 +135,16 @@ export interface FaceGateInput {
 export async function verifyFaceBeforeDispatch(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
-  if (!hasAwsCreds()) return { ok: true, code: "skipped", reason: "no_aws_credentials" };
-  if (!input.videoUrl) return { ok: true, code: "skipped", reason: "no_video_url" };
+  if (!hasAwsCreds()) {
+    return input.requireMouth === true
+      ? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_aws_credentials" }
+      : { ok: true, code: "skipped", reason: "no_aws_credentials" };
+  }
+  if (!input.videoUrl) {
+    return input.requireMouth === true
+      ? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_video_url" }
+      : { ok: true, code: "skipped", reason: "no_video_url" };
+  }
 
 
   const frame = Number.isFinite(input.frameNumber) ? Number(input.frameNumber) : null;
@@ -172,7 +180,10 @@ export async function verifyFaceBeforeDispatch(
       if (input.requireMouth === true && awsFrameProbeAvailable()) {
         const exactStill = await renderAwsStill({
           videoUrl: input.videoUrl,
-          timestamp: Math.max(0.02, frame / Math.max(1, input.fps ?? 30)),
+          // gateFrame may be an absolute plate frame while videoUrl is the
+          // short preclip. Frame 0.05s is guaranteed to belong to the exact
+          // provider artifact and avoids sampling past its duration.
+          timestamp: 0.05,
           frameSize: Math.max(64, Number(input.plateWidth ?? input.plateHeight ?? 720)),
           deadline: Date.now() + Math.max(15_000, input.timeoutMs ?? 45_000),
         });
@@ -188,14 +199,14 @@ export async function verifyFaceBeforeDispatch(
           };
         }
       } else {
-      return {
-        ok: input.requireMouth !== true,
-        code: "probe_unavailable",
-        reason: input.requireMouth === true
-          ? `exact_preclip_probe_unavailable:${extracted.reason ?? "unknown"}`
-          : `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
-        extract_ms: extractMs,
-      };
+        return {
+          ok: input.requireMouth !== true,
+          code: "probe_unavailable",
+          reason: input.requireMouth === true
+            ? `exact_preclip_probe_unavailable:${extracted.reason ?? "unknown"}`
+            : `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
+          extract_ms: extractMs,
+        };
       }
     }
     if (!frameJpegUrl) {

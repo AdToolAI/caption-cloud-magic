@@ -7686,6 +7686,8 @@ serve(async (req) => {
         (pass as any).mouth_frame_dims = gate.mouth_frame_dims ?? null;
         (pass as any).mouth_edge_margin_px = gate.mouth_edge_margin_px ?? null;
         (pass as any).mouth_geometry_space = usePassPreclip ? "preclip" : "plate";
+        (pass as any).mouth_geometry_validated = gate.ok && gate.code === "ok";
+        (pass as any).mouth_geometry_validated_at = new Date().toISOString();
       }
 
 
