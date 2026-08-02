@@ -1,97 +1,78 @@
-# v386 — Welle D: Enum-State im gesamten Composer-Client verbindlich machen
+# v387 — Stabilisierung statt Umbau
 
-## Bestätigte Ursache
+Ziel: keine neuen Features, keine weitere Architekturwelle. Wir schließen genau zwei bestätigte Brüche, verifizieren einen dritten, und frieren die Pipeline danach ein.
 
-Der aktuelle Run der betroffenen Szene ist im Backend korrekt:
+## Status: was gesichert ist und was nicht
 
-- `pipeline_state = plate_rendering`
-- `plate_generation = 4`
-- `clip_url = null`
-- kein Audio-Plan und kein Sync.so-Job
-- ein aktiver HappyHorse-Plate-Render für Generation 4
+**Bestätigt (aus den Function-Logs des letzten Laufs):**
+`compose-video-clips` setzt bei aktiviertem Dialog/Lip-Sync den Zustand direkt auf `audio_prep`/`audio_ready` und ruft die Audio-Function auf, **bevor** die Plate fertig ist. Diese Updates umgehen `composer_scene_transition()`. Das ist die Ursache für „Lip-Sync startet, obwohl die Szene noch gebaut wird".
 
-Der sichtbare Sprung zu „Lip-Sync startet“ ist ein Client-Fehler. Die serverseitige Enum-Migration ist fertig, aber zentrale UI-Reader verwenden noch `clip_status`, `twoshot_stage`, `lip_sync_status`, `dialog_shots` und alte persistierte Fortschrittswerte. Zudem schreibt die allgemeine Szenen-Persistenz lokale Lifecycle-Spiegel weiterhin zurück in die Datenbank. Damit kann ein neuer Run korrekt `plate_rendering` sein, während die Oberfläche einen alten Lip-Sync-Status anzeigt oder wiederbelebt.
+**Noch nicht bestätigt:**
+Der aktuelle Fehler `lipsync_identity_collision` („Zwei Sprecher wurden demselben Charakter zugeordnet"). Erster Schritt ist deshalb eine Datenprüfung, kein Codefix — dazu unten Schritt 1.
 
-## Umsetzung
+## Schritt 1 — Sprecher-Kollision forensisch klären (vor jedem Fix)
 
-### 1. Enum-Zustand vollständig in das Client-Modell übernehmen
+Für die betroffene Szene auslesen:
 
-- `ComposerScene` um `pipelineState`, `pipelineStateAt`, `pipelineStateRunId`, `activeRunId`, `plateGeneration` und `plateReadyGeneration` erweitern.
-- Alle DB→Client-Mapper in `VideoComposerDashboard` und `ClipsTab` um diese Felder ergänzen.
-- Bei Realtime-/Tab-Refreshes `clip_url = null` respektieren; niemals auf eine alte lokale URL zurückfallen.
+- `dialog_turns` — welche Sprecher-UUIDs stehen dort wirklich
+- `assignment_lock` — auf welchen Face-Slot zeigt jede UUID
+- Cast-Liste der Szene — die UI zeigt vier Sprecher, sichtbar sind drei Chips
+- die Rekognition-FaceIds des aktuellen Plate-Attempts
 
-### 2. Lifecycle-Spalten für den Client schreibgeschützt machen
+Damit wird eindeutig, welcher der drei möglichen Fälle vorliegt:
 
-- `useComposerPersistence` darf bei normalen Prompt-, Cast- oder Layout-Edits keine Lifecycle-Felder mehr schreiben:
-  - `clip_url`
-  - `clip_status`
-  - `pipeline_state`
-  - `twoshot_stage`
-  - `lip_sync_status`
-  - Run-/Generationsfelder
-- Diese Felder werden ausschließlich durch `composer-start-scene-generation`, State-Transitions und generation-gebundene Webhooks geändert.
-- Optimistische UI-Updates bleiben lokal, können aber keinen alten Run mehr in die Datenbank zurückschreiben.
+1. zwei Dialog-Turns tragen dieselbe Charakter-UUID (Fehler entsteht schon im Briefing/Skript)
+2. zwei unterschiedliche UUIDs zeigen auf denselben Face-Slot (Fehler im Assignment-Lock)
+3. die Plate enthält tatsächlich nur drei unterscheidbare Gesichter für vier Sprecher (Fehler im Plate-Prompt/Cast-Block)
 
-### 3. `SceneInlinePlayer` vollständig auf `sceneState()` umstellen
+Erst danach wird gefixt — und nur der Fall, der tatsächlich vorliegt.
 
-- Anzeigezustände ausschließlich aus dem Enum ableiten:
-  - Plate-Aufbau: `plate_queued`, `plate_rendering`
-  - Audio: `audio_prep`, `audio_ready`
-  - Lip-Sync: `lipsync_dispatched`, `lipsync_running`, `lipsync_muxing`
-  - Fertig: `complete`
-  - Terminal: `failed`, `canceled`
-- `status === ready`, alte `twoshotStage`-Werte oder alte `lipSyncStatus`-Werte dürfen Lip-Sync nicht mehr sichtbar starten.
-- Provider-/Pass-Daten bleiben nur Detailinformationen innerhalb eines bereits enum-bestätigten Lip-Sync-Zustands.
+## Schritt 2 — Den bestätigten Zustandsbruch schließen
 
-### 4. Globalen Fortschrittsbalken generation-sicher machen
+- Den kompletten Audio-/Lip-Sync-Vorgriff aus `compose-video-clips` entfernen. Diese Function darf ausschließlich `plate_queued → plate_rendering` steuern und nichts nachgelagertes aufrufen.
+- Audio-Prep wird nur noch nach bestätigtem `plate_ready` ausgelöst, also durch den Provider-Callback mit passendem Run und passender Generation.
+- Verbleibende direkte Enum-Schreibstellen für `audio_prep`, `audio_ready`, `lipsync_*` und `complete` in Webhooks, Mux und Dialog-Dispatch auf die Transition-Funktion umstellen.
 
-- `usePipelineProgress` für Clips, Audio, Lip-Sync, Erfolg und Fehler ausschließlich über `sceneState()` ableiten.
-- Ein Plate-Run darf niemals die Lip-Sync-Phase aktivieren.
-- Persistierte Session-Snapshots an `sceneId + plateGeneration + activeRunId` binden.
-- Bei neuer Generation oder neuem Run alle Floors, Event-Flags und den alten 99%-Stand verwerfen.
-- Legacy-Events dürfen eine Phase nur anzeigen, wenn der aktuelle Enum-Zustand diese Phase bestätigt.
+Verbindliche Reihenfolge, ohne Abkürzung:
 
-### 5. Auto-Trigger strikt an Enum-Transitions koppeln
+```text
+plate_rendering → plate_ready → audio_prep → audio_ready → lipsync_dispatched → lipsync_running → lipsync_muxing → complete
+```
 
-- `useTwoShotAutoTrigger` nutzt:
-  - Audio-Prep nur bei `plate_ready`
-  - Lip-Sync-Dispatch nur bei `audio_ready`
-  - sichtbare Lip-Sync-Arbeit nur bei `lipsync_dispatched|lipsync_running|lipsync_muxing`
-- Alte clientseitige Self-Heals, die `twoshot_stage` oder `lip_sync_status` direkt schreiben, entfernen.
-- Fehler werden nicht mehr clientseitig über Legacy-Spalten terminal gesetzt; die jeweilige Edge Function besitzt den Transition-Claim.
+## Schritt 3 — Kollision abhängig vom Befund beheben
 
-### 6. Weitere sichtbare Statuskomponenten migrieren
+Je nach Ergebnis aus Schritt 1 genau eine Korrektur:
 
-- `SceneClipProgress` auf den Enum umstellen.
-- Reset-/Fehlerbuttons im globalen Fortschrittsbalken über `pipeline_state === failed` bestimmen.
-- Legacy-Felder dürfen nur noch als Diagnose-/Kompatibilitätsdaten angezeigt, aber nicht zur Steuerung verwendet werden.
+- **Fall 1:** Dedup der Sprecher-UUIDs beim Erzeugen der Dialog-Turns; doppelte Zuweisung wird beim Speichern abgelehnt, nicht erst kurz vor Sync.so.
+- **Fall 2:** Der Assignment-Lock vergibt jeden Face-Slot exakt einmal; ein zweiter Anspruch auf denselben Slot führt zu einer klaren, frühen Fehlermeldung mit Nennung der betroffenen Namen.
+- **Fall 3:** Der Cast-Block der Plate erzwingt so viele klar getrennte Gesichter wie Sprecher; passt das Ergebnis nicht, schlägt die Szene **vor** dem Lip-Sync fehl und die Credits werden erstattet.
 
-### 7. Alte Plate-Versuche sauber klassifizieren
+In allen Fällen gilt: die Meldung nennt die konkreten Sprechernamen und den nächsten Schritt, nicht nur einen internen Fehlercode.
 
-Für die betroffene Szene existieren zwei abgeschlossene ältere `plate_attempts`, die noch nicht als `superseded` markiert sind. Sie sind durch Generation/Run bereits wirkungslos, werden aber zur forensischen Eindeutigkeit beim Start einer neuen Generation als `superseded` markiert. Abgeschlossene historische Ergebnisse werden nicht gelöscht; sie dürfen nur nie wieder als aktuelle Provenienz gelten.
+## Schritt 4 — Kein stiller Geldverbrauch
 
-### 8. Lockout nach erfolgreicher Migration
+- Jeder Abbruch vor dem ersten Provider-Aufruf erstattet automatisch und idempotent.
+- Ein Abbruch wegen Kollision oder fehlender Plate darf nie als „fertig" enden und nie Lip-Sync anzeigen.
 
-- Repository-Audit aller verbleibenden Client-Lese- und Schreibstellen für die vier Legacy-Lifecycle-Spalten.
-- Verbleibende Steuerlogik auf `sceneState()` migrieren.
-- Schutztest hinzufügen, der fehlschlägt, wenn Composer-Clientcode Lifecycle-Spalten direkt schreibt oder Lip-Sync aus Legacy-Spalten startet.
+## Schritt 5 — Freeze und Regressionsnetz
 
-## Verifikation
+Nach diesen Korrekturen wird der Lip-Sync-Pfad eingefroren. Es kommen nur noch Tests dazu:
 
-1. Neue Generierung einer zuvor erfolgreich lip-synchronisierten Szene starten.
-2. Sofort prüfen:
-   - Enum ist `plate_queued|plate_rendering`
-   - Clip-URL leer
-   - UI zeigt ausschließlich „Szene wird gebaut“
-   - Lip-Sync-Phase ist inaktiv
-   - Fortschritt startet für die neue Generation neu, nicht bei 99 %
-3. Während des Provider-Renders sicherstellen, dass kein `compose-dialog-segments`-Aufruf erfolgt.
-4. Erst nach `plate_ready → audio_prep → audio_ready` darf der Dispatch erfolgen.
-5. Erst nach `lipsync_dispatched` darf „Lip-Sync startet“ erscheinen.
-6. Fehlgeschlagene Plate-Generierung muss terminal bleiben und darf Audio/Lip-Sync nie aktivieren.
-7. F5/Tabwechsel darf weder alte URL noch alten Fortschritt noch alten Lip-Sync-Zustand wiederherstellen.
-8. Selektive Tests für `sceneState`, Progress, Auto-Trigger und Persistenz ausführen.
+1. Dialog-Run bleibt während des Provider-Renders ausschließlich in `plate_rendering`.
+2. Vor `plate_ready` gibt es keinen Audio- und keinen Sync.so-Aufruf.
+3. Vier Sprecher ergeben vier verschiedene Face-Slots; doppelte Zuordnung wird früh abgelehnt.
+4. Verspätete Callbacks eines alten Runs bleiben wirkungslos.
+5. Provider-Fehler ist terminal, mit Erstattung, ohne Folge-Function.
 
-## Ergebnis
+Änderungen an dieser Kette danach nur noch mit vorheriger Absprache.
 
-Nach Welle D gibt es für Steuerlogik nur noch eine Wahrheit: `pipeline_state` des aktuellen `active_run_id` und der aktuellen `plate_generation`. Die Legacy-Spalten bleiben vorübergehend Spiegel für Kompatibilität, können aber weder die UI noch einen neuen Pipeline-Schritt auslösen.
+## Verifikation am echten Lauf
+
+Ein 4-Sprecher-Testlauf, protokolliert nach Zeit:
+
+- zuerst sichtbare Plate mit vier getrennten Gesichtern
+- danach genau ein Audio-Claim
+- danach genau ein Lip-Sync-Dispatch
+- Ergebnis visuell prüfen: alle vier Sprecher bewegen die Lippen zu ihrem eigenen Text
+
+Schlägt einer dieser Punkte fehl, wird nicht weitergebaut, sondern der Punkt einzeln geklärt.
