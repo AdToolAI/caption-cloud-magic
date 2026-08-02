@@ -3,6 +3,9 @@ import {
   classifyProviderRejection,
   isGreenNetRejection,
   hardSanitizeForHappyHorse,
+  buildCastClause,
+  extractCastNames,
+  validateCastContract,
 } from "./happyhorse-green-net.ts";
 
 const REAL_INVALID_PARAM =
@@ -45,4 +48,58 @@ Deno.test("v369: hard sanitizer actually changes a rejected dialog plate prompt"
   assertEquals(res.clean.trim() === plate.trim(), false);
   assertEquals(res.clean.toLowerCase().includes("bedroom"), false);
   assertEquals(res.touched.length > 0, true);
+});
+
+// ---------------------------------------------------------------------------
+// v370 — Cast-Block-Vertrag
+// ---------------------------------------------------------------------------
+
+const REAL_BROKEN_CAST =
+  "[Besetzung: Matthew Dusatko (Profil), Sarah Dusatko (Profil), Kailee (Profil)] Exactly four people in frame: in frame: Samuel Dusatko. Exactly four people in frame: Samuel Dusatko. Soft cinematic lighting in a bright modern office.";
+
+Deno.test("v370: broken cast block becomes one consistent clause", () => {
+  const { clean } = hardSanitizeForHappyHorse(REAL_BROKEN_CAST);
+  // no bracket tag, no duplicate clause, count == names
+  assertEquals(validateCastContract(clean).ok, true);
+  assertEquals(clean.includes("["), false);
+  assertEquals((clean.match(/Exactly/gi) ?? []).length, 1);
+  assertEquals(
+    clean.startsWith(
+      "Exactly four people in frame: Matthew Dusatko, Sarah Dusatko, Kailee, Samuel Dusatko.",
+    ),
+    true,
+  );
+});
+
+Deno.test("v370: sanitizing is idempotent", () => {
+  const once = hardSanitizeForHappyHorse(REAL_BROKEN_CAST).clean;
+  const twice = hardSanitizeForHappyHorse(once).clean;
+  assertEquals(twice, once);
+});
+
+Deno.test("v370: cast lock survives the mouth-choreography filter", () => {
+  const src =
+    "Exactly 2 distinct people: Samuel Dusatko, Sarah Dusatko, each visible exactly once with mouth and jaw clearly visible and unobstructed. LOCKED static camera on a tripod.";
+  const { clean } = hardSanitizeForHappyHorse(src);
+  assertEquals(clean.includes("Samuel Dusatko"), true);
+  assertEquals(clean.includes("Sarah Dusatko"), true);
+  assertEquals(validateCastContract(clean).ok, true);
+});
+
+Deno.test("v370: builder never contradicts itself", () => {
+  assertEquals(
+    buildCastClause(["Kailee", "Samuel Dusatko"]),
+    "Exactly two people in frame: Kailee, Samuel Dusatko.",
+  );
+  assertEquals(buildCastClause(["Kailee"]), "Exactly one person in frame: Kailee.");
+  assertEquals(buildCastClause([], 3), "Exactly three people in frame.");
+});
+
+Deno.test("v370: names are recovered from tags and headers", () => {
+  assertEquals(extractCastNames(REAL_BROKEN_CAST), [
+    "Matthew Dusatko",
+    "Sarah Dusatko",
+    "Kailee",
+    "Samuel Dusatko",
+  ]);
 });
