@@ -50,6 +50,7 @@ import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaReko
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { sceneState, transitionScene } from "../_shared/scene-state.ts";
 import { sanitizeForHappyHorse, hardSanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 import {
   buildCastClause,
@@ -471,7 +472,7 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
-            clip_status: "generating",
+            pipeline_state: "plate_rendering",
             clip_error: null,
             updated_at: new Date().toISOString(),
           })
@@ -1635,7 +1636,7 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
-            clip_status: "generating",
+            pipeline_state: "plate_rendering",
             clip_error: null,
             updated_at: new Date().toISOString(),
           })
@@ -1717,8 +1718,6 @@ serve(async (req) => {
                   .update({
                     engine_override: "auto",
                     lip_sync_with_voiceover: false,
-                    lip_sync_status: null,
-                    twoshot_stage: null,
                     updated_at: new Date().toISOString(),
                   })
                   .eq("id", scene.id);
@@ -1859,8 +1858,7 @@ serve(async (req) => {
             .update({
               engine_override: "cinematic-sync",
               lip_sync_with_voiceover: true,
-              lip_sync_status: "pending",
-              twoshot_stage: "audio",
+              pipeline_state: "audio_prep",
               clip_error: null,
               updated_at: new Date().toISOString(),
             })
@@ -2075,7 +2073,7 @@ serve(async (req) => {
               await supabaseAdmin
                 .from("composer_scenes")
                 .update({
-                  twoshot_stage: "audio",
+                  pipeline_state: "audio_prep",
                   updated_at: new Date().toISOString(),
                 })
                 .eq("id", scene.id);
@@ -2102,7 +2100,7 @@ serve(async (req) => {
                 await supabaseAdmin
                   .from("composer_scenes")
                   .update({
-                    twoshot_stage: "master_clip",
+                    pipeline_state: "audio_ready",
                     updated_at: new Date().toISOString(),
                   })
                   .eq("id", scene.id);
@@ -3934,7 +3932,7 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               clip_url: scene.uploadUrl,
-              clip_status: "ready",
+              pipeline_state: "plate_ready",
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
@@ -3965,7 +3963,7 @@ serve(async (req) => {
               .from("composer_scenes")
               .update({
                 clip_url: bestVideo.url,
-                clip_status: "ready",
+                pipeline_state: "plate_ready",
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);
@@ -4021,13 +4019,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               ...(isCinematicSyncScene
                 ? {
                     lip_sync_source_clip_url: null,
-                    lip_sync_status: "pending",
-                    twoshot_stage: "master_clip",
+                    pipeline_state: "audio_ready",
                   }
                 : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-hailuo", isI2V),
@@ -4081,7 +4078,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-kling", isI2V),
               updated_at: new Date().toISOString(),
@@ -4152,7 +4149,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               updated_at: new Date().toISOString(),
             })
@@ -4216,7 +4213,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-wan", isI2V),
               updated_at: new Date().toISOString(),
@@ -4268,7 +4265,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim(
                 "ai-seedance",
@@ -4319,7 +4316,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-luma", isI2V),
               updated_at: new Date().toISOString(),
@@ -4373,7 +4370,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-veo", isI2V),
               updated_at: new Date().toISOString(),
@@ -4453,7 +4450,7 @@ serve(async (req) => {
             await supabaseAdmin
               .from("composer_scenes")
               .update({
-                clip_status: "generating",
+                pipeline_state: "plate_rendering",
                 clip_quality: "standard",
                 replicate_prediction_id: fallbackPred.id,
               })
@@ -4469,7 +4466,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               updated_at: new Date().toISOString(),
             })
@@ -4540,7 +4537,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-pika", isI2V),
               updated_at: new Date().toISOString(),
@@ -4643,13 +4640,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               ...(isCinematicSyncHH
                 ? {
                     lip_sync_source_clip_url: null,
-                    lip_sync_status: "pending",
-                    twoshot_stage: "master_clip",
+                    pipeline_state: "audio_ready",
                     dialog_shots: null,
                     replicate_prediction_id: null,
                     lip_sync_applied_at: null,
@@ -4924,7 +4920,7 @@ serve(async (req) => {
             await admin
               .from("composer_scenes")
               .update({
-                clip_status: "failed",
+                pipeline_state: "failed",
                 clip_error: `[${__stage}] ${msg}`.slice(0, 500),
                 updated_at: new Date().toISOString(),
               })
@@ -4936,8 +4932,6 @@ serve(async (req) => {
               await admin
                 .from("composer_scenes")
                 .update({
-                  lip_sync_status: null,
-                  twoshot_stage: null,
                   lip_sync_source_clip_url: null,
                   dialog_shots: null,
                   updated_at: new Date().toISOString(),
