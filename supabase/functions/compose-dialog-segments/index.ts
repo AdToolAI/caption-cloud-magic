@@ -117,6 +117,9 @@ import {
 
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
+// v396 — eine Transformation für Planner, Renderer, Gate und Reprojektion.
+import { assertRoundtrip, buildPreclipTransform, persistTransform } from "../_shared/preclip-transform.ts";
+
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 // v357 — echtes Per-Frame-Gesichts-Tracking statt wiederholter Standbox.
 import {
