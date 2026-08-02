@@ -244,16 +244,8 @@ serve(async (req) => {
       );
     }
 
-    return json({
-      ok: true,
-      runs: Object.fromEntries(
-        Object.entries(runs).map(([sceneId, r]) => [
-          sceneId,
-          { generation: r.generation, run_id: r.runId },
-        ]),
-      ),
-      compose: payload,
-    });
+    return json({ ok: true, runs: runContext, compose: payload });
+
   } catch (e) {
     console.error("[composer-start-scene-generation] crash", e);
     return json({ ok: false, error: (e as Error).message ?? "internal_error" }, 500);
