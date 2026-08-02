@@ -28,7 +28,7 @@ const CAST_TAG_RE = /\[\s*(?:besetzung|cast|castlist|cast\s*list|characters?)\s*
  * Group 1 = count, group 2 = raw name blob (optional).
  */
 const CAST_HEADER_RE =
-  /\bexactly\s+(\d+|one|two|three|four|five|six|seven|eight)\s+(?:distinct\s+)?(?:people|persons|person)\b(?:\s+in\s+(?:the\s+)?frame)?\s*(?::\s*((?:in\s+frame\s*:\s*)?[^.;]*?))?(?=\s*[,.;]|\s+all\b|\s+each\b|\s+every\b|\s+standing\b|$)/gi;
+  /\bexactly\s+(\d+|one|two|three|four|five|six|seven|eight)\s+(?:distinct\s+)?(?:people|persons|person)\b(?:\s+in\s+(?:the\s+)?frame)?\s*(?::\s*([^.;]*))?/gi;
 
 const NAME_STOPWORDS = new Set([
   "all", "each", "every", "both", "the", "they", "no", "none", "and", "und",
@@ -64,17 +64,38 @@ function isLikelyName(candidate: string): boolean {
  * never leaks into the cast list.
  */
 export function parseNameList(blob: string): string[] {
-  const out: string[] = [];
-  const parts = String(blob ?? "")
-    .replace(/\bin\s+frame\s*:/gi, " ")
-    .split(/,|;|\band\b|\bund\b|&|\//i);
-  for (const part of parts) {
-    const name = normalizeCastName(part);
-    if (!name) continue;
+  return parseNameListWithRest(blob).names;
+}
+
+/**
+ * Like {@link parseNameList} but also returns the prose that follows the name
+ * list ("…, all standing in a single line…"), so removing a cast header never
+ * deletes the framing directives that share its sentence.
+ */
+export function parseNameListWithRest(
+  blob: string,
+): { names: string[]; rest: string } {
+  const text = String(blob ?? "");
+  const sep = /\s*(?:,|;|\band\b|\bund\b|&|\/)\s*/g;
+  const names: string[] = [];
+  let cursor = 0;
+
+  while (cursor <= text.length) {
+    sep.lastIndex = cursor;
+    const m = sep.exec(text);
+    const end = m ? m.index : text.length;
+    const chunk = text.slice(cursor, end).replace(/\bin\s+frame\s*:/gi, " ");
+    const name = normalizeCastName(chunk);
     if (!isLikelyName(name)) break;
-    out.push(name);
+    names.push(name);
+    if (!m) {
+      cursor = text.length;
+      break;
+    }
+    cursor = sep.lastIndex;
   }
-  return out;
+
+  return { names, rest: text.slice(cursor) };
 }
 
 function dedupeNames(names: string[]): string[] {
@@ -171,9 +192,11 @@ export function normalizeCastInPrompt(
 
   // 2) remove every inline cast header, keeping the surrounding prose
   let removedHeaders = 0;
-  s = s.replace(CAST_HEADER_RE, () => {
+  s = s.replace(CAST_HEADER_RE, (_m, _count, blob) => {
     removedHeaders++;
-    return " ";
+    // keep the prose that followed the name list (framing/blocking directives)
+    const rest = parseNameListWithRest(String(blob ?? "")).rest;
+    return rest ? ` ${rest.replace(/^[\s,;:]+/, "")}` : " ";
   });
   CAST_HEADER_RE.lastIndex = 0;
   if (removedHeaders > 1) touched.push("duplicate-cast-clause-removed");
