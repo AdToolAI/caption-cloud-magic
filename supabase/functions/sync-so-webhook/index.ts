@@ -421,12 +421,24 @@ serve(async (req) => {
     return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
   }
 
+  // v388 — Zustandswechsel laufen ausschliesslich ueber den gepruefte Weg
+  // (`composer_scene_transition`): Zeilensperre, Freigabeliste, Lauf- und
+  // Generations-Abgleich in einer atomaren Operation. Ein verspaeteter
+  // Callback eines alten Laufs kann damit strukturell nichts mehr bewegen.
+  const advanceScene = (to: SceneState, from?: SceneState[]) =>
+    transitionScene(supabase, sceneId, to, {
+      from,
+      runId: String((scene as any).active_run_id ?? "") || null,
+      generation: Number((scene as any).plate_generation ?? 1),
+    });
+
   const state = scene.dialog_shots ?? null;
   if (!state) {
     return ok({ ok: true, skipped: "no_state" });
   }
 
   const nowIso = new Date().toISOString();
+
 
   // ── v80: legacy v41-v56 single-call segments[] branch removed ─────────
   // The single-call `sync-3 + segments[]` dispatcher in compose-dialog-
