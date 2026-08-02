@@ -6373,6 +6373,7 @@ export type Database = {
           anchor_confirmed_at: string | null
           applied_style_preset_id: string | null
           audio_plan: Json | null
+          audio_selfheal_count: number
           character_audio_url: string | null
           character_image_url: string | null
           character_script: string | null
@@ -6474,6 +6475,7 @@ export type Database = {
           anchor_confirmed_at?: string | null
           applied_style_preset_id?: string | null
           audio_plan?: Json | null
+          audio_selfheal_count?: number
           character_audio_url?: string | null
           character_image_url?: string | null
           character_script?: string | null
@@ -6575,6 +6577,7 @@ export type Database = {
           anchor_confirmed_at?: string | null
           applied_style_preset_id?: string | null
           audio_plan?: Json | null
+          audio_selfheal_count?: number
           character_audio_url?: string | null
           character_image_url?: string | null
           character_script?: string | null
