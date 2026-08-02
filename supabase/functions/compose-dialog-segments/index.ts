@@ -167,7 +167,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v283-face-gate-partial-identity-soft-pass";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v395-exact-preclip-mouth-gate";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -7686,6 +7686,8 @@ serve(async (req) => {
         (pass as any).mouth_frame_dims = gate.mouth_frame_dims ?? null;
         (pass as any).mouth_edge_margin_px = gate.mouth_edge_margin_px ?? null;
         (pass as any).mouth_geometry_space = usePassPreclip ? "preclip" : "plate";
+        (pass as any).mouth_geometry_validated = gate.ok && gate.code === "ok";
+        (pass as any).mouth_geometry_validated_at = new Date().toISOString();
       }
 
 
@@ -7753,10 +7755,8 @@ serve(async (req) => {
         });
       }
 
-      // Honest non-blocking signal: when the Lovable AI gateway can't probe
-      // (extract failure or transient 5xx), log it but let the dispatch
-      // through. The Forensik UI surfaces this clearly so we don't silently
-      // pretend the probe passed.
+      // v395 — probe outages are non-blocking only for plate diagnostics.
+      // Exact provider preclips use requireMouth and fail closed above.
       if (gate.ok && gate.code === "probe_unavailable") {
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -7783,7 +7783,7 @@ serve(async (req) => {
               extract_ms: gate.extract_ms,
               gemini_ms: gate.gemini_ms,
             },
-            non_blocking: true,
+            non_blocking: !usePassPreclip,
           },
         });
       }

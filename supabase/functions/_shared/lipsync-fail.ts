@@ -83,6 +83,21 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
   // Prefer the cost persisted on the dialog state (authoritative) over a
   // caller-supplied hint; fall back to the hint when state has none yet.
   const refundAmount = stateCost > 0 ? stateCost : requestedRefund;
+  // composer_scenes is project-scoped and intentionally has no user_id.
+  // Resolve the owner here so every caller gets identical refund behaviour.
+  let refundUserId = args.userId ?? null;
+  if (!refundUserId && refundAmount > 0 && existing?.project_id) {
+    try {
+      const { data: project } = await supabase
+        .from("composer_projects")
+        .select("user_id")
+        .eq("id", existing.project_id)
+        .maybeSingle();
+      refundUserId = project?.user_id ?? null;
+    } catch (e) {
+      console.warn(`[failLipSync] project owner lookup crash: ${(e as Error).message}`);
+    }
+  }
 
   // 2. Collect every Sync.so job id we know about so the inflight registry
   //    is freed even if Sync.so never sends a terminal webhook.
@@ -143,12 +158,12 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
 
   // 4. Refund credits exactly once.
   let didRefund = false;
-  if (!alreadyRefunded && refundAmount > 0 && args.userId) {
+  if (!alreadyRefunded && refundAmount > 0 && refundUserId) {
     try {
       const { data: wallet } = await supabase
         .from("wallets")
         .select("balance")
-        .eq("user_id", args.userId)
+        .eq("user_id", refundUserId)
         .single();
       if (wallet) {
         await supabase
@@ -157,7 +172,7 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
             balance: Number(wallet.balance ?? 0) + refundAmount,
             updated_at: nowIso,
           })
-          .eq("user_id", args.userId);
+          .eq("user_id", refundUserId);
         didRefund = true;
       }
     } catch (e) {

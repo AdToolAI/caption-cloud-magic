@@ -32,6 +32,7 @@
 import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
 import { measurePreclipMouth } from "./preclip-mouth-geometry.ts";
+import { awsFrameProbeAvailable, renderAwsStill } from "./aws-frame-probe.ts";
 
 const GATE_VERSION = "v393-mouth-geometry-gate";
 
@@ -134,8 +135,16 @@ export interface FaceGateInput {
 export async function verifyFaceBeforeDispatch(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
-  if (!hasAwsCreds()) return { ok: true, code: "skipped", reason: "no_aws_credentials" };
-  if (!input.videoUrl) return { ok: true, code: "skipped", reason: "no_video_url" };
+  if (!hasAwsCreds()) {
+    return input.requireMouth === true
+      ? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_aws_credentials" }
+      : { ok: true, code: "skipped", reason: "no_aws_credentials" };
+  }
+  if (!input.videoUrl) {
+    return input.requireMouth === true
+      ? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_video_url" }
+      : { ok: true, code: "skipped", reason: "no_video_url" };
+  }
 
 
   const frame = Number.isFinite(input.frameNumber) ? Number(input.frameNumber) : null;
@@ -164,22 +173,77 @@ export async function verifyFaceBeforeDispatch(
     });
     extractMs = extracted.latencyMs ?? 0;
     if (!extracted.ok || !extracted.frameUrl) {
-      return {
-        ok: true,
-        code: "probe_unavailable",
-        reason: `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
-        extract_ms: extractMs,
-      };
+      // v395 — A preclip mouth-gate must inspect the exact artifact sent to
+      // Sync.so. The legacy extractor only checks a deterministic cache and
+      // therefore returned `probe_unavailable` for valid freshly rendered
+      // preclips. Render a still from that preclip on AWS instead.
+      if (input.requireMouth === true && awsFrameProbeAvailable()) {
+        const exactStill = await renderAwsStill({
+          videoUrl: input.videoUrl,
+          // gateFrame may be an absolute plate frame while videoUrl is the
+          // short preclip. Frame 0.05s is guaranteed to belong to the exact
+          // provider artifact and avoids sampling past its duration.
+          timestamp: 0.05,
+          frameSize: Math.max(64, Number(input.plateWidth ?? input.plateHeight ?? 720)),
+          deadline: Date.now() + Math.max(15_000, input.timeoutMs ?? 45_000),
+        });
+        if (exactStill.url) {
+          frameJpegUrl = exactStill.url;
+          frameCached = false;
+        } else {
+          return {
+            ok: false,
+            code: "probe_unavailable",
+            reason: `exact_preclip_probe_unavailable:${exactStill.error ?? extracted.reason ?? "unknown"}`,
+            extract_ms: extractMs,
+          };
+        }
+      } else {
+        return {
+          ok: input.requireMouth !== true,
+          code: "probe_unavailable",
+          reason: input.requireMouth === true
+            ? `exact_preclip_probe_unavailable:${extracted.reason ?? "unknown"}`
+            : `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
+          extract_ms: extractMs,
+        };
+      }
     }
-    frameJpegUrl = extracted.frameUrl;
-    frameCached = !!extracted.cached;
+    if (!frameJpegUrl) {
+      frameJpegUrl = extracted.frameUrl;
+      frameCached = !!extracted.cached;
+    }
+  }
+
+  if (!frameJpegUrl) {
+    if (input.requireMouth === true && awsFrameProbeAvailable()) {
+      const exactStill = await renderAwsStill({
+        videoUrl: input.videoUrl,
+        timestamp: 0.05,
+        frameSize: Math.max(64, Number(input.plateWidth ?? input.plateHeight ?? 720)),
+        deadline: Date.now() + Math.max(15_000, input.timeoutMs ?? 45_000),
+      });
+      if (exactStill.url) {
+        frameJpegUrl = exactStill.url;
+        frameCached = false;
+      } else {
+        return {
+          ok: false,
+          code: "probe_unavailable",
+          reason: `exact_preclip_probe_unavailable:${exactStill.error ?? "unknown"}`,
+          extract_ms: extractMs,
+        };
+      }
+    }
   }
 
   if (!frameJpegUrl) {
     return {
-      ok: true,
+      ok: input.requireMouth !== true,
       code: "probe_unavailable",
-      reason: `no_client_canvas_frame; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
+      reason: input.requireMouth === true
+        ? "exact_preclip_probe_unavailable:no_frame"
+        : `no_client_canvas_frame; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
       extract_ms: extractMs,
     };
   }
@@ -208,9 +272,11 @@ export async function verifyFaceBeforeDispatch(
     });
   } catch (e) {
     return {
-      ok: true,
+      ok: input.requireMouth !== true,
       code: "probe_unavailable",
-      reason: `aws_rekognition_threw: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
+      reason: input.requireMouth === true
+        ? `exact_preclip_face_probe_threw:${(e as Error)?.message ?? String(e)}`
+        : `aws_rekognition_threw: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
       frame_jpeg_url: frameJpegUrl,
       frame_cached: frameCached,
       extract_ms: extractMs,
@@ -232,9 +298,11 @@ export async function verifyFaceBeforeDispatch(
 
   if (!rek.ok) {
     return {
-      ok: true,
+      ok: input.requireMouth !== true,
       code: "probe_unavailable",
-      reason: `aws_rekognition_error: ${rek.error ?? "unknown"} — dispatch will proceed unchecked.`,
+      reason: input.requireMouth === true
+        ? `exact_preclip_face_probe_error:${rek.error ?? "unknown"}`
+        : `aws_rekognition_error: ${rek.error ?? "unknown"} — dispatch will proceed unchecked.`,
       raw_error: (rek.error ?? "").slice(0, 400),
       raw_reply: rawReply,
       ...baseMeta,
