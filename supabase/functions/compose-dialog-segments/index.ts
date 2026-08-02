@@ -7709,10 +7709,58 @@ serve(async (req) => {
         (pass as any).mouth_geometry_validated_at = new Date().toISOString();
       }
 
+      // ── v396 — Geometrievertrag persistieren ──────────────────────────
+      // Planner, Renderer, Gate und (ab v397) die Reprojektion konsumieren
+      // dieselbe Matrix. Sie wird hier einmal abgelegt, zusammen mit dem
+      // Fingerprint und dem Roundtrip-Beweis. Der Roundtrip ist notwendig,
+      // aber nicht hinreichend — er beweist nur, dass Matrix und Inverse
+      // algebraisch zusammenpassen.
+      if (usePassPreclip && preclipCropForGate) {
+        try {
+          const t396 = buildPreclipTransform({
+            x: Number(preclipCropForGate.x),
+            y: Number(preclipCropForGate.y),
+            size: Number(preclipCropForGate.size),
+            outputSize: Number(preclipCropForGate.outputSize ?? gateWidth ?? 720),
+          });
+          const rt = assertRoundtrip(t396, [
+            [t396.crop.x, t396.crop.y],
+            [t396.crop.x + t396.crop.size, t396.crop.y + t396.crop.size],
+            ...(gateCoord ? [gateCoord as [number, number]] : []),
+          ]);
+          const persisted396 = persistTransform(t396);
+          (pass as any).geometry_contract = {
+            ...persisted396,
+            version: "v396",
+            roundtrip_ok: rt.ok,
+            roundtrip_max_error_px: Number(rt.maxErrorPx.toFixed(4)),
+            decoded_preclip_frame_count: decodedPreclipFrames || null,
+            preclip_frame: preclipLocalFrame ?? null,
+            source_plate_frame: gateFrame ?? null,
+            preclip_fps: Number((pass as any).preclip_fps) || null,
+          };
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} v396_geometry_contract pass=${currentPassIdx + 1} ` +
+            `fingerprint=${persisted396.geometry_fingerprint} roundtrip_ok=${rt.ok} err=${rt.maxErrorPx.toFixed(4)}px ` +
+            `preclip_frame=${preclipLocalFrame ?? "-"} source_plate_frame=${gateFrame ?? "-"} decoded_frames=${decodedPreclipFrames || "?"}`,
+          );
+          if (!rt.ok) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v396_transform_contract_failed pass=${currentPassIdx + 1} ` +
+              `err=${rt.maxErrorPx.toFixed(4)}px — internal geometry bug, not a provider or content problem`,
+            );
+          }
+        } catch (e) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v396_geometry_contract_error pass=${currentPassIdx + 1} ${(e as Error)?.message}`,
+          );
+        }
+      }
 
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v129.23.2_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} preclip_trusted=${preclipTrustedForGate} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
+
       // ── v130 — Post-Probe Snap as a Re-Invocation of the Same Strategy ──
       // Previously (v129.22.3 → v129.30) the Face-Gate's `ok_after_snap`
       // branch was an ad-hoc patch: it overwrote `syncOptions` and
