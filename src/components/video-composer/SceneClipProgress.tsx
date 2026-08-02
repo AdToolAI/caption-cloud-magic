@@ -220,7 +220,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const isDialog =
     isCinematic &&
     !lipSyncCanceled &&
-    scene.clipStatus !== 'failed' &&
+    pipelineState !== 'failed' &&
     (dialogShots.length > 0 || lipSyncRunning);
   const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
   const dialogTotal = dialogShots.length;
