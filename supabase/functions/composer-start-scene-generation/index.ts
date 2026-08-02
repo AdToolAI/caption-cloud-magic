@@ -131,69 +131,92 @@ serve(async (req) => {
     const runs: Record<string, SceneRun> = {};
     const syncApiKey = getSyncApiKey() || null;
 
-    for (const scene of scenes) {
-      let run: SceneRun;
-      try {
-        run = await startSceneRun(admin as any, scene.id);
-      } catch (e) {
-        console.error(`[v377_start] acquire_failed scene=${scene.id}`, e);
-        return json(
-          {
-            ok: false,
-            error: "run_acquire_failed",
-            scene_id: scene.id,
-            message: (e as Error).message,
-          },
-          409,
+    if (useExistingRun) {
+      // Second leg of the prepare/dispatch split — read back the run that the
+      // prepare call committed. No reset here: the purge already ran, and
+      // re-running it would delete the anchors rendered in between.
+      const { data: runRows, error: runErr } = await admin
+        .from("composer_scenes")
+        .select("id, project_id, plate_generation, active_run_id")
+        .in("id", sceneIds);
+      if (runErr) return json({ ok: false, error: "run_lookup_failed" }, 500);
+      for (const row of (runRows ?? []) as any[]) {
+        if (!row.active_run_id) {
+          return json(
+            { ok: false, error: "no_active_run", scene_id: row.id },
+            409,
+          );
+        }
+        runs[row.id] = {
+          generation: Number(row.plate_generation ?? 0),
+          runId: String(row.active_run_id),
+          projectId: String(row.project_id),
+        };
+      }
+    } else {
+      for (const scene of scenes) {
+        let run: SceneRun;
+        try {
+          run = await startSceneRun(admin as any, scene.id);
+        } catch (e) {
+          console.error(`[v377_start] acquire_failed scene=${scene.id}`, e);
+          return json(
+            {
+              ok: false,
+              error: "run_acquire_failed",
+              scene_id: scene.id,
+              message: (e as Error).message,
+            },
+            409,
+          );
+        }
+
+        const reset = await hardResetScene({
+          supabase: admin as any,
+          sceneId: scene.id,
+          userId,
+          projectId: scene.project_id,
+          syncApiKey,
+          reason,
+          generationOverride: run.generation,
+        });
+
+        // The generation + run id are already committed, so the scene is
+        // logically safe even if a best-effort storage delete warned. We only
+        // abort when the state write itself failed.
+        const fatal = reset.errors.filter((e) => e.startsWith("update:"));
+        if (fatal.length > 0) {
+          console.error(`[v377_start] reset_failed scene=${scene.id}`, fatal);
+          return json(
+            { ok: false, error: "reset_failed", scene_id: scene.id, details: fatal },
+            409,
+          );
+        }
+
+        runs[scene.id] = run;
+        console.log(
+          `[v377_start] scene=${scene.id} gen=${run.generation} run=${run.runId} ` +
+            `refund=${reset.refundDecision} purged=${reset.deletedObjects} warnings=${reset.errors.length}`,
         );
       }
+    }
 
-      const reset = await hardResetScene({
-        supabase: admin as any,
-        sceneId: scene.id,
-        userId,
-        projectId: scene.project_id,
-        syncApiKey,
-        reason,
-        generationOverride: run.generation,
-      });
+    const runContext = Object.fromEntries(
+      Object.entries(runs).map(([sceneId, r]) => [
+        sceneId,
+        { generation: r.generation, run_id: r.runId },
+      ]),
+    );
 
-      // The generation + run id are already committed, so the scene is
-      // logically safe even if a best-effort storage delete warned. We only
-      // abort when the state write itself failed.
-      const fatal = reset.errors.filter((e) => e.startsWith("update:"));
-      if (fatal.length > 0) {
-        console.error(`[v377_start] reset_failed scene=${scene.id}`, fatal);
-        return json(
-          {
-            ok: false,
-            error: "reset_failed",
-            scene_id: scene.id,
-            details: fatal,
-          },
-          409,
-        );
-      }
-
-      runs[scene.id] = run;
-      console.log(
-        `[v377_start] scene=${scene.id} gen=${run.generation} run=${run.runId} ` +
-          `refund=${reset.refundDecision} purged=${reset.deletedObjects} warnings=${reset.errors.length}`,
-      );
+    if (prepareOnly) {
+      return json({ ok: true, prepared: true, runs: runContext });
     }
 
     // ── 3. Dispatch ────────────────────────────────────────────────────────
     // Forward the caller's JWT: `compose-video-clips` authenticates the user
     // itself and charges that user's wallet.
-    const dispatchBody = {
-      ...compose,
-      run_context: Object.fromEntries(
-        Object.entries(runs).map(([sceneId, r]) => [
-          sceneId,
-          { generation: r.generation, run_id: r.runId },
-        ]),
-      ),
-    };
+    const dispatchBody = { ...compose, run_context: runContext };
+
 
     const resp = await fetch(`${supabaseUrl}/functions/v1/compose-video-clips`, {
       method: "POST",
