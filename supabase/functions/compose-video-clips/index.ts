@@ -52,6 +52,12 @@ import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse, hardSanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 import {
+  buildCastClause,
+  extractCastNames,
+  normalizeCastInPrompt,
+  validateCastContract,
+} from "../_shared/cast-clause.ts";
+import {
   ensureDialogTurnsForScene,
   fetchDialogTurnsForScenes,
   readIdOnlyEnabled,
@@ -1127,9 +1133,13 @@ serve(async (req) => {
       // share — required for slot-based face targeting in
       // compose-dialog-segments.
       const n = Math.max(cleanNames.length, fallbackCount, 1);
-      const named =
-        cleanNames.length > 0 ? `: ${cleanNames.join(", ")}` : "";
-      const subject = n === 1 ? "Exactly 1 person" : `Exactly ${n} distinct people`;
+      // v370 — the cast block is built ONCE, deterministically, from the
+      // resolved names. Stated count and listed names can no longer diverge
+      // (the "Exactly four people in frame: Samuel Dusatko." contradiction
+      // that HappyHorse answered with InvalidParameter).
+      const castSentence = buildCastClause(cleanNames, n) ??
+        `Exactly ${n} ${n === 1 ? "person" : "people"} in frame.`;
+
       const asymBlocking = opts.asymmetric && n >= 3
         ? `all present in the same physical room as a natural asymmetric ensemble captured in one continuous cinematic frame. Each person appears exactly once and performs their own distinct assigned task (foreground / midground / background depth staging is required — do NOT force a symmetric side-by-side line-up). Preserve practical office / on-set blocking and depth: some subjects closer to camera, others further away, each occupying a different area of the room. Every face still stays clearly readable enough for lip-sync — front, three-quarter or natural profile is acceptable — with mouth and jaw unobstructed by hands, phones, microphones or props`
         : null;
@@ -1150,10 +1160,10 @@ serve(async (req) => {
       // requires it) but keeps body / head / gesture motion free so the
       // scene performance still surfaces.
       if (n === 1) {
-        return `${subject}${named}, ${visibility}. Lips soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can drive the mouth cleanly in post), but the mouth stays softly closed in a natural neutral resting position on the raw plate — no idle mouth motion, no jaw motion, no lip-flap, no muttering, no chewing. Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression. LOCKED static camera on a fixed tripod for the entire clip — no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no shot change; the focal length, framing and the subject's position and size in the frame stay identical from the first frame to the last frame. Natural body motion, gestures and head motion driven by the scene performance are allowed, but the camera itself never moves. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+        return `${castSentence} ${visibility.charAt(0).toUpperCase()}${visibility.slice(1)}. Lips soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can drive the mouth cleanly in post), but the mouth stays softly closed in a natural neutral resting position on the raw plate — no idle mouth motion, no jaw motion, no lip-flap, no muttering, no chewing. Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression. LOCKED static camera on a fixed tripod for the entire clip — no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no shot change; the focal length, framing and the subject's position and size in the frame stay identical from the first frame to the last frame. Natural body motion, gestures and head motion driven by the scene performance are allowed, but the camera itself never moves. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
       }
 
-      return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. Non-speakers stay silently at rest — lips softly closed, breathing calmly through the nose, only micro facial life (occasional blinks, tiny weight shifts, a soft swallow at most). No lip-flap, no chewing pattern, no rhythmic mouth motion, no whispering shapes; a non-speaker's mouth never forms syllables. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `${castSentence} ${visibility.charAt(0).toUpperCase()}${visibility.slice(1)}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. Non-speakers stay silently at rest — lips softly closed, breathing calmly through the nose, only micro facial life (occasional blinks, tiny weight shifts, a soft swallow at most). No lip-flap, no chewing pattern, no rhythmic mouth motion, no whispering shapes; a non-speaker's mouth never forms syllables. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     /**
@@ -4635,10 +4645,31 @@ serve(async (req) => {
           // sanitizer + lip-ready compressor right away: their prompts are the
           // longest and the ones HappyHorse rejects with InvalidParameter /
           // Green Net. Lip motion comes from Sync.so, not from this prompt.
+          // v370 — the resolved cast names travel with the prompt so the
+          // sanitizer rebuilds ONE canonical clause instead of regex-patching
+          // whatever it finds.
+          const hhCastNames = extractCastNames(String(hhPromptRaw ?? ""));
           const hhSan = isCinematicSyncHH
-            ? hardSanitizeForHappyHorse(String(hhPromptRaw ?? ""))
-            : sanitizeForHappyHorse(String(hhPromptRaw ?? ""));
-          const hhCleanPrompt = hhSan.emptied ? String(hhPromptRaw ?? "") : hhSan.clean;
+            ? hardSanitizeForHappyHorse(String(hhPromptRaw ?? ""), hhCastNames)
+            : sanitizeForHappyHorse(String(hhPromptRaw ?? ""), { castNames: hhCastNames });
+          let hhCleanPrompt = hhSan.emptied ? String(hhPromptRaw ?? "") : hhSan.clean;
+
+          // Pre-Dispatch-Contract: nothing leaves this function with a
+          // bracket tag, a duplicated cast clause or a count/name mismatch —
+          // the exact triad behind "InvalidParameter - Could not process with
+          // this prompt".
+          const hhContract = validateCastContract(hhCleanPrompt);
+          if (!hhContract.ok) {
+            const rebuilt = normalizeCastInPrompt(hhCleanPrompt, hhCastNames);
+            hhCleanPrompt = rebuilt.out.replace(/\[[^\]]*\]/g, " ")
+              .replace(/[ \t]+/g, " ").trim();
+            console.warn(
+              `[compose-video-clips] v370_cast_contract_rebuilt scene=${scene.id} issues=${
+                hhContract.issues.map((i) => `${i.code}(${i.detail})`).join(", ")
+              }`,
+            );
+          }
+
           if (hhSan.touched.length > 0) {
             console.log(
               `[compose-video-clips] HappyHorse scene ${scene.id} green-net sanitized: ${hhSan.touched.join(", ")}`,

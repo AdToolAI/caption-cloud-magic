@@ -14,6 +14,16 @@
 // returns the cleaned prompt plus the list of tokens it touched so the
 // caller can persist it for forensics.
 
+import {
+  buildCastClause,
+  extractCastNames,
+  isCastClauseSentence,
+  normalizeCastInPrompt,
+  validateCastContract,
+} from "./cast-clause.ts";
+
+export { buildCastClause, extractCastNames, validateCastContract };
+
 export interface GreenNetSanitizeResult {
   clean: string;
   touched: string[];
@@ -186,7 +196,11 @@ export interface LipReadyCompressResult {
  * Collapse the lip-sync master-plate choreography into Green-Net-safe text.
  * `hard` shortens further (used for the automatic retry after a rejection).
  */
-export function compressLipReadyPlate(input: string, hard = false): LipReadyCompressResult {
+export function compressLipReadyPlate(
+  input: string,
+  hard = false,
+  castNames: string[] = [],
+): LipReadyCompressResult {
   const touched: string[] = [];
   let s = String(input ?? "");
 
@@ -205,33 +219,24 @@ export function compressLipReadyPlate(input: string, hard = false): LipReadyComp
     touched.push("no-onscreen-text-tail");
   }
 
-  // 1b) rescue the cast lock BEFORE the mouth-block filter deletes it —
-  //     "Exactly 2 distinct people: Samuel Dusatko, …" sits inside the same
-  //     sentence as the mouth/jaw directive.
-  let castClause = "";
-  let castCount = 0;
-  const exact = s.match(
-    /\bexactly\s+(\d+|one|two|three|four|five|six|seven|eight)\s+(?:distinct\s+)?(?:people|persons|person)\s*:?\s*([^,.;—]*)/i,
-  );
-  if (exact) {
-    const raw = exact[1].toLowerCase();
-    const n = NUMBER_WORDS[raw] ?? Number(raw);
-    if (Number.isFinite(n) && n >= 1 && n <= 8) {
-      castCount = n;
-      const names = (exact[2] || "").trim().replace(/\s+/g, " ");
-      const word = COUNT_WORDS[n] ?? String(n);
-      castClause = names
-        ? `Exactly ${word} ${n === 1 ? "person" : "people"} in frame: ${names}.`
-        : `Exactly ${word} ${n === 1 ? "person" : "people"} in frame.`;
-      touched.push("cast-lock-preserved");
-    }
-  }
+  // 1b/1c) v370 — cast block. One canonical clause, built from structured
+  //     names (assignmentLock / dialog_turns) plus anything rescued out of the
+  //     text; every bracket tag and every duplicate inline header is removed.
+  //     This runs BEFORE the mouth-block filter so the cast lock can never be
+  //     deleted together with the mouth/jaw directive it used to share a
+  //     sentence with.
+  const castNorm = normalizeCastInPrompt(s, castNames);
+  s = castNorm.out;
+  const castClause = castNorm.clause ?? "";
+  const castCount = castNorm.count;
+  if (castNorm.touched.length > 0) touched.push(...castNorm.touched);
 
-  // 1c) internal bracket tags ("[Besetzung: … ]") read as role instructions.
+  // remaining non-cast bracket tags read as role instructions.
   if (/\[[^\]]*\]/.test(s)) {
     s = s.replace(/\[[^\]]*\]/g, " ");
     touched.push("bracket-tag");
   }
+
 
   // 2) sentence-level pass: drop mouth-choreography and negative lists.
   const sentences = splitSentences(s);
@@ -245,6 +250,12 @@ export function compressLipReadyPlate(input: string, hard = false): LipReadyComp
     const mouthHits = countMouthTokens(sentence);
     const cameraLock =
       /\b(locked|static)\b/.test(lower) && /\bcamera\b/.test(lower);
+
+    // v370 — the canonical cast clause is re-inserted once below; drop every
+    // cast-only sentence here so it can never appear twice.
+    if (isCastClauseSentence(sentence)) continue;
+
+
 
     if (cameraLock) {
       droppedCamera = true;
@@ -305,19 +316,28 @@ export function compressLipReadyPlate(input: string, hard = false): LipReadyComp
 
 export function sanitizeForHappyHorse(
   input: string,
-  opts: { compress?: boolean; hard?: boolean } = {},
+  opts: { compress?: boolean; hard?: boolean; castNames?: string[] } = {},
 ): GreenNetSanitizeResult {
   const touched: string[] = [];
   let s = String(input ?? "");
 
   const compress = opts.compress !== false;
   if (compress) {
-    const c = compressLipReadyPlate(s, opts.hard === true);
+    const c = compressLipReadyPlate(s, opts.hard === true, opts.castNames ?? []);
     if (c.touched.length > 0) {
       touched.push(...c.touched);
       s = c.out;
     }
+  } else {
+    // v370 — even without the compressor the cast block must be canonical:
+    // no bracket tags, exactly one clause, count == number of names.
+    const castNorm = normalizeCastInPrompt(s, opts.castNames ?? []);
+    if (castNorm.touched.length > 0) {
+      touched.push(...castNorm.touched);
+      s = castNorm.out;
+    }
   }
+
 
   for (const [re, repl, tag] of REPLACEMENTS) {
     if (re.test(s)) {
@@ -350,9 +370,13 @@ export function sanitizeForHappyHorse(
 }
 
 /** Aggressive variant used for the single automatic retry after a rejection. */
-export function hardSanitizeForHappyHorse(input: string): GreenNetSanitizeResult {
-  return sanitizeForHappyHorse(input, { compress: true, hard: true });
+export function hardSanitizeForHappyHorse(
+  input: string,
+  castNames: string[] = [],
+): GreenNetSanitizeResult {
+  return sanitizeForHappyHorse(input, { compress: true, hard: true, castNames });
 }
+
 
 
 /**
