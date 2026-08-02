@@ -7636,11 +7636,17 @@ serve(async (req) => {
       // damit den Mund statt eines generischen Grossbereichs.
       if (Array.isArray(gate.mouth_center)) {
         (pass as any).mouth_center = gate.mouth_center;
-        (pass as any).mouth_rect = gate.mouth_rect ?? null;
-        (pass as any).mouth_control_rect = gate.control_rect ?? null;
+        // `mouth_rect` MUSS normalisiert sein — `mouthRectFromPass()` rechnet
+        // in 0..1. Die Pixelfassung wandert getrennt mit, fuer die Forensik.
+        (pass as any).mouth_rect = gate.mouth_rect_norm ?? null;
+        (pass as any).mouth_control_rect = gate.control_rect_norm ?? null;
+        (pass as any).mouth_rect_px = gate.mouth_rect ?? null;
+        (pass as any).mouth_control_rect_px = gate.control_rect ?? null;
+        (pass as any).mouth_frame_dims = gate.mouth_frame_dims ?? null;
         (pass as any).mouth_edge_margin_px = gate.mouth_edge_margin_px ?? null;
         (pass as any).mouth_geometry_space = usePassPreclip ? "preclip" : "plate";
       }
+
 
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v129.23.2_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} preclip_trusted=${preclipTrustedForGate} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
