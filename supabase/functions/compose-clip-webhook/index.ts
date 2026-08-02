@@ -134,6 +134,25 @@ serve(async (req) => {
 
     const { id: predictionId, status, output, error: predError } = payload;
 
+    // ── v375 GENERATION GUARD ────────────────────────────────────────────────
+    // A provider callback may only touch the scene when the attempt it belongs
+    // to is still the current generation. After a hard reset the attempt is
+    // tombstoned (`superseded`) and this late result is dropped instead of
+    // overwriting the fresh run's plate. We ACK with 200 so the provider stops
+    // redelivering.
+    const attemptCheck = await checkPlateAttempt(supabase, sceneId, predictionId);
+    if (!attemptCheck.ok) {
+      console.log(
+        `[compose-clip-webhook v375] ignored_stale scene=${sceneId} job=${predictionId} ` +
+          `verdict=${attemptCheck.verdict} expected_gen=${attemptCheck.expectedGeneration} ` +
+          `current_gen=${attemptCheck.currentGeneration}`,
+      );
+      return new Response(
+        JSON.stringify({ ok: true, ignored_stale: true, verdict: attemptCheck.verdict }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+      );
+    }
+
     if (status === 'succeeded' && output) {
       const videoUrl = Array.isArray(output) ? output[0] : output;
       console.log(`[compose-clip-webhook] Clip ready: ${videoUrl}`);
