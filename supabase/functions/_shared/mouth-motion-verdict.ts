@@ -595,6 +595,17 @@ function meanAbsDelta(a: Float64Array, b: Float64Array): number {
   return sum / n;
 }
 
+/** v371 — median of a non-empty numeric list. */
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+
+
 function normaliseRect(rect: unknown): MouthRect | null {
   if (!rect || typeof rect !== "object") return null;
   const r = rect as Record<string, unknown>;
