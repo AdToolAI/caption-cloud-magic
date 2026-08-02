@@ -1526,10 +1526,11 @@ serve(async (req) => {
                 },
               ].slice(-16),
             },
-            pipeline_state: "lipsync_running",
             updated_at: nowIso,
           })
           .eq("id", sceneId);
+        await advanceScene("lipsync_running");
+
         console.warn(
           `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} → retry ${passRetryCount + 1}/${MAX_V5_RETRIES} variant=${nextVariant}${needsAudioRepair ? " +repair_audio" : ""}`,
         );
