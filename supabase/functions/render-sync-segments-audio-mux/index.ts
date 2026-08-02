@@ -28,6 +28,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { sceneState } from "../_shared/scene-state.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
@@ -115,7 +116,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, lip_sync_status, clip_url, plate_generation, active_run_id",
+        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, pipeline_state, clip_url, plate_generation, active_run_id",
       )
       .eq("id", sceneId)
       .single();
@@ -124,7 +125,7 @@ serve(async (req) => {
     }
 
     const state = ((scene as any).dialog_shots ?? null) as DialogShotsState | null;
-    if ((scene as any).lip_sync_status === "canceled" || (state as any)?.status === "canceled") {
+    if (sceneState(scene) === "canceled" || (state as any)?.status === "canceled") {
       return json({ ok: true, skipped: "canceled", scene_id: sceneId });
     }
     if (!state || state.engine !== "sync-segments") {
@@ -239,8 +240,7 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           dialog_shots: { ...(state as any), status: "failed", error: blockedCode },
-          lip_sync_status: "failed",
-          twoshot_stage: "needs_clip_rerender",
+          pipeline_state: "failed",
           clip_error: gateMsg,
           updated_at: new Date().toISOString(),
         })
@@ -273,8 +273,7 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           dialog_shots: { ...(state as any), status: "failed", error: "incomplete_passes" },
-          lip_sync_status: "failed",
-          twoshot_stage: "needs_clip_rerender",
+          pipeline_state: "failed",
           clip_error: partialMsg,
           updated_at: new Date().toISOString(),
         })
@@ -322,8 +321,7 @@ serve(async (req) => {
           .from("composer_scenes")
           .update({
             dialog_shots: { ...(state as any), status: "failed", error: detail },
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
+            pipeline_state: "failed",
             clip_error: "Lip-Sync-Zuordnung konnte nicht sicher bestätigt werden.",
             updated_at: new Date().toISOString(),
           })
@@ -876,8 +874,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
+            pipeline_state: "failed",
             clip_error: detail.slice(0, 300),
             dialog_shots: {
               ...(state as any),
@@ -1032,8 +1029,7 @@ serve(async (req) => {
       .from("composer_scenes")
       .update({
         dialog_shots: updatedState,
-        lip_sync_status: "audio_muxing",
-        twoshot_stage: "audio_muxing",
+        pipeline_state: "lipsync_muxing",
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
@@ -1080,8 +1076,7 @@ serve(async (req) => {
             ...retryState,
             audio_mux_error: `invoke ${invokeResp.status}: ${invokeMessage}`.slice(0, 500),
           },
-          lip_sync_status: "failed",
-          twoshot_stage: "audio_mux_failed",
+          pipeline_state: "failed",
           clip_error: `audio_mux_dispatch: ${invokeMessage}`.slice(0, 300),
           updated_at: new Date().toISOString(),
         })

@@ -59,6 +59,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { sceneState, canDispatchLipsync } from "../_shared/scene-state.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
@@ -817,7 +818,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, clip_status, clip_error, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, twoshot_stage, reference_image_url, lock_reference_url, scene_assets, plate_generation, plate_ready_generation, active_run_id",
+        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, clip_status, clip_error, lip_sync_source_clip_url, lip_sync_applied_at, pipeline_state, reference_image_url, lock_reference_url, scene_assets, plate_generation, plate_ready_generation, active_run_id",
       )
       .eq("id", sceneId)
       .single();
@@ -840,18 +841,14 @@ serve(async (req) => {
         "syncso_concurrency_deferred",
       ].some((marker) => String((scene as any).clip_error).startsWith(marker));
     const terminalScene =
-      (scene as any).clip_status !== "ready" ||
+      // v385 — Zustand kommt ausschließlich aus `pipeline_state`.
+      !canDispatchLipsync(scene) ||
       terminalClipError ||
-      ["failed", "canceled"].includes(String((scene as any).lip_sync_status ?? "")) ||
-      ["failed", "audio_mux_failed", "canceled", "needs_clip_rerender"].includes(
-        String((scene as any).twoshot_stage ?? ""),
-      ) ||
       ["failed", "canceled"].includes(String((scene as any).dialog_shots?.status ?? ""));
     if (!(scene as any).active_run_id || terminalScene) {
       console.warn(
         `[compose-dialog-segments] v378_terminal_guard scene=${sceneId} ` +
-          `run=${(scene as any).active_run_id ?? "none"} clip=${(scene as any).clip_status ?? "null"} ` +
-          `lip=${(scene as any).lip_sync_status ?? "null"} stage=${(scene as any).twoshot_stage ?? "null"}`,
+          `run=${(scene as any).active_run_id ?? "none"} state=${sceneState(scene)}`,
       );
       return json(
         {
@@ -873,7 +870,7 @@ serve(async (req) => {
     if (!userId) return json({ error: "missing_user" }, 403);
 
     if (
-      (scene as any).lip_sync_status === "canceled" ||
+      sceneState(scene) === "canceled" ||
       (scene as any).dialog_shots?.status === "canceled"
     ) {
       return json({ ok: true, skipped: "canceled", scene_id: sceneId });
@@ -913,8 +910,7 @@ serve(async (req) => {
           recovery: body?.recovery === true,
           auto: body?.auto === true,
           repair_audio: repairAudio,
-          stage_at_entry: (scene as any).twoshot_stage ?? null,
-          lip_sync_status_at_entry: (scene as any).lip_sync_status ?? null,
+          state_at_entry: sceneState(scene),
           existing_state_version: (scene as any).dialog_shots?.version ?? null,
           existing_state_status: (scene as any).dialog_shots?.status ?? null,
           // v134 §3 — Forensik-friendly noop tracking
@@ -1020,8 +1016,7 @@ serve(async (req) => {
           await supabase
             .from("composer_scenes")
             .update({
-              lip_sync_status: "failed",
-              twoshot_stage: "failed",
+              pipeline_state: "failed",
               clip_error: `id_only_dialog_turns_required:${ensuredTurns.reason}`,
               updated_at: new Date().toISOString(),
             })
@@ -1042,8 +1037,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          twoshot_stage: null,
-          lip_sync_status: "pending",
+          pipeline_state: "plate_ready",
           clip_error: "audio_plan_not_ready_self_heal",
           updated_at: new Date().toISOString(),
         })
@@ -1171,11 +1165,9 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           clip_url: null,
-          clip_status: "pending",
-          lip_sync_status: "pending",
+          pipeline_state: "idle",
           lip_sync_source_clip_url: null,
           lip_sync_applied_at: null,
-          twoshot_stage: null,
           dialog_shots: null,
           replicate_prediction_id: null,
           clip_error:
@@ -1309,8 +1301,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: "dialog_pipeline_no_turns",
         })
         .eq("id", sceneId);
@@ -1341,8 +1332,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: `segments_invalid_${segValidation.reason}`,
         })
         .eq("id", sceneId);
@@ -1386,8 +1376,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: keepRunning ? "running" : "pending",
-          twoshot_stage: "circuit_open",
+          pipeline_state: keepRunning ? "lipsync_running" : "audio_ready",
           clip_error: `syncso_circuit_open:${circuit.reason ?? "unknown"}`,
           updated_at: new Date().toISOString(),
         })
@@ -1562,8 +1551,7 @@ serve(async (req) => {
             error: "plate_probe_failed_3plus_speakers",
             finished_at: new Date().toISOString(),
           }),
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: 'plate_probe_failed_3plus_speakers: Video-Geometrie konnte nicht gelesen werden. Bitte "Sauber neu starten" drücken — beim erneuten Versuch nutzt das System die Anchor-Dimensionen als Fallback.',
           updated_at: new Date().toISOString(),
         })
@@ -2693,8 +2681,7 @@ serve(async (req) => {
               error: "v183_cast_duplicate_character_id",
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
+            pipeline_state: "failed",
             clip_error: msg,
             updated_at: new Date().toISOString(),
           })
@@ -2824,7 +2811,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            lip_sync_status: "failed",
+            pipeline_state: "failed",
             clip_error: msg,
             updated_at: new Date().toISOString(),
           })
@@ -2986,8 +2973,7 @@ serve(async (req) => {
               error: reason,
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
+            pipeline_state: "failed",
             clip_error: (() => {
               if (speakers.length === 1) {
                 return "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
@@ -3118,9 +3104,7 @@ serve(async (req) => {
               },
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
-            clip_status: "pending",
+            pipeline_state: "failed",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: userMsg,
@@ -3275,9 +3259,7 @@ serve(async (req) => {
               error: `v117_plate_quality_gate:${reason}`,
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
-            clip_status: "pending",
+            pipeline_state: "failed",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: splitScreenReason
@@ -3518,9 +3500,7 @@ serve(async (req) => {
               v132_turn_gate: { failures, probes },
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
-            clip_status: "pending",
+            pipeline_state: "failed",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: userMsg,
@@ -3640,15 +3620,13 @@ serve(async (req) => {
         .update(
           giveUp
             ? {
-                lip_sync_status: "failed",
-                twoshot_stage: "failed",
+                pipeline_state: "failed",
                 clip_error:
                   "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
                 dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: 0 }),
               }
             : {
-                lip_sync_status: "pending",
-                twoshot_stage: "pending",
+                pipeline_state: "audio_ready",
                 clip_error: `awaiting_face_detection_retry_${nextRetryCount}_of_3`,
                 dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: nextRetryCount }),
               },
@@ -3792,8 +3770,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: "speaker_count_mismatch: Zwei Cast-Mitglieder teilen denselben Character-Slot. Bitte vollen Namen verwenden oder eindeutige Cast-IDs zuweisen, dann 'Sauber neu starten'.",
         })
         .eq("id", sceneId);
@@ -3824,8 +3801,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: "dialog_pipeline_no_per_speaker_tracks",
         })
         .eq("id", sceneId);
@@ -4093,8 +4069,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: `syncso_segments_preflight_${badProbe}`,
         })
         .eq("id", sceneId);
@@ -4215,8 +4190,7 @@ serve(async (req) => {
             audio_diagnostics: audioDiagnostics,
             finished_at: new Date().toISOString(),
           }),
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: `syncso_audio_preflight_${reason}`,
           updated_at: new Date().toISOString(),
         })
@@ -4424,8 +4398,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
+            pipeline_state: "failed",
             clip_error: reason,
           })
           .eq("id", sceneId);
@@ -4484,8 +4457,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            lip_sync_status: "pending",
-            twoshot_stage: "deferred",
+            pipeline_state: "audio_ready",
             clip_error: `syncso_concurrency_deferred:${inflightCount}`,
             updated_at: new Date().toISOString(),
           })
@@ -4800,8 +4772,7 @@ serve(async (req) => {
               refunded: !alreadyRefundedSanity,
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
+            pipeline_state: "failed",
             clip_error: sanityReason,
           })
           .eq("id", sceneId);
@@ -5215,9 +5186,7 @@ serve(async (req) => {
               error: `v118_circuit_breaker:${reason}`,
               finished_at: new Date().toISOString(),
             }),
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
-            clip_status: "failed",
+            pipeline_state: "failed",
             clip_error: `Lip-Sync abgebrochen: Sync.so hat für Sprecher „${pass.speaker_name ?? `Pass ${currentPassIdx + 1}`}" ${passFailCount}× hintereinander mit „provider_unknown_error" abgebrochen. Credits wurden zurückerstattet. Bitte drücke „Sauber neu starten" oder render die Plate neu, falls das Gesicht nicht klar erkennbar ist.`,
             updated_at: new Date().toISOString(),
           })
@@ -5918,7 +5887,7 @@ serve(async (req) => {
             await supabase
               .from("composer_scenes")
               .update({
-                lip_sync_status: "failed",
+                pipeline_state: "failed",
                 clip_error: msg,
                 updated_at: new Date().toISOString(),
               })
@@ -6108,9 +6077,7 @@ serve(async (req) => {
             },
             finished_at: new Date().toISOString(),
           }),
-          lip_sync_status: "failed",
-          twoshot_stage: "needs_clip_rerender",
-          clip_status: "pending",
+          pipeline_state: "failed",
           clip_url: null,
           lip_sync_source_clip_url: null,
           clip_error: friendlyClipError,
@@ -6794,8 +6761,7 @@ serve(async (req) => {
             error: reason,
             finished_at: new Date().toISOString(),
           }),
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: reason,
         })
         .eq("id", sceneId);
@@ -7798,10 +7764,10 @@ serve(async (req) => {
     try {
       const { data: sceneNow } = await supabase
         .from("composer_scenes")
-        .select("clip_status, dialog_shots")
+        .select("pipeline_state, clip_status, clip_url, dialog_shots")
         .eq("id", sceneId)
         .maybeSingle();
-      const sceneClipStatus = String((sceneNow as any)?.clip_status ?? "");
+      const sceneClipStatus = sceneState(sceneNow);
       const shotsStatus = String(((sceneNow as any)?.dialog_shots as any)?.status ?? "");
       if (sceneClipStatus === "failed" || shotsStatus === "failed") {
         console.warn(
@@ -7909,8 +7875,7 @@ serve(async (req) => {
             error: pass.error,
             finished_at: new Date().toISOString(),
           }),
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          pipeline_state: "failed",
           clip_error: resp.status === 429
             ? "syncso_concurrency_exhausted"
             : `syncso_segments_dispatch_${resp.status}`,
@@ -8339,8 +8304,7 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "running",
-          twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
+          pipeline_state: "lipsync_running",
           lip_sync_source_clip_url: sourceClipUrl,
           replicate_prediction_id: `sync:${jobId}`,
           clip_error: null,

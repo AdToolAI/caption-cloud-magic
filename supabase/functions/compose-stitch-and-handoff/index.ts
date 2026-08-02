@@ -3,6 +3,7 @@
 // triggert anschließend das Stitching (compose-video-assemble) und gibt
 // die finale Video-URL zur Übergabe an Director's Cut / Library / Download zurück.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { sceneState, isRealizedScene } from "../_shared/scene-state.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
@@ -79,13 +80,13 @@ serve(async (req) => {
     // Load scenes
     const { data: scenes, error: scenesErr } = await supabase
       .from("composer_scenes")
-      .select("id, clip_status")
+      .select("id, pipeline_state, clip_status, clip_url, plate_generation, plate_ready_generation")
       .eq("project_id", projectId);
     if (scenesErr) throw scenesErr;
 
     const total = scenes?.length || 0;
-    const ready = (scenes || []).filter((s) => s.clip_status === "ready").length;
-    const failed = (scenes || []).filter((s) => s.clip_status === "failed").length;
+    const ready = (scenes || []).filter((s) => isRealizedScene(s)).length;
+    const failed = (scenes || []).filter((s) => sceneState(s) === "failed").length;
     const pending = total - ready - failed;
 
     if (total === 0) {

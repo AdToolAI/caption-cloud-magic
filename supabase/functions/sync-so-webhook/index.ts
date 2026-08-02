@@ -16,6 +16,7 @@
  * NOT retry storm us. The 60s pg_cron poller is the safety net.
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { sceneState } from "../_shared/scene-state.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -328,7 +329,7 @@ serve(async (req) => {
   if (sceneHint) {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, clip_error, plate_generation, active_run_id")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, pipeline_state, clip_error, plate_generation, active_run_id")
       .eq("id", sceneHint)
       .maybeSingle();
     if (data) {
@@ -344,7 +345,7 @@ serve(async (req) => {
     // We must check ALL three so late/parallel pass webhooks find their scene.
     const { data: rows } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, clip_error, plate_generation, active_run_id")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, pipeline_state, clip_error, plate_generation, active_run_id")
       .in("lip_sync_status", ["running", "stitching", "audio_muxing"])
       .limit(200);
     for (const r of rows ?? []) {
@@ -396,7 +397,7 @@ serve(async (req) => {
   }
   // v18 Cancel-Guard: ignore late webhooks for user-cancelled scenes.
   if (
-    (scene as any).lip_sync_status === "canceled" ||
+    sceneState(scene) === "canceled" ||
     (scene.dialog_shots as any)?.status === "canceled"
   ) {
     try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
@@ -411,7 +412,7 @@ serve(async (req) => {
   // refund logic. Ack 200 so Sync.so stops retrying, no state mutation.
   //
   if (
-    ((scene as any).lip_sync_status === "failed" ||
+    (sceneState(scene) === "failed" ||
       (scene.dialog_shots as any)?.status === "failed")
   ) {
     console.log(
@@ -916,12 +917,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            lip_sync_status: "failed",
-            twoshot_stage: "needs_clip_rerender",
-            // v371 — ohne clip_status='failed' zeigte die UI die Szene
-            // gleichzeitig als "fertig" (clip_url gesetzt) und als
-            // fehlgeschlagen an, und der Fortschrittsbalken lief weiter.
-            clip_status: "failed",
+            pipeline_state: "failed",
             clip_error: userMsg,
             updated_at: nowIso,
           })
@@ -1078,8 +1074,7 @@ serve(async (req) => {
               partial_done_count: doneCount,
               partial_failed_speakers: failedSpeakers,
             },
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
+            pipeline_state: "failed",
             clip_error: failReason,
             updated_at: nowIso,
           })
@@ -1111,8 +1106,7 @@ serve(async (req) => {
           await supabase
             .from("composer_scenes")
             .update({
-              lip_sync_status: "running",
-              twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
+              pipeline_state: "lipsync_running",
               updated_at: nowIso,
             })
             .eq("id", sceneId);
@@ -1124,8 +1118,7 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
-              lip_sync_status: "running",
-              twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
+              pipeline_state: "lipsync_running",
               updated_at: nowIso,
             })
             .eq("id", sceneId);
@@ -1179,10 +1172,8 @@ serve(async (req) => {
               finished_at: nowIso,
             },
             clip_url: finalUrl,
-            clip_status: "ready",
-            lip_sync_status: "applied",
+            pipeline_state: "complete",
             lip_sync_applied_at: nowIso,
-            twoshot_stage: "complete",
             clip_error: null,
             updated_at: nowIso,
           })
@@ -1258,8 +1249,7 @@ serve(async (req) => {
               dispatched_at: nowIso,
             },
           },
-          lip_sync_status: "audio_muxing",
-          twoshot_stage: "audio_muxing",
+          pipeline_state: "lipsync_muxing",
           clip_error: null,
           updated_at: nowIso,
         })
@@ -1536,8 +1526,7 @@ serve(async (req) => {
                 },
               ].slice(-16),
             },
-            lip_sync_status: "running",
-            twoshot_stage: `syncso_retry_${nextVariant}_pass_${currentPass + 1}_of_${Number((freshState as any).total_passes ?? freshPasses.length ?? 1)}`,
+            pipeline_state: "lipsync_running",
             updated_at: nowIso,
           })
           .eq("id", sceneId);
@@ -1730,8 +1719,7 @@ serve(async (req) => {
               watchdog_finalized: false,
               ...(v1294RequiredPassFail ? { v1294_required_pass_failure: true } : {}),
             },
-            lip_sync_status: "failed",
-            twoshot_stage: "failed",
+            pipeline_state: "failed",
             clip_error: reason,
             updated_at: nowIso,
           })
@@ -1804,8 +1792,7 @@ serve(async (req) => {
                 partial_done_count: doneCount,
                 partial_failed_speakers: failedSpeakers,
               },
-              lip_sync_status: "failed",
-              twoshot_stage: "failed",
+              pipeline_state: "failed",
               clip_error: failReason,
               updated_at: nowIso,
             })
@@ -1824,8 +1811,7 @@ serve(async (req) => {
                 final_url: partialMux ? ((lastDonePass as any)?.output_url ?? freshFailState?.final_url ?? null) : freshFailState?.final_url,
                 partial_mux: partialMux ? true : freshFailState?.partial_mux,
               },
-              lip_sync_status: partialMux ? "audio_muxing" : "running",
-              twoshot_stage: partialMux ? "audio_muxing" : `syncso_fanout_${doneCount}_of_${totalSpeakers}`,
+              pipeline_state: partialMux ? "lipsync_muxing" : "lipsync_running",
               updated_at: nowIso,
             })
             .eq("id", sceneId);

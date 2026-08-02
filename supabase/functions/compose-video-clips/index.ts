@@ -656,6 +656,24 @@ serve(async (req) => {
       return "failed";
     };
 
+    /**
+     * v385 — Direkter Fehl-Schreibpfad: Nutzdaten + validierter Übergang.
+     * `failedClipUpdate` allein setzt keinen Zustand mehr.
+     */
+    const writeSceneFailure = async (
+      sceneId: string,
+      isCinematicSyncScene: boolean,
+      clipError?: string,
+    ): Promise<void> => {
+      await supabaseAdmin
+        .from("composer_scenes")
+        .update(failedClipUpdate(isCinematicSyncScene, clipError))
+        .eq("id", sceneId);
+      await transitionScene(supabaseAdmin, sceneId, "failed", {
+        detail: (clipError ?? "unknown_failure_no_details").slice(0, 200),
+      });
+    };
+
 
     // Build a quick character lookup for the safety-net injection
     const charById = new Map<string, ComposerCharacter>();
@@ -843,10 +861,11 @@ serve(async (req) => {
           console.error(
             `[compose-video-clips] v201_id_only_required_block scene=${scene.id} reason=${result.reason} details=${JSON.stringify(result.details ?? {})}`,
           );
-          await supabaseAdmin
-            .from("composer_scenes")
-            .update(failedClipUpdate(true, `id_only_dialog_turns_required:${result.reason}`))
-            .eq("id", scene.id);
+          await writeSceneFailure(
+            scene.id,
+            true,
+            `id_only_dialog_turns_required:${result.reason}`,
+          );
           return new Response(
             JSON.stringify({
               error: "id_only_dialog_turns_required",
@@ -3930,10 +3949,14 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               clip_url: scene.uploadUrl,
-              pipeline_state: "plate_ready",
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v385 — Nutzdaten und Zustandsübergang NIE im selben Update:
+          // der Bridge-Trigger spiegelt die Legacy-Spalten sonst nicht.
+          await transitionScene(supabaseAdmin, scene.id, "plate_ready", {
+            detail: "compose-video-clips upload",
+          });
           results.push({
             sceneId: scene.id,
             status: "ready",
@@ -3961,20 +3984,20 @@ serve(async (req) => {
               .from("composer_scenes")
               .update({
                 clip_url: bestVideo.url,
-                pipeline_state: "plate_ready",
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);
+            // v385 — siehe oben: Zustand separat schalten.
+            await transitionScene(supabaseAdmin, scene.id, "plate_ready", {
+              detail: "compose-video-clips stock",
+            });
             results.push({
               sceneId: scene.id,
               status: "ready",
               clipUrl: bestVideo.url,
             });
           } else {
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update(failedClipUpdate(false))
-              .eq("id", scene.id);
+            await writeSceneFailure(scene.id, false, "No stock videos found");
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4181,15 +4204,11 @@ serve(async (req) => {
               imgResp.status,
               errBody,
             );
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update(
-                failedClipUpdate(
-                  (scene.engineOverride ?? "auto") === "cinematic-sync",
-                  `Image generation failed (${imgResp.status})`,
-                ),
-              )
-              .eq("id", scene.id);
+            await writeSceneFailure(
+              scene.id,
+              (scene.engineOverride ?? "auto") === "cinematic-sync",
+              `Image generation failed (${imgResp.status})`
+              );
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4494,15 +4513,11 @@ serve(async (req) => {
               runwayResp.status,
               errBody,
             );
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update(
-                failedClipUpdate(
-                  (scene.engineOverride ?? "auto") === "cinematic-sync",
-                  `Runway ${runwayResp.status}`,
-                ),
-              )
-              .eq("id", scene.id);
+            await writeSceneFailure(
+              scene.id,
+              (scene.engineOverride ?? "auto") === "cinematic-sync",
+              `Runway ${runwayResp.status}`
+              );
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4567,15 +4582,11 @@ serve(async (req) => {
               pikaResp.status,
               errBody,
             );
-            await supabaseAdmin
-              .from("composer_scenes")
-              .update(
-                failedClipUpdate(
-                  (scene.engineOverride ?? "auto") === "cinematic-sync",
-                  `Pika ${pikaResp.status}`,
-                ),
-              )
-              .eq("id", scene.id);
+            await writeSceneFailure(
+              scene.id,
+              (scene.engineOverride ?? "auto") === "cinematic-sync",
+              `Pika ${pikaResp.status}`
+              );
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4766,15 +4777,11 @@ serve(async (req) => {
       } catch (sceneError) {
         const errMsg = errorToString(sceneError);
         console.error(`[compose-video-clips] Scene ${scene.id} error:`, errMsg);
-        await supabaseAdmin
-          .from("composer_scenes")
-          .update(
-            failedClipUpdate(
-              (scene.engineOverride ?? "auto") === "cinematic-sync",
-              errMsg,
-            ),
-          )
-          .eq("id", scene.id);
+        await writeSceneFailure(
+          scene.id,
+          (scene.engineOverride ?? "auto") === "cinematic-sync",
+          errMsg
+          );
         results.push({ sceneId: scene.id, status: "failed", error: errMsg });
       }
     }

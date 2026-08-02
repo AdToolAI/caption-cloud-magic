@@ -239,8 +239,7 @@ Deno.serve(async (req) => {
     await admin
       .from("composer_scenes")
       .update({
-        lip_sync_status: "failed",
-        twoshot_stage: "needs_clip_rerender",
+        pipeline_state: "failed",
         clip_error: userMsg,
         updated_at: nowIso,
       })
