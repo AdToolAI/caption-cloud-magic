@@ -1,43 +1,45 @@
-Ja — mit einer Einschränkung, die ich offen sagen will: Schritt 2 (der Datenbank-Wächter) ist der eigentliche Kern. Ohne ihn ist alles andere wieder nur Konvention, und Konvention hat uns die letzten Wochen gekostet. Mit ihm ist der Rückfall technisch unmöglich.
+Beide Schritte sind **begonnen, aber nicht abgeschlossen**. Ich habe den aktuellen Stand gerade geprüft — hier ist, was wirklich steht und was fehlt.
 
-## Warum das der saubere Weg ist
+## Stand heute (geprüft)
 
-Das Problem ist nicht, dass die Pipeline falsch rechnet. Sie rechnet an ~50 Stellen **getrennt voneinander richtig**. Jede dieser Stellen hat ihre eigene handgeschriebene Prüfung auf Lauf-ID, Generation und Endzustand nachgebaut. Das ist kein Uhrwerk, das sind 50 Uhren, die zufällig gleich gehen — und jedes Mal, wenn eine nicht mitgezogen wurde, hattest du wieder einen Sprung im Ablauf.
+**Schritt 1 — teilweise erledigt.** Umgestellt sind: der Sync.so-Webhook (Vorwärtswechsel), der Mux-Versand und der zentrale Lip-Sync-Anstoß im Dialogpfad.
 
-Die Alternative wäre ein Neubau der Pipeline. Davon rate ich ab: die Logik selbst ist inzwischen korrekt (siehe Audit unten), nur die Durchsetzung ist verteilt. Ein Neubau würde funktionierende Logik wegwerfen, um dasselbe Ziel zu erreichen.
+Noch direkt schreibend (56 Stellen in 9 Dateien):
 
-## Was das Audit ergeben hat
+| Datei | direkte Schreibvorgänge | davon vorwärts |
+|---|---|---|
+| `compose-dialog-segments` | 27 | 5 (`plate_ready`, `idle`, `audio_ready` ×3, `lipsync_running`) |
+| `compose-video-clips` | 14 | 13 (alle `plate_rendering`) |
+| `render-sync-segments-audio-mux` | 5 | 0 |
+| `sync-so-webhook` | 4 | 0 |
+| `_shared/clip-terminal-failure.ts`, `report-lipsync-motion-probe`, `hybrid-extend-scene`, `compose-twoshot-audio`, `_shared/scene-hard-reset.ts` | je 1–2 | gemischt |
 
-**Sauber und bestätigt:**
-- Genau ein Einstiegspunkt — alle 11 Klick-Pfade laufen über den Server-Endpunkt, keiner ruft direkt an
-- Reset und Generations-Hochzählung passieren vor jedem Provider-Aufruf; scheitert der Reset, bricht der Lauf ohne Kosten ab
-- Veraltete Rückmeldungen werden fünffach abgelehnt (überholt, doppelt, fertig, falsche Generation, falscher Lauf)
-- Lip-Sync kann auf einer fehlgeschlagenen Szene nicht mehr starten; ein Callback belebt sie nicht wieder
-- Erstattungen sind idempotent und feuern nie für geliefertes Material
-- Die Freigabeliste der erlaubten Zustandswechsel ist lückenlos
-- Die Oberfläche kann nicht mehr "Lip-Sync läuft" zeigen, während die Plate rendert
+**Schritt 2 — halb scharf.** Der Wächter `composer_scene_state_guard()` läuft, blockt aber nur zwei Klassen:
+- Klasse A: Wiederbelebung einer fehlgeschlagenen/abgebrochenen Szene → blockiert
+- Klasse B: Sprung in Ton-/Lip-Sync-Phase ohne fertige Plate → blockiert
+- Klasse C: jeder andere nicht freigegebene Wechsel → **nur protokolliert, nicht abgewiesen**
 
-**Der eine systemische Widerspruch:** Der Code sagt "Zustandswechsel laufen ausschließlich über die geprüfte Übergangsfunktion". Tatsächlich tun das nur ~10 von ~60 Schreibvorgängen (Plate: 13 Umgehungen, Dialog: 28, Sync-Webhook: 10, Mux: 6).
-
-**Kleinere Abweichungen:** Zwei UI-Komponenten entscheiden noch an Alt-Feldern; der Player zeigt nach 9 Minuten eigenmächtig "Fehler", obwohl der Server die Szene als laufend führt; der Client stößt parallel zum Server an (serverseitig abgesichert); der Watchdog prüft vor dem Anstoßen nicht selbst auf Generation.
+Genau das ist die Lücke: Solange Klasse C nur mitschreibt, bleibt der Vertrag Konvention. Die Protokolltabelle ist derzeit leer — seit dem Ausrollen des Wächters lief noch kein Durchlauf, es gibt also noch keine Praxisdaten.
 
 ## Der Plan
 
-**Schritt 1 — Ein einziger Schreibweg.** Alle direkten Zustandsschreibungen in den vier Backend-Funktionen auf die geprüfte Übergangsfunktion umstellen. Jeder Wechsel bekommt damit automatisch Zeilensperre, Freigabeprüfung und Lauf-/Generations-Abgleich. Die 50 handgeschriebenen Einzelprüfungen werden dadurch überflüssig statt weiter dupliziert.
+**1a — Plate-Pfad umstellen (`compose-video-clips`).** Die 13 `plate_rendering`-Schreibvorgänge laufen künftig über `transitionScene(..., { from, runId, generation })`. Das ist der Pfad, der zuletzt Szenen verfrüht weitergeschoben hat; er bekommt damit Zeilensperre und Generationsabgleich.
 
-**Schritt 2 — Den Schreibweg erzwingen.** Ein Datenbank-Wächter weist jede Zustandsänderung ab, die nicht aus der Übergangsfunktion kommt. Ab hier ist die Regel physikalisch, nicht mehr nur dokumentiert. Das ist der Schritt, der die Fehlerklasse endgültig schließt.
+**1b — Dialogpfad-Reste (`compose-dialog-segments`).** Die 5 verbliebenen Vorwärtswechsel umstellen. Der `idle`-Schreibvorgang (Zeile 1181) wird zusätzlich geprüft: Ein Rücksetzen auf `idle` mitten im Lauf gehört in den Reset, nicht in den Dialogpfad.
 
-**Schritt 3 — Watchdog absichern.** Er prüft Generation und Lauf-ID selbst, bevor er etwas erneut anstößt, statt sich auf die Zielfunktion zu verlassen.
+**1c — Randfunktionen.** `report-lipsync-motion-probe`, `hybrid-extend-scene`, `compose-twoshot-audio` und `_shared/clip-terminal-failure.ts` auf denselben Weg ziehen. `_shared/scene-hard-reset.ts` bleibt bewusst direkt — der Reset ist der einzige legitime Zwangsschreiber und bekommt stattdessen die Sitzungsmarkierung des Wächters.
 
-**Schritt 4 — UI angleichen.** Beide Komponenten vollständig auf den Pipeline-Zustand umstellen; die 9-Minuten-Eigenanzeige entfernen.
+**1d — Fehlerpfade.** Die ~40 `failed`-Schreibvorgänge bleiben inhaltlich, werden aber über den einheitlichen Helfer geführt, damit Protokoll, Erstattung und Zustand immer zusammen passieren statt an 40 Stellen getrennt.
 
-**Schritt 5 — Verifikation.** Ein Vertragstest, der den Build bricht, sobald irgendwo wieder am Vertrag vorbeigeschrieben wird, plus ein echter 4-Sprecher-Durchlauf mit Protokollprüfung an allen sieben Stationen.
+**2 — Wächter scharf schalten.** Klasse C wechselt von „protokollieren" auf „abweisen": Jede Zustandsänderung ohne die Sitzungsmarkierung der Übergangsfunktion wird zurückgerollt und protokolliert. Reihenfolge ist wichtig — das passiert **nach** 1a–1d, sonst blockiert der Wächter noch nicht umgestellte Pfade und die Pipeline steht.
+
+**3 — Absicherung vor dem Scharfschalten.** Ein Trockenlauf: Wächter bleibt im Protokollmodus, ein vollständiger 4-Sprecher-Durchlauf läuft durch, danach muss die Protokolltabelle **leer** sein. Erst wenn sie leer ist, wird abgewiesen. Findet sie Einträge, sind das exakt die vergessenen Stellen — die kommen zuerst dran.
 
 ### Technische Details
 
-- Betroffen: `compose-video-clips`, `compose-dialog-segments`, `sync-so-webhook`, `render-sync-segments-audio-mux` — jeweils `transitionScene(...)` mit `from`, `runId`, `generation` statt `.update({ pipeline_state })`
-- Schritt 2 als Migration: BEFORE-UPDATE-Trigger, der `pipeline_state`-Änderungen ohne die Sitzungsmarkierung der Übergangsfunktion abweist; die Funktion setzt die Markierung innerhalb ihrer Transaktion
-- Fehlerpfade bleiben bei `failLipSync` — bereits vertragskonform und idempotent
-- Kein Schema-Umbau, keine Datenmigration, keine Änderung an der Freigabeliste
+- Umstellungsmuster überall gleich: `.update({ pipeline_state: X, ... })` → `transitionScene(supabase, sceneId, { to: X, from: erwarteterZustand, runId, generation, reason })`; Nebenfelder (`clip_url`, `dialog_shots`, …) bleiben im selben Aufruf als Nutzlast erhalten
+- Reset-Ausnahme: `scene-hard-reset.ts` setzt `set_config('composer.transition_scene', scene_id, true)` in seiner Transaktion
+- Schritt 2 als Migration, die nur den Klasse-C-Zweig der bestehenden Wächterfunktion ersetzt — keine Schemaänderung, keine Datenmigration
+- Vertragstest (Deno): scannt die vier Hauptfunktionen auf `pipeline_state:` in `.update(`-Aufrufen und lässt den Build scheitern, sobald wieder direkt geschrieben wird — Ausnahmeliste nur für `scene-hard-reset.ts`
 
-Aufwand liegt fast vollständig in Schritt 1+2. Danach ist der Zustandsautomat nachweisbar der einzige Taktgeber — und Abweichungen scheitern beim Build statt beim Kunden.
+Der Aufwand liegt in 1a–1d. Schritt 2 selbst ist ein kleiner Migrationseingriff — aber er ist der, der die Fehlerklasse endgültig schließt.
