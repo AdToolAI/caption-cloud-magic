@@ -15,12 +15,6 @@ import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import { subscribePipelineEvents, type PipelinePhaseId } from '@/lib/pipelineEvents';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
-import {
-  isInFlightState,
-  isRealizedState,
-  isTerminalState,
-  sceneState,
-} from '@/lib/composer/sceneState';
 
 export interface PipelinePhaseState {
   id: PipelinePhaseId;
@@ -52,7 +46,6 @@ const storageKeyFor = (projectId?: string) =>
   `${STORAGE_PREFIX}${projectId || 'default'}`;
 
 interface PersistedSnapshot {
-  runIdentity?: string;
   pipelineStart: number | null;
   runFloor: number;
   floor: Record<PipelinePhaseId, number>;
@@ -124,6 +117,7 @@ const PHASE_NOMINAL_SECONDS: Record<PipelinePhaseId, number> = {
 // v231 — `needs_clip_rerender` is a terminal FAIL state (hard-fail after noop
 // ladder). Without it here, the progress bar hangs at ~23% because the scene
 // is never counted as "settled" (see sync-so-webhook v134 hard-fail branch).
+const TERMINAL_TWOSHOT_STAGES = new Set(['done', 'complete', 'failed', 'audio_mux_failed', 'canceled', 'needs_clip_rerender']);
 const TERMINAL_DIALOG_SHOT_STATUSES = new Set(['done', 'failed', 'canceled']);
 
 function isCanceledLipsyncScene(scene: any) {
@@ -133,6 +127,10 @@ function isCanceledLipsyncScene(scene: any) {
     scene?.dialogShots?.status === 'canceled' ||
     scene?.dialog_shots?.status === 'canceled'
   );
+}
+
+function isActiveTwoshotStage(stage: unknown) {
+  return !!stage && !TERMINAL_TWOSHOT_STAGES.has(String(stage));
 }
 
 function isActiveDialogShots(dialogShots: any) {
@@ -151,13 +149,6 @@ export function usePipelineProgress({
   projectId,
 }: UsePipelineProgressArgs) {
   const storageKey = storageKeyFor(projectId);
-  const runIdentity = useMemo(
-    () => scenes
-      .map((s) => `${s.id}:${s.plateGeneration ?? 0}:${s.activeRunId ?? 'none'}`)
-      .sort()
-      .join('|'),
-    [scenes],
-  );
   // ── Per-run baselines ──────────────────────────────────────────────
   // Captured the moment a phase emits `:start`. They make the bar always
   // start at 0 %, even if some assets from a previous run already exist
@@ -191,7 +182,7 @@ export function usePipelineProgress({
   if (!hydratedRef.current) {
     hydratedRef.current = true;
     const snap = readSnapshot(storageKey);
-    if (snap && (!snap.runIdentity || snap.runIdentity === runIdentity)) {
+    if (snap) {
       pipelineStartRef.current = snap.pipelineStart;
       runFloorRef.current = snap.runFloor;
       floorRef.current = snap.floor;
@@ -206,19 +197,6 @@ export function usePipelineProgress({
   const [eventFlags, setEventFlags] = useState<Record<PipelinePhaseId, boolean>>({
     clips: false, voiceover: false, lipsync: false, music: false, export: false,
   });
-  const lastRunIdentityRef = useRef(runIdentity);
-  useEffect(() => {
-    if (lastRunIdentityRef.current === runIdentity) return;
-    lastRunIdentityRef.current = runIdentity;
-    clearSnapshot(storageKey);
-    baselineRef.current = null;
-    pipelineStartRef.current = null;
-    runFloorRef.current = 0;
-    floorRef.current = { clips: 0, voiceover: 0, lipsync: 0, music: 0, export: 0 };
-    startedAtRef.current = { clips: null, voiceover: null, lipsync: null, music: null, export: null };
-    setEventFlags({ clips: false, voiceover: false, lipsync: false, music: false, export: false });
-    setBaselineVersion((v) => v + 1);
-  }, [runIdentity, storageKey]);
 
   // Snapshot scene/assembly state into refs so the event listener can read
   // the latest values without re-subscribing (which would lose pending events).
@@ -250,7 +228,7 @@ export function usePipelineProgress({
         const lipTargets = ss.filter(
           (s) =>
             !isCanceledLipsyncScene(s) &&
-            isLipSyncIntentional(s as any),
+            (isLipSyncIntentional(s as any) || !!(s as any).twoshotStage),
         );
         const dsTotals = lipTargets.reduce(
           (acc, s) => {
@@ -263,11 +241,14 @@ export function usePipelineProgress({
           { done: 0, total: 0 },
         );
         baselineRef.current = {
-          clipsReady: ai.filter((s) => isRealizedState(sceneState(s))).length,
+          clipsReady: ai.filter((s) => s.clipStatus === 'ready').length,
           clipsTotal: ai.length,
           lipsyncDone: lipTargets.filter(
             (s) =>
-              sceneState(s) === 'complete',
+              ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
+              (s as any).twoshotStage === 'done' ||
+              (s as any).twoshotStage === 'complete' ||
+              ((s as any).dialogShots ?? (s as any).dialog_shots)?.status === 'done',
           ).length,
           lipsyncTotal: lipTargets.length,
           dialogShotsDone: dsTotals.done,
@@ -300,14 +281,21 @@ export function usePipelineProgress({
     const hasActiveBackend = ss.some((s) => {
       const sa = s as any;
       if (isCanceledLipsyncScene(sa)) return false;
-      return isInFlightState(sceneState(sa));
+      if (sa.clipStatus === 'generating') return true;
+      if (sa.lipSyncStatus === 'running') return true;
+      if (sa.replicatePredictionId) return true;
+      const stage = sa.twoshotStage;
+      if (isActiveTwoshotStage(stage)) return true;
+      const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
+      if (isActiveDialogShots(ds)) return true;
+      return false;
     });
     if (!hasActiveBackend) return;
     const ai = ss.filter((s) => s.clipSource?.startsWith('ai-'));
     const lipTargets = ss.filter(
       (s) =>
         !isCanceledLipsyncScene(s) &&
-        isLipSyncIntentional(s as any),
+        (isLipSyncIntentional(s as any) || !!(s as any).twoshotStage),
     );
     const dsTotals = lipTargets.reduce(
       (acc, s) => {
@@ -320,11 +308,14 @@ export function usePipelineProgress({
       { done: 0, total: 0 },
     );
     baselineRef.current = {
-      clipsReady: ai.filter((s) => isRealizedState(sceneState(s))).length,
+      clipsReady: ai.filter((s) => s.clipStatus === 'ready').length,
       clipsTotal: ai.length,
       lipsyncDone: lipTargets.filter(
         (s) =>
-          sceneState(s) === 'complete',
+          ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
+          (s as any).twoshotStage === 'done' ||
+          (s as any).twoshotStage === 'complete' ||
+          ((s as any).dialogShots ?? (s as any).dialog_shots)?.status === 'done',
       ).length,
       lipsyncTotal: lipTargets.length,
       dialogShotsDone: dsTotals.done,
@@ -341,6 +332,9 @@ export function usePipelineProgress({
 
 
   // ── Derived per-phase progress (from real state, relative to baseline) ──
+  const dialogVoiceCount = (s: ComposerScene) =>
+    s.dialogVoices ? countSceneSpeakers(s) : 0;
+
   const hasLipsyncScenes = useMemo(
     () =>
       scenes.some(
@@ -350,8 +344,12 @@ export function usePipelineProgress({
           // Do not treat it as a lipsync target — otherwise the global bar
           // shows misleading progress (e.g. 96%) for a scene that hard-failed
           // at image generation (Green-Net reject, etc.).
-          if (isTerminalState(sceneState(s))) return false;
-          return isLipSyncIntentional(s as any);
+          const cs = (s as any).clipStatus ?? (s as any).clip_status;
+          if (cs === 'failed') return false;
+          return (
+            isLipSyncIntentional(s as any) ||
+            !!(s as any).twoshotStage
+          );
         },
       ),
     [scenes],
@@ -371,17 +369,17 @@ export function usePipelineProgress({
     // Without this the bar gets stuck at ~40% in the Clips phase forever
     // after Sync.so finishes.
     const isReadyOrLipsynced = (s: any) =>
-      !!s.clipUrl && isRealizedState(sceneState(s));
+      s.clipStatus === 'ready' ||
+      (!!s.clipUrl && (
+        s.lipSyncStatus === 'applied' ||
+        s.twoshotStage === 'complete' ||
+        s.twoshotStage === 'done'
+      ));
     const ready = aiScenes.filter(isReadyOrLipsynced).length;
-    // v371 — eine terminal fehlgeschlagene Szene ist NIE "running", egal
-    // welche veralteten Backend-Handles (replicate_prediction_id, twoshot
-    // stage) noch auf der Zeile stehen. Ohne das lief der globale Balken
-    // minutenlang weiter, obwohl die Szene rot + refundiert war.
-    const isFailed = (s: any) => sceneState(s) === 'failed';
     const generating = aiScenes.filter(
-      (s) => ['plate_queued', 'plate_rendering'].includes(sceneState(s)) && !isReadyOrLipsynced(s),
+      (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s),
     ).length;
-    const failed = aiScenes.filter(isFailed).length;
+    const failed = aiScenes.filter((s) => s.clipStatus === 'failed').length;
     // Stage 7: a scene with an active backend handle (Replicate prediction,
     // dialog-shot pipeline, lipsync stage) also counts as "running" — even
     // when clipStatus momentarily reverts to 'pending' between the optimistic
@@ -389,10 +387,18 @@ export function usePipelineProgress({
     // disappears for 5–30 s right after the user clicks "Generieren".
     const backendActive = aiScenes.filter((s) => {
       const sa = s as any;
-      if (isFailed(sa)) return false;
       if (isCanceledLipsyncScene(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;
-      return ['plate_queued', 'plate_rendering'].includes(sceneState(sa));
+      const stage = sa.twoshotStage;
+      const lip = sa.lipSyncStatus;
+      const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
+      const dsActive = isActiveDialogShots(ds);
+      return (
+        !!sa.replicatePredictionId ||
+        lip === 'running' ||
+        isActiveTwoshotStage(stage) ||
+        dsActive
+      );
     }).length;
     // Progress is measured RELATIVE to the baseline captured on `clips:start`.
     const baseReady = b?.clipsReady ?? 0;
@@ -439,21 +445,117 @@ export function usePipelineProgress({
     if (!hasLipsyncScenes) {
       return { progress: 0, running: false, done: false, applicable: false, failed: false };
     }
-    const targets = scenes.filter((s) =>
-      isLipSyncIntentional(s as any) && sceneState(s) !== 'canceled',
+    const targets = scenes.filter(
+      (s) => {
+        // v182: failed master clip must never count as "lipsync running" — the
+        // bar would otherwise spin on a scene where lip-sync is impossible.
+        const cs = (s as any).clipStatus ?? (s as any).clip_status;
+        const ts = (s as any).twoshotStage ?? (s as any).twoshot_stage;
+        const ls = (s as any).lipSyncStatus ?? (s as any).lip_sync_status;
+        if (cs === 'failed') return false;
+        if (TERMINAL_TWOSHOT_STAGES.has(String(ts))) return false;
+        if (ls === 'canceled') return false;
+        if (isCanceledLipsyncScene(s)) return false;
+        return (
+          isLipSyncIntentional(s as any) ||
+          !!(s as any).twoshotStage
+        );
+      },
     );
-    if (targets.length === 0) {
-      return { progress: 0, running: false, done: false, applicable: false, failed: false };
-    }
 
     const getDialogShots = (s: any) => (s.dialogShots ?? s.dialog_shots ?? null) as
       | { status?: string; shots?: Array<{ status: string }> }
       | null;
 
-    const done = targets.filter((s) => sceneState(s) === 'complete').length;
-    const runningStates = new Set(['audio_prep', 'audio_ready', 'lipsync_dispatched', 'lipsync_running', 'lipsync_muxing']);
-    const running = targets.some((s) => runningStates.has(sceneState(s)));
-    const failed = targets.some((s) => sceneState(s) === 'failed');
+    /**
+     * lip_sync_status is the authoritative terminal signal — webhook /
+     * watchdog / refund paths all write to it. A stale `dialog_shots.status`
+     * value (e.g. v4 row with status='queued' but lipSyncStatus='failed')
+     * must NOT keep the bar pinned in "running" forever.
+     */
+    const isTerminalScene = (s: any) =>
+      s.lipSyncStatus === 'applied' ||
+      s.lipSyncStatus === 'canceled' ||
+      s.lipSyncStatus === 'failed' ||
+      TERMINAL_TWOSHOT_STAGES.has(String(s.twoshotStage ?? '')) ||
+      TERMINAL_DIALOG_SHOT_STATUSES.has(String(getDialogShots(s)?.status ?? ''));
+
+    const done = targets.filter((s) => {
+      const ds = getDialogShots(s);
+      if (ds?.status === 'done') return true;
+      return (
+        ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
+        (s as any).lipSyncStatus === 'applied' ||
+        (s as any).twoshotStage === 'done' ||
+        (s as any).twoshotStage === 'complete'
+      );
+    }).length;
+
+    // A scene is only "really" running if there's evidence of an active
+    // provider job AND it's not already in a terminal lipSyncStatus.
+    const hasRealJob = (s: any) => {
+      if (isTerminalScene(s)) return false;
+      const predId = s.replicatePredictionId;
+      if (typeof predId === 'string' && predId.startsWith('sync:')) return true;
+      const plan = s.audioPlan as any;
+      const jobs = plan?.twoshot?.syncJobs?.jobs;
+      if (Array.isArray(jobs) && jobs.length > 0) return true;
+      if (plan?.twoshot?.heartbeat?.syncJobId) return true;
+      const ds = getDialogShots(s);
+      if (isActiveDialogShots(ds)) return true;
+      if (Array.isArray(ds?.shots) && ds!.shots.some((sh) =>
+        ['pending', 'generating', 'generated', 'lipsyncing'].includes(sh.status),
+      )) return true;
+      return false;
+    };
+    const running = targets.some(
+      (s) =>
+        !isTerminalScene(s) &&
+        (s as any).lipSyncStatus === 'running' &&
+        hasRealJob(s),
+    ) || targets.some(
+      (s) => {
+        if (isTerminalScene(s)) return false;
+        const stage = (s as any).twoshotStage;
+        if (!isActiveTwoshotStage(stage)) return false;
+        // Frühe v5-Stages (Audio-Prep, Anchor-Bau, Master-Plate, Sync.so-Queue,
+        // Audio-Mux, Circuit Breaker) zählen als laufend — auch wenn
+        // lipSyncStatus noch null/pending/audio_muxing ist. Sonst verschwindet
+        // der globale Balken sobald irgendein interner Zwischenschritt läuft.
+        if ([
+          'audio',
+          'anchor',
+          'master_clip',
+          'preflight',
+          'deferred',
+          'circuit_open',
+          'audio_muxing',
+        ].includes(stage)) {
+          return true;
+        }
+        return hasRealJob(s) || (s as any).lipSyncStatus === 'running' || (s as any).lipSyncStatus === 'audio_muxing';
+      },
+    ) || targets.some((s) => {
+      if (isTerminalScene(s)) return false;
+      const ds = getDialogShots(s);
+      return isActiveDialogShots(ds);
+    });
+
+    const failed = targets.some((s) => {
+      const ds = getDialogShots(s);
+      if (ds?.status === 'failed') return true;
+      // Ignore scenes mid auto-retry (clip_error starts with "auto-retry:" and
+      // lipSyncStatus has been reset back to pending). Those are recovering,
+      // not failed — surfacing them as failed makes the bar flash red while
+      // the v4 per-turn path is actually progressing underneath.
+      const ce = (s as any).clipError as string | undefined;
+      const isAutoRetry = typeof ce === 'string' && ce.startsWith('auto-retry:');
+      if (isAutoRetry && (s as any).lipSyncStatus !== 'failed') return false;
+      return (s as any).lipSyncStatus === 'failed' ||
+        (s as any).twoshotStage === 'failed' ||
+        (s as any).twoshotStage === 'audio_mux_failed' ||
+        (s as any).twoshotStage === 'needs_clip_rerender';
+    });
 
     const b = baselineRef.current;
 
@@ -472,7 +574,7 @@ export function usePipelineProgress({
     // Count "settled" scenes (terminal in any form) so a single failed scene
     // doesn't keep the bar pinned at 95% — failed counts toward "we're done
     // processing", just with a failure flag surfaced separately.
-    const settled = targets.filter((s) => ['complete', 'failed', 'canceled'].includes(sceneState(s))).length;
+    const settled = targets.filter(isTerminalScene).length;
 
     let progress: number;
     if (dsTotals.total > 0) {
@@ -643,7 +745,8 @@ export function usePipelineProgress({
   // v73 — Multi-speaker fan-out (3–4 Sprecher) braucht legitim mehr als 4
   // Minuten (4× Sync.so + 4× Preclip + Audio-Mux). Stall-Threshold dynamisch.
   const lipTargetCount = (scenes ?? []).filter((s: any) =>
-    sceneState(s) !== 'canceled' && isLipSyncIntentional(s),
+    !isCanceledLipsyncScene(s) &&
+    (isLipSyncIntentional(s) || !!s.twoshotStage),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
     const n = s.dialogVoices ? countSceneSpeakers(s) : 0;
@@ -668,7 +771,17 @@ export function usePipelineProgress({
   // visible in the scene state, the run is NOT stalled even if the
   // weighted progress bar hasn't moved (Sync.so passes are long).
   const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
-    return ['audio_prep', 'audio_ready', 'lipsync_dispatched', 'lipsync_running', 'lipsync_muxing'].includes(sceneState(s));
+    if (isCanceledLipsyncScene(s)) return false;
+    if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
+    if (s.engineOverride === 'cinematic-sync' && s.clipStatus === 'generating') return true;
+    const stage = s.twoshotStage;
+    if (isActiveTwoshotStage(stage)) return true;
+    const ds = s.dialogShots ?? s.dialog_shots ?? null;
+    if (isActiveDialogShots(ds)) return true;
+    if (ds?.audio_mux?.render_id) return true;
+    const predId = s.replicatePredictionId;
+    if (typeof predId === 'string' && predId.startsWith('sync:')) return true;
+    return false;
   });
   const isStalled =
     isActive &&
@@ -749,7 +862,6 @@ export function usePipelineProgress({
     if (now - lastPersistAtRef.current > 1000) {
       lastPersistAtRef.current = now;
       writeSnapshot(storageKey, {
-        runIdentity,
         pipelineStart: pipelineStartRef.current,
         runFloor: runFloorRef.current,
         floor: floorRef.current,

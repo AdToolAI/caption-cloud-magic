@@ -8,9 +8,6 @@ import type {
   ComposerStatus,
   AdCampaignMeta,
 } from '@/types/video-composer';
-import { dedupeCharacterShots } from '@/lib/video-composer/canonicalCastId';
-import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
-import { useOutfitLookMap } from '@/hooks/useOutfitLookMap';
 
 /**
  * Persist the assembly_config of an existing composer project to the database.
@@ -109,13 +106,6 @@ const isUuid = (val?: string) =>
 const inFlightPersists = new Map<string, Promise<PersistResult>>();
 
 export function useComposerPersistence() {
-  // v319 — full identity pool for cast dedupe: briefing cast alone is not
-  // enough (a character picked straight from the library never reaches
-  // `briefing.characters`, so its slug/outfit slot stayed unresolvable and
-  // survived as a duplicate).
-  const { data: libraryCharacters = [] } = useAccessibleCharacters();
-  const { outfitLookMap } = useOutfitLookMap();
-
   const ensureProjectPersisted = useCallback(
     async (project: PersistableProject): Promise<PersistResult> => {
       const cacheKey = project.id || '__new__';
@@ -182,35 +172,8 @@ export function useComposerPersistence() {
       // 4. Persist scenes (update existing, insert new) at their final order_index
       const persistedScenes: ComposerScene[] = [];
 
-      // Cast & World is the canonical pool. Briefing rows are appended only as
-      // aliases for legacy slugs, never as an independent character source.
-      const briefingCast = (project.briefing?.characters ?? []).map((c) => ({
-        id: c.id,
-        name: c.name,
-        // v320 — Cast & World UUID is the canonical identity of this entry.
-        brandCharacterId: c.brandCharacterId,
-      }));
-      const castPool = [
-        ...libraryCharacters
-          .filter((c: any) => c?.id)
-          .map((c: any) => ({
-            id: c.id as string,
-            name: (c.name as string) ?? '',
-            aliasIds: c.aliasIds ?? [],
-          })),
-        ...briefingCast,
-      ];
-      const castShotsFor = (scene: ComposerScene) =>
-        dedupeCharacterShots(
-          scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []),
-          castPool,
-          { outfitLookMap },
-        );
-
-
       for (let i = 0; i < project.scenes.length; i++) {
         const scene = project.scenes[i];
-
         const sceneHasUuid = isUuid(scene.id);
 
         if (sceneHasUuid) {
@@ -229,14 +192,14 @@ export function useComposerPersistence() {
               upload_url: scene.uploadUrl ?? null,
               upload_type: scene.uploadType ?? null,
               reference_image_url: scene.referenceImageUrl ?? null,
-              // Lifecycle fields are server-owned. Persisting local mirrors here
-              // can resurrect URLs/statuses from a superseded generation.
+              clip_url: scene.clipUrl ?? null,
+              clip_status: scene.clipStatus,
               text_overlay: scene.textOverlay as any,
               transition_type: scene.transitionType,
               transition_duration: scene.transitionDuration,
               cost_euros: scene.costEuros,
               character_shot: (scene.characterShot ?? null) as any,
-              character_shots: castShotsFor(scene) as any,
+              character_shots: (scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])) as any,
               dialog_script: scene.dialogScript ?? null,
               dialog_turns: ((scene as any).dialogTurns ?? []) as any,
               dialog_voices: (scene.dialogVoices ?? {}) as any,
@@ -296,7 +259,7 @@ export function useComposerPersistence() {
               cost_euros: scene.costEuros || 0,
               retry_count: scene.retryCount || 0,
               character_shot: (scene.characterShot ?? null) as any,
-              character_shots: castShotsFor(scene) as any,
+              character_shots: (scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])) as any,
               dialog_script: scene.dialogScript ?? null,
               dialog_turns: ((scene as any).dialogTurns ?? []) as any,
               dialog_voices: (scene.dialogVoices ?? {}) as any,
@@ -349,7 +312,7 @@ export function useComposerPersistence() {
         inFlightPersists.delete(cacheKey);
       }
     },
-    [libraryCharacters, outfitLookMap]
+    []
   );
 
   return { ensureProjectPersisted };
