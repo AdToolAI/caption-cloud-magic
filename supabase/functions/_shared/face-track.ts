@@ -152,6 +152,50 @@ export function withContextPadding(box: Box, width: number, height: number): Box
   ];
 }
 
+/**
+ * v372 — Obergrenze für die Fläche der Ziel-Bounding-Box.
+ *
+ * Empirie aus Szene 6bf4e815: die drei animierten Sprecher lagen bei 38–41 %
+ * der Preclip-Fläche, der einzige Passthrough bei 84.86 %. Eine Box, die
+ * praktisch das ganze Bild umfasst, sagt dem Provider nichts über die
+ * Zielperson. Die Grenze liegt bewusst deutlich über dem gemessenen
+ * Arbeitsbereich — sie soll nur Entartungen abfangen, nicht Qualität bewerten.
+ */
+export const MAX_DISPATCH_BOX_AREA_FRAC = 0.55;
+
+/**
+ * Schneidet eine zu große Box zum Mittelpunkt hin zurück, statt sie zu
+ * verwerfen. Ein Abbruch würde Credits vernichten, obwohl eine korrigierbare
+ * Geometrie vorliegt.
+ */
+export function clampBoxArea(
+  box: Box,
+  width: number,
+  height: number,
+  maxFrac: number = MAX_DISPATCH_BOX_AREA_FRAC,
+): { box: Box; clamped: boolean; areaFrac: number } {
+  const frame = Math.max(1, width * height);
+  const w = Math.max(1, box[2] - box[0]);
+  const h = Math.max(1, box[3] - box[1]);
+  const areaFrac = (w * h) / frame;
+  if (!(areaFrac > maxFrac)) {
+    return { box: [...box] as Box, clamped: false, areaFrac: Number(areaFrac.toFixed(4)) };
+  }
+  const scale = Math.sqrt(maxFrac / areaFrac);
+  const cx = (box[0] + box[2]) / 2;
+  const cy = (box[1] + box[3]) / 2;
+  const halfW = (w * scale) / 2;
+  const halfH = (h * scale) / 2;
+  const out: Box = [
+    Math.round(clamp(cx - halfW, 0, width - 2)),
+    Math.round(clamp(cy - halfH, 0, height - 2)),
+    Math.round(clamp(cx + halfW, 2, width)),
+    Math.round(clamp(cy + halfH, 2, height)),
+  ];
+  return { box: out, clamped: true, areaFrac: Number(areaFrac.toFixed(4)) };
+}
+
+
 /** Gleichmäßige Stützstellen über das Turn-Fenster (inkl. Rändern). */
 export function sampleTimestamps(startSec: number, endSec: number, maxSamples: number): number[] {
   const dur = Math.max(0, endSec - startSec);
@@ -472,10 +516,18 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
   const hits = samples.filter((s) => s.box);
   if (hits.length === 0) return fallback("no_face_tracked");
 
+  // v372 — RAW boxes. Der Kontextaufschlag ist NICHT mehr Aufgabe des
+  // Trackers. Er wird ausschließlich an der Aufrufstelle angewendet, die die
+  // Dispatch-Box baut. Vorher paddete der Tracker seine Keyframes selbst,
+  // während der Fallback-Pfad die bereits kontextualisierte Anchor-Box ein
+  // ZWEITES Mal aufweitete — belegt bei Samuel (Szene 6bf4e815): aus einer
+  // gültigen 40%-Gesichtsbox wurde eine 84.86%-Fast-Vollbildbox und Sync.so
+  // lieferte Passthrough.
   const keyframes = hits.map((s) => ({
     t: s.timestamp,
-    box: withContextPadding(s.box as Box, req.width, req.height),
+    box: [...(s.box as Box)] as Box,
   }));
+
 
   let peakMotionPx = 0;
   for (let i = 1; i < keyframes.length; i++) {

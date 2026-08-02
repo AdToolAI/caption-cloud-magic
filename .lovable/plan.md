@@ -1,43 +1,43 @@
-## Kurzantwort
+## Diagnose (belegt, nicht vermutet)
 
-Ja — die Ursache ist belegt, nicht vermutet:
+Szene `6bf4e815…`, Pass 1 (Samuel):
 
-- Der Webhook hat pass 4 um 09:09:32 verarbeitet (`status=COMPLETED`), also kein Hänger und kein verlorener Callback. Die „4/4"-Anzeige war das ~90 s Warten zwischen Dispatch (09:08:02) und Provider-Antwort.
-- Der Abbruch kam aus der Verdikt-Logik: `verdict=passthrough score=84.38 outVsIn=2.3105 … max_delta=2.311<3`.
-- Pass 4 hatte damit die **stärkste** gemessene Mundbewegung aller vier Pässe (84 vs. 44 bei dem Pass, der durchging) und wurde trotzdem terminal verworfen, weil eine einzelne Magic Number (`PASSTHROUGH_MAX_SCORE = 3.0`) den Ausschlag gab. Der im Code dokumentierte Rauschbereich echter Passthroughs liegt bei 1.1–2.1 — 2.31 liegt im Rauschen, nicht im Beweis.
+- Korrekte Clip-Gesichtsbox war **[154,113,561,624]** (≈ 40 %).
+- Turn nur 1,18 s → Tracking lieferte `anchor_fallback`.
+- Die bereits gepaddete Box wurde **erneut** aufgeweitet: **[52,0,663,720]** = **84,86 %**.
+- Die drei erfolgreichen Sprecher lagen bei **38–41 %** und wurden alle korrekt animiert.
+- Sync.so bekam damit fast das ganze Bild statt einer Gesichtsregion und gab den Preclip unverändert zurück. Das v371-Verdikt hat diesen echten Passthrough korrekt gemeldet.
 
-Die sauberste Lösung ist deshalb **nicht**, die Schwelle zu senken (das macht die nächste Grenzwert-Lotterie auf), sondern das Verdikt auf mehrere unabhängige Kriterien zu stellen und Unsicherheit als `unknown` (Telemetrie, kein Abbruch) statt als Hard-Fail zu behandeln.
+Zwei strukturelle Ursachen, nicht eine:
 
----
+1. **Padding hat keine eindeutige Zuständigkeit.** Getrackte Boxen werden in `face-track.ts` gepaddet; die Anchor-Box wird in `compose-dialog-segments` gepaddet — und im Fallback zusätzlich ein zweites Mal.
+2. **Das Sanity-Gate deckt den Fall nicht ab.** Im Preclip-Modus ist die Obergrenze 0.98, eine Fast-Vollbildbox gilt dort als plausibel.
 
-## Plan v371 — Evidenzbasiertes Passthrough statt Einzelschwelle
+Der `CreateCollection AccessDeniedException` ist ein separater Warnpfad und war für diesen Pass nicht ursächlich: Preclip, Audio und Clip-Koordinaten wurden korrekt erzeugt.
 
-### 1. Verdikt-Logik (`supabase/functions/_shared/mouth-motion-verdict.ts`)
-- Passthrough nur bei **Übereinstimmung mehrerer Kriterien**:
-  - `max(outVsIn) < PASSTHROUGH_HARD_MAX` (2.0 = gemessenes Re-Encode-Rauschen), **und**
-  - `median(outVsIn) < 1.5` (nicht ein einzelner Ausreißer-Frame), **und**
-  - kein Veto durch Eigenbewegung.
-- **Eigenbewegungs-Veto:** `score >= STRONG_MOTION_SCORE` (12) und `max(outVsIn) > 1.8` → `moved`. Ein Provider, der den Input zurückgibt, kann nicht gleichzeitig ein stark bewegtes Mundband und messbaren Abstand zum Input liefern.
-- Graubereich (schwache Eigenbewegung, `outVsIn` zwischen den Bändern) → `unknown`. `unknown` bleibt wie in v348 reine Telemetrie und blockiert den Mux nicht.
+## Plan v372 — Eine Padding-Zuständigkeit statt Symptomfix
 
-### 2. Messqualität
-- Sampling strikt in das Sprechfenster des Turns (`windowStartSec`/`windowEndSec`), Frames außerhalb verwerfen; Samples von 4 auf 6.
-- Alle `outVsIn`-Deltas plus das entscheidende Kriterium in die Pass-Forensik (`_v371_verdict`) schreiben — kein Log-Graben mehr beim nächsten Fall.
+### 1. Padding genau einmal, an einer Stelle
+- `face-track.ts` liefert **rohe** Gesichtsboxen zurück (Keyframes und Fallback-Anchor gleichermaßen), ohne Kontextaufschlag.
+- Der Kontextaufschlag wird ausschließlich beim Bau der Dispatch-Box in `compose-dialog-segments` angewendet — für getrackte und ungetrackte Boxen identisch.
+- Ergebnis: Tracking-Erfolg oder -Ausfall ändert die Boxgeometrie nicht mehr systematisch. Genau das war der Unterschied zwischen Samuel und den drei funktionierenden Sprechern.
 
-### 3. Webhook (`supabase/functions/sync-so-webhook/index.ts`)
-- Hard-Fail nur bei `passthrough` oder `static`; `unknown` läuft weiter.
-- Fehlertext um die Messwerte ergänzen (`outVsIn`, `score`, Frames), damit die UI-Meldung belegbar ist.
+### 2. Obergrenze an der Empirie ausrichten, ohne neue Abbruch-Lotterie
+- Für den Preclip-Pfad die Fläche der Dispatch-Box auf einen an den erfolgreichen Läufen gemessenen Bereich **begrenzen statt abzubrechen**: Boxen über der Grenze werden auf das Gesichtszentrum zurückgeschnitten, nicht verworfen.
+- Der bestehende Hard-Fail bleibt nur für tatsächlich unmögliche Geometrie (leere oder außerhalb liegende Box).
+- Begründung: v344–v355 haben gezeigt, dass zusätzliche harte Schwellen legitime Szenen blockieren. Ein Clamp korrigiert, ohne Credits zu vernichten.
 
-### 4. Zustands-Konsistenz
-Die Szene steht nach dem Hard-Fail auf `lip_sync_status='failed'` + `twoshot_stage='needs_clip_rerender'`, gleichzeitig aber auf `clip_status='ready'` mit gesetzter `clip_url` (in der DB verifiziert). Beim Hard-Fail zusätzlich `clip_status='failed'` setzen, damit die UI keinen widersprüchlichen „fertig"-Zustand rendert.
-
-### 5. UI-Wartefenster (`src/hooks/usePipelineProgress.ts` + Lip-Sync-Badge)
-- Statt fixer 95 % im letzten Pass: Fortschritt aus `done/total` der Pässe, plus verstrichene Zeit des laufenden Passes („Pass 4/4 · 1:12").
-- Nach 4 Minuten ohne Provider-Antwort ein sichtbares „Provider antwortet nicht — Watchdog übernimmt"-Label statt eines eingefrorenen Balkens.
+### 3. Forensik
+- Pro Pass festhalten: Tracking-Quelle, Box vor und nach Padding, finale Flächenangabe und ob geclampt wurde.
+- Damit ist beim nächsten Fall in einer Zeile sichtbar, ob Geometrie oder Provider die Ursache war.
 
 ### Verifikation
-- Regressionstests der Verdikt-Matrix: (84 / 2.31) → `moved`; (3 / 1.2) → `passthrough`; (44 / 4.08) → `moved`; Grauzone → `unknown`.
-- Danach ein 4-Sprecher-Lauf derselben Szene und Kontrolle der Pass-Verdikte in der DB.
+- Regressionstests: Fallback-Anchor und getrackte Box ergeben nach dem Dispatch-Bau dieselbe Flächenordnung (≈ 40 %, nicht 85 %); die realen Samuel-Werte dürfen nicht mehr auf `[52,0,663,720]` wachsen.
+- `compose-dialog-segments` deployen, den betroffenen Pass erneut fahren und in den Logs prüfen: Box ≈ `[154,113,561,624]`, Fläche ≈ 40 %, kein Passthrough-Verdikt.
+- Anschließend ein vollständiger 4-Sprecher-Lauf derselben Szene.
 
-### Technische Notiz
-Keine Änderung an Dispatch-, Preclip- oder Geometrie-Pfad (v355/v356/v359 bleiben unangetastet). Die Änderung betrifft ausschließlich die Bewertung des Provider-Ergebnisses, die Statuskonsistenz und die Anzeige.
+### Bewusst nicht angefasst
+v371-Verdiktlogik, Preclip-Rendering, Mux und Dispatch-Reihenfolge. Die Änderung betrifft ausschließlich die Erzeugung der Ziel-Bounding-Box.
+
+### Offener, getrennt zu behandelnder Punkt
+Der Rekognition-`AccessDeniedException` sollte separat geprüft werden. Er hat diesen Fehlschlag nicht verursacht, kostet aber bei jedem Lauf die Identitäts-Absicherung über die Face-Collection.
