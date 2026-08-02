@@ -212,19 +212,12 @@ export async function verifyFaceBeforeDispatch(
     }
   }
 
-  /**
-   * v396 — Zeitstempel wird AUSSCHLIESSLICH aus dem geprüften lokalen
-   * Preclip-Frameindex abgeleitet. Der frühere feste Wert `0.05 s` war der
-   * stille Fallback, hinter dem sich der "102 aus 68"-Vertragsbruch
-   * versteckt hat.
-   */
-  const exactProbeTimestamp = (): number => {
-    const fps = Number.isFinite(input.fps) && Number(input.fps) > 0 ? Number(input.fps) : 30;
-    const idx = verifiedPreclipFrame ?? 0;
-    // Mitte des Frames treffen, damit Rundung im Decoder nicht auf den
-    // Nachbarframe kippt.
-    return (idx + 0.5) / fps;
-  };
+  // v396/v397 — Zeitstempel werden AUSSCHLIESSLICH aus geprüften lokalen
+  // Preclip-Frameindizes abgeleitet (siehe Konsens-Schleife unten). Der
+  // frühere feste Wert `0.05 s` war der stille Fallback, hinter dem sich der
+  // "102 aus 68"-Vertragsbruch versteckt hat.
+
+
 
 
   // Rekognition braucht Bildmasse, um relative Boxen in Pixel zu wandeln.
