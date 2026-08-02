@@ -364,7 +364,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   }
 
   // GENERATING (HQ) → Phase 5.2 provider-tinted skeleton with live ETA
-  if (scene.clipStatus === 'generating') {
+  if (pipelineState === 'plate_queued' || pipelineState === 'plate_rendering') {
     return (
       <div className="relative w-full h-full">
         <SceneGenerationSkeleton scene={scene} />
