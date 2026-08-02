@@ -6403,6 +6403,10 @@ export type Database = {
           mentioned_location_ids: string[] | null
           motion_track: Json | null
           order_index: number
+          plate_generation: number
+          plate_generation_started_at: string | null
+          plate_ready_at: string | null
+          plate_ready_generation: number | null
           preview_anchor_url: string | null
           preview_audit: Json | null
           preview_clip_url: string | null
@@ -6494,6 +6498,10 @@ export type Database = {
           mentioned_location_ids?: string[] | null
           motion_track?: Json | null
           order_index?: number
+          plate_generation?: number
+          plate_generation_started_at?: string | null
+          plate_ready_at?: string | null
+          plate_ready_generation?: number | null
           preview_anchor_url?: string | null
           preview_audit?: Json | null
           preview_clip_url?: string | null
@@ -6585,6 +6593,10 @@ export type Database = {
           mentioned_location_ids?: string[] | null
           motion_track?: Json | null
           order_index?: number
+          plate_generation?: number
+          plate_generation_started_at?: string | null
+          plate_ready_at?: string | null
+          plate_ready_generation?: number | null
           preview_anchor_url?: string | null
           preview_audit?: Json | null
           preview_clip_url?: string | null
