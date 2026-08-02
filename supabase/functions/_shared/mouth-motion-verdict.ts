@@ -50,13 +50,33 @@ const MODEL_TAG = "v350-mouth-motion-verdict-aws";
 export const MOVED_MIN_SCORE = 1.6;
 
 /**
- * v350 — Passthrough detection.
- * If the provider output differs from its own INPUT preclip by no more than
- * this (mean |ΔY| in the mouth band, at every sampled timestamp), the provider
- * returned the input essentially unchanged — measured re-encode noise on a
- * proven passthrough was 1.1–2.1, genuine lip-sync moves far beyond this.
+ * v371 — Passthrough detection (evidence-based, no single magic threshold).
+ *
+ * v350 used one number (`outVsIn < 3.0`) to hard-fail a pass. Scene 6bf4e815
+ * (2026-08-02, pass 4 "Kailee") was killed with `outVsIn=2.31` while its own
+ * intra-clip mouth motion was `score=84` — by far the STRONGEST of all four
+ * passes. 2.31 sits inside the measured re-encode noise band (1.1–2.1), so the
+ * number proved nothing; it was a coin flip.
+ *
+ * A passthrough is now only declared when several independent criteria agree:
+ *   max(outVsIn)    < PASSTHROUGH_HARD_MAX   (real re-encode noise)
+ *   median(outVsIn) < PASSTHROUGH_MEDIAN_MAX (not a single outlier frame)
+ *   and no self-motion veto (see STRONG_MOTION_SCORE).
+ * Everything in between becomes `unknown` → telemetry only, never a hard fail.
  */
-export const PASSTHROUGH_MAX_SCORE = 3.0;
+export const PASSTHROUGH_MAX_SCORE = 3.0; // kept for back-compat imports
+export const PASSTHROUGH_HARD_MAX = 2.0;
+export const PASSTHROUGH_MEDIAN_MAX = 1.5;
+
+/**
+ * Intra-output mouth-band motion above this is strong, unambiguous animation.
+ * A provider that handed the input straight back cannot produce both a heavily
+ * moving mouth band AND a measurable distance to that same input.
+ */
+export const STRONG_MOTION_SCORE = 12;
+/** Distance to the input that must at least be present for the veto to apply. */
+export const STRONG_MOTION_MIN_OUT_VS_IN = 1.8;
+
 
 /** Sample grid the mouth band is resampled to before differencing. */
 const GRID_W = 48;
@@ -125,6 +145,10 @@ export interface MouthMotionVerdictResult {
   outputVsInput?: number | null;
   /** v350 — all output↔input deltas, for forensics. */
   outputVsInputDeltas?: number[];
+  /** v371 — median output↔input delta; null when not measured. */
+  outputVsInputMedian?: number | null;
+  /** v371 — which rule produced the verdict (forensics, shown in logs). */
+  verdictCriterion?: string;
   /**
    * v346 — Per-frame extractor outcome. Without this a probe failure was
    * indistinguishable from a provider no-op in the logs.
@@ -179,7 +203,9 @@ export async function judgeMouthMotion(
       };
     }
 
-    const samples = clampInt(input.sampleCount ?? 4, 3, 8);
+    // v371 — 4 samples made `Math.max` over the output↔input deltas a lottery.
+    // 6 samples inside the speech window is the new floor.
+    const samples = clampInt(input.sampleCount ?? 6, 3, 8);
     const budgetMs = clampInt(input.timeoutMs ?? 45_000, 10_000, 120_000);
 
     // Sampling window: stay inside the speech portion, away from the very
@@ -326,12 +352,46 @@ export async function judgeMouthMotion(
       }
     }
 
-    const verdict: MotionVerdict =
-      outputVsInput !== null && outputVsInput < PASSTHROUGH_MAX_SCORE
-        ? "passthrough"
-        : score >= MOVED_MIN_SCORE
-          ? "moved"
-          : "static";
+    // ══════════════════════════════════════════════════════════════════
+    // v371 — EVIDENCE-BASED VERDICT (no single magic threshold).
+    // ══════════════════════════════════════════════════════════════════
+    const outVsInMedian = outputVsInputDeltas.length
+      ? median(outputVsInputDeltas)
+      : null;
+
+    let verdict: MotionVerdict;
+    let criterion: string;
+
+    if (outputVsInput === null) {
+      // No input comparison available → fall back to intra-output motion only.
+      verdict = score >= MOVED_MIN_SCORE ? "moved" : "static";
+      criterion = `intra_only:score=${score.toFixed(3)}`;
+    } else if (
+      score >= STRONG_MOTION_SCORE && outputVsInput > STRONG_MOTION_MIN_OUT_VS_IN
+    ) {
+      // Self-motion veto: strong mouth animation AND a measurable distance to
+      // the input cannot both come from a passthrough.
+      verdict = "moved";
+      criterion =
+        `self_motion_veto:score=${score.toFixed(3)}>=${STRONG_MOTION_SCORE}&outVsIn=${outputVsInput.toFixed(3)}>${STRONG_MOTION_MIN_OUT_VS_IN}`;
+    } else if (
+      outputVsInput < PASSTHROUGH_HARD_MAX &&
+      outVsInMedian !== null && outVsInMedian < PASSTHROUGH_MEDIAN_MAX
+    ) {
+      verdict = "passthrough";
+      criterion =
+        `passthrough_consensus:max=${outputVsInput.toFixed(3)}<${PASSTHROUGH_HARD_MAX}&median=${outVsInMedian.toFixed(3)}<${PASSTHROUGH_MEDIAN_MAX}`;
+    } else if (outputVsInput < PASSTHROUGH_MAX_SCORE && score < STRONG_MOTION_SCORE) {
+      // Grey zone: close to the input, but not provably a passthrough and
+      // without strong self-motion. Never hard-fail on this — report it.
+      verdict = "unknown";
+      criterion =
+        `grey_zone:max=${outputVsInput.toFixed(3)}&median=${outVsInMedian?.toFixed(3) ?? "n/a"}&score=${score.toFixed(3)}`;
+    } else {
+      verdict = score >= MOVED_MIN_SCORE ? "moved" : "static";
+      criterion =
+        `distinct_from_input:outVsIn=${outputVsInput.toFixed(3)}&score=${score.toFixed(3)}`;
+    }
 
     return {
       deltas: deltas.map((d) => Number(d.toFixed(4))),
@@ -343,14 +403,19 @@ export async function judgeMouthMotion(
       score: Number(score.toFixed(4)),
       outputVsInput: outputVsInput === null ? null : Number(outputVsInput.toFixed(4)),
       outputVsInputDeltas: outputVsInputDeltas.map((d) => Number(d.toFixed(4))),
+      outputVsInputMedian: outVsInMedian === null ? null : Number(outVsInMedian.toFixed(4)),
+      verdictCriterion: criterion,
       frameErrors,
       reason: verdict === "passthrough"
-        ? `mouth_band_passthrough_output_equals_input:max_delta=${outputVsInput?.toFixed(3)}<${PASSTHROUGH_MAX_SCORE}`
+        ? `mouth_band_passthrough_output_equals_input:${criterion}`
         : verdict === "moved"
-          ? "mouth_band_motion_detected"
-          : "mouth_band_static_provider_returned_noop",
+          ? `mouth_band_motion_detected:${criterion}`
+          : verdict === "unknown"
+            ? `motion_probe_inconclusive:${criterion}`
+            : `mouth_band_static_provider_returned_noop:${criterion}`,
       latencyMs: Date.now() - t0,
     };
+
   } catch (e) {
     return {
       ...base,
@@ -529,6 +594,17 @@ function meanAbsDelta(a: Float64Array, b: Float64Array): number {
   for (let i = 0; i < n; i++) sum += Math.abs(a[i] - b[i]);
   return sum / n;
 }
+
+/** v371 — median of a non-empty numeric list. */
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+
 
 function normaliseRect(rect: unknown): MouthRect | null {
   if (!rect || typeof rect !== "object") return null;

@@ -698,7 +698,7 @@ serve(async (req) => {
       const motionStatic = motion.verdict === "static" || motionPassthrough;
       const motionUnknown = motion.verdict === "unknown";
       console.log(
-        `[sync-so-webhook] v350_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} outVsIn=${motion.outputVsInput ?? "n/a"} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
+        `[sync-so-webhook] v371_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} outVsIn=${motion.outputVsInput ?? "n/a"} median=${(motion as any).outputVsInputMedian ?? "n/a"} criterion=${(motion as any).verdictCriterion ?? "n/a"} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
       );
 
       // ══════════════════════════════════════════════════════════════════
@@ -789,7 +789,7 @@ serve(async (req) => {
       if (motionStatic) {
         console.warn(
           motionPassthrough
-            ? `[sync-so-webhook] v353 scene=${sceneId} pass=${currentPass} MOUTH PASSTHROUGH (output equals input inside the mouth band: outVsIn=${motion.outputVsInput} < ${3.0}; intra-clip score=${motion.score} is irrelevant here) → terminal, no retry`
+            ? `[sync-so-webhook] v371 scene=${sceneId} pass=${currentPass} MOUTH PASSTHROUGH (multi-criteria: ${(motion as any).verdictCriterion}) → terminal, no retry`
             : `[sync-so-webhook] v353 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → terminal, no retry`,
         );
       }
@@ -922,15 +922,21 @@ serve(async (req) => {
         const turnEnd = Number(passBeforeDone?.segments?.[0]?.endTime ?? 0).toFixed(1);
         // v353 — klare Trennung: Provider hat nicht animiert vs. Messung
         // war nicht möglich. Kein Retry-Karussell mehr im Text.
+        const evidence =
+          `outVsIn=${motion.outputVsInput ?? "n/a"} median=${(motion as any).outputVsInputMedian ?? "n/a"} score=${motion.score} frames=${motion.framesDecoded}`;
         const userMsg = motionStatic
-          ? `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung erzeugt). Bitte die Szene mit größeren Gesichtern neu rendern.`
-          : `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Ergebnis konnte nicht geprüft werden (Messung nicht möglich). Bitte erneut versuchen.`;
+          ? `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung erzeugt, ${evidence}). Bitte die Szene mit größeren Gesichtern neu rendern.`
+          : `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Ergebnis konnte nicht geprüft werden (Messung nicht möglich, ${evidence}). Bitte erneut versuchen.`;
 
         await supabase
           .from("composer_scenes")
           .update({
             lip_sync_status: "failed",
             twoshot_stage: "needs_clip_rerender",
+            // v371 — ohne clip_status='failed' zeigte die UI die Szene
+            // gleichzeitig als "fertig" (clip_url gesetzt) und als
+            // fehlgeschlagen an, und der Fortschrittsbalken lief weiter.
+            clip_status: "failed",
             clip_error: userMsg,
             updated_at: nowIso,
           })
@@ -994,6 +1000,16 @@ serve(async (req) => {
         motion_output_vs_input: motion.outputVsInput ?? null,
         motion_verdict_at: nowIso,
         motion_verdict_reason: motion.reason,
+        // v371 — vollständige Beweislage am Pass, damit der nächste Fall
+        // nicht wieder aus Logs rekonstruiert werden muss.
+        _v371_verdict: {
+          criterion: (motion as any).verdictCriterion ?? null,
+          out_vs_in_max: motion.outputVsInput ?? null,
+          out_vs_in_median: (motion as any).outputVsInputMedian ?? null,
+          out_vs_in_deltas: (motion as any).outputVsInputDeltas ?? [],
+          score: motion.score,
+          frames: motion.framesDecoded,
+        },
         ...(providerJob ? { provider_job: providerJob } : {}),
       };
       if (freshDonePasses[currentPass]) {
