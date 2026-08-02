@@ -447,117 +447,21 @@ export function usePipelineProgress({
     if (!hasLipsyncScenes) {
       return { progress: 0, running: false, done: false, applicable: false, failed: false };
     }
-    const targets = scenes.filter(
-      (s) => {
-        // v182: failed master clip must never count as "lipsync running" — the
-        // bar would otherwise spin on a scene where lip-sync is impossible.
-        const cs = (s as any).clipStatus ?? (s as any).clip_status;
-        const ts = (s as any).twoshotStage ?? (s as any).twoshot_stage;
-        const ls = (s as any).lipSyncStatus ?? (s as any).lip_sync_status;
-        if (cs === 'failed') return false;
-        if (TERMINAL_TWOSHOT_STAGES.has(String(ts))) return false;
-        if (ls === 'canceled') return false;
-        if (isCanceledLipsyncScene(s)) return false;
-        return (
-          isLipSyncIntentional(s as any) ||
-          !!(s as any).twoshotStage
-        );
-      },
+    const targets = scenes.filter((s) =>
+      isLipSyncIntentional(s as any) && sceneState(s) !== 'canceled',
     );
+    if (targets.length === 0) {
+      return { progress: 0, running: false, done: false, applicable: false, failed: false };
+    }
 
     const getDialogShots = (s: any) => (s.dialogShots ?? s.dialog_shots ?? null) as
       | { status?: string; shots?: Array<{ status: string }> }
       | null;
 
-    /**
-     * lip_sync_status is the authoritative terminal signal — webhook /
-     * watchdog / refund paths all write to it. A stale `dialog_shots.status`
-     * value (e.g. v4 row with status='queued' but lipSyncStatus='failed')
-     * must NOT keep the bar pinned in "running" forever.
-     */
-    const isTerminalScene = (s: any) =>
-      s.lipSyncStatus === 'applied' ||
-      s.lipSyncStatus === 'canceled' ||
-      s.lipSyncStatus === 'failed' ||
-      TERMINAL_TWOSHOT_STAGES.has(String(s.twoshotStage ?? '')) ||
-      TERMINAL_DIALOG_SHOT_STATUSES.has(String(getDialogShots(s)?.status ?? ''));
-
-    const done = targets.filter((s) => {
-      const ds = getDialogShots(s);
-      if (ds?.status === 'done') return true;
-      return (
-        ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
-        (s as any).lipSyncStatus === 'applied' ||
-        (s as any).twoshotStage === 'done' ||
-        (s as any).twoshotStage === 'complete'
-      );
-    }).length;
-
-    // A scene is only "really" running if there's evidence of an active
-    // provider job AND it's not already in a terminal lipSyncStatus.
-    const hasRealJob = (s: any) => {
-      if (isTerminalScene(s)) return false;
-      const predId = s.replicatePredictionId;
-      if (typeof predId === 'string' && predId.startsWith('sync:')) return true;
-      const plan = s.audioPlan as any;
-      const jobs = plan?.twoshot?.syncJobs?.jobs;
-      if (Array.isArray(jobs) && jobs.length > 0) return true;
-      if (plan?.twoshot?.heartbeat?.syncJobId) return true;
-      const ds = getDialogShots(s);
-      if (isActiveDialogShots(ds)) return true;
-      if (Array.isArray(ds?.shots) && ds!.shots.some((sh) =>
-        ['pending', 'generating', 'generated', 'lipsyncing'].includes(sh.status),
-      )) return true;
-      return false;
-    };
-    const running = targets.some(
-      (s) =>
-        !isTerminalScene(s) &&
-        (s as any).lipSyncStatus === 'running' &&
-        hasRealJob(s),
-    ) || targets.some(
-      (s) => {
-        if (isTerminalScene(s)) return false;
-        const stage = (s as any).twoshotStage;
-        if (!isActiveTwoshotStage(stage)) return false;
-        // Frühe v5-Stages (Audio-Prep, Anchor-Bau, Master-Plate, Sync.so-Queue,
-        // Audio-Mux, Circuit Breaker) zählen als laufend — auch wenn
-        // lipSyncStatus noch null/pending/audio_muxing ist. Sonst verschwindet
-        // der globale Balken sobald irgendein interner Zwischenschritt läuft.
-        if ([
-          'audio',
-          'anchor',
-          'master_clip',
-          'preflight',
-          'deferred',
-          'circuit_open',
-          'audio_muxing',
-        ].includes(stage)) {
-          return true;
-        }
-        return hasRealJob(s) || (s as any).lipSyncStatus === 'running' || (s as any).lipSyncStatus === 'audio_muxing';
-      },
-    ) || targets.some((s) => {
-      if (isTerminalScene(s)) return false;
-      const ds = getDialogShots(s);
-      return isActiveDialogShots(ds);
-    });
-
-    const failed = targets.some((s) => {
-      const ds = getDialogShots(s);
-      if (ds?.status === 'failed') return true;
-      // Ignore scenes mid auto-retry (clip_error starts with "auto-retry:" and
-      // lipSyncStatus has been reset back to pending). Those are recovering,
-      // not failed — surfacing them as failed makes the bar flash red while
-      // the v4 per-turn path is actually progressing underneath.
-      const ce = (s as any).clipError as string | undefined;
-      const isAutoRetry = typeof ce === 'string' && ce.startsWith('auto-retry:');
-      if (isAutoRetry && (s as any).lipSyncStatus !== 'failed') return false;
-      return (s as any).lipSyncStatus === 'failed' ||
-        (s as any).twoshotStage === 'failed' ||
-        (s as any).twoshotStage === 'audio_mux_failed' ||
-        (s as any).twoshotStage === 'needs_clip_rerender';
-    });
+    const done = targets.filter((s) => sceneState(s) === 'complete').length;
+    const runningStates = new Set(['audio_prep', 'audio_ready', 'lipsync_dispatched', 'lipsync_running', 'lipsync_muxing']);
+    const running = targets.some((s) => runningStates.has(sceneState(s)));
+    const failed = targets.some((s) => sceneState(s) === 'failed');
 
     const b = baselineRef.current;
 
@@ -576,7 +480,7 @@ export function usePipelineProgress({
     // Count "settled" scenes (terminal in any form) so a single failed scene
     // doesn't keep the bar pinned at 95% — failed counts toward "we're done
     // processing", just with a failure flag surfaced separately.
-    const settled = targets.filter(isTerminalScene).length;
+    const settled = targets.filter((s) => ['complete', 'failed', 'canceled'].includes(sceneState(s))).length;
 
     let progress: number;
     if (dsTotals.total > 0) {
@@ -747,8 +651,7 @@ export function usePipelineProgress({
   // v73 — Multi-speaker fan-out (3–4 Sprecher) braucht legitim mehr als 4
   // Minuten (4× Sync.so + 4× Preclip + Audio-Mux). Stall-Threshold dynamisch.
   const lipTargetCount = (scenes ?? []).filter((s: any) =>
-    !isCanceledLipsyncScene(s) &&
-    (isLipSyncIntentional(s) || !!s.twoshotStage),
+    sceneState(s) !== 'canceled' && isLipSyncIntentional(s),
   ).length;
   const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
     const n = s.dialogVoices ? countSceneSpeakers(s) : 0;
@@ -773,17 +676,7 @@ export function usePipelineProgress({
   // visible in the scene state, the run is NOT stalled even if the
   // weighted progress bar hasn't moved (Sync.so passes are long).
   const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
-    if (isCanceledLipsyncScene(s)) return false;
-    if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
-    if (s.engineOverride === 'cinematic-sync' && s.clipStatus === 'generating') return true;
-    const stage = s.twoshotStage;
-    if (isActiveTwoshotStage(stage)) return true;
-    const ds = s.dialogShots ?? s.dialog_shots ?? null;
-    if (isActiveDialogShots(ds)) return true;
-    if (ds?.audio_mux?.render_id) return true;
-    const predId = s.replicatePredictionId;
-    if (typeof predId === 'string' && predId.startsWith('sync:')) return true;
-    return false;
+    return ['audio_prep', 'audio_ready', 'lipsync_dispatched', 'lipsync_running', 'lipsync_muxing'].includes(sceneState(s));
   });
   const isStalled =
     isActive &&
@@ -864,6 +757,7 @@ export function usePipelineProgress({
     if (now - lastPersistAtRef.current > 1000) {
       lastPersistAtRef.current = now;
       writeSnapshot(storageKey, {
+        runIdentity,
         pipelineStart: pipelineStartRef.current,
         runFloor: runFloorRef.current,
         floor: floorRef.current,
