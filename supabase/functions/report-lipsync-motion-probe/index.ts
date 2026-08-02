@@ -25,6 +25,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { failSceneState } from "../_shared/scene-state.ts";
 
 const YAVG_NOOP_THRESHOLD = 4.0;
 
