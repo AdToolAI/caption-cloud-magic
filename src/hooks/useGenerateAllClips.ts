@@ -212,23 +212,22 @@ export function useGenerateAllClips({
       // gebaut — die Reihenfolge ist zwingend, weil der Artefakt-Purge einen
       // bereits erzeugten neuen Anchor sonst wieder mitlöschen würde.
       // Schlägt das fehl, wird NICHTS gestartet und nichts berechnet.
-      const scenesNeedingReset = eligibleScenes.filter(
-        (s) =>
-          /^[0-9a-f-]{36}$/i.test(s.id) &&
-          (!!s.clipUrl ||
-            !!(s as any).twoshotStage ||
-            !!(s as any).dialogShots ||
-            !!(s as any).lipSyncStatus ||
-            s.clipStatus === 'failed'),
+      // Jede persistierte Szene bekommt einen Run — auch eine, die noch nie
+      // gelaufen ist. Nur so ist der Dispatch danach lückenlos an
+      // `scene_id + generation + run_id` gebunden; der Teardown einer frischen
+      // Szene ist ohnehin ein No-Op.
+      const runnableScenes = eligibleScenes.filter((s) =>
+        /^[0-9a-f-]{36}$/i.test(s.id),
       );
       const preparedSceneIds = new Set<string>();
-      if (scenesNeedingReset.length > 0) {
+      if (runnableScenes.length > 0) {
         const runs = await prepareSceneRuns({
-          sceneIds: scenesNeedingReset.map((s) => s.id),
+          sceneIds: runnableScenes.map((s) => s.id),
           reason: 'user_regenerate_all',
         });
         Object.keys(runs).forEach((id) => preparedSceneIds.add(id));
       }
+
 
 
 
