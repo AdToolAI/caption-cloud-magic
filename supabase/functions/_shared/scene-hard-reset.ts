@@ -246,8 +246,8 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
         twoshot_stage: null,
         dialog_shots: null,
         dialog_takes: null,
+        audio_plan: cleanedPlan,
 
-        audio_plan: null,
         replicate_prediction_id: null,
         retry_count: 0,
         updated_at: nowIso,
