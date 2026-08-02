@@ -316,19 +316,28 @@ export function compressLipReadyPlate(
 
 export function sanitizeForHappyHorse(
   input: string,
-  opts: { compress?: boolean; hard?: boolean } = {},
+  opts: { compress?: boolean; hard?: boolean; castNames?: string[] } = {},
 ): GreenNetSanitizeResult {
   const touched: string[] = [];
   let s = String(input ?? "");
 
   const compress = opts.compress !== false;
   if (compress) {
-    const c = compressLipReadyPlate(s, opts.hard === true);
+    const c = compressLipReadyPlate(s, opts.hard === true, opts.castNames ?? []);
     if (c.touched.length > 0) {
       touched.push(...c.touched);
       s = c.out;
     }
+  } else {
+    // v370 — even without the compressor the cast block must be canonical:
+    // no bracket tags, exactly one clause, count == number of names.
+    const castNorm = normalizeCastInPrompt(s, opts.castNames ?? []);
+    if (castNorm.touched.length > 0) {
+      touched.push(...castNorm.touched);
+      s = castNorm.out;
+    }
   }
+
 
   for (const [re, repl, tag] of REPLACEMENTS) {
     if (re.test(s)) {
