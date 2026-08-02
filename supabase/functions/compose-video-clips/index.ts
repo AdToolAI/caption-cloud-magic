@@ -567,7 +567,6 @@ serve(async (req) => {
       isCinematicSyncScene: boolean,
       clipError?: string,
     ): Record<string, unknown> => ({
-      clip_status: "failed",
       // v264 — Never allow silent failures. A missing clip_error paired with
       // clip_status='failed' is a bug (produces the "Fehlgeschlagen"-Badge
       // with no explanation and orphans the lip-sync spinner).
@@ -575,12 +574,7 @@ serve(async (req) => {
         ? clipError
         : "unknown_failure_no_details").slice(0, 500),
       ...(isCinematicSyncScene
-        ? {
-            lip_sync_status: null,
-            twoshot_stage: null,
-            lip_sync_source_clip_url: null,
-            dialog_shots: null,
-          }
+        ? { lip_sync_source_clip_url: null, dialog_shots: null }
         : {}),
       updated_at: new Date().toISOString(),
     });
@@ -616,17 +610,17 @@ serve(async (req) => {
       try {
         const { data: current } = await supabaseAdmin
           .from("composer_scenes")
-          .select("clip_url, clip_status, lip_sync_status")
+          .select("clip_url, pipeline_state, plate_generation, active_run_id")
           .eq("id", sceneId)
           .maybeSingle();
         const hasClipUrl =
           typeof current?.clip_url === "string" && current.clip_url.length > 0;
+        const st = sceneState(current);
         const lipsyncLive =
-          current?.lip_sync_status === "running" ||
-          current?.lip_sync_status === "done";
+          st === "lipsync_running" || st === "lipsync_muxing" || st === "complete";
         if (hasClipUrl || lipsyncLive) {
           console.warn(
-            `[compose-video-clips] v264_safe_fail_skip scene=${sceneId} reason=already_succeeded clip_url=${hasClipUrl} lip_sync_status=${current?.lip_sync_status ?? "null"} would_have_written=${clipError.slice(0, 120)}`,
+            `[compose-video-clips] v264_safe_fail_skip scene=${sceneId} reason=already_succeeded clip_url=${hasClipUrl} state=${st} would_have_written=${clipError.slice(0, 120)}`,
           );
           // Preserve the concern as a diagnostic note but do NOT flip status.
           try {
@@ -654,6 +648,10 @@ serve(async (req) => {
         .from("composer_scenes")
         .update(payload)
         .eq("id", sceneId);
+      // v385 — Zustand ausschließlich über die Zustandsmaschine.
+      await transitionScene(supabaseAdmin, sceneId, "failed", {
+        detail: clipError.slice(0, 200),
+      });
       return "failed";
     };
 
