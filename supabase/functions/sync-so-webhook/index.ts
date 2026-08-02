@@ -1000,6 +1000,16 @@ serve(async (req) => {
         motion_output_vs_input: motion.outputVsInput ?? null,
         motion_verdict_at: nowIso,
         motion_verdict_reason: motion.reason,
+        // v371 — vollständige Beweislage am Pass, damit der nächste Fall
+        // nicht wieder aus Logs rekonstruiert werden muss.
+        _v371_verdict: {
+          criterion: (motion as any).verdictCriterion ?? null,
+          out_vs_in_max: motion.outputVsInput ?? null,
+          out_vs_in_median: (motion as any).outputVsInputMedian ?? null,
+          out_vs_in_deltas: (motion as any).outputVsInputDeltas ?? [],
+          score: motion.score,
+          frames: motion.framesDecoded,
+        },
         ...(providerJob ? { provider_job: providerJob } : {}),
       };
       if (freshDonePasses[currentPass]) {
