@@ -186,7 +186,11 @@ export interface LipReadyCompressResult {
  * Collapse the lip-sync master-plate choreography into Green-Net-safe text.
  * `hard` shortens further (used for the automatic retry after a rejection).
  */
-export function compressLipReadyPlate(input: string, hard = false): LipReadyCompressResult {
+export function compressLipReadyPlate(
+  input: string,
+  hard = false,
+  castNames: string[] = [],
+): LipReadyCompressResult {
   const touched: string[] = [];
   let s = String(input ?? "");
 
