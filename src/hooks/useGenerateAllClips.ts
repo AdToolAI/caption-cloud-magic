@@ -28,7 +28,7 @@ import { buildSceneAssetsForRender } from '@/lib/motion-studio/buildSceneAssetsF
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
-import { hardResetSceneJob } from '@/lib/lipsyncReset';
+import { prepareSceneRuns, startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 
 import { emitStageEvent } from '@/lib/stage/stageEvents';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
@@ -205,13 +205,13 @@ export function useGenerateAllClips({
           ),
       );
 
-      // 2b. v373 — harter Neustart VOR allem anderen.
-      // Jede Szene, die schon einmal gelaufen ist, wird vollständig
-      // abgeräumt (Provider-Jobs abbrechen, Slots freigeben, Credits
-      // erstatten, Artefakte löschen, Generation hochzählen), bevor Anchor
-      // und Prompt für den neuen Lauf gebaut werden. Die Reihenfolge ist
-      // zwingend: der Artefakt-Purge würde einen bereits erzeugten neuen
-      // Anchor sonst wieder mitlöschen.
+      // 2b. v377 — Run serverseitig übernehmen, DANN erst abräumen.
+      // `prepareSceneRuns` erhöht die Generation, vergibt eine frische
+      // run_id und führt den vollständigen Teardown aus (Provider-Jobs,
+      // Slots, Credits, Artefakte). Erst danach werden Anchor und Prompt
+      // gebaut — die Reihenfolge ist zwingend, weil der Artefakt-Purge einen
+      // bereits erzeugten neuen Anchor sonst wieder mitlöschen würde.
+      // Schlägt das fehl, wird NICHTS gestartet und nichts berechnet.
       const scenesNeedingReset = eligibleScenes.filter(
         (s) =>
           /^[0-9a-f-]{36}$/i.test(s.id) &&
@@ -221,11 +221,15 @@ export function useGenerateAllClips({
             !!(s as any).lipSyncStatus ||
             s.clipStatus === 'failed'),
       );
+      const preparedSceneIds = new Set<string>();
       if (scenesNeedingReset.length > 0) {
-        await Promise.all(
-          scenesNeedingReset.map((s) => hardResetSceneJob(s.id, 'user_regenerate_all')),
-        );
+        const runs = await prepareSceneRuns({
+          sceneIds: scenesNeedingReset.map((s) => s.id),
+          reason: 'user_regenerate_all',
+        });
+        Object.keys(runs).forEach((id) => preparedSceneIds.add(id));
       }
+
 
 
       // 3. compose prompts
