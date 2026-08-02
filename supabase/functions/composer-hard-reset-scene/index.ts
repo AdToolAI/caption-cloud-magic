@@ -81,14 +81,20 @@ serve(async (req) => {
       reason: String((body as any)?.reason ?? "user_regenerate"),
     });
 
+    console.log(
+      `[composer-hard-reset-scene] scene=${sceneId} gen=${result.generation} refund=${result.refundDecision}`,
+    );
+
     return json({
       ok: true,
       scene_id: sceneId,
       generation: result.generation,
       deleted_objects: result.deletedObjects,
       canceled_jobs: result.canceledJobs,
+      refund_decision: result.refundDecision,
       warnings: result.errors,
     });
+
   } catch (e) {
     console.error("[composer-hard-reset-scene] crash", e);
     return json({ error: (e as Error).message ?? "internal_error" }, 500);
