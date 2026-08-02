@@ -1,30 +1,43 @@
-## Wo wir stehen
+## Ursache — belegt aus dem Log
 
-Verifiziert im Code (v377–v380):
-- Start eines Renders geht nur noch über `composer-start-scene-generation` (Run-Erwerb + Teardown + Dispatch als eine Server-Operation).
-- `compose-dialog-segments` blockt Lip-Sync bei `master_clip_failed` / `no_active_scene_run`.
-- Webhooks (`sync-so-webhook`, `remotion-webhook`) verwerfen Callbacks fremder Generationen.
-- `scene-hard-reset.ts` enthält `stripDerivedSceneAssets` und `supersedeOpenRenders`.
-- `auto-director-compose` erwirbt einen Run und übergibt `run_context`.
+Der Fehler kommt nicht von der Szenengenerierung, sondern vom Hard-Reset davor:
 
-Nicht verifiziert: dass ein **echter** Regenerate-Lauf danach nachweislich keine Artefakte der Vorgeneration mehr berührt. Bisher liegt nur der synthetische Selbsttest vor. Deshalb keine Garantie, sondern dieser Plan.
+```
+[v377_start] reset_failed scene=6bf4e815…
+update: null value in column "dialog_takes" of relation "composer_scenes" violates not-null constraint
+[v380_hard_reset] … errors=1
+```
 
-## Plan v381
+In der Datenbank geprüft:
 
-### 1. Realer Beweislauf (Kern)
-Eine bestehende Szene mit Vorgeneration nehmen, „Clip generieren" auslösen und lückenlos protokollieren:
-- Generation vorher/nachher, `active_run_id` vorher/nachher.
-- Alle in diesem Lauf verwendeten Storage-Pfade auf Zugehörigkeit zur neuen Generation prüfen (Plate, Anchor, Preclips, Frames).
-- Alle `plate_attempts`, `video_renders`, `dialog_dispatch_locks`, `syncso_inflight_jobs` der Szene: Zeilen älterer Generation müssen tombstoned/superseded sein.
-- Ergebnis als Tabelle „Feld → alt → neu → Verdikt".
+| Spalte | nullable | default |
+|---|---|---|
+| `dialog_takes` | **NO** | `'{}'::jsonb` |
+| `scene_assets` | **NO** | `'[]'::jsonb` |
+| `dialog_shots` | YES | – |
 
-### 2. Restlücken, die der Lauf typischerweise aufdeckt
-- **Reuse-Fenster:** `pass-face-preclip` liest `video_renders` — Lookup muss zwingend auf `plate_generation` + `active_run_id` filtern, nicht nur auf Szene. Prüfen und ggf. nachziehen.
-- **Selbsttest-Assertion `no_active_run_after_reset`** ist falsch formuliert (v377 erwirbt den Run vor dem Reset). Umstellen auf „Run-ID ist neu und Generation ist gestiegen".
-- **Autopilot-Pfad** einmal real durchlaufen lassen, da er erst jetzt Run-Kontext übergibt.
+`scene-hard-reset.ts` (Zeile 551) schreibt `dialog_takes: null`. Das verletzt die NOT-NULL-Bedingung, der Reset meldet `errors=1`, v377 bricht korrekt mit `reset_failed` ab und liefert non-2xx — genau die rote Meldung im Screenshot. Der v377-Vertrag hat also funktioniert (kein Geld ausgegeben, kein halber Lauf), aber der Reset selbst war seit v380 durch diesen einen Wert dauerhaft kaputt: **jeder** Regenerate einer Dialogszene schlägt hier fehl. Das erklärt auch, warum in der Produktionsdatenbank noch nie eine Szene `plate_generation > 1` erreicht hat.
 
-### 3. Dauerhafter Wächter
-Log-Marker `v381_generation_provenance` an jedem Punkt, der ein Asset in die Pipeline hineinreicht (Plate-Load, Preclip-Cut, Sync-Dispatch, Mux): loggt die Generation der Quelle. Weicht sie von der aktiven Generation ab → harter Abbruch statt stiller Weiterverarbeitung. Damit ist die Klasse „alter Feed steckt noch drin" nicht mehr nur verhindert, sondern messbar.
+## Plan v382 — Reset-Write NOT-NULL-konform machen
+
+### 1. Leerwerte statt NULL
+In `supabase/functions/_shared/scene-hard-reset.ts`:
+- `dialog_takes: null` → `dialog_takes: {}` (Spaltendefault).
+- `scene_assets`: sicherstellen, dass der `cleanedAssets === null`-Fall als `[]` geschrieben wird, nicht als `null` — dieselbe Falle, nur bisher nicht ausgelöst.
+- `dialog_shots` bleibt `null` (Spalte ist nullable).
+
+### 2. Schema-Drift dauerhaft ausschließen
+Ein kleiner Guard vor dem Update: das Reset-Update-Objekt wird gegen die NOT-NULL-Spalten von `composer_scenes` abgeglichen; ein `null` auf einer NOT-NULL-Spalte wird auf den Spaltendefault korrigiert und mit `v382_notnull_coerced` geloggt, statt den ganzen Reset scheitern zu lassen. Damit kann eine künftige Schemaänderung den Regenerate nicht erneut komplett blockieren.
+
+### 3. Verifikation am echten Lauf
+Nach dem Deploy löst du den Regenerate auf derselben Szene aus. Ich lese danach:
+- `composer_scenes`: `plate_generation` 2 → 3, `plate_ready_generation` leer, neue `active_run_id`.
+- Log auf `reset_failed` = 0 und `[v380_hard_reset] … errors=0`.
+- Die vier `v381_generation_provenance`-Marker (`plate_load`, `preclip_cut`, `sync_dispatch`, `mux`) mit der neuen Generation.
+
+Erst wenn diese Kette sauber ist, ist die Aussage „die Pipeline wird bei jedem Neustart komplett geleert" belegt statt behauptet.
 
 ## Technische Details
-Betroffen: `supabase/functions/_shared/pass-face-preclip.ts` (Reuse-Filter), `supabase/functions/composer-reset-selftest/index.ts` (Assertion), `supabase/functions/compose-dialog-segments/index.ts` und `_shared/scene-hard-reset.ts` (Provenance-Marker). Kein Schema-Change nötig.
+- Betroffene Datei: `supabase/functions/_shared/scene-hard-reset.ts`.
+- Kein Schema-Change, keine Migration.
+- Alle Funktionen, die den Shared-Reset importieren (u. a. `composer-start-scene-generation`, `composer-hard-reset-scene`, `auto-director-compose`), werden neu deployt.
