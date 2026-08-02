@@ -241,6 +241,12 @@ export function compressLipReadyPlate(
     const cameraLock =
       /\b(locked|static)\b/.test(lower) && /\bcamera\b/.test(lower);
 
+    // v370 — the canonical cast clause is re-inserted once below; drop every
+    // cast-only sentence here so it can never appear twice.
+    if (isCastClauseSentence(sentence)) continue;
+
+
+
     if (cameraLock) {
       droppedCamera = true;
       continue;
