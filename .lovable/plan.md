@@ -1,56 +1,44 @@
-## Ziel
-Der gesamte Composer-Pfad (Clip-Erzeugung → Lip-Sync → Webhooks → Frontend-Trigger) geht strikt auf Commit `58060cffe` (27.07.2026). Alles außerhalb dieses Pfads bleibt unberührt.
+## Befund
 
-## Ausgangslage (per Diff verifiziert)
-- `compose-dialog-segments`, `sync-so-webhook`, `lipsync-watchdog` sind bereits 1:1 Juli-Stand (nur Versions-String weicht ab).
-- Der Plate-Erzeuger ist es **nicht** — daher der Fehler „Plate-Quality-Gate (v117): 0 von 4 erkannt": Ein Post-Juli-Close-up/Dialog-Director-Framing liefert Plates, die das Juli-Gate zwangsläufig ablehnt.
+Nein — **der tatsächlich laufende Produktionspfad ist noch nicht vollständig 1:1 konsistent**, obwohl die zurückgesetzten Backend-Dateien bis auf Versionsmarker/Adapter dem Commit `58060cffe` entsprechen.
 
-## Schritt 1 — Backend-Clip-Pfad zurücksetzen
-Strikt auf `58060cffe`:
-- `supabase/functions/compose-video-clips/index.ts`
-- `supabase/functions/compose-clip-webhook/index.ts`
-- `supabase/functions/compose-twoshot-audio/index.ts`
-- `supabase/functions/compose-scene-anchor/index.ts`
-- `supabase/functions/compose-stitch-and-handoff/index.ts`
-- `supabase/functions/compose-video-assemble/index.ts`
-- `supabase/functions/auto-director-compose/index.ts`
-- `supabase/functions/_shared/happyhorse-green-net.ts`
-- `supabase/functions/_shared/render-concurrency.ts`
+Der letzte Lauf `8370ede5…` zeigt den konkreten Bruch:
 
-## Schritt 2 — Post-Juli-Shared-Module aus dem Pfad entfernen
-Module, die es am 27.07. nicht gab und die nur der Composer nutzt, werden entfernt bzw. nicht mehr importiert: `dialog-director.ts`, `lipsync-closeup-contract.ts`, `camera-path.ts`, `face-track.ts`, `frame-space.ts`, `preclip-*.ts` (Geometry-Contract, Identity-Binding, Safe-Region, Transform, Provider-Boxes, Mouth-Geometry, Reprojection-Contract), `mouth-motion-verdict.ts`, `plate-attempt.ts`, `plate-identity-split.ts`, `cast-identity-lock.ts`, `rekognition-face-collection.ts`, `rek-image-space.ts`, `still-sanity.ts`, `aws-frame-probe.ts`, `generation-provenance.ts`, `twoshot-audio-contract.ts`, `scene-hard-reset.ts`, `clip-terminal-failure.ts`, `assignment-lock.ts`, `cast-clause.ts`, `canonical-cast.ts`, `scene-run.ts`, `scene-state.ts` plus deren Tests.
-Vor jedem Löschen wird per Grep geprüft, ob Autopilot-Funktionen (`autopilot-*`, `_shared/autopilot*.ts`) das Modul importieren. Falls ja: Modul bleibt im Repo bestehen, wird aber aus dem Composer-Pfad herausgelöst — nichts, was Autopilot braucht, wird entfernt.
+```text
+Clip-Provider erfolgreich
+  → permanenter Clip gespeichert
+  → clip_status = ready
+  → clip_url ist weiterhin vorhanden
+  → compose-dialog-segments startet
+  → audio_plan.twoshot.url fehlt
+  → audio_plan_not_ready_self_heal
+  → Lip-Sync bleibt pending / pipeline_state bleibt plate_ready
+```
 
-## Schritt 3 — Post-Juli-Endpunkte stilllegen
-`composer-start-scene-generation`, `composer-hard-reset-scene`, `composer-reset-selftest` werden vom Frontend nicht mehr aufgerufen (Juli-Frontend ruft `compose-video-clips` direkt). Die Funktionen bleiben deployed, falls Autopilot sie nutzt; werden sie nirgends referenziert, werden sie gelöscht.
+Der Clip wurde also **nicht gelöscht**. Er liegt weiterhin in der Datenbank und im Storage. Der Abbruch passiert vor dem ersten Sync.so-Aufruf, weil die zusammengeführte Dialog-Audiospur noch nicht erzeugt wurde.
 
-## Schritt 4 — Frontend-Trigger zurücksetzen
-Strikt auf `58060cffe`:
-- `src/hooks/useTwoShotAutoTrigger.ts`
-- `src/hooks/useSceneGenerate.ts`
-- `src/hooks/usePipelineProgress.ts`
-- `src/hooks/useGenerateAllClips.ts`
-- `src/hooks/useComposerPersistence.ts`
-- `src/hooks/useApplyProductionPlan.ts`, `useMouthYavgProbe.ts`, `useAccessibleCharacters.ts` (nur die composer-relevanten Teile)
-- `src/lib/composer/sceneState.ts` und die zugehörigen Contract-Tests, sofern sie erst nach dem 27.07. entstanden sind
+Zusätzlich läuft der Screenshot auf `useadtool.ai`. Diese veröffentlichte Version lädt ein anderes Frontend-Bundle als die aktuelle Preview. Damit treffen der zurückgesetzte Backend-Pfad und ein älterer veröffentlichter Auto-Trigger aufeinander. Das erklärt, warum die UI den Recovery-Zustand so darstellt, als sei nie ein Clip erstellt worden.
 
-Jede Datei wird vorher auf Importe aus Autopilot-UI, Voice Studio oder Music Studio geprüft. Wo eine zurückgesetzte Datei von neueren Features gebraucht wird, bleibt ein dünner Adapter erhalten, statt das neue Feature zu brechen.
+Der 500-Fehler von `extract-video-last-frame` ist separat und laut Webhook nicht terminal; er ist nicht die Ursache des Lip-Sync-Abbruchs.
 
-## Schritt 5 — Datenbank-Verträge
-Keine Migration, die Spalten entfernt. Die Bridge `composer_scene_state_bridge` spiegelt Legacy-Status-Writes weiter in den Enum, der Guard bleibt reine Telemetrie. Damit schreibt der Juli-Code wieder seine Legacy-Spalten, ohne dass Enum-abhängige neuere Ansichten brechen.
+## Umsetzung
 
-## Schritt 6 — Verifikation vor jedem Testlauf
-1. `git diff --stat 58060cffe` über den gesamten Composer-Pfad muss leer sein (Ausnahme: Versions-Strings und bewusst belassene Adapter — beide werden einzeln aufgelistet).
-2. `tsgo` sauber, Deno-Tests der verbleibenden Shared-Module grün.
-3. Alle betroffenen Edge Functions deployen.
-4. Erst dann ein echter Lauf mit einer 4-Sprecher-Szene; Auswertung der Logs von `compose-video-clips`, `compose-dialog-segments`, `sync-so-webhook` — ohne weitere Code-Änderung, bevor das Ergebnis vorliegt.
+1. **Audio-Hand-off auf v283 atomar machen**
+   - Nach erfolgreichem Master-Clip für Dialogszenen `compose-twoshot-audio` zuverlässig auslösen.
+   - `compose-dialog-segments` erst starten, wenn `audio_plan.twoshot.url` vorhanden ist.
+   - Kein clientabhängiges Zwischenfenster mehr zwischen Clip, Audio und Lip-Sync.
 
-## Technische Hinweise
-- Der Rollback erfolgt datei-granular über `git checkout 58060cffe -- <pfad>`, nicht über einen History-Revert — dadurch bleibt der Rest der Woche unangetastet.
-- Sicherheitsnetz: Das Ergebnis von Schritt 6.1 wird dir als Liste gezeigt, bevor irgendetwas deployed wird.
+2. **Recovery ohne optischen Clip-Verlust**
+   - Bei fehlendem Audio-Plan `clip_url` und `clip_status=ready` unverändert lassen.
+   - Nur den Audio-Schritt erneut anstoßen; Preview und erzeugten Clip nicht zurücksetzen.
+   - Recovery-Marker nicht als fehlgeschlagene oder leere Szene darstellen.
 
-## Erhalten bleibt
-Autopilot, Stripe/Founders-Rabatt, Voice Studio + Voice Library, Music Studio, Landing Page, Cast & World, UCC, Directors Cut, Analytics, Admin.
+3. **Frontend und Backend auf denselben Stand bringen**
+   - Auto-Trigger und Statusauswertung exakt an die v283-Zustände `pending → audio → master_clip → running → done` binden.
+   - Post-Juli-Self-Heals entfernen, die Clipfelder leeren oder einen v283-Zwischenzustand falsch interpretieren können.
+   - Preview gegen den echten Produktionsdatensatz testen; die veröffentlichte Domain benötigt danach einen separaten Publish-Schritt.
 
-## Bewusst verloren
-Post-Juli-Verbesserungen im Clip-Pfad: Dialog-Director-Framing, Close-up-Contract, Cast-Identity-Lock via Rekognition, Single-Run-Vertrag, Hard-Reset-Endpunkt sowie das erweiterte HappyHorse-Prompt-Hardening.
+4. **End-to-End-Verifikation**
+   - Neue 4-Sprecher-Szene auslösen.
+   - In den Logs belegen: Clip gespeichert → Audio-URL vorhanden → erster Sync.so-Job angelegt → alle vier Pässe → finaler Clip.
+   - Prüfen, dass die Vorschau während Audio-/Lip-Sync-Vorbereitung sichtbar bleibt und kein schwarzer/leerer Zustand entsteht.

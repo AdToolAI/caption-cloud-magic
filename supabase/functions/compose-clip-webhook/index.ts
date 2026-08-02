@@ -335,10 +335,11 @@ serve(async (req) => {
         console.error('[compose-clip-webhook] continuity chain error:', chainErr);
       }
 
-      // 🎤 Auto Lip-Sync fallback — server-side, but ownership-safe.
-      // The Lip-Sync functions now accept service-role calls and derive the
-      // owner from composer_projects, so the webhook can rescue the pipeline
-      // even if the user leaves the tab before the client poller fires.
+      // 🎤 Server-owned audio → lip-sync handoff.
+      // A cinematic-sync master must never be dispatched to Sync.so before
+      // compose-twoshot-audio has persisted audio_plan.twoshot.url. Keeping
+      // this chain on the server removes the client polling race that left a
+      // ready plate parked at `audio_plan_not_ready_self_heal`.
       try {
         const { data: lipScene } = await supabase
           .from('composer_scenes')
@@ -382,22 +383,56 @@ serve(async (req) => {
           !alreadyFailed &&
           !wasCanceled
         ) {
-          // v70: All dialog scenes (1–4 speakers) route to v69 unified
-          // pipeline (`compose-dialog-segments`). Legacy `compose-dialog-scene`
-          // forwarder and per-turn v4 chain removed.
-          const fnName = 'compose-dialog-segments';
-          console.log(
-            `[compose-clip-webhook] auto lipsync route: scene=${sceneId} fn=${fnName}`,
-          );
-          const lipPromise = fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
-            body: JSON.stringify({ scene_id: sceneId }),
-          }).then(async (r) => {
-            if (!r.ok) {
-              const txt = await r.text().catch(() => '');
-              console.error(`[compose-clip-webhook] ${fnName} fallback failed`, r.status, txt.slice(0, 500));
+          const invokeSceneFunction = async (fnName: string) => {
+            const response = await fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({ scene_id: sceneId }),
+            });
+            const text = await response.text().catch(() => '');
+            let body: Record<string, unknown> = {};
+            try {
+              body = text ? JSON.parse(text) : {};
+            } catch {
+              body = {};
             }
+            if (!response.ok) {
+              throw new Error(`${fnName}:${response.status}:${text.slice(0, 400)}`);
+            }
+            return body;
+          };
+
+          const lipPromise = (async () => {
+            const hasAudioPlan = Boolean((lipScene?.audio_plan as any)?.twoshot?.url);
+            if (!hasAudioPlan) {
+              console.log(`[compose-clip-webhook] preparing dialog audio: scene=${sceneId}`);
+              const audioResult = await invokeSceneFunction('compose-twoshot-audio');
+              if (audioResult.success !== true || typeof audioResult.url !== 'string') {
+                throw new Error(`compose-twoshot-audio:invalid_response:${JSON.stringify(audioResult).slice(0, 300)}`);
+              }
+            }
+
+            // The audio function has completed its DB write before this call.
+            // compose-dialog-segments therefore always reads a complete plan.
+            console.log(`[compose-clip-webhook] dispatching lip-sync after audio: scene=${sceneId}`);
+            await invokeSceneFunction('compose-dialog-segments');
+          })().catch(async (error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error(`[compose-clip-webhook] audio/lipsync handoff failed scene=${sceneId}:`, message);
+            // Preserve the paid master clip and its ready status. Only the
+            // downstream stage is marked failed so the user can retry it.
+            await supabase
+              .from('composer_scenes')
+              .update({
+                lip_sync_status: 'failed',
+                twoshot_stage: 'failed',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sceneId)
+              .eq('clip_status', 'ready');
           });
 
           // @ts-ignore — Deno Deploy / Supabase edge runtime API
