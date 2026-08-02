@@ -820,7 +820,6 @@ serve(async (req) => {
           .from("composer_scenes")
           .update({
             lock_reference_url: composedUrl,
-            twoshot_stage: "anchor",
             updated_at: new Date().toISOString(),
           })
           .eq("id", body.sceneId);

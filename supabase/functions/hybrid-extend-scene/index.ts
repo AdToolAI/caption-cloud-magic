@@ -14,6 +14,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { transitionScene } from "../_shared/scene-state.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -190,6 +191,7 @@ serve(async (req) => {
         clip_quality: quality,
         ai_prompt: body.prompt,
         clip_status: "pending",
+        pipeline_state: "idle",
         text_overlay: { text: "", position: "bottom", animation: "fade-in", fontSize: 48, color: "#FFFFFF" },
         transition_type: "crossfade",
         transition_duration: 0.5,
@@ -370,10 +372,7 @@ function jsonError(message: string, status: number) {
 
 async function markSceneFailed(admin: any, sceneId: string) {
   try {
-    await admin
-      .from("composer_scenes")
-      .update({ clip_status: "failed" })
-      .eq("id", sceneId);
+    await transitionScene(admin, sceneId, "failed", { detail: "hybrid-extend-scene" });
   } catch (e) {
     console.warn("[hybrid-extend-scene] failed to mark scene failed:", e);
   }
