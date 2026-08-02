@@ -227,7 +227,9 @@ export async function verifyFaceBeforeDispatch(
   };
 
 
+  // ── Stage 1 — resolve a real still image of the ASD frame ───────
   // Client-canvas frames are authoritative. Server extraction only checks
+
   // the deterministic cache path; it never calls Replicate/lucataco.
   let frameJpegUrl: string | undefined;
   let frameCached = false;
