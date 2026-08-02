@@ -50,6 +50,7 @@ import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaReko
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { sceneState, transitionScene } from "../_shared/scene-state.ts";
 import { sanitizeForHappyHorse, hardSanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 import {
   buildCastClause,
@@ -471,7 +472,7 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
-            clip_status: "generating",
+            pipeline_state: "plate_rendering",
             clip_error: null,
             updated_at: new Date().toISOString(),
           })
@@ -567,7 +568,6 @@ serve(async (req) => {
       isCinematicSyncScene: boolean,
       clipError?: string,
     ): Record<string, unknown> => ({
-      clip_status: "failed",
       // v264 — Never allow silent failures. A missing clip_error paired with
       // clip_status='failed' is a bug (produces the "Fehlgeschlagen"-Badge
       // with no explanation and orphans the lip-sync spinner).
@@ -575,12 +575,7 @@ serve(async (req) => {
         ? clipError
         : "unknown_failure_no_details").slice(0, 500),
       ...(isCinematicSyncScene
-        ? {
-            lip_sync_status: null,
-            twoshot_stage: null,
-            lip_sync_source_clip_url: null,
-            dialog_shots: null,
-          }
+        ? { lip_sync_source_clip_url: null, dialog_shots: null }
         : {}),
       updated_at: new Date().toISOString(),
     });
@@ -616,17 +611,17 @@ serve(async (req) => {
       try {
         const { data: current } = await supabaseAdmin
           .from("composer_scenes")
-          .select("clip_url, clip_status, lip_sync_status")
+          .select("clip_url, pipeline_state, plate_generation, active_run_id")
           .eq("id", sceneId)
           .maybeSingle();
         const hasClipUrl =
           typeof current?.clip_url === "string" && current.clip_url.length > 0;
+        const st = sceneState(current);
         const lipsyncLive =
-          current?.lip_sync_status === "running" ||
-          current?.lip_sync_status === "done";
+          st === "lipsync_running" || st === "lipsync_muxing" || st === "complete";
         if (hasClipUrl || lipsyncLive) {
           console.warn(
-            `[compose-video-clips] v264_safe_fail_skip scene=${sceneId} reason=already_succeeded clip_url=${hasClipUrl} lip_sync_status=${current?.lip_sync_status ?? "null"} would_have_written=${clipError.slice(0, 120)}`,
+            `[compose-video-clips] v264_safe_fail_skip scene=${sceneId} reason=already_succeeded clip_url=${hasClipUrl} state=${st} would_have_written=${clipError.slice(0, 120)}`,
           );
           // Preserve the concern as a diagnostic note but do NOT flip status.
           try {
@@ -654,6 +649,10 @@ serve(async (req) => {
         .from("composer_scenes")
         .update(payload)
         .eq("id", sceneId);
+      // v385 — Zustand ausschließlich über die Zustandsmaschine.
+      await transitionScene(supabaseAdmin, sceneId, "failed", {
+        detail: clipError.slice(0, 200),
+      });
       return "failed";
     };
 
@@ -1637,7 +1636,7 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
-            clip_status: "generating",
+            pipeline_state: "plate_rendering",
             clip_error: null,
             updated_at: new Date().toISOString(),
           })
@@ -1719,8 +1718,6 @@ serve(async (req) => {
                   .update({
                     engine_override: "auto",
                     lip_sync_with_voiceover: false,
-                    lip_sync_status: null,
-                    twoshot_stage: null,
                     updated_at: new Date().toISOString(),
                   })
                   .eq("id", scene.id);
@@ -1778,26 +1775,26 @@ serve(async (req) => {
         const { data: dbRow } = await supabaseAdmin
           .from("composer_scenes")
           .select(
-            "cinematic_preset_slug, engine_override, clip_status, clip_url, character_audio_url",
+            "cinematic_preset_slug, engine_override, pipeline_state, clip_url, character_audio_url",
           )
           .eq("id", scene.id)
           .maybeSingle();
         const slug = (dbRow as any)?.cinematic_preset_slug as string | null;
         const dbEngine = (dbRow as any)?.engine_override as string | null;
-        const status = (dbRow as any)?.clip_status as string | null;
+        const status = sceneState(dbRow);
         const hasAudio = !!(dbRow as any)?.character_audio_url;
         if (
           dbEngine !== "cinematic-sync" &&
           slug &&
           slug.startsWith("dialog-srs:") &&
-          (hasAudio || status === "generating" || status === "ready")
+          (hasAudio || status === "plate_rendering" || status === "plate_ready")
         ) {
           console.log(
             `[compose-video-clips] Skipping SRS lip-sync sub-scene ${scene.id} (slug=${slug}, status=${status})`,
           );
           results.push({
             sceneId: scene.id,
-            status: status === "ready" ? "ready" : "generating",
+            status: status === "plate_ready" ? "ready" : "generating",
           });
           continue;
         }
@@ -1861,8 +1858,7 @@ serve(async (req) => {
             .update({
               engine_override: "cinematic-sync",
               lip_sync_with_voiceover: true,
-              lip_sync_status: "pending",
-              twoshot_stage: "audio",
+              pipeline_state: "audio_prep",
               clip_error: null,
               updated_at: new Date().toISOString(),
             })
@@ -2077,7 +2073,7 @@ serve(async (req) => {
               await supabaseAdmin
                 .from("composer_scenes")
                 .update({
-                  twoshot_stage: "audio",
+                  pipeline_state: "audio_prep",
                   updated_at: new Date().toISOString(),
                 })
                 .eq("id", scene.id);
@@ -2104,7 +2100,7 @@ serve(async (req) => {
                 await supabaseAdmin
                   .from("composer_scenes")
                   .update({
-                    twoshot_stage: "master_clip",
+                    pipeline_state: "audio_ready",
                     updated_at: new Date().toISOString(),
                   })
                   .eq("id", scene.id);
@@ -2389,7 +2385,6 @@ serve(async (req) => {
                 );
                 await safeMarkSceneFailed(scene.id, msg, {
                   isCinematicSyncScene: true,
-                  extra: { twoshot_stage: "failed" },
                 });
                 results.push({ sceneId: scene.id, status: "failed", error: msg });
                 continue;
@@ -3602,7 +3597,6 @@ serve(async (req) => {
           );
           await safeMarkSceneFailed(scene.id, msg, {
             isCinematicSyncScene: true,
-            extra: { twoshot_stage: "failed" },
           });
           results.push({ sceneId: scene.id, status: "failed", error: msg });
           continue;
@@ -3936,7 +3930,7 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               clip_url: scene.uploadUrl,
-              clip_status: "ready",
+              pipeline_state: "plate_ready",
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
@@ -3967,7 +3961,7 @@ serve(async (req) => {
               .from("composer_scenes")
               .update({
                 clip_url: bestVideo.url,
-                clip_status: "ready",
+                pipeline_state: "plate_ready",
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);
@@ -4023,13 +4017,11 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               ...(isCinematicSyncScene
                 ? {
                     lip_sync_source_clip_url: null,
-                    lip_sync_status: "pending",
-                    twoshot_stage: "master_clip",
                   }
                 : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-hailuo", isI2V),
@@ -4068,7 +4060,6 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               replicate_prediction_id: prediction.id,
-              ...(isCinematicSyncScene ? { twoshot_stage: "master_clip" } : {}),
             })
             .eq("id", scene.id);
 
@@ -4083,7 +4074,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-kling", isI2V),
               updated_at: new Date().toISOString(),
@@ -4154,7 +4145,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               updated_at: new Date().toISOString(),
             })
@@ -4218,7 +4209,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-wan", isI2V),
               updated_at: new Date().toISOString(),
@@ -4270,7 +4261,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim(
                 "ai-seedance",
@@ -4321,7 +4312,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-luma", isI2V),
               updated_at: new Date().toISOString(),
@@ -4375,7 +4366,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-veo", isI2V),
               updated_at: new Date().toISOString(),
@@ -4455,7 +4446,7 @@ serve(async (req) => {
             await supabaseAdmin
               .from("composer_scenes")
               .update({
-                clip_status: "generating",
+                pipeline_state: "plate_rendering",
                 clip_quality: "standard",
                 replicate_prediction_id: fallbackPred.id,
               })
@@ -4471,7 +4462,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               updated_at: new Date().toISOString(),
             })
@@ -4542,7 +4533,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-pika", isI2V),
               updated_at: new Date().toISOString(),
@@ -4645,13 +4636,11 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
-              clip_status: "generating",
+              pipeline_state: "plate_rendering",
               clip_quality: quality,
               ...(isCinematicSyncHH
                 ? {
                     lip_sync_source_clip_url: null,
-                    lip_sync_status: "pending",
-                    twoshot_stage: "master_clip",
                     dialog_shots: null,
                     replicate_prediction_id: null,
                     lip_sync_applied_at: null,
@@ -4898,12 +4887,14 @@ serve(async (req) => {
           // once it starts. Preserve the diagnostic as a clip_error note.
           const { data: liveRows } = await admin
             .from("composer_scenes")
-            .select("id, clip_url, lip_sync_status")
+            .select("id, clip_url, pipeline_state")
             .in("id", failedSceneIds);
           const safeToFail = (liveRows ?? [])
             .filter((r) => {
               const hasUrl = typeof r?.clip_url === "string" && r.clip_url.length > 0;
-              const live = r?.lip_sync_status === "running" || r?.lip_sync_status === "done";
+              const st = sceneState(r);
+              const live =
+                st === "lipsync_running" || st === "lipsync_muxing" || st === "complete";
               return !hasUrl && !live;
             })
             .map((r) => r.id as string);
@@ -4926,7 +4917,7 @@ serve(async (req) => {
             await admin
               .from("composer_scenes")
               .update({
-                clip_status: "failed",
+                pipeline_state: "failed",
                 clip_error: `[${__stage}] ${msg}`.slice(0, 500),
                 updated_at: new Date().toISOString(),
               })
@@ -4938,8 +4929,6 @@ serve(async (req) => {
               await admin
                 .from("composer_scenes")
                 .update({
-                  lip_sync_status: null,
-                  twoshot_stage: null,
                   lip_sync_source_clip_url: null,
                   dialog_shots: null,
                   updated_at: new Date().toISOString(),

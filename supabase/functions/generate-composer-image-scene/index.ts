@@ -15,6 +15,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { transitionScene } from "../_shared/scene-state.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -139,8 +140,12 @@ serve(async (req) => {
     // Mark scene as generating
     await supabaseAdmin
       .from("composer_scenes")
-      .update({ clip_status: "generating", clip_quality: q, updated_at: new Date().toISOString() })
+      .update({ clip_quality: q, updated_at: new Date().toISOString() })
       .eq("id", sceneId);
+    // v385 — Zustand ausschließlich über die Zustandsmaschine.
+    await transitionScene(supabaseAdmin, sceneId, "plate_rendering", {
+      detail: "generate-composer-image-scene",
+    });
 
     // Call Lovable AI Gateway — image modality
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -159,10 +164,9 @@ serve(async (req) => {
     if (!aiResp.ok) {
       const errText = await aiResp.text();
       console.error(`[generate-composer-image-scene] AI gateway ${aiResp.status}:`, errText);
-      await supabaseAdmin
-        .from("composer_scenes")
-        .update({ clip_status: "failed", updated_at: new Date().toISOString() })
-        .eq("id", sceneId);
+      await transitionScene(supabaseAdmin, sceneId, "failed", {
+        detail: "generate-composer-image-scene",
+      });
       if (aiResp.status === 429) {
         return new Response(
           JSON.stringify({ error: "RATE_LIMIT", message: "Too many requests. Please retry shortly." }),
@@ -187,10 +191,9 @@ serve(async (req) => {
 
     if (!imageDataUrl || !imageDataUrl.startsWith("data:image/")) {
       console.error("[generate-composer-image-scene] No image in response", JSON.stringify(aiData).slice(0, 500));
-      await supabaseAdmin
-        .from("composer_scenes")
-        .update({ clip_status: "failed", updated_at: new Date().toISOString() })
-        .eq("id", sceneId);
+      await transitionScene(supabaseAdmin, sceneId, "failed", {
+        detail: "generate-composer-image-scene",
+      });
       return new Response(
         JSON.stringify({ error: "NO_IMAGE_RETURNED" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -215,10 +218,9 @@ serve(async (req) => {
       });
     if (upErr) {
       console.error("[generate-composer-image-scene] storage upload failed:", upErr);
-      await supabaseAdmin
-        .from("composer_scenes")
-        .update({ clip_status: "failed", updated_at: new Date().toISOString() })
-        .eq("id", sceneId);
+      await transitionScene(supabaseAdmin, sceneId, "failed", {
+        detail: "generate-composer-image-scene",
+      });
       throw upErr;
     }
 
@@ -231,11 +233,13 @@ serve(async (req) => {
       .from("composer_scenes")
       .update({
         clip_url: publicUrl,
-        clip_status: "ready",
         upload_type: "image",
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
+    await transitionScene(supabaseAdmin, sceneId, "plate_ready", {
+      detail: "generate-composer-image-scene",
+    });
 
     console.log(`[generate-composer-image-scene] scene=${sceneId} → ${publicUrl}`);
 
