@@ -323,10 +323,31 @@ export function useGenerateAllClips({
       });
       onUpdateScenes(optimistic);
 
-      const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
-      });
-      if (error) throw error;
+      const composeBody = { projectId: pid, scenes: scenesPayload, visualStyle, characters };
+      let data: any;
+      const dispatchIds = scenesPayload
+        .map((p) => p.id)
+        .filter((id) => preparedSceneIds.has(id));
+      if (dispatchIds.length > 0) {
+        // v377 — Dispatch gegen den bereits übernommenen Run. Der Server
+        // bindet jeden Provider-Job an `scene_id + generation + run_id`;
+        // ein Job aus einem älteren Lauf kann das Ergebnis nicht mehr
+        // überschreiben.
+        const started = await startSceneGeneration({
+          sceneIds: dispatchIds,
+          compose: composeBody,
+          reason: 'user_regenerate_all',
+          useExistingRun: true,
+        });
+        data = started.compose;
+      } else {
+        const res = await supabase.functions.invoke('compose-video-clips', {
+          body: composeBody,
+        });
+        if (res.error) throw res.error;
+        data = res.data;
+      }
+
 
       // Edge function returns HTTP 200 with `{ok:false}` on early-phase crashes.
       if (data && (data as any).ok === false) {
