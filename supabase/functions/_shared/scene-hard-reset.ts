@@ -48,14 +48,93 @@ export interface HardResetArgs {
   reason?: string;
 }
 
+/**
+ * v374 — why a reset may or may not refund.
+ *   refunded                 → an open provider job was cancelled by us
+ *   skipped_delivered        → the previous run produced a usable clip
+ *   skipped_already_refunded → the failure path already paid it back
+ *   nothing_open             → no job and no cost was ever reserved
+ */
+export type RefundDecision =
+  | "refunded"
+  | "skipped_delivered"
+  | "skipped_already_refunded"
+  | "nothing_open";
+
 export interface HardResetResult {
   ok: boolean;
   sceneId: string;
   generation: number;
   deletedObjects: number;
   canceledJobs: number;
+  refundDecision: RefundDecision;
   errors: string[];
 }
+
+/** Dialog states that mean "provider work is still open / still billing". */
+const OPEN_DIALOG_STATES = new Set([
+  "queued",
+  "dispatched",
+  "running",
+  "processing",
+  "rendering",
+  "rendering_preflight",
+  "pending",
+  "in_progress",
+]);
+
+/**
+ * v374 — decide whether a hard reset owes the user a refund.
+ *
+ * The automatic refund is bound to a failure event. A hard reset has no
+ * failure event: the user aborts on purpose. So we refund exactly the case
+ * that would otherwise leak — an *open* job we are about to cancel — and never
+ * the case where the previous run already delivered something billable.
+ */
+export function decideRefund(input: {
+  scene: Record<string, any> | null;
+  knownJobIds: string[];
+  hasInflightRows: boolean;
+}): { decision: RefundDecision; amount: number } {
+  const scene = input.scene ?? {};
+  const state = (scene.dialog_shots ?? null) as Record<string, any> | null;
+  const cost = Number(state?.cost_credits) || 0;
+
+  if (state?.refunded === true) {
+    return { decision: "skipped_already_refunded", amount: 0 };
+  }
+
+  // Delivered work is never refunded on a voluntary restart.
+  const currentGen = Number(scene.plate_generation ?? 1);
+  const readyGen = scene.plate_ready_generation === null ||
+      scene.plate_ready_generation === undefined
+    ? null
+    : Number(scene.plate_ready_generation);
+  const plateDelivered = typeof scene.clip_url === "string" &&
+    scene.clip_url.length > 0 &&
+    (readyGen === null || readyGen === currentGen);
+  const dialogCompleted = state?.status === "completed" ||
+    state?.status === "succeeded" ||
+    !!scene.lip_sync_applied_at;
+
+  if (plateDelivered || dialogCompleted) {
+    return { decision: "skipped_delivered", amount: 0 };
+  }
+
+  const predId = typeof scene.replicate_prediction_id === "string"
+    ? scene.replicate_prediction_id
+    : "";
+  const jobOpen = input.hasInflightRows ||
+    input.knownJobIds.length > 0 ||
+    predId.length > 0 ||
+    (typeof state?.status === "string" && OPEN_DIALOG_STATES.has(state.status));
+
+  if (!jobOpen || cost <= 0) {
+    return { decision: "nothing_open", amount: 0 };
+  }
+  return { decision: "refunded", amount: cost };
+}
+
 
 /** Buckets + prefixes that can hold artifacts of a single composer scene. */
 function artifactPrefixes(
