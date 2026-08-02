@@ -91,14 +91,15 @@ Deno.test("ratio mode stays available as anchor framing guidance", () => {
   assert(r.reason?.startsWith("face_width_ratio_"));
 });
 
-Deno.test("anchor gate keeps steering toward tight framing", () => {
-  const gate = enforceMinFaceSize({
-    faces: [{ bbox: [0, 0, 140, 180] }],
+Deno.test("anchor gate uses the July 2026 baseline floor (12 % face width)", () => {
+  // Rollback 27.07.2026: der harte 30 %-Anker-Floor (v354/v355) ist entfernt.
+  const tooSmall = enforceMinFaceSize({
+    faces: [{ bbox: [0, 0, 80, 100] }],
     plateWidth: 1000,
     plateHeight: 1000,
     expectedSpeakers: 1,
   });
-  assertEquals(gate.ok, false, "single-speaker anchor should still want 30 % face width");
+  assertEquals(tooSmall.ok, false, "8 % face width is below the 12 % baseline floor");
 
   const ok = enforceMinFaceSize({
     faces: [{ bbox: [0, 0, 320, 400] }],
@@ -126,26 +127,4 @@ Deno.test("closeup framing suffix is present for every speaker count", () => {
   }
 });
 
-Deno.test("v356 — preclip carries NO geometric pre-dispatch block", async () => {
-  const src = await Deno.readTextFile(
-    new URL("./pass-face-preclip.ts", import.meta.url),
-  );
-  // DB-verified baseline (2026-07-27, scene 0f8818ee, status=done):
-  // crop 128px, face-share 4.8 % — both former floors rejected it.
-  assert(!src.includes("MIN_NATIVE_CROP_PX"), "144px crop floor must stay removed");
-  assert(!src.includes("FACE_SIDE_SHARE_FLOOR"), "0.34 side-share floor must stay removed");
-  assert(src.includes("v356_geometry_telemetry"), "geometry must still be measured");
-  assert(src.includes("minSize: 128"), "crop minSize must match the July baseline");
-  assert(CONTRACT_VIOLATION_UPSTREAM === "contract_violation_upstream");
-});
-
-Deno.test("v356 — the plate contract is advisory only at the call site", async () => {
-  const src = await Deno.readTextFile(
-    new URL("../compose-dialog-segments/index.ts", import.meta.url),
-  );
-  assert(src.includes("v356_plate_geometry_telemetry"));
-  assert(
-    !src.includes("lipsync_face_contract_violation"),
-    "a scene must not be failed on plate geometry before dispatch",
-  );
-});
+// v356/v396 source-grep contracts removed with the 27.07.2026 lip-sync rollback.

@@ -31,12 +31,8 @@
 
 import { extractFrameForFaceProbe } from "./face-frame-extract.ts";
 import { detectFacesMediaPipe } from "./face-detect-mediapipe.ts";
-import { measurePreclipMouth } from "./preclip-mouth-geometry.ts";
-import { awsFrameProbeAvailable, renderAwsStill } from "./aws-frame-probe.ts";
-import { checkPreclipFrame } from "./frame-space.ts";
-import { inspectStill } from "./still-sanity.ts";
 
-const GATE_VERSION = "v397-zero-face-consensus";
+const GATE_VERSION = "v252-aws-face-gate-primary";
 
 
 export type FaceGateCode =
@@ -45,28 +41,9 @@ export type FaceGateCode =
   | "no_face"
   | "not_at_coord"
   | "multiple_faces"
-  | "mouth_missing"
-  | "mouth_at_edge"
-  // ── v396 — `mouth_at_edge` war ein Sammelbecken für völlig verschiedene
-  // Ursachen. Sie sind jetzt getrennt; nur `crop_not_viable` heisst wirklich
-  // "richtige Person, richtiger Frame, korrekte Transformation, trotzdem am Rand".
-  | "frame_mapping_failed"
-  | "transform_contract_failed"
-  | "face_not_detected"
-  | "identity_ambiguous"
-  | "wrong_identity"
-  | "source_geometry_drift"
-  | "recrop_required"
-  | "crop_not_viable"
-  // ── v397 — Messausfall (leeres/schwarzes Still) vs. degradierter Pass.
-  | "still_blank"
-  | "probe_degraded"
   | "skipped"
   | "probe_unavailable"
   | "unparsed";
-
-
-
 
 export interface FaceGateResult {
   ok: boolean;
@@ -90,33 +67,7 @@ export interface FaceGateResult {
   original_coord?: [number, number];
   /** v129.22.3 — Pixel distance between original and snapped coord. */
   snap_distance_px?: number;
-  /** v393 — Mundmittelpunkt auf dem dispatchten Bild, in Clip-Pixeln. */
-  mouth_center?: [number, number];
-  /** v393 — Messfenster um den Mund [x1,y1,x2,y2] in Clip-Pixeln. */
-  mouth_rect?: [number, number, number, number];
-  /** v393 — Kontrollfenster (Stirn) fuer die Rausch-Normalisierung. */
-  control_rect?: [number, number, number, number];
-  /** v393 — normalisierte (0..1) Messfenster fuer die Passthrough-Bewertung. */
-  mouth_rect_norm?: { x: number; y: number; w: number; h: number };
-  control_rect_norm?: { x: number; y: number; w: number; h: number };
-  /** v393 — Bildmasse, in denen die Pixel-Fenster gelten. */
-  mouth_frame_dims?: [number, number];
-  /** v393 — kleinster Abstand des Mundfensters zum Bildrand. */
-  mouth_edge_margin_px?: number;
-
-  // ── v397 Forensik: was wurde tatsächlich angeschaut? ──────────────
-  /** Öffentliche URLs aller geprüften Probe-Stills. */
-  probe_still_urls?: string[];
-  /** Bytegrösse je Probe-Still (0 = nicht ladbar). */
-  probe_still_bytes?: number[];
-  /** Lokale Preclip-Frameindizes je Probe. */
-  probe_frame_indices?: number[];
-  /** Verdikt je Probe: `faces:N` | `zero_faces` | `still_blank` | … */
-  probe_verdicts?: string[];
-
 }
-
-
 
 function hasAwsCreds(): boolean {
   return Boolean(Deno.env.get("AWS_ACCESS_KEY_ID") && Deno.env.get("AWS_SECRET_ACCESS_KEY"));
@@ -145,57 +96,19 @@ export interface FaceGateInput {
   passIdx?: number;
   /** True when the preclip was already validated as exactly one clean face. */
   preclipTrusted?: boolean;
-  /**
-   * v393 — Mund-Vorbedingung. Fuer Preclips (Single-Face-Crop, der direkt an
-   * Sync.so geht) muss der Mund nachweislich im Bild liegen und Abstand zum
-   * Rand haben. Ohne Mund kann der Provider nichts animieren und reicht den
-   * Clip unveraendert durch — genau der belegte Passthrough-Fall.
-   */
-  requireMouth?: boolean;
-
   /** v129.22.3 — Plate pixel dims required for AWS Rekognition auto-snap.
    *  When omitted, "yes_but_not_at_coord" stays a hard fail (legacy v129.11
    *  behaviour). Callers with plate dims handy should pass them to enable
    *  self-healing. */
   plateWidth?: number;
   plateHeight?: number;
-
-  /**
-   * v396 — REAL dekodierte Framezahl des encodierten Preclips. Pflicht,
-   * sobald `requireMouth` gesetzt ist. Ohne sie kann `frameNumber` nicht
-   * geprüft werden und wir wiederholen den belegten Fehler: ein absoluter
-   * Plate-Frame (102) wurde gegen einen 68-Frame-Preclip geprüft und der
-   * Vertragsbruch blieb hinter dem stillen `t = 0.05 s`-Fallback verborgen.
-   */
-  decodedPreclipFrameCount?: number;
-  /**
-   * v396 — Frames der Zielperson dürfen NICHT über Sekunden adressiert
-   * werden. Ist dieser Index gesetzt, wird genau er extrahiert.
-   */
-  preclipFrameIndex?: number;
-  /**
-   * v397 — true, wenn die v396-Geometrie (Affine + Roundtrip-Beweis) für
-   * diesen Pass verifiziert wurde. Nur dann darf ein reiner Messausfall
-   * (alle Stills leer) in einen degradierten Dispatch münden statt in ein
-   * hartes Scheitern.
-   */
-  geometryContractOk?: boolean;
-
 }
 
 export async function verifyFaceBeforeDispatch(
   input: FaceGateInput,
 ): Promise<FaceGateResult> {
-  if (!hasAwsCreds()) {
-    return input.requireMouth === true
-      ? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_aws_credentials" }
-      : { ok: true, code: "skipped", reason: "no_aws_credentials" };
-  }
-  if (!input.videoUrl) {
-    return input.requireMouth === true
-      ? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_video_url" }
-      : { ok: true, code: "skipped", reason: "no_video_url" };
-  }
+  if (!hasAwsCreds()) return { ok: true, code: "skipped", reason: "no_aws_credentials" };
+  if (!input.videoUrl) return { ok: true, code: "skipped", reason: "no_video_url" };
 
 
   const frame = Number.isFinite(input.frameNumber) ? Number(input.frameNumber) : null;
@@ -203,328 +116,81 @@ export async function verifyFaceBeforeDispatch(
     ? [Number(input.coord[0]), Number(input.coord[1])] as [number, number]
     : null;
 
-  // ── v396 Stage 0 — Framevertrag, VOR jeder Extraktion ────────────
-  // Auf einem Preclip ist `frameNumber` ein LOKALER Index. Wird hier ein
-  // absoluter Plate-Frame durchgereicht, ist das ein Vertragsbruch und kein
-  // Anlass, still auf einen Zeitstempel auszuweichen.
-  const decodedFrameCount = Number.isFinite(input.decodedPreclipFrameCount)
-    ? Number(input.decodedPreclipFrameCount)
-    : null;
-  let verifiedPreclipFrame: number | null = null;
-  if (input.requireMouth === true) {
-    const requested = Number.isFinite(input.preclipFrameIndex)
-      ? Number(input.preclipFrameIndex)
-      : frame;
-    if (decodedFrameCount === null || !(decodedFrameCount > 0)) {
-      return {
-        ok: false,
-        code: "frame_mapping_failed",
-        reason:
-          "decoded_preclip_frame_count is unknown — refusing to probe a preclip frame by timestamp " +
-          "(v396: no more seconds-based extraction)",
-      };
-    }
-    if (requested !== null) {
-      const checked = checkPreclipFrame(requested, decodedFrameCount);
-      if (!checked.ok) {
-        console.warn(`[face-gate] ${GATE_VERSION} frame_mapping_failed ${checked.reason}`);
-        return { ok: false, code: "frame_mapping_failed", reason: checked.reason };
-      }
-      verifiedPreclipFrame = Number(checked.frame);
-    } else {
-      verifiedPreclipFrame = 0;
-    }
-  }
-
-  // v396/v397 — Zeitstempel werden AUSSCHLIESSLICH aus geprüften lokalen
-  // Preclip-Frameindizes abgeleitet (siehe Konsens-Schleife unten). Der
-  // frühere feste Wert `0.05 s` war der stille Fallback, hinter dem sich der
-  // "102 aus 68"-Vertragsbruch versteckt hat.
-
-
-
-
-  // Rekognition braucht Bildmasse, um relative Boxen in Pixel zu wandeln.
-  const W = Math.max(0, Number(input.plateWidth ?? 0));
-  const H = Math.max(0, Number(input.plateHeight ?? 0));
-  const rekW = W > 0 ? W : 1280;
-  const rekH = H > 0 ? H : 720;
-
-  // ── v397 Forensik-Sammler ────────────────────────────────────────
-  const probeStillUrls: string[] = [];
-  const probeStillBytes: number[] = [];
-  const probeFrameIndices: number[] = [];
-  const probeVerdicts: string[] = [];
-
+  // ── Stage 1 — resolve a real still image of the ASD frame ───────
+  // Client-canvas frames are authoritative. Server extraction only checks
+  // the deterministic cache path; it never calls Replicate/lucataco.
   let frameJpegUrl: string | undefined;
   let frameCached = false;
   let extractMs = 0;
-  let rek: Awaited<ReturnType<typeof detectFacesMediaPipe>> | null = null;
-  let awsMs = 0;
-
-  /** Ein Still auswerten: erst Bildinhalt, dann Gesichter. */
-  const probeStill = async (
-    url: string,
-    frameIdx: number,
-  ): Promise<
-    | { state: "faces"; rek: Awaited<ReturnType<typeof detectFacesMediaPipe>>; ms: number }
-    | { state: "zero"; ms: number }
-    | { state: "blank"; code: string }
-    | { state: "detector_error"; error: string; ms: number }
-  > => {
-    const sanity = await inspectStill(url);
-    probeStillUrls.push(url);
-    probeStillBytes.push(sanity.bytes);
-    probeFrameIndices.push(frameIdx);
-    if (!sanity.usable) {
-      probeVerdicts.push(sanity.code);
-      console.warn(
-        `[face-gate] ${GATE_VERSION} still_not_usable frame=${frameIdx} code=${sanity.code} ` +
-        `reason=${sanity.reason ?? "-"} bytes=${sanity.bytes}`,
-      );
-      return { state: "blank", code: sanity.code };
-    }
-    const t0 = Date.now();
-    try {
-      const r = await detectFacesMediaPipe({
-        videoUrl: input.videoUrl,
-        plateWidth: rekW,
-        plateHeight: rekH,
-        durationSec: 1,
-        prebuiltFrameUrls: [url],
-      });
-      const ms = Date.now() - t0;
-      if (!r.ok) {
-        probeVerdicts.push(`detector_error:${r.error ?? "unknown"}`);
-        return { state: "detector_error", error: r.error ?? "unknown", ms };
-      }
-      if ((r.faces?.length ?? 0) === 0) {
-        probeVerdicts.push("zero_faces");
-        return { state: "zero", ms };
-      }
-      probeVerdicts.push(`faces:${r.faces.length}`);
-      return { state: "faces", rek: r, ms };
-    } catch (e) {
-      const ms = Date.now() - t0;
-      probeVerdicts.push("detector_threw");
-      return { state: "detector_error", error: (e as Error)?.message ?? String(e), ms };
-    }
-  };
-
-  const forensicMeta = () => ({
-    probe_still_urls: [...probeStillUrls],
-    probe_still_bytes: [...probeStillBytes],
-    probe_frame_indices: [...probeFrameIndices],
-    probe_verdicts: [...probeVerdicts],
-  });
-
-  // ── Stage 1/2 (Preclip) — Konsens über bis zu 3 Frames ───────────
-  if (input.requireMouth === true && awsFrameProbeAvailable()) {
-    const total = decodedFrameCount ?? 0;
-    const base = verifiedPreclipFrame ?? 0;
-    const span = Math.max(1, Math.round(total * 0.15));
-    const candidates: number[] = [];
-    for (const idx of [base, base + span, base - span]) {
-      const checked = checkPreclipFrame(idx, total);
-      if (checked.ok && !candidates.includes(Number(checked.frame))) {
-        candidates.push(Number(checked.frame));
-      }
-    }
-    if (candidates.length === 0) candidates.push(0);
-
-    const fps = Number.isFinite(input.fps) && Number(input.fps) > 0 ? Number(input.fps) : 30;
-    let zeroCount = 0;
-    let usableCount = 0;
-    let detectorError: string | null = null;
-
-    // Ein bereits vorhandenes Client-Canvas-Frame ist autoritativ und wird
-    // als erster Kandidat geprüft.
-    const prebuilt = typeof input.prebuiltFrameUrl === "string" && input.prebuiltFrameUrl.startsWith("http")
-      ? input.prebuiltFrameUrl
-      : null;
-
-    for (let i = 0; i < candidates.length; i++) {
-      const idx = candidates[i];
-      let url: string | null = null;
-      let cached = false;
-      if (i === 0 && prebuilt) {
-        url = prebuilt;
-        cached = true;
-      } else {
-        const t0 = Date.now();
-        const still = await renderAwsStill({
-          videoUrl: input.videoUrl,
-          // v396 — kein Sekunden-Raten. Der Zeitstempel folgt streng dem
-          // gegen die dekodierte Framezahl geprüften LOKALEN Index.
-          timestamp: (idx + 0.5) / fps,
-          frameSize: Math.max(64, Number(input.plateWidth ?? input.plateHeight ?? 720)),
-          deadline: Date.now() + Math.max(15_000, input.timeoutMs ?? 45_000),
-        });
-        extractMs += Date.now() - t0;
-        if (!still.url) {
-          probeFrameIndices.push(idx);
-          probeVerdicts.push(`still_render_failed:${still.error ?? "unknown"}`);
-          continue;
-        }
-        url = still.url;
-      }
-
-      const res = await probeStill(url, idx);
-      if (res.state === "faces") {
-        frameJpegUrl = url;
-        frameCached = cached;
-        rek = res.rek;
-        awsMs += res.ms;
-        usableCount++;
-        break;
-      }
-      if (res.state === "zero") {
-        frameJpegUrl = frameJpegUrl ?? url;
-        awsMs += res.ms;
-        usableCount++;
-        zeroCount++;
-        continue;
-      }
-      if (res.state === "detector_error") {
-        awsMs += res.ms;
-        detectorError = res.error;
-        continue;
-      }
-      // blank → Messausfall, nächster Kandidat
-    }
-
-    if (!rek) {
-      const baseFail = {
-        frame_jpeg_url: frameJpegUrl,
-        frame_cached: frameCached,
-        extract_ms: extractMs,
-        gemini_ms: awsMs,
-        ...forensicMeta(),
-      };
-
-      // Zwei auswertbare Stills, beide ohne Gesicht → belastbarer Befund.
-      if (zeroCount >= 2) {
-        console.warn(`[face-gate] ${GATE_VERSION} no_face consensus zero=${zeroCount}/${usableCount}`);
-        return {
-          ok: false,
-          code: "no_face",
-          reason:
-            `AWS Rekognition detected no human face in ${zeroCount} independent preclip stills ` +
-            `(frames ${probeFrameIndices.join(",")}) — Sync.so cannot lipsync.`,
-          raw_reply: `aws_rek:0_face x${zeroCount}`,
-          ...baseFail,
-        };
-      }
-
-      // Alle Stills leer/schwarz → Messausfall, KEIN Befund.
-      if (usableCount === 0) {
-        const allBlank = probeVerdicts.length > 0 &&
-          probeVerdicts.every((v) => v.startsWith("still_"));
-        if (allBlank && input.preclipTrusted === true && input.geometryContractOk === true) {
-          console.warn(
-            `[face-gate] ${GATE_VERSION} probe_degraded — all stills blank, but preclip is ` +
-            `single-face validated and geometry roundtrip passed. Dispatching under degraded trust.`,
-          );
-          return {
-            ok: true,
-            code: "probe_degraded",
-            reason: `still_blank_all:${probeVerdicts.join(",")} — dispatch under degraded trust (preclip validated).`,
-            ...baseFail,
-          };
-        }
-        return {
-          ok: false,
-          code: allBlank ? "still_blank" : "probe_unavailable",
-          reason: allBlank
-            ? `exact_preclip_probe_unavailable:still_blank_all:${probeVerdicts.join(",")}`
-            : `exact_preclip_probe_unavailable:${detectorError ?? (probeVerdicts.join(",") || "no_frame")}`,
-          ...baseFail,
-        };
-      }
-
-      // Genau ein auswertbares Still ohne Gesicht — zu dünn für ein hartes
-      // Urteil (v397: no_face braucht Konsens).
+  if (typeof input.prebuiltFrameUrl === "string" && input.prebuiltFrameUrl.startsWith("http")) {
+    frameJpegUrl = input.prebuiltFrameUrl;
+    frameCached = true;
+  } else if (frame != null) {
+    const extracted = await extractFrameForFaceProbe({
+      videoUrl: input.videoUrl,
+      frameNumber: frame,
+      fps: input.fps ?? 30,
+      userId: input.userId,
+      projectId: input.projectId,
+      sceneId: input.sceneId,
+      passIdx: input.passIdx,
+    });
+    extractMs = extracted.latencyMs ?? 0;
+    if (!extracted.ok || !extracted.frameUrl) {
       return {
-        ok: false,
+        ok: true,
         code: "probe_unavailable",
-        reason:
-          `exact_preclip_probe_inconclusive:zero_faces_on_single_still ` +
-          `(usable=${usableCount}, verdicts=${probeVerdicts.join(",")})`,
-        ...baseFail,
+        reason: `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
+        extract_ms: extractMs,
       };
     }
+    frameJpegUrl = extracted.frameUrl;
+    frameCached = !!extracted.cached;
   }
 
-  // ── Stage 1 (Nicht-Preclip) — bestehendes Verhalten ──────────────
-  if (!rek) {
-    if (typeof input.prebuiltFrameUrl === "string" && input.prebuiltFrameUrl.startsWith("http")) {
-      frameJpegUrl = input.prebuiltFrameUrl;
-      frameCached = true;
-    } else if (frame != null) {
-      const extracted = await extractFrameForFaceProbe({
-        videoUrl: input.videoUrl,
-        frameNumber: verifiedPreclipFrame ?? frame,
-        fps: input.fps ?? 30,
-        userId: input.userId,
-        projectId: input.projectId,
-        sceneId: input.sceneId,
-        passIdx: input.passIdx,
-      });
-      extractMs += extracted.latencyMs ?? 0;
-      if (!extracted.ok || !extracted.frameUrl) {
-        return {
-          ok: input.requireMouth !== true,
-          code: "probe_unavailable",
-          reason: input.requireMouth === true
-            ? `exact_preclip_probe_unavailable:${extracted.reason ?? "unknown"}`
-            : `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
-          extract_ms: extractMs,
-          ...forensicMeta(),
-        };
-      }
-      frameJpegUrl = extracted.frameUrl;
-      frameCached = !!extracted.cached;
-    }
-
-    if (!frameJpegUrl) {
-      return {
-        ok: input.requireMouth !== true,
-        code: "probe_unavailable",
-        reason: input.requireMouth === true
-          ? "exact_preclip_probe_unavailable:no_frame"
-          : `no_client_canvas_frame; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
-        extract_ms: extractMs,
-        ...forensicMeta(),
-      };
-    }
-
-    // ── Stage 2 — AWS Rekognition auf dem extrahierten Bild ────────
-    const awsStart = Date.now();
-    try {
-      rek = await detectFacesMediaPipe({
-        videoUrl: input.videoUrl,
-        plateWidth: rekW,
-        plateHeight: rekH,
-        durationSec: 1,
-        prebuiltFrameUrls: [frameJpegUrl],
-      });
-    } catch (e) {
-      return {
-        ok: input.requireMouth !== true,
-        code: "probe_unavailable",
-        reason: input.requireMouth === true
-          ? `exact_preclip_face_probe_threw:${(e as Error)?.message ?? String(e)}`
-          : `aws_rekognition_threw: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
-        frame_jpeg_url: frameJpegUrl,
-        frame_cached: frameCached,
-        extract_ms: extractMs,
-        gemini_ms: Date.now() - awsStart,
-        ...forensicMeta(),
-      };
-    }
-    awsMs += Date.now() - awsStart;
+  if (!frameJpegUrl) {
+    return {
+      ok: true,
+      code: "probe_unavailable",
+      reason: `no_client_canvas_frame; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
+      extract_ms: extractMs,
+    };
   }
 
+  // ── Stage 2 — AWS Rekognition on the extracted JPEG ─────────────
+  // v252: primary detector is AWS Rekognition, not Gemini. Deterministic
+  // bboxes with confidence; no text parsing, no rate-limit surprises.
+  const W = Math.max(0, Number(input.plateWidth ?? 0));
+  const H = Math.max(0, Number(input.plateHeight ?? 0));
+  // Rekognition needs plate dims to convert its relative bbox to pixel
+  // space. When callers didn't provide them, fall back to a 1x1 unit box —
+  // the face count is still trustworthy, we just can't do coord-tolerance
+  // or safe-zone snapping.
+  const rekW = W > 0 ? W : 1280;
+  const rekH = H > 0 ? H : 720;
+
+  const awsStart = Date.now();
+  let rek: Awaited<ReturnType<typeof detectFacesMediaPipe>>;
+  try {
+    rek = await detectFacesMediaPipe({
+      videoUrl: input.videoUrl,
+      plateWidth: rekW,
+      plateHeight: rekH,
+      durationSec: 1,
+      prebuiltFrameUrls: [frameJpegUrl],
+    });
+  } catch (e) {
+    return {
+      ok: true,
+      code: "probe_unavailable",
+      reason: `aws_rekognition_threw: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
+      frame_jpeg_url: frameJpegUrl,
+      frame_cached: frameCached,
+      extract_ms: extractMs,
+      gemini_ms: Date.now() - awsStart,
+    };
+  }
+  const awsMs = Date.now() - awsStart;
   const faceCount = rek.faces?.length ?? 0;
   const rawReply = rek.ok
     ? `aws_rek:${faceCount}_face${faceCount === 1 ? `@${Math.round(rek.faces[0].center[0])},${Math.round(rek.faces[0].center[1])}` : ""}`
@@ -535,25 +201,18 @@ export async function verifyFaceBeforeDispatch(
     frame_cached: frameCached,
     extract_ms: extractMs,
     gemini_ms: awsMs, // reused meta field for wall-clock (kept name for schema compat)
-    ...forensicMeta(),
   } as const;
 
   if (!rek.ok) {
-    // v397 — hier landen nur noch ECHTE Ausfälle (Credentials, Fetch, HTTP).
-    // "0 Gesichter" ist seit v397 `ok:true, faces:[]` und fällt unten in den
-    // korrekten `no_face`-Pfad.
     return {
-      ok: input.requireMouth !== true,
+      ok: true,
       code: "probe_unavailable",
-      reason: input.requireMouth === true
-        ? `exact_preclip_face_probe_error:${rek.error ?? "unknown"}`
-        : `aws_rekognition_error: ${rek.error ?? "unknown"} — dispatch will proceed unchecked.`,
+      reason: `aws_rekognition_error: ${rek.error ?? "unknown"} — dispatch will proceed unchecked.`,
       raw_error: (rek.error ?? "").slice(0, 400),
       raw_reply: rawReply,
       ...baseMeta,
     };
   }
-
 
   // ── Verdict from face count ──────────────────────────────────────
   if (faceCount === 0) {
@@ -567,54 +226,6 @@ export async function verifyFaceBeforeDispatch(
     };
   }
 
-  // ── v393 — Mundgeometrie auf genau diesem Bild ───────────────────
-  // Ein Gesicht ohne sichtbaren Mund ist fuer Sync.so wertlos. Wir messen
-  // hier einmal und geben die Fenster zurueck, damit die spaetere
-  // Passthrough-Bewertung nicht mehr auf einem generischen Grossbereich
-  // raten muss.
-  const mouthGeo = measurePreclipMouth({
-    faces: (rek.faces ?? []).map((f: any) => ({
-      bbox: f.bbox,
-      center: f.center,
-      landmarks: f.landmarks,
-    })),
-    width: rekW,
-    height: rekH,
-  });
-  // Pixel- UND normalisierte Fassung: Pixel fuer die Forensik, normalisiert
-  // fuer die spaetere Passthrough-Messung, die in 0..1 rechnet.
-  const toNorm = (r?: [number, number, number, number]) =>
-    r && rekW > 0 && rekH > 0
-      ? { x: r[0] / rekW, y: r[1] / rekH, w: (r[2] - r[0]) / rekW, h: (r[3] - r[1]) / rekH }
-      : undefined;
-  const mouthMeta = {
-    mouth_center: mouthGeo.mouthCenter,
-    mouth_rect: mouthGeo.mouthRect,
-    control_rect: mouthGeo.controlRect,
-    mouth_rect_norm: toNorm(mouthGeo.mouthRect),
-    control_rect_norm: toNorm(mouthGeo.controlRect),
-    mouth_frame_dims: [rekW, rekH] as [number, number],
-    mouth_edge_margin_px: mouthGeo.edgeMarginPx,
-  } as const;
-
-  console.log(
-    `[face-gate] ${GATE_VERSION} mouth_geometry code=${mouthGeo.code} derived=${mouthGeo.derived} ` +
-    `center=${mouthGeo.mouthCenter?.join(",") ?? "-"} band_y=${mouthGeo.bandY?.toFixed(3) ?? "-"} ` +
-    `edge_margin=${mouthGeo.edgeMarginPx ?? "-"}px frame=${rekW}x${rekH} require_mouth=${input.requireMouth === true}`,
-  );
-  if (input.requireMouth === true && !mouthGeo.ok) {
-    return {
-      ok: false,
-      code: mouthGeo.code === "no_face" ? "no_face" : (mouthGeo.code as FaceGateCode),
-      reason: `Preclip mouth check failed: ${mouthGeo.reason ?? mouthGeo.code}`,
-      raw_reply: rawReply,
-      ...baseMeta,
-      ...mouthMeta,
-    };
-  }
-
-
-
   if (faceCount > 1) {
     if (input.isMultiSpeakerContext) {
       console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} multi_speaker=true → hard fail`);
@@ -624,13 +235,12 @@ export async function verifyFaceBeforeDispatch(
         reason: `AWS Rekognition saw ${faceCount} faces on a multi-speaker plate — Sync.so cannot disambiguate from a single coordinate.`,
         raw_reply: rawReply,
         ...baseMeta,
-      ...mouthMeta,
       };
     }
     // Single-speaker preclip: extra faces (e.g. background extra) are a
     // soft pass — the preclip crop guarantees the target face dominates.
     console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} single_speaker → soft pass`);
-    return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
+    return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
   }
 
   // Exactly one face — check coord tolerance if we have both coord + plate dims.
@@ -647,7 +257,7 @@ export async function verifyFaceBeforeDispatch(
         `[face-gate] ${GATE_VERSION} ok face=[${Math.round(faceCx)},${Math.round(faceCy)}] ` +
         `coord=[${coord[0]},${coord[1]}] dist=${Math.round(dist)}px tol=${Math.round(tolPx)}px`,
       );
-      return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
+      return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
     }
 
     // Off-coord: attempt auto-snap when the face is inside the 5-95% safe zone.
@@ -670,7 +280,6 @@ export async function verifyFaceBeforeDispatch(
         original_coord: [coord[0], coord[1]],
         snap_distance_px: Math.round(dist),
         ...baseMeta,
-      ...mouthMeta,
       };
     }
 
@@ -684,12 +293,11 @@ export async function verifyFaceBeforeDispatch(
       reason: `Face exists but not at active_speaker_detection coord [${coord[0]},${coord[1]}] — Sync.so would return generation_unknown_error.`,
       raw_reply: rawReply,
       ...baseMeta,
-      ...mouthMeta,
     };
   }
 
   // No coord or no plate dims → 1 face is a green light.
   console.log(`[face-gate] ${GATE_VERSION} ok face_count=1 (no coord check)`);
-  return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta, ...mouthMeta };
+  return { ok: true, code: "ok", raw_reply: rawReply, ...baseMeta };
 
 }

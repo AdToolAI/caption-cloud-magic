@@ -20,15 +20,6 @@
  * one standalone as well simplifies auditing.
  */
 
-import {
-  probeImageDims,
-  normToPixels,
-  isPlausibleFaceBox,
-  compareAspect,
-  projectNormBox,
-} from "./rek-image-space.ts";
-
-
 // ── AWS Rekognition config (duplicated for auditability) ────────────
 const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
 const DEFAULT_REKOGNITION_REGION = "eu-central-1";
@@ -210,9 +201,31 @@ export function buildAnchorLayoutFromV274(
   return { version: "v278", anchorUrl, dims, slots };
 }
 
-// v361 — Dimensionssondierung liegt jetzt zentral in rek-image-space.ts, damit
-// beide Rekognition-Call-Sites denselben Koordinatenvertrag benutzen.
-
+/** Minimal PNG/JPEG dimension probe. */
+function probeImageDims(bytes: Uint8Array): { width: number; height: number } | null {
+  try {
+    if (bytes[0] === 0x89 && bytes[1] === 0x50) {
+      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      return { width: dv.getUint32(16), height: dv.getUint32(20) };
+    }
+    if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+      let i = 2;
+      while (i < bytes.length - 8) {
+        if (bytes[i] !== 0xff) { i++; continue; }
+        const marker = bytes[i + 1];
+        if (marker >= 0xc0 && marker <= 0xc3) {
+          const h = (bytes[i + 5] << 8) | bytes[i + 6];
+          const w = (bytes[i + 7] << 8) | bytes[i + 8];
+          return { width: w, height: h };
+        }
+        const segLen = (bytes[i + 2] << 8) | bytes[i + 3];
+        if (segLen < 2) return null;
+        i += 2 + segLen;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
 
 async function detectFacesOnBytes(
   bytes: Uint8Array,
@@ -232,14 +245,11 @@ async function detectFacesOnBytes(
     const conf = Number(d.Confidence ?? 0);
     if (conf < 80) continue;
     const { Left, Top, Width, Height } = d.BoundingBox;
-    const [x1, y1, x2, y2] = normToPixels([Left, Top, Left + Width, Top + Height], dims);
+    const x1 = Math.max(0, Math.min(dims.width, Math.round(Left * dims.width)));
+    const y1 = Math.max(0, Math.min(dims.height, Math.round(Top * dims.height)));
+    const x2 = Math.max(0, Math.min(dims.width, Math.round((Left + Width) * dims.width)));
+    const y2 = Math.max(0, Math.min(dims.height, Math.round((Top + Height) * dims.height)));
     if (x2 - x1 < 8 || y2 - y1 < 8) continue;
-    if (!isPlausibleFaceBox([x1, y1, x2, y2], dims)) {
-      console.warn(
-        `[plateFaceSlotRouter] v361_implausible_box_dropped bbox=[${x1},${y1},${x2},${y2}] space=${dims.width}x${dims.height}`,
-      );
-      continue;
-    }
     raw.push({
       norm: { Left, Top, Width, Height },
       bbox: [x1, y1, x2, y2],
@@ -317,43 +327,13 @@ export async function routePlateFacesToAnchor(params: {
   const bytes = await fetchImageBytes(plateUrl);
   if (!bytes) return emptyResult("plate_fetch_failed");
 
-  // ── v361 KOORDINATENVERTRAG ──────────────────────────────────────────
-  // Detektiert wird IMMER im Raum der gesendeten Bytes. `plateDims` ist der
-  // ZIELRAUM, nicht der Detektionsraum. Bis v360 wurden anchor-normalisierte
-  // Werte direkt mit den Plate-Dimensionen multipliziert — dabei entstanden
-  // systematisch verschobene, in der Höhe gestauchte Boxen (Szene 89c5e01c).
-  const probedDims = probeImageDims(bytes);
-  const detectionDims = probedDims ?? params.plateDims ?? { width: 1920, height: 1080 };
-  const targetDims = params.plateDims ?? detectionDims;
-  const aspect = compareAspect(detectionDims, targetDims);
-  if (!aspect.aspectMatch) {
-    console.warn(
-      `[plateFaceSlotRouter] v361_aspect_mismatch detect=${detectionDims.width}x${detectionDims.height} ` +
-      `target=${targetDims.width}x${targetDims.height} — projecting with contain semantics`,
-    );
-  }
-  const dims = targetDims;
+  const dims = params.plateDims ?? probeImageDims(bytes) ?? { width: 1920, height: 1080 };
 
   let detected: Awaited<ReturnType<typeof detectFacesOnBytes>>;
   try {
-    detected = await detectFacesOnBytes(bytes, detectionDims);
+    detected = await detectFacesOnBytes(bytes, dims);
   } catch (e) {
     return { ...emptyResult(`detect_failed:${(e as Error).message}`), dims };
-  }
-
-  // Boxen aus dem Detektionsraum in den Zielraum projizieren.
-  if (
-    detectionDims.width !== targetDims.width ||
-    detectionDims.height !== targetDims.height
-  ) {
-    detected = detected.map((f) => ({
-      ...f,
-      bbox: projectNormBox(
-        [f.norm.Left, f.norm.Top, f.norm.Left + f.norm.Width, f.norm.Top + f.norm.Height],
-        detectionDims,
-        targetDims,
-      ).pixels,
-    }));
   }
 
   const anchorSlots = [...anchorLayout.slots].sort((a, b) => a.slotIndex - b.slotIndex);

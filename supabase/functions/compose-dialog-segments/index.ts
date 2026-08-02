@@ -21,15 +21,9 @@
 
  *
  * The only stable multi-speaker pattern is the one v4 used: one Sync.so
- * call per speaker, each with single-face ASD pointing at THAT speaker.
- * v357 — KORREKTUR EINES VERALTETEN KOMMENTARS: Die Passes sind NICHT
- * verkettet. Jeder Pass nutzt das UNVERÄNDERTE Original-Plate als Input
- * (`passInputUrl = sourceClipUrl`), und bis zu `concurrencyCap` Passes
- * laufen parallel (v193 fan-out). Es gibt keine Generationen-Akkumulation.
- * Die lipgesyncten Crops werden anschließend an ihrer absoluten
- * Original-Zeitposition zurück auf die Master-Plate gelegt (Overlay,
- * kein Concat).
-
+ * call per speaker, each with single-coord ASD pointing at THAT speaker's
+ * face. We chain them: pass N's video input = pass N-1's output. The final
+ * pass's output has every speaker correctly lip-synced.
  *
  * State model (dialog_shots, multi-pass):
  *  {
@@ -59,9 +53,6 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, canDispatchLipsync, canContinueLipsync, transitionScene, failSceneState, type SceneState } from "../_shared/scene-state.ts";
-import { canonicalizeAssignmentLock, stripVariantPrefix } from "../_shared/assignment-lock.ts";
-
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
@@ -98,8 +89,6 @@ import {
 import { detectPlateFaces, validatePlateFacesGeometry } from "../_shared/plate-face-detect.ts";
 import { resolvePlateFaceIdentities, PlateIdentityFace } from "../_shared/plate-face-identity.ts";
 import { buildAnchorLayoutFromV274, routePlateFacesToAnchor, type AnchorFaceLayout } from "../_shared/plateFaceSlotRouter.ts";
-import { CAST_IDENTITY_LOCK_TAG, resolveCastIdentityLock } from "../_shared/cast-identity-lock.ts";
-
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -107,33 +96,9 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // bbox-url-pro pipeline (1..N speakers). v187 makes this fail-closed for
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
-import {
-  assertGenerationProvenance,
-  provenanceMessage,
-} from "../_shared/generation-provenance.ts";
-import {
-  assertPlateFaceContract,
-} from "../_shared/lipsync-closeup-contract.ts";
-
 import { assertSafeDispatchEntry } from "../_shared/dialogPassTransition.ts";
 import { verifyFaceBeforeDispatch } from "../_shared/syncso-face-gate.ts";
-// v396 — eine Transformation für Planner, Renderer, Gate und Reprojektion.
-import { assertRoundtrip, buildPreclipTransform, persistTransform } from "../_shared/preclip-transform.ts";
-
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
-// v357 — echtes Per-Frame-Gesichts-Tracking statt wiederholter Standbox.
-import {
-  trackFaceAcrossTurn,
-  detectAnchorBoxOnClip,
-  interpolateBoxes,
-  withContextPadding,
-  clampBoxArea,
-
-  MAX_DISPATCH_BOX_AREA_FRAC,
-  trackMovementPx,
-} from "../_shared/face-track.ts";
-
-
 import {
   buildAsdStrategy,
   type PreflightFaceResult,
@@ -170,7 +135,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v395-exact-preclip-mouth-gate";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v283-face-gate-partial-identity-soft-pass";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -393,16 +358,15 @@ function buildPerFrameBoxes(params: {
     .filter(([fs, fe]) => Number.isFinite(fs) && Number.isFinite(fe) && fe >= fs);
   const out: Array<[number, number, number, number] | null> =
     new Array(Math.max(1, params.frameCount)).fill(null);
-  // v357 — Der alte "alle Frames dieselbe Box"-Notpfad ist entfernt. Fehlen
-  // die Voiced-Windows, gilt der gesamte Clip explizit als EIN Sprech-Fenster
-  // (statt stillschweigend eine Standbox über alles zu legen).
-  const effective = windows.length > 0
-    ? windows
-    : [[0, Math.max(0, Math.max(1, params.frameCount) - 1)] as [number, number]];
-  for (const [fs, fe] of effective) {
+  if (windows.length === 0) {
+    // No voiced windows known → preserve legacy behaviour (full-fill) so
+    // we don't accidentally produce an all-null array that would silently
+    // disable lip-sync entirely.
+    return out.map(() => params.box);
+  }
+  for (const [fs, fe] of windows) {
     for (let i = fs; i <= fe; i++) out[i] = params.box;
   }
-
   // v201 — strict turn-scoped boxes. Older builds backfilled leading/trailing
   // silence with the target box to satisfy Sync.so's validator, but that let
   // the provider reproject inactive faces outside the spoken turn. Keep every
@@ -433,11 +397,6 @@ async function uploadBoundingBoxesJson(
     // neighbour faces during turns this speaker is silent.
     voicedWindowsSec?: Array<[number, number]>;
     fps?: number;
-    /**
-     * v357 — Vorberechnete echte Bewegungsspur (Per-Frame-Tracking). Wenn
-     * gesetzt, hat sie Vorrang vor der statischen `box`.
-     */
-    trackedBoxes?: Array<[number, number, number, number] | null>;
   },
 ): Promise<{ url: string | null; nonNullFrames: number; totalFrames: number }> {
   try {
@@ -445,17 +404,14 @@ async function uploadBoundingBoxesJson(
     const ts = Date.now();
     const path = `${params.userId}/${sub}/asd/${params.sceneId}-p${params.passIdx + 1}-${ts}.json`;
     const totalFrames = Math.max(1, params.frameCount);
-    const boxes = params.trackedBoxes && params.trackedBoxes.length === totalFrames
-      ? params.trackedBoxes
-      : (params.fps
-        ? buildPerFrameBoxes({
-            box: params.box,
-            frameCount: totalFrames,
-            fps: params.fps,
-            voicedWindowsSec: params.voicedWindowsSec ?? [],
-          })
-        : new Array(totalFrames).fill(params.box));
-
+    const boxes = params.voicedWindowsSec && params.voicedWindowsSec.length > 0 && params.fps
+      ? buildPerFrameBoxes({
+          box: params.box,
+          frameCount: totalFrames,
+          fps: params.fps,
+          voicedWindowsSec: params.voicedWindowsSec,
+        })
+      : new Array(totalFrames).fill(params.box);
     const nonNullFrames = boxes.reduce((acc, v) => acc + (v ? 1 : 0), 0);
     const payload = { bounding_boxes: boxes };
     // v279 — Uint8Array instead of Blob: supabase-js 2.75 in Deno silently
@@ -825,100 +781,13 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, clip_status, clip_error, lip_sync_source_clip_url, lip_sync_applied_at, pipeline_state, reference_image_url, lock_reference_url, scene_assets, plate_generation, plate_ready_generation, active_run_id, audio_selfheal_count",
+        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets",
       )
       .eq("id", sceneId)
       .single();
     if (sceneErr || !scene) {
       return json({ error: "scene_not_found", details: sceneErr?.message }, 404);
     }
-
-    // v378 — terminal scene/run guard. This is deliberately server-side: the
-    // browser auto-trigger is not the only caller (webhooks and recovery paths
-    // also enter here). A failed master clip, a failed/canceled lip-sync state,
-    // or a scene without an active v377 run may never reach preclip/provider
-    // work. Only a user-triggered composer-start-scene-generation call can mint
-    // a fresh run and clear the terminal state.
-    //
-    // v394 — Start und Fortsetzung sind zwei Vertraege. Der Szenenzustand
-    // beschreibt die Phase, der Pass-Slot die Arbeitseinheit. Sobald Pass 1 die
-    // Szene auf `lipsync_running` hebt, ist der START-Vertrag nicht mehr
-    // erfuellt — Fan-out-Geschwister, Webhook-Advance und Watchdog sind aber
-    // legitime FORTSETZUNGEN und wurden bis v393 faelschlich mit 409 abgewiesen
-    // (Pipeline blieb bei Pass 1/N stehen).
-    const bodyPassIdxRaw = Number(body?.pass_idx);
-    const hasExplicitPassIdx = Number.isFinite(bodyPassIdxRaw) && bodyPassIdxRaw >= 0;
-    const guardMode: "start" | "continue" = (isAdvance || hasExplicitPassIdx) ? "continue" : "start";
-    const terminalClipError =
-      typeof (scene as any).clip_error === "string" &&
-      (scene as any).clip_error.length > 0 &&
-      ![
-        "audio_plan_not_ready_self_heal",
-        "audio_prep_transient_retry",
-        "syncso_concurrency_deferred",
-      ].some((marker) => String((scene as any).clip_error).startsWith(marker));
-    const stateGateOk = guardMode === "continue"
-      ? canContinueLipsync(scene)
-      : canDispatchLipsync(scene);
-    const terminalScene =
-      // v385 — Zustand kommt ausschließlich aus `pipeline_state`.
-      !stateGateOk ||
-      terminalClipError ||
-      ["failed", "canceled"].includes(String((scene as any).dialog_shots?.status ?? ""));
-    if (!(scene as any).active_run_id || terminalScene) {
-      console.warn(
-        `[compose-dialog-segments] v378_terminal_guard scene=${sceneId} ` +
-          `run=${(scene as any).active_run_id ?? "none"} state=${sceneState(scene)} ` +
-          `mode=${guardMode} pass=${hasExplicitPassIdx ? Math.floor(bodyPassIdxRaw) : "-"}`,
-      );
-      return json(
-        {
-          error: terminalScene ? "master_clip_failed" : "no_active_scene_run",
-          message: terminalScene
-            ? "Die Szene ist fehlgeschlagen oder noch nicht fertig. Lip-Sync wurde nicht gestartet."
-            : "Für diese Szene existiert kein aktiver Generierungslauf.",
-        },
-        409,
-      );
-    }
-
-    // v394 — Pass-Ebenen-Vertrag: eine Fortsetzung darf niemals einen bereits
-    // gelieferten Pass anfassen (v141-Invariante: ein Pass mit `output_url` ist
-    // terminal). Ein expliziter Retry (`retry: true`) der Retry-Leiter bleibt
-    // erlaubt — er adressiert bewusst einen fehlgeschlagenen Pass.
-    if (guardMode === "continue" && hasExplicitPassIdx && !isRetry) {
-      const guardPassIdx = Math.floor(bodyPassIdxRaw);
-      const guardPasses = Array.isArray((scene as any).dialog_shots?.passes)
-        ? (scene as any).dialog_shots.passes
-        : [];
-      const guardPass = guardPasses[guardPassIdx];
-      const guardPassStatus = String(guardPass?.status ?? "");
-      if (
-        guardPass &&
-        (guardPass.output_url || ["done", "done_suspect"].includes(guardPassStatus))
-      ) {
-        console.warn(
-          `[compose-dialog-segments] v394_pass_already_terminal scene=${sceneId} ` +
-            `pass=${guardPassIdx} status=${guardPassStatus || "-"} has_output=${!!guardPass.output_url}`,
-        );
-        return json(
-          { error: "pass_already_terminal", scene_id: sceneId, pass_idx: guardPassIdx, status: guardPassStatus },
-          409,
-        );
-      }
-    }
-
-
-    // v388 — Phasenwechsel laufen ausschliesslich ueber den geprueften Weg:
-    // atomar, mit Freigabeliste sowie Lauf- und Generations-Fence.
-    const advanceScene = (to: SceneState, from?: SceneState[]) =>
-      transitionScene(supabase, sceneId, to, {
-        from,
-        runId: String((scene as any).active_run_id ?? "") || null,
-        generation: Number((scene as any).plate_generation ?? 1),
-      });
-
-
 
     const { data: project } = await supabase
       .from("composer_projects")
@@ -929,7 +798,7 @@ serve(async (req) => {
     if (!userId) return json({ error: "missing_user" }, 403);
 
     if (
-      sceneState(scene) === "canceled" ||
+      (scene as any).lip_sync_status === "canceled" ||
       (scene as any).dialog_shots?.status === "canceled"
     ) {
       return json({ ok: true, skipped: "canceled", scene_id: sceneId });
@@ -969,7 +838,8 @@ serve(async (req) => {
           recovery: body?.recovery === true,
           auto: body?.auto === true,
           repair_audio: repairAudio,
-          state_at_entry: sceneState(scene),
+          stage_at_entry: (scene as any).twoshot_stage ?? null,
+          lip_sync_status_at_entry: (scene as any).lip_sync_status ?? null,
           existing_state_version: (scene as any).dialog_shots?.version ?? null,
           existing_state_status: (scene as any).dialog_shots?.status ?? null,
           // v134 §3 — Forensik-friendly noop tracking
@@ -1075,61 +945,41 @@ serve(async (req) => {
           await supabase
             .from("composer_scenes")
             .update({
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
               clip_error: `id_only_dialog_turns_required:${ensuredTurns.reason}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", sceneId);
-          // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-          await failSceneState(supabase, sceneId, "failed");
           return json({ error: "id_only_dialog_turns_required", reason: ensuredTurns.reason, details: ensuredTurns.details ?? null }, 422);
         }
       }
     }
 
     if (!masterAudioUrl || speakers.length === 0 || totalSec <= 0) {
-      // v390 bounded self-heal: transient ordering gets three retries, but an
-      // invalid audio contract must never create an infinite state loop.
-      const nextSelfHealCount = Number((scene as any).audio_selfheal_count ?? 0) + 1;
-      const exhausted = nextSelfHealCount >= 3;
-      const { error: selfHealWriteError } = await supabase
+      // v172 self-heal: NICHT als hartes failed markieren — der Audio-Prep
+      // (compose-twoshot-audio) ist hier einfach noch nicht durchgelaufen
+      // oder hat keinen master geschrieben. twoshot_stage auf null setzen,
+      // damit der Client-Trigger (useTwoShotAutoTrigger) im nächsten Tick
+      // den Audio-Prep nachholt. Vorher blieb die Szene ewig auf
+      // "Lip-Sync wird gestartet…" weil der Status pending blieb und
+      // gleichzeitig twoshot_stage='master_clip' den Re-Try blockierte.
+      await supabase
         .from("composer_scenes")
         .update({
-          audio_selfheal_count: nextSelfHealCount,
-          clip_error: exhausted
-            ? "audio_plan_not_ready_retry_exhausted"
-            : `audio_plan_not_ready_self_heal:${nextSelfHealCount}/3`,
+          twoshot_stage: null,
+          lip_sync_status: "pending",
+          clip_error: "audio_plan_not_ready_self_heal",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", sceneId)
-        .eq("active_run_id", String((scene as any).active_run_id ?? ""))
-        .eq("plate_generation", Number((scene as any).plate_generation ?? 1));
-      if (selfHealWriteError) {
-        console.error(`[compose-dialog-segments] v390 self-heal counter failed scene=${sceneId}: ${selfHealWriteError.message}`);
-      }
-      if (exhausted) {
-        await failSceneState(supabase, sceneId, "failed", "v390_audio_plan_retry_exhausted");
-        return json(
-          {
-            ok: false,
-            error: "missing_audio_plan_retry_exhausted",
-            message: "Der Audio-Plan konnte nach drei Versuchen nicht vollständig erstellt werden.",
-          },
-          422,
-        );
-      }
-      await transitionScene(supabase, sceneId, "plate_ready", {
-        from: ["plate_ready", "audio_prep", "audio_ready"],
-        detail: `v390_audio_plan_not_ready_self_heal_${nextSelfHealCount}`,
-        runId: String((scene as any).active_run_id ?? ""),
-        generation: Number((scene as any).plate_generation ?? 1),
-      });
+        .eq("id", sceneId);
       return json(
         {
           ok: false,
           self_heal: true,
           error: "missing_audio_plan",
           message:
-            `Audio-Plan ist noch nicht fertig — kontrollierter Neuversuch ${nextSelfHealCount}/3.`,
+            "Audio-Plan ist noch nicht fertig — Stage wurde zurückgesetzt, Trigger holt compose-twoshot-audio im nächsten Tick nach.",
         },
         202,
       );
@@ -1158,63 +1008,6 @@ serve(async (req) => {
         );
       }
     }
-
-    // ── v373 Generations-Vertrag ─────────────────────────────────────────
-    // Lip-Sync darf ausschließlich auf der Plate DES AKTUELLEN Laufs
-    // arbeiten. Am 02.08. schnitt diese Kette um 11:04:42 Preclips aus der
-    // Plate von 21:28 des Vortages, während der neue Render erst um 11:06:08
-    // startete → Passthrough-Fehlschlag auf untauglichem Altmaterial.
-    // `plate_ready_generation` wird per DB-Trigger gesetzt, sobald eine neue
-    // `clip_url` geschrieben wird; stimmt sie nicht mit `plate_generation`
-    // überein, ist die Plate von einem älteren Lauf → hart abbrechen.
-    {
-      const curGen = Number((scene as any).plate_generation ?? 1);
-      const readyGen = (scene as any).plate_ready_generation;
-      if (readyGen === null || readyGen === undefined || Number(readyGen) !== curGen) {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v373_stale_plate_blocked gen=${curGen} ready_gen=${readyGen}`,
-        );
-        return json(
-          {
-            error: "v373_stale_plate_blocked",
-            message:
-              "Die Szene wird gerade neu gerendert — Lip-Sync startet automatisch, sobald die neue Plate fertig ist.",
-            plate_generation: curGen,
-            plate_ready_generation: readyGen ?? null,
-          },
-          409,
-        );
-      }
-    }
-
-    // ── v381 Provenance-Wächter (plate_load) ─────────────────────────────
-    // Erster Punkt, an dem ein Asset in die Lip-Sync-Kette geht. Der Marker
-    // `v381_generation_provenance` belegt für jeden Lauf, aus welcher
-    // Generation die verwendete Plate stammt.
-    {
-      const prov = await assertGenerationProvenance({
-        supabase,
-        sceneId,
-        stage: "plate_load",
-        expectedGeneration: Number((scene as any).plate_generation ?? 1),
-        expectedRunId: String((scene as any).active_run_id),
-        note: `plate=…${String((scene as any).clip_url ?? "").slice(-48)}`,
-      });
-      if (!prov.ok) {
-        return json(
-          {
-            error: prov.code,
-            message: provenanceMessage(prov.code),
-            plate_generation: prov.generation,
-            plate_ready_generation: prov.readyGeneration,
-          },
-          409,
-        );
-      }
-    }
-
-
-
 
     // Pick the master plate for lipsync. CRITICAL: for cinematic-sync we
     // must NEVER use a `talking-head-renders/...` URL as the source — that
@@ -1246,8 +1039,11 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           clip_url: null,
+          clip_status: "pending",
+          lip_sync_status: "pending",
           lip_sync_source_clip_url: null,
           lip_sync_applied_at: null,
+          twoshot_stage: null,
           dialog_shots: null,
           replicate_prediction_id: null,
           clip_error:
@@ -1255,10 +1051,6 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      // v388 — Zuruecksetzen auf `idle` laeuft ueber den Vertrag.
-      await transitionScene(supabase, sceneId, "idle", {
-        detail: "v388_raw_talking_head_source_blocked",
-      });
       return json(
         {
           error: "raw_talking_head_source_blocked",
@@ -1314,9 +1106,14 @@ serve(async (req) => {
       existing &&
       (existingStatus === "failed" || /v68|v58|v41|v56|recovery refund|provider_unknown/i.test(existingError));
     if (isStaleFailedState) {
-      // v378 — terminal states are never auto-revived. Recovery may repair a
-      // waiting state, but only an explicit user regeneration may mint a new
-      // run after failed/canceled/superseded work.
+      // v100 — Self-heal stale watchdog-killed terminal state on auto-trigger.
+      // When the watchdog (or any prior failure) refunded credits and parked
+      // dialog_shots in {status:failed, refunded:true}, the previous
+      // behaviour returned 409 reset_required, forcing the user to click
+      // "Sauber neu starten" manually. For auto-trigger calls we now clear
+      // the stale state in-line and continue with a clean dispatch. Manual
+      // invocations (auto !== true) still get the 409 so the explicit reset
+      // button remains the user's eskalation path.
       const isAutoTrigger = body?.auto === true || body?.recovery === true;
       const existingPasses = Array.isArray((existing as any)?.passes)
         ? ((existing as any).passes as Array<{ status?: string }>)
@@ -1324,16 +1121,52 @@ serve(async (req) => {
       const hasActivePass = existingPasses.some((p) =>
         ["queued", "rendering", "retrying"].includes(String(p?.status ?? "")),
       );
-      console.warn(
-        `[compose-dialog-segments] v378_terminal_no_revive scene=${sceneId} status=${existingStatus} error=${existingError.slice(0, 160)} auto=${isAutoTrigger} hasActivePass=${hasActivePass}`,
-      );
-      return json(
-        {
-          error: "reset_required",
-          message: "Der vorherige Lauf ist terminal. Bitte die Szene ausdrücklich neu rendern.",
-        },
-        409,
-      );
+      const isCleanlyRefunded =
+        (existing as any)?.refunded === true && !hasActivePass;
+      const canAutoReset =
+        isAutoTrigger &&
+        existingStatus === "failed" &&
+        isCleanlyRefunded;
+
+      if (canAutoReset) {
+        console.log(
+          `[compose-dialog-segments] v100 auto-reset-stale-failed scene=${sceneId} prev_error=${existingError.slice(0, 120)}`,
+        );
+        const { error: resetErr } = await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: null,
+            lip_sync_status: "pending",
+            clip_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        if (resetErr) {
+          console.warn(
+            `[compose-dialog-segments] v100 auto-reset write_failed scene=${sceneId} err=${resetErr.message} — falling back to 409`,
+          );
+          return json(
+            {
+              error: "reset_required",
+              message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before dispatch.",
+            },
+            409,
+          );
+        }
+        // Continue with a clean slate — `existing` is now logically null.
+        (scene as any).dialog_shots = null;
+      } else {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} reset_required — refusing stale failed state status=${existingStatus} error=${existingError.slice(0, 160)} auto=${isAutoTrigger} refunded=${(existing as any)?.refunded === true} hasActivePass=${hasActivePass}`,
+        );
+        return json(
+          {
+            error: "reset_required",
+            message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before v69 dispatch.",
+          },
+          409,
+        );
+      }
     }
 
     if (
@@ -1385,11 +1218,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: "dialog_pipeline_no_turns",
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       return json({ error: "no_turns" }, 422);
     }
 
@@ -1417,11 +1250,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: `segments_invalid_${segValidation.reason}`,
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "SEGMENTS_INVALID", error_class: "segments_invalid",
@@ -1462,22 +1295,12 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
+          lip_sync_status: keepRunning ? "running" : "pending",
+          twoshot_stage: "circuit_open",
           clip_error: `syncso_circuit_open:${circuit.reason ?? "unknown"}`,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      // v388 — auch der Circuit-Breaker-Parkzustand laeuft ueber den Vertrag.
-      await transitionScene(
-        supabase,
-        sceneId,
-        keepRunning ? "lipsync_running" : "audio_ready",
-        {
-          from: keepRunning
-            ? ["lipsync_dispatched", "lipsync_running", "lipsync_muxing"]
-            : ["audio_prep", "audio_ready", "lipsync_dispatched"],
-          detail: "v388_syncso_circuit_open",
-        },
-      );
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "CIRCUIT_BLOCKED", error_class: "rate_limited",
@@ -1534,33 +1357,10 @@ serve(async (req) => {
       console.log(`[compose-dialog-segments] scene=${sceneId} auto-tuner prefers source_kind=${tunerKind}`);
     }
 
-    // ── v381 Provenance-Wächter (sync_dispatch) ──────────────────────────
-    // Letzter Punkt vor dem bezahlten Provider-Dispatch. Zwischen Plate-Load
-    // und hier liegen Face-Map, Preclips und Credits — wurde die Szene in der
-    // Zwischenzeit neu gestartet, darf hier nichts mehr rausgehen.
-    {
-      const prov = await assertGenerationProvenance({
-        supabase,
-        sceneId,
-        stage: "sync_dispatch",
-        expectedGeneration: Number((scene as any).plate_generation ?? 1),
-        expectedRunId: String((scene as any).active_run_id),
-      });
-      if (!prov.ok) {
-        return json(
-          { error: prov.code, message: provenanceMessage(prov.code) },
-          409,
-        );
-      }
-    }
-
     // ── Webhook URL ──────────────────────────────────────────────────────
     const webhookUrl = appendWebhookToken(
-      `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
-        `&generation=${encodeURIComponent(String((scene as any).plate_generation))}` +
-        `&run_id=${encodeURIComponent(String((scene as any).active_run_id))}`,
+      `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
     );
-
 
     // ── Face-targeting (resolve per-speaker coords) ──────────────────────
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -1648,12 +1448,12 @@ serve(async (req) => {
             error: "plate_probe_failed_3plus_speakers",
             finished_at: new Date().toISOString(),
           }),
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: 'plate_probe_failed_3plus_speakers: Video-Geometrie konnte nicht gelesen werden. Bitte "Sauber neu starten" drücken — beim erneuten Versuch nutzt das System die Anchor-Dimensionen als Fallback.',
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "PREFLIGHT_BLOCKED", error_class: "plate_probe_failed",
@@ -2061,89 +1861,11 @@ serve(async (req) => {
       // when: N < 3 (legacy is cheap and reliable there), the anchor
       // layout is missing (older scenes), face-count mismatch, or the
       // AWS DetectFaces call fails.
-      // ── v349 — CAST IDENTITY LOCK (AWS Rekognition Face Collection) ──
-      // Deterministic identity BEFORE any similarity ranking runs: every
-      // Cast & World portrait is indexed once under
-      // `ExternalImageId = brand_character_id`, and the anchor faces are
-      // looked up by FaceId instead of being ranked by a confidence score.
-      // Two speakers can no longer inherit the same face, and a character
-      // rendered twice (or missing entirely) is detected instead of being
-      // silently mapped to "the nearest box".
-      if (!plateIdentityMap && anchorUrl && characters.length === speakers.length) {
-        try {
-          const castLock = await resolveCastIdentityLock({
-            supabase,
-            userId,
-            frameUrl: anchorUrl,
-            frameWidth: plateDims.width,
-            frameHeight: plateDims.height,
-            cast: speakers.map((sp, idx) => {
-              const cid = String(sp.character_id ?? "");
-              const portrait = characters.find((c) => c.characterId === cid)?.portraitUrl ?? "";
-              return { characterId: cid, portraitUrl: portrait, speakerIdx: idx, name: sp.speaker };
-            }).filter((m) => !!m.characterId),
-          });
-          console.log(
-            `[compose-dialog-segments] scene=${sceneId} v349_cast_identity_lock verdict=${castLock.verdict} ` +
-            `resolved=${castLock.resolvedCount}/${speakers.length} detected=${castLock.detectedCount} ` +
-            `indexed=${castLock.indexedCount} dup=[${castLock.duplicateCharacterIds.join(",")}] ` +
-            `missing=[${castLock.missingCharacterIds.join(",")}] ms=${castLock.msTotal} reason=${castLock.reason ?? "-"}`,
-          );
-          if (castLock.verdict === "ok" && castLock.resolvedCount === speakers.length) {
-            plateIdentityMap = {
-              faces: castLock.faces.map((f) => ({
-                bbox: f.bbox,
-                center: [
-                  Math.round((f.bbox[0] + f.bbox[2]) / 2),
-                  Math.round((f.bbox[1] + f.bbox[3]) / 2),
-                ] as [number, number],
-                slot: f.slot,
-                confidence: (f.similarity ?? 100) / 100,
-                characterId: f.characterId,
-                matchConfidence: (f.similarity ?? 100) / 100,
-              })),
-              width: plateDims.width,
-              height: plateDims.height,
-              detector: CAST_IDENTITY_LOCK_TAG,
-              cached: false,
-              resolvedCount: castLock.resolvedCount,
-              identityMethod: "rekognition-face-collection",
-              assignmentLock: castLock.assignmentLock,
-              assignmentLockSource: "v349_cast_identity_lock",
-              anchorLayoutSource,
-              minConfidence: Math.min(
-                ...castLock.faces
-                  .filter((f) => f.characterId)
-                  .map((f) => (f.similarity ?? 100) / 100),
-              ),
-              minMargin: 1,
-              ambiguous: false,
-              // deno-lint-ignore no-explicit-any
-            } as any;
-          } else if (castLock.verdict === "duplicate" || castLock.verdict === "missing") {
-            // Hard evidence that the rendered anchor does not show the cast
-            // one-to-one. Ranking-based fallbacks would now guess — log the
-            // forensic detail and let the downstream sanity gates decide.
-            console.warn(
-              `[compose-dialog-segments] scene=${sceneId} v349_identity_integrity_violation ` +
-              `type=${castLock.verdict} dup=[${castLock.duplicateCharacterIds.join(",")}] ` +
-              `missing=[${castLock.missingCharacterIds.join(",")}]`,
-            );
-          }
-        } catch (err) {
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v349_cast_identity_lock threw: ${(err as Error)?.message}`,
-          );
-        }
-      }
-
       if (
-        !plateIdentityMap &&
         hasCompleteV278AnchorLayout &&
         anchorLayoutRaw
       ) {
         try {
-
           const routed = await routePlateFacesToAnchor({
             // v278.2 — Anchor-First router: AWS Rekognition cannot detect faces
             // from MP4 bytes. Route on the still anchor/reference image, then
@@ -2779,12 +2501,12 @@ serve(async (req) => {
               error: "v183_cast_duplicate_character_id",
               finished_at: new Date().toISOString(),
             }),
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
             clip_error: msg,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_status: "PREFLIGHT_BLOCKED", error_class: "v183_cast_duplicate_character_id",
@@ -2843,23 +2565,9 @@ serve(async (req) => {
       });
     }
     const mergedFallbackLock = { ...(freshLock ?? existingLock) };
-    const _preCanonLock = anchorRekLockSeed
+    const finalAssignmentLock = anchorRekLockSeed
       ? { ...mergedFallbackLock, ...anchorRekLockSeed }
       : mergedFallbackLock;
-    // v387 — Der Lock wird pro Lauf aus der AKTUELLEN Sprecherliste gebaut.
-    // Persistierte Slots aus einem früheren Lauf (z. B. 5 Slots bei 4
-    // Sprechern) werden verworfen statt in den Injektivitätstest zu laufen.
-    const _canon = canonicalizeAssignmentLock(
-      _preCanonLock,
-      speakers.map((sp) => sp.character_id ?? null),
-    );
-    const finalAssignmentLock = _canon.lock;
-    if (_canon.droppedSlots.length > 0) {
-      console.warn(
-        `[compose-dialog-segments] scene=${sceneId} v387_stale_lock_slots_dropped ` +
-        `dropped=${_canon.droppedSlots.join(",")} speakers=${speakers.length}`,
-      );
-    }
     const lockSource = anchorRekLockComplete
       ? "v277_anchor_rekognition_complete"
       : anchorRekLockPartial
@@ -2867,7 +2575,6 @@ serve(async (req) => {
         : freshLock
           ? "v242_fresh"
           : "existing";
-
     const v153PlateIdentitySnapshot = {
       version: "v242" as const,
       dims: plateDims,
@@ -2885,96 +2592,6 @@ serve(async (req) => {
       `[compose-dialog-segments] scene=${sceneId} v277_assignment_lock ` +
       `source=${lockSource} locked_slots=${Object.keys(finalAssignmentLock).length}/${speakers.length}`,
     );
-    // v387 — Der Lock ist kanonisch (nur Slots der aktuellen Sprecher) und
-    // MUSS injektiv sein. Eine Kollision ist jetzt nur noch möglich, wenn
-    // zwei AKTUELLE Sprecher wirklich denselben Charakter tragen — stale
-    // Slots aus früheren Läufen können die Szene nicht mehr abschiessen.
-    if (speakers.length >= 2) {
-      const nameForCid = (cid: string) => {
-        const idx = speakers.findIndex(
-          (sp) => stripVariantPrefix(sp.character_id) === cid,
-        );
-        return idx >= 0
-          ? String((speakers[idx] as any).speaker ?? `Sprecher ${idx + 1}`)
-          : cid;
-      };
-      const dupCid = _canon.duplicateCharacterIds[0] ?? null;
-      const centers = speakerPlateBboxes.map((b) =>
-        Array.isArray(b) && b.every((n) => Number.isFinite(Number(n)))
-          ? [
-              (Number(b[0]) + Number(b[2])) / 2,
-              (Number(b[1]) + Number(b[3])) / 2,
-              Math.abs(Number(b[2]) - Number(b[0])),
-            ]
-          : null,
-      );
-      let dupBox: string | null = null;
-      for (let i = 0; i < centers.length && !dupBox; i++) {
-        for (let j = i + 1; j < centers.length; j++) {
-          const a = centers[i], b = centers[j];
-          if (!a || !b) continue;
-          const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-          if (d < 0.4 * Math.min(a[2], b[2])) {
-            dupBox = `${String((speakers[i] as any).speaker ?? `Sprecher ${i + 1}`)} und ${String((speakers[j] as any).speaker ?? `Sprecher ${j + 1}`)}`;
-            break;
-          }
-        }
-      }
-      if (dupCid || dupBox) {
-        const msg =
-          `lipsync_identity_collision: ` +
-          (dupCid
-            ? `„${nameForCid(dupCid)}" ist in dieser Szene mehrfach als Sprecher hinterlegt. ` +
-              `Bitte im Dialog jedem Redeanteil einen eigenen Charakter zuweisen.`
-            : `${dupBox} zeigen im Bild auf dasselbe Gesicht. ` +
-              `Bitte die Szene mit klar getrennten Sprechern neu generieren.`) +
-          ` Es wurde kein Lip-Sync gestartet.`;
-        console.error(`[compose-dialog-segments] scene=${sceneId} v387_identity_collision ${msg}`);
-        // v387 — Abbruch VOR dem ersten Provider-Aufruf: idempotent erstatten.
-        const alreadyRefundedIC = !!(existing as any)?.refunded;
-        if (!alreadyRefundedIC) {
-          try {
-            const { data: wIC } = await supabase
-              .from("wallets").select("balance").eq("user_id", userId).single();
-            await supabase
-              .from("wallets")
-              .update({
-                balance: Number(wIC?.balance ?? 0) + Number(totalCost ?? 0),
-                updated_at: new Date().toISOString(),
-              })
-              .eq("user_id", userId);
-          } catch (e) {
-            console.error(
-              `[compose-dialog-segments] scene=${sceneId} v387 identity-collision refund failed: ${(e as Error)?.message}`,
-            );
-          }
-        }
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(existing, {
-              version: 5,
-              engine: "sync-segments",
-              status: "failed",
-              refunded: true,
-              error: "v387_identity_collision",
-              finished_at: new Date().toISOString(),
-            }),
-            clip_error: msg,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
-        return json(
-          { ok: false, error: msg, refunded: alreadyRefundedIC ? 0 : totalCost },
-          200,
-        );
-
-      }
-    }
-
-
     console.warn(
       `[compose-dialog-segments] scene=${sceneId} v158_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} mouths=${speakerPlateMouths.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
     );
@@ -3012,48 +2629,6 @@ serve(async (req) => {
         422,
       );
     }
-
-    // ── v356 — PLATE FACE GEOMETRY: TELEMETRY, NOT A GATE ────────────────
-    // v354 blocked on a ratio, v355 blocked on absolute pixels. Both were
-    // generalised from one failing scene. The database says otherwise:
-    // the 2026-07-27 runs that completed successfully (scene 0f8818ee,
-    // 4 speakers, status=done) used 128px crops at 4.8 % face-share —
-    // numbers that both contracts reject. A pre-dispatch geometry gate
-    // cannot be defined for group shots without excluding the very
-    // configuration that is proven to work.
-    //
-    // The binding guard now sits AFTER the run: `mouth-motion-verdict`
-    // compares provider output against input, blocks the mux on a proven
-    // passthrough and refunds. That measures what the customer sees
-    // instead of predicting what the provider can do.
-    if (
-      !isAdvance &&
-      !isRetry &&
-      speakers.length >= 1 &&
-      plateDims &&
-      Number(plateDims.width) > 0
-    ) {
-      const contractBoxes = speakerPlateBboxes.filter(
-        (b): b is [number, number, number, number] =>
-          Array.isArray(b) && b.length === 4,
-      );
-      if (contractBoxes.length === speakers.length) {
-        const verdict = assertPlateFaceContract({
-          faces: contractBoxes,
-          plateWidth: Number(plateDims.width),
-          speakers: speakers.length,
-          mode: "pixels",
-        });
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} v356_plate_geometry_telemetry advisory_ok=${verdict.ok ? 1 : 0} ` +
-          `min_px=${verdict.minWidthPx} advisory_px=${verdict.requiredPx} ` +
-          `min_ratio=${verdict.minWidthRatio.toFixed(3)} plate_w=${plateDims.width} n=${speakers.length} — no block, verdict decides`,
-        );
-      }
-    }
-
-
-
 
     // ── v153.1 — Unified Pre-Flight Hard-Fail (N=1..4) ──────────────────
     // SINGLE-PATH-POLICY: jeder Sprecher MUSS eine eigene plate-native Box
@@ -3128,6 +2703,8 @@ serve(async (req) => {
               error: reason,
               finished_at: new Date().toISOString(),
             }),
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
             clip_error: (() => {
               if (speakers.length === 1) {
                 return "Lip-Sync abgebrochen: für den Sprecher konnte kein eindeutiges Gesicht in der Szene gefunden werden. " +
@@ -3173,8 +2750,6 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_status: "PREFLIGHT_BLOCKED", error_class: "v153_preflight_block",
@@ -3260,14 +2835,15 @@ serve(async (req) => {
               },
               finished_at: new Date().toISOString(),
             }),
+            lip_sync_status: "failed",
+            twoshot_stage: "needs_clip_rerender",
+            clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: userMsg,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
       } catch (_) { /* best-effort */ }
       try {
         await logSyncDispatch(supabase, {
@@ -3416,6 +2992,9 @@ serve(async (req) => {
               error: `v117_plate_quality_gate:${reason}`,
               finished_at: new Date().toISOString(),
             }),
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: splitScreenReason
@@ -3424,8 +3003,6 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
         try {
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -3658,14 +3235,15 @@ serve(async (req) => {
               v132_turn_gate: { failures, probes },
               finished_at: new Date().toISOString(),
             }),
+            lip_sync_status: "failed",
+            twoshot_stage: "needs_clip_rerender",
+            clip_status: "pending",
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: userMsg,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
         try {
           await logSyncDispatch(supabase, {
             scene_id: sceneId,
@@ -3779,27 +3357,20 @@ serve(async (req) => {
         .update(
           giveUp
             ? {
+                lip_sync_status: "failed",
+                twoshot_stage: "failed",
                 clip_error:
                   "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
                 dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: 0 }),
               }
             : {
+                lip_sync_status: "pending",
+                twoshot_stage: "pending",
                 clip_error: `awaiting_face_detection_retry_${nextRetryCount}_of_3`,
                 dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: nextRetryCount }),
               },
         )
         .eq("id", sceneId);
-      // v388 — Aufgeben bzw. Warten auf den nächsten Versuch über den Vertrag.
-      await transitionScene(
-        supabase,
-        sceneId,
-        giveUp ? "failed" : "audio_ready",
-        {
-          detail: giveUp
-            ? "v388_no_face_map_after_3_retries"
-            : `v388_awaiting_face_detection_retry_${nextRetryCount}`,
-        },
-      );
 
       await logSyncDispatch(supabase, {
         scene_id: sceneId,
@@ -3938,11 +3509,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: "speaker_count_mismatch: Zwei Cast-Mitglieder teilen denselben Character-Slot. Bitte vollen Namen verwenden oder eindeutige Cast-IDs zuweisen, dann 'Sauber neu starten'.",
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       return json(
         {
           error: "speaker_count_mismatch",
@@ -3970,11 +3541,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: "dialog_pipeline_no_per_speaker_tracks",
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       return json(
         {
           error: "no_per_speaker_tracks",
@@ -4239,11 +3810,11 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: `syncso_segments_preflight_${badProbe}`,
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_source_kind: "segments", video_url: sourceClipUrl,
@@ -4361,12 +3932,12 @@ serve(async (req) => {
             audio_diagnostics: audioDiagnostics,
             finished_at: new Date().toISOString(),
           }),
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: `syncso_audio_preflight_${reason}`,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "PREFLIGHT_BLOCKED", error_class: "audio_invalid",
@@ -4570,11 +4141,11 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
             clip_error: reason,
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
         return json(
           {
             error: strict && hadFaces ? "plate_target_face_missing" : "face_validation_failed",
@@ -4630,15 +4201,12 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
+            lip_sync_status: "pending",
+            twoshot_stage: "deferred",
             clip_error: `syncso_concurrency_deferred:${inflightCount}`,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        // v388 — Parken auf `audio_ready` läuft über den Vertrag.
-        await transitionScene(supabase, sceneId, "audio_ready", {
-          from: ["audio_prep", "audio_ready", "lipsync_dispatched"],
-          detail: "v388_syncso_concurrency_deferred",
-        });
       }
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -4718,50 +4286,6 @@ serve(async (req) => {
       passes = builtPasses;
       currentPassIdx = 0;
     }
-
-    // ── v343 — Slot-Integrity Guard ──────────────────────────────────────
-    // Verified failure (scene 69d56a49, 2026-07-31 23:09): a concurrent
-    // full-array read-modify-write left `passes[0]` as `{}` — no idx, no
-    // speaker_idx, no status. Every later redispatch then read
-    // `speaker_idx=undefined`, hit the v87 sanity block and returned a
-    // non-terminal 202 forever: the scene could neither finish nor fail and
-    // the UI hung on "Pass 4/4". Heal any structurally broken slot from the
-    // freshly built skeleton before anything downstream reads it.
-    if (Array.isArray(builtPasses) && builtPasses.length > 0) {
-      const healed: number[] = [];
-      for (let i = 0; i < passes.length; i++) {
-        const slot: any = passes[i];
-        const broken =
-          !slot ||
-          typeof slot !== "object" ||
-          !Number.isFinite(Number(slot.idx)) ||
-          !Number.isFinite(Number(slot.speaker_idx));
-        if (!broken) continue;
-        const skeleton: any = builtPasses[i];
-        if (!skeleton) continue;
-        // Skeleton first, then whatever survived on the wiped slot.
-        passes[i] = { ...skeleton, ...(slot && typeof slot === "object" ? slot : {}), idx: i, speaker_idx: skeleton.speaker_idx };
-        healed.push(i);
-      }
-      if (healed.length > 0) {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v343_slot_integrity_healed idx=[${healed.join(",")}] ` +
-          `total=${passes.length} — wiped pass slot(s) rebuilt from turn skeleton`,
-        );
-        try {
-          await logSyncDispatch(supabase, {
-            scene_id: sceneId,
-            user_id: userId,
-            engine: "sync-segments",
-            sync_status: "SLOT_INTEGRITY_HEALED",
-            error_class: "pass_slot_wiped",
-            error_message: `healed=[${healed.join(",")}] total=${passes.length}`,
-            meta: { v343: true, healed, total_passes: passes.length },
-          });
-        } catch { /* best-effort */ }
-      }
-    }
-
 
     // ── v87 — Coords refresh on advance/retry ────────────────────────────
     // Bug (verified in edge logs, scene 4c310576…): pass 1 dispatched with
@@ -4872,21 +4396,9 @@ serve(async (req) => {
     if (speakers.length >= 2) {
       const pSrc = coordSources[Number(passes[currentPassIdx]?.speaker_idx ?? -1)] ?? "none";
       if (pSrc === "heuristic" || pSrc === "none") {
-        // v343 — This guard used to return a non-terminal 202 unconditionally.
-        // A pass that can never resolve a coord source (e.g. a wiped slot with
-        // speaker_idx=undefined) therefore looped forever: no terminal status,
-        // no inflight row, nothing for the watchdog to reconcile, UI stuck on
-        // "Lip-Sync läuft…". Bound it like the fresh-path guard: 3 attempts,
-        // then terminal failure + refund.
-        const blockKey = `sanity_block_count_${currentPassIdx}`;
-        const prevBlockCount = Number((prevState as any)?.[blockKey] ?? 0);
-        const nextBlockCount = prevBlockCount + 1;
-        const giveUpSanity = nextBlockCount >= 3;
-
         console.warn(
           `[compose-dialog-segments] scene=${sceneId} v87 SANITY-BLOCK pass=${currentPassIdx} ` +
-          `speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc} ` +
-          `attempt=${nextBlockCount}/3 giveUp=${giveUpSanity}`,
+          `speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc} — skipping dispatch, awaiting retry`,
         );
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
@@ -4894,80 +4406,19 @@ serve(async (req) => {
           engine: "sync-segments",
           sync_status: "HEURISTIC_BLOCKED",
           error_class: "coords_heuristic_unverified",
-          error_message: `pass=${currentPassIdx} speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc} attempt=${nextBlockCount}/3`,
-          meta: {
-            speakers: speakers.length,
-            pass_idx: currentPassIdx,
-            is_advance: isAdvance,
-            is_retry: isRetry,
-            v343_block_count: nextBlockCount,
-            v343_gave_up: giveUpSanity,
-          },
+          error_message: `pass=${currentPassIdx} speaker_idx=${passes[currentPassIdx]?.speaker_idx} source=${pSrc}`,
+          meta: { speakers: speakers.length, pass_idx: currentPassIdx, is_advance: isAdvance, is_retry: isRetry },
         });
-
-        if (!giveUpSanity) {
-          await supabase
-            .from("composer_scenes")
-            .update({
-              dialog_shots: mergeDialogShots(prevState ?? {}, { [blockKey]: nextBlockCount }),
-            })
-            .eq("id", sceneId);
-          return json(
-            {
-              ok: true,
-              status: "awaiting_face_detection",
-              skipped: `pass_${currentPassIdx}_heuristic_coord_unverified`,
-              attempt: nextBlockCount,
-            },
-            202,
-          );
-        }
-
-        // Terminal: refund once, mark the scene failed so the UI stops waiting.
-        const alreadyRefundedSanity = !!(prevState as any)?.refunded;
-        if (!alreadyRefundedSanity) {
-          const { data: wSan } = await supabase
-            .from("wallets").select("balance").eq("user_id", userId).single();
-          await supabase
-            .from("wallets")
-            .update({
-              balance: Number(wSan?.balance ?? 0) + totalCost,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId);
-        }
-        const sanityReason =
-          `coords_unverified_pass_${currentPassIdx}: Für Sprecher ${currentPassIdx + 1} konnte keine ` +
-          `verifizierte Gesichtsposition ermittelt werden. Die Credits wurden erstattet — bitte die Plate neu rendern.`;
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: mergeDialogShots(prevState ?? {}, {
-              [blockKey]: 0,
-              status: "failed",
-              error: sanityReason,
-              refunded: !alreadyRefundedSanity,
-              finished_at: new Date().toISOString(),
-            }),
-            clip_error: sanityReason,
-          })
-          .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
-
         return json(
           {
-            ok: false,
-            status: "failed",
-            error: "coords_heuristic_unverified",
-            message: sanityReason,
-            refunded: !alreadyRefundedSanity,
+            ok: true,
+            status: "awaiting_face_detection",
+            skipped: `pass_${currentPassIdx}_heuristic_coord_unverified`,
           },
-          422,
+          202,
         );
       }
     }
-
 
 
     const pass = passes[currentPassIdx];
@@ -5031,22 +4482,6 @@ serve(async (req) => {
         } catch { /* best-effort */ }
         return json({ ok: true, skipped: "v193_pass_already_active", pass_idx: currentPassIdx, status: liveStatus }, 202);
       }
-      // ── v364 — Crash-Loop-Breaker für den Plate-Tracker ─────────────────
-      // Der v359-Tracker lief bis v363 in vollem Plate-Maßstab und hat den
-      // Edge-Worker mit `Memory limit exceeded` getötet, BEVOR der Preclip
-      // startete. Ein hart abgeschossener Worker räumt nichts auf: der Pass
-      // bleibt auf `rendering_preflight`, der Watchdog startet exakt denselben
-      // Absturz erneut. Findet ein neuer Lauf einen Tracker-Marker ohne
-      // Abschluss vor, wird das Tracking übersprungen und der Preclip statisch
-      // gerendert (Verhalten vor v359). Qualität > 0 schlägt Endlos-Hänger.
-      const trackCrashSuspected =
-        !!livePass?.plate_track_attempted_at && !livePass?.plate_track_completed_at;
-      const plateTrackDisabled = trackCrashSuspected || livePass?.plate_track_disabled === true;
-      if (plateTrackDisabled) {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v364_plate_track_disabled reason=${trackCrashSuspected ? "previous_worker_crash" : "flagged"}`,
-        );
-      }
       try {
         await supabase.rpc("update_dialog_pass_slot", {
           _scene_id: sceneId,
@@ -5055,7 +4490,6 @@ serve(async (req) => {
             status: "rendering_preflight",
             preflight_started_at: new Date().toISOString(),
             preflight_claim_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
-            plate_track_disabled: plateTrackDisabled,
           },
         });
       } catch (claimErr) {
@@ -5064,10 +4498,8 @@ serve(async (req) => {
         );
       }
       (pass as any).preflight_started_at = new Date().toISOString();
-      (pass as any).plate_track_disabled = plateTrackDisabled;
       pass.status = "rendering_preflight";
     }
-
 
     // ── v193 — Batch preclip all sibling passes immediately ──────────────
     // v192 only prefetched passes beyond the Sync.so concurrency cap. With cap=4
@@ -5229,18 +4661,15 @@ serve(async (req) => {
     // Variant (bbox-url-pro → coords-pro-box). Wenn ein Preclip existiert,
     // greift jedoch Rule 0 (v131.2 auto_detect_unconditional_on_preclip) und
     // kollabiert den Dispatch wieder auf `auto_detect` — die exakt selbe
-    // ASD-Shape, die gerade NOOP'd hat.
+    // ASD-Shape, die gerade NOOP'd hat. Resultat: 2 identische Dispatches,
+    // Ladder erschöpft, Hard-Fail.
     //
-    // v346 — HARTE EINSCHRÄNKUNG AUF N=1.
-    // Bei N≥2 blockiert das v204-Gate wenige Zeilen weiter unten JEDEN
-    // Full-Plate-Dispatch (`v204_preclip_required`). Der alte Bypass hat den
-    // Preclip also genau dann verworfen, wenn er zwingend gebraucht wird —
-    // die Pipeline erzeugte einen Retry, den ihr eigenes nächstes Gate
-    // garantiert ablehnt (Scene 7c11bc27, 01.08.2026). Multi-Speaker-Retries
-    // bleiben deshalb im v204/v169-konformen Preclip-Pfad.
+    // Fix: Bei einer NOOP-Eskalation mit deterministischem Variant droppen
+    // wir den per-Pass Preclip lokal (analog v120), damit der Full-Plate
+    // bbox-url-pro / coords-pro-box Pfad greift. Rule 0 wird so für genau
+    // diesen eskalierten Pass übergangen, nicht generell.
     const v148NoopBypassEligible =
       body?.noop_auto_escalation === true &&
-      speakers.length < 2 &&
       (requestedRetryVariant === "bbox-url-pro" || requestedRetryVariant === "coords-pro-box") &&
       !!(pass as any).preclip_url;
     if (v148NoopBypassEligible) {
@@ -5248,18 +4677,9 @@ serve(async (req) => {
       (pass as any).preclip_render_id = null;
       (pass as any).preclip_crop = null;
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v148_noop_bypass_preclip step=${body?.noop_escalation_step ?? "?"} variant=${requestedRetryVariant} speaker=${pass.speaker_name ?? "?"} — dropping preclip to allow full-plate deterministic ASD (N=1 only)`,
-      );
-    } else if (
-      body?.noop_auto_escalation === true &&
-      speakers.length >= 2 &&
-      !!(pass as any).preclip_url
-    ) {
-      console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v346_preclip_retained_on_retry speakers=${speakers.length} variant=${requestedRetryVariant} — v148 full-plate bypass disabled for multi-speaker (v204 would block it)`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v148_noop_bypass_preclip step=${body?.noop_escalation_step ?? "?"} variant=${requestedRetryVariant} speaker=${pass.speaker_name ?? "?"} — dropping preclip to allow full-plate deterministic ASD`,
       );
     }
-
 
     // ── v153.1 — Single-Path bbox-url-pro Pipeline (N=1..4 einheitlich) ──
     // PRECLIP IS DEAD. Es gibt nur noch einen einzigen Dispatch-Pfad:
@@ -5364,12 +4784,13 @@ serve(async (req) => {
               error: `v118_circuit_breaker:${reason}`,
               finished_at: new Date().toISOString(),
             }),
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_status: "failed",
             clip_error: `Lip-Sync abgebrochen: Sync.so hat für Sprecher „${pass.speaker_name ?? `Pass ${currentPassIdx + 1}`}" ${passFailCount}× hintereinander mit „provider_unknown_error" abgebrochen. Credits wurden zurückerstattet. Bitte drücke „Sauber neu starten" oder render die Plate neu, falls das Gesicht nicht klar erkennbar ist.`,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
         try {
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -5838,15 +5259,8 @@ serve(async (req) => {
       body?.noop_auto_escalation !== true;
 
     if (v161PreclipEligible) {
-      // v357 Schritt 5 — Handles an den Turn-Grenzen: 200 ms Vor-/Nachlauf,
-      // damit Sync.so den Mundansatz vor dem ersten Laut und das Schließen
-      // nach dem letzten Laut mitbekommt. Ohne Handles springt der Mund an
-      // der Fenstergrenze sichtbar. Der Mux legt den Clip weiterhin exakt
-      // an `preclip_start_sec` zurück, die Zeitlage bleibt also korrekt.
-      const V357_HANDLE_SEC = 0.2;
-      const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)) - V357_HANDLE_SEC);
-      const unionEnd = Math.min(totalSec, Math.max(...speakerWindowsSecs.map(([, e]) => e)) + V357_HANDLE_SEC);
-
+      const unionStart = Math.max(0, Math.min(...speakerWindowsSecs.map(([s]) => s)));
+      const unionEnd = Math.min(totalSec, Math.max(...speakerWindowsSecs.map(([, e]) => e)));
       const siblingCoords: Array<[number, number]> = [];
       for (let i = 0; i < speakers.length; i++) {
         if (i === pass.speaker_idx) continue;
@@ -5859,96 +5273,6 @@ serve(async (req) => {
       console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render START speaker=${pass.speaker_name} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] speakers=${speakers.length} plate_box=${platePassBoxForPreclip ? "yes" : "no"} siblings=${siblingCoords.length}`,
       );
-
-      // ─── v359 — PLATE-TRACK VOR DEM PRECLIP ──────────────────────────
-      // Bis v358 wurde das Gesicht erst NACH dem Preclip verfolgt (v357,
-      // im Clip-Raum) — der Ausschnitt selbst stand da längst fest. Genau
-      // deshalb konnte die belegte Kailee-Szene scheitern: die Spur wusste,
-      // wo der Mund ist, aber der Schnitt hatte ihn schon weggeschnitten.
-      //
-      // Der Track läuft jetzt VORHER auf der Plate, damit das Fenster dem
-      // Gesicht folgen kann. Schlägt er fehl, rendert der Preclip statisch
-      // wie vor v359 — ein fehlender Track darf keine Szene blockieren.
-      let v359PlateTrack:
-        | Array<{ t: number; box: [number, number, number, number] }>
-        | null = null;
-      // v363 — The tracker is optional and must not consume the whole Edge
-      // worker before the actual Lambda preclip render. The failing production
-      // run exhausted worker resources while probing a 1.38 s turn and never
-      // reached Sync.so. Short turns cannot travel far enough to justify the
-      // AWS-still fan-out; longer turns use three support frames at most.
-      const turnDurationSec = Math.max(0, unionEnd - unionStart);
-      // v364 — Crash-Loop-Breaker: hat ein früherer Lauf den Worker während
-      // des Trackings verloren, wird hier ohne Tracker gerendert.
-      const trackerBlocked = (pass as any)?.plate_track_disabled === true;
-      const shouldTrackPlate = !!platePassBoxForPreclip && turnDurationSec >= 2 && !trackerBlocked;
-      if (shouldTrackPlate) {
-        // v364 — Marker setzen. Stirbt der Worker im Tracker, findet der
-        // nächste Lauf `plate_track_attempted_at` ohne `..._completed_at`
-        // und überspringt das Tracking.
-        try {
-          await supabase.rpc("update_dialog_pass_slot", {
-            _scene_id: sceneId,
-            _pass_idx: currentPassIdx,
-            _patch: {
-              plate_track_attempted_at: new Date().toISOString(),
-              plate_track_completed_at: null,
-            },
-          });
-        } catch { /* best-effort */ }
-        try {
-          const plateTrack = await trackFaceAcrossTurn({
-            videoUrl: sourceClipUrl,
-            width: plateDims.width,
-            height: plateDims.height,
-            startSec: unionStart,
-            endSec: unionEnd,
-            anchorBox: platePassBoxForPreclip as [number, number, number, number],
-            deadline: Date.now() + 35_000,
-            maxSamples: 3,
-            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1} v359_plate`,
-          });
-          if (plateTrack.ok && plateTrack.keyframes.length >= 2) {
-            // v372 — Der Tracker liefert ab sofort ROHE Gesichtsboxen. Der
-            // Kontextaufschlag gehört an die Aufrufstelle; hier bleibt das
-            // Verhalten damit exakt wie vor v372 (Kamerapfad des Preclips).
-            v359PlateTrack = plateTrack.keyframes.map((k) => ({
-              t: k.t,
-              box: withContextPadding(
-                k.box as [number, number, number, number],
-                plateDims.width,
-                plateDims.height,
-              ) as [number, number, number, number],
-            }));
-          }
-
-          console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track ` +
-            `source=${plateTrack.source} keyframes=${plateTrack.keyframes.length} ` +
-            `detection_ratio=${(plateTrack.detectionRatio ?? 0).toFixed(2)} ` +
-            `peak_motion_px=${plateTrack.peakMotionPx ?? 0} extra=${plateTrack.extraSamples ?? 0} ` +
-            `ms=${plateTrack.ms}`,
-          );
-        } catch (trackErr) {
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track_failed ${(trackErr as Error)?.message ?? String(trackErr)}`,
-          );
-        }
-        try {
-          await supabase.rpc("update_dialog_pass_slot", {
-            _scene_id: sceneId,
-            _pass_idx: currentPassIdx,
-            _patch: { plate_track_completed_at: new Date().toISOString() },
-          });
-        } catch { /* best-effort */ }
-      } else if (platePassBoxForPreclip) {
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v363_plate_track_skipped ` +
-          `duration=${turnDurationSec.toFixed(2)}s reason=${trackerBlocked ? "v364_crash_loop_breaker" : "short_turn_resource_guard"}`,
-        );
-      }
-
-
       try {
         const preclipResult = await renderPassFacePreclip(
           supabase,
@@ -5968,17 +5292,9 @@ serve(async (req) => {
             siblingCoords: siblingCoords.length > 0 ? siblingCoords : null,
             startSec: unionStart,
             endSec: unionEnd,
-            track: v359PlateTrack,
-            // Sprachfenster relativ zum Preclip-Start — Sichtbarkeit während
-            // der tatsächlichen Sprachframes wiegt schwerer als in Handles.
-            voicedWindows: speakerWindowsSecs.map(([s, e]) => [
-              Math.max(0, s - unionStart),
-              Math.max(0, e - unionStart),
-            ]) as Array<[number, number]>,
           },
           300_000,
         );
-
         if (preclipResult.ok && preclipResult.preclipUrl && preclipResult.crop) {
           passPreclipUrl = preclipResult.preclipUrl;
           usePassPreclip = true;
@@ -5990,17 +5306,8 @@ serve(async (req) => {
             size: preclipResult.crop.size,
             outputSize: preclipResult.crop.outputSize,
           };
-          // v359 — der bewegte Ausschnitt. Der Mux MUSS den lipsynced Crop
-          // entlang exakt dieses Pfades zurücklegen, sonst schmiert das
-          // Gesicht über die Plate. Fehlt der Pfad, bleibt `preclip_crop`
-          // maßgeblich (statisches Verhalten wie vor v359).
-          (pass as any).preclip_crop_path = preclipResult.cropPath ?? null;
-          (pass as any).preclip_crop_mode = preclipResult.cropMode ?? "static";
-          (pass as any).preclip_camera_travel_px = preclipResult.cameraTravelPx ?? 0;
-          (pass as any).preclip_track_containment = preclipResult.trackContainment ?? null;
           (pass as any).preclip_start_sec = Number(unionStart.toFixed(3));
           (pass as any).preclip_end_sec = Number(unionEnd.toFixed(3));
-
           // v163 — persist the exact Remotion render frame count. Sync.so
           // requires `bounding_boxes_url.bounding_boxes.length` to match the
           // dispatched video frames exactly; duration-derived `round(dur*fps)`
@@ -6012,69 +5319,16 @@ serve(async (req) => {
           (pass as any).preclip_duration_sec = Number(
             (preclipResult.durationSec ?? Math.max(0.2, unionEnd - unionStart)).toFixed(3),
           );
-          (pass as any).preclip_dims = preclipResult.actualDims ?? {
-            width: preclipResult.crop.outputSize,
-            height: preclipResult.crop.outputSize,
-          };
           (pass as any).preclip_error = null;
           // v247 — mouth-anchor observability, flowed into syncso_dispatch_log via meta.
           (pass as any).preclip_anchor = preclipResult.anchor ?? null;
           (pass as any).preclip_face_share = Number.isFinite(Number(preclipResult.faceShareInCrop))
             ? Number(preclipResult.faceShareInCrop)
             : null;
-          // v344.1 — linear share is the gate metric; persist it alongside.
-          (pass as any).preclip_side_share = Number.isFinite(Number(preclipResult.faceSideShare))
-            ? Number(preclipResult.faceSideShare)
-            : null;
-          (pass as any).preclip_face_side_px = Number.isFinite(Number(preclipResult.faceSidePx))
-            ? Number(preclipResult.faceSidePx)
-            : null;
-          (pass as any).preclip_min_size_widened = !!preclipResult.minSizeWidened;
           (pass as any).preclip_mouth_offset_px = Number.isFinite(Number(preclipResult.mouthOffsetPx))
             ? Number(preclipResult.mouthOffsetPx)
             : null;
           (pass as any).preclip_clamped = !!preclipResult.clamped;
-          // v367 — Overlay-Kollisions-Vertrag.
-          // Wenn zwei Sprecher denselben Bildausschnitt bekommen, landen alle
-          // lipsynced Overlays im Mux auf EINEM Gesicht (der Kunde sieht dann
-          // eine einzige Person, die sämtliche Dialoge spricht). Das ist ein
-          // harter Fehler und darf NIE stillschweigend gemuxt werden.
-          try {
-            const myCrop = (pass as any).preclip_crop as { x: number; y: number; size: number };
-            for (let oi = 0; oi < passes.length; oi++) {
-              if (oi === currentPassIdx) continue;
-              const oc = (passes[oi] as any)?.preclip_crop as
-                | { x: number; y: number; size: number }
-                | null
-                | undefined;
-              if (!oc || !Number.isFinite(Number(oc.size)) || Number(oc.size) <= 0) continue;
-              const dx = (myCrop.x + myCrop.size / 2) - (oc.x + oc.size / 2);
-              const dy = (myCrop.y + myCrop.size / 2) - (oc.y + oc.size / 2);
-              const dist = Math.hypot(dx, dy);
-              const minSep = 0.4 * Math.min(myCrop.size, Number(oc.size));
-              if (dist < minSep) {
-                throw new Error(
-                  `lipsync_overlay_collision: Sprecher ${currentPassIdx + 1} und ${oi + 1} zeigen auf denselben Bildausschnitt ` +
-                    `(Abstand ${Math.round(dist)}px < ${Math.round(minSep)}px). Die Gesichts-Zuordnung ist mehrdeutig — ` +
-                    `bitte Szene mit klar getrennten Sprechern neu generieren.`,
-                );
-              }
-            }
-          } catch (collisionErr) {
-            const msg = (collisionErr as Error).message;
-            console.error(`[compose-dialog-segments] scene=${sceneId} v367_overlay_collision ${msg}`);
-            await supabase
-              .from("composer_scenes")
-              .update({
-                clip_error: msg,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", sceneId);
-            // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-            await failSceneState(supabase, sceneId, "failed");
-            return json({ ok: false, error: msg }, 200);
-          }
-
           console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_preclip_render OK url=…${passPreclipUrl.slice(-60)} crop=${JSON.stringify((pass as any).preclip_crop)} render_id=${preclipResult.preclipRenderId} frames=${(pass as any).preclip_frame_count} dur=${(pass as any).preclip_duration_sec} fps=${(pass as any).preclip_fps} v247_anchor=${(pass as any).preclip_anchor} face_share=${(pass as any).preclip_face_share} mouth_off_px=${(pass as any).preclip_mouth_offset_px}`,
           );
@@ -6082,20 +5336,10 @@ serve(async (req) => {
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           if (speakers.length >= 2) {
-            // v353 — the native-crop floor is a *pre-dispatch* block, not a
-            // timeout. Tell the user exactly what to change instead of the
-            // generic "Preclip nicht rechtzeitig fertig".
-            const tooSmall = String(preclipResult.error ?? "").startsWith(
-              "plate_face_too_small_for_lipsync",
-            );
-            const speakerLabel = pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`;
-            const reason = tooSmall
-              ? `v353_plate_face_too_small: „${speakerLabel}" ist auf der Szene zu klein im Bild, dafür erzeugt der Lip-Sync-Anbieter nachweislich keine Mundbewegung (${preclipResult.error}). Bitte die Szene mit näherem Bildausschnitt / größeren Gesichtern neu rendern.`
-              : `v187_preclip_required_no_fullplate_fallback: Preclip für „${speakerLabel}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+            const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
             console.error(
-              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} ${tooSmall ? "v353_plate_face_too_small" : "v187_preclip_required_no_fullplate_fallback"} speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing dispatch`,
+              `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
             );
-
             await logSyncDispatch(supabase, {
               scene_id: sceneId,
               user_id: userId,
@@ -6257,14 +5501,15 @@ serve(async (req) => {
             },
             finished_at: new Date().toISOString(),
           }),
+          lip_sync_status: "failed",
+          twoshot_stage: "needs_clip_rerender",
+          clip_status: "pending",
           clip_url: null,
           lip_sync_source_clip_url: null,
           clip_error: friendlyClipError,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
 
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -6469,15 +5714,6 @@ serve(async (req) => {
         | { x: number; y: number; size: number; outputSize: number }
         | undefined : undefined;
       const v161UsingPreclipForBbox = usePassPreclip && !!passPreclipUrl && !!v161PreclipCrop;
-      const v358ActualPreclipDims = v161UsingPreclipForBbox
-        ? (pass as any).preclip_dims as { width?: number; height?: number } | undefined
-        : undefined;
-      const v358DispatchWidth = v161UsingPreclipForBbox
-        ? Math.max(1, Number(v358ActualPreclipDims?.width ?? v161PreclipCrop?.outputSize ?? 0))
-        : Math.max(1, Number(plateDims?.width ?? videoDims.width));
-      const v358DispatchHeight = v161UsingPreclipForBbox
-        ? Math.max(1, Number(v358ActualPreclipDims?.height ?? v161PreclipCrop?.outputSize ?? 0))
-        : Math.max(1, Number(plateDims?.height ?? videoDims.height));
       // v204 — Preclip is the canonical multi-speaker path again. No hard-fail here.
       const probeUrlForBbox = v161UsingPreclipForBbox ? (passPreclipUrl as string) : passInputUrl;
       const v161PreclipStartSec = v161UsingPreclipForBbox
@@ -6540,160 +5776,22 @@ serve(async (req) => {
       // Box in the dispatched video's pixel space.
       let dispatchBox: [number, number, number, number] | null = box;
       if (v161UsingPreclipForBbox && box && v161PreclipCrop) {
-        const scaleX = v358DispatchWidth / Math.max(1, v161PreclipCrop.size);
-        const scaleY = v358DispatchHeight / Math.max(1, v161PreclipCrop.size);
-        const cx1 = Math.max(0, Math.round((box[0] - v161PreclipCrop.x) * scaleX));
-        const cy1 = Math.max(0, Math.round((box[1] - v161PreclipCrop.y) * scaleY));
-        const cx2 = Math.min(v358DispatchWidth, Math.round((box[2] - v161PreclipCrop.x) * scaleX));
-        const cy2 = Math.min(v358DispatchHeight, Math.round((box[3] - v161PreclipCrop.y) * scaleY));
+        const scale = v161PreclipCrop.outputSize / Math.max(1, v161PreclipCrop.size);
+        const cx1 = Math.max(0, Math.round((box[0] - v161PreclipCrop.x) * scale));
+        const cy1 = Math.max(0, Math.round((box[1] - v161PreclipCrop.y) * scale));
+        const cx2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[2] - v161PreclipCrop.x) * scale));
+        const cy2 = Math.min(v161PreclipCrop.outputSize, Math.round((box[3] - v161PreclipCrop.y) * scale));
         if (cx2 > cx1 + 4 && cy2 > cy1 + 4) {
           dispatchBox = [cx1, cy1, cx2, cy2];
         } else {
           // Fallback: most of the preclip IS the face.
-          const padX = Math.max(2, Math.round(v358DispatchWidth * 0.08));
-          const padY = Math.max(2, Math.round(v358DispatchHeight * 0.08));
-          dispatchBox = [padX, padY, v358DispatchWidth - padX, v358DispatchHeight - padY];
+          const pad = Math.max(2, Math.round(v161PreclipCrop.outputSize * 0.08));
+          dispatchBox = [pad, pad, v161PreclipCrop.outputSize - pad, v161PreclipCrop.outputSize - pad];
         }
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_bbox_clip_space plate_box=${JSON.stringify(box)} crop=${JSON.stringify(v161PreclipCrop)} → clip_box=${JSON.stringify(dispatchBox)} windows_clip=${JSON.stringify(v124VoicedWindows)}`,
         );
       }
-
-      // ─── v357 — ECHTES PER-FRAME-TRACKING ─────────────────────────────
-      // Bis v356 war die "bounding_boxes_url" faktisch eine Standbox: für
-      // jeden Frame dieselben Koordinaten, nur an-/ausgeschaltet nach
-      // Voiced-Window. Bewegt sich die Figur, zeigt diese Box ins Leere,
-      // Sync 3 findet keinen Mund und liefert das Eingangsvideo unverändert
-      // zurück — genau der "Passthrough", den wir wochenlang gemessen haben.
-      // Ab hier verfolgen wir das Gesicht wirklich über die Frames des Turns.
-      let v357TrackedBoxes: Array<[number, number, number, number] | null> | null = null;
-      let v357TrackSource = "not_attempted";
-      let v357TrackMovementPx = 0;
-      // v372 — Forensik: Geometrie vor/nach Padding und Clamp, damit beim
-      // nächsten Fall in EINER Zeile sichtbar ist, ob Geometrie oder Provider
-      // die Ursache war.
-      const v372BoxBeforeTrack = dispatchBox ? ([...dispatchBox] as [number, number, number, number]) : null;
-      let v372Clamped = false;
-      if (dispatchBox && retryVariant === "bbox-url-pro") {
-        const trackW = v358DispatchWidth;
-        const trackH = v358DispatchHeight;
-        const windowStart = v124VoicedWindows.length > 0
-          ? Math.min(...v124VoicedWindows.map(([s]) => s))
-          : 0;
-        const windowEnd = v124VoicedWindows.length > 0
-          ? Math.max(...v124VoicedWindows.map(([, e]) => e))
-          : frameCount / Math.max(1, dispatchFps);
-        try {
-          const track = await trackFaceAcrossTurn({
-            videoUrl: probeUrlForBbox,
-            width: trackW,
-            height: trackH,
-            startSec: windowStart,
-            endSec: windowEnd,
-            anchorBox: dispatchBox,
-            deadline: Date.now() + 45_000,
-            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1}`,
-          });
-          v357TrackSource = track.source;
-          if (track.ok && track.keyframes.length > 0) {
-            // v372 — Kontextaufschlag GENAU HIER, auf die rohen Tracker-Boxen.
-            // Das ist die einzige Stelle, an der die Dispatch-Geometrie ihren
-            // Kontext bekommt.
-            v357TrackedBoxes = interpolateBoxes({
-              keyframes: track.keyframes.map((k) => ({
-                t: k.t,
-                box: withContextPadding(k.box, trackW, trackH),
-              })),
-              frameCount,
-              fps: dispatchFps ?? ASSUMED_FPS,
-              voicedWindowsSec: v124VoicedWindows,
-            });
-            v357TrackMovementPx = trackMovementPx(v357TrackedBoxes);
-          }
-          // v372 — Kein `else` mehr. Die Anchor-Box wurde oben bereits aus der
-          // kontextualisierten Plate-Face-Box in den Clip-Raum überführt; ein
-          // zweiter Aufschlag machte aus Samuels gültiger 40%-Box eine
-          // 84.86%-Fast-Vollbildbox (Szene 6bf4e815) und Sync.so gab den
-          // Preclip unverändert zurück. Tracking-Ausfall darf die Geometrie
-          // nicht systematisch verändern.
-        } catch (e) {
-          v357TrackSource = "track_threw";
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v357_track_failed ${(e as Error).message}`,
-          );
-        }
-
-        // ─── v393.2 — ANCHOR-RESCUE AUF DEM PRECLIP ────────────────────
-        // Ohne Track gilt sonst die aus dem Plate-Raum reprojizierte Box
-        // weiter. Genau die war in den Passthrough-Faellen entartet (am
-        // Rand geclamped, Mund ausserhalb). Auf einem Einzelsprecher-
-        // Preclip ist genau EIN Gesicht im Bild: ein AWS-Still misst die
-        // wahre Box, statt sie zu raten.
-        let v393AnchorRescue = "not_needed";
-        if (!v357TrackedBoxes && v161UsingPreclipForBbox) {
-          const rescueAt = Math.max(
-            0,
-            (v124VoicedWindows.length > 0 ? Math.min(...v124VoicedWindows.map(([s]) => s)) : 0) + 0.15,
-          );
-          const rescued = await detectAnchorBoxOnClip({
-            videoUrl: probeUrlForBbox,
-            width: trackW,
-            height: trackH,
-            atSec: rescueAt,
-            deadline: Date.now() + 20_000,
-            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1}`,
-          });
-          if (rescued.box) {
-            dispatchBox = withContextPadding(rescued.box, trackW, trackH);
-            v393AnchorRescue = `rescued_faces_${rescued.faces}`;
-          } else {
-            v393AnchorRescue = `rescue_failed:${rescued.error ?? "unknown"}`;
-          }
-          console.log(
-            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v393_anchor_rescue ` +
-            `result=${v393AnchorRescue} box=${JSON.stringify(dispatchBox)} track_source=${v357TrackSource}`,
-          );
-          (pass as any)._v393AnchorRescue = v393AnchorRescue;
-        }
-
-
-
-        // v372 — Entartungen zurückschneiden statt abbrechen. Ein Hard-Fail
-        // würde Credits vernichten, obwohl die Geometrie korrigierbar ist.
-        const clampedAnchor = clampBoxArea(dispatchBox, trackW, trackH);
-        if (clampedAnchor.clamped) {
-          dispatchBox = clampedAnchor.box;
-          v372Clamped = true;
-        }
-        if (v357TrackedBoxes) {
-          let anyClamped = false;
-          v357TrackedBoxes = v357TrackedBoxes.map((b) => {
-            if (!b) return b;
-            const c = clampBoxArea(b, trackW, trackH);
-            if (c.clamped) anyClamped = true;
-            return c.box;
-          });
-          if (anyClamped) v372Clamped = true;
-        }
-
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v357_face_track ` +
-          `source=${v357TrackSource} movement_px=${v357TrackMovementPx} frames=${frameCount} ` +
-          `space=${v161UsingPreclipForBbox ? "clip" : "plate"} dims=${trackW}x${trackH}`,
-        );
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v372_box_geometry ` +
-          `source=${v357TrackSource} anchor_in=${JSON.stringify(v372BoxBeforeTrack)} ` +
-          `anchor_out=${JSON.stringify(dispatchBox)} clamped=${v372Clamped} ` +
-          `max_area_frac=${MAX_DISPATCH_BOX_AREA_FRAC}`,
-        );
-        (pass as any)._v357TrackSource = v357TrackSource;
-        (pass as any)._v357TrackMovementPx = v357TrackMovementPx;
-        (pass as any)._v372BoxIn = v372BoxBeforeTrack;
-        (pass as any)._v372BoxOut = dispatchBox;
-        (pass as any)._v372Clamped = v372Clamped;
-      }
-
 
       let usedUrl: string | null = null;
       let nonNullFrames = frameCount;
@@ -6707,12 +5805,10 @@ serve(async (req) => {
           frameCount,
           voicedWindowsSec: v124VoicedWindows,
           fps: dispatchFps,
-          trackedBoxes: v357TrackedBoxes ?? undefined,
         });
         usedUrl = up.url;
         nonNullFrames = up.nonNullFrames;
       }
-
 
 
       // v147 — Pre-Dispatch Validation: bbox-url muss mind. 1 voiced frame
@@ -6724,7 +5820,7 @@ serve(async (req) => {
       // Preclip-Modus ist die Box-Fläche praktisch das ganze Bild (≈ 60-95 %),
       // also wird der upper-bound für Preclip auf 0.98 angehoben.
       const dispatchDimsArea = v161UsingPreclipForBbox && v161PreclipCrop
-        ? Math.max(1, v358DispatchWidth * v358DispatchHeight)
+        ? Math.max(1, v161PreclipCrop.outputSize * v161PreclipCrop.outputSize)
         : Math.max(1, (plateDims?.width ?? 0) * (plateDims?.height ?? 0));
       const boxArea = dispatchBox ? Math.max(0, (dispatchBox[2] - dispatchBox[0]) * (dispatchBox[3] - dispatchBox[1])) : 0;
       const boxAreaPct = boxArea / dispatchDimsArea;
@@ -6732,70 +5828,7 @@ serve(async (req) => {
       const v152BboxSane = boxAreaPct >= 0.002 && boxAreaPct <= v152UpperBound;
       (pass as any)._v152BboxAreaPct = Number(boxAreaPct.toFixed(4));
 
-      // ════════════════════════════════════════════════════════════════
-      // v359 — DREI HARTE STOPPS VOR DEM KOSTENPFLICHTIGEN DISPATCH
-      //
-      // Bewusst NUR drei. v344–v355 haben gezeigt, wohin weiche
-      // Qualitätsschwellen führen: sie blockieren legitime Szenen, werden
-      // gelockert, und der Passthrough kommt zurück. Diese drei Fälle sind
-      // keine Qualitätsurteile, sondern nachweisbare Widersprüche — in
-      // ihnen KANN der Provider gar nicht arbeiten, ein Dispatch wäre
-      // sicher verlorenes Geld. Alles andere bleibt Telemetrie und wird
-      // weiterhin am Ergebnis entschieden (mouth-motion-verdict).
-      // ════════════════════════════════════════════════════════════════
-      let v359HardStop: string | null = null;
-
-      if (v161UsingPreclipForBbox && v161PreclipCrop) {
-        // (1) Box-Anzahl ≠ Frame-Anzahl des tatsächlich dispatchten Videos.
-        //     Sync.so ordnet Boxen positionsweise zu; bei Versatz zeigt jede
-        //     Box auf den falschen Frame.
-        const decodedFrames = Math.round(Number((pass as any).preclip_frame_count ?? 0));
-        if (decodedFrames > 0 && frameCount !== decodedFrames) {
-          v359HardStop = `bbox_count_mismatch:boxes=${frameCount},frames=${decodedFrames}`;
-        }
-
-        // (2) Box liegt außerhalb des realen Preclip-Pixelraums.
-        if (!v359HardStop && dispatchBox) {
-          const [bx1, by1, bx2, by2] = dispatchBox;
-          const outOfBounds =
-            bx1 < 0 || by1 < 0 ||
-            bx2 > v358DispatchWidth || by2 > v358DispatchHeight ||
-            bx2 <= bx1 || by2 <= by1;
-          if (outOfBounds) {
-            v359HardStop = `bbox_out_of_clip_space:box=${JSON.stringify(dispatchBox)},space=${v358DispatchWidth}x${v358DispatchHeight}`;
-          }
-        }
-
-        // (3) Gesicht im gesamten Sprachkern nie im Ausschnitt. Nicht "zu
-        //     klein", nicht "knapp" — nie. Dann existiert kein Mund, den
-        //     Sync.so animieren könnte, und Passthrough ist garantiert.
-        const containment = (pass as any).preclip_track_containment;
-        if (
-          !v359HardStop &&
-          (pass as any).preclip_crop_mode === "camera_path" &&
-          Number.isFinite(Number(containment)) &&
-          Number(containment) <= 0
-        ) {
-          v359HardStop = "face_never_visible_in_speech_window";
-        }
-      }
-
-      if (v359HardStop) {
-        (pass as any)._v152HardFail = {
-          reason: v359HardStop,
-          errorClass: "v359_predispatch_hard_stop",
-          message:
-            `Die Szene wurde vor dem kostenpflichtigen Lip-Sync-Lauf gestoppt: ${v359HardStop}. ` +
-            `Es wurden keine Credits verbraucht.`,
-        };
-        console.error(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_hard_stop ${v359HardStop} ` +
-          `crop_mode=${(pass as any).preclip_crop_mode ?? "static"} travel_px=${(pass as any).preclip_camera_travel_px ?? 0}`,
-        );
-      }
-
-      if (!v359HardStop && v147BboxValid && v152BboxSane) {
-
+      if (v147BboxValid && v152BboxSane) {
         syncOptions.active_speaker_detection = {
           auto_detect: false,
           bounding_boxes_url: usedUrl!,
@@ -6804,15 +5837,12 @@ serve(async (req) => {
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v163_BBOX_URL_PRIMARY speaker=${pass.speaker_name} space=${v161UsingPreclipForBbox ? "clip" : "plate"} box=${JSON.stringify(dispatchBox)} source=${bboxSource} frames=${frameCount} voiced_frames=${nonNullFrames} area_pct=${(boxAreaPct * 100).toFixed(2)} windows=${JSON.stringify(v124VoicedWindows)} url=…${usedUrl!.slice(-60)}`,
         );
       } else if (
-        !v359HardStop && (
-          retryVariant === "coords-pro-box" ||
-          // v279 — Graceful-Degrade: wenn NUR der Storage-Upload gescheitert ist,
-          // aber Geometrie sane und voiced-frames vorhanden → inline bboxes statt
-          // Hard-Fail/Refund. Entspricht dem in v82 dokumentierten Default-Pfad.
-          (!usedUrl && v152BboxSane && dispatchBox)
-        )
+        retryVariant === "coords-pro-box" ||
+        // v279 — Graceful-Degrade: wenn NUR der Storage-Upload gescheitert ist,
+        // aber Geometrie sane und voiced-frames vorhanden → inline bboxes statt
+        // Hard-Fail/Refund. Entspricht dem in v82 dokumentierten Default-Pfad.
+        (!usedUrl && v152BboxSane && dispatchBox)
       ) {
-
         const boundingBoxes: ([number, number, number, number] | null)[] =
           v124VoicedWindows.length > 0
             ? buildPerFrameBoxes({
@@ -6831,8 +5861,7 @@ serve(async (req) => {
         console.log(
           `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v279_BBOX_INLINE_FALLBACK reason=${degradeReason} speaker=${pass.speaker_name} box=${JSON.stringify(dispatchBox ?? box)} source=${bboxSource} frames=${frameCount} voiced_frames=${inlineNonNull} area_pct=${(boxAreaPct * 100).toFixed(2)}`,
         );
-      } else if (!v359HardStop) {
-
+      } else {
         // v152 — Hard-Fail nur noch für echte Datenprobleme (zero voiced frames
         // oder geometrisch unsinnige Boxen). Upload-Fehler werden oben durch
         // v279 Inline-Fallback abgefangen.
@@ -6847,7 +5876,6 @@ serve(async (req) => {
         (pass as any)._v152HardFail = {
           reason: v152FailReason,
           errorClass: "v152_bbox_hard_fail",
-
           message:
             `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" konnte nicht vorbereitet werden ` +
             `(${v152FailReason}). Bitte Szene neu rendern — Sprecher muss frontal und unverdeckt im Bild sein. ` +
@@ -6977,11 +6005,11 @@ serve(async (req) => {
             error: reason,
             finished_at: new Date().toISOString(),
           }),
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: reason,
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_source_kind: "segments", video_url: passInputUrl,
@@ -7637,18 +6665,6 @@ serve(async (req) => {
       const gateCoord: [number, number] | null = Array.isArray(gateAsd?.coordinates) && gateAsd.coordinates.length >= 2
         ? [Number(gateAsd.coordinates[0]), Number(gateAsd.coordinates[1])]
         : null;
-      // ── v396 — Framevertrag. `preclip_frame_count` stammt aus dem real
-      // gerenderten und encodierten Preclip. Ohne diese Zahl darf das Gate
-      // keinen Frame mehr über Sekunden raten; mit ihr wird ein absoluter
-      // Plate-Frame als `frame_mapping_failed` blockiert statt still auf
-      // t=0.05s zurückzufallen (belegter Fall: 102 gegen 68 Frames).
-      const decodedPreclipFrames = Number.isFinite(Number((pass as any).preclip_frame_count))
-        ? Math.round(Number((pass as any).preclip_frame_count))
-        : 0;
-      const preclipLocalFrame = usePassPreclip && decodedPreclipFrames > 0
-        ? (gateFrame != null && gateFrame >= 0 && gateFrame < decodedPreclipFrames ? gateFrame : 0)
-        : undefined;
-
       const gateMulti = speakers.length >= 2;
       const preclipDimsForGate = (pass as any).preclip_dims ?? null;
       const preclipCropForGate = (pass as any).preclip_crop ?? null;
@@ -7665,29 +6681,7 @@ serve(async (req) => {
       // trusted" short-circuit (v131.4) is gone because we no longer dispatch
       // auto_detect on preclips; we send explicit center coords and the gate
       // (+ Sync.so auto-snap) is the safety net against drift.
-      // ── v397 — Geometrie-Roundtrip VOR dem Gate prüfen ────────────────
-      // Nur mit grünem Roundtrip darf ein reiner Messausfall (alle Stills
-      // leer) in einen degradierten Dispatch münden statt hart zu scheitern.
-      let geometryContractOkPre = false;
-      if (usePassPreclip && preclipCropForGate) {
-        try {
-          const tPre = buildPreclipTransform({
-            x: Number(preclipCropForGate.x),
-            y: Number(preclipCropForGate.y),
-            size: Number(preclipCropForGate.size),
-            outputSize: Number(preclipCropForGate.outputSize ?? gateWidth ?? 720),
-          });
-          geometryContractOkPre = assertRoundtrip(tPre, [
-            [tPre.crop.x, tPre.crop.y],
-            [tPre.crop.x + tPre.crop.size, tPre.crop.y + tPre.crop.size],
-          ]).ok;
-        } catch {
-          geometryContractOkPre = false;
-        }
-      }
-
       const gate = await verifyFaceBeforeDispatch({
-
         videoUrl: dispatchVideoUrl,
         frameNumber: gateFrame,
         coord: gateCoord,
@@ -7701,102 +6695,14 @@ serve(async (req) => {
         sceneId,
         passIdx: currentPassIdx,
         preclipTrusted: preclipTrustedForGate,
-        // v393 — auf einem Preclip ist der Mund die Vorbedingung: fehlt er
-        // oder klebt er am Rand, animiert Sync.so nichts und reicht den
-        // Clip unveraendert durch. Lieber hier scheitern als nach dem Lauf.
-        requireMouth: usePassPreclip,
-        fps: Number.isFinite(Number((pass as any).preclip_fps)) && Number((pass as any).preclip_fps) > 0
-          ? Number((pass as any).preclip_fps)
-          : undefined,
-        // v396 — Framevertrag statt Sekunden-Fallback.
-        decodedPreclipFrameCount: usePassPreclip && decodedPreclipFrames > 0 ? decodedPreclipFrames : undefined,
-        preclipFrameIndex: preclipLocalFrame,
-        // v397 — Voraussetzung für den eng begrenzten degradierten Pfad.
-        geometryContractOk: geometryContractOkPre,
       });
-
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
         (pass as any).probe_frame_cached = !!gate.frame_cached;
       }
-      // ── v397 — Probe-Forensik persistieren: welche Stills wurden mit
-      // welchem Ergebnis angeschaut? Ohne das lässt sich ein späteres
-      // "kein Gesicht" nicht mehr am Bild überprüfen.
-      (pass as any).probe_still_urls = gate.probe_still_urls ?? null;
-      (pass as any).probe_still_bytes = gate.probe_still_bytes ?? null;
-      (pass as any).probe_frame_indices = gate.probe_frame_indices ?? null;
-      (pass as any).probe_verdicts = gate.probe_verdicts ?? null;
-      (pass as any).probe_degraded = gate.code === "probe_degraded";
-
-      // v393 — Messfenster persistieren: die Passthrough-Bewertung misst
-      // damit den Mund statt eines generischen Grossbereichs.
-      if (Array.isArray(gate.mouth_center)) {
-        (pass as any).mouth_center = gate.mouth_center;
-        // `mouth_rect` MUSS normalisiert sein — `mouthRectFromPass()` rechnet
-        // in 0..1. Die Pixelfassung wandert getrennt mit, fuer die Forensik.
-        (pass as any).mouth_rect = gate.mouth_rect_norm ?? null;
-        (pass as any).mouth_control_rect = gate.control_rect_norm ?? null;
-        (pass as any).mouth_rect_px = gate.mouth_rect ?? null;
-        (pass as any).mouth_control_rect_px = gate.control_rect ?? null;
-        (pass as any).mouth_frame_dims = gate.mouth_frame_dims ?? null;
-        (pass as any).mouth_edge_margin_px = gate.mouth_edge_margin_px ?? null;
-        (pass as any).mouth_geometry_space = usePassPreclip ? "preclip" : "plate";
-        (pass as any).mouth_geometry_validated = gate.ok && gate.code === "ok";
-        (pass as any).mouth_geometry_validated_at = new Date().toISOString();
-      }
-
-      // ── v396 — Geometrievertrag persistieren ──────────────────────────
-      // Planner, Renderer, Gate und (ab v397) die Reprojektion konsumieren
-      // dieselbe Matrix. Sie wird hier einmal abgelegt, zusammen mit dem
-      // Fingerprint und dem Roundtrip-Beweis. Der Roundtrip ist notwendig,
-      // aber nicht hinreichend — er beweist nur, dass Matrix und Inverse
-      // algebraisch zusammenpassen.
-      if (usePassPreclip && preclipCropForGate) {
-        try {
-          const t396 = buildPreclipTransform({
-            x: Number(preclipCropForGate.x),
-            y: Number(preclipCropForGate.y),
-            size: Number(preclipCropForGate.size),
-            outputSize: Number(preclipCropForGate.outputSize ?? gateWidth ?? 720),
-          });
-          const rt = assertRoundtrip(t396, [
-            [t396.crop.x, t396.crop.y],
-            [t396.crop.x + t396.crop.size, t396.crop.y + t396.crop.size],
-            ...(gateCoord ? [gateCoord as [number, number]] : []),
-          ]);
-          const persisted396 = persistTransform(t396);
-          (pass as any).geometry_contract = {
-            ...persisted396,
-            version: "v396",
-            roundtrip_ok: rt.ok,
-            roundtrip_max_error_px: Number(rt.maxErrorPx.toFixed(4)),
-            decoded_preclip_frame_count: decodedPreclipFrames || null,
-            preclip_frame: preclipLocalFrame ?? null,
-            source_plate_frame: gateFrame ?? null,
-            preclip_fps: Number((pass as any).preclip_fps) || null,
-          };
-          console.log(
-            `[compose-dialog-segments] scene=${sceneId} v396_geometry_contract pass=${currentPassIdx + 1} ` +
-            `fingerprint=${persisted396.geometry_fingerprint} roundtrip_ok=${rt.ok} err=${rt.maxErrorPx.toFixed(4)}px ` +
-            `preclip_frame=${preclipLocalFrame ?? "-"} source_plate_frame=${gateFrame ?? "-"} decoded_frames=${decodedPreclipFrames || "?"}`,
-          );
-          if (!rt.ok) {
-            console.error(
-              `[compose-dialog-segments] scene=${sceneId} v396_transform_contract_failed pass=${currentPassIdx + 1} ` +
-              `err=${rt.maxErrorPx.toFixed(4)}px — internal geometry bug, not a provider or content problem`,
-            );
-          }
-        } catch (e) {
-          console.error(
-            `[compose-dialog-segments] scene=${sceneId} v396_geometry_contract_error pass=${currentPassIdx + 1} ${(e as Error)?.message}`,
-          );
-        }
-      }
-
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v129.23.2_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} preclip_trusted=${preclipTrustedForGate} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
-
       // ── v130 — Post-Probe Snap as a Re-Invocation of the Same Strategy ──
       // Previously (v129.22.3 → v129.30) the Face-Gate's `ok_after_snap`
       // branch was an ad-hoc patch: it overwrote `syncOptions` and
@@ -7858,8 +6764,10 @@ serve(async (req) => {
         });
       }
 
-      // v395 — probe outages are non-blocking only for plate diagnostics.
-      // Exact provider preclips use requireMouth and fail closed above.
+      // Honest non-blocking signal: when the Lovable AI gateway can't probe
+      // (extract failure or transient 5xx), log it but let the dispatch
+      // through. The Forensik UI surfaces this clearly so we don't silently
+      // pretend the probe passed.
       if (gate.ok && gate.code === "probe_unavailable") {
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -7886,7 +6794,7 @@ serve(async (req) => {
               extract_ms: gate.extract_ms,
               gemini_ms: gate.gemini_ms,
             },
-            non_blocking: !usePassPreclip,
+            non_blocking: true,
           },
         });
       }
@@ -8092,44 +7000,7 @@ serve(async (req) => {
       // never let logging crash dispatch
     }
 
-    // ── v360 — Dispatch-Stopp bei terminal fehlgeschlagener Szene ─────────
-    // Belegt (Szene 89c5e01c, 01.08.2026): Pass 1 fiel um 20:14 terminal aus,
-    // die Szene stand seitdem auf `failed` — trotzdem ging um 20:20 noch
-    // Pass 2 an Sync.so raus. Ergebnis: bezahlter Job, belegter Slot und die
-    // widersprüchliche UI ("Szene fehlgeschlagen" + "Lip-Sync läuft").
-    // Der bestehende Check greift erst im Webhook (`ignored_due_scene_failed`).
-    try {
-      const { data: sceneNow } = await supabase
-        .from("composer_scenes")
-        .select("pipeline_state, clip_status, clip_url, dialog_shots")
-        .eq("id", sceneId)
-        .maybeSingle();
-      const sceneClipStatus = sceneState(sceneNow);
-      const shotsStatus = String(((sceneNow as any)?.dialog_shots as any)?.status ?? "");
-      if (sceneClipStatus === "failed" || shotsStatus === "failed") {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v360_dispatch_skipped_scene_failed clip_status=${sceneClipStatus} shots_status=${shotsStatus} — kein Sync.so-Dispatch mehr`,
-        );
-        return await failBeforeProviderDispatch(
-          "SCENE_ALREADY_FAILED",
-          "skipped_scene_failed",
-          "v360: Die Szene ist bereits terminal fehlgeschlagen — dieser Sprecher-Turn wird nicht mehr an Sync.so gesendet.",
-          200,
-          {
-            clip_status: sceneClipStatus,
-            shots_status: shotsStatus,
-            compose_version: COMPOSE_DIALOG_SEGMENTS_VERSION,
-          },
-        );
-      }
-    } catch (guardErr) {
-      console.warn(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx} v360_scene_status_guard_read_failed: ${(guardErr as Error).message}`,
-      );
-    }
-
     // v169 Stage A — Stale-Job Reconcile (best-effort, ≤500ms). Frees Sync.so
-
     // concurrency slots held by zombie jobs from earlier failed runs so this
     // dispatch doesn't hit a spurious 429.
     try {
@@ -8212,13 +7083,13 @@ serve(async (req) => {
             error: pass.error,
             finished_at: new Date().toISOString(),
           }),
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
           clip_error: resp.status === 429
             ? "syncso_concurrency_exhausted"
             : `syncso_segments_dispatch_${resp.status}`,
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_source_kind: "segments", video_url: dispatchVideoUrl,
@@ -8257,17 +7128,6 @@ serve(async (req) => {
       job_id: jobId, user_id: userId, scene_id: sceneId, engine: "sync-segments",
     });
     await recordCircuitSuccess(supabase, "sync.so");
-
-    // v391 — Zustandsvertrag einhalten. Vorher sprang der Dispatch direkt von
-    // `audio_ready` nach `lipsync_running`; diese Kante ist in der DB bewusst
-    // verboten, der Wechsel wurde still abgelehnt (`transition_not_allowed`)
-    // und die Szene blieb dauerhaft auf "Lip-Sync wird gestartet" stehen,
-    // obwohl Sync.so bereits arbeitete. Der Zwischenzustand wird jetzt
-    // tatsaechlich durchlaufen. Bei paralleler Fan-out-Dispatch greift nur der
-    // erste Uebergang; spaetere sind wirkungslos (idempotent).
-    await advanceScene("lipsync_dispatched", ["audio_ready"]);
-
-
 
     pass.job_id = jobId;
     passes[currentPassIdx] = pass;
@@ -8501,25 +7361,7 @@ serve(async (req) => {
           coords_sent: syncOptions.active_speaker_detection?.coordinates ?? null,
           preclip_face_count: (pass as any).preclip_face_count ?? null,
           preclip_crop: (pass as any).preclip_crop ?? null,
-          // v342 — geometry telemetry so a no-op is visible in one SQL row.
-          preclip_anchor: (pass as any).preclip_anchor ?? null,
-          preclip_face_share: (pass as any).preclip_face_share ?? null,
-          // v344.1 — linear share (gate metric) + source-face size.
-          preclip_side_share: (pass as any).preclip_side_share ?? null,
-          preclip_face_side_px: (pass as any).preclip_face_side_px ?? null,
-          preclip_min_size_widened: (pass as any).preclip_min_size_widened ?? null,
-          preclip_low_source_face: Number((pass as any).preclip_face_side_px) > 0
-            ? Number((pass as any).preclip_face_side_px) < 48
-            : null,
-          preclip_crop_to_face_ratio: (() => {
-            const c = (pass as any).preclip_crop;
-            const b = speakerPlateBboxes?.[pass.speaker_idx] as number[] | null | undefined;
-            if (!c?.size || !Array.isArray(b) || b.length !== 4) return null;
-            const side = Math.max(Number(b[2]) - Number(b[0]), Number(b[3]) - Number(b[1]));
-            return side > 0 ? Number((Number(c.size) / side).toFixed(2)) : null;
-          })(),
           preclip_repair_attempts: (pass as any).preclip_repair_attempts ?? 0,
-
           coord_source: coordSources[Number(pass.speaker_idx ?? -1)] ?? "unknown",
           plate_identity_resolved: plateIdentityMap?.resolvedCount ?? 0,
           plate_identity_total: plateIdentityMap?.faces?.length ?? 0,
@@ -8653,14 +7495,14 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
+          lip_sync_status: "running",
+          twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
           lip_sync_source_clip_url: sourceClipUrl,
           replicate_prediction_id: `sync:${jobId}`,
           clip_error: null,
           updated_at: nowIso,
         })
         .eq("id", sceneId);
-      await advanceScene("lipsync_running");
-
     }
 
     // ── Plan D (v93) — flag-gated parallel fan-out, supersedes hard `false`.

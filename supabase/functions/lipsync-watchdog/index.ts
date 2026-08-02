@@ -23,14 +23,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
-import {
-  getSyncApiKey,
-  releaseInflightSyncJob,
-  reconcileStaleSyncJobs,
-  sweepOrphanInflightSyncJobs,
-} from "../_shared/syncso-preflight.ts";
+import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
-import { transitionScene } from "../_shared/scene-state.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
@@ -54,11 +48,6 @@ const STALE_DISPATCH_RECOVERY_MS = 30_000;
 // own timeout is now 300 s (see render-sync-segments-audio-mux), so 6 min
 // gives one extra retry cycle before we hard-fail the scene.
 const STALE_AUDIO_MUX_MS = 6 * 60_000;
-// v362 — A preclip render happens before a Sync.so job exists. If the Edge
-// runtime is hard-killed during that await, neither the 420 s dispatch lock nor
-// `rendering_preflight` is cleaned up. Recover after three minutes of zero
-// provider progress; healthy preflights refresh into a provider job before this.
-const STALE_RENDERING_PREFLIGHT_MS = 3 * 60_000;
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 
@@ -190,41 +179,6 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey);
   const syncApiKey = getSyncApiKey() || null;
 
-  // v351 — Orphan-Slot Sweep. Sync.so slots are freed by the webhook only,
-  // which needs `dialog_shots.passes[].job_id` to attribute a job. Any reset
-  // that nulls dialog_shots while jobs are in flight leaks a slot forever
-  // (observed: 4 inflight rows, MAX_INFLIGHT=4 → every dispatch DEFERRED
-  // with rate_limited). This sweep runs every cron tick, so a leak now heals
-  // in ≤ 1 minute instead of waiting out the 15-min expires_at.
-  let orphanSlotsFreed = 0;
-  try {
-    orphanSlotsFreed = await sweepOrphanInflightSyncJobs(supabase);
-    if (syncApiKey) {
-      const { data: inflightUsers } = await supabase
-        .from("syncso_inflight_jobs")
-        .select("user_id")
-        .not("user_id", "is", null)
-        .limit(100);
-      const userIds = [
-        ...new Set(((inflightUsers ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)),
-      ];
-      for (const uid of userIds) {
-        orphanSlotsFreed += await reconcileStaleSyncJobs(supabase, {
-          userId: uid,
-          syncApiKey,
-          budgetMs: 1_500,
-        });
-      }
-    }
-    if (orphanSlotsFreed > 0) {
-      console.log(`[lipsync-watchdog] v351 slots_freed=${orphanSlotsFreed}`);
-    }
-  } catch (e) {
-    console.warn(`[lipsync-watchdog] v351 sweep crash: ${(e as Error).message}`);
-  }
-
-
-
   // v32: widen the scan. The previous `lip_sync_status IN ('running','audio_muxing')`
   // filter missed scenes that compose-dialog-segments parked at
   // `pending + twoshot_stage='circuit_open'` (or `deferred`). Those rows
@@ -237,9 +191,8 @@ serve(async (req) => {
   const { data: rows, error } = await supabase
     .from("composer_scenes")
     .select(
-      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at, pipeline_state, active_run_id, plate_generation, plate_ready_generation",
+      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
     )
-
     // v141 — Widen filter to include the zombie state observed on
     // 2026-06-20: `pending + twoshot_stage=syncso_fanout_3_of_4`.
     // After a watchdog auto-retry reset a `rendering` pass to `pending`
@@ -253,10 +206,7 @@ serve(async (req) => {
       "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred,master_clip,syncso_fanout_recovering,audio_muxing))," +
       "and(lip_sync_status.eq.pending,twoshot_stage.like.syncso_fanout_%)," +
       "and(lip_sync_status.eq.pending,twoshot_stage.like.syncso_retry_%)," +
-      "and(lip_sync_status.eq.pending,twoshot_stage.is.null,clip_url.is.null)," +
-      // v362: includes preclip zombies with a ready source clip. Previously
-      // these rows were invisible because clip_url was non-null.
-      "and(lip_sync_status.eq.pending,dialog_shots.not.is.null)",
+      "and(lip_sync_status.eq.pending,twoshot_stage.is.null,clip_url.is.null)",
     )
     .is("lip_sync_applied_at", null)
     .limit(200);
@@ -272,8 +222,6 @@ serve(async (req) => {
   const failed: Array<{ scene_id: string; reason: string }> = [];
   const polled: Array<{ scene_id: string; job_id: string; status: string }> = [];
   const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
-  // v361 — Szenen, deren Dispatch bewusst unterdrückt wurde (Terminal-Guard).
-  const skipped: Array<{ scene_id: string; reason: string }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
     // v128 Phase B3 — wrap every mutation on this scene in the per-scene
@@ -285,50 +233,6 @@ serve(async (req) => {
     // terminal in the same window.
     await withDialogLock(supabase, d.id, "lipsync-watchdog", async () => {
     const ds: any = d.dialog_shots ?? {};
-
-    // ── v388 Generations-Vertrag ─────────────────────────────────────────
-    // Der Watchdog verliess sich bisher darauf, dass die aufgerufene Funktion
-    // veraltete Laeufe abweist. Er prueft das jetzt selbst: ohne aktiven Lauf
-    // oder mit einer Plate aus einer aelteren Generation wird nichts mehr
-    // angestossen — ein neu gestarteter Clip kann so nicht mehr von einem
-    // Wiederbelebungsversuch des Vorlaufs getroffen werden.
-    {
-      const pipeState = String((d as any).pipeline_state ?? "");
-      const runId = (d as any).active_run_id ?? null;
-      const gen = (d as any).plate_generation ?? null;
-      const readyGen = (d as any).plate_ready_generation ?? null;
-      if (["failed", "canceled", "complete"].includes(pipeState)) {
-        return;
-      }
-      if (!runId || (gen != null && Number(readyGen) !== Number(gen))) {
-        console.log(
-          `[lipsync-watchdog] v388_stale_generation_skip scene=${d.id} ` +
-            `run=${runId ?? "none"} gen=${gen ?? "none"} ready_gen=${readyGen ?? "none"}`,
-        );
-        return;
-      }
-
-      // ── v391 Letztes Netz ──────────────────────────────────────────────
-      // Eine Szene, die noch auf `audio_ready` steht, obwohl bereits ein
-      // Provider-Job registriert ist, hat einen Zustandswechsel verloren.
-      // Frueher blieb sie dadurch unbegrenzt auf "Lip-Sync wird gestartet".
-      // Wir ziehen den Zustand kontrolliert nach, ohne neu zu dispatchen.
-      if (pipeState === "audio_ready") {
-        const dsHere: any = d.dialog_shots ?? {};
-        const hasProviderJob = Array.isArray(dsHere?.passes) &&
-          dsHere.passes.some((p: any) => typeof p?.job_id === "string" && p.job_id.length > 0);
-        if (hasProviderJob) {
-          console.warn(
-            `[lipsync-watchdog] v391_state_catchup scene=${d.id} audio_ready trotz Provider-Job — ziehe Zustand nach`,
-          );
-          await transitionScene(supabase, d.id, "lipsync_running", {
-            runId: String(runId),
-            generation: gen != null ? Number(gen) : null,
-            detail: "v391_watchdog_state_catchup",
-          });
-        }
-      }
-    }
 
     // v129.4a — Terminal no-op guard.
     // The sync-so-webhook is the single source of truth for scene
@@ -344,7 +248,6 @@ serve(async (req) => {
     ) {
       return;
     }
-
     // Liveness anchor: prefer first_started_at, fall back to started_at,
     // then earliest pass started_at, then updated_at (last resort).
     const passStarts = Array.isArray(ds?.passes)
@@ -361,84 +264,6 @@ serve(async (req) => {
       ds?.version === 5 &&
       ds?.engine === "sync-segments" &&
       Array.isArray(ds?.passes);
-
-    // ── v362 stale preflight/lock recovery ───────────────────────────────
-    // A hard Edge-runtime timeout cannot execute compose-dialog-segments'
-    // `finally`, leaving a pass at rendering_preflight with no Sync.so job.
-    // The old watchdog only understood fully initialized v5 states, while the
-    // first preclip can die before that root state is written. Reset the stale
-    // slot atomically, remove only expired/stale dispatch locks, and trigger a
-    // fresh idempotent dispatch immediately.
-    const preflightPasses: any[] = Array.isArray(ds?.passes) ? ds.passes : [];
-    const stalePreflightIdx = preflightPasses.findIndex((p: any) => {
-      if (String(p?.status ?? "") !== "rendering_preflight" || p?.job_id) return false;
-      const started = typeof p?.preflight_started_at === "string"
-        ? Date.parse(p.preflight_started_at)
-        : NaN;
-      return Number.isFinite(started) && now - started >= STALE_RENDERING_PREFLIGHT_MS;
-    });
-    if (stalePreflightIdx >= 0) {
-      const stalePass = preflightPasses[stalePreflightIdx] ?? {};
-      const preflightAgeMs = now - Date.parse(String(stalePass.preflight_started_at));
-      // v364 — Jede Preflight-Recovery zählt als Absturzindiz. Ab der ersten
-      // Wiederholung läuft der Pass ohne Plate-Tracker, damit der Worker nicht
-      // erneut am selben Speicherlimit stirbt.
-      const preflightRecoveries = Number(stalePass.preflight_recoveries ?? 0) + 1;
-      const recoveredPass = {
-        ...stalePass,
-        status: "pending",
-        job_id: null,
-        preflight_started_at: null,
-        preflight_recovered_at: new Date().toISOString(),
-        preflight_recovery_version: "v364",
-        preflight_recoveries: preflightRecoveries,
-        plate_track_disabled: true,
-        plate_track_attempted_at: null,
-        plate_track_completed_at: null,
-        error: null,
-      };
-
-      await supabase.rpc("update_dialog_pass_slot", {
-        _scene_id: d.id,
-        _pass_idx: stalePreflightIdx,
-        _patch: recoveredPass,
-      });
-      // A hard-killed invocation may leave its long-TTL row behind. Delete it
-      // only after the same staleness threshold; never steal a fresh lock.
-      await supabase
-        .from("dialog_dispatch_locks")
-        .delete()
-        .eq("scene_id", d.id)
-        .eq("pass_idx", stalePreflightIdx)
-        .lt("acquired_at", new Date(now - STALE_RENDERING_PREFLIGHT_MS).toISOString());
-
-      const invokeResp = await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-        },
-        // v394 — Fortsetzung eines laufenden Lip-Syncs, kein Neustart:
-        // explizit mit `advance` + `pass_idx`, damit der Dispatcher gegen den
-        // Fortsetzungsvertrag prueft statt gegen das Start-Gate.
-        body: JSON.stringify({
-          scene_id: d.id,
-          auto: true,
-          recovery: true,
-          advance: true,
-          pass_idx: stalePreflightIdx,
-        }),
-      });
-      const invokeBody = await invokeResp.text().catch(() => "");
-      console.warn(
-        `[lipsync-watchdog] v362_stale_preflight_recovered scene=${d.id} ` +
-        `pass=${stalePreflightIdx} age=${Math.round(preflightAgeMs / 1000)}s ` +
-        `invoke_status=${invokeResp.status} body=${invokeBody.slice(0, 160)}`,
-      );
-      advanced.push({ scene_id: d.id, pass_idx: stalePreflightIdx });
-      return;
-    }
 
     // ── v252 audio-mux stall guard ────────────────────────────────────────
     // `render-sync-segments-audio-mux` dispatches the final DialogStitchVideo
@@ -457,6 +282,30 @@ serve(async (req) => {
       muxAge >= STALE_AUDIO_MUX_MS
     ) {
       const refundCredits = Number(ds?.cost_credits) || 0;
+      let refundedFlag = !!ds?.refunded;
+      // Best-effort refund via increment_balance RPC (same path used by the
+      // dialog-stitch webhook fail branch).
+      if (!refundedFlag && refundCredits > 0) {
+        const { data: sceneUser } = await supabase
+          .from("composer_scenes")
+          .select("created_by")
+          .eq("id", d.id)
+          .maybeSingle();
+        const userId = (sceneUser as any)?.created_by;
+        if (userId) {
+          try {
+            await supabase.rpc("increment_balance", {
+              p_user_id: userId,
+              p_amount: refundCredits,
+            });
+            refundedFlag = true;
+          } catch (e) {
+            console.warn(
+              `[lipsync-watchdog] scene=${d.id} audio_mux refund failed: ${(e as Error).message}`,
+            );
+          }
+        }
+      }
       // Flip the pending video_renders row for this render_id to failed so
       // downstream analytics / status pages reflect reality.
       const muxRenderId = ds?.audio_mux?.render_id;
@@ -471,15 +320,23 @@ serve(async (req) => {
           .eq("render_id", muxRenderId)
           .in("status", ["pending", "rendering"]);
       }
-      const failedResult = await failLipSync({
-        supabase,
-        sceneId: d.id,
-        reason: "watchdog_audio_mux_stall: no webhook after 6min",
-        refundCredits,
-        syncApiKey,
-      });
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "audio_mux_failed",
+          clip_error: "watchdog_audio_mux_stall: no webhook after 6min",
+          dialog_shots: {
+            ...(ds as any),
+            status: "failed",
+            error: "watchdog_audio_mux_stall",
+            refunded: refundedFlag,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", d.id);
       console.log(
-        `[lipsync-watchdog] scene=${d.id} audio_mux_stall killed after ${Math.round(muxAge / 1000)}s (refunded=${failedResult.refunded})`,
+        `[lipsync-watchdog] scene=${d.id} audio_mux_stall killed after ${Math.round(muxAge / 1000)}s (refunded=${refundedFlag})`,
       );
       failed.push({ scene_id: d.id, reason: "audio_mux_stall" });
       return;
@@ -525,18 +382,7 @@ serve(async (req) => {
     // Skip dispatching while we're parked on circuit_open — re-triggering
     // compose-dialog-segments would just hit the circuit again and reset
     // updated_at, masking the real TTL.
-    // v361 — Terminal-Guard. Ist die Szene bereits als fehlgeschlagen markiert
-    // (ein Sprecher-Pass hat z.B. Passthrough geliefert), darf der Watchdog
-    // keine weiteren Sprecher mehr zu Sync.so schicken. Genau diese Geister-
-    // Dispatches erzeugten "Lip-Sync läuft…" auf einer toten Szene.
-    const sceneTerminal =
-      String(d.lip_sync_status ?? "") === "failed" ||
-      String((d as any).status ?? "") === "failed" ||
-      String(d.twoshot_stage ?? "").startsWith("scene_failed");
-    if (sceneTerminal) {
-      skipped.push({ scene_id: d.id, reason: "skipped_scene_failed" });
-    }
-    if (!sceneTerminal && isV5Fanout && d.twoshot_stage !== "circuit_open") {
+    if (isV5Fanout && d.twoshot_stage !== "circuit_open") {
       // v126 — Also pick up `retrying` passes with no live job_id. Previously
       // a pass set to `retrying` by the webhook but with a lost re-dispatch
       // invoke would sit idle until the watchdog killed the whole scene.
@@ -894,7 +740,7 @@ serve(async (req) => {
     `[lipsync-watchdog] scanned=${rows?.length ?? 0} polled=${polled.length} advanced=${advanced.length} failed=${failed.length}`,
   );
   return new Response(
-    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, skipped, failed }),
+    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, failed }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
