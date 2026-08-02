@@ -1172,12 +1172,13 @@ serve(async (req) => {
               finished_at: nowIso,
             },
             clip_url: finalUrl,
-            pipeline_state: "complete",
             lip_sync_applied_at: nowIso,
             clip_error: null,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
+        await advanceScene("complete");
+
         console.log(`[sync-so-webhook] v25 scene=${sceneId} single-speaker DONE (no tight, direct finalize)`);
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", applied: true });
       }
