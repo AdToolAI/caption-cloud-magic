@@ -23,6 +23,7 @@
  */
 
 import { failLipSync } from "./lipsync-fail.ts";
+import { supersedeOpenPlateAttempts } from "./plate-attempt.ts";
 
 type SupabaseLike = {
   from: (t: string) => any;
