@@ -109,6 +109,14 @@ export interface FaceGateInput {
   passIdx?: number;
   /** True when the preclip was already validated as exactly one clean face. */
   preclipTrusted?: boolean;
+  /**
+   * v393 — Mund-Vorbedingung. Fuer Preclips (Single-Face-Crop, der direkt an
+   * Sync.so geht) muss der Mund nachweislich im Bild liegen und Abstand zum
+   * Rand haben. Ohne Mund kann der Provider nichts animieren und reicht den
+   * Clip unveraendert durch — genau der belegte Passthrough-Fall.
+   */
+  requireMouth?: boolean;
+
   /** v129.22.3 — Plate pixel dims required for AWS Rekognition auto-snap.
    *  When omitted, "yes_but_not_at_coord" stays a hard fail (legacy v129.11
    *  behaviour). Callers with plate dims handy should pass them to enable
