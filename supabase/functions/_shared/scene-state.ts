@@ -158,9 +158,27 @@ export const canStartAudioPrep = (row: any): boolean => {
   return isRealizedScene(row) && (s === "plate_ready" || s === "audio_prep");
 };
 
+/**
+ * START-Vertrag: darf fuer diese Szene ueberhaupt ein Lip-Sync-Lauf beginnen?
+ */
 export const canDispatchLipsync = (row: any): boolean => {
   const s = sceneState(row);
   return isRealizedScene(row) && (s === "audio_ready" || s === "lipsync_dispatched");
+};
+
+/**
+ * v394 — FORTSETZUNGS-Vertrag: darf ein *weiterer* Pass eines bereits
+ * laufenden Lip-Syncs dispatcht werden?
+ *
+ * Der Szenenzustand beschreibt die Phase, der Pass-Slot die Arbeitseinheit.
+ * Sobald Pass 1 die Szene auf `lipsync_running` hebt, ist der Start-Vertrag
+ * naturgemaess nicht mehr erfuellt — die Fan-out-Geschwister, der
+ * Webhook-Advance und der Watchdog sind aber legitime Fortsetzungen.
+ * `failed`, `canceled`, `complete` und `lipsync_muxing` bleiben ausgeschlossen.
+ */
+export const canContinueLipsync = (row: any): boolean => {
+  const s = sceneState(row);
+  return isRealizedScene(row) && (s === "lipsync_dispatched" || s === "lipsync_running");
 };
 
 export interface TransitionResult {
