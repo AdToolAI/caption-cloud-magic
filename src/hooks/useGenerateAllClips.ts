@@ -28,6 +28,8 @@ import { buildSceneAssetsForRender } from '@/lib/motion-studio/buildSceneAssetsF
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
+import { hardResetSceneJob } from '@/lib/lipsyncReset';
+
 import { emitStageEvent } from '@/lib/stage/stageEvents';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 
