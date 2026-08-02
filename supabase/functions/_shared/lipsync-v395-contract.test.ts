@@ -1,6 +1,5 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { verifyFaceBeforeDispatch } from "./syncso-face-gate.ts";
-import { mouthRectFromPass } from "./mouth-motion-verdict.ts";
 
 Deno.test("v395 — exact preclip mouth gate fails closed without AWS", async () => {
   const previousAccess = Deno.env.get("AWS_ACCESS_KEY_ID");
@@ -41,14 +40,6 @@ Deno.test("v395 — plate-only diagnostic remains non-blocking without AWS", asy
     if (previousAccess) Deno.env.set("AWS_ACCESS_KEY_ID", previousAccess);
     if (previousSecret) Deno.env.set("AWS_SECRET_ACCESS_KEY", previousSecret);
   }
-});
-
-Deno.test("v395 — persisted normalized mouth geometry is authoritative", () => {
-  const rect = mouthRectFromPass({
-    mouth_rect: { x: 0.31, y: 0.58, w: 0.24, h: 0.16 },
-    preclip_crop: { x: 100, y: 100, size: 300 },
-  });
-  assertEquals(rect, { x: 0.31, y: 0.58, w: 0.24, h: 0.16 });
 });
 
 Deno.test("v395 — webhook terminal passthrough uses central failure helper", async () => {

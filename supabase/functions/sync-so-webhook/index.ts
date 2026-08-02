@@ -330,7 +330,7 @@ serve(async (req) => {
   if (sceneHint) {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, user_id, dialog_shots, lip_sync_applied_at, lip_sync_status, pipeline_state, clip_error, plate_generation, active_run_id")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, pipeline_state, clip_error, plate_generation, active_run_id")
       .eq("id", sceneHint)
       .maybeSingle();
     if (data) {
@@ -346,7 +346,7 @@ serve(async (req) => {
     // We must check ALL three so late/parallel pass webhooks find their scene.
     const { data: rows } = await supabase
       .from("composer_scenes")
-      .select("id, user_id, dialog_shots, lip_sync_applied_at, lip_sync_status, pipeline_state, clip_error, plate_generation, active_run_id")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, pipeline_state, clip_error, plate_generation, active_run_id")
       .in("lip_sync_status", ["running", "stitching", "audio_muxing"])
       .limit(200);
     for (const r of rows ?? []) {
@@ -934,7 +934,7 @@ serve(async (req) => {
           supabase,
           sceneId,
           reason: userMsg,
-          userId: String((scene as any)?.user_id ?? "") || null,
+          userId: null,
           extraSyncJobIds: jobId ? [jobId] : [],
           syncApiKey: Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY"),
         });
