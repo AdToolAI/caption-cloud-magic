@@ -1133,9 +1133,13 @@ serve(async (req) => {
       // share — required for slot-based face targeting in
       // compose-dialog-segments.
       const n = Math.max(cleanNames.length, fallbackCount, 1);
-      const named =
-        cleanNames.length > 0 ? `: ${cleanNames.join(", ")}` : "";
-      const subject = n === 1 ? "Exactly 1 person" : `Exactly ${n} distinct people`;
+      // v370 — the cast block is built ONCE, deterministically, from the
+      // resolved names. Stated count and listed names can no longer diverge
+      // (the "Exactly four people in frame: Samuel Dusatko." contradiction
+      // that HappyHorse answered with InvalidParameter).
+      const castSentence = buildCastClause(cleanNames, n) ??
+        `Exactly ${n} ${n === 1 ? "person" : "people"} in frame.`;
+
       const asymBlocking = opts.asymmetric && n >= 3
         ? `all present in the same physical room as a natural asymmetric ensemble captured in one continuous cinematic frame. Each person appears exactly once and performs their own distinct assigned task (foreground / midground / background depth staging is required — do NOT force a symmetric side-by-side line-up). Preserve practical office / on-set blocking and depth: some subjects closer to camera, others further away, each occupying a different area of the room. Every face still stays clearly readable enough for lip-sync — front, three-quarter or natural profile is acceptable — with mouth and jaw unobstructed by hands, phones, microphones or props`
         : null;
