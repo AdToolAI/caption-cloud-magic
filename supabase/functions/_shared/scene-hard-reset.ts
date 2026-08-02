@@ -379,13 +379,8 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   // loses every derived pipeline artifact — a stale faceMap or preclip
   // payload from the previous generation must never survive the reset.
   const prevPlan = (scene?.audio_plan ?? null) as Record<string, unknown> | null;
-  let cleanedPlan: Record<string, unknown> | null = null;
-  if (prevPlan && typeof prevPlan === "object") {
-    cleanedPlan = { ...prevPlan };
-    delete (cleanedPlan as any).twoshot;
-    delete (cleanedPlan as any).lipsync;
-    delete (cleanedPlan as any).segments_payload;
-  }
+  const cleanedPlan = stripDerivedAudioPlan(prevPlan);
+
 
   try {
     const { error } = await supabase
