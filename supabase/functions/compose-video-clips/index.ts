@@ -52,6 +52,12 @@ import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { sanitizeForHappyHorse, hardSanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 import {
+  buildCastClause,
+  extractCastNames,
+  normalizeCastInPrompt,
+  validateCastContract,
+} from "../_shared/cast-clause.ts";
+import {
   ensureDialogTurnsForScene,
   fetchDialogTurnsForScenes,
   readIdOnlyEnabled,
