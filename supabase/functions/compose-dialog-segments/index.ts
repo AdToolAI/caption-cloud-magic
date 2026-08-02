@@ -7586,11 +7586,25 @@ serve(async (req) => {
         sceneId,
         passIdx: currentPassIdx,
         preclipTrusted: preclipTrustedForGate,
+        // v393 — auf einem Preclip ist der Mund die Vorbedingung: fehlt er
+        // oder klebt er am Rand, animiert Sync.so nichts und reicht den
+        // Clip unveraendert durch. Lieber hier scheitern als nach dem Lauf.
+        requireMouth: usePassPreclip,
       });
       if (gate.frame_jpeg_url) {
         (pass as any).probe_frame_url = gate.frame_jpeg_url;
         (pass as any).probe_frame_cached = !!gate.frame_cached;
       }
+      // v393 — Messfenster persistieren: die Passthrough-Bewertung misst
+      // damit den Mund statt eines generischen Grossbereichs.
+      if (Array.isArray(gate.mouth_center)) {
+        (pass as any).mouth_center = gate.mouth_center;
+        (pass as any).mouth_rect = gate.mouth_rect ?? null;
+        (pass as any).mouth_control_rect = gate.control_rect ?? null;
+        (pass as any).mouth_edge_margin_px = gate.mouth_edge_margin_px ?? null;
+        (pass as any).mouth_geometry_space = usePassPreclip ? "preclip" : "plate";
+      }
+
       console.log(
         `[compose-dialog-segments] scene=${sceneId} v129.23.2_face_gate pass=${currentPassIdx + 1} source=${usePassPreclip ? "preclip" : "plate"} preclip_trusted=${preclipTrustedForGate} dims=${gateWidth || "?"}x${gateHeight || "?"} code=${gate.code} ok=${gate.ok} extract_ms=${gate.extract_ms ?? 0} gemini_ms=${gate.gemini_ms ?? 0} jpeg=${gate.frame_jpeg_url ? "yes" : "no"} snap=${gate.snapped_coord ? JSON.stringify(gate.snapped_coord) : "no"} reason=${gate.reason ?? ""} reply="${gate.raw_reply ?? ""}"`,
       );
