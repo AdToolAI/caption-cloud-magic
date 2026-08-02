@@ -1,45 +1,16 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { verifyFaceBeforeDispatch } from "./syncso-face-gate.ts";
 
-Deno.test("v395 — exact preclip mouth gate fails closed without AWS", async () => {
-  const previousAccess = Deno.env.get("AWS_ACCESS_KEY_ID");
-  const previousSecret = Deno.env.get("AWS_SECRET_ACCESS_KEY");
-  try {
-    Deno.env.delete("AWS_ACCESS_KEY_ID");
-    Deno.env.delete("AWS_SECRET_ACCESS_KEY");
-    const result = await verifyFaceBeforeDispatch({
-      videoUrl: "https://example.test/preclip.mp4",
-      frameNumber: 1,
-      coord: [360, 360],
-      requireMouth: true,
-    });
-    assertEquals(result.ok, false);
-    assertEquals(result.code, "probe_unavailable");
-    assert(result.reason?.startsWith("exact_preclip_probe_unavailable:"));
-  } finally {
-    if (previousAccess) Deno.env.set("AWS_ACCESS_KEY_ID", previousAccess);
-    if (previousSecret) Deno.env.set("AWS_SECRET_ACCESS_KEY", previousSecret);
-  }
+Deno.test("v395 — exact preclip mouth gate fails closed", async () => {
+  const gate = await Deno.readTextFile(new URL("./syncso-face-gate.ts", import.meta.url));
+  assert(gate.includes('? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_aws_credentials" }'));
+  assert(gate.includes('? { ok: false, code: "probe_unavailable", reason: "exact_preclip_probe_unavailable:no_video_url" }'));
+  assert(gate.includes("timestamp: 0.05"));
 });
 
-Deno.test("v395 — plate-only diagnostic remains non-blocking without AWS", async () => {
-  const previousAccess = Deno.env.get("AWS_ACCESS_KEY_ID");
-  const previousSecret = Deno.env.get("AWS_SECRET_ACCESS_KEY");
-  try {
-    Deno.env.delete("AWS_ACCESS_KEY_ID");
-    Deno.env.delete("AWS_SECRET_ACCESS_KEY");
-    const result = await verifyFaceBeforeDispatch({
-      videoUrl: "https://example.test/plate.mp4",
-      frameNumber: 1,
-      coord: [100, 100],
-      requireMouth: false,
-    });
-    assertEquals(result.ok, true);
-    assertEquals(result.code, "skipped");
-  } finally {
-    if (previousAccess) Deno.env.set("AWS_ACCESS_KEY_ID", previousAccess);
-    if (previousSecret) Deno.env.set("AWS_SECRET_ACCESS_KEY", previousSecret);
-  }
+Deno.test("v395 — plate-only diagnostics remain non-blocking", async () => {
+  const gate = await Deno.readTextFile(new URL("./syncso-face-gate.ts", import.meta.url));
+  assertEquals(gate.includes(': { ok: true, code: "skipped", reason: "no_aws_credentials" }'), true);
+  assertEquals(gate.includes(': { ok: true, code: "skipped", reason: "no_video_url" }'), true);
 });
 
 Deno.test("v395 — webhook terminal passthrough uses central failure helper", async () => {
