@@ -40,6 +40,7 @@ import { probeMp4Dims } from "./twoshot-face-map.ts";
 // v359 — temporaler Crop: der Preclip-Ausschnitt folgt dem Gesicht.
 import { planCameraPath, buildSpeechWeights } from "./camera-path.ts";
 import { buildDenseTrack } from "./face-track.ts";
+import { assertGenerationProvenance } from "./generation-provenance.ts";
 
 // v356 — the closeup contract no longer blocks here; geometry is telemetry.
 
@@ -465,6 +466,22 @@ export async function renderPassFacePreclip(
   if (!runRow?.active_run_id) {
     return { ok: false, error: "no_active_scene_run", errorClass: "dispatch_failed" };
   }
+
+  // v381 — Provenance-Wächter: der Schnitt darf nur aus der Plate DIESER
+  // Generation erfolgen. Ein Treffer hier ist der Beweis, dass kein Material
+  // einer Vorgeneration in die Pipeline gereicht wurde.
+  {
+    const prov = await assertGenerationProvenance({
+      supabase,
+      sceneId,
+      stage: "preclip_cut",
+      note: `pass=${passIdx} src=…${String(masterVideoUrl).slice(-48)}`,
+    });
+    if (!prov.ok) {
+      return { ok: false, error: String(prov.code), errorClass: "dispatch_failed" };
+    }
+  }
+
 
   // v188 (Phase 1.2) — Reuse-Guard. If an earlier Lambda run for THIS exact
   // scene+pass with the SAME crop geometry finished within the last 15 min

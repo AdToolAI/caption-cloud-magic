@@ -152,7 +152,22 @@ serve(async (req) => {
         pass: Number(after?.plate_generation ?? 0) > Number(before.plate_generation ?? 0),
         detail: `${before.plate_generation} → ${after?.plate_generation}`,
       },
+      {
+        // v381 — NICHT "kein Run nach Reset": der v377-Vertrag erwirbt den Run
+        // VOR dem Reset. Korrekt ist: die Run-ID ist eine andere als vorher.
+        name: "run_id_rotated_or_cleared",
+        pass:
+          !after?.active_run_id ||
+          String(after.active_run_id) !== String(before.active_run_id ?? ""),
+        detail: `${before.active_run_id ?? "none"} → ${after?.active_run_id ?? "none"}`,
+      },
+      {
+        name: "plate_ready_generation_reset",
+        pass: after?.plate_ready_generation == null,
+        detail: String(after?.plate_ready_generation ?? "null"),
+      },
       { name: "clip_url_cleared", pass: !after?.clip_url },
+
       { name: "clip_error_cleared", pass: !after?.clip_error },
       { name: "lip_sync_state_cleared", pass: !after?.lip_sync_status && !after?.lip_sync_applied_at },
       { name: "dialog_shots_cleared", pass: after?.dialog_shots == null },

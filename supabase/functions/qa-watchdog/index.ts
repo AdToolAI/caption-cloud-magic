@@ -327,6 +327,53 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       });
     }
 
+    // ─── 4c-2 (v381). Zombie: `generating` OHNE aktiven Run ──────────────
+    // Unter dem v377-Single-Run-Vertrag ist das ein unmöglicher Zustand: die
+    // Szene zeigt in der UI einen laufenden Ladebalken, obwohl serverseitig
+    // niemand mehr an ihr arbeitet. Genau das war der „Balken hängt bei 96 %"-
+    // Fall. Kein Refund hier — der zugehörige Fehlschlag hat, falls Kosten
+    // entstanden sind, bereits über `failLipSync` erstattet.
+    const orphanCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: orphanGenerating } = await sb
+      .from("composer_scenes")
+      .select("id, project_id, clip_error, lip_sync_status, updated_at")
+      .eq("clip_status", "generating")
+      .is("active_run_id", null)
+      .lt("updated_at", orphanCutoff)
+      .limit(200);
+
+    if (orphanGenerating && orphanGenerating.length > 0) {
+      for (const s of orphanGenerating as any[]) {
+        await sb
+          .from("composer_scenes")
+          .update({
+            clip_status: "failed",
+            clip_error:
+              s.clip_error && String(s.clip_error).length > 0
+                ? String(s.clip_error)
+                : "v381_orphan_generating_no_run",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", s.id);
+      }
+      rowsAutoFailed += orphanGenerating.length;
+      anomalies.push({
+        kind: "workflow",
+        severity: "high",
+        title: `Watchdog v381: ${orphanGenerating.length} Szenen zeigten "generating" ohne aktiven Run`,
+        description: `Terminal gesetzt, damit der Ladebalken stoppt. Sample:\n${(orphanGenerating as any[])
+          .slice(0, 20)
+          .map(
+            (s: any) =>
+              `- ${s.id} lip_sync=${s.lip_sync_status} err=${s.clip_error} updated=${s.updated_at}`,
+          )
+          .join("\n")}`,
+        fingerprint: "composer-orphan-generating-no-run",
+      });
+    }
+
+
+
     // ─── 4d. Hard TTL: no active scene may live longer than N hours ───
     // Backstop for any exotic status the specialised blocks above miss.
     // Refunds a flat amount per scene, mirroring the lipsync convention.
