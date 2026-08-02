@@ -557,3 +557,58 @@ export async function trackFaceAcrossTurn(req: TrackFaceRequest): Promise<FaceTr
   };
 
 }
+
+/**
+ * v393.2 — ANCHOR-RESCUE AUF DEM DISPATCHTEN CLIP
+ * ================================================
+ * Scheitert das Tracking (`anchor_fallback`), gilt bisher die aus dem
+ * Plate-Raum reprojizierte Anchor-Box weiter. Genau diese Box war in den
+ * Passthrough-Fällen entartet (an den Rand geclamped, Mund ausserhalb) —
+ * Sync 3 fand keinen Mund und reichte den Clip unveraendert durch.
+ *
+ * Auf einem Einzelsprecher-Preclip brauchen wir die Reprojektion gar nicht:
+ * es ist genau EIN Gesicht im Bild. Ein einziger AWS-Still + Rekognition
+ * liefert die wahre Box im Clip-Raum. Das ist billiger als ein verbrannter
+ * Sync.so-Lauf und ersetzt Raten durch Messen.
+ */
+export async function detectAnchorBoxOnClip(req: {
+  videoUrl: string;
+  width: number;
+  height: number;
+  atSec: number;
+  deadline: number;
+  logTag?: string;
+}): Promise<{ box: Box | null; faces: number; error: string | null }> {
+  const tag = req.logTag ?? "face-track";
+  if (!awsFrameProbeAvailable()) return { box: null, faces: 0, error: "aws_frame_probe_unavailable" };
+  if (Date.now() > req.deadline - 5_000) return { box: null, faces: 0, error: "budget_exhausted" };
+  try {
+    const still = await renderAwsStill({
+      videoUrl: req.videoUrl,
+      timestamp: Math.max(0, req.atSec),
+      frameSize: Math.max(req.width, req.height),
+      deadline: req.deadline,
+    });
+    if (!still.url) return { box: null, faces: 0, error: still.error ?? "still_missing" };
+    const det = await detectFacesMediaPipe({
+      videoUrl: req.videoUrl,
+      plateWidth: req.width,
+      plateHeight: req.height,
+      durationSec: 1,
+      prebuiltFrameUrls: [still.url],
+    });
+    const candidates = (det.faces ?? [])
+      .map((f) => f.bbox as Box)
+      .filter((b) => Array.isArray(b) && boxArea(b) > 16);
+    if (candidates.length === 0) return { box: null, faces: 0, error: det.error ?? "no_face_in_still" };
+    // Groesstes Gesicht = der Sprecher, fuer den dieser Preclip geschnitten
+    // wurde. Bewusst OHNE Anchor-Referenz: die Referenz ist ja verdaechtig.
+    const box = [...candidates].sort((a, b) => boxArea(b) - boxArea(a))[0];
+    console.log(
+      `[${tag}] v393_anchor_rescue faces=${candidates.length} box=${JSON.stringify(box)} at=${req.atSec.toFixed(2)}s`,
+    );
+    return { box, faces: candidates.length, error: null };
+  } catch (e) {
+    return { box: null, faces: 0, error: (e as Error).message };
+  }
+}
