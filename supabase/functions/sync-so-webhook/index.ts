@@ -1193,7 +1193,33 @@ serve(async (req) => {
         console.log(`[sync-so-webhook] v64 scene=${sceneId} single-speaker TIGHT → dispatching audio-mux (overlay on master plate)`);
       }
 
+      // ── v381 Provenance-Wächter (mux) ──────────────────────────────────
+      // Zwischen Callback-Eingang und Mux können Minuten liegen. Wurde die
+      // Szene inzwischen neu gestartet, darf das Ergebnis des alten Laufs
+      // nicht mehr in die aktuelle Generation gemuxt werden.
+      {
+        const prov = await assertGenerationProvenance({
+          supabase,
+          sceneId,
+          stage: "mux",
+          expectedGeneration: Number((scene as any).plate_generation ?? 1),
+          expectedRunId: String((scene as any).active_run_id ?? ""),
+          note: `job=${jobId}`,
+        });
+        if (!prov.ok) {
+          return ok({
+            ok: true,
+            scene_id: sceneId,
+            job_id: jobId,
+            status,
+            engine: "sync-segments",
+            ignored: prov.code,
+          });
+        }
+      }
+
       // Multi-speaker: dispatch fan-in compositor.
+
       // Plan D (v93): atomic mux-claim via try_claim_mux_dispatch RPC.
       // When parallel passes complete near-simultaneously, all N webhooks
       // see allDone=true; without the claim each would POST to the audio
