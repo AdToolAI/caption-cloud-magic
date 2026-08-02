@@ -240,7 +240,10 @@ export async function verifyFaceBeforeDispatch(
   } else if (frame != null) {
     const extracted = await extractFrameForFaceProbe({
       videoUrl: input.videoUrl,
-      frameNumber: frame,
+      // v396 — auf einem Preclip zählt der geprüfte LOKALE Index, nie der
+      // durchgereichte absolute Plate-Frame.
+      frameNumber: verifiedPreclipFrame ?? frame,
+
       fps: input.fps ?? 30,
       userId: input.userId,
       projectId: input.projectId,
