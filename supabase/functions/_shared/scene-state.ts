@@ -215,3 +215,31 @@ export async function transitionScene(
   );
   return result;
 }
+
+/**
+ * v388 — Einheitlicher Terminal-Helfer.
+ *
+ * Vorher standen ~40 direkte `pipeline_state: "failed"`-Schreibvorgänge in
+ * den Edge-Funktionen. Jeder davon umging Zeilensperre, Übergangstabelle und
+ * Protokoll — und genau darüber wurden fehlgeschlagene Szenen später wieder
+ * belebt. Der Fehlertext bleibt in seinem eigenen `.update()`; der Zustand
+ * wechselt danach über den Vertrag.
+ *
+ * Fehlgeschlagene/abgebrochene Szenen bleiben terminal: die Übergangstabelle
+ * lässt aus `failed`/`canceled` nur `idle` und `plate_queued` zu, beides
+ * ausschließlich über den Reset.
+ */
+export async function failSceneState(
+  supabase: any,
+  sceneIdOrIds: string | string[],
+  to: "failed" | "canceled" = "failed",
+  detail: string | null = null,
+): Promise<void> {
+  const ids = Array.isArray(sceneIdOrIds) ? sceneIdOrIds : [sceneIdOrIds];
+  for (const id of ids) {
+    if (!id) continue;
+    await transitionScene(supabase, id, to, {
+      detail: detail ?? `v388_${to}`,
+    });
+  }
+}

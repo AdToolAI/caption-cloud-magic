@@ -28,7 +28,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, transitionScene } from "../_shared/scene-state.ts";
+import { sceneState, transitionScene, failSceneState } from "../_shared/scene-state.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
@@ -240,11 +240,12 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           dialog_shots: { ...(state as any), status: "failed", error: blockedCode },
-          pipeline_state: "failed",
           clip_error: gateMsg,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
+      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+      await failSceneState(supabase, sceneId, "failed");
       console.error(
         `[render-sync-segments-audio-mux] v348_mux_gate scene=${sceneId} BLOCKED code=${blockedCode} speakers=${names}`,
       );
@@ -273,11 +274,12 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           dialog_shots: { ...(state as any), status: "failed", error: "incomplete_passes" },
-          pipeline_state: "failed",
           clip_error: partialMsg,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
+      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+      await failSceneState(supabase, sceneId, "failed");
       console.error(
         `[render-sync-segments-audio-mux] v346_no_partial_mux scene=${sceneId} BLOCKED failed=${failedPasses.length}/${passes.length} speakers=${failedNames}`,
       );
@@ -321,11 +323,12 @@ serve(async (req) => {
           .from("composer_scenes")
           .update({
             dialog_shots: { ...(state as any), status: "failed", error: detail },
-            pipeline_state: "failed",
             clip_error: "Lip-Sync-Zuordnung konnte nicht sicher bestätigt werden.",
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
+        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+        await failSceneState(supabase, sceneId, "failed");
         return json({ error: detail, code: "v368_reprojection_contract_failed" }, 409);
       }
     }
@@ -874,7 +877,6 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            pipeline_state: "failed",
             clip_error: detail.slice(0, 300),
             dialog_shots: {
               ...(state as any),
@@ -885,6 +887,8 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
+        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+        await failSceneState(supabase, sceneId, "failed");
       } catch (e) {
         console.warn("[render-sync-segments-audio-mux] failed to persist preflight failure:", (e as Error).message);
       }
@@ -1081,11 +1085,12 @@ serve(async (req) => {
             ...retryState,
             audio_mux_error: `invoke ${invokeResp.status}: ${invokeMessage}`.slice(0, 500),
           },
-          pipeline_state: "failed",
           clip_error: `audio_mux_dispatch: ${invokeMessage}`.slice(0, 300),
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
+      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+      await failSceneState(supabase, sceneId, "failed");
       return json({ error: `invoke ${invokeResp.status}: ${invokeMessage}` }, 500);
     }
 

@@ -25,6 +25,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { failSceneState } from "../_shared/scene-state.ts";
 
 const YAVG_NOOP_THRESHOLD = 4.0;
 
@@ -239,11 +240,12 @@ Deno.serve(async (req) => {
     await admin
       .from("composer_scenes")
       .update({
-        pipeline_state: "failed",
         clip_error: userMsg,
         updated_at: nowIso,
       })
       .eq("id", body.scene_id);
+    // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+    await failSceneState(admin, body.scene_id, "failed");
 
     await logDispatch(admin, {
       scene_id: body.scene_id,
