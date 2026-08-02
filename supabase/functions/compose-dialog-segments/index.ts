@@ -957,29 +957,16 @@ serve(async (req) => {
     }
 
     if (!masterAudioUrl || speakers.length === 0 || totalSec <= 0) {
-      // v172 self-heal: NICHT als hartes failed markieren — der Audio-Prep
-      // (compose-twoshot-audio) ist hier einfach noch nicht durchgelaufen
-      // oder hat keinen master geschrieben. twoshot_stage auf null setzen,
-      // damit der Client-Trigger (useTwoShotAutoTrigger) im nächsten Tick
-      // den Audio-Prep nachholt. Vorher blieb die Szene ewig auf
-      // "Lip-Sync wird gestartet…" weil der Status pending blieb und
-      // gleichzeitig twoshot_stage='master_clip' den Re-Try blockierte.
-      await supabase
-        .from("composer_scenes")
-        .update({
-          twoshot_stage: null,
-          lip_sync_status: "pending",
-          clip_error: "audio_plan_not_ready_self_heal",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
+      // The clip webhook owns audio preparation and dispatches this function
+      // again after audio_plan.twoshot is durably stored. An early/stale client
+      // call is therefore a benign wait state: never reset the stage, attach a
+      // clip error, or hide the already-rendered master plate.
       return json(
         {
           ok: false,
-          self_heal: true,
+          waiting_for_audio: true,
           error: "missing_audio_plan",
-          message:
-            "Audio-Plan ist noch nicht fertig — Stage wurde zurückgesetzt, Trigger holt compose-twoshot-audio im nächsten Tick nach.",
+          message: "Audio-Plan wird serverseitig vorbereitet.",
         },
         202,
       );
