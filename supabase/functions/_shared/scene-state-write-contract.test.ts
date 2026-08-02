@@ -16,9 +16,9 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 const ALLOWED = new Set<string>([
   "supabase/functions/_shared/scene-hard-reset.ts",
   "supabase/functions/_shared/scene-state.ts",
-  "supabase/functions/_shared/clip-terminal-failure.ts",
   "supabase/functions/_shared/scene-state-write-contract.test.ts",
 ]);
+
 
 const ROOT = new URL("../../../", import.meta.url).pathname;
 
