@@ -3,7 +3,6 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
-import { sceneState, transitionScene } from "../_shared/scene-state.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,15 +48,6 @@ serve(async (req) => {
     const renderJobId = customData?.render_job_id;
     const longFormProjectId = customData?.sora_long_form_project_id;
     const composerSceneId = customData?.composer_scene_id;
-    const callbackGeneration = customData?.plate_generation;
-    const callbackRunId = customData?.active_run_id;
-
-    const isCurrentComposerRun = (sceneRow: any): boolean =>
-      callbackGeneration !== null &&
-      callbackGeneration !== undefined &&
-      !!callbackRunId &&
-      Number(callbackGeneration) === Number(sceneRow?.plate_generation) &&
-      String(callbackRunId) === String(sceneRow?.active_run_id ?? '');
 
     console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, isLongForm, progressIdFromWebhook });
 
@@ -213,19 +203,15 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-preclip', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, pipeline_state, lip_sync_applied_at, plate_generation, active_run_id')
+              .select('dialog_shots, lip_sync_status, lip_sync_applied_at')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
-            if (!isCurrentComposerRun(sceneRow)) {
-              console.warn(`🎬 [dialog-turn-preclip] v379 stale callback ignored scene=${composerSceneId}`);
-              return;
-            }
             // v18 Cancel-Guard: do not revive a user-cancelled scene with a
             // late preclip render — just log the render and exit.
             if (
               (sceneRow as any)?.lip_sync_applied_at ||
-              sceneState(sceneRow) === 'canceled' ||
+              (sceneRow as any)?.lip_sync_status === 'canceled' ||
               prevState?.status === 'canceled'
             ) {
               console.log(`🎬 [dialog-turn-preclip] scene ${composerSceneId} shot ${shotIdx} ignored — scene canceled/applied`);
@@ -275,28 +261,29 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, pipeline_state, lip_sync_applied_at, plate_generation, active_run_id')
+              .select('dialog_shots, lip_sync_status, lip_sync_applied_at')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
-            if (!isCurrentComposerRun(sceneRow)) {
-              console.warn(`💋 [dialog-stitch] v379 stale callback ignored scene=${composerSceneId}`);
-              return;
-            }
             // v18 Cancel-Guard: do not overwrite clip_url for a cancelled scene.
             if (
-              sceneState(sceneRow) === 'canceled' ||
+              (sceneRow as any)?.lip_sync_status === 'canceled' ||
               prevState?.status === 'canceled'
             ) {
               console.log(`💋 [dialog-stitch] scene ${composerSceneId} ignored — scene canceled`);
               return;
             }
             const nowIso = new Date().toISOString();
-            // v385 — Nutzdaten schreiben, Zustand danach über die Maschine.
             await supabaseAdmin.from('composer_scenes').update({
               clip_url: finalOutputUrl,
+              // v268 — dialog-stitch finalisiert die Szene komplett; ohne
+              // clip_status='ready' bleibt die UI ewig auf „Szene wird
+              // gebaut…" obwohl das MP4 längst existiert.
+              clip_status: 'ready',
               lip_sync_source_clip_url: prevState?.source_clip_url ?? null,
               lip_sync_applied_at: nowIso,
+              lip_sync_status: 'done',
+              twoshot_stage: 'done',
               clip_error: null,
               dialog_shots: {
                 ...prevState,
@@ -306,58 +293,8 @@ serve(async (req) => {
               },
               updated_at: nowIso,
             }).eq('id', composerSceneId);
-            await transitionScene(supabaseAdmin, composerSceneId, 'complete', {
-              detail: 'remotion-webhook dialog_stitch',
-              generation: (sceneRow as any)?.plate_generation ?? null,
-            });
           }, { ttlSeconds: 30 });
           console.log(`💋 [dialog-stitch] scene ${composerSceneId} done → ${finalOutputUrl}`);
-
-          // v367 — the stitched mux is the ONLY canonical library asset for a
-          // dialog scene (plates + preclips stay internal).
-          try {
-            const { data: sc } = await supabaseAdmin
-              .from('composer_scenes')
-              .select('project_id, order_index, duration_seconds, clip_source')
-              .eq('id', composerSceneId)
-              .maybeSingle();
-            const { data: proj } = sc?.project_id
-              ? await supabaseAdmin
-                  .from('composer_projects')
-                  .select('user_id, title')
-                  .eq('id', sc.project_id)
-                  .maybeSingle()
-              : { data: null as any };
-            if (proj?.user_id) {
-              const { data: dup } = await supabaseAdmin
-                .from('video_creations')
-                .select('id')
-                .eq('output_url', finalOutputUrl)
-                .maybeSingle();
-              if (!dup) {
-                await supabaseAdmin.from('video_creations').insert({
-                  user_id: proj.user_id,
-                  output_url: finalOutputUrl,
-                  status: 'completed',
-                  credits_used: 0,
-                  metadata: {
-                    source: 'motion-studio-clip',
-                    canonical: true,
-                    dialog_final: true,
-                    project_id: sc?.project_id ?? null,
-                    project_name: proj.title ?? null,
-                    scene_id: composerSceneId,
-                    scene_order: sc?.order_index ?? 0,
-                    model: sc?.clip_source ?? null,
-                    duration_seconds: sc?.duration_seconds ?? null,
-                    superseded: false,
-                  },
-                });
-              }
-            }
-          } catch (e) {
-            console.warn('💋 [dialog-stitch] library archive failed', (e as Error).message);
-          }
         } else {
           console.warn('💋 [dialog-stitch] success webhook without composer_scene_id');
         }
@@ -662,14 +599,10 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-preclip-fail', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, plate_generation, active_run_id')
+              .select('dialog_shots')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
-            if (!isCurrentComposerRun(sceneRow)) {
-              console.warn(`🎬 [dialog-turn-preclip-fail] v379 stale callback ignored scene=${composerSceneId}`);
-              return;
-            }
             const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
             if (shots[shotIdx]) {
               shots[shotIdx] = {
@@ -704,14 +637,10 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch-fail', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, project_id, plate_generation, active_run_id')
+              .select('dialog_shots, project_id')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
-            if (!isCurrentComposerRun(sceneRow)) {
-              console.warn(`💋 [dialog-stitch-fail] v379 stale callback ignored scene=${composerSceneId}`);
-              return;
-            }
             let refundedFlag = !!prevState.refunded;
             const refundCredits = Number(prevState.cost_credits) || 0;
             if (!refundedFlag && refundCredits > 0 && userId) {
@@ -723,6 +652,8 @@ serve(async (req) => {
               }
             }
             await supabaseAdmin.from('composer_scenes').update({
+              lip_sync_status: 'failed',
+              twoshot_stage: 'failed',
               clip_error: `dialog_stitch_lambda_failed: ${errorMessage}`.slice(0, 300),
               dialog_shots: {
                 ...prevState,
@@ -732,10 +663,6 @@ serve(async (req) => {
               },
               updated_at: new Date().toISOString(),
             }).eq('id', composerSceneId);
-            await transitionScene(supabaseAdmin, composerSceneId, 'failed', {
-              detail: `dialog_stitch_lambda_failed: ${errorMessage}`.slice(0, 200),
-              generation: (sceneRow as any)?.plate_generation ?? null,
-            });
           }, { ttlSeconds: 30 });
           console.log(`💋 [dialog-stitch] scene ${composerSceneId} failed: ${errorMessage.slice(0, 120)}`);
         }
