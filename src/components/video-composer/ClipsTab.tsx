@@ -378,10 +378,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             variant: 'destructive',
           });
         }
-        newPrev[scene.id] = dbScene.clip_status;
+        newPrev[scene.id] = dbClipStatus as string;
         return {
           ...scene,
-          clipStatus: dbScene.clip_status as ComposerScene['clipStatus'],
+          clipStatus: dbClipStatus as ComposerScene['clipStatus'],
+
           clipUrl: dbScene.clip_url || undefined,
           pipelineState: (dbScene as any).pipeline_state,
           pipelineStateAt: (dbScene as any).pipeline_state_at,
