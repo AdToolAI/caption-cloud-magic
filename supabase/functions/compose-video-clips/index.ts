@@ -4645,10 +4645,31 @@ serve(async (req) => {
           // sanitizer + lip-ready compressor right away: their prompts are the
           // longest and the ones HappyHorse rejects with InvalidParameter /
           // Green Net. Lip motion comes from Sync.so, not from this prompt.
+          // v370 — the resolved cast names travel with the prompt so the
+          // sanitizer rebuilds ONE canonical clause instead of regex-patching
+          // whatever it finds.
+          const hhCastNames = extractCastNames(String(hhPromptRaw ?? ""));
           const hhSan = isCinematicSyncHH
-            ? hardSanitizeForHappyHorse(String(hhPromptRaw ?? ""))
-            : sanitizeForHappyHorse(String(hhPromptRaw ?? ""));
-          const hhCleanPrompt = hhSan.emptied ? String(hhPromptRaw ?? "") : hhSan.clean;
+            ? hardSanitizeForHappyHorse(String(hhPromptRaw ?? ""), hhCastNames)
+            : sanitizeForHappyHorse(String(hhPromptRaw ?? ""), { castNames: hhCastNames });
+          let hhCleanPrompt = hhSan.emptied ? String(hhPromptRaw ?? "") : hhSan.clean;
+
+          // Pre-Dispatch-Contract: nothing leaves this function with a
+          // bracket tag, a duplicated cast clause or a count/name mismatch —
+          // the exact triad behind "InvalidParameter - Could not process with
+          // this prompt".
+          const hhContract = validateCastContract(hhCleanPrompt);
+          if (!hhContract.ok) {
+            const rebuilt = normalizeCastInPrompt(hhCleanPrompt, hhCastNames);
+            hhCleanPrompt = rebuilt.out.replace(/\[[^\]]*\]/g, " ")
+              .replace(/[ \t]+/g, " ").trim();
+            console.warn(
+              `[compose-video-clips] v370_cast_contract_rebuilt scene=${scene.id} issues=${
+                hhContract.issues.map((i) => `${i.code}(${i.detail})`).join(", ")
+              }`,
+            );
+          }
+
           if (hhSan.touched.length > 0) {
             console.log(
               `[compose-video-clips] HappyHorse scene ${scene.id} green-net sanitized: ${hhSan.touched.join(", ")}`,
