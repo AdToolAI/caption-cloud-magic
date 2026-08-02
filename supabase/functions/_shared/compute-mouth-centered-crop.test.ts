@@ -66,3 +66,47 @@ Deno.test("v344.1: 41x55px face in a minSize-widened crop passes the linear floo
   );
   assert(r.faceSidePx === 55, `expected faceSidePx 55, got ${r.faceSidePx}`);
 });
+
+// ── v393 — Mund-Vorrang-Framing (Beweisfaelle Szene 9eded574) ──────────
+
+Deno.test("v393: mouth never sits at or beyond the lower crop edge", () => {
+  // Frau mit Hut: Bbox inkl. Hut -> Kopf-Containment zog den Crop nach oben,
+  // der Mund lag exakt auf der Unterkante (belegt per Overlay-Screenshot).
+  const r = computeMouthCenteredCrop({
+    face: { bbox: [640, 300, 900, 620], center: [770, 460], mouth: [772, 575] },
+    plateWidth: 1928,
+    plateHeight: 1076,
+    minSize: 128,
+  });
+  const band = (575 - r.crop.y) / r.crop.size;
+  assert(band > 0.35 && band < 0.8, `mouth band out of range: ${band}`);
+  assert(
+    r.crop.y + r.crop.size - 575 >= r.crop.size * 0.15,
+    `not enough room below the mouth: ${r.crop.y + r.crop.size - 575}px`,
+  );
+  assert(r.mouthInsideCrop, "mouth must be inside the crop");
+});
+
+Deno.test("v393: bbox-derived anchor keeps the mouth inside the crop", () => {
+  const r = computeMouthCenteredCrop({
+    face: { bbox: [1150, 350, 1330, 620], center: [1240, 480] },
+    plateWidth: 1928,
+    plateHeight: 1076,
+    minSize: 128,
+  });
+  const mouthY = 350 + (620 - 350) * 0.72;
+  const band = (mouthY - r.crop.y) / r.crop.size;
+  assert(band > 0.35 && band < 0.8, `derived mouth band out of range: ${band}`);
+  assert(r.mouthInsideCrop, "derived mouth must be inside the crop");
+});
+
+Deno.test("v393: mouth priority also holds at the bottom plate edge", () => {
+  const r = computeMouthCenteredCrop({
+    face: { bbox: [1500, 780, 1720, 1050], center: [1610, 915], mouth: [1610, 1000] },
+    plateWidth: 1928,
+    plateHeight: 1076,
+    minSize: 128,
+  });
+  assert(r.mouthInsideCrop, "mouth must stay inside even when clamped");
+  assert(r.crop.y + r.crop.size <= 1076, "crop must stay inside the plate");
+});
