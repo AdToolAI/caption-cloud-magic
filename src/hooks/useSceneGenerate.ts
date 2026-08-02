@@ -119,48 +119,41 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
 
         const forceCinematicSync = shouldForceCinematicSync(workingScene);
 
-        // Stage 7: clear any stale `auto-reset:` marker BEFORE the invoke so
-        // the row visibly flips to `generating` even if realtime races the
-        // edge function's own pre-mark. Without this, an old
-        // `talking_head_master_invalid_for_cinematic_sync` marker keeps the
-        // UI on "Wartet" forever for 1-speaker cinematic-sync scenes.
+        // v387/Wave D — Der Client schreibt KEINE Lifecycle-Spalten mehr.
+        // `clip_status`, `twoshot_stage` und `lip_sync_status` werden von der
+        // DB-Bridge in `pipeline_state` zurückgespiegelt; ein Pre-Mark mit
+        // `twoshot_stage: 'audio'` hat die Szene deshalb direkt nach
+        // `audio_prep` gehoben — der Grund, warum die UI in den Lip-Sync
+        // sprang, während die Plate noch gerendert wurde. Den Lebenszyklus
+        // setzt ausschliesslich `composer-start-scene-generation` bzw. die
+        // Provider-Webhooks über `composer_scene_transition()`.
+        // Nur reine Konfiguration (Engine-Wahl) darf hier persistiert werden.
         const scenePersisted =
           /^[0-9a-f-]{36}$/i.test(workingScene.id) &&
           !!workingScene.clipSource?.startsWith('ai-');
-        if (scenePersisted) {
+        if (scenePersisted && forceCinematicSync) {
           try {
-            const preMark: Record<string, unknown> = {
-              clip_status: 'generating',
-              clip_error: null,
+            workingScene = {
+              ...workingScene,
+              engineOverride: 'cinematic-sync',
+              lipSyncWithVoiceover: true,
             };
-            if (forceCinematicSync) {
-              Object.assign(preMark, {
+            opts.onOptimisticPatch?.(workingScene.id, {
+              engineOverride: 'cinematic-sync',
+              lipSyncWithVoiceover: true,
+            });
+            await supabase
+              .from('composer_scenes')
+              .update({
                 engine_override: 'cinematic-sync',
                 lip_sync_with_voiceover: true,
-                lip_sync_status: 'pending',
-                twoshot_stage: 'audio',
-                lip_sync_source_clip_url: null,
-              });
-              workingScene = {
-                ...workingScene,
-                engineOverride: 'cinematic-sync',
-                lipSyncWithVoiceover: true,
-                lipSyncStatus: 'pending',
-                twoshotStage: 'audio',
-              };
-              opts.onOptimisticPatch?.(workingScene.id, {
-                clipStatus: 'generating',
-                engineOverride: 'cinematic-sync',
-                lipSyncWithVoiceover: true,
-                lipSyncStatus: 'pending',
-                twoshotStage: 'audio',
-              });
-            }
-            await supabase.from('composer_scenes').update(preMark).eq('id', workingScene.id);
+              })
+              .eq('id', workingScene.id);
           } catch (preErr) {
-            console.warn('[useSceneGenerate] pre-mark failed', preErr);
+            console.warn('[useSceneGenerate] engine pre-mark failed', preErr);
           }
         }
+
 
         // v173 — compose final prompt for single-scene invokes too. Previously
         // performance/actionBeat from the Briefing-Plan were dropped here

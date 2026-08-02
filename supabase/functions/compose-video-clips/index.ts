@@ -1877,8 +1877,11 @@ serve(async (req) => {
             .update({
               engine_override: "cinematic-sync",
               lip_sync_with_voiceover: true,
-              pipeline_state: "audio_prep",
+              // v387 — KEIN Zustandssprung hier. Diese Function baut nur die
+              // Plate; `audio_prep` darf ausschliesslich nach bestaetigtem
+              // `plate_ready` (Provider-Callback) gesetzt werden.
               clip_error: null,
+
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
@@ -2080,57 +2083,18 @@ serve(async (req) => {
           // This is what makes the "Artlist Two-Shot Hook" work end-to-end:
           // Hailuo renders the 10s two-shot, then Sync.so lip-syncs against
           // the merged audio.
-          try {
-            const dlg = String((scene as any).dialogScript ?? "");
-            const speakerLines = dlg
-              .split(/\r?\n/)
-              .filter((l) =>
-                /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/.test(l),
-              );
-            if (speakerLines.length >= 1) {
-              // Mark stage = 'audio' so the UI can show step 1/6.
-              await supabaseAdmin
-                .from("composer_scenes")
-                .update({
-                  pipeline_state: "audio_prep",
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", scene.id);
-              const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-twoshot-audio`;
-              const r = await fetch(fnUrl, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-                },
-                body: JSON.stringify({ scene_id: scene.id }),
-              });
-              // Drain body to avoid leak; capture text on failure for logs.
-              const respText = await r.text().catch(() => "");
-              if (!r.ok) {
-                console.warn(
-                  `[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status} ${respText.slice(0, 300)}`,
-                );
-              } else {
-                console.log(
-                  `[compose-video-clips] twoshot-audio prep OK for ${scene.id}`,
-                );
-                // Stage = 'master_clip' — Hailuo render begins next.
-                await supabaseAdmin
-                  .from("composer_scenes")
-                  .update({
-                    pipeline_state: "audio_ready",
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq("id", scene.id);
-              }
-            }
-          } catch (twoshotErr) {
-            console.warn(
-              `[compose-video-clips] twoshot-audio prep exception for ${scene.id}:`,
-              twoshotErr,
-            );
-          }
+          // v387 — Der frühere Two-Shot-Audio-Vorgriff wurde hier ENTFERNT.
+          //
+          // Bis v386 hat diese Function bei Dialogszenen direkt
+          // `pipeline_state='audio_prep'` geschrieben, `compose-twoshot-audio`
+          // aufgerufen und danach `audio_ready` gesetzt — und zwar BEVOR die
+          // Plate überhaupt gerendert war. Beide Writes umgingen
+          // `composer_scene_transition()`. Genau daher sprang die UI direkt
+          // auf „Lip-Sync startet", während HappyHorse noch rechnete.
+          //
+          // Audio-Prep wird jetzt ausschließlich nach bestätigtem
+          // `plate_ready` ausgelöst (compose-clip-webhook + Auto-Trigger).
+
 
           const { data: voClips } = await supabaseAdmin
             .from("scene_audio_clips")
@@ -3185,7 +3149,13 @@ serve(async (req) => {
                           const geometryLock: Record<string, string> = {};
                           if (resolved < expected && anchorLayoutComplete) {
                             for (const slot of anchorFaceLayout.slots) {
-                              if (slot?.characterId) geometryLock[String(slot.slotIndex)] = slot.characterId;
+                              // v387 — nur Slots der aktuellen Sprecherzahl.
+                              // Vorher konnten Layout-Slots > expected in den
+                              // Lock wandern (locked_slots=5/4) und beim
+                              // Dispatch eine Identitaets-Kollision ausloesen.
+                              const si = Number(slot?.slotIndex);
+                              if (!Number.isInteger(si) || si < 0 || si >= expected) continue;
+                              if (slot?.characterId) geometryLock[String(si)] = slot.characterId;
                             }
                           }
                           const useGeometryLock =
@@ -3193,10 +3163,17 @@ serve(async (req) => {
                             anchorLayoutComplete &&
                             Object.keys(geometryLock).length >= expected;
                           if (useGeometryLock) {
-                            anchorIdentityPayload.assignmentLock = {
+                            const _mergedLock: Record<string, string> = {
                               ...geometryLock,
                               ...(idResolved.assignmentLock ?? {}),
                             };
+                            anchorIdentityPayload.assignmentLock = Object.fromEntries(
+                              Object.entries(_mergedLock).filter(([k]) => {
+                                const i = Number(k);
+                                return Number.isInteger(i) && i >= 0 && i < expected;
+                              }),
+                            );
+
                             (anchorIdentityPayload as any).assignmentLockSource = "v326_geometry_rowmajor";
                             (anchorIdentityPayload as any).status = "geometry";
                             (anchorIdentityPayload as any).resolvedCount = expected;

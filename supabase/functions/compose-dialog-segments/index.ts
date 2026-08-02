@@ -60,6 +60,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { sceneState, canDispatchLipsync } from "../_shared/scene-state.ts";
+import { canonicalizeAssignmentLock, stripVariantPrefix } from "../_shared/assignment-lock.ts";
+
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
@@ -2744,9 +2746,23 @@ serve(async (req) => {
       });
     }
     const mergedFallbackLock = { ...(freshLock ?? existingLock) };
-    const finalAssignmentLock = anchorRekLockSeed
+    const _preCanonLock = anchorRekLockSeed
       ? { ...mergedFallbackLock, ...anchorRekLockSeed }
       : mergedFallbackLock;
+    // v387 — Der Lock wird pro Lauf aus der AKTUELLEN Sprecherliste gebaut.
+    // Persistierte Slots aus einem früheren Lauf (z. B. 5 Slots bei 4
+    // Sprechern) werden verworfen statt in den Injektivitätstest zu laufen.
+    const _canon = canonicalizeAssignmentLock(
+      _preCanonLock,
+      speakers.map((sp) => sp.character_id ?? null),
+    );
+    const finalAssignmentLock = _canon.lock;
+    if (_canon.droppedSlots.length > 0) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v387_stale_lock_slots_dropped ` +
+        `dropped=${_canon.droppedSlots.join(",")} speakers=${speakers.length}`,
+      );
+    }
     const lockSource = anchorRekLockComplete
       ? "v277_anchor_rekognition_complete"
       : anchorRekLockPartial
@@ -2754,6 +2770,7 @@ serve(async (req) => {
         : freshLock
           ? "v242_fresh"
           : "existing";
+
     const v153PlateIdentitySnapshot = {
       version: "v242" as const,
       dims: plateDims,
@@ -2771,14 +2788,20 @@ serve(async (req) => {
       `[compose-dialog-segments] scene=${sceneId} v277_assignment_lock ` +
       `source=${lockSource} locked_slots=${Object.keys(finalAssignmentLock).length}/${speakers.length}`,
     );
-    // v367 — Der Assignment-Lock ist ALLEINIGE Wahrheit und MUSS injektiv
-    // sein. Zwei Sprecher auf derselben characterId (oder derselben
-    // Plate-Bbox) bedeuten: alle Overlays landen später auf einem Gesicht.
-    // Lieber hier sauber scheitern als ein Video ausliefern, in dem eine
-    // Person sämtliche Dialoge spricht.
+    // v387 — Der Lock ist kanonisch (nur Slots der aktuellen Sprecher) und
+    // MUSS injektiv sein. Eine Kollision ist jetzt nur noch möglich, wenn
+    // zwei AKTUELLE Sprecher wirklich denselben Charakter tragen — stale
+    // Slots aus früheren Läufen können die Szene nicht mehr abschiessen.
     if (speakers.length >= 2) {
-      const lockVals = Object.values(finalAssignmentLock).map((v) => String(v).toLowerCase());
-      const dupCid = lockVals.find((v, i) => v && lockVals.indexOf(v) !== i);
+      const nameForCid = (cid: string) => {
+        const idx = speakers.findIndex(
+          (sp) => stripVariantPrefix(sp.character_id) === cid,
+        );
+        return idx >= 0
+          ? String((speakers[idx] as any).speaker ?? `Sprecher ${idx + 1}`)
+          : cid;
+      };
+      const dupCid = _canon.duplicateCharacterIds[0] ?? null;
       const centers = speakerPlateBboxes.map((b) =>
         Array.isArray(b) && b.every((n) => Number.isFinite(Number(n)))
           ? [
@@ -2795,7 +2818,7 @@ serve(async (req) => {
           if (!a || !b) continue;
           const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
           if (d < 0.4 * Math.min(a[2], b[2])) {
-            dupBox = `${i + 1}/${j + 1}`;
+            dupBox = `${String((speakers[i] as any).speaker ?? `Sprecher ${i + 1}`)} und ${String((speakers[j] as any).speaker ?? `Sprecher ${j + 1}`)}`;
             break;
           }
         }
@@ -2804,21 +2827,55 @@ serve(async (req) => {
         const msg =
           `lipsync_identity_collision: ` +
           (dupCid
-            ? `Zwei Sprecher wurden demselben Charakter zugeordnet.`
-            : `Sprecher ${dupBox} zeigen auf dasselbe Gesicht in der Szene.`) +
-          ` Die Sprecher-Zuordnung ist mehrdeutig — bitte Szene mit klar getrennten Sprechern neu generieren.`;
-        console.error(`[compose-dialog-segments] scene=${sceneId} v367_identity_collision ${msg}`);
+            ? `„${nameForCid(dupCid)}" ist in dieser Szene mehrfach als Sprecher hinterlegt. ` +
+              `Bitte im Dialog jedem Redeanteil einen eigenen Charakter zuweisen.`
+            : `${dupBox} zeigen im Bild auf dasselbe Gesicht. ` +
+              `Bitte die Szene mit klar getrennten Sprechern neu generieren.`) +
+          ` Es wurde kein Lip-Sync gestartet.`;
+        console.error(`[compose-dialog-segments] scene=${sceneId} v387_identity_collision ${msg}`);
+        // v387 — Abbruch VOR dem ersten Provider-Aufruf: idempotent erstatten.
+        const alreadyRefundedIC = !!(existing as any)?.refunded;
+        if (!alreadyRefundedIC) {
+          try {
+            const { data: wIC } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wIC?.balance ?? 0) + Number(totalCost ?? 0),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          } catch (e) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v387 identity-collision refund failed: ${(e as Error)?.message}`,
+            );
+          }
+        }
         await supabase
           .from("composer_scenes")
           .update({
+            dialog_shots: mergeDialogShots(existing, {
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              refunded: true,
+              error: "v387_identity_collision",
+              finished_at: new Date().toISOString(),
+            }),
             pipeline_state: "failed",
             clip_error: msg,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        return json({ ok: false, error: msg }, 200);
+        return json(
+          { ok: false, error: msg, refunded: alreadyRefundedIC ? 0 : totalCost },
+          200,
+        );
+
       }
     }
+
 
     console.warn(
       `[compose-dialog-segments] scene=${sceneId} v158_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} mouths=${speakerPlateMouths.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
