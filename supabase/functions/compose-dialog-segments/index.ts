@@ -863,6 +863,17 @@ serve(async (req) => {
       );
     }
 
+    // v388 — Phasenwechsel laufen ausschliesslich ueber den geprueften Weg:
+    // atomar, mit Freigabeliste sowie Lauf- und Generations-Fence.
+    const advanceScene = (to: SceneState, from?: SceneState[]) =>
+      transitionScene(supabase, sceneId, to, {
+        from,
+        runId: String((scene as any).active_run_id ?? "") || null,
+        generation: Number((scene as any).plate_generation ?? 1),
+      });
+
+
+
     const { data: project } = await supabase
       .from("composer_projects")
       .select("user_id")
