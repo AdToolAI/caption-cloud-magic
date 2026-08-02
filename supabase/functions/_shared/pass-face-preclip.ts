@@ -578,6 +578,11 @@ export async function renderPassFacePreclip(
         width: outW,
         height: outH,
         composer_scene_id: sceneId,
+        // v380 — Generation/Run MÜSSEN mitgeschrieben werden: der Reuse-Lookup
+        // oben filtert darauf und der Hard-Reset markiert offene Renders alter
+        // Generationen anhand dieser Felder als `superseded`.
+        plate_generation: Number(runRow.plate_generation),
+        active_run_id: String(runRow.active_run_id),
         pass_idx: passIdx,
         face_crop: { x: crop.x, y: crop.y, size: crop.size, outputSize: crop.outputSize },
         crop_mode: cropMode,

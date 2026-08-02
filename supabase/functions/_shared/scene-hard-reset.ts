@@ -187,6 +187,101 @@ export function stripDerivedAudioPlan(
   return cleaned;
 }
 
+/**
+ * v380 — Schlüssel in `scene_assets`, die aus einem Pipeline-Lauf STAMMEN.
+ * Alles, was der Nutzer gepflegt hat (Charakter-Referenzen, Location, manuell
+ * bestätigte Anchors), überlebt einen Neustart. Alles, was ein vorheriger Lauf
+ * berechnet hat, darf es nicht — eine überlebende Plate-, Preclip- oder
+ * Tracking-Referenz ist genau der Weg, auf dem ein neuer Lauf aus dem Material
+ * von gestern schneidet.
+ */
+const DERIVED_SCENE_ASSET_KEYS: readonly string[] = [
+  "plate",
+  "plate_url",
+  "plateUrl",
+  "plates",
+  "preclip",
+  "preclips",
+  "preclip_urls",
+  "passes",
+  "pass_videos",
+  "tracking",
+  "tracking_url",
+  "bounding_boxes_url",
+  "boundingBoxesUrl",
+  "faceMap",
+  "face_map",
+  "face_slots",
+  "landmarks",
+  "camera_path",
+  "cameraPath",
+  "mux",
+  "mux_url",
+  "stitch",
+  "stitch_url",
+  "lipsync",
+  "lipsync_urls",
+  "silence_track_url",
+  "generation",
+  "plate_generation",
+  "run_id",
+  "runId",
+];
+
+/**
+ * Entfernt jeden abgeleiteten Schlüssel aus einem `scene_assets`-Snapshot.
+ * Gibt `null` zurück, wenn nichts Nutzer-Gepflegtes übrig bleibt, damit die
+ * Spalte geleert statt auf `{}` gesetzt wird.
+ */
+export function stripDerivedSceneAssets(
+  prevAssets: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!prevAssets || typeof prevAssets !== "object") return null;
+  const cleaned: Record<string, unknown> = { ...prevAssets };
+  for (const key of DERIVED_SCENE_ASSET_KEYS) delete cleaned[key];
+  return Object.keys(cleaned).length > 0 ? cleaned : null;
+}
+
+/**
+ * v380 — offene `video_renders` der Szene, die zu einer ÄLTEREN Generation
+ * gehören, werden als `failed` mit `superseded`-Marker geschlossen. Kein
+ * Delete: die Forensik (welcher Lauf hat was gerendert) bleibt erhalten, aber
+ * kein Reuse-Lookup und kein Webhook kann sie noch als „frisch" verwenden.
+ */
+async function supersedeOpenRenders(
+  supabase: SupabaseLike,
+  sceneId: string,
+  nextGeneration: number,
+): Promise<number> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from("video_renders")
+      .select("render_id, content_config")
+      .contains("content_config", { composer_scene_id: sceneId })
+      .in("status", ["pending", "queued"]);
+    if (error || !Array.isArray(data) || data.length === 0) return 0;
+
+    const stale = data.filter(
+      (row: any) =>
+        Number(row?.content_config?.plate_generation ?? 0) < nextGeneration,
+    );
+    if (stale.length === 0) return 0;
+
+    const { error: updErr } = await (supabase as any)
+      .from("video_renders")
+      .update({
+        status: "failed",
+        error_message: `v380_superseded_by_generation_${nextGeneration}`,
+      })
+      .in("render_id", stale.map((r: any) => r.render_id));
+    return updErr ? 0 : stale.length;
+  } catch {
+    return 0;
+  }
+}
+
+
+
 
 
 
@@ -297,7 +392,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     const { data } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, replicate_prediction_id, lip_sync_applied_at",
+        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, scene_assets, replicate_prediction_id, lip_sync_applied_at",
       )
       .eq("id", sceneId)
       .maybeSingle();
@@ -422,6 +517,18 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   // payload from the previous generation must never survive the reset.
   const prevPlan = (scene?.audio_plan ?? null) as Record<string, unknown> | null;
   const cleanedPlan = stripDerivedAudioPlan(prevPlan);
+  // v380 — dasselbe für `scene_assets`: Plate-, Preclip-, Tracking- und
+  // FaceMap-Referenzen der Vorgeneration verlassen die Szene hier.
+  const cleanedAssets = stripDerivedSceneAssets(
+    (scene?.scene_assets ?? null) as Record<string, unknown> | null,
+  );
+  // v380 — offene Renders der Vorgeneration schließen, bevor der neue Lauf
+  // startet (sonst kann der Reuse-Lookup ein Ergebnis von gestern ziehen).
+  const supersededRenders = await supersedeOpenRenders(
+    supabase,
+    sceneId,
+    nextGeneration,
+  );
 
 
   try {
@@ -443,6 +550,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
         dialog_shots: null,
         dialog_takes: null,
         audio_plan: cleanedPlan,
+        scene_assets: cleanedAssets,
 
         replicate_prediction_id: null,
         retry_count: 0,
@@ -455,7 +563,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   }
 
   console.log(
-    `[v376_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} attempts_superseded=${supersededAttempts} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
+    `[v380_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} attempts_superseded=${supersededAttempts} renders_superseded=${supersededRenders} assets_cleared=${cleanedAssets === null ? "all" : "derived"} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
   );
 
   return {
