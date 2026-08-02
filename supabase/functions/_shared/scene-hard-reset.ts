@@ -580,6 +580,10 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     // NOT NULL; ein `null` hier ließ den kompletten Reset — und damit jeden
     // Regenerate einer Dialogszene — an einer Constraint scheitern.
     const patch = coerceNotNullResetColumns({
+      // v385 — der Hard-Reset setzt den Zustand direkt (Purge, keine
+      // Transition): `pipeline_state` ist die Wahrheit, `clip_status` wird im
+      // selben Statement mitgeschrieben, weil die Spalte NOT NULL ist.
+      pipeline_state: "idle",
       plate_generation: nextGeneration,
       plate_generation_started_at: nowIso,
       plate_ready_generation: null,
@@ -601,6 +605,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
       retry_count: 0,
       updated_at: nowIso,
     }, sceneId);
+
 
     const { error } = await supabase
       .from("composer_scenes")
