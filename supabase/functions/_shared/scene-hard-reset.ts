@@ -243,6 +243,49 @@ export function stripDerivedSceneAssets(
 }
 
 /**
+ * v382 — NOT-NULL-Guard für den Reset-Write.
+ *
+ * `composer_scenes.dialog_takes` (default `'{}'`) und `composer_scenes.scene_assets`
+ * (default `'[]'`) sind NOT NULL. Ein einziges `null` in diesem Patch ließ das
+ * gesamte Update — und damit jeden Regenerate einer Dialogszene — an einer
+ * Constraint scheitern; v377 meldete daraufhin korrekt `reset_failed` und die
+ * UI zeigte "Edge Function returned a non-2xx status code".
+ *
+ * Statt sich auf handgepflegte Werte zu verlassen, wird hier jedes `null` auf
+ * einer bekannten NOT-NULL-Spalte auf deren Default korrigiert und geloggt.
+ * Eine künftige Schemaänderung kann den Regenerate so nicht erneut blockieren.
+ */
+const NOT_NULL_SCENE_COLUMN_DEFAULTS: Record<string, unknown> = {
+  dialog_takes: {},
+  scene_assets: [],
+  clip_status: "pending",
+  retry_count: 0,
+  plate_generation: 1,
+};
+
+export function coerceNotNullResetColumns(
+  patch: Record<string, unknown>,
+  sceneId?: string,
+): Record<string, unknown> {
+  const out = { ...patch };
+  const coerced: string[] = [];
+  for (const [col, fallback] of Object.entries(NOT_NULL_SCENE_COLUMN_DEFAULTS)) {
+    if (col in out && (out[col] === null || out[col] === undefined)) {
+      out[col] = fallback;
+      coerced.push(col);
+    }
+  }
+  if (coerced.length > 0) {
+    console.log(
+      `[v382_notnull_coerced] scene=${sceneId ?? "unknown"} columns=${coerced.join(",")}`,
+    );
+  }
+  return out;
+}
+
+
+
+/**
  * v380 — offene `video_renders` der Szene, die zu einer ÄLTEREN Generation
  * gehören, werden als `failed` mit `superseded`-Marker geschlossen. Kein
  * Delete: die Forensik (welcher Lauf hat was gerendert) bleibt erhalten, aber
@@ -532,30 +575,36 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
 
 
   try {
+    // v382 — NOT-NULL-Spalten dürfen im Reset niemals `null` bekommen.
+    // `dialog_takes` (default '{}') und `scene_assets` (default '[]') sind
+    // NOT NULL; ein `null` hier ließ den kompletten Reset — und damit jeden
+    // Regenerate einer Dialogszene — an einer Constraint scheitern.
+    const patch = coerceNotNullResetColumns({
+      plate_generation: nextGeneration,
+      plate_generation_started_at: nowIso,
+      plate_ready_generation: null,
+      plate_ready_at: null,
+      clip_url: null,
+      clip_status: "pending",
+      clip_error: null,
+      preview_clip_url: null,
+      lip_sync_status: null,
+      lip_sync_source_clip_url: null,
+      lip_sync_applied_at: null,
+      twoshot_stage: null,
+      dialog_shots: null,
+      dialog_takes: {},
+      audio_plan: cleanedPlan,
+      scene_assets: cleanedAssets,
+
+      replicate_prediction_id: null,
+      retry_count: 0,
+      updated_at: nowIso,
+    }, sceneId);
+
     const { error } = await supabase
       .from("composer_scenes")
-      .update({
-        plate_generation: nextGeneration,
-        plate_generation_started_at: nowIso,
-        plate_ready_generation: null,
-        plate_ready_at: null,
-        clip_url: null,
-        clip_status: "pending",
-        clip_error: null,
-        preview_clip_url: null,
-        lip_sync_status: null,
-        lip_sync_source_clip_url: null,
-        lip_sync_applied_at: null,
-        twoshot_stage: null,
-        dialog_shots: null,
-        dialog_takes: null,
-        audio_plan: cleanedPlan,
-        scene_assets: cleanedAssets,
-
-        replicate_prediction_id: null,
-        retry_count: 0,
-        updated_at: nowIso,
-      })
+      .update(patch)
       .eq("id", sceneId);
     if (error) errors.push(`update:${(error as any).message ?? "unknown"}`);
   } catch (e) {
