@@ -10,6 +10,7 @@ import LeadInTrimSheet from './LeadInTrimSheet';
 import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
 import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 import { FaceMapReviewDialog } from './FaceMapReviewDialog';
+import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
@@ -159,8 +160,10 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         .eq('id', scene.id);
       if (error) throw error;
 
-      const { data: invokeData, error: invokeError } = await supabase.functions.invoke('compose-video-clips', {
-        body: {
+      const started = await startSceneGeneration({
+        sceneIds: [scene.id],
+        reason: 'wrong_render_path_regenerate',
+        compose: {
           projectId: scene.projectId,
           scenes: [
             {
@@ -186,7 +189,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           ],
         },
       });
-      if (invokeError) throw invokeError;
+      const invokeData = started.compose;
       if (invokeData && (invokeData as any).ok === false) {
         throw new Error((invokeData as any).error || (invokeData as any).message || 'Render konnte nicht gestartet werden.');
       }

@@ -53,6 +53,7 @@ import { SortableSceneItem } from './SortableSceneItem';
 import ContinuityGuardianStrip from './ContinuityGuardianStrip';
 import RenderPipelinePanel from './RenderPipelinePanel';
 import FramePickerOverlay from './FramePickerOverlay';
+import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
@@ -708,10 +709,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       });
       onUpdateScenes(optimistic);
 
-      const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
+      const started = await startSceneGeneration({
+        sceneIds: scenesPayload.map((item) => item.id),
+        compose: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
+        reason: 'clips_tab_generate_all',
       });
-      if (error) throw error;
+      const data = started.compose;
 
       const updatedScenes = optimistic.map(scene => {
         const result = data?.results?.find((r: any) => r.sceneId === scene.id);
@@ -826,8 +829,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         onUpdateScenes(frozen);
       }
 
-      const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: {
+      const started = await startSceneGeneration({
+        sceneIds: [targetScene.id],
+        reason: 'clips_tab_generate_one',
+        compose: {
           projectId: pid,
           visualStyle,
           characters,
@@ -851,7 +856,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           }],
         },
       });
-      if (error) throw error;
+      const data = started.compose;
 
       const result = data?.results?.[0];
       if (result) {
@@ -994,8 +999,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       let composedFirstFrame: string | undefined = undefined;
 
       // 5. Fire compose-video-clips with explicit cinematic-sync payload.
-      const { data, error } = await supabase.functions.invoke('compose-video-clips', {
-        body: {
+      const started = await startSceneGeneration({
+        sceneIds: [targetSceneId],
+        reason: 'clips_tab_cinematic_sync',
+        compose: {
           projectId: pid,
           visualStyle,
           characters,
@@ -1016,7 +1023,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           }],
         },
       });
-      if (error) throw error;
+      const data = started.compose;
 
       const result = data?.results?.[0];
       if (result?.status === 'failed') {

@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import type { ComposerScene } from "@/types/video-composer";
+import { startSceneGeneration } from "@/lib/composer/startSceneGeneration";
 
 interface FaceMapReviewDialogProps {
   open: boolean;
@@ -193,8 +194,10 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
       if (updErr) throw updErr;
 
       // Re-dispatch the scene now that the mapping is user-approved.
-      const { error: invokeErr } = await supabase.functions.invoke("compose-video-clips", {
-        body: {
+      await startSceneGeneration({
+        sceneIds: [scene.id],
+        reason: "manual_face_map_regenerate",
+        compose: {
           projectId: scene.projectId,
           scenes: [
             {
@@ -218,7 +221,6 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
           ],
         },
       });
-      if (invokeErr) throw invokeErr;
 
       toast({
         title: "Face-Map gespeichert",

@@ -118,11 +118,14 @@ export function AnchorPreviewGate({
       })
       .eq("id", sceneId);
 
-    const { error } = await supabase.functions.invoke("compose-video-clips", {
-      body: { ...composeBody, previewOnly: true },
-    });
-    if (error) {
-
+    try {
+      await startSceneGeneration({
+        sceneIds: [sceneId],
+        compose: { ...composeBody, previewOnly: true },
+        reason: "anchor_preview",
+        useExistingRun: true,
+      });
+    } catch (error: any) {
       setPhase("error");
       setErrMsg(error.message || "Preview konnte nicht gestartet werden.");
       return;

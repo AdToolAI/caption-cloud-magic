@@ -187,6 +187,9 @@ interface ClipRequest {
    *  spend. The client then shows the preview and re-invokes without this
    *  flag once the user confirms. */
   previewOnly?: boolean;
+  /** v377/v378: mandatory proof that each persisted scene belongs to the
+   * currently active, atomically acquired generation run. */
+  run_context?: Record<string, { generation: number; run_id: string }>;
 }
 
 
@@ -231,7 +234,7 @@ serve(async (req) => {
     __stage = "parse_body";
     const body: ClipRequest = await req.json();
     __parsedBody = body;
-    const { projectId, scenes, visualStyle, characters, previewOnly } = body;
+    const { projectId, scenes, visualStyle, characters, previewOnly, run_context: runContext } = body;
 
     if (!projectId) {
       return new Response(
@@ -259,6 +262,26 @@ serve(async (req) => {
       );
     }
 
+    // v378 — direct dispatch is forbidden. Every persisted scene must first
+    // pass through composer-start-scene-generation, which invalidates and
+    // tears down the previous run before forwarding this request.
+    const persistedSceneIds = scenes
+      .map((scene) => String(scene?.id ?? ""))
+      .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    if (
+      persistedSceneIds.length > 0 &&
+      persistedSceneIds.some((id) => !runContext?.[id]?.run_id)
+    ) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "scene_run_required",
+          message: "Renderstart abgelehnt: Die Szene wurde nicht atomar neu gestartet.",
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Verify project ownership
     __stage = "verify_project";
     const { data: project, error: projError } = await supabaseAdmin
@@ -279,6 +302,34 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
+    }
+
+
+    // Compare-and-set guard before any charge/provider call. A second click or
+    // reset can supersede the forwarded request while it is in flight.
+    if (persistedSceneIds.length > 0) {
+      const { data: runRows, error: runErr } = await supabaseAdmin
+        .from("composer_scenes")
+        .select("id, plate_generation, active_run_id")
+        .in("id", persistedSceneIds);
+      if (runErr) {
+        return new Response(JSON.stringify({ ok: false, error: "scene_run_lookup_failed" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const stale = (runRows ?? []).find((row: any) => {
+        const expected = runContext?.[String(row.id)];
+        return !expected ||
+          String(row.active_run_id ?? "") !== String(expected.run_id) ||
+          Number(row.plate_generation) !== Number(expected.generation);
+      });
+      if (stale) {
+        return new Response(
+          JSON.stringify({ ok: false, error: "scene_run_superseded", scene_id: stale.id }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     // ── v202: Cast & World ID-Registry — JIT scene_assets backfill ────────
