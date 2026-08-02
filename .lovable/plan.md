@@ -1,44 +1,49 @@
 ## Befund
 
-Nein — **der tatsächlich laufende Produktionspfad ist noch nicht vollständig 1:1 konsistent**, obwohl die zurückgesetzten Backend-Dateien bis auf Versionsmarker/Adapter dem Commit `58060cffe` entsprechen.
+Nein — der aktive Composer-Pfad ist **noch nicht vollständig 1:1 wie am 27.07.2026**.
 
-Der letzte Lauf `8370ede5…` zeigt den konkreten Bruch:
+Der letzte Lauf `d7402a67-d10d-493d-8fe5-aefb91b6ccc9` lief technisch bis zum fertigen Ergebnis:
 
 ```text
-Clip-Provider erfolgreich
-  → permanenter Clip gespeichert
-  → clip_status = ready
-  → clip_url ist weiterhin vorhanden
-  → compose-dialog-segments startet
-  → audio_plan.twoshot.url fehlt
-  → audio_plan_not_ready_self_heal
-  → Lip-Sync bleibt pending / pipeline_state bleibt plate_ready
+Master-Clip gespeichert
+→ Dialog-Audio für 4 Sprecher erstellt
+→ 4/4 Sync.so-Pässe erfolgreich
+→ finaler Dialog-Stitch erfolgreich gerendert
+→ fertige MP4 vorhanden
+→ Abschluss-Webhook verwirft das Ergebnis als „stale callback“
+→ Szene bleibt auf audio_muxing / plate_ready
+→ UI schaltet den Lip-Sync-Prozess wieder ab
 ```
 
-Der Clip wurde also **nicht gelöscht**. Er liegt weiterhin in der Datenbank und im Storage. Der Abbruch passiert vor dem ersten Sync.so-Aufruf, weil die zusammengeführte Dialog-Audiospur noch nicht erzeugt wurde.
+Der konkrete Widerspruch ist im Code bestätigt:
 
-Zusätzlich läuft der Screenshot auf `useadtool.ai`. Diese veröffentlichte Version lädt ein anderes Frontend-Bundle als die aktuelle Preview. Damit treffen der zurückgesetzte Backend-Pfad und ein älterer veröffentlichter Auto-Trigger aufeinander. Das erklärt, warum die UI den Recovery-Zustand so darstellt, als sei nie ein Clip erstellt worden.
-
-Der 500-Fehler von `extract-video-last-frame` ist separat und laut Webhook nicht terminal; er ist nicht die Ursache des Lip-Sync-Abbruchs.
+- `render-sync-segments-audio-mux` sendet beim finalen Render **keine** `plate_generation` und **keine** `active_run_id` im Callback (`index.ts:838–852`). Das entspricht dem zurückgesetzten Juli-Pfad.
+- `remotion-webhook` enthält aber weiterhin den späteren **v379-Run-Guard**, der genau diese beiden Werte zwingend verlangt (`index.ts:53–60`, `282–285`).
+- Deshalb wurde um `23:29:11 UTC` der erfolgreich fertiggestellte Clip mit `v379 stale callback ignored` verworfen.
+- Der ursprüngliche Plate-Clip wurde nicht gelöscht: Die Szene hat weiterhin `clip_status=ready` und eine gültige `clip_url`. Nur der fertige Lip-Sync-Clip wurde nicht übernommen.
 
 ## Umsetzung
 
-1. **Audio-Hand-off auf v283 atomar machen**
-   - Nach erfolgreichem Master-Clip für Dialogszenen `compose-twoshot-audio` zuverlässig auslösen.
-   - `compose-dialog-segments` erst starten, wenn `audio_plan.twoshot.url` vorhanden ist.
-   - Kein clientabhängiges Zwischenfenster mehr zwischen Clip, Audio und Lip-Sync.
+1. **Dialog-Stitch-Abschluss auf Juli-Baseline zurücksetzen**
+   - Den post-Juli-v379-Run-Guard ausschließlich aus dem Composer-Dialog-Stitch-Erfolgs- und Fehlerpfad entfernen.
+   - Erfolgreiche Juli-Callbacks wieder `clip_url`, `lip_sync_applied_at`, `dialog_shots.status=done`, `lip_sync_status` und `twoshot_stage` finalisieren lassen.
+   - Andere Remotion-Pfade wie Director’s Cut und Long Form unverändert lassen.
 
-2. **Recovery ohne optischen Clip-Verlust**
-   - Bei fehlendem Audio-Plan `clip_url` und `clip_status=ready` unverändert lassen.
-   - Nur den Audio-Schritt erneut anstoßen; Preview und erzeugten Clip nicht zurücksetzen.
-   - Recovery-Marker nicht als fehlgeschlagene oder leere Szene darstellen.
+2. **Verwandte Composer-Callbacks abgleichen**
+   - `dialog-turn-preclip` und Dialog-Stitch-Fehlerbehandlung gegen Commit `58060cffe` prüfen.
+   - Weitere post-Juli-Abhängigkeiten auf `active_run_id`, `plate_generation` oder Enum-Transitions im Composer-spezifischen Callback entfernen, sofern sie die Juli-Nutzdaten blockieren.
+   - Die additive Datenbank-Bridge darf nur spiegeln/telemetrieren und keinen Juli-Abschluss verhindern.
 
-3. **Frontend und Backend auf denselben Stand bringen**
-   - Auto-Trigger und Statusauswertung exakt an die v283-Zustände `pending → audio → master_clip → running → done` binden.
-   - Post-Juli-Self-Heals entfernen, die Clipfelder leeren oder einen v283-Zwischenzustand falsch interpretieren können.
-   - Preview gegen den echten Produktionsdatensatz testen; die veröffentlichte Domain benötigt danach einen separaten Publish-Schritt.
+3. **Erfolgreichen Abschluss atomar machen**
+   - Erst finalen Clip und Dialogstatus speichern, dann den kompatiblen Abschlussstatus setzen.
+   - Ein nachgelagerter Statusfehler darf den bereits fertig gerenderten Clip weder ausblenden noch zurücksetzen.
+   - Wiederholte Webhooks bleiben idempotent und dürfen denselben fertigen Clip erneut bestätigen.
 
-4. **End-to-End-Verifikation**
-   - Neue 4-Sprecher-Szene auslösen.
-   - In den Logs belegen: Clip gespeichert → Audio-URL vorhanden → erster Sync.so-Job angelegt → alle vier Pässe → finaler Clip.
-   - Prüfen, dass die Vorschau während Audio-/Lip-Sync-Vorbereitung sichtbar bleibt und kein schwarzer/leerer Zustand entsteht.
+4. **Gezielte Verifikation**
+   - Tests für einen Dialog-Stitch-Callback ohne `active_run_id`/`plate_generation` ergänzen — genau die Juli-Payload.
+   - Nach Deployment einen 4-Sprecher-Lauf prüfen: 4/4 Sync.so → Stitch → Callback → `done` → finale `clip_url` sichtbar.
+   - Zusätzlich belegen, dass kein `stale callback ignored` mehr im Composer-Dialog-Stitch-Pfad erscheint und fertige Plates währenddessen sichtbar bleiben.
+
+## Wichtig
+
+Der aktuelle Fehler liegt **nicht bei Sync.so** und nicht beim generierten Video. Der fertige Lip-Sync-Render existiert; ausschließlich ein übrig gebliebener post-Juli-v379-Guard verhindert seine Übernahme.
