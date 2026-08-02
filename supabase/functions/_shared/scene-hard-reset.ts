@@ -47,7 +47,16 @@ export interface HardResetArgs {
   syncApiKey?: string | null;
   /** Reason string for the audit log. */
   reason?: string;
+  /**
+   * v377 — the caller already invalidated the scene atomically through
+   * `composer_start_scene_run` (generation bump + fresh `active_run_id` under
+   * a row lock). The teardown then must NOT bump the generation a second time;
+   * it only performs the physical cleanup and writes the state fields for the
+   * generation given here.
+   */
+  generationOverride?: number | null;
 }
+
 
 /**
  * v374 — why a reset may or may not refund.
