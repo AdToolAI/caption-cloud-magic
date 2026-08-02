@@ -28,7 +28,8 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, transitionScene, failSceneState } from "../_shared/scene-state.ts";
+import { sceneState, transitionScene } from "../_shared/scene-state.ts";
+import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
@@ -236,16 +237,7 @@ serve(async (req) => {
       const gateMsg =
         `Lip-Sync abgebrochen: Für ${names} hat der Provider ein Video ohne messbare Mundbewegung geliefert. Die Szene wurde nicht zusammengesetzt.`;
 
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: { ...(state as any), status: "failed", error: blockedCode },
-          clip_error: gateMsg,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
+      await failLipSync({ supabase, sceneId, reason: gateMsg, userId });
       console.error(
         `[render-sync-segments-audio-mux] v348_mux_gate scene=${sceneId} BLOCKED code=${blockedCode} speakers=${names}`,
       );
@@ -270,16 +262,7 @@ serve(async (req) => {
         .join(", ");
       const partialMsg =
         `Lip-Sync abgebrochen: Für ${failedNames} konnte keine Mundbewegung erzeugt werden. Die Szene wurde nicht zusammengesetzt — bitte die Szene neu rendern.`;
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: { ...(state as any), status: "failed", error: "incomplete_passes" },
-          clip_error: partialMsg,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
+      await failLipSync({ supabase, sceneId, reason: partialMsg, userId });
       console.error(
         `[render-sync-segments-audio-mux] v346_no_partial_mux scene=${sceneId} BLOCKED failed=${failedPasses.length}/${passes.length} speakers=${failedNames}`,
       );
@@ -319,16 +302,12 @@ serve(async (req) => {
       if (!contract.ok) {
         const detail = `v368_reprojection_contract:${contract.errors.join(",")}`;
         console.error(`[render-sync-segments-audio-mux] scene=${sceneId} ${detail}`);
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: { ...(state as any), status: "failed", error: detail },
-            clip_error: "Lip-Sync-Zuordnung konnte nicht sicher bestätigt werden.",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
+        await failLipSync({
+          supabase,
+          sceneId,
+          reason: `Lip-Sync-Zuordnung konnte nicht sicher bestätigt werden: ${detail}`,
+          userId,
+        });
         return json({ error: detail, code: "v368_reprojection_contract_failed" }, 409);
       }
     }
@@ -887,8 +866,7 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
+        await failLipSync({ supabase, sceneId, reason: detail, userId });
       } catch (e) {
         console.warn("[render-sync-segments-audio-mux] failed to persist preflight failure:", (e as Error).message);
       }
@@ -1089,8 +1067,12 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-      await failSceneState(supabase, sceneId, "failed");
+      await failLipSync({
+        supabase,
+        sceneId,
+        reason: `audio_mux_dispatch: ${invokeMessage}`,
+        userId,
+      });
       return json({ error: `invoke ${invokeResp.status}: ${invokeMessage}` }, 500);
     }
 

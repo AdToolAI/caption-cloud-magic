@@ -457,30 +457,6 @@ serve(async (req) => {
       muxAge >= STALE_AUDIO_MUX_MS
     ) {
       const refundCredits = Number(ds?.cost_credits) || 0;
-      let refundedFlag = !!ds?.refunded;
-      // Best-effort refund via increment_balance RPC (same path used by the
-      // dialog-stitch webhook fail branch).
-      if (!refundedFlag && refundCredits > 0) {
-        const { data: sceneUser } = await supabase
-          .from("composer_scenes")
-          .select("created_by")
-          .eq("id", d.id)
-          .maybeSingle();
-        const userId = (sceneUser as any)?.created_by;
-        if (userId) {
-          try {
-            await supabase.rpc("increment_balance", {
-              p_user_id: userId,
-              p_amount: refundCredits,
-            });
-            refundedFlag = true;
-          } catch (e) {
-            console.warn(
-              `[lipsync-watchdog] scene=${d.id} audio_mux refund failed: ${(e as Error).message}`,
-            );
-          }
-        }
-      }
       // Flip the pending video_renders row for this render_id to failed so
       // downstream analytics / status pages reflect reality.
       const muxRenderId = ds?.audio_mux?.render_id;
@@ -495,23 +471,15 @@ serve(async (req) => {
           .eq("render_id", muxRenderId)
           .in("status", ["pending", "rendering"]);
       }
-      await supabase
-        .from("composer_scenes")
-        .update({
-          lip_sync_status: "failed",
-          twoshot_stage: "audio_mux_failed",
-          clip_error: "watchdog_audio_mux_stall: no webhook after 6min",
-          dialog_shots: {
-            ...(ds as any),
-            status: "failed",
-            error: "watchdog_audio_mux_stall",
-            refunded: refundedFlag,
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", d.id);
+      const failedResult = await failLipSync({
+        supabase,
+        sceneId: d.id,
+        reason: "watchdog_audio_mux_stall: no webhook after 6min",
+        refundCredits,
+        syncApiKey,
+      });
       console.log(
-        `[lipsync-watchdog] scene=${d.id} audio_mux_stall killed after ${Math.round(muxAge / 1000)}s (refunded=${refundedFlag})`,
+        `[lipsync-watchdog] scene=${d.id} audio_mux_stall killed after ${Math.round(muxAge / 1000)}s (refunded=${failedResult.refunded})`,
       );
       failed.push({ scene_id: d.id, reason: "audio_mux_stall" });
       return;
