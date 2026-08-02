@@ -77,8 +77,14 @@ export interface FaceGateResult {
   mouth_rect?: [number, number, number, number];
   /** v393 — Kontrollfenster (Stirn) fuer die Rausch-Normalisierung. */
   control_rect?: [number, number, number, number];
+  /** v393 — normalisierte (0..1) Messfenster fuer die Passthrough-Bewertung. */
+  mouth_rect_norm?: { x: number; y: number; w: number; h: number };
+  control_rect_norm?: { x: number; y: number; w: number; h: number };
+  /** v393 — Bildmasse, in denen die Pixel-Fenster gelten. */
+  mouth_frame_dims?: [number, number];
   /** v393 — kleinster Abstand des Mundfensters zum Bildrand. */
   mouth_edge_margin_px?: number;
+
 }
 
 
