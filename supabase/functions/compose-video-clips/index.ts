@@ -50,7 +50,7 @@ import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaReko
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
-import { sceneState, transitionScene } from "../_shared/scene-state.ts";
+import { sceneState, transitionScene, failSceneState } from "../_shared/scene-state.ts";
 import { sanitizeForHappyHorse, hardSanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 import {
   buildCastClause,

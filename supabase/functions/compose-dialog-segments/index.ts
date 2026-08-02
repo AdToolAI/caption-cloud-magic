@@ -59,7 +59,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, canDispatchLipsync, transitionScene, type SceneState } from "../_shared/scene-state.ts";
+import { sceneState, canDispatchLipsync, transitionScene, failSceneState, type SceneState } from "../_shared/scene-state.ts";
 import { canonicalizeAssignmentLock, stripVariantPrefix } from "../_shared/assignment-lock.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
