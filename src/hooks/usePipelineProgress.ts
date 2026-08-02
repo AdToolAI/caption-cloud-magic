@@ -376,10 +376,15 @@ export function usePipelineProgress({
         s.twoshotStage === 'done'
       ));
     const ready = aiScenes.filter(isReadyOrLipsynced).length;
+    // v371 — eine terminal fehlgeschlagene Szene ist NIE "running", egal
+    // welche veralteten Backend-Handles (replicate_prediction_id, twoshot
+    // stage) noch auf der Zeile stehen. Ohne das lief der globale Balken
+    // minutenlang weiter, obwohl die Szene rot + refundiert war.
+    const isFailed = (s: any) => (s.clipStatus ?? s.clip_status) === 'failed';
     const generating = aiScenes.filter(
-      (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s),
+      (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s) && !isFailed(s),
     ).length;
-    const failed = aiScenes.filter((s) => s.clipStatus === 'failed').length;
+    const failed = aiScenes.filter(isFailed).length;
     // Stage 7: a scene with an active backend handle (Replicate prediction,
     // dialog-shot pipeline, lipsync stage) also counts as "running" — even
     // when clipStatus momentarily reverts to 'pending' between the optimistic
@@ -387,6 +392,7 @@ export function usePipelineProgress({
     // disappears for 5–30 s right after the user clicks "Generieren".
     const backendActive = aiScenes.filter((s) => {
       const sa = s as any;
+      if (isFailed(sa)) return false;
       if (isCanceledLipsyncScene(sa)) return false;
       if (isReadyOrLipsynced(sa)) return false;
       const stage = sa.twoshotStage;
