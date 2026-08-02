@@ -203,6 +203,29 @@ export function useGenerateAllClips({
           ),
       );
 
+      // 2b. v373 — harter Neustart VOR allem anderen.
+      // Jede Szene, die schon einmal gelaufen ist, wird vollständig
+      // abgeräumt (Provider-Jobs abbrechen, Slots freigeben, Credits
+      // erstatten, Artefakte löschen, Generation hochzählen), bevor Anchor
+      // und Prompt für den neuen Lauf gebaut werden. Die Reihenfolge ist
+      // zwingend: der Artefakt-Purge würde einen bereits erzeugten neuen
+      // Anchor sonst wieder mitlöschen.
+      const scenesNeedingReset = eligibleScenes.filter(
+        (s) =>
+          /^[0-9a-f-]{36}$/i.test(s.id) &&
+          (!!s.clipUrl ||
+            !!(s as any).twoshotStage ||
+            !!(s as any).dialogShots ||
+            !!(s as any).lipSyncStatus ||
+            s.clipStatus === 'failed'),
+      );
+      if (scenesNeedingReset.length > 0) {
+        await Promise.all(
+          scenesNeedingReset.map((s) => hardResetSceneJob(s.id, 'user_regenerate_all')),
+        );
+      }
+
+
       // 3. compose prompts
       const composedByScene = new Map<string, ReturnType<typeof composeFinalPrompt>>();
       for (const s of eligibleScenes) {
