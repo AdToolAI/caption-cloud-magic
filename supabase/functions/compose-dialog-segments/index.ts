@@ -2833,15 +2833,46 @@ serve(async (req) => {
               `Bitte die Szene mit klar getrennten Sprechern neu generieren.`) +
           ` Es wurde kein Lip-Sync gestartet.`;
         console.error(`[compose-dialog-segments] scene=${sceneId} v387_identity_collision ${msg}`);
+        // v387 — Abbruch VOR dem ersten Provider-Aufruf: idempotent erstatten.
+        const alreadyRefundedIC = !!(existing as any)?.refunded;
+        if (!alreadyRefundedIC) {
+          try {
+            const { data: wIC } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wIC?.balance ?? 0) + Number(totalCost ?? 0),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          } catch (e) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v387 identity-collision refund failed: ${(e as Error)?.message}`,
+            );
+          }
+        }
         await supabase
           .from("composer_scenes")
           .update({
+            dialog_shots: mergeDialogShots(existing, {
+              version: 5,
+              engine: "sync-segments",
+              status: "failed",
+              refunded: true,
+              error: "v387_identity_collision",
+              finished_at: new Date().toISOString(),
+            }),
             pipeline_state: "failed",
             clip_error: msg,
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        return json({ ok: false, error: msg }, 200);
+        return json(
+          { ok: false, error: msg, refunded: alreadyRefundedIC ? 0 : totalCost },
+          200,
+        );
+
       }
     }
 
