@@ -1191,6 +1191,10 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
+      // v388 — Zuruecksetzen auf `idle` laeuft ueber den Vertrag.
+      await transitionScene(supabase, sceneId, "idle", {
+        detail: "v388_raw_talking_head_source_blocked",
+      });
       return json(
         {
           error: "raw_talking_head_source_blocked",
