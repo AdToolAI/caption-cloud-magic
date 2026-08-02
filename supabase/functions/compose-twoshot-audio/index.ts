@@ -620,39 +620,61 @@ serve(async (req) => {
     // Load scene + ownership
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, dialog_script, dialog_turns, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status")
+      .select("id, project_id, dialog_script, dialog_turns, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status, pipeline_state, plate_generation, plate_ready_generation, active_run_id")
       .eq("id", scene_id)
       .single();
     if (sErr || !scene) return json({ error: "scene not found" }, 404);
 
-    // v182: Hard guard — refuse to prep audio for a scene whose master clip
-    // is failed/missing. Prevents phantom lip-sync runs when a client race
-    // fires the audio-prep tick microseconds before the failure webhook
-    // lands. The auto-trigger will silently retry once the master clip is
-    // genuinely ready again.
-    const cs = (scene as any).clip_status;
-    const ce = (scene as any).clip_error;
-    const ts = (scene as any).twoshot_stage;
-    const ls = (scene as any).lip_sync_status;
-    const cu = (scene as any).clip_url;
-    if (
-      cs === "failed" ||
-      ts === "failed" ||
-      ts === "audio_mux_failed" ||
-      ls === "failed" ||
-      ls === "canceled" ||
-      !!ce ||
-      typeof cu !== "string" ||
-      cu.length === 0
-    ) {
+    // v384 — Realized-Vertrag aus der Zustandsmaschine.
+    //
+    // Vorher (v182) blockierte hier JEDES nicht-leere `clip_error`. Ein
+    // transienter Diagnosetext (z. B. `audio_prep_transient_retry`, den der
+    // Client selbst nach einem Netzfehler schreibt) genügte, um eine
+    // fertig gerenderte Szene terminal zu quittieren
+    // ("scene_not_realized_no_lipsync"). Der Zustand entscheidet jetzt,
+    // nicht der Freitext.
+    const state = sceneState(scene);
+    if (!isRealizedScene(scene)) {
       return json(
         {
           error: "scene_not_realized_no_lipsync",
-          detail: { clip_status: cs, twoshot_stage: ts, lip_sync_status: ls, has_clip_url: !!cu, has_clip_error: !!ce },
+          detail: {
+            pipeline_state: state,
+            has_clip_url: !!(scene as any).clip_url,
+            plate_generation: (scene as any).plate_generation,
+            plate_ready_generation: (scene as any).plate_ready_generation,
+          },
         },
         422,
       );
     }
+
+    // v384 — Serverseitiger, atomarer Claim. Ersetzt den rein clientseitigen
+    // `inflight`-Set, der nur pro Browser-Tab galt und deshalb parallele
+    // TTS-Läufe derselben Szene zuließ.
+    if (state !== "audio_prep") {
+      const claim = await transitionScene(supabase, scene_id, "audio_prep", {
+        from: ["plate_ready"],
+        detail: "audio_prep_started",
+        runId: (scene as any).active_run_id ?? null,
+      });
+      if (!claim.applied) {
+        return json(
+          { error: "audio_prep_already_running", detail: { state: claim.state, reason: claim.reason } },
+          202,
+        );
+      }
+    } else if (!force_regenerate) {
+      const claimedAt = Date.parse(String((scene as any).pipeline_state_at ?? "")) || 0;
+      const staleMs = Date.now() - claimedAt;
+      if (claimedAt > 0 && staleMs < 5 * 60_000) {
+        return json(
+          { error: "audio_prep_already_running", detail: { state, claimed_ms_ago: staleMs } },
+          202,
+        );
+      }
+    }
+
 
     const { data: project } = await supabase
       .from("composer_projects")
