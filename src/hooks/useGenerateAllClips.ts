@@ -341,11 +341,7 @@ export function useGenerateAllClips({
         });
         data = started.compose;
       } else {
-        const res = await supabase.functions.invoke('compose-video-clips', {
-          body: composeBody,
-        });
-        if (res.error) throw res.error;
-        data = res.data;
+        throw new Error('Keine gespeicherte Szene konnte atomar gestartet werden.');
       }
 
 

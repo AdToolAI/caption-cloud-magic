@@ -53,7 +53,7 @@ import { SortableSceneItem } from './SortableSceneItem';
 import ContinuityGuardianStrip from './ContinuityGuardianStrip';
 import RenderPipelinePanel from './RenderPipelinePanel';
 import FramePickerOverlay from './FramePickerOverlay';
-import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
+import { prepareSceneRuns, startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
@@ -610,6 +610,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           ),
       );
 
+      // v378 — acquire and purge every prior run before creating fresh anchors.
+      const bulkSceneIds = eligibleScenes.map((scene) => scene.id);
+      await prepareSceneRuns({ sceneIds: bulkSceneIds, reason: 'clips_tab_generate_all' });
+
       // First pass: compose prompts (so the scene-anchor compose call gets the
       // FINAL English prompt, not the raw one).
       const composedByScene = new Map<string, ReturnType<typeof composeFinalPrompt>>();
@@ -713,6 +717,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         sceneIds: scenesPayload.map((item) => item.id),
         compose: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
         reason: 'clips_tab_generate_all',
+        useExistingRun: true,
       });
       const data = started.compose;
 
@@ -789,6 +794,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         clipSource: scene.clipSource ?? dbScene.clipSource,
       };
 
+      await prepareSceneRuns({ sceneIds: [targetScene.id], reason: 'clips_tab_generate_one' });
+
       // Optimistic update
       if (targetScene.clipSource.startsWith('ai-')) {
         const optimistic = pScenes.map(s =>
@@ -832,6 +839,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       const started = await startSceneGeneration({
         sceneIds: [targetScene.id],
         reason: 'clips_tab_generate_one',
+        useExistingRun: true,
         compose: {
           projectId: pid,
           visualStyle,
@@ -950,29 +958,6 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           persisted.scenes.find((s) => s.orderIndex === scene.orderIndex) ?? scene;
         targetSceneId = remapped.id;
         dbScene = { ...remapped };
-      }
-
-      // 3. Persist the engine + source override + status for THIS scene only.
-      //    Single-row update — no risk of clobbering anything else.
-      const { error: persistErr } = await supabase
-        .from('composer_scenes')
-        .update({
-          engine_override: 'cinematic-sync',
-          clip_source: newClipSource,
-          clip_status: 'generating',
-          lip_sync_status: 'pending',
-          lip_sync_with_voiceover: true,
-          // Re-Run: alten Abschluss-Zustand wegräumen, sonst verwirft der
-          // Auto-Trigger die Szene als „bereits angewendet".
-          lip_sync_applied_at: null,
-          dialog_shots: null,
-          lip_sync_source_clip_url: null,
-          twoshot_stage: null,
-        })
-        .eq('id', targetSceneId);
-      if (persistErr) {
-        console.error('[ClipsTab] cinematic-sync DB persist failed:', persistErr);
-        throw new Error(persistErr.message || 'Cinematic-Sync konnte nicht gespeichert werden');
       }
 
       const composed = composeFinalPrompt({
