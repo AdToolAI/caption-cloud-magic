@@ -73,7 +73,10 @@ export interface MediaPipeDetectResult {
   source: "aws_rekognition" | "error";
   ms: number;
   error?: string;
+  /** v397 — Detector lief sauber, fand aber kein Gesicht (kein Ausfall). */
+  zeroFaces?: boolean;
 }
+
 
 function withTimeout<T>(p: Promise<T>, ms: number, tag: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
