@@ -6346,6 +6346,24 @@ export type Database = {
           },
         ]
       }
+      composer_scene_transitions: {
+        Row: {
+          created_at: string
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+        }
+        Insert: {
+          created_at?: string
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+        }
+        Update: {
+          created_at?: string
+          from_state?: Database["public"]["Enums"]["composer_scene_state"]
+          to_state?: Database["public"]["Enums"]["composer_scene_state"]
+        }
+        Relationships: []
+      }
       composer_scenes: {
         Row: {
           action_beat: Json | null
@@ -6405,6 +6423,10 @@ export type Database = {
           mentioned_location_ids: string[] | null
           motion_track: Json | null
           order_index: number
+          pipeline_detail: string | null
+          pipeline_state: Database["public"]["Enums"]["composer_scene_state"]
+          pipeline_state_at: string
+          pipeline_state_run_id: string | null
           plate_generation: number
           plate_generation_started_at: string | null
           plate_ready_at: string | null
@@ -6502,6 +6524,10 @@ export type Database = {
           mentioned_location_ids?: string[] | null
           motion_track?: Json | null
           order_index?: number
+          pipeline_detail?: string | null
+          pipeline_state?: Database["public"]["Enums"]["composer_scene_state"]
+          pipeline_state_at?: string
+          pipeline_state_run_id?: string | null
           plate_generation?: number
           plate_generation_started_at?: string | null
           plate_ready_at?: string | null
@@ -6599,6 +6625,10 @@ export type Database = {
           mentioned_location_ids?: string[] | null
           motion_track?: Json | null
           order_index?: number
+          pipeline_detail?: string | null
+          pipeline_state?: Database["public"]["Enums"]["composer_scene_state"]
+          pipeline_state_at?: string
+          pipeline_state_run_id?: string | null
           plate_generation?: number
           plate_generation_started_at?: string | null
           plate_ready_at?: string | null
@@ -18852,6 +18882,21 @@ export type Database = {
         Returns: number
       }
       cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
+      composer_scene_transition: {
+        Args: {
+          _detail?: string
+          _from?: Database["public"]["Enums"]["composer_scene_state"][]
+          _generation?: number
+          _run_id?: string
+          _scene_id: string
+          _to: Database["public"]["Enums"]["composer_scene_state"]
+        }
+        Returns: {
+          applied: boolean
+          reason: string
+          state: Database["public"]["Enums"]["composer_scene_state"]
+        }[]
+      }
       composer_start_scene_run: {
         Args: { _scene_id: string }
         Returns: {
@@ -18859,6 +18904,17 @@ export type Database = {
           project_id: string
           run_id: string
         }[]
+      }
+      composer_state_from_legacy: {
+        Args: {
+          _active_run_id: string
+          _audio_plan: Json
+          _clip_status: string
+          _clip_url: string
+          _lip_sync_status: string
+          _twoshot_stage: string
+        }
+        Returns: Database["public"]["Enums"]["composer_scene_state"]
       }
       compute_content_hash: {
         Args: {
@@ -19231,6 +19287,19 @@ export type Database = {
         | "approver"
         | "viewer"
       calendar_view_type: "month" | "week" | "list" | "kanban" | "timeline"
+      composer_scene_state:
+        | "idle"
+        | "plate_queued"
+        | "plate_rendering"
+        | "plate_ready"
+        | "audio_prep"
+        | "audio_ready"
+        | "lipsync_dispatched"
+        | "lipsync_running"
+        | "lipsync_muxing"
+        | "complete"
+        | "failed"
+        | "canceled"
       goal_status: "active" | "completed" | "paused" | "failed"
       goal_type:
         | "followers"
@@ -19457,6 +19526,20 @@ export const Constants = {
         "viewer",
       ],
       calendar_view_type: ["month", "week", "list", "kanban", "timeline"],
+      composer_scene_state: [
+        "idle",
+        "plate_queued",
+        "plate_rendering",
+        "plate_ready",
+        "audio_prep",
+        "audio_ready",
+        "lipsync_dispatched",
+        "lipsync_running",
+        "lipsync_muxing",
+        "complete",
+        "failed",
+        "canceled",
+      ],
       goal_status: ["active", "completed", "paused", "failed"],
       goal_type: [
         "followers",
