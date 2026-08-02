@@ -6579,6 +6579,41 @@ serve(async (req) => {
           );
         }
 
+        // ─── v393.2 — ANCHOR-RESCUE AUF DEM PRECLIP ────────────────────
+        // Ohne Track gilt sonst die aus dem Plate-Raum reprojizierte Box
+        // weiter. Genau die war in den Passthrough-Faellen entartet (am
+        // Rand geclamped, Mund ausserhalb). Auf einem Einzelsprecher-
+        // Preclip ist genau EIN Gesicht im Bild: ein AWS-Still misst die
+        // wahre Box, statt sie zu raten.
+        let v393AnchorRescue = "not_needed";
+        if (!v357TrackedBoxes && v161UsingPreclipForBbox) {
+          const rescueAt = Math.max(
+            0,
+            (v124VoicedWindows.length > 0 ? Math.min(...v124VoicedWindows.map(([s]) => s)) : 0) + 0.15,
+          );
+          const rescued = await detectAnchorBoxOnClip({
+            videoUrl: probeUrlForBbox,
+            width: trackW,
+            height: trackH,
+            atSec: rescueAt,
+            deadline: Date.now() + 20_000,
+            logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1}`,
+          });
+          if (rescued.box) {
+            dispatchBox = withContextPadding(rescued.box, trackW, trackH);
+            v393AnchorRescue = `rescued_faces_${rescued.faces}`;
+          } else {
+            v393AnchorRescue = `rescue_failed:${rescued.error ?? "unknown"}`;
+          }
+          console.log(
+            `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v393_anchor_rescue ` +
+            `result=${v393AnchorRescue} box=${JSON.stringify(dispatchBox)} track_source=${v357TrackSource}`,
+          );
+          (pass as any)._v393AnchorRescue = v393AnchorRescue;
+        }
+
+
+
         // v372 — Entartungen zurückschneiden statt abbrechen. Ein Hard-Fail
         // würde Credits vernichten, obwohl die Geometrie korrigierbar ist.
         const clampedAnchor = clampBoxArea(dispatchBox, trackW, trackH);
