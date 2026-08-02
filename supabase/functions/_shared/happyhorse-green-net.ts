@@ -370,9 +370,13 @@ export function sanitizeForHappyHorse(
 }
 
 /** Aggressive variant used for the single automatic retry after a rejection. */
-export function hardSanitizeForHappyHorse(input: string): GreenNetSanitizeResult {
-  return sanitizeForHappyHorse(input, { compress: true, hard: true });
+export function hardSanitizeForHappyHorse(
+  input: string,
+  castNames: string[] = [],
+): GreenNetSanitizeResult {
+  return sanitizeForHappyHorse(input, { compress: true, hard: true, castNames });
 }
+
 
 
 /**
