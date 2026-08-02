@@ -22,6 +22,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { hardResetScene } from "../_shared/scene-hard-reset.ts";
+import { transitionScene } from "../_shared/scene-state.ts";
 import { startSceneRun, type SceneRun } from "../_shared/scene-run.ts";
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
@@ -193,6 +194,15 @@ serve(async (req) => {
           );
         }
 
+        // v384 — expliziter Zustandseintritt fuer den neuen Lauf. Der Reset
+        // schreibt nur Legacy-Spalten; hier setzen wir die Zustandsmaschine
+        // an den Anfang, damit Watchdogs den Lauf ab Sekunde 0 zuordnen.
+        await transitionScene(admin as any, scene.id, "plate_queued", {
+          detail: `run_started:${reason ?? "user"}`,
+          runId: run.runId,
+          generation: run.generation,
+        });
+
         runs[scene.id] = run;
         console.log(
           `[v377_start] scene=${scene.id} gen=${run.generation} run=${run.runId} ` +
@@ -238,6 +248,16 @@ serve(async (req) => {
 
     if (!resp.ok) {
       console.error(`[v377_start] dispatch_failed status=${resp.status}`);
+      // v384 — der Lauf wurde bezahlt-frei abgebrochen, bevor ein Provider
+      // ihn gesehen hat: Zustand sofort terminal setzen, damit die UI keinen
+      // Ladebalken stehen laesst.
+      for (const [sceneId, r] of Object.entries(runs)) {
+        await transitionScene(admin as any, sceneId, "failed", {
+          detail: `dispatch_failed:${resp.status}`,
+          runId: r.runId,
+          generation: r.generation,
+        });
+      }
       return json(
         { ok: false, error: "dispatch_failed", status: resp.status, payload },
         502,

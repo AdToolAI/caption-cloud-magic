@@ -1,43 +1,84 @@
-## Ursache — belegt aus dem Log
+## Warum jetzt und was genau kaputt ist
 
-Der Fehler kommt nicht von der Szenengenerierung, sondern vom Hard-Reset davor:
+Der Zustand einer Szene wird heute in **vier** Spalten gleichzeitig beschrieben — `clip_status`, `twoshot_stage`, `lip_sync_status` und dem Freitextfeld `clip_error` — und **41 Dateien** (29 Edge Functions, 21 Frontend-Module) schreiben darauf, jede mit eigener Auslegung. Die Produktionsdaten zeigen das Ergebnis:
 
+- `twoshot_stage` enthält 11 verschiedene Werte, darunter `done`, `complete` **und** `applied` für denselben Zustand, dazu Einmal-Artefakte wie `stale_cleanup_v193` und `lipsync_1`.
+- `lip_sync_status` enthält 7 Werte mit derselben Dopplung (`done` / `applied`).
+- `clip_status` enthält `ready` **und** `completed`.
+- Freitext in `clip_error` steuert Kontrollfluss: `!!clip_error` ⇒ „Szene nicht realisiert" — das ist der aktuelle Bruch vor Sync.so.
+
+Gemessen an den letzten 21 Tagen fällt rund **ein Drittel** aller Fehler in diese Orchestrierungsklasse (`watchdog_never_dispatched` 20, `hard_timeout` 8, `stuck_lipsync` 8, `audio_plan_not_ready_self_heal` 6, `kickstart_failed:missing_audio_plan` 5, `no_turns` 4, jetzt `scene_not_realized`). Die sind strukturell, nicht zufällig: es gibt keine Instanz, die verbietet, dass zwei Felder sich widersprechen.
+
+## Zielbild
+
+**Eine** Spalte als Wahrheit, ein Enum, Übergänge nur über eine atomare DB-Funktion. `clip_error` wird reine Anzeige und steuert nie wieder etwas.
+
+```text
+idle ─▶ plate_queued ─▶ plate_rendering ─▶ plate_ready
+                                              │
+                                              ▼
+                                        audio_prep ─▶ audio_ready
+                                              │
+                                              ▼
+                              lipsync_dispatched ─▶ lipsync_running
+                                              │
+                                              ▼
+                                      lipsync_muxing ─▶ complete
+
+  jeder Zustand ─▶ failed | canceled     (terminal, nur Hard-Reset kommt raus)
 ```
-[v377_start] reset_failed scene=6bf4e815…
-update: null value in column "dialog_takes" of relation "composer_scenes" violates not-null constraint
-[v380_hard_reset] … errors=1
-```
 
-In der Datenbank geprüft:
+## Phasen
 
-| Spalte | nullable | default |
-|---|---|---|
-| `dialog_takes` | **NO** | `'{}'::jsonb` |
-| `scene_assets` | **NO** | `'[]'::jsonb` |
-| `dialog_shots` | YES | – |
+### P0 — Migration: Enum + Brücke (keine Verhaltensänderung)
 
-`scene-hard-reset.ts` (Zeile 551) schreibt `dialog_takes: null`. Das verletzt die NOT-NULL-Bedingung, der Reset meldet `errors=1`, v377 bricht korrekt mit `reset_failed` ab und liefert non-2xx — genau die rote Meldung im Screenshot. Der v377-Vertrag hat also funktioniert (kein Geld ausgegeben, kein halber Lauf), aber der Reset selbst war seit v380 durch diesen einen Wert dauerhaft kaputt: **jeder** Regenerate einer Dialogszene schlägt hier fehl. Das erklärt auch, warum in der Produktionsdatenbank noch nie eine Szene `plate_generation > 1` erreicht hat.
+- Enum `composer_scene_state` mit den 12 Zuständen oben.
+- Neue Spalten auf `composer_scenes`: `pipeline_state` (NOT NULL, default `'idle'`), `pipeline_detail` (text, nur Anzeige), `pipeline_state_at` (timestamptz), `pipeline_state_run_id` (uuid).
+- **Backfill** aller ~4.200 Zeilen aus der bestehenden Vierfach-Logik (inkl. Normalisierung `done`/`complete`/`applied` → `complete`, `ready`/`completed` → passender Zustand).
+- **Bidirektionaler Sync-Trigger**: schreibt ein Altpfad die Legacy-Spalten, leitet der Trigger `pipeline_state` ab; schreibt ein neuer Pfad `pipeline_state`, setzt der Trigger die Legacy-Spalten konsistent. Damit können alte und migrierte Writer koexistieren — Voraussetzung dafür, das ohne Big-Bang zu machen.
+- Atomare Transition-Funktion `composer_scene_transition(_scene_id, _from composer_scene_state[], _to composer_scene_state, _detail text, _run_id uuid, _generation int)`, SECURITY DEFINER: setzt den Zustand nur, wenn der Ist-Zustand in `_from` liegt **und** `active_run_id`/`plate_generation` passen. Rückgabe `applied boolean` + aktueller Zustand. Damit sind veraltete Callbacks und Doppelaufrufe strukturell wirkungslos, nicht mehr per Handprüfung.
+- Erlaubte Übergänge als Tabelle `composer_scene_transitions` (from, to) — verbotene Übergänge scheitern hart und werden geloggt.
+- GRANTs: `authenticated` liest, `service_role` voll; Transition-Funktion nur für `service_role` und den Szenen-Eigentümer ausführbar.
 
-## Plan v382 — Reset-Write NOT-NULL-konform machen
+### P1 — Ein Lese-Vertrag für Server und Client
 
-### 1. Leerwerte statt NULL
-In `supabase/functions/_shared/scene-hard-reset.ts`:
-- `dialog_takes: null` → `dialog_takes: {}` (Spaltendefault).
-- `scene_assets`: sicherstellen, dass der `cleanedAssets === null`-Fall als `[]` geschrieben wird, nicht als `null` — dieselbe Falle, nur bisher nicht ausgelöst.
-- `dialog_shots` bleibt `null` (Spalte ist nullable).
+- Neu `supabase/functions/_shared/scene-state.ts` und `src/lib/composer/sceneState.ts` (gleiche Semantik, ein Zustandsmodell): `isRealized`, `isTerminal`, `isInFlight`, `canStartAudioPrep`, `canDispatchLipsync`, `progressPercent`.
+- `isRealizedScene.ts` wird auf `pipeline_state` umgestellt und behält nur noch für Altzeilen einen Legacy-Fallback.
+- Damit ist der aktuelle Bruch (`scene_not_realized_no_lipsync` durch transientes `clip_error`) mit erledigt: „realized" heißt ab jetzt `pipeline_state ∈ {plate_ready, audio_prep, audio_ready, …}`, unabhängig von jedem Diagnosetext.
 
-### 2. Schema-Drift dauerhaft ausschließen
-Ein kleiner Guard vor dem Update: das Reset-Update-Objekt wird gegen die NOT-NULL-Spalten von `composer_scenes` abgeglichen; ein `null` auf einer NOT-NULL-Spalte wird auf den Spaltendefault korrigiert und mit `v382_notnull_coerced` geloggt, statt den ganzen Reset scheitern zu lassen. Damit kann eine künftige Schemaänderung den Regenerate nicht erneut komplett blockieren.
+### P2 — Hot-Path-Writer auf Transitionen umstellen
 
-### 3. Verifikation am echten Lauf
-Nach dem Deploy löst du den Regenerate auf derselben Szene aus. Ich lese danach:
-- `composer_scenes`: `plate_generation` 2 → 3, `plate_ready_generation` leer, neue `active_run_id`.
-- Log auf `reset_failed` = 0 und `[v380_hard_reset] … errors=0`.
-- Die vier `v381_generation_provenance`-Marker (`plate_load`, `preclip_cut`, `sync_dispatch`, `mux`) mit der neuen Generation.
+In dieser Reihenfolge, jede Function einzeln deployt und geprüft:
+1. `composer-start-scene-generation` + `_shared/scene-hard-reset.ts` → `→ plate_queued` (einziger Weg aus `failed`/`canceled` heraus)
+2. `compose-video-clips` (19 Status-Writes) → `plate_rendering`
+3. `compose-clip-webhook`, `remotion-webhook` → `plate_ready` / `failed`
+4. `compose-twoshot-audio` → `audio_prep` (Claim = Transition, ersetzt das Race), `audio_ready`
+5. `compose-dialog-segments` → `lipsync_dispatched`
+6. `sync-so-webhook` → `lipsync_running` / `lipsync_muxing` / `complete` / `failed`
+7. `qa-watchdog`, `lipsync-watchdog`, `recover-stuck-composer-clip` → nur noch Zeitüberschreitungen nach `failed`, keine Wiederbelebung
+8. `composer-cancel-scene`, `composer-cancel-project`, `reset-lipsync-scene` → `canceled`
 
-Erst wenn diese Kette sauber ist, ist die Aussage „die Pipeline wird bei jedem Neustart komplett geleert" belegt statt behauptet.
+### P3 — Frontend
 
-## Technische Details
-- Betroffene Datei: `supabase/functions/_shared/scene-hard-reset.ts`.
-- Kein Schema-Change, keine Migration.
-- Alle Funktionen, die den Shared-Reset importieren (u. a. `composer-start-scene-generation`, `composer-hard-reset-scene`, `auto-director-compose`), werden neu deployt.
+- `useTwoShotAutoTrigger`, `usePipelineProgress`, `ClipsTab`, `SceneCard`, `AnchorPreviewGate` lesen `pipeline_state` statt der Feldkombinationen; der Ladebalken wird direkt aus dem Zustand abgeleitet (der 96%-Hänger bei fehlgeschlagener Szene ist damit strukturell unmöglich).
+- Nicht-terminale Serverantworten schreiben nie mehr `failed` — der Client schreibt überhaupt keine Zustände mehr, er ruft nur noch Transitionen auf.
+
+### P4 — Rückfall verhindern
+
+- Vitest-Guard, der bei direkten Writes auf `clip_status` / `twoshot_stage` / `lip_sync_status` außerhalb der erlaubten Module fehlschlägt.
+- `composer-reset-selftest` erweitert: prüft Zustandsrotation, verbotene Übergänge, Run-/Generation-Bindung.
+
+### P5 — Beweis
+
+Realer Lauf an einer echten Szene: Ich lese danach die vollständige Zustandshistorie (`plate_queued → … → complete`), die Provenance-Marker und belege, dass kein Zwischenzustand übersprungen oder rückwärts geschrieben wurde.
+
+## Was das realistisch bringt
+
+- Die Orchestrierungsklasse (~⅓ der Fehler) wird strukturell adressiert: keine widersprüchlichen Felder, keine Freitext-Steuerung, keine Doppelläufe, keine Zombie-Szenen ohne Lauf.
+- **Nicht** adressiert: Sync.so-eigene Fehler (`generation_unknown_error`, Provider-Timeouts, ~⅓) und die Gesichts-/Geometrie-Gates (~15 Fälle). Das bleiben eigene Baustellen.
+
+## Risiko und Rückfahrkarte
+
+- Der Sync-Trigger aus P0 hält Legacy- und Neu-Spalten während der gesamten Umstellung konsistent. Bricht eine Phase, funktioniert der Altpfad unverändert weiter — Rollback heißt „Function zurückdeployen", nicht „Migration rückabwickeln".
+- Keine Spalte wird in diesem Plan gelöscht. Das Aufräumen der Legacy-Spalten ist ein separater Schritt nach der Live-Woche.
+- Umfang: 1 Migration, 2 neue Shared-Module, ~14 Edge Functions, ~6 Frontend-Module, 1 Guard-Test.
