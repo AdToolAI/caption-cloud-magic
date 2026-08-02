@@ -196,14 +196,13 @@ serve(async (req) => {
           }
         : null;
 
+      // v385 — kein Legacy-Status mehr; der Zustandswechsel folgt unten.
       const patch: Record<string, unknown> = {
-        lip_sync_status: "canceled",
         lip_sync_with_voiceover: false,
         dialog_mode: false,
         engine_override: "auto",
         lip_sync_applied_at: null,
         lip_sync_source_clip_url: null,
-        twoshot_stage: null,
         clip_error: "lipsync_canceled_by_user",
         replicate_prediction_id: null,
         updated_at: nowIso,
@@ -215,6 +214,11 @@ serve(async (req) => {
       }
 
       await supabase.from("composer_scenes").update(patch).eq("id", sceneId);
+
+      await transitionScene(supabase, sceneId, "canceled", {
+        detail: "lipsync_canceled_by_user",
+      });
+
 
       console.log(
         `[cancel-dialog-lipsync] scene=${sceneId} user=${userId} jobs=${uniqueJobIds.length} reset=${reset}`,
