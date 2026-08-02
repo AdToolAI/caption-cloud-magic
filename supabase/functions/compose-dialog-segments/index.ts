@@ -2786,14 +2786,20 @@ serve(async (req) => {
       `[compose-dialog-segments] scene=${sceneId} v277_assignment_lock ` +
       `source=${lockSource} locked_slots=${Object.keys(finalAssignmentLock).length}/${speakers.length}`,
     );
-    // v367 — Der Assignment-Lock ist ALLEINIGE Wahrheit und MUSS injektiv
-    // sein. Zwei Sprecher auf derselben characterId (oder derselben
-    // Plate-Bbox) bedeuten: alle Overlays landen später auf einem Gesicht.
-    // Lieber hier sauber scheitern als ein Video ausliefern, in dem eine
-    // Person sämtliche Dialoge spricht.
+    // v387 — Der Lock ist kanonisch (nur Slots der aktuellen Sprecher) und
+    // MUSS injektiv sein. Eine Kollision ist jetzt nur noch möglich, wenn
+    // zwei AKTUELLE Sprecher wirklich denselben Charakter tragen — stale
+    // Slots aus früheren Läufen können die Szene nicht mehr abschiessen.
     if (speakers.length >= 2) {
-      const lockVals = Object.values(finalAssignmentLock).map((v) => String(v).toLowerCase());
-      const dupCid = lockVals.find((v, i) => v && lockVals.indexOf(v) !== i);
+      const nameForCid = (cid: string) => {
+        const idx = speakers.findIndex(
+          (sp) => stripVariantPrefix(sp.character_id) === cid,
+        );
+        return idx >= 0
+          ? String((speakers[idx] as any).speaker ?? `Sprecher ${idx + 1}`)
+          : cid;
+      };
+      const dupCid = _canon.duplicateCharacterIds[0] ?? null;
       const centers = speakerPlateBboxes.map((b) =>
         Array.isArray(b) && b.every((n) => Number.isFinite(Number(n)))
           ? [
@@ -2810,7 +2816,7 @@ serve(async (req) => {
           if (!a || !b) continue;
           const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
           if (d < 0.4 * Math.min(a[2], b[2])) {
-            dupBox = `${i + 1}/${j + 1}`;
+            dupBox = `${String((speakers[i] as any).speaker ?? `Sprecher ${i + 1}`)} und ${String((speakers[j] as any).speaker ?? `Sprecher ${j + 1}`)}`;
             break;
           }
         }
@@ -2819,10 +2825,12 @@ serve(async (req) => {
         const msg =
           `lipsync_identity_collision: ` +
           (dupCid
-            ? `Zwei Sprecher wurden demselben Charakter zugeordnet.`
-            : `Sprecher ${dupBox} zeigen auf dasselbe Gesicht in der Szene.`) +
-          ` Die Sprecher-Zuordnung ist mehrdeutig — bitte Szene mit klar getrennten Sprechern neu generieren.`;
-        console.error(`[compose-dialog-segments] scene=${sceneId} v367_identity_collision ${msg}`);
+            ? `„${nameForCid(dupCid)}" ist in dieser Szene mehrfach als Sprecher hinterlegt. ` +
+              `Bitte im Dialog jedem Redeanteil einen eigenen Charakter zuweisen.`
+            : `${dupBox} zeigen im Bild auf dasselbe Gesicht. ` +
+              `Bitte die Szene mit klar getrennten Sprechern neu generieren.`) +
+          ` Es wurde kein Lip-Sync gestartet.`;
+        console.error(`[compose-dialog-segments] scene=${sceneId} v387_identity_collision ${msg}`);
         await supabase
           .from("composer_scenes")
           .update({
@@ -2834,6 +2842,7 @@ serve(async (req) => {
         return json({ ok: false, error: msg }, 200);
       }
     }
+
 
     console.warn(
       `[compose-dialog-segments] scene=${sceneId} v158_plate_hydration source=${plateHydrationSource} speakers=${speakers.length} boxes=${speakerPlateBboxes.filter(Boolean).length}/${speakers.length} mouths=${speakerPlateMouths.filter(Boolean).length}/${speakers.length} advance=${isAdvance} retry=${isRetry}`,
