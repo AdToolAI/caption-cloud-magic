@@ -467,6 +467,22 @@ export async function renderPassFacePreclip(
     return { ok: false, error: "no_active_scene_run", errorClass: "dispatch_failed" };
   }
 
+  // v381 — Provenance-Wächter: der Schnitt darf nur aus der Plate DIESER
+  // Generation erfolgen. Ein Treffer hier ist der Beweis, dass kein Material
+  // einer Vorgeneration in die Pipeline gereicht wurde.
+  {
+    const prov = await assertGenerationProvenance({
+      supabase,
+      sceneId,
+      stage: "preclip_cut",
+      note: `pass=${passIdx} src=…${String(masterVideoUrl).slice(-48)}`,
+    });
+    if (!prov.ok) {
+      return { ok: false, error: String(prov.code), errorClass: "dispatch_failed" };
+    }
+  }
+
+
   // v188 (Phase 1.2) — Reuse-Guard. If an earlier Lambda run for THIS exact
   // scene+pass with the SAME crop geometry finished within the last 15 min
   // (typical case: previous compose-dialog-segments hit its 180s poll timeout
