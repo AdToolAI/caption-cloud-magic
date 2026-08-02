@@ -247,6 +247,44 @@ export async function verifyFaceBeforeDispatch(
     };
   }
 
+  // ── v393 — Mundgeometrie auf genau diesem Bild ───────────────────
+  // Ein Gesicht ohne sichtbaren Mund ist fuer Sync.so wertlos. Wir messen
+  // hier einmal und geben die Fenster zurueck, damit die spaetere
+  // Passthrough-Bewertung nicht mehr auf einem generischen Grossbereich
+  // raten muss.
+  const mouthGeo = measurePreclipMouth({
+    faces: (rek.faces ?? []).map((f: any) => ({
+      bbox: f.bbox,
+      center: f.center,
+      landmarks: f.landmarks,
+    })),
+    width: rekW,
+    height: rekH,
+  });
+  const mouthMeta = {
+    mouth_center: mouthGeo.mouthCenter,
+    mouth_rect: mouthGeo.mouthRect,
+    control_rect: mouthGeo.controlRect,
+    mouth_edge_margin_px: mouthGeo.edgeMarginPx,
+  } as const;
+  console.log(
+    `[face-gate] ${GATE_VERSION} mouth_geometry code=${mouthGeo.code} derived=${mouthGeo.derived} ` +
+    `center=${mouthGeo.mouthCenter?.join(",") ?? "-"} band_y=${mouthGeo.bandY?.toFixed(3) ?? "-"} ` +
+    `edge_margin=${mouthGeo.edgeMarginPx ?? "-"}px frame=${rekW}x${rekH} require_mouth=${input.requireMouth === true}`,
+  );
+  if (input.requireMouth === true && !mouthGeo.ok) {
+    return {
+      ok: false,
+      code: mouthGeo.code === "no_face" ? "no_face" : (mouthGeo.code as FaceGateCode),
+      reason: `Preclip mouth check failed: ${mouthGeo.reason ?? mouthGeo.code}`,
+      raw_reply: rawReply,
+      ...baseMeta,
+      ...mouthMeta,
+    };
+  }
+
+
+
   if (faceCount > 1) {
     if (input.isMultiSpeakerContext) {
       console.log(`[face-gate] ${GATE_VERSION} multiple_faces=${faceCount} multi_speaker=true → hard fail`);
