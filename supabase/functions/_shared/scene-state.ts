@@ -176,7 +176,25 @@ export interface TransitionResult {
  *               durch die Übergangstabelle begrenzt)
  * @param runId  bindet den Wechsel an einen Lauf — passt er nicht, greift er nicht
  */
-export async function transitionScene(
+/**
+ * v391 — Lineare Hauptkette der Pipeline. Nur hierueber darf ein Ziel
+ * schrittweise erreicht werden; Sonderwege (failed/canceled/idle/reset)
+ * bleiben ausdruecklich ausgeschlossen.
+ */
+const LINEAR_CHAIN: readonly SceneState[] = [
+  "idle",
+  "plate_queued",
+  "plate_rendering",
+  "plate_ready",
+  "audio_prep",
+  "audio_ready",
+  "lipsync_dispatched",
+  "lipsync_running",
+  "lipsync_muxing",
+  "complete",
+];
+
+async function rpcTransition(
   supabase: any,
   sceneId: string,
   to: SceneState,
@@ -185,7 +203,7 @@ export async function transitionScene(
     detail?: string | null;
     runId?: string | null;
     generation?: number | null;
-  } = {},
+  },
 ): Promise<TransitionResult> {
   const { data, error } = await supabase.rpc("composer_scene_transition", {
     _scene_id: sceneId,
@@ -204,15 +222,70 @@ export async function transitionScene(
   }
 
   const row = Array.isArray(data) ? data[0] : data;
-  const result: TransitionResult = {
+  return {
     applied: !!row?.applied,
     state: isSceneState(row?.state) ? row.state : null,
     reason: row?.reason ?? null,
   };
+}
 
-  console.log(
-    `[v384_transition] scene=${sceneId} to=${to} applied=${result.applied} state=${result.state} reason=${result.reason ?? "-"}`,
-  );
+/**
+ * Atomarer Zustandswechsel über die DB-Funktion.
+ *
+ * @param from   erlaubte Ausgangszustände (leer = beliebig, aber immer noch
+ *               durch die Übergangstabelle begrenzt)
+ * @param runId  bindet den Wechsel an einen Lauf — passt er nicht, greift er nicht
+ */
+export async function transitionScene(
+  supabase: any,
+  sceneId: string,
+  to: SceneState,
+  opts: {
+    from?: SceneState[];
+    detail?: string | null;
+    runId?: string | null;
+    generation?: number | null;
+  } = {},
+): Promise<TransitionResult> {
+  let result = await rpcTransition(supabase, sceneId, to, opts);
+
+  // v391 — Klassenfehler-Schutz. Ein Ziel, das auf der linearen Hauptkette
+  // liegt, aber nur ueber Zwischenzustaende erreichbar ist, wurde bisher
+  // still abgelehnt (`applied=false`) — die Pipeline blieb dann sichtbar
+  // stehen (z.B. `audio_ready → lipsync_running`). Solche Spruenge werden
+  // jetzt Schritt fuer Schritt nachgeholt, statt zu versanden.
+  if (!result.applied && result.reason === "transition_not_allowed" && result.state) {
+    const fromIdx = LINEAR_CHAIN.indexOf(result.state);
+    const toIdx = LINEAR_CHAIN.indexOf(to);
+    if (fromIdx >= 0 && toIdx > fromIdx + 1) {
+      console.warn(
+        `[v391_transition_gap] scene=${sceneId} ${result.state} → ${to} ` +
+          `nicht direkt erlaubt — Zwischenzustaende werden nachgeholt: ` +
+          LINEAR_CHAIN.slice(fromIdx + 1, toIdx + 1).join(" → "),
+      );
+      for (let i = fromIdx + 1; i <= toIdx; i++) {
+        const step = LINEAR_CHAIN[i];
+        result = await rpcTransition(supabase, sceneId, step, {
+          ...opts,
+          from: [LINEAR_CHAIN[i - 1]],
+          detail: opts.detail ?? `v391_chain_step_${step}`,
+        });
+        if (!result.applied) break;
+      }
+    }
+  }
+
+  if (!result.applied) {
+    // v391 — abgelehnte Uebergaenge sind ab jetzt immer eine Warnung. Vorher
+    // stand das nur als INFO im Log und blieb wochenlang unentdeckt.
+    console.warn(
+      `[v391_transition_rejected] scene=${sceneId} to=${to} state=${result.state} reason=${result.reason ?? "-"}`,
+    );
+  } else {
+    console.log(
+      `[v384_transition] scene=${sceneId} to=${to} applied=true state=${result.state} reason=${result.reason ?? "-"}`,
+    );
+  }
   return result;
 }
 
