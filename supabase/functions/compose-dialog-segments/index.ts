@@ -5676,11 +5676,19 @@ serve(async (req) => {
             logTag: `compose-dialog-segments scene=${sceneId} pass=${currentPassIdx + 1} v359_plate`,
           });
           if (plateTrack.ok && plateTrack.keyframes.length >= 2) {
+            // v372 — Der Tracker liefert ab sofort ROHE Gesichtsboxen. Der
+            // Kontextaufschlag gehört an die Aufrufstelle; hier bleibt das
+            // Verhalten damit exakt wie vor v372 (Kamerapfad des Preclips).
             v359PlateTrack = plateTrack.keyframes.map((k) => ({
               t: k.t,
-              box: k.box as [number, number, number, number],
+              box: withContextPadding(
+                k.box as [number, number, number, number],
+                plateDims.width,
+                plateDims.height,
+              ) as [number, number, number, number],
             }));
           }
+
           console.log(
             `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v359_plate_track ` +
             `source=${plateTrack.source} keyframes=${plateTrack.keyframes.length} ` +
