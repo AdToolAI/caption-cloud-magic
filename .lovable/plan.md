@@ -1,49 +1,36 @@
 ## Ziel
 
-Nur die Lip-Sync-Kette auf den Stand vom 27.07.2026 zurückholen. Alles andere aus der letzten Woche bleibt zu 100 % erhalten: Voice Library, Autopilot & Production Lounge, Landing-Page-Overhaul, Stripe/Gründer-Rabatt, Music Studio, Cast & World, UCC-Fixes, Branding.
+Die Lip-Sync-Kette bleibt auf dem Stand vom **27.07.2026 (v283)**. Es wird kein weiterer Code zurückgebaut. Diese Umsetzung fixiert und dokumentiert diesen Zustand und verifiziert ihn an einem echten Lauf.
 
-## Warum kein History-Revert
+## Ausgangslage (verifiziert)
 
-Ein Revert über die Versions-History setzt das **gesamte** Projekt zurück – also auch alles oben Genannte. Deshalb machen wir stattdessen einen chirurgischen Rückbau: nur die Dateien der Lip-Sync-Kette werden auf ihren damaligen Inhalt gesetzt, Datei für Datei.
+- Der Rollback hat die Lip-Sync-Kette auf Commit `58060cffe` (27.07.2026) gesetzt. Die Versionskonstante dort lautet `v283-face-gate-partial-identity-soft-pass`.
+- Der v169-Rebuild-Guide beschreibt einen älteren Stand (Codekonstante `v169` zuletzt am 05.07.2026). Er ist damit **nicht** die Beschreibung des aktuellen Zustands.
+- Übereinstimmend mit dem Guide: Retry-Ladder (7 Varianten), `sync_mode: cut_off`, `auto_detect` bei N≥2 blockiert, Per-Pass-Lock, Preclip-Prefanout, Webhook + Watchdog.
+- Abweichend vom Guide: `SYNCSO_DEFAULT_MAX_PARALLEL = 3` (statt 5), Slot-RPC heißt `update_dialog_pass_slot`, Anchor-Bridge ist die v183-Variante, zusätzlich aktiv sind Face-Gate (v283), Rekognition-Anchor-Lock (v277), Hungarian-Plate-Router (v278), Preclip-Pflicht (v204), Identity-Trust-Gate (v189), Motion-Gate (v231), Mouth-Anchor (v247/v280).
 
-## Vorgehen
+## Umsetzung
 
-### Schritt 1 – Betroffene Dateien exakt bestimmen
-Ich ermittle die vollständige Dateiliste der Lip-Sync-Kette und vergleiche jede Datei mit ihrem Stand vom 27.07.2026. Erwarteter Umfang (wird verifiziert, nicht angenommen):
+1. **Versions-Marker eindeutig machen**
+   `COMPOSE_DIALOG_SEGMENTS_VERSION` auf `v283-baseline-27-07-rollback` setzen, damit in den Logs sofort erkennbar ist, dass der Rollback-Stand läuft und nicht ein späterer Patch. Reine Log-Kennzeichnung, keine Verhaltensänderung.
 
-- `supabase/functions/compose-dialog-segments/`
-- `supabase/functions/lipsync-watchdog/`
-- Sync.so-Webhook-Function
-- `supabase/functions/_shared/` – nur die Lip-Sync-Module: Face-Gate, Preclip, Frame-Space, Motion-Verdict, Face-Track, Camera-Path, Rekognition-Helfer, Geometrie- und Contract-Module
+2. **Projektgedächtnis korrigieren**
+   Der Rollback-Eintrag hält aktuell nur „Stand 27.07." fest. Ergänzt wird: Baseline = **v283**, ausdrücklich **nicht** v169; der v169-Guide ist historisch und darf nicht als Soll-Zustand herangezogen werden. Dazu die Liste der im Baseline aktiven Gates, damit künftige Fehlersuche direkt weiß, welche Abbruchgründe systembedingt möglich sind.
 
-**Ergebnis von Schritt 1: eine konkrete Liste, die du siehst und freigibst, bevor eine einzige Datei angefasst wird.** Dateien, die auch von anderen Features genutzt werden (z. B. gemeinsame Storage- oder Auth-Helfer), markiere ich separat – die werden **nicht** zurückgesetzt, sondern einzeln geprüft.
+3. **Referenz-Dokument im Repo**
+   `docs/lipsync-baseline-v283.md` mit der oben verifizierten Abweichungstabelle v169-Guide ↔ v283-Baseline, den aktiven Gates und ihren typischen Fehlercodes (`preclip_required`, `face_gate_*`, `passthrough`). Dient als Nachschlagewerk beim nächsten Fehlerbild statt erneuter Code-Archäologie.
 
-### Schritt 2 – Abhängigkeiten prüfen
-Für jede Datei auf der Liste prüfe ich, wer sie sonst noch importiert. Wenn ein neues Feature (z. B. Autopilot oder UCC) ein Lip-Sync-Modul mitbenutzt, wird diese Datei nicht blind zurückgesetzt, sondern so angepasst, dass die alte Lip-Sync-Logik zurückkommt und die neue Schnittstelle erhalten bleibt.
+4. **Verifikation am echten Lauf**
+   Nach einer von dir gestarteten Dialogszene: Auswertung der Edge-Function-Logs von `compose-dialog-segments`, `sync-so-webhook` und `lipsync-watchdog` sowie der Tabellen `syncso_dispatch_log`, `syncso_inflight_jobs` und `composer_state_guard_violations`. Ergebnis ist ein Befund, an welchem T-Schritt der Baseline-Stand steht — ohne Code-Änderung.
 
-### Schritt 3 – Rückbau der Dateien
-Die freigegebene Liste wird auf den 27.07.-Inhalt gesetzt. Nach v34x eingeführte Module, die es damals nicht gab, werden gelöscht – aber nur, wenn Schritt 2 bestätigt, dass sie nichts anderes benutzt.
+## Was bewusst nicht passiert
 
-### Schritt 4 – Schema-Verträglichkeit herstellen
-Die Patches der letzten Wochen haben auch Datenbank-Objekte eingeführt (u. a. `pipeline_state`-Enum, `plate_attempts`, `composer_scene_transition()`, Guard-Trigger). Ich lese das aktuelle Schema aus und liste, welche davon den alten Code blockieren würden.
+- Kein weiterer Rückbau auf v169.
+- Keine Entschärfung von Face-Gate, Preclip-Pflicht oder Face-Size-Floors — die bleiben so, wie sie am 27.07. waren.
+- Keine Änderung an Voice Library, Autopilot, Music Studio, Landing Page, Stripe, Cast & World.
 
-Danach **eine einzige Migration**, die du vorher liest und freigibst:
-- Guard-Trigger, die den alten Code blockieren → entfernen
-- Tabellen/Spalten, die der alte Code nicht kennt → stehen lassen (stören nicht)
-- Enum-Spalten, auf die der alte Code Textwerte schreibt → kompatibel machen
+## Technische Details
 
-Keine Nutzdaten werden gelöscht.
-
-### Schritt 5 – Deploy
-Nur die zurückgesetzten Edge Functions werden neu deployt. Alle anderen bleiben unberührt.
-
-### Schritt 6 – Laufzeit säubern und ein Testlauf
-Hängende Runs und Sync.so-Slot-Leases einmalig auf einen Endzustand setzen. Dann **ein** kontrollierter Testlauf mit 2 Sprechern. Bewertet wird nur: trifft das Lip-Sync? Kein Nebenbei-Patchen.
-
-## Sicherheitsnetz
-
-Vor Schritt 3 markieren wir den aktuellen Stand in der History. Falls der Rückbau nicht das gewünschte Ergebnis bringt, kommen wir mit einem Klick auf den heutigen Stand zurück – ohne irgendetwas verloren zu haben.
-
-## Was in diesem Plan nicht passiert
-
-Keine Änderung an Frontend, Landing Page, Stripe, Voice Library, Autopilot, Music Studio oder Cast & World. Keine neuen Gates, Verdicts oder Contract-Module. Reiner, eingegrenzter Rückbau.
+- Betroffene Dateien: `supabase/functions/compose-dialog-segments/index.ts` (eine Zeile: Versionskonstante), neu `docs/lipsync-baseline-v283.md`, Aktualisierung von `mem://architecture/lipsync/v398-surgical-rollback-27-07`.
+- Deployment: erneutes Deployment von `compose-dialog-segments` wegen der Versionskonstante.
+- Keine Datenbank-Migration. Die v398-Anpassung an Bridge und Guard bleibt unverändert bestehen, da die Baseline-Kette über die Legacy-Spalten steuert.
