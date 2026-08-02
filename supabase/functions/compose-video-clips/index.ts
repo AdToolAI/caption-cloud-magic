@@ -2083,57 +2083,18 @@ serve(async (req) => {
           // This is what makes the "Artlist Two-Shot Hook" work end-to-end:
           // Hailuo renders the 10s two-shot, then Sync.so lip-syncs against
           // the merged audio.
-          try {
-            const dlg = String((scene as any).dialogScript ?? "");
-            const speakerLines = dlg
-              .split(/\r?\n/)
-              .filter((l) =>
-                /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/.test(l),
-              );
-            if (speakerLines.length >= 1) {
-              // Mark stage = 'audio' so the UI can show step 1/6.
-              await supabaseAdmin
-                .from("composer_scenes")
-                .update({
-                  pipeline_state: "audio_prep",
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", scene.id);
-              const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-twoshot-audio`;
-              const r = await fetch(fnUrl, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-                },
-                body: JSON.stringify({ scene_id: scene.id }),
-              });
-              // Drain body to avoid leak; capture text on failure for logs.
-              const respText = await r.text().catch(() => "");
-              if (!r.ok) {
-                console.warn(
-                  `[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status} ${respText.slice(0, 300)}`,
-                );
-              } else {
-                console.log(
-                  `[compose-video-clips] twoshot-audio prep OK for ${scene.id}`,
-                );
-                // Stage = 'master_clip' — Hailuo render begins next.
-                await supabaseAdmin
-                  .from("composer_scenes")
-                  .update({
-                    pipeline_state: "audio_ready",
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq("id", scene.id);
-              }
-            }
-          } catch (twoshotErr) {
-            console.warn(
-              `[compose-video-clips] twoshot-audio prep exception for ${scene.id}:`,
-              twoshotErr,
-            );
-          }
+          // v387 — Der frühere Two-Shot-Audio-Vorgriff wurde hier ENTFERNT.
+          //
+          // Bis v386 hat diese Function bei Dialogszenen direkt
+          // `pipeline_state='audio_prep'` geschrieben, `compose-twoshot-audio`
+          // aufgerufen und danach `audio_ready` gesetzt — und zwar BEVOR die
+          // Plate überhaupt gerendert war. Beide Writes umgingen
+          // `composer_scene_transition()`. Genau daher sprang die UI direkt
+          // auf „Lip-Sync startet", während HappyHorse noch rechnete.
+          //
+          // Audio-Prep wird jetzt ausschließlich nach bestätigtem
+          // `plate_ready` ausgelöst (compose-clip-webhook + Auto-Trigger).
+
 
           const { data: voClips } = await supabaseAdmin
             .from("scene_audio_clips")
