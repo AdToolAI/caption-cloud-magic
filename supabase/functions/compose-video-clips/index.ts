@@ -3149,7 +3149,13 @@ serve(async (req) => {
                           const geometryLock: Record<string, string> = {};
                           if (resolved < expected && anchorLayoutComplete) {
                             for (const slot of anchorFaceLayout.slots) {
-                              if (slot?.characterId) geometryLock[String(slot.slotIndex)] = slot.characterId;
+                              // v387 — nur Slots der aktuellen Sprecherzahl.
+                              // Vorher konnten Layout-Slots > expected in den
+                              // Lock wandern (locked_slots=5/4) und beim
+                              // Dispatch eine Identitaets-Kollision ausloesen.
+                              const si = Number(slot?.slotIndex);
+                              if (!Number.isInteger(si) || si < 0 || si >= expected) continue;
+                              if (slot?.characterId) geometryLock[String(si)] = slot.characterId;
                             }
                           }
                           const useGeometryLock =
@@ -3157,10 +3163,17 @@ serve(async (req) => {
                             anchorLayoutComplete &&
                             Object.keys(geometryLock).length >= expected;
                           if (useGeometryLock) {
-                            anchorIdentityPayload.assignmentLock = {
+                            const _mergedLock: Record<string, string> = {
                               ...geometryLock,
                               ...(idResolved.assignmentLock ?? {}),
                             };
+                            anchorIdentityPayload.assignmentLock = Object.fromEntries(
+                              Object.entries(_mergedLock).filter(([k]) => {
+                                const i = Number(k);
+                                return Number.isInteger(i) && i >= 0 && i < expected;
+                              }),
+                            );
+
                             (anchorIdentityPayload as any).assignmentLockSource = "v326_geometry_rowmajor";
                             (anchorIdentityPayload as any).status = "geometry";
                             (anchorIdentityPayload as any).resolvedCount = expected;
