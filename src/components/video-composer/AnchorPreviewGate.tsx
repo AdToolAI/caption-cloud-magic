@@ -24,8 +24,13 @@
  * NOT hijack existing invocation paths.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  prepareSceneRuns,
+  startSceneGeneration,
+} from "@/lib/composer/startSceneGeneration";
+
 import {
   Dialog,
   DialogContent,
@@ -75,12 +80,31 @@ export function AnchorPreviewGate({
   const [anchorUrl, setAnchorUrl] = useState<string | null>(null);
   const [audit, setAudit] = useState<PreviewAudit | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  /** True once this gate owns an active server-side run for the scene. */
+  const runReadyRef = useRef(false);
+
 
   const invokePreview = useCallback(async () => {
     setPhase("composing");
     setAnchorUrl(null);
     setAudit(null);
     setErrMsg(null);
+    runReadyRef.current = false;
+
+    // v377 — den Run HIER übernehmen, nicht erst beim Bestätigen.
+    // Dieses Gate war der Pfad, der bisher komplett am harten Neustart
+    // vorbeilief. Der Teardown muss vor der Anchor-Vorschau laufen, weil er
+    // sonst genau den Anchor löschen würde, den der Nutzer gerade bestätigt.
+    try {
+      await prepareSceneRuns({ sceneIds: [sceneId], reason: "anchor_preview" });
+      runReadyRef.current = true;
+    } catch (e: any) {
+      setPhase("error");
+      setErrMsg(
+        e?.message || "Der vorherige Lauf dieser Szene konnte nicht beendet werden.",
+      );
+      return;
+    }
 
     // Clear any stale preview state so the poll picks up the fresh one.
     await supabase
@@ -98,6 +122,7 @@ export function AnchorPreviewGate({
       body: { ...composeBody, previewOnly: true },
     });
     if (error) {
+
       setPhase("error");
       setErrMsg(error.message || "Preview konnte nicht gestartet werden.");
       return;
@@ -138,6 +163,13 @@ export function AnchorPreviewGate({
   }, [open]);
 
   const handleConfirm = async () => {
+    if (!runReadyRef.current) {
+      // Ohne übernommenen Run darf hier nichts starten — genau dieser Pfad
+      // hat früher am harten Neustart vorbei gerendert.
+      setPhase("error");
+      setErrMsg("Kein aktiver Lauf für diese Szene. Bitte Vorschau neu erstellen.");
+      return;
+    }
     setPhase("confirming");
     try {
       await supabase
@@ -148,10 +180,15 @@ export function AnchorPreviewGate({
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      const { error } = await supabase.functions.invoke("compose-video-clips", {
-        body: composeBody, // no previewOnly → full render, pinned anchor reused
+      // v377 — Dispatch gegen den beim Vorschau-Start übernommenen Run.
+      // Kein zweiter Teardown: der würde den gerade bestätigten Anchor löschen.
+      await startSceneGeneration({
+        sceneIds: [sceneId],
+        compose: composeBody, // no previewOnly → full render, pinned anchor reused
+        reason: "anchor_confirm",
+        useExistingRun: true,
       });
-      if (error) throw error;
+
       toast.success("Render gestartet — Vorschau bestätigt.");
       onConfirmed?.();
       onOpenChange(false);

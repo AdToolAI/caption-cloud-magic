@@ -6349,6 +6349,8 @@ export type Database = {
       composer_scenes: {
         Row: {
           action_beat: Json | null
+          active_run_id: string | null
+          active_run_started_at: string | null
           ai_prompt: string | null
           anchor_confirmed_at: string | null
           applied_style_preset_id: string | null
@@ -6444,6 +6446,8 @@ export type Database = {
         }
         Insert: {
           action_beat?: Json | null
+          active_run_id?: string | null
+          active_run_started_at?: string | null
           ai_prompt?: string | null
           anchor_confirmed_at?: string | null
           applied_style_preset_id?: string | null
@@ -6539,6 +6543,8 @@ export type Database = {
         }
         Update: {
           action_beat?: Json | null
+          active_run_id?: string | null
+          active_run_started_at?: string | null
           ai_prompt?: string | null
           anchor_confirmed_at?: string | null
           applied_style_preset_id?: string | null
@@ -10443,6 +10449,7 @@ export type Database = {
           id: string
           provider: string | null
           provider_job_id: string | null
+          run_id: string | null
           scene_id: string
           status: string
           superseded_at: string | null
@@ -10457,6 +10464,7 @@ export type Database = {
           id?: string
           provider?: string | null
           provider_job_id?: string | null
+          run_id?: string | null
           scene_id: string
           status?: string
           superseded_at?: string | null
@@ -10471,6 +10479,7 @@ export type Database = {
           id?: string
           provider?: string | null
           provider_job_id?: string | null
+          run_id?: string | null
           scene_id?: string
           status?: string
           superseded_at?: string | null
@@ -18843,6 +18852,14 @@ export type Database = {
         Returns: number
       }
       cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
+      composer_start_scene_run: {
+        Args: { _scene_id: string }
+        Returns: {
+          generation: number
+          project_id: string
+          run_id: string
+        }[]
+      }
       compute_content_hash: {
         Args: {
           p_caption: string

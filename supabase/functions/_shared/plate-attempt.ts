@@ -28,16 +28,22 @@
 type SupabaseLike = { from: (t: string) => any };
 
 export type PlateAttemptVerdict =
-  /** attempt matches the scene's current generation — the write may proceed */
+  /** attempt matches the scene's current generation + run — the write may proceed */
   | "current"
   /** the attempt was tombstoned by a hard reset / newer generation */
   | "superseded"
   /** attempt exists but points at an older generation */
   | "generation_mismatch"
+  /** v377 — attempt belongs to a previous run of the same generation */
+  | "run_mismatch"
+  /** v377 — a second dispatch that was never the open attempt */
+  | "duplicate"
   /** attempt already produced a result — duplicate callback */
   | "already_completed"
   /** no attempt row (pre-v375 job or non-provider route) — do not block */
   | "unregistered"
+  /** v377 — no attempt row although the scene runs under the new contract */
+  | "unregistered_stale"
   /** the scene row is gone */
   | "scene_missing";
 
@@ -47,19 +53,25 @@ export interface PlateAttemptCheck {
   attemptId: string | null;
   expectedGeneration: number | null;
   currentGeneration: number | null;
+  /** v377 — the run the attempt was dispatched under. */
+  runId?: string | null;
 }
+
 
 /**
  * Pure decision function — kept separate from IO so it can be unit tested
  * without a database.
  */
 export function decidePlateAttempt(input: {
-  scene: { plate_generation?: number | null } | null;
+  scene:
+    | { plate_generation?: number | null; active_run_id?: string | null }
+    | null;
   attempt:
     | {
       id: string;
       status: string;
       expected_plate_generation: number;
+      run_id?: string | null;
     }
     | null;
 }): PlateAttemptCheck {
@@ -70,21 +82,37 @@ export function decidePlateAttempt(input: {
       attemptId: input.attempt?.id ?? null,
       expectedGeneration: input.attempt?.expected_plate_generation ?? null,
       currentGeneration: null,
+      runId: input.attempt?.run_id ?? null,
     };
   }
 
   const currentGeneration = Number(input.scene.plate_generation ?? 1);
+  const activeRunId = input.scene.active_run_id ?? null;
 
   if (!input.attempt) {
-    // Pre-v375 jobs and routes that never touch `replicate_prediction_id`
-    // (upload / stock) have no attempt row. Blocking them would break
-    // legitimate work during the migration window.
+    // v377 — a scene that has an `active_run_id` runs under the single-run
+    // contract, so every provider job of that run HAS an attempt row. A
+    // callback without one therefore belongs to a run that predates the
+    // current one and must not write. Only legacy scenes that were never
+    // started through `composer_start_scene_run` still fail open, so
+    // in-flight work from before the rollout is not discarded.
+    if (activeRunId) {
+      return {
+        ok: false,
+        verdict: "unregistered_stale",
+        attemptId: null,
+        expectedGeneration: null,
+        currentGeneration,
+        runId: null,
+      };
+    }
     return {
       ok: true,
       verdict: "unregistered",
       attemptId: null,
       expectedGeneration: null,
       currentGeneration,
+      runId: null,
     };
   }
 
@@ -93,16 +121,26 @@ export function decidePlateAttempt(input: {
     attemptId: input.attempt.id,
     expectedGeneration,
     currentGeneration,
+    runId: input.attempt.run_id ?? null,
   };
 
   if (input.attempt.status === "superseded") {
     return { ok: false, verdict: "superseded", ...base };
+  }
+  if (input.attempt.status === "duplicate") {
+    return { ok: false, verdict: "duplicate", ...base };
   }
   if (input.attempt.status === "completed") {
     return { ok: false, verdict: "already_completed", ...base };
   }
   if (expectedGeneration !== currentGeneration) {
     return { ok: false, verdict: "generation_mismatch", ...base };
+  }
+  // v377 — same generation is no longer sufficient: the attempt must belong to
+  // the run that is currently active. Attempts minted before the rollout carry
+  // no run id and stay acceptable while their generation still matches.
+  if (activeRunId && base.runId && base.runId !== activeRunId) {
+    return { ok: false, verdict: "run_mismatch", ...base };
   }
   return { ok: true, verdict: "current", ...base };
 }
@@ -119,11 +157,13 @@ export async function checkPlateAttempt(
   sceneId: string,
   providerJobId: string | null | undefined,
 ): Promise<PlateAttemptCheck> {
-  let scene: { plate_generation?: number | null } | null = null;
+  let scene:
+    | { plate_generation?: number | null; active_run_id?: string | null }
+    | null = null;
   try {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, plate_generation")
+      .select("id, plate_generation, active_run_id")
       .eq("id", sceneId)
       .maybeSingle();
     scene = data ?? null;
@@ -134,6 +174,7 @@ export async function checkPlateAttempt(
       attemptId: null,
       expectedGeneration: null,
       currentGeneration: null,
+      runId: null,
     };
   }
 
@@ -145,7 +186,7 @@ export async function checkPlateAttempt(
   try {
     const { data } = await supabase
       .from("plate_attempts")
-      .select("id, status, expected_plate_generation")
+      .select("id, status, expected_plate_generation, run_id")
       .eq("scene_id", sceneId)
       .eq("provider_job_id", providerJobId)
       .maybeSingle();
@@ -156,6 +197,7 @@ export async function checkPlateAttempt(
 
   return decidePlateAttempt({ scene, attempt });
 }
+
 
 /** Marks the attempt as the delivered one. Best effort — never throws. */
 export async function completePlateAttempt(

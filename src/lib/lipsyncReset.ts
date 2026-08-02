@@ -66,35 +66,66 @@ export async function resetSceneLipSync(
 }
 
 /**
- * v373 — "Clip generieren" = harter Neustart.
+ * v373/v377 — standalone hard reset of a scene job.
  *
- * Bricht alle laufenden Provider-Jobs ab, gibt Slots frei, erstattet Credits,
- * löscht sämtliche Artefakte (Plate, Preclips, Anchors, Tracking, Voiceover)
- * und erhöht die Generationsnummer der Szene.
+ * Cancels running provider jobs, frees slots, refunds credits, deletes every
+ * artifact and bumps the generation.
  *
- * MUSS vor jedem neuen Render-Dispatch abgewartet werden. Erst danach darf
- * `compose-video-clips` aufgerufen werden — sonst schneidet die Lip-Sync-Kette
- * Preclips aus der Plate des vorherigen Laufs.
+ * NOTE: this is NO LONGER the way to prepare a new render. Starting a render
+ * goes through `startSceneGeneration()`, which performs reset and dispatch as
+ * one server-side operation — "reset here, render there" was exactly the
+ * bypassable convention that let stale runs survive. Use this function only to
+ * abandon a scene without starting anything new.
  *
- * Gibt `true` zurück, wenn der Reset serverseitig bestätigt wurde.
+ * Returns a typed result; callers must NOT treat a failure as "continue".
  */
+export interface HardResetResult {
+  ok: boolean;
+  generation: number | null;
+  refundDecision: string | null;
+  warnings: string[];
+  error?: string;
+}
+
 export async function hardResetSceneJob(
   sceneId: string,
   reason = 'user_regenerate',
-): Promise<boolean> {
-  if (!/^[0-9a-f-]{36}$/i.test(sceneId)) return false;
+): Promise<HardResetResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(sceneId)) {
+    return { ok: false, generation: null, refundDecision: null, warnings: [], error: 'invalid_scene_id' };
+  }
   try {
     const { data, error } = await supabase.functions.invoke('composer-hard-reset-scene', {
       body: { scene_id: sceneId, reason },
     });
     if (error) {
       console.warn('[lipsyncReset] hard reset failed', sceneId, error);
-      return false;
+      return {
+        ok: false,
+        generation: null,
+        refundDecision: null,
+        warnings: [],
+        error: error.message ?? 'invoke_failed',
+      };
     }
-    return (data as any)?.ok === true;
+    const d = (data ?? {}) as any;
+    return {
+      ok: d.ok === true,
+      generation: typeof d.generation === 'number' ? d.generation : null,
+      refundDecision: d.refund_decision ?? null,
+      warnings: Array.isArray(d.warnings) ? d.warnings : [],
+      error: d.ok === true ? undefined : String(d.error ?? 'reset_failed'),
+    };
   } catch (e) {
     console.warn('[lipsyncReset] hard reset crash', sceneId, e);
-    return false;
+    return {
+      ok: false,
+      generation: null,
+      refundDecision: null,
+      warnings: [],
+      error: (e as Error).message,
+    };
   }
 }
+
 

@@ -47,7 +47,16 @@ export interface HardResetArgs {
   syncApiKey?: string | null;
   /** Reason string for the audit log. */
   reason?: string;
+  /**
+   * v377 — the caller already invalidated the scene atomically through
+   * `composer_start_scene_run` (generation bump + fresh `active_run_id` under
+   * a row lock). The teardown then must NOT bump the generation a second time;
+   * it only performs the physical cleanup and writes the state fields for the
+   * generation given here.
+   */
+  generationOverride?: number | null;
 }
+
 
 /**
  * v374 — why a reset may or may not refund.
@@ -137,6 +146,48 @@ export function decideRefund(input: {
   }
   return { decision: "refunded", amount: cost };
 }
+
+/**
+ * v377 — keys inside `audio_plan` that are DERIVED from a pipeline run.
+ *
+ * Everything the user authored (script, per-speaker voices, turns, timing
+ * preferences) survives a restart. Everything a previous run computed must
+ * not: a surviving `faceMap`, `preclips` payload or dispatch timestamp is how
+ * a new generation ends up cutting from yesterday's plate.
+ */
+const DERIVED_AUDIO_PLAN_KEYS: readonly string[] = [
+  "twoshot",
+  "lipsync",
+  "segments_payload",
+  "segments",
+  "faceMap",
+  "face_map",
+  "preclips",
+  "tracking",
+  "dispatch",
+  "mux",
+  "generatedAt",
+  "generated_at",
+  "renderedAt",
+  "rendered_at",
+  "runId",
+  "run_id",
+];
+
+/**
+ * Removes every derived key from an `audio_plan` snapshot. Returns `null` when
+ * there was no plan at all, so the column is cleared rather than set to `{}`.
+ */
+export function stripDerivedAudioPlan(
+  prevPlan: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!prevPlan || typeof prevPlan !== "object") return null;
+  const cleaned: Record<string, unknown> = { ...prevPlan };
+  for (const key of DERIVED_AUDIO_PLAN_KEYS) delete cleaned[key];
+  return cleaned;
+}
+
+
 
 
 /** Buckets + prefixes that can hold artifacts of a single composer scene. */
@@ -272,7 +323,13 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
 
   const refund = decideRefund({ scene, knownJobIds: jobIds, hasInflightRows });
 
-  const nextGeneration = Number(scene?.plate_generation ?? 1) + 1;
+  // v377 — when the caller already acquired the run atomically, its generation
+  // is authoritative and must not be bumped again.
+  const preInvalidated =
+    args.generationOverride !== null && args.generationOverride !== undefined;
+  const nextGeneration = preInvalidated
+    ? Number(args.generationOverride)
+    : Number(scene?.plate_generation ?? 1) + 1;
 
   // ── 2. v376 — INVALIDATE LOGICALLY FIRST ────────────────────────────────
   // Provider cancellation is never fully reliable: the job may already be past
@@ -283,20 +340,22 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   // (`plate_attempts` rows are tombstoned by the `supersede_plate_attempts`
   // trigger, and the webhook write is generation-scoped).
   let supersededAttempts = 0;
-  try {
-    const { error } = await supabase
-      .from("composer_scenes")
-      .update({
-        plate_generation: nextGeneration,
-        plate_generation_started_at: nowIso,
-        plate_ready_generation: null,
-        plate_ready_at: null,
-        updated_at: nowIso,
-      })
-      .eq("id", sceneId);
-    if (error) errors.push(`invalidate:${(error as any).message ?? "unknown"}`);
-  } catch (e) {
-    errors.push(`invalidate:${(e as Error).message}`.slice(0, 120));
+  if (!preInvalidated) {
+    try {
+      const { error } = await supabase
+        .from("composer_scenes")
+        .update({
+          plate_generation: nextGeneration,
+          plate_generation_started_at: nowIso,
+          plate_ready_generation: null,
+          plate_ready_at: null,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+      if (error) errors.push(`invalidate:${(error as any).message ?? "unknown"}`);
+    } catch (e) {
+      errors.push(`invalidate:${(e as Error).message}`.slice(0, 120));
+    }
   }
 
   // The DB trigger already supersedes open attempts on the bump; this call is
@@ -307,6 +366,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     sceneId,
     nextGeneration,
   );
+
 
   // ── 3. BEST-EFFORT TEARDOWN ─────────────────────────────────────────────
   // Cancel provider jobs + free inflight slots. Credits are refunded ONLY
@@ -361,13 +421,8 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   // loses every derived pipeline artifact — a stale faceMap or preclip
   // payload from the previous generation must never survive the reset.
   const prevPlan = (scene?.audio_plan ?? null) as Record<string, unknown> | null;
-  let cleanedPlan: Record<string, unknown> | null = null;
-  if (prevPlan && typeof prevPlan === "object") {
-    cleanedPlan = { ...prevPlan };
-    delete (cleanedPlan as any).twoshot;
-    delete (cleanedPlan as any).lipsync;
-    delete (cleanedPlan as any).segments_payload;
-  }
+  const cleanedPlan = stripDerivedAudioPlan(prevPlan);
+
 
   try {
     const { error } = await supabase

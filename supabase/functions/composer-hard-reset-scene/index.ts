@@ -85,8 +85,12 @@ serve(async (req) => {
       `[composer-hard-reset-scene] scene=${sceneId} gen=${result.generation} refund=${result.refundDecision}`,
     );
 
+    // v377 — never report success when the teardown reported errors. A caller
+    // that gets `ok: true` on a partially failed reset is the exact bug class
+    // this contract removes.
     return json({
-      ok: true,
+      ok: result.ok,
+      error: result.ok ? undefined : "reset_incomplete",
       scene_id: sceneId,
       generation: result.generation,
       deleted_objects: result.deletedObjects,
@@ -94,6 +98,7 @@ serve(async (req) => {
       refund_decision: result.refundDecision,
       warnings: result.errors,
     });
+
 
   } catch (e) {
     console.error("[composer-hard-reset-scene] crash", e);

@@ -1,59 +1,86 @@
-## Bewertung der externen Analyse
+# Plan v377 — Alte Pipeline-Läufe strukturell unmöglich machen
 
-Drei Punkte sind gegen den Code verifiziert und echte Defekte:
+## Warum dieser Plan und kein weiterer Patch
 
-1. **Generations-Race (belegt)** — `stamp_plate_generation` stempelt `plate_generation` zum Schreibzeitpunkt. Ein verspäteter Render aus einer alten Generation wird als aktuell markiert. Der Generations-Vertrag aus v373 hat hier ein Loch.
-2. **4 Frames pro Pass (belegt)** — `mouth-motion-verdict.ts:111`. Beweist „kein Passthrough", nicht „guter Sync".
-3. **Kein Final-Output-Gate** — T16 setzt direkt `ready`.
+Die bisherigen Versionen v373–v376 waren inhaltlich richtig, aber an der falschen Stelle verankert: Der „harte Neustart" ist heute eine **Frontend-Konvention**. Jeder Aufrufpfad, der sie nicht befolgt, umgeht sie folgenlos.
 
-Nicht übernommen (bewusst): AV-Sync-Score (T15c), Outbox-Pattern, Fencing-Token. Zu großer Aufwand für den Nutzen bei 3 Slots und einem Watchdog; als Backlog nach Launch.
+Nachgewiesen am letzten Lauf:
 
-## v375 — Unveränderliche Plate-Generation
+- Drei **gleichzeitig offene** Plate-Attempts in **derselben Generation 1**.
+- `AnchorPreviewGate` startet den Render direkt, komplett ohne Hard-Reset.
+- `useSceneGenerate` wartet zwar auf den Reset, ignoriert aber dessen Fehlschlag und rendert trotzdem weiter.
+- Der `audio_plan` trug noch abgeleitete Daten vom 01.08., 21:28.
+- Die Datenbank erlaubt mehrere offene Läufe pro Szene; der vorhandene Index verhindert nur identische Provider-Job-IDs.
 
-- Neue Tabelle `plate_attempts` (`scene_id`, `expected_plate_generation`, `provider`, `provider_job_id`, `status`, `clip_url`, `superseded_at`).
-- `compose-video-clips` legt den Attempt **vor** dem Provider-Dispatch mit der zum Dispatch gültigen Generation an.
-- Das Render-Ergebnis schreibt nur noch über den Attempt: `UPDATE ... WHERE id = :attempt AND expected_plate_generation = (SELECT plate_generation FROM composer_scenes ...) AND status='rendering'`. Trifft es nicht, wird der Attempt als `superseded` abgelegt und `composer_scenes` **nicht** angefasst.
-- `stamp_plate_generation` stempelt nicht mehr blind; die Generation kommt aus dem Attempt.
+Konsequenz: Der Vertrag muss dorthin, wo er nicht umgangen werden kann — in die Datenbank und in genau **einen** Startpunkt. Bewusst **keine** zusätzlichen Watchdogs, Retries oder Heuristiken; davon existieren bereits zu viele und sie waren mehrfach selbst Fehlerquelle.
 
-## v376 — Hard-Reset: erst invalidieren, dann aufräumen
+## Umsetzung
 
-Reihenfolge in `_shared/scene-hard-reset.ts` umdrehen:
-1. Transaktion: `plate_generation + 1`, offene Attempts + Passes auf `superseded` mit `superseded_by_generation`.
-2. Commit.
-3. Danach best-effort: Provider-Cancel, Slot-Freigabe.
-4. Artefakt-Purge nur für Generationen, die älter als die vorletzte sind (Tombstone statt Sofortlöschung), damit verspätete Webhooks ihren Bezug behalten.
+### 1. Genau eine Eintrittstür
 
-## v377 — Plate-Viability-Audit (T7.5)
+Neue Funktion `composer-start-scene-generation` wird der **einzige** erlaubte Weg, einen kostenpflichtigen Clip-Render zu starten:
 
-Neues Gate nach dem Plate-Render, vor der Dialog-Segmentierung. Nutzt das bereits vorhandene Rekognition-Tracking:
-- Cast-Identität pro Sprecher gegen die Face-Collection (`_shared/rekognition-face-collection.ts`).
-- Identity-bound Tracking: nach Track-Verlust wird **nicht** die nächstliegende Box übernommen, sondern per FaceId re-identifiziert; scheitert das, gilt der Turn als nicht auditierbar.
-- Sichtbarkeit + Mundgröße **innerhalb des jeweiligen Sprechintervalls**, nicht global.
-- Ergebnis als `plate_viability` in `composer_scenes`; Fail → Szene fehlschlagen + Refund, statt teuer zu dispatchen.
+1. Szene exklusiv sperren
+2. Generation atomar erhöhen, alte Attempts tombstonen
+3. Locks, Inflight-Slots und abgeleitete Zustände löschen
+4. Alte Artefakte entfernen
+5. Unveränderliche `run_id` erzeugen
+6. Erst danach `compose-video-clips` mit `scene_id + generation + run_id` starten
 
-## v378 — Turn-basiertes Verdict statt Pass-Verdict
+Reset und Render sind damit **eine** Transaktion statt zweier Client-Requests.
 
-`mouth-motion-verdict.ts` bekommt Prüf-Fenster **pro Turn** statt 4 Frames pro Pass:
-- je Turn 3 Fenster, gelegt auf Audio-Energiespitzen des Turn-Audios.
-- Pass besteht nur, wenn jeder relevante Turn besteht.
-- Aufteilung der Verdikte: `T15a ingest` (Datei lesbar, Dauer, Auflösung, Checksumme, Übernahme in eigenen Storage) → `T15b motion` (bestehend) → `T15d collateral` (Nicht-Sprecher dürfen sich im Pass nicht bewegen — Mund-ROI der übrigen Cast-Mitglieder gegen das Plate vergleichen).
+### 2. Invariante in der Datenbank statt im Client
 
-## v379 — Final-Scene-Verdict + atomarer Publish
+Migration ergänzt:
 
-- T16 setzt künftig `clip_status = 'rendered'`, nicht `ready`.
-- Neue Prüfung `final-scene-verdict`: Datei vollständig, Dauer in Toleranz, Audio-Stream vorhanden, keine Black/Freeze-Sequenzen, richtiger Sprecher bewegt sich je Turn, keine sichtbaren Cropnähte.
-- Erst danach in einer Transition `ready` + Credit-Commit.
+- `run_id` auf `plate_attempts` und am aktuellen Szenenlauf
+- Partieller Unique Index: **höchstens ein offener Attempt pro Szene**
+- Atomare Startfunktion mit Row Lock, die Generation und Run-ID gemeinsam setzt
+- Attempts werden nur registriert, wenn Generation **und** Run-ID zum aktuellen Lauf passen
 
-## v380 — Reservierungsmodell für Credits
+Ein zweiter Dispatch wird abgelehnt, **bevor** Providerkosten entstehen. Grants, RLS und Service-Role-Zugriff werden in derselben Migration gesetzt.
 
-- Reservierung bei T1, Provider-Kosten am Run, Commit erst bei erfolgreichem Publish (T18), Freigabe bei terminalem Systemfehler.
-- Append-only Ledger mit Unique-Constraint auf (`run_id`, `reason_code`), damit doppelte Refunds technisch unmöglich sind.
-- `decideRefund` bekommt die vom Reviewer genannten fünf Fälle; „Nutzer-Reset nach kostenpflichtigem Dispatch" wird gezählt und ab einem Schwellwert nicht mehr voll erstattet.
+### 3. Ein Reset darf nicht mehr still scheitern
 
-## Reihenfolge
+- `hardResetSceneJob` liefert ein typisiertes Ergebnis statt `boolean`
+- Fehler beim logischen Invalidieren **stoppen** den Start hart
+- Nur physische Löschwarnungen sind tolerierbar, und auch nur wenn Generation und Run-ID sicher invalidiert wurden
+- `composer-hard-reset-scene` meldet nicht länger `ok: true`, wenn intern Fehler auftraten
 
-v375 + v376 zuerst (echte Datenkorruption). Dann v378, dann v379. v377 und v380 danach.
+### 4. Alle Startpfade vereinheitlichen
 
-## Technische Details
+Umgestellt werden: einzelnes „Clip generieren" / „Neu rendern", „Alle Clips generieren", Anchor-Preview → „Bestätigen & rendern", Preview-Neuerstellung sowie verbleibende direkte `compose-video-clips`-Aufrufe.
 
-Betroffen: Migration für `plate_attempts` + Ledger, `_shared/scene-hard-reset.ts`, `compose-video-clips`, `compose-dialog-segments`, `_shared/mouth-motion-verdict.ts`, `sync-so-webhook`, `render-sync-segments-audio-mux`, `lipsync-watchdog` (muss `slot_wait` von `provider_runtime` unterscheiden, sonst timeoutet Sprecher 4 fälschlich).
+Preview-only bleibt kostenfrei, bekommt aber eine Preview-ID — bestätigt werden kann ausschließlich die aktuelle Preview.
+
+### 5. Nur Nutzerinhalte überleben den Neustart
+
+Erhalten bleiben: Skript, Sprecher- und Stimmauswahl, Timing-Vorgaben.
+
+Gelöscht werden alle abgeleiteten Laufdaten: `audio_plan.twoshot`, `lipsync`, `segments_payload`, alte Dispatch-/Mux-/Preclip-/FaceMap-/Tracking-Daten, `dialog_shots`, `dialog_takes`, Provider-IDs, Locks, Inflight-Zeilen und Storage-Artefakte.
+
+### 6. Webhooks an die Run-ID binden
+
+- Plate-, Audio-, Sync.so- und Mux-Callbacks müssen `scene_id + generation + run_id` nachweisen
+- `unregistered` ist für neue Jobs **nicht mehr** fail-open
+- Nur ausdrücklich markierte Legacy-Jobs dürfen übergangsweise ohne Run-ID durch
+- Watchdog und Recovery starten keinen Job, solange ein aktueller offener Attempt existiert
+
+### 7. Die aktuell blockierte Szene bereinigen
+
+Konkurrierende Attempts tombstonen, Locks und Inflight-Zeilen löschen, abgeleiteten Audio-/Lip-Sync-Zustand entfernen, Szene in einen sauberen Ruhezustand versetzen. **Kein automatischer kostenpflichtiger Neustart.**
+
+## Verifikation
+
+Regressionstests:
+
+1. Doppelklick erzeugt genau einen Provider-Job
+2. Anchor-Confirm kann den Reset nicht umgehen
+3. Fehlgeschlagener Reset verhindert jeden Dispatch
+4. Alter Webhook kann die neue Generation nicht beschreiben
+5. Zwei parallele Starts ergeben einen Gewinner und einen sauberen Konflikt
+6. Alte Audio-/Lip-Sync-Daten überleben den Neustart nicht
+7. Watchdog erzeugt keinen zweiten Attempt
+8. Fehlgeschlagene Szene beendet Fortschrittsanzeige und Locks
+
+Danach ein kontrollierter Testlauf mit Prüfung von Logs und Datenbank: genau eine aktuelle Run-ID, genau ein offener Attempt, kein wiederverwendetes Artefakt.
