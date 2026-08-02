@@ -9,6 +9,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { transitionScene } from "../_shared/scene-state.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -122,28 +124,26 @@ serve(async (req) => {
     }
 
     const nowIso = new Date().toISOString();
-    if (clipIds.length > 0) {
+    // v385 — Zustand nur noch über die Zustandsmaschine; Legacy-Spalten
+    // spiegelt der Bridge-Trigger.
+    const cancelIds = Array.from(new Set([...clipIds, ...lipsyncIds]));
+    if (cancelIds.length > 0) {
       await supabase
         .from("composer_scenes")
         .update({
-          clip_status: "canceled",
-          clip_error: "canceled_by_user",
-          updated_at: nowIso,
-        })
-        .in("id", clipIds);
-    }
-    if (lipsyncIds.length > 0) {
-      await supabase
-        .from("composer_scenes")
-        .update({
-          lip_sync_status: "canceled",
-          twoshot_stage: null,
           clip_error: "canceled_by_user",
           replicate_prediction_id: null,
           updated_at: nowIso,
         })
-        .in("id", lipsyncIds);
+        .in("id", cancelIds);
+
+      for (const id of cancelIds) {
+        await transitionScene(supabase, id, "canceled", {
+          detail: "canceled_by_user",
+        });
+      }
     }
+
 
     console.log(
       `[composer-cancel-scene] user=${userId} scenes=${authorized.length} clips=${clipIds.length} lipsync=${lipsyncIds.length} syncso=${uniqueJobs.length}`,

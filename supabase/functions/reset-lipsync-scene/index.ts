@@ -18,6 +18,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
+import { transitionScene } from "../_shared/scene-state.ts";
+
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
@@ -116,13 +118,10 @@ serve(async (req) => {
   await admin
     .from("composer_scenes")
     .update({
-      lip_sync_status: "pending",
-      twoshot_stage: null,
       replicate_prediction_id: null,
       dialog_shots: null,
       clip_error: null,
       clip_url: restoredSourceClip ?? null,
-      clip_status: restoredSourceClip ? "ready" : ((scene as any).clip_status ?? "pending"),
       lip_sync_source_clip_url: null,
       lip_sync_applied_at: null,
       audio_plan: cleanedPlan,
@@ -130,5 +129,15 @@ serve(async (req) => {
     })
     .eq("id", sceneId);
 
+  // v385 — Zustand über die Zustandsmaschine: mit belastbarer Plate zurück auf
+  // `plate_ready`, sonst auf `idle`. Legacy-Spalten spiegelt der Bridge-Trigger.
+  await transitionScene(
+    admin,
+    sceneId,
+    restoredSourceClip ? "plate_ready" : "idle",
+    { detail: "lipsync_reset" },
+  );
+
   return json({ ok: true, status: "reset", scene_id: sceneId });
+
 });
