@@ -28,12 +28,9 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, transitionScene } from "../_shared/scene-state.ts";
-import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
-import { validateReprojectionPasses } from "../_shared/preclip-reprojection-contract.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 const corsHeaders = {
@@ -53,7 +50,7 @@ function json(body: unknown, status = 200) {
 // v205 mux/v169 parity — telemetry only. Mask stops live in the Remotion
 // template (`DialogStitchVideo.tsx`); this constant just tags the render so
 // operators can grep for the active mask profile.
-const OVERLAY_MASK_VERSION = "v368_full_face_core";
+const OVERLAY_MASK_VERSION = "v169_parity";
 const COLOR_MATCH_ENABLED = false;
 // v206 — Silent overlay layers (v195/v197 SilentFaceFreeze, v183 SilentFaceAnchor,
 // v193 MouthMatteFreeze) are hard-disabled to restore true v169 behaviour:
@@ -117,7 +114,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, pipeline_state, clip_url, plate_generation, active_run_id",
+        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, lip_sync_status, clip_url",
       )
       .eq("id", sceneId)
       .single();
@@ -126,7 +123,7 @@ serve(async (req) => {
     }
 
     const state = ((scene as any).dialog_shots ?? null) as DialogShotsState | null;
-    if (sceneState(scene) === "canceled" || (state as any)?.status === "canceled") {
+    if ((scene as any).lip_sync_status === "canceled" || (state as any)?.status === "canceled") {
       return json({ ok: true, skipped: "canceled", scene_id: sceneId });
     }
     if (!state || state.engine !== "sync-segments") {
@@ -197,84 +194,6 @@ serve(async (req) => {
     const height = evenDimension(state.video_height, 720);
 
     const passes = Array.isArray((state as any).passes) ? (state as any).passes : [];
-
-    // ══════════════════════════════════════════════════════════════════
-    // v348 — MUX GATE. Only *measured* failure blocks the mux.
-    //   `static`  → the provider really returned a motionless mouth: block.
-    //   `unknown` → OUR measurement was unavailable (AWS still probe outage).
-    //               That is not evidence against the provider and must never
-    //               turn a successful lip-sync into a customer-facing error.
-    //               The pass is muxed and flagged `motion_unverified`.
-    // ══════════════════════════════════════════════════════════════════
-    // v350 — `passthrough` (output == input inside the mouth band) is proven
-    // provider failure just like `static` and must block the mux too.
-    const BLOCKING_VERDICTS = new Set(["static", "passthrough"]);
-    const staticPasses = passes.filter(
-      (p: any) => p?.status === "done" && BLOCKING_VERDICTS.has(String(p?.motion_verdict ?? "")),
-    );
-    const unverifiedPasses = passes.filter(
-      (p: any) =>
-        p?.status === "done" &&
-        String(p?.motion_verdict ?? "") !== "moved" &&
-        !BLOCKING_VERDICTS.has(String(p?.motion_verdict ?? "")),
-    );
-    if (unverifiedPasses.length > 0) {
-      console.warn(
-        `[render-sync-segments-audio-mux] v348 scene=${sceneId} motion_unverified passes=${
-          unverifiedPasses.map((p: any) => p?.speaker_name ?? p?.speaker_idx).join(",")
-        } → muxing anyway (measurement outage, provider not penalised)`,
-      );
-    }
-    if (staticPasses.length > 0 && !forceRemux) {
-      const names = staticPasses
-        .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`)
-        .join(", ");
-      const blockedCode = staticPasses.some(
-          (p: any) => String(p?.motion_verdict ?? "") === "passthrough",
-        )
-        ? "provider_returned_passthrough_output"
-        : "provider_returned_static_output";
-      const gateMsg =
-        `Lip-Sync abgebrochen: Für ${names} hat der Provider ein Video ohne messbare Mundbewegung geliefert. Die Szene wurde nicht zusammengesetzt.`;
-
-      await failLipSync({ supabase, sceneId, reason: gateMsg, userId });
-      console.error(
-        `[render-sync-segments-audio-mux] v348_mux_gate scene=${sceneId} BLOCKED code=${blockedCode} speakers=${names}`,
-      );
-      return json({
-        ok: false,
-        blocked: blockedCode,
-        scene_id: sceneId,
-        affected_speakers: names,
-      }, 200);
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // v346 — NO PARTIAL MUX. Previously a scene with 4 speakers muxed
-    // happily when only 1 pass survived, producing exactly the symptom the
-    // user reported: voiceover plays, most mouths never move. A scene is
-    // only composited when every speaking pass is `done`.
-    // ══════════════════════════════════════════════════════════════════
-    const failedPasses = passes.filter((p: any) => p?.status === "failed");
-    if (failedPasses.length > 0 && !forceRemux) {
-      const failedNames = failedPasses
-        .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`)
-        .join(", ");
-      const partialMsg =
-        `Lip-Sync abgebrochen: Für ${failedNames} konnte keine Mundbewegung erzeugt werden. Die Szene wurde nicht zusammengesetzt — bitte die Szene neu rendern.`;
-      await failLipSync({ supabase, sceneId, reason: partialMsg, userId });
-      console.error(
-        `[render-sync-segments-audio-mux] v346_no_partial_mux scene=${sceneId} BLOCKED failed=${failedPasses.length}/${passes.length} speakers=${failedNames}`,
-      );
-      return json({
-        ok: false,
-        blocked: "incomplete_passes",
-        scene_id: sceneId,
-        affected_speakers: failedNames,
-      }, 200);
-    }
-
-
     const donePasses = passes.filter(
       (p: any) =>
         p?.status === "done" &&
@@ -293,24 +212,6 @@ serve(async (req) => {
     const anyTight = donePasses.some((p: any) => !!p?.audio_tight);
     const isFanout = donePasses.length >= 2;
     const useOverlay = isFanout || (donePasses.length >= 1 && anyTight);
-
-    // v368 — validate the persisted pass identity + native plate crop once,
-    // before any shot is built. The 720px preclip outputSize is deliberately
-    // excluded from target placement: x/y/size are source-plate pixels.
-    if (useOverlay) {
-      const contract = validateReprojectionPasses(donePasses, width, height);
-      if (!contract.ok) {
-        const detail = `v368_reprojection_contract:${contract.errors.join(",")}`;
-        console.error(`[render-sync-segments-audio-mux] scene=${sceneId} ${detail}`);
-        await failLipSync({
-          supabase,
-          sceneId,
-          reason: `Lip-Sync-Zuordnung konnte nicht sicher bestätigt werden: ${detail}`,
-          userId,
-        });
-        return json({ error: detail, code: "v368_reprojection_contract_failed" }, 409);
-      }
-    }
 
 
     const sourcePlateUrl = String((state as any).source_clip_url ?? "");
@@ -622,20 +523,6 @@ serve(async (req) => {
           // v190 — per-shot silent slots removed. Silent-face anchors are
           // now rendered globally (see `globalSilentSlots` on inputProps),
           // so the active overlay only needs to carry its own crop/mask.
-          // v359 — bewegter Ausschnitt. Wurde der Preclip mit Kamerafahrt
-          // geschnitten, MUSS das Zurückkleben demselben Pfad folgen; ein
-          // statisches Rechteck würde das mitgezogene Gesicht über die Plate
-          // schmieren. Ohne Pfad bleibt es exakt beim v358-Verhalten.
-          const rawCropPath = (p as any).preclip_crop_path;
-          const cropPath = Array.isArray(rawCropPath)
-            ? rawCropPath
-                .filter((c: any) =>
-                  Number.isFinite(Number(c?.x)) &&
-                  Number.isFinite(Number(c?.y)) &&
-                  Number(c?.size) > 0
-                )
-                .map((c: any) => ({ x: Number(c.x), y: Number(c.y), size: Number(c.size) }))
-            : [];
           const overlayPayload: Record<string, unknown> = hasPreclipCrop
             ? {
                 crop: {
@@ -643,7 +530,6 @@ serve(async (req) => {
                   y: Number(preclipCrop.y),
                   size: Number(preclipCrop.size),
                 },
-                ...(cropPath.length > 0 ? { cropPath } : {}),
               }
             : {
                 faceMask: {
@@ -652,7 +538,6 @@ serve(async (req) => {
                   radius: radiusForCount,
                 },
               };
-
 
           const mouthMattes = listenerMouthMatteEnabled && isFanout
             ? Array.from(mouthMatteBySpeakerIdx.entries())
@@ -693,8 +578,6 @@ serve(async (req) => {
                 startSec: s,
                 endSec: e,
                 outputUrl: String(p.output_url),
-                speakerIdx: Number((p as any).speaker_idx),
-                characterId: String((p as any).character_id),
                 sourceTiming,
                 sourceStartSec,
                 ...(mouthMattes.length > 0 ? { mouthMattes } : {}),
@@ -769,8 +652,6 @@ serve(async (req) => {
       faceMask: shot.faceMask ?? null,
       mouthMattes: Array.isArray((shot as any).mouthMattes) ? (shot as any).mouthMattes.length : 0,
       outputUrl: String(shot.outputUrl ?? "").slice(0, 120),
-      speakerIdx: shot.speakerIdx ?? null,
-      characterId: shot.characterId ?? null,
     }));
 
     // v205 mux/v169 parity telemetry + guard.
@@ -856,6 +737,8 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
             clip_error: detail.slice(0, 300),
             dialog_shots: {
               ...(state as any),
@@ -866,7 +749,6 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
-        await failLipSync({ supabase, sceneId, reason: detail, userId });
       } catch (e) {
         console.warn("[render-sync-segments-audio-mux] failed to persist preflight failure:", (e as Error).message);
       }
@@ -907,8 +789,6 @@ serve(async (req) => {
           height,
           totalDuration: totalSec,
           composer_scene_id: sceneId,
-          plate_generation: Number((scene as any).plate_generation),
-          active_run_id: String((scene as any).active_run_id ?? ""),
           stage: "sync_segments_audio_mux",
           shots: shotSummary,
         },
@@ -933,15 +813,6 @@ serve(async (req) => {
       },
       codec: "h264",
       imageFormat: "jpeg",
-      // Visually-lossless floor (mem://architecture/render/global-export-quality-floor.md)
-      // Mux path uses preset=medium (not slow) to keep 600s Lambda timeout safe
-      // for 4-speaker v205 muxes; jpeg/crf/bitrate match global floor.
-      jpegQuality: 95,
-      crf: 16,
-      x264Preset: "medium",
-      videoBitrate: "10M",
-      audioCodec: "aac",
-      audioBitrate: "256k",
       maxRetries: 1,
       privacy: "public",
       logLevel: "warn",
@@ -954,6 +825,7 @@ serve(async (req) => {
       framesPerLambda: muxFramesPerLambda,
       frameRange: [0, durationInFrames - 1],
       muted: false,
+      audioCodec: "aac",
       scale: 1,
       envVariables: {},
       chromiumOptions: {},
@@ -976,8 +848,6 @@ serve(async (req) => {
           composer_scene_id: sceneId,
           composer_project_id: (scene as any).project_id,
           stage: "sync_segments_audio_mux",
-          plate_generation: Number((scene as any).plate_generation),
-          active_run_id: String((scene as any).active_run_id ?? ""),
         },
       },
     };
@@ -991,17 +861,6 @@ serve(async (req) => {
     const updatedState: DialogShotsState = {
       ...state,
       status: "audio_muxing",
-      reprojection_contract: {
-        version: "v368_native_plate",
-        mask: OVERLAY_MASK_VERSION,
-        verified_at: new Date().toISOString(),
-        passes: donePasses.map((p: any) => ({
-          speaker_idx: Number(p?.speaker_idx),
-          character_id: String(p?.character_id ?? ""),
-          preclip_crop: p?.preclip_crop ?? null,
-          motion_verdict: p?.motion_verdict ?? "unknown",
-        })),
-      },
       audio_mux: {
         render_id: renderId,
         dispatched_at: new Date().toISOString(),
@@ -1011,15 +870,11 @@ serve(async (req) => {
       .from("composer_scenes")
       .update({
         dialog_shots: updatedState,
+        lip_sync_status: "audio_muxing",
+        twoshot_stage: "audio_muxing",
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
-    // v388 — Phasenwechsel nur ueber den geprueften Weg (Lauf-/Generations-Fence).
-    await transitionScene(supabase, sceneId, "lipsync_muxing", {
-      runId: String((scene as any).active_run_id ?? "") || null,
-      generation: Number((scene as any).plate_generation ?? 1),
-    });
-
 
     const invokeResp = await fetch(
       `${supabaseUrl}/functions/v1/invoke-remotion-render`,
@@ -1063,16 +918,12 @@ serve(async (req) => {
             ...retryState,
             audio_mux_error: `invoke ${invokeResp.status}: ${invokeMessage}`.slice(0, 500),
           },
+          lip_sync_status: "failed",
+          twoshot_stage: "audio_mux_failed",
           clip_error: `audio_mux_dispatch: ${invokeMessage}`.slice(0, 300),
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      await failLipSync({
-        supabase,
-        sceneId,
-        reason: `audio_mux_dispatch: ${invokeMessage}`,
-        userId,
-      });
       return json({ error: `invoke ${invokeResp.status}: ${invokeMessage}` }, 500);
     }
 

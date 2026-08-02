@@ -1,15 +1,10 @@
 /**
  * Central, idempotent lip-sync failure helper.
  *
- * v385: der Zustandswechsel läuft ausschließlich über die Zustandsmaschine
- * (`transitionScene(... 'failed')`). Die Legacy-Spalten `lip_sync_status` und
- * `twoshot_stage` werden hier NICHT mehr geschrieben — sie werden vom
- * Bridge-Trigger aus `pipeline_state` gespiegelt. `clip_error` bleibt reiner
- * Anzeigetext.
- *
  * Used by every dialog/lip-sync edge function so a failure always ends with:
  *   - dialog_shots.status = 'failed' (+ error reason)
- *   - pipeline_state      = 'failed'
+ *   - lip_sync_status     = 'failed'
+ *   - twoshot_stage       = 'failed'
  *   - clip_error          = <human-friendly reason>
  *   - replicate_prediction_id = null
  *   - inflight Sync.so jobs (per scene + extra ids) removed from registry
@@ -22,13 +17,9 @@
  * (callers may still return their own HTTP response).
  */
 
-import { transitionScene } from "./scene-state.ts";
-
 type SupabaseLike = {
   from: (t: string) => any;
-  rpc?: (fn: string, params: Record<string, unknown>) => any;
 };
-
 
 export interface FailLipSyncArgs {
   supabase: SupabaseLike;
@@ -83,21 +74,6 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
   // Prefer the cost persisted on the dialog state (authoritative) over a
   // caller-supplied hint; fall back to the hint when state has none yet.
   const refundAmount = stateCost > 0 ? stateCost : requestedRefund;
-  // composer_scenes is project-scoped and intentionally has no user_id.
-  // Resolve the owner here so every caller gets identical refund behaviour.
-  let refundUserId = args.userId ?? null;
-  if (!refundUserId && refundAmount > 0 && existing?.project_id) {
-    try {
-      const { data: project } = await supabase
-        .from("composer_projects")
-        .select("user_id")
-        .eq("id", existing.project_id)
-        .maybeSingle();
-      refundUserId = project?.user_id ?? null;
-    } catch (e) {
-      console.warn(`[failLipSync] project owner lookup crash: ${(e as Error).message}`);
-    }
-  }
 
   // 2. Collect every Sync.so job id we know about so the inflight registry
   //    is freed even if Sync.so never sends a terminal webhook.
@@ -158,12 +134,12 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
 
   // 4. Refund credits exactly once.
   let didRefund = false;
-  if (!alreadyRefunded && refundAmount > 0 && refundUserId) {
+  if (!alreadyRefunded && refundAmount > 0 && args.userId) {
     try {
       const { data: wallet } = await supabase
         .from("wallets")
         .select("balance")
-        .eq("user_id", refundUserId)
+        .eq("user_id", args.userId)
         .single();
       if (wallet) {
         await supabase
@@ -172,7 +148,7 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
             balance: Number(wallet.balance ?? 0) + refundAmount,
             updated_at: nowIso,
           })
-          .eq("user_id", refundUserId);
+          .eq("user_id", args.userId);
         didRefund = true;
       }
     } catch (e) {
@@ -196,6 +172,8 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
       .from("composer_scenes")
       .update({
         dialog_shots: patchedState,
+        lip_sync_status: "failed",
+        twoshot_stage: "failed",
         clip_error: safeReason,
         replicate_prediction_id: null,
         updated_at: nowIso,
@@ -205,14 +183,6 @@ export async function failLipSync(args: FailLipSyncArgs): Promise<FailLipSyncRes
     console.warn(`[failLipSync] scene update crash: ${(e as Error).message}`);
     return { ok: false, refunded: didRefund, scene_id: sceneId, reason: safeReason };
   }
-
-  // v385 — Zustand ausschließlich über die Zustandsmaschine.
-  try {
-    await transitionScene(supabase, sceneId, "failed", { detail: safeReason });
-  } catch (e) {
-    console.warn(`[failLipSync] transition crash: ${(e as Error).message}`);
-  }
-
 
   console.log(
     `[failLipSync] scene=${sceneId} reason="${safeReason}" jobs=${ids.length} refunded=${didRefund}/${refundAmount}`,

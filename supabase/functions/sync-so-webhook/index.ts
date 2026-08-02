@@ -16,7 +16,6 @@
  * NOT retry storm us. The 60s pg_cron poller is the safety net.
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, transitionScene, failSceneState, type SceneState } from "../_shared/scene-state.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -32,10 +31,7 @@ import {
   logSyncDispatch,
 } from "../_shared/syncso-preflight.ts";
 import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
-import { judgeMouthMotion, mouthRectFromPass } from "../_shared/mouth-motion-verdict.ts";
-import { assertGenerationProvenance } from "../_shared/generation-provenance.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
-import { failLipSync } from "../_shared/lipsync-fail.ts";
 
 
 const corsHeaders = {
@@ -321,8 +317,6 @@ serve(async (req) => {
   // hint if poll-dialog-shots embedded it in the webhook URL.
   const url = new URL(req.url);
   const sceneHint = url.searchParams.get("scene_id");
-  const incomingGeneration = url.searchParams.get("generation");
-  const incomingRunId = url.searchParams.get("run_id");
 
   let sceneId: string | null = null;
   let scene: any = null;
@@ -330,7 +324,7 @@ serve(async (req) => {
   if (sceneHint) {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, pipeline_state, clip_error, plate_generation, active_run_id")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
       .eq("id", sceneHint)
       .maybeSingle();
     if (data) {
@@ -346,7 +340,7 @@ serve(async (req) => {
     // We must check ALL three so late/parallel pass webhooks find their scene.
     const { data: rows } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, pipeline_state, clip_error, plate_generation, active_run_id")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
       .in("lip_sync_status", ["running", "stitching", "audio_muxing"])
       .limit(200);
     for (const r of rows ?? []) {
@@ -367,44 +361,19 @@ serve(async (req) => {
 
   if (!scene || !sceneId) {
     console.warn(`[sync-so-webhook] no scene matched job ${jobId}`);
-    // v351 — a job we can no longer attribute must NOT keep holding a
-    // Sync.so concurrency slot. Without this every client-side reset that
-    // nulls dialog_shots permanently burns one of the 4 slots.
-    try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
     return ok({ ok: true, skipped: "no_scene_match", job_id: jobId });
   }
 
-  // v379 — provider callbacks are capabilities for exactly one scene run.
-  // Missing metadata means a pre-v379/stale callback and is intentionally
-  // ignored; accepting it would allow an old job to revive a reset scene.
-  if (
-    !incomingGeneration ||
-    !incomingRunId ||
-    Number(incomingGeneration) !== Number((scene as any).plate_generation) ||
-    String(incomingRunId) !== String((scene as any).active_run_id ?? "")
-  ) {
-    try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
-    console.warn(
-      `[sync-so-webhook] v379 stale callback ignored scene=${sceneId} job=${jobId} ` +
-        `incoming_gen=${incomingGeneration ?? "none"} current_gen=${(scene as any).plate_generation ?? "none"} ` +
-        `incoming_run=${incomingRunId ?? "none"} current_run=${(scene as any).active_run_id ?? "none"}`,
-    );
-    return ok({ ok: true, skipped: "stale_scene_run", scene_id: sceneId, job_id: jobId });
-  }
-
   if (scene.lip_sync_applied_at) {
-    try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
     return ok({ ok: true, skipped: "already_applied" });
   }
   // v18 Cancel-Guard: ignore late webhooks for user-cancelled scenes.
   if (
-    sceneState(scene) === "canceled" ||
+    (scene as any).lip_sync_status === "canceled" ||
     (scene.dialog_shots as any)?.status === "canceled"
   ) {
-    try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
     return ok({ ok: true, skipped: "canceled", scene_id: sceneId });
   }
-
 
   // v129.4a — Late-webhook guard for already-terminal scenes.
   // The webhook is the single source of truth for scene terminalisation
@@ -412,26 +381,51 @@ serve(async (req) => {
   // is already failed must not flip it to done (partial output) or replay
   // refund logic. Ack 200 so Sync.so stops retrying, no state mutation.
   //
+  // v131.8 — Ausnahme: wenn die Szene NUR wegen unseres eigenen
+  // `watchdog_provider_timeout` als failed markiert wurde UND Sync.so jetzt
+  // doch `COMPLETED` für einen Pass liefert, der in `dialog_shots.passes[]`
+  // bekannt ist, dürfen wir die Szene aus failed zurückholen. Sonst
+  // verlieren wir gesunde Provider-Outputs durch unsere eigene zu strenge
+  // Liveness-Heuristik. Echte Sync.so-Failures bleiben terminal.
+  const sceneFailedSelfInflicted =
+    ((scene as any).lip_sync_status === "failed" ||
+      (scene.dialog_shots as any)?.status === "failed") &&
+    typeof (scene as any).clip_error === "string" &&
+    /^watchdog_(provider_timeout|auto_retry_|hard_timeout)/.test((scene as any).clip_error ?? "");
+  const dsForRecover: any = scene.dialog_shots ?? {};
+  const passesForRecover: any[] = Array.isArray(dsForRecover?.passes) ? dsForRecover.passes : [];
+  const jobKnown = passesForRecover.some((p: any) => p?.job_id === jobId) ||
+    dsForRecover?.sync_job_id === jobId;
+
   if (
-    (sceneState(scene) === "failed" ||
+    ((scene as any).lip_sync_status === "failed" ||
       (scene.dialog_shots as any)?.status === "failed")
   ) {
-    console.log(
-      `[sync-so-webhook] v379 terminal_no_revive scene=${sceneId} job=${jobId} status=${status}`,
-    );
-    return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
+    if (status === "COMPLETED" && outputUrl && sceneFailedSelfInflicted && jobKnown) {
+      console.log(
+        `[sync-so-webhook] v131.8 recover_from_self_inflicted_fail scene=${sceneId} job=${jobId} ` +
+        `prev_clip_error=${(scene as any).clip_error} — resetting status to running and continuing pass merge`,
+      );
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "running",
+          twoshot_stage: dsForRecover?.engine === "sync-segments" ? "syncso_fanout_recovering" : "running",
+          clip_error: null,
+          dialog_shots: { ...dsForRecover, status: "rendering", recovered_from_watchdog_at: new Date().toISOString() },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      (scene as any).lip_sync_status = "running";
+      (scene.dialog_shots as any).status = "rendering";
+      // fall through into the normal v5 success branch below
+    } else {
+      console.log(
+        `[sync-so-webhook] v129.4a ignored_due_scene_failed scene=${sceneId} job=${jobId} status=${status}`,
+      );
+      return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
+    }
   }
-
-  // v388 — Zustandswechsel laufen ausschliesslich ueber den gepruefte Weg
-  // (`composer_scene_transition`): Zeilensperre, Freigabeliste, Lauf- und
-  // Generations-Abgleich in einer atomaren Operation. Ein verspaeteter
-  // Callback eines alten Laufs kann damit strukturell nichts mehr bewegen.
-  const advanceScene = (to: SceneState, from?: SceneState[]) =>
-    transitionScene(supabase, sceneId, to, {
-      from,
-      runId: String((scene as any).active_run_id ?? "") || null,
-      generation: Number((scene as any).plate_generation ?? 1),
-    });
 
   const state = scene.dialog_shots ?? null;
   if (!state) {
@@ -439,7 +433,6 @@ serve(async (req) => {
   }
 
   const nowIso = new Date().toISOString();
-
 
   // ── v80: legacy v41-v56 single-call segments[] branch removed ─────────
   // The single-call `sync-3 + segments[]` dispatcher in compose-dialog-
@@ -622,188 +615,27 @@ serve(async (req) => {
       const reencodedPassthroughSuspect_DEPRECATED = !syncOutputUnchanged &&
         sizeRatio >= 0.65 && sizeRatio <= 1.35;
       const reencodedPassthroughSuspect = false; // v150: disabled, see comment above
-      // ══════════════════════════════════════════════════════════════════
-      // v344 Phase 1 — SERVER-SIDE MOUTH-MOTION VERDICT
-      // ══════════════════════════════════════════════════════════════════
-      // Single source of truth for "did lip-sync actually happen". Byte /
-      // etag / sizeRatio heuristics (v128, v150, v231) are demoted to
-      // forensics: they either missed real no-ops (multi-speaker) or hard-
-      // failed good passes (single-speaker tight band).
-      //
-      // The verdict looks at the pixels of the provider output inside the
-      // mouth band we cropped for the dispatch:
-      //   moved   → pass is genuinely animated, continue
-      //   static  → provider returned a no-op, feed the NOOP ladder
-      //   unknown → measurement unavailable; retry/stop cleanly. Never mark
-      //             an unverified pass done or ship a voiceover-only scene.
+      // v231 — Motion Content Gate für Einzelsprecher (N=1).
+      // Für Multi-Cast ist die bytes-Heuristik ein False-Positive-Generator
+      // (v150-Kommentar oben). Für N=1 gibt es aber KEINE Kaskaden-Risiken:
+      // ein statischer Sync.so-Output („Noop") lässt den Sprecher eingefroren
+      // erscheinen und der Kunde bekommt sichtbar keine Lippenbewegung.
+      // Deshalb reaktivieren wir den byte-basierten Gate GEZIELT und nur mit
+      // einem sehr engen Passthrough-Band (0.92–1.08), das nur echte
+      // Beinahe-Identitäts-Outputs trifft (real animiertes Lip-Sync
+      // produziert typischerweise sizeRatio ≤ 0.90 durch veränderte
+      // Keyframes im Mund-Bereich).
       const isSingleSpeakerScene = totalPasses === 1;
-      const turnStartSec = Number(passBeforeDone?.segments?.[0]?.startTime);
-      const turnEndSec = Number(passBeforeDone?.segments?.[0]?.endTime);
-      const turnDurSec = Number.isFinite(turnStartSec) && Number.isFinite(turnEndSec) &&
-          turnEndSec > turnStartSec
-        ? turnEndSec - turnStartSec
-        : undefined;
-      const preclipDurSec = Number((passBeforeDone as any)?.preclip_duration_sec);
-      const probeInput = {
-        outputUrl: rehostedUrl ?? outputUrl,
-        // A per-pass Sync.so output always starts at t=0 with the tight turn
-        // audio, so the speech window is [0, turnDuration].
-        windowStartSec: 0,
-        windowEndSec: turnDurSec,
-        clipDurationSec: Number.isFinite(preclipDurSec) && preclipDurSec > 0
-          ? preclipDurSec
-          : turnDurSec,
-        mouthRect: mouthRectFromPass(passBeforeDone),
-        sampleCount: 4,
-        // v347 — the AWS still renderer needs the square edge length of the
-        // provider output to render a full, undistorted frame.
-        frameSize: Number((passBeforeDone as any)?.preclip_crop?.outputSize) ||
-          Number(outputDims?.width) || 512,
-        // v350 — the clip we SENT the provider. Without it a passthrough
-        // (input handed straight back) is indistinguishable from real motion
-        // on a plate with camera movement.
-        inputUrl: inputPreclipUrl ||
-          String((passBeforeDone as any)?.input_url ?? "") || null,
-        label: `scene=${sceneId} pass=${currentPass}`,
-      };
-      let motion = await judgeMouthMotion(probeInput);
-
-      // v346 — An `unknown` verdict is a MEASUREMENT failure, not evidence
-      // about the provider. Retry the probe once (wider sampling) before
-      // letting it drive any provider-side decision.
-      if (motion.verdict === "unknown") {
-        console.warn(
-          `[sync-so-webhook] v346 scene=${sceneId} pass=${currentPass} motion probe failed (${motion.reason}) → retrying probe once`,
-        );
-        const retryMotion = await judgeMouthMotion({
-          ...probeInput,
-          sampleCount: 6,
-          timeoutMs: 60_000,
-          label: `${probeInput.label} probe_retry`,
-        });
-        if (retryMotion.verdict !== "unknown") {
-          motion = retryMotion;
-        } else {
-          motion = {
-            ...retryMotion,
-            reason: `${retryMotion.reason}|first=${motion.reason}`,
-          };
-        }
-      }
-
-      // v350 — `passthrough` is *measured* provider failure, exactly like
-      // `static`: the output equals the input inside the mouth band.
-      const motionPassthrough = motion.verdict === "passthrough";
-      const motionStatic = motion.verdict === "static" || motionPassthrough;
-      const motionUnknown = motion.verdict === "unknown";
-      console.log(
-        `[sync-so-webhook] v371_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} outVsIn=${motion.outputVsInput ?? "n/a"} median=${(motion as any).outputVsInputMedian ?? "n/a"} criterion=${(motion as any).verdictCriterion ?? "n/a"} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
-      );
-
-      // ══════════════════════════════════════════════════════════════════
-      // v350 — PROVIDER FORENSICS. Ask Sync.so what it actually did with the
-      // job instead of guessing from pixels alone. Stored 1:1 on the pass so
-      // the next fix is based on the provider's own answer (model used, ASD
-      // outcome, warnings) rather than another payload guess.
-      // ══════════════════════════════════════════════════════════════════
-      let providerJob: Record<string, unknown> | null = null;
-      try {
-        const syncKey = Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY") ?? "";
-        if (syncKey && jobId) {
-          const jr = await fetch(
-            `https://api.sync.so/v2/generate/${encodeURIComponent(jobId)}`,
-            { headers: { "x-api-key": syncKey }, signal: AbortSignal.timeout(15_000) },
-          );
-          const jtxt = await jr.text();
-          if (jr.ok) {
-            try {
-              const parsed = JSON.parse(jtxt);
-              providerJob = {
-                status: parsed?.status ?? null,
-                model: parsed?.model ?? null,
-                error: parsed?.error ?? parsed?.errorMessage ?? null,
-                options: parsed?.options ?? null,
-                webhookUrl: undefined,
-                raw_keys: Object.keys(parsed ?? {}),
-              };
-            } catch {
-              providerJob = { parse_error: true, body: jtxt.slice(0, 400) };
-            }
-          } else {
-            providerJob = { http_status: jr.status, body: jtxt.slice(0, 400) };
-          }
-          console.log(
-            `[sync-so-webhook] v350_provider_job scene=${sceneId} pass=${currentPass} ${JSON.stringify(providerJob).slice(0, 900)}`,
-          );
-        }
-      } catch (e) {
-        providerJob = { fetch_error: (e as Error)?.message ?? "?" };
-      }
-
-
-
-
-      // Legacy byte gate stays active ONLY while the probe is unavailable.
-      const legacyByteNoop = motionUnknown && isSingleSpeakerScene &&
+      const singleSpeakerMotionNoop = isSingleSpeakerScene &&
         !syncOutputUnchanged &&
         inBytes > 0 && outBytes > 0 &&
         sizeRatio >= 0.92 && sizeRatio <= 1.08;
-
-      // v347 — MEASUREMENT ERRORS NEVER COUNT AS PROVIDER EVIDENCE.
-      // An `unknown` verdict means our AWS probe could not decode frames.
-      // It must not consume the NOOP ladder, must not recommend a plate
-      // re-render and must not fail a pass. Only proven-static output or the
-      // hard byte/resolution signals do that.
-      const motionUnverified = false as boolean;
-      const noopSuspect = motionStatic || syncOutputUnchanged ||
-        syncOutputResolutionRegression || legacyByteNoop;
-
-      // Persist the verdict for every pass, pass or fail (Phase 4).
-      try {
-        await logSyncDispatch(supabase, {
-          scene_id: sceneId,
-          engine: "sync-segments",
-          job_id: jobId,
-          turn_idx: Number(passBeforeDone?.idx ?? currentPass),
-          sync_status: `MOTION_VERDICT_${motion.verdict.toUpperCase()}`,
-          error_class: motionStatic
-            ? "sync_output_motion_static"
-            : motionUnverified
-              ? "sync_output_motion_unverified"
-              : null,
-          motion_verdict: motion.verdict,
-          motion_score: motion.score,
-          motion_probe_meta: {
-            ...motion,
-            pass_idx: currentPass,
-            speaker_name: passBeforeDone?.speaker_name ?? null,
-            preclip_face_share: passBeforeDone?.preclip_face_share ?? null,
-            size_ratio: sizeRatio,
-            provider_status: status,
-          },
-          meta: { v344_motion_verdict: true, pass_idx: currentPass },
-        });
-      } catch { /* forensics must never break the webhook */ }
-
-      if (motionStatic) {
+      const noopSuspect = syncOutputUnchanged || syncOutputResolutionRegression || singleSpeakerMotionNoop;
+      if (singleSpeakerMotionNoop) {
         console.warn(
-          motionPassthrough
-            ? `[sync-so-webhook] v371 scene=${sceneId} pass=${currentPass} MOUTH PASSTHROUGH (multi-criteria: ${(motion as any).verdictCriterion}) → terminal, no retry`
-            : `[sync-so-webhook] v353 scene=${sceneId} pass=${currentPass} MOUTH STATIC (score=${motion.score} < ${motion.threshold}) → terminal, no retry`,
+          `[sync-so-webhook] v231_n1_motion_gate scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(3)} → NOOP suspect (single-speaker tight-band)`,
         );
       }
-
-      if (motionUnknown) {
-        console.warn(
-          `[sync-so-webhook] v347 scene=${sceneId} pass=${currentPass} MOTION UNVERIFIED (${motion.reason}) → telemetry only; provider result is NOT penalised`,
-        );
-      }
-      if (legacyByteNoop) {
-        console.warn(
-          `[sync-so-webhook] v231_n1_motion_gate scene=${sceneId} pass=${currentPass} sizeRatio=${sizeRatio.toFixed(3)} → NOOP suspect (probe unavailable, legacy fallback)`,
-        );
-      }
-
       // v150 — Diagnostik-Log auch wenn nur die alte (jetzt deaktivierte)
       // bytes-Heuristik anschlagen würde. So sehen wir in den Logs, ob die
       // alte v128 noch täglich False-Positives produziert hätte — ohne dass
@@ -814,11 +646,7 @@ serve(async (req) => {
         );
       }
       if (noopSuspect) {
-        const noopReason = motionStatic
-          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
-          : motionUnverified
-          ? "motion_probe_unavailable"
-          : syncOutputResolutionRegression
+        const noopReason = syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : "sync_output_unchanged";
         await logSyncDispatch(supabase, {
@@ -840,44 +668,50 @@ serve(async (req) => {
           },
         });
         console.warn(
-          `[sync-so-webhook] v346 scene=${sceneId} pass=${currentPass} NOOP-suspect (${noopReason}, sizeRatio=${sizeRatio.toFixed(2)}) → retry ladder or hard fail; the pass is never marked done on an unverified mouth motion.`,
+          `[sync-so-webhook] v150 scene=${sceneId} pass=${currentPass} NOOP-suspect (${noopReason}, sizeRatio=${sizeRatio.toFixed(2)}) → PASS_DONE_SUSPECT (no auto-retry, awaiting user retry)`,
         );
+        // Fall through to mark this pass `done` with `sync_noop_suspect: true`
+        // (patched in the freshDonePasses update below).
       }
 
-
-
-
-      // ══════════════════════════════════════════════════════════════════
-      // v353 — NOOP-LADDER ABGESCHAFFT.
-      // Die Ladder hat nur die ASD-Form gewechselt (bbox-url-pro →
-      // coords-pro-box), NICHT die Eingangsbedingung. Messung Szene
-      // 7c11bc27 (01.08.2026): identischer Input → identisches Passthrough
-      // (outVsIn 2.26 → 2.64, Schwelle 3.0), danach Hard-Fail. Der Retry
-      // hat also nur Slot + Zeit + Credits verbrannt.
+      // v134 — Deterministic NOOP escalation ladder (sync-3 only, per
+      // v129.29 directive). Replaces v129.26's single-shot escalation
+      // to `coords-pro` (which dispatched IDENTICAL input and produced
+      // the same NOOP). The ladder varies the ASD-shape — the only
+      // input axis Sync.so actually responds to — and hard-fails after
+      // step 2 instead of silently muxing a NOOP output (which made
+      // Speaker 2 in 4-speaker scenes appear frozen).
       //
-      // Ein Retry ist ab jetzt nur zulässig, wenn die EINGANGSBEDINGUNG
-      // messbar besser wird (größerer nativer Crop, längeres Audiofenster).
-      // Das passiert vor dem Dispatch in `_shared/pass-face-preclip.ts`
-      // (v353 native-crop floor). Auf Webhook-Ebene ist ein bewiesener
-      // NOOP/Passthrough daher terminal.
+      // Step 0 (1st NOOP)  → variant `bbox-url-pro`   (per-frame bounding_boxes_url, sync-3 conform)
+      // Step 1 (2nd NOOP)  → variant `coords-pro-box` (bounding-box ASD on plate coords)
+      // Step 2 (3rd NOOP)  → HARD FAIL + idempotent refund + `needs_clip_rerender`
+      //
+      // All three steps stay on `sync-3`. No model swap. ASD is rebuilt
+      // by compose-dialog-segments' v130 buildAsdStrategy() based on the
+      // new retry_variant — single source of truth.
       const noopEscalationStep = Number(passBeforeDone?.noop_escalation_step ?? 0);
+      const havePlateCoords = Array.isArray(passBeforeDone?.coords) &&
+        passBeforeDone.coords.length === 2;
+      const havePreclipCrop = !!passBeforeDone?.preclip_crop &&
+        Number.isFinite(Number(passBeforeDone.preclip_crop.size));
       const passSpeakerName = String(passBeforeDone?.speaker_name ?? "Speaker");
       const passTurnIdx = Number(passBeforeDone?.idx ?? currentPass);
 
-      const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [];
-      const nextRung: { step: number; variant: string; label: string } | undefined = undefined;
-      const canEscalate = false as boolean;
-
+      // v150 — Step 0 (bbox-url-pro) entfernt: ist nach v147+v150-B bereits
+      // PRIMARY auf Fresh-Dispatch für Multi-Speaker. Ein erneuter Retry mit
+      // derselben Variante produziert garantiert dasselbe Ergebnis. Nur noch
+      // 1 echte Eskalations-Stufe (coords-pro-box), danach Hard-Fail.
+      const NOOP_LADDER: Array<{ step: number; variant: string; label: string }> = [
+        { step: 0, variant: "coords-pro-box", label: "bounding-box ASD (sync-3)" },
+      ];
+      const nextRung = NOOP_LADDER.find((r) => r.step === noopEscalationStep);
+      const canEscalate = noopSuspect && !!nextRung && havePlateCoords && havePreclipCrop &&
+        Number.isFinite(Number(passBeforeDone?.reference_frame_number));
 
       if (noopSuspect && !canEscalate) {
-        // v353 — Every proven NOOP is terminal: fail the pass cleanly
-        // (slot already released above), never mux an unanimated output.
-
-        const noopReasonHard = motionStatic
-          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
-          : motionUnverified
-          ? "motion_probe_unavailable"
-          : syncOutputResolutionRegression
+        // Ladder exhausted (step >= 2) OR missing inputs → HARD FAIL + REFUND.
+        // No more PASS_DONE_SUSPECT (which silently muxed the NOOP output).
+        const noopReasonHard = syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
@@ -919,25 +753,16 @@ serve(async (req) => {
         // hint rather than a frozen-lips final output.
         const turnStart = Number(passBeforeDone?.segments?.[0]?.startTime ?? 0).toFixed(1);
         const turnEnd = Number(passBeforeDone?.segments?.[0]?.endTime ?? 0).toFixed(1);
-        // v353 — klare Trennung: Provider hat nicht animiert vs. Messung
-        // war nicht möglich. Kein Retry-Karussell mehr im Text.
-        const evidence =
-          `outVsIn=${motion.outputVsInput ?? "n/a"} median=${(motion as any).outputVsInputMedian ?? "n/a"} score=${motion.score} frames=${motion.framesDecoded}`;
-        const userMsg = motionStatic
-          ? `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung erzeugt, ${evidence}). Bitte die Szene mit größeren Gesichtern neu rendern.`
-          : `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Ergebnis konnte nicht geprüft werden (Messung nicht möglich, ${evidence}). Bitte erneut versuchen.`;
-
-        // v395 — One terminal helper owns dialog_shots.status, clip_error,
-        // state transition and inflight cleanup. Previously this branch only
-        // changed pipeline_state, leaving dialog_shots.status="rendering".
-        await failLipSync({
-          supabase,
-          sceneId,
-          reason: userMsg,
-          userId: null,
-          extraSyncJobIds: jobId ? [jobId] : [],
-          syncApiKey: Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY"),
-        });
+        const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`;
+        await supabase
+          .from("composer_scenes")
+          .update({
+            lip_sync_status: "failed",
+            twoshot_stage: "needs_clip_rerender",
+            clip_error: userMsg,
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
           engine: "sync-segments",
@@ -953,9 +778,7 @@ serve(async (req) => {
             noop_escalation_step: noopEscalationStep,
             noop_reason: noopReasonHard,
             ladder_size: NOOP_LADDER.length,
-            canonical_lipsync_pipeline: freshDonePasses.length >= 2
-              ? "v204_preclip_bbox_clipspace"
-              : null,
+            canonical_lipsync_pipeline: speakerCount >= 2 ? "v204_preclip_bbox_clipspace" : null,
             previous_noop_output_url: rehostedUrl ?? outputUrl,
             size_ratio: sizeRatio,
           },
@@ -975,64 +798,144 @@ serve(async (req) => {
         });
       }
 
+      if (canEscalate && nextRung) {
+        const newAttemptId = crypto.randomUUID();
+        const nextStep = nextRung.step + 1;
+        const noopReason = syncOutputResolutionRegression
+          ? "sync_output_resolution_regression"
+          : syncOutputUnchanged
+            ? "sync_output_unchanged"
+            : "sync_output_reencoded_passthrough_suspect";
+        // v184 retry-forensics: append a FIFO entry (max 8) to
+        // pass.retry_history so we can reconstruct why a run took 15 min.
+        const _prevHistory = Array.isArray((freshDonePasses[currentPass] as any)?.retry_history)
+          ? ((freshDonePasses[currentPass] as any).retry_history as any[]).slice(-7)
+          : [];
+        const _newRetryEntry = {
+          ts: nowIso,
+          reason: "noop_ladder_escalation",
+          from_variant: passBeforeDone?.retry_variant ?? null,
+          to_variant: nextRung.variant,
+          step: nextStep,
+          noop_reason: noopReason,
+          size_ratio: sizeRatio,
+        };
+        const escalationPatch = {
+          ...freshDonePasses[currentPass],
+          status: "pending",
+          job_id: null,
+          output_url: null,
+          finished_at: null,
+          retry_variant: nextRung.variant,
+          noop_escalation_step: nextStep,
+          noop_retry_attempted: true, // kept for back-compat with v131 watchdog
+          noop_retry_attempt_id: newAttemptId,
+          noop_retry_reason: noopReason,
+          previous_noop_output_url: rehostedUrl ?? outputUrl,
+          previous_noop_size_ratio: sizeRatio,
+          retry_history: [..._prevHistory, _newRetryEntry],
+        };
+        freshDonePasses[currentPass] = escalationPatch;
+        try {
+          await supabase.rpc("update_dialog_pass_slot", {
+            _scene_id: sceneId,
+            _pass_idx: currentPass,
+            _patch: {
+              status: "pending",
+              job_id: null,
+              output_url: null,
+              finished_at: null,
+              retry_variant: nextRung.variant,
+              noop_escalation_step: nextStep,
+              noop_retry_attempted: true,
+              noop_retry_attempt_id: newAttemptId,
+            },
+          });
+        } catch (e) {
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: { ...freshDoneState, passes: freshDonePasses, updated_at: nowIso },
+              updated_at: nowIso,
+            })
+            .eq("id", sceneId);
+        }
+        // Forensics: explicit per-pass log with turn_idx + speaker_name (v134 §3).
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          engine: "sync-segments",
+          job_id: jobId,
+          turn_idx: passTurnIdx,
+          sync_status: "NOOP_ESCALATING",
+          error_class: "sync_completed_noop",
+          meta: {
+            v134_ladder: true,
+            pass_idx: currentPass,
+            speaker_name: passSpeakerName,
+            noop_escalation_step: nextStep,
+            from_variant: passBeforeDone?.retry_variant ?? null,
+            to_variant: nextRung.variant,
+            rung_label: nextRung.label,
+            noop_reason: noopReason,
+            size_ratio: sizeRatio,
+            attempt_id: newAttemptId,
+          },
+        });
+        // Fire-and-forget re-dispatch with user_retry_flag so the
+        // safe-entry guard lets us back through.
+        try {
+          fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              scene_id: sceneId,
+              retry: true,
+              pass_idx: currentPass,
+              retry_variant: nextRung.variant,
+              user_retry_flag: true,
+              new_attempt_id: newAttemptId,
+              credit_charge_result: "skip",
+              noop_auto_escalation: true,
+              noop_escalation_step: nextStep,
+            }),
+          }).catch(() => {});
+        } catch { /* ignore */ }
+        console.warn(
+          `[sync-so-webhook] v134 scene=${sceneId} pass=${currentPass} speaker="${passSpeakerName}" NOOP → escalating step ${nextStep} variant=${nextRung.variant} (${nextRung.label}) attempt_id=${newAttemptId}`,
+        );
+        return ok({
+          ok: true,
+          scene_id: sceneId,
+          job_id: jobId,
+          status,
+          engine: "sync-segments",
+          escalated: `noop_ladder_step_${nextStep}_v134`,
+          pass_idx: currentPass,
+          speaker_name: passSpeakerName,
+          variant: nextRung.variant,
+        });
+      }
 
       const noopSuspectFlags = noopSuspect ? {
         sync_noop_suspect: true,
-        noop_reason: motionStatic
-          ? (motionPassthrough ? "provider_returned_passthrough_output" : "provider_returned_static_output")
-          : motionUnverified
-          ? "motion_probe_unavailable"
-          : syncOutputResolutionRegression
+        noop_reason: syncOutputResolutionRegression
           ? "sync_output_resolution_regression"
           : syncOutputUnchanged
             ? "sync_output_unchanged"
             : "sync_output_reencoded_passthrough_suspect",
         noop_size_ratio: sizeRatio,
       } : {};
-      // v344 — the verdict travels with the pass so the mux gate can refuse
-      // to composite a scene that contains a proven-static speaker.
-      const motionVerdictFlags = {
-        motion_verdict: motion.verdict,
-        motion_score: motion.score,
-        motion_output_vs_input: motion.outputVsInput ?? null,
-        motion_verdict_at: nowIso,
-        motion_verdict_reason: motion.reason,
-        // v371 — vollständige Beweislage am Pass, damit der nächste Fall
-        // nicht wieder aus Logs rekonstruiert werden muss.
-        _v371_verdict: {
-          criterion: (motion as any).verdictCriterion ?? null,
-          out_vs_in_max: motion.outputVsInput ?? null,
-          out_vs_in_median: (motion as any).outputVsInputMedian ?? null,
-          out_vs_in_deltas: (motion as any).outputVsInputDeltas ?? [],
-          score: motion.score,
-          frames: motion.framesDecoded,
-        },
-        ...(providerJob ? { provider_job: providerJob } : {}),
-      };
       if (freshDonePasses[currentPass]) {
-        // v347 — a pass reaches `done` unless the mouth motion was *proven*
-        // static (or a hard byte/resolution no-op signal fired). An `unknown`
-        // verdict is a measurement outage on our side and must never fail a
-        // pass the provider completed — that was the v344–v346 regression.
-        const verifiedMoved = motion.verdict !== "static" &&
-          motion.verdict !== "passthrough" && !noopSuspect;
         freshDonePasses[currentPass] = {
           ...freshDonePasses[currentPass],
-          status: verifiedMoved ? "done" : "failed",
-          ...(verifiedMoved ? {} : {
-            error: "sync_noop_unrecoverable",
-            last_error_class: "sync_noop_unrecoverable",
-          }),
+          status: "done",
           output_url: rehostedUrl ?? outputUrl,
           rehosted: !!rehostedUrl,
           sync_output_probe: { inputHead, outputHead, inputDims, outputDims, syncOutputUnchanged, syncOutputResolutionRegression },
           finished_at: nowIso,
-          ...motionVerdictFlags,
           ...noopSuspectFlags,
         };
       }
-
-
 
       const { doneCount, failedCount, allTerminal } = terminalV5Counts(freshDonePasses);
       const allDone = allTerminal && doneCount > 0;
@@ -1090,12 +993,12 @@ serve(async (req) => {
               partial_done_count: doneCount,
               partial_failed_speakers: failedSpeakers,
             },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
             clip_error: failReason,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
         console.warn(
           `[sync-so-webhook] v48 scene=${sceneId} COMPLETED-branch race — refusing partial mux (${doneCount}/${totalPasses} done, failed=${failedSpeakers.join(",")}) — refund=${costFinal}`,
         );
@@ -1116,15 +1019,17 @@ serve(async (req) => {
               output_url: rehostedUrl ?? outputUrl,
               rehosted: !!rehostedUrl,
               finished_at: nowIso,
-              ...motionVerdictFlags,
             },
           });
           // Top-level scene status / counters — non-slot fields, safe to UPDATE.
           await supabase
             .from("composer_scenes")
-            .update({ updated_at: nowIso })
+            .update({
+              lip_sync_status: "running",
+              twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
+              updated_at: nowIso,
+            })
             .eq("id", sceneId);
-          await advanceScene("lipsync_running");
         } catch (e) {
           // RPC failure → fall back to the legacy full-array write so a
           // missing/migration-pending RPC never strands a scene.
@@ -1133,12 +1038,12 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
+              lip_sync_status: "running",
+              twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
               updated_at: nowIso,
             })
             .eq("id", sceneId);
-          await advanceScene("lipsync_running");
         }
-
         console.log(`[sync-so-webhook] v25/plan_d scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
 
         // v94 — Lambda warm-ping. When second-to-last pass completes, wake
@@ -1188,13 +1093,14 @@ serve(async (req) => {
               finished_at: nowIso,
             },
             clip_url: finalUrl,
+            clip_status: "ready",
+            lip_sync_status: "applied",
             lip_sync_applied_at: nowIso,
+            twoshot_stage: "complete",
             clip_error: null,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
-        await advanceScene("complete");
-
         console.log(`[sync-so-webhook] v25 scene=${sceneId} single-speaker DONE (no tight, direct finalize)`);
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", applied: true });
       }
@@ -1202,33 +1108,7 @@ serve(async (req) => {
         console.log(`[sync-so-webhook] v64 scene=${sceneId} single-speaker TIGHT → dispatching audio-mux (overlay on master plate)`);
       }
 
-      // ── v381 Provenance-Wächter (mux) ──────────────────────────────────
-      // Zwischen Callback-Eingang und Mux können Minuten liegen. Wurde die
-      // Szene inzwischen neu gestartet, darf das Ergebnis des alten Laufs
-      // nicht mehr in die aktuelle Generation gemuxt werden.
-      {
-        const prov = await assertGenerationProvenance({
-          supabase,
-          sceneId,
-          stage: "mux",
-          expectedGeneration: Number((scene as any).plate_generation ?? 1),
-          expectedRunId: String((scene as any).active_run_id ?? ""),
-          note: `job=${jobId}`,
-        });
-        if (!prov.ok) {
-          return ok({
-            ok: true,
-            scene_id: sceneId,
-            job_id: jobId,
-            status,
-            engine: "sync-segments",
-            ignored: prov.code,
-          });
-        }
-      }
-
       // Multi-speaker: dispatch fan-in compositor.
-
       // Plan D (v93): atomic mux-claim via try_claim_mux_dispatch RPC.
       // When parallel passes complete near-simultaneously, all N webhooks
       // see allDone=true; without the claim each would POST to the audio
@@ -1266,12 +1146,12 @@ serve(async (req) => {
               dispatched_at: nowIso,
             },
           },
+          lip_sync_status: "audio_muxing",
+          twoshot_stage: "audio_muxing",
           clip_error: null,
           updated_at: nowIso,
         })
         .eq("id", sceneId);
-      await advanceScene("lipsync_muxing");
-
       console.log(`[sync-so-webhook] v25 scene=${sceneId} ALL ${totalPasses} passes done → dispatching fan-in compositor`);
       try {
         fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
@@ -1544,11 +1424,11 @@ serve(async (req) => {
                 },
               ].slice(-16),
             },
+            lip_sync_status: "running",
+            twoshot_stage: `syncso_retry_${nextVariant}_pass_${currentPass + 1}_of_${Number((freshState as any).total_passes ?? freshPasses.length ?? 1)}`,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
-        await advanceScene("lipsync_running");
-
         console.warn(
           `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} → retry ${passRetryCount + 1}/${MAX_V5_RETRIES} variant=${nextVariant}${needsAudioRepair ? " +repair_audio" : ""}`,
         );
@@ -1738,12 +1618,12 @@ serve(async (req) => {
               watchdog_finalized: false,
               ...(v1294RequiredPassFail ? { v1294_required_pass_failure: true } : {}),
             },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
             clip_error: reason,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
         console.warn(
           `[sync-so-webhook] v5/v129.4a scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${v1294Bucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
         );
@@ -1812,12 +1692,12 @@ serve(async (req) => {
                 partial_done_count: doneCount,
                 partial_failed_speakers: failedSpeakers,
               },
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
               clip_error: failReason,
               updated_at: nowIso,
             })
             .eq("id", sceneId);
-          // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-          await failSceneState(supabase, sceneId, "failed");
           console.warn(
             `[sync-so-webhook] v36 scene=${sceneId} 3+ speakers — refusing partial mux (${doneCount}/${totalSpeakers} done, failed=${failedSpeakers.join(",")}) — refund=${costFinal} alreadyRefunded=${alreadyRefundedFinal}`,
           );
@@ -1832,11 +1712,11 @@ serve(async (req) => {
                 final_url: partialMux ? ((lastDonePass as any)?.output_url ?? freshFailState?.final_url ?? null) : freshFailState?.final_url,
                 partial_mux: partialMux ? true : freshFailState?.partial_mux,
               },
+              lip_sync_status: partialMux ? "audio_muxing" : "running",
+              twoshot_stage: partialMux ? "audio_muxing" : `syncso_fanout_${doneCount}_of_${totalSpeakers}`,
               updated_at: nowIso,
             })
             .eq("id", sceneId);
-          await advanceScene(partialMux ? "lipsync_muxing" : "lipsync_running");
-
           console.warn(
             `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} FAILED but scene can continue (alive=${aliveSiblings.length}, done=${doneCount}, partialMux=${partialMux}) — no refund yet`,
           );
