@@ -21,7 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
-import { isRealizedScene } from '@/lib/composer/isRealizedScene';
+import { canDispatchLipsync, canStartAudioPrep, sceneState } from '@/lib/composer/sceneState';
 import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
 import { resetSceneLipSync } from '@/lib/lipsyncReset';
 
@@ -49,7 +49,7 @@ const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
  * ungewollt Sync.so-Kosten auslösen.
  */
 const isLipSyncCandidate = (d: any) =>
-  d.lip_sync_status !== 'canceled' &&
+  sceneState(d) !== 'canceled' &&
   isDialogEngine(d.engine_override) &&
   isLipSyncIntentionalRow(d);
 
@@ -195,10 +195,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
-            d.lip_sync_status !== 'canceled' &&
-            d.lip_sync_status === 'running' &&
-            !d.lip_sync_applied_at &&
-            hasRecordedProviderJob(d),
+            ['lipsync_dispatched', 'lipsync_running', 'lipsync_muxing'].includes(sceneState(d)),
         );
         if (runningSyncJobs.length > 0 && !progressActive.current) {
           progressActive.current = true;
@@ -226,119 +223,13 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             d.dialog_script,
           );
 
-        // Re-Run Self-Heal: Szene ist auf pending zurückgesetzt, aber
-        // lip_sync_applied_at vom vorigen Erfolgs-Lauf steht noch — der
-        // Kandidatenfilter weiter unten würde sie sonst stumm verwerfen.
-        // Klarer Re-Run-Marker = pending + applied_at gesetzt + Master-Clip da.
-        const orphanReruns = (data as any[]).filter(
-          (d) =>
-            isDialogEngine(d.engine_override) &&
-            d.lip_sync_status === 'pending' &&
-            d.clip_status !== 'failed' &&
-            d.lip_sync_applied_at &&
-            typeof d.clip_url === 'string' &&
-            d.clip_url.length > 0,
-        );
-        if (orphanReruns.length > 0) {
-          console.warn(
-            `[useTwoShotAutoTrigger] self-heal: clearing stale applied_at on ${orphanReruns.length} re-run scene(s)`,
-          );
-          await Promise.all(
-            orphanReruns.map((d) => {
-              const prevShots = d.dialog_shots;
-              d.lip_sync_applied_at = null;
-              d.dialog_shots = null;
-              d.lip_sync_source_clip_url = null;
-              return resetSceneLipSync(d.id, prevShots, {
-                lip_sync_applied_at: null,
-                lip_sync_source_clip_url: null,
-              });
-            }),
-          );
-        }
-
-        // Stale-Watchdog: stage='audio' >3min ohne audio_plan → clear stage
-        // damit nächster Tick einen frischen Versuch startet.
-        const stalePrep = (data as any[]).filter(
-          (d) =>
-            isDialogEngine(d.engine_override) &&
-            d.lip_sync_status !== 'canceled' &&
-            d.clip_status !== 'failed' &&
-            d.twoshot_stage === 'audio' &&
-            !d.audio_plan?.twoshot?.url &&
-            d.updated_at &&
-            now - new Date(d.updated_at).getTime() > AUDIO_PREP_STALE_MS,
-        );
-        if (stalePrep.length > 0) {
-          console.warn(
-            `[useTwoShotAutoTrigger] resetting ${stalePrep.length} stale audio-prep stage(s)`,
-          );
-          await Promise.all(
-            stalePrep.map((d) => {
-              inflight.current.delete(`audio-prep:${d.id}`);
-              d.twoshot_stage = null;
-              return supabase
-                .from('composer_scenes')
-                .update({ twoshot_stage: null, clip_error: 'auto-reset: stale audio prep' })
-                .eq('id', d.id);
-            }),
-          );
-        }
-
-        // ── Audio-Done → master_clip transition ─────────────────────────────
-        // Wenn compose-twoshot-audio fertig ist (audio_plan.twoshot.url
-        // existiert), Master-Clip da ist, aber twoshot_stage immer noch auf
-        // 'audio' steht (oder null), schalten wir auf 'master_clip'. Erst
-        // damit greift der v5-Kandidatenfilter unten und ruft
-        // compose-dialog-segments auf. Ohne diese Brücke bleibt die Szene
-        // permanent in 'audio' hängen, der globale Balken verschwindet,
-        // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
-        const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
-          if (!isRealizedScene(d)) return false;
-          if (!isLipSyncCandidate(d)) return false;
-          // v70: cinematic-sync-legacy removed.
-          if (d.lip_sync_applied_at) return false;
-          if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
-          if (d.clip_status && d.clip_status !== 'ready') return false;
-          if (!d.audio_plan?.twoshot?.url) return false;
-          if (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching' || d.lip_sync_status === 'applied' || d.lip_sync_status === 'done') return false;
-          if (d.twoshot_stage && d.twoshot_stage !== 'audio') return false;
-          return true;
-        });
-        if (audioReadyButNotAdvanced.length > 0) {
-          await Promise.all(
-            audioReadyButNotAdvanced.map((d) => {
-              d.twoshot_stage = 'master_clip';
-              // Clear transient recovery marker written by the v172 self-heal
-              // branch in compose-dialog-segments — otherwise isRealizedScene
-              // would keep rejecting the row and the auto-trigger would never
-              // re-dispatch, deadlocking the UI on "Lip-Sync wird gestartet…".
-              const clearRecoveryErr =
-                typeof d.clip_error === 'string' &&
-                (d.clip_error === 'audio_plan_not_ready_self_heal' ||
-                  d.clip_error.startsWith('auto-reset:'));
-              if (clearRecoveryErr) d.clip_error = null;
-              return supabase
-                .from('composer_scenes')
-                .update({
-                  twoshot_stage: 'master_clip',
-                  ...(clearRecoveryErr ? { clip_error: null } : {}),
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', d.id);
-            }),
-          );
-        }
-
         const needsAudioPrep = (data as any[]).filter((d) => {
-          if (!isRealizedScene(d)) return false;
+          if (!canStartAudioPrep(d)) return false;
           if (!isLipSyncCandidate(d)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
-          if (d.clip_status && d.clip_status !== 'ready') return false;
           if (d.audio_plan?.twoshot?.url) return false; // schon da
-          if (d.twoshot_stage === 'audio') return false; // läuft gerade
           if (inflight.current.has(`audio-prep:${d.id}`)) return false;
           if (!hasDialogScript(d)) return false;
           return true;
@@ -349,7 +240,6 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // `compose-twoshot-audio` beansprucht die Szene serverseitig und
           // atomar (`plate_ready` -> `audio_prep`); doppelte Ticks aus
           // mehreren Tabs koennen dadurch keinen zweiten TTS-Lauf ausloesen.
-          d.twoshot_stage = 'audio'; // rein optimistische UI-Anzeige
           console.info(
             `[useTwoShotAutoTrigger] self-heal: invoking compose-twoshot-audio for ${d.id}`,
           );
@@ -388,15 +278,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                   `[useTwoShotAutoTrigger] audio-prep failed for ${d.id}:`,
                   msgStr,
                 );
-                // Nur Diagnosetext — den terminalen Zustand setzt der Server.
-                await supabase
-                  .from('composer_scenes')
-                  .update({
-                    twoshot_stage: 'failed',
-                    lip_sync_status: 'failed',
-                    clip_error: `twoshot_audio_prep_failed: ${msgStr.slice(0, 200)}`,
-                  })
-                  .eq('id', d.id);
+                // Terminale Transition und Diagnosetext gehören ausschließlich dem Server.
               } else {
                 console.info(
                   `[useTwoShotAutoTrigger] audio-prep OK for ${d.id} — advancing to master_clip`,
@@ -432,11 +314,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         
 
         const candidates = (data as any[]).filter((d) => {
-          if (!isRealizedScene(d)) return false;
+          if (!canDispatchLipsync(d)) return false;
           if (!isLipSyncCandidate(d)) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           // Master clip must be READY — never try lip-sync on a failed/generating master.
-          if (d.clip_status && d.clip_status !== 'ready') return false;
           if (d.lip_sync_applied_at) return false;
           // v18: never auto-revive a user-cancelled scene. The Cancel button
           // explicitly opts the user out — only an explicit "Lip-Sync neu rendern"
@@ -449,8 +330,6 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // v32: `circuit_open` and `deferred` are server-owned wait states
           // — DO NOT auto-advance them from the client, otherwise we re-enter
           // the dispatch loop that flipped the breaker open in the first place.
-          const ADVANCEABLE_STAGES = new Set(['master_clip', 'failed']);
-          if (d.twoshot_stage && !ADVANCEABLE_STAGES.has(d.twoshot_stage)) return false;
           // ── Pre-flight gate ──────────────────────────────────────────
           // v5 (compose-dialog-segments) hard-requires audio_plan.twoshot.url
           // (merged VO from compose-twoshot-audio) AND a master plate clip.
@@ -464,16 +343,13 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (!sourceClip || typeof sourceClip !== 'string' || sourceClip.length === 0) return false;
           // v23: ONLY `pending` (or null) is a valid start state on the client.
           // `failed` requires explicit user reset via `reset-lipsync-scene`.
-          if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
-          return false;
+          return true;
         });
         if (candidates.length === 0) {
           const anyVisibleLipsyncWork = (data as any[]).some(
             (d) =>
               isLipSyncCandidate(d) &&
-              !d.lip_sync_applied_at &&
-              (d.lip_sync_status === 'running' ||
-                (d.twoshot_stage && !['done', 'complete', 'failed'].includes(String(d.twoshot_stage)))),
+              ['audio_prep', 'audio_ready', 'lipsync_dispatched', 'lipsync_running', 'lipsync_muxing'].includes(sceneState(d)),
           );
           if (!anyVisibleLipsyncWork && progressActive.current) {
             progressActive.current = false;
