@@ -71,7 +71,16 @@ export interface FaceGateResult {
   original_coord?: [number, number];
   /** v129.22.3 — Pixel distance between original and snapped coord. */
   snap_distance_px?: number;
+  /** v393 — Mundmittelpunkt auf dem dispatchten Bild, in Clip-Pixeln. */
+  mouth_center?: [number, number];
+  /** v393 — Messfenster um den Mund [x1,y1,x2,y2] in Clip-Pixeln. */
+  mouth_rect?: [number, number, number, number];
+  /** v393 — Kontrollfenster (Stirn) fuer die Rausch-Normalisierung. */
+  control_rect?: [number, number, number, number];
+  /** v393 — kleinster Abstand des Mundfensters zum Bildrand. */
+  mouth_edge_margin_px?: number;
 }
+
 
 function hasAwsCreds(): boolean {
   return Boolean(Deno.env.get("AWS_ACCESS_KEY_ID") && Deno.env.get("AWS_SECRET_ACCESS_KEY"));
