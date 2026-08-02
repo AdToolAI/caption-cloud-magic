@@ -3930,10 +3930,14 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               clip_url: scene.uploadUrl,
-              pipeline_state: "plate_ready",
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
+          // v385 — Nutzdaten und Zustandsübergang NIE im selben Update:
+          // der Bridge-Trigger spiegelt die Legacy-Spalten sonst nicht.
+          await transitionScene(supabaseAdmin, scene.id, "plate_ready", {
+            detail: "compose-video-clips upload",
+          });
           results.push({
             sceneId: scene.id,
             status: "ready",
@@ -3961,10 +3965,13 @@ serve(async (req) => {
               .from("composer_scenes")
               .update({
                 clip_url: bestVideo.url,
-                pipeline_state: "plate_ready",
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);
+            // v385 — siehe oben: Zustand separat schalten.
+            await transitionScene(supabaseAdmin, scene.id, "plate_ready", {
+              detail: "compose-video-clips stock",
+            });
             results.push({
               sceneId: scene.id,
               status: "ready",
