@@ -1775,26 +1775,26 @@ serve(async (req) => {
         const { data: dbRow } = await supabaseAdmin
           .from("composer_scenes")
           .select(
-            "cinematic_preset_slug, engine_override, clip_status, clip_url, character_audio_url",
+            "cinematic_preset_slug, engine_override, pipeline_state, clip_url, character_audio_url",
           )
           .eq("id", scene.id)
           .maybeSingle();
         const slug = (dbRow as any)?.cinematic_preset_slug as string | null;
         const dbEngine = (dbRow as any)?.engine_override as string | null;
-        const status = (dbRow as any)?.clip_status as string | null;
+        const status = sceneState(dbRow);
         const hasAudio = !!(dbRow as any)?.character_audio_url;
         if (
           dbEngine !== "cinematic-sync" &&
           slug &&
           slug.startsWith("dialog-srs:") &&
-          (hasAudio || status === "generating" || status === "ready")
+          (hasAudio || status === "plate_rendering" || status === "plate_ready")
         ) {
           console.log(
             `[compose-video-clips] Skipping SRS lip-sync sub-scene ${scene.id} (slug=${slug}, status=${status})`,
           );
           results.push({
             sceneId: scene.id,
-            status: status === "ready" ? "ready" : "generating",
+            status: status === "plate_ready" ? "ready" : "generating",
           });
           continue;
         }
@@ -2385,7 +2385,6 @@ serve(async (req) => {
                 );
                 await safeMarkSceneFailed(scene.id, msg, {
                   isCinematicSyncScene: true,
-                  extra: { twoshot_stage: "failed" },
                 });
                 results.push({ sceneId: scene.id, status: "failed", error: msg });
                 continue;
@@ -3598,7 +3597,6 @@ serve(async (req) => {
           );
           await safeMarkSceneFailed(scene.id, msg, {
             isCinematicSyncScene: true,
-            extra: { twoshot_stage: "failed" },
           });
           results.push({ sceneId: scene.id, status: "failed", error: msg });
           continue;
@@ -4889,12 +4887,14 @@ serve(async (req) => {
           // once it starts. Preserve the diagnostic as a clip_error note.
           const { data: liveRows } = await admin
             .from("composer_scenes")
-            .select("id, clip_url, lip_sync_status")
+            .select("id, clip_url, pipeline_state")
             .in("id", failedSceneIds);
           const safeToFail = (liveRows ?? [])
             .filter((r) => {
               const hasUrl = typeof r?.clip_url === "string" && r.clip_url.length > 0;
-              const live = r?.lip_sync_status === "running" || r?.lip_sync_status === "done";
+              const st = sceneState(r);
+              const live =
+                st === "lipsync_running" || st === "lipsync_muxing" || st === "complete";
               return !hasUrl && !live;
             })
             .map((r) => r.id as string);
