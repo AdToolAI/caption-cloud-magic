@@ -1087,11 +1087,12 @@ serve(async (req) => {
               partial_done_count: doneCount,
               partial_failed_speakers: failedSpeakers,
             },
-            pipeline_state: "failed",
             clip_error: failReason,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
+        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+        await failSceneState(supabase, sceneId, "failed");
         console.warn(
           `[sync-so-webhook] v48 scene=${sceneId} COMPLETED-branch race — refusing partial mux (${doneCount}/${totalPasses} done, failed=${failedSpeakers.join(",")}) — refund=${costFinal}`,
         );
@@ -1734,11 +1735,12 @@ serve(async (req) => {
               watchdog_finalized: false,
               ...(v1294RequiredPassFail ? { v1294_required_pass_failure: true } : {}),
             },
-            pipeline_state: "failed",
             clip_error: reason,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
+        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+        await failSceneState(supabase, sceneId, "failed");
         console.warn(
           `[sync-so-webhook] v5/v129.4a scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${v1294Bucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
         );
@@ -1807,11 +1809,12 @@ serve(async (req) => {
                 partial_done_count: doneCount,
                 partial_failed_speakers: failedSpeakers,
               },
-              pipeline_state: "failed",
               clip_error: failReason,
               updated_at: nowIso,
             })
             .eq("id", sceneId);
+          // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
+          await failSceneState(supabase, sceneId, "failed");
           console.warn(
             `[sync-so-webhook] v36 scene=${sceneId} 3+ speakers — refusing partial mux (${doneCount}/${totalSpeakers} done, failed=${failedSpeakers.join(",")}) — refund=${costFinal} alreadyRefunded=${alreadyRefundedFinal}`,
           );
