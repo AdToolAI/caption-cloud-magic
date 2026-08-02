@@ -1,35 +1,89 @@
-## Befund (geprüft, nicht vermutet)
+## Warum das trotz der bisherigen Absicherung passieren konnte
 
-Ich habe den Weg vom Klick bis zur fertigen Szene durchgesehen — Code, Datenbankwächter und Übergangstabelle.
+Die bisherigen Reparaturen sichern die **Video-/Lip-Sync-Artefakte** bereits nach Lauf und Generation ab: Plate, Anchor, Preclips, Sync.so-Jobs, Locks, Storage-Dateien und `audio_plan.twoshot` werden beim harten Neustart entwertet oder gelöscht.
 
-**Was jetzt sauber ist:**
+Es blieb jedoch ein zweiter Verweis auf den Ton außerhalb dieses Vertrags bestehen:
 
-1. **Ein Einstieg.** Kein einziger Client-Aufruf geht mehr direkt an `compose-video-clips`; alle sechs Startpunkte (SceneCard, ClipsTab, AnchorPreviewGate, FaceMapReviewDialog, SceneClipProgress, SceneDialogStudio) laufen über `startSceneGeneration` → `composer-start-scene-generation`.
-2. **Ein Schreibpfad.** Im gesamten Funktionsbestand schreibt nur noch `scene-hard-reset.ts` (legitimer Zwangsschreiber) direkt auf `pipeline_state`. Alles andere geht über `transitionScene` / `failSceneState`.
-3. **Wächter scharf.** Die Datenbankfunktion weist Klasse A (Wiederbelebung terminaler Szenen), Klasse B (Sprung in Ton/Lip-Sync ohne fertige Plate) und Klasse C (jeder nicht freigegebene Übergang) zurück und rollt inklusive Legacy-Spalten zurück.
-4. **Protokolltabelle leer** — allerdings heißt das nur, dass seit dem Scharfschalten noch kein Durchlauf lief. Es ist noch **kein Praxisbeweis**, nur die Abwesenheit von Gegenbeweisen.
+```text
+scene_audio_clips (Datenbankzeile)
+  └── URL zur alten Voiceover-Datei
+```
 
-## Drei verbliebene Widersprüche
+Der Reset entfernt zwar die Datei unter `voiceover-audio/.../twoshot-vo` und löscht `audio_plan.twoshot`, aber **nicht die Zeile in `scene_audio_clips`**. `compose-twoshot-audio` sucht später nur nach einer Voiceover-Zeile derselben `scene_id`. Es prüft weder `active_run_id` noch `plate_generation` und akzeptiert deshalb die alte Zeile als „bereits fertig“.
 
-**A — Toter Schreibpfad in `_shared/clip-terminal-failure.ts`.** `buildClipRerenderPatch()` baut ein rohes `{ pipeline_state: 'failed' | 'idle', ... }`-Objekt für ein `.update()`. Aufrufer gibt es aktuell keine — aber die Datei steht auf der Ausnahmeliste des Vertragstests. Wer sie morgen wieder benutzt, bekommt keinen Testfehler und keinen Laufzeitfehler: Der Wächter rollt den Zustand still zurück, die Nebenfelder (`clip_url: null`) bleiben aber geschrieben. Das ist genau die Sorte halb angewendeter Schreibvorgang, die früher Szenen zerlegt hat.
+Im letzten Lauf ist das konkret belegt:
 
-**B — Zwei Besitzer für den Ton-Start.** Nach `plate_ready` ruft sowohl `compose-clip-webhook` (Server, Zeile ~251) als auch `useTwoShotAutoTrigger` (Client, Zeile ~155) `compose-twoshot-audio` auf. Der atomare Claim auf `audio_prep` verhindert den Doppellauf, aber es gibt zwei Auslöser für einen Schritt — und der Client-Pfad ist der, der bei Tab-Wechsel/Reload unvorhersehbar feuert.
+- aktueller Szenenlauf: Generation 3, gestartet gegen 17:05 Uhr
+- gefundene `scene_audio_clips`-Zeile: erstellt um 15:37 Uhr
+- der Reuse-Zweig setzt trotzdem `audio_ready`
+- er schreibt aber keinen neuen `audio_plan.twoshot`
+- der Lip-Sync-Dispatcher erkennt den fehlenden Plan und fällt auf `plate_ready` zurück
+- anschließend beginnt derselbe Kreislauf erneut
 
-**C — Rückwege in der Übergangstabelle sind asymmetrisch.** Aus `lipsync_muxing` führt kein Weg zurück nach `audio_ready` oder `plate_ready` (nur `complete`/`failed`/`idle`/`canceled`). Wenn ein Mux-Retry das versucht, wird er still zurückgerollt statt sichtbar zu scheitern. Aus `lipsync_running`/`lipsync_dispatched` existieren diese Rückwege dagegen. Entweder die Rückwege sind erlaubt — dann fehlt einer — oder sie sind es nicht, dann gehören die anderen weg.
+Das ist daher kein Versagen des bestehenden Plate-Generationsvertrags, sondern eine bislang nicht einbezogene **Audio-Nebenquelle**. Die Szene wird dabei nicht wirklich gelöscht; ihre UUID bleibt absichtlich bestehen. Genau deshalb konnte die alte, nur über `scene_id` verknüpfte Audiozeile wiedergefunden werden.
 
-## Der Plan
+## Umsetzung
 
-**1 — Toten Schreibpfad entfernen.** `buildClipRerenderPatch()` und `clipRerenderTargetState()` aus `_shared/clip-terminal-failure.ts` löschen (nur `isTerminalClipFailure` und die Meldungstexte bleiben — die haben Aufrufer). Danach `clip-terminal-failure.ts` von der Ausnahmeliste in `scene-state-write-contract.test.ts` streichen, damit die Datei künftig wieder vom Vertragstest bewacht wird.
+### 1. Audio in den Generationsvertrag aufnehmen
 
-**2 — Ton-Start auf einen Besitzer.** Der Server behält ihn: `compose-clip-webhook` bleibt der Auslöser nach `plate_ready`. Im Client wird der `compose-twoshot-audio`-Aufruf in `useTwoShotAutoTrigger` zum reinen Nachzügler-Netz — er feuert nur noch, wenn die Szene länger als 90 Sekunden auf `plate_ready` steht (Server-Webhook verloren gegangen). Der Lip-Sync-Zweig (Zeile ~296) bleibt unverändert.
+Neue Voiceover-Zeilen erhalten in `metadata` zwingend:
 
-**3 — Übergangstabelle symmetrisch machen.** Migration, die `lipsync_muxing → audio_ready` und `lipsync_muxing → plate_ready` ergänzt, damit ein Mux-Retry denselben Rückweg hat wie ein Lip-Sync-Retry. Reine Datenzeilen, keine Schemaänderung.
+- `active_run_id`
+- `plate_generation`
+- `audio_plan_version`
+- optional einen Hash aus Dialog, Stimmen und Timing
 
-**4 — Praxisnachweis.** Ein vollständiger 4-Sprecher-Durchlauf, danach Kontrolle von `composer_state_guard_violations`. Bleibt sie leer, hält der Vertrag über einen echten Lauf. Einträge zeigen exakt die verbliebene Stelle mit Szene, Von-Zustand, Nach-Zustand und Grund — die kommt dann zuerst dran.
+Wiederverwendung ist nur erlaubt, wenn Lauf, Generation und Hash zur aktuellen Szene passen. Alte Zeilen ohne diese Angaben gelten als Legacy und werden niemals in einem neu gestarteten Lauf wiederverwendet.
 
-### Technische Details
+### 2. Hard-Reset vollständig machen
 
-- Punkt 1 ist eine Löschung plus eine Zeile aus der `ALLOWED`-Menge des Vertragstests; anschließend muss der Test weiterhin grün laufen.
-- Punkt 2: Bedingung im Kandidatenfilter ergänzen — `canStartAudioPrep(d) && Date.now() - Date.parse(d.pipeline_state_at) > 90_000`. Dafür muss `pipeline_state_at` in die Select-Liste von Zeile 90 aufgenommen werden.
-- Punkt 3: `INSERT INTO composer_scene_transitions ... ON CONFLICT DO NOTHING` für die zwei Paare.
-- Kein Eingriff in `scene-hard-reset.ts`, `composer-start-scene-generation` oder die Wächterfunktion selbst — die drei sind geprüft und stimmig.
+`scene-hard-reset.ts` löscht neben den Storage-Dateien auch alle `scene_audio_clips` der Szene mit `kind='voiceover'`. Dieser Schritt wird Teil des Reset-Ergebnisses und bei einem Fehler als Reset-Warnung beziehungsweise harter Reset-Fehler behandelt, damit kein neuer Lauf auf unvollständig bereinigtem Zustand startet.
+
+### 3. Sicheren Audio-Reuse-Pfad bauen
+
+Wenn ein gültiger Audio-Clip desselben Laufs gefunden wird, rekonstruiert `compose-twoshot-audio` vollständig:
+
+- `character_audio_url`
+- `audio_plan.twoshot.url`
+- `speakers`
+- `segments`
+- `totalSec` / `spokenSec`
+- External-/Embedded-Audio-Flags
+
+Erst nach erfolgreichem Speichern darf der Zustand auf `audio_ready` wechseln. Fehlen Metadaten, wird der Ton neu erzeugt statt unvollständig wiederverwendet.
+
+### 4. Zustandstransition an persistierte Daten koppeln
+
+Vor `audio_ready` wird serverseitig geprüft:
+
+- Voiceover-URL vorhanden
+- Audio-Plan vollständig
+- Run-ID und Generation aktuell
+- mindestens ein Sprecher und positive Dauer
+
+Damit kann der Zustandsautomat künftig nicht mehr „Audio fertig“ melden, wenn das dafür erforderliche Datenpaket fehlt.
+
+### 5. Endlosschleife absichern
+
+`audio_plan_not_ready_self_heal` wird pro Lauf gezählt. Nach maximal drei Rückfällen endet die Szene sichtbar in `failed`, mit klarer Meldung und idempotenter Erstattung. Damit führt selbst ein zukünftiger unbekannter Audiofehler nicht mehr zu einem schwarzen Clip ohne Fehlermeldung.
+
+### 6. Regressionstests
+
+Automatische Tests decken ab:
+
+1. Hard-Reset entfernt Storage-Artefakt **und** `scene_audio_clips`-Zeile.
+2. Eine Zeile aus Generation 2 darf in Generation 3 nicht wiederverwendet werden.
+3. Legacy-Zeile ohne Generation wird nicht wiederverwendet.
+4. Gültiger Same-Run-Reuse schreibt den vollständigen `audio_plan.twoshot`.
+5. `audio_ready` ist ohne vollständigen Audio-Plan unmöglich.
+6. Nach drei fehlgeschlagenen Self-Heals entsteht ein sichtbarer Terminalzustand statt einer Schleife.
+7. Der bestehende Scene-State-Schreibvertrag bleibt grün und `composer_state_guard_violations` bleibt leer.
+
+## Betroffene Bereiche
+
+- `supabase/functions/_shared/scene-hard-reset.ts`
+- `supabase/functions/compose-twoshot-audio/index.ts`
+- `supabase/functions/compose-dialog-segments/index.ts`
+- zugehörige Reset-, Audio- und Zustandsvertragstests
+
+Keine UI-Änderung ist nötig: Nach der Korrektur läuft der echte neue Clip weiter in den Lip-Sync oder endet sichtbar mit einem eindeutigen Fehler; der schwarze Scheinzustand verschwindet.
