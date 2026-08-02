@@ -147,6 +147,48 @@ export function decideRefund(input: {
   return { decision: "refunded", amount: cost };
 }
 
+/**
+ * v377 — keys inside `audio_plan` that are DERIVED from a pipeline run.
+ *
+ * Everything the user authored (script, per-speaker voices, turns, timing
+ * preferences) survives a restart. Everything a previous run computed must
+ * not: a surviving `faceMap`, `preclips` payload or dispatch timestamp is how
+ * a new generation ends up cutting from yesterday's plate.
+ */
+const DERIVED_AUDIO_PLAN_KEYS: readonly string[] = [
+  "twoshot",
+  "lipsync",
+  "segments_payload",
+  "segments",
+  "faceMap",
+  "face_map",
+  "preclips",
+  "tracking",
+  "dispatch",
+  "mux",
+  "generatedAt",
+  "generated_at",
+  "renderedAt",
+  "rendered_at",
+  "runId",
+  "run_id",
+];
+
+/**
+ * Removes every derived key from an `audio_plan` snapshot. Returns `null` when
+ * there was no plan at all, so the column is cleared rather than set to `{}`.
+ */
+export function stripDerivedAudioPlan(
+  prevPlan: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!prevPlan || typeof prevPlan !== "object") return null;
+  const cleaned: Record<string, unknown> = { ...prevPlan };
+  for (const key of DERIVED_AUDIO_PLAN_KEYS) delete cleaned[key];
+  return cleaned;
+}
+
+
+
 
 /** Buckets + prefixes that can hold artifacts of a single composer scene. */
 function artifactPrefixes(
