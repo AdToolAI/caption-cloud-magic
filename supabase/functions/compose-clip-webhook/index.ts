@@ -214,10 +214,29 @@ serve(async (req) => {
         sceneUpdate.lip_sync_status = 'pending';
         sceneUpdate.twoshot_stage = 'master_clip';
       }
-      await supabase
+      // v375 — the write itself is generation-scoped, so a hard reset that
+      // lands between the guard above and this update can no longer be
+      // overwritten (compare-and-set instead of blind write).
+      let plateWrite = supabase
         .from('composer_scenes')
         .update(sceneUpdate)
         .eq('id', sceneId);
+      if (attemptCheck.expectedGeneration !== null) {
+        plateWrite = plateWrite.eq('plate_generation', attemptCheck.expectedGeneration);
+      }
+      const { data: writtenRows } = await plateWrite.select('id');
+
+      if (Array.isArray(writtenRows) && writtenRows.length === 0) {
+        console.log(
+          `[compose-clip-webhook v375] ignored_stale_on_write scene=${sceneId} job=${predictionId} ` +
+            `expected_gen=${attemptCheck.expectedGeneration}`,
+        );
+        return new Response(
+          JSON.stringify({ ok: true, ignored_stale: true, verdict: 'lost_race' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+        );
+      }
+      await completePlateAttempt(supabase, attemptCheck.attemptId, permanentUrl);
 
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
       // Even if the full project never finishes, or the user later regenerates the
