@@ -352,12 +352,46 @@ export async function judgeMouthMotion(
       }
     }
 
-    const verdict: MotionVerdict =
-      outputVsInput !== null && outputVsInput < PASSTHROUGH_MAX_SCORE
-        ? "passthrough"
-        : score >= MOVED_MIN_SCORE
-          ? "moved"
-          : "static";
+    // ══════════════════════════════════════════════════════════════════
+    // v371 — EVIDENCE-BASED VERDICT (no single magic threshold).
+    // ══════════════════════════════════════════════════════════════════
+    const outVsInMedian = outputVsInputDeltas.length
+      ? median(outputVsInputDeltas)
+      : null;
+
+    let verdict: MotionVerdict;
+    let criterion: string;
+
+    if (outputVsInput === null) {
+      // No input comparison available → fall back to intra-output motion only.
+      verdict = score >= MOVED_MIN_SCORE ? "moved" : "static";
+      criterion = `intra_only:score=${score.toFixed(3)}`;
+    } else if (
+      score >= STRONG_MOTION_SCORE && outputVsInput > STRONG_MOTION_MIN_OUT_VS_IN
+    ) {
+      // Self-motion veto: strong mouth animation AND a measurable distance to
+      // the input cannot both come from a passthrough.
+      verdict = "moved";
+      criterion =
+        `self_motion_veto:score=${score.toFixed(3)}>=${STRONG_MOTION_SCORE}&outVsIn=${outputVsInput.toFixed(3)}>${STRONG_MOTION_MIN_OUT_VS_IN}`;
+    } else if (
+      outputVsInput < PASSTHROUGH_HARD_MAX &&
+      outVsInMedian !== null && outVsInMedian < PASSTHROUGH_MEDIAN_MAX
+    ) {
+      verdict = "passthrough";
+      criterion =
+        `passthrough_consensus:max=${outputVsInput.toFixed(3)}<${PASSTHROUGH_HARD_MAX}&median=${outVsInMedian.toFixed(3)}<${PASSTHROUGH_MEDIAN_MAX}`;
+    } else if (outputVsInput < PASSTHROUGH_MAX_SCORE && score < STRONG_MOTION_SCORE) {
+      // Grey zone: close to the input, but not provably a passthrough and
+      // without strong self-motion. Never hard-fail on this — report it.
+      verdict = "unknown";
+      criterion =
+        `grey_zone:max=${outputVsInput.toFixed(3)}&median=${outVsInMedian?.toFixed(3) ?? "n/a"}&score=${score.toFixed(3)}`;
+    } else {
+      verdict = score >= MOVED_MIN_SCORE ? "moved" : "static";
+      criterion =
+        `distinct_from_input:outVsIn=${outputVsInput.toFixed(3)}&score=${score.toFixed(3)}`;
+    }
 
     return {
       deltas: deltas.map((d) => Number(d.toFixed(4))),
@@ -369,14 +403,19 @@ export async function judgeMouthMotion(
       score: Number(score.toFixed(4)),
       outputVsInput: outputVsInput === null ? null : Number(outputVsInput.toFixed(4)),
       outputVsInputDeltas: outputVsInputDeltas.map((d) => Number(d.toFixed(4))),
+      outputVsInputMedian: outVsInMedian === null ? null : Number(outVsInMedian.toFixed(4)),
+      verdictCriterion: criterion,
       frameErrors,
       reason: verdict === "passthrough"
-        ? `mouth_band_passthrough_output_equals_input:max_delta=${outputVsInput?.toFixed(3)}<${PASSTHROUGH_MAX_SCORE}`
+        ? `mouth_band_passthrough_output_equals_input:${criterion}`
         : verdict === "moved"
-          ? "mouth_band_motion_detected"
-          : "mouth_band_static_provider_returned_noop",
+          ? `mouth_band_motion_detected:${criterion}`
+          : verdict === "unknown"
+            ? `motion_probe_inconclusive:${criterion}`
+            : `mouth_band_static_provider_returned_noop:${criterion}`,
       latencyMs: Date.now() - t0,
     };
+
   } catch (e) {
     return {
       ...base,
