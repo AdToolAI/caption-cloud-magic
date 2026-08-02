@@ -115,7 +115,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, lip_sync_status, clip_url",
+        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, lip_sync_status, clip_url, plate_generation, active_run_id",
       )
       .eq("id", sceneId)
       .single();
@@ -928,6 +928,8 @@ serve(async (req) => {
           height,
           totalDuration: totalSec,
           composer_scene_id: sceneId,
+          plate_generation: Number((scene as any).plate_generation),
+          active_run_id: String((scene as any).active_run_id ?? ""),
           stage: "sync_segments_audio_mux",
           shots: shotSummary,
         },
@@ -995,6 +997,8 @@ serve(async (req) => {
           composer_scene_id: sceneId,
           composer_project_id: (scene as any).project_id,
           stage: "sync_segments_audio_mux",
+          plate_generation: Number((scene as any).plate_generation),
+          active_run_id: String((scene as any).active_run_id ?? ""),
         },
       },
     };

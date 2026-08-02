@@ -1418,7 +1418,9 @@ serve(async (req) => {
 
     // ── Webhook URL ──────────────────────────────────────────────────────
     const webhookUrl = appendWebhookToken(
-      `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
+      `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
+        `&generation=${encodeURIComponent(String((scene as any).plate_generation))}` +
+        `&run_id=${encodeURIComponent(String((scene as any).active_run_id))}`,
     );
 
     // ── Face-targeting (resolve per-speaker coords) ──────────────────────

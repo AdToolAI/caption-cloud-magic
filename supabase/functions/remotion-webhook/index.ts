@@ -48,6 +48,15 @@ serve(async (req) => {
     const renderJobId = customData?.render_job_id;
     const longFormProjectId = customData?.sora_long_form_project_id;
     const composerSceneId = customData?.composer_scene_id;
+    const callbackGeneration = customData?.plate_generation;
+    const callbackRunId = customData?.active_run_id;
+
+    const isCurrentComposerRun = (sceneRow: any): boolean =>
+      callbackGeneration !== null &&
+      callbackGeneration !== undefined &&
+      !!callbackRunId &&
+      Number(callbackGeneration) === Number(sceneRow?.plate_generation) &&
+      String(callbackRunId) === String(sceneRow?.active_run_id ?? '');
 
     console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, isLongForm, progressIdFromWebhook });
 
@@ -203,10 +212,14 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-preclip', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, lip_sync_status, lip_sync_applied_at')
+              .select('dialog_shots, lip_sync_status, lip_sync_applied_at, plate_generation, active_run_id')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
+            if (!isCurrentComposerRun(sceneRow)) {
+              console.warn(`🎬 [dialog-turn-preclip] v379 stale callback ignored scene=${composerSceneId}`);
+              return;
+            }
             // v18 Cancel-Guard: do not revive a user-cancelled scene with a
             // late preclip render — just log the render and exit.
             if (
@@ -261,10 +274,14 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, lip_sync_status, lip_sync_applied_at')
+              .select('dialog_shots, lip_sync_status, lip_sync_applied_at, plate_generation, active_run_id')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
+            if (!isCurrentComposerRun(sceneRow)) {
+              console.warn(`💋 [dialog-stitch] v379 stale callback ignored scene=${composerSceneId}`);
+              return;
+            }
             // v18 Cancel-Guard: do not overwrite clip_url for a cancelled scene.
             if (
               (sceneRow as any)?.lip_sync_status === 'canceled' ||
@@ -645,10 +662,14 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-preclip-fail', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots')
+              .select('dialog_shots, plate_generation, active_run_id')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
+            if (!isCurrentComposerRun(sceneRow)) {
+              console.warn(`🎬 [dialog-turn-preclip-fail] v379 stale callback ignored scene=${composerSceneId}`);
+              return;
+            }
             const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
             if (shots[shotIdx]) {
               shots[shotIdx] = {
@@ -683,10 +704,14 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch-fail', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, project_id')
+              .select('dialog_shots, project_id, plate_generation, active_run_id')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
+            if (!isCurrentComposerRun(sceneRow)) {
+              console.warn(`💋 [dialog-stitch-fail] v379 stale callback ignored scene=${composerSceneId}`);
+              return;
+            }
             let refundedFlag = !!prevState.refunded;
             const refundCredits = Number(prevState.cost_credits) || 0;
             if (!refundedFlag && refundCredits > 0 && userId) {

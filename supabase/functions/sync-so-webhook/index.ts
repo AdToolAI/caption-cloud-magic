@@ -318,6 +318,8 @@ serve(async (req) => {
   // hint if poll-dialog-shots embedded it in the webhook URL.
   const url = new URL(req.url);
   const sceneHint = url.searchParams.get("scene_id");
+  const incomingGeneration = url.searchParams.get("generation");
+  const incomingRunId = url.searchParams.get("run_id");
 
   let sceneId: string | null = null;
   let scene: any = null;
@@ -325,7 +327,7 @@ serve(async (req) => {
   if (sceneHint) {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, clip_error, plate_generation, active_run_id")
       .eq("id", sceneHint)
       .maybeSingle();
     if (data) {
@@ -341,7 +343,7 @@ serve(async (req) => {
     // We must check ALL three so late/parallel pass webhooks find their scene.
     const { data: rows } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status, clip_error, plate_generation, active_run_id")
       .in("lip_sync_status", ["running", "stitching", "audio_muxing"])
       .limit(200);
     for (const r of rows ?? []) {
@@ -369,6 +371,24 @@ serve(async (req) => {
     return ok({ ok: true, skipped: "no_scene_match", job_id: jobId });
   }
 
+  // v379 — provider callbacks are capabilities for exactly one scene run.
+  // Missing metadata means a pre-v379/stale callback and is intentionally
+  // ignored; accepting it would allow an old job to revive a reset scene.
+  if (
+    !incomingGeneration ||
+    !incomingRunId ||
+    Number(incomingGeneration) !== Number((scene as any).plate_generation) ||
+    String(incomingRunId) !== String((scene as any).active_run_id ?? "")
+  ) {
+    try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
+    console.warn(
+      `[sync-so-webhook] v379 stale callback ignored scene=${sceneId} job=${jobId} ` +
+        `incoming_gen=${incomingGeneration ?? "none"} current_gen=${(scene as any).plate_generation ?? "none"} ` +
+        `incoming_run=${incomingRunId ?? "none"} current_run=${(scene as any).active_run_id ?? "none"}`,
+    );
+    return ok({ ok: true, skipped: "stale_scene_run", scene_id: sceneId, job_id: jobId });
+  }
+
   if (scene.lip_sync_applied_at) {
     try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
     return ok({ ok: true, skipped: "already_applied" });
@@ -389,50 +409,14 @@ serve(async (req) => {
   // is already failed must not flip it to done (partial output) or replay
   // refund logic. Ack 200 so Sync.so stops retrying, no state mutation.
   //
-  // v131.8 — Ausnahme: wenn die Szene NUR wegen unseres eigenen
-  // `watchdog_provider_timeout` als failed markiert wurde UND Sync.so jetzt
-  // doch `COMPLETED` für einen Pass liefert, der in `dialog_shots.passes[]`
-  // bekannt ist, dürfen wir die Szene aus failed zurückholen. Sonst
-  // verlieren wir gesunde Provider-Outputs durch unsere eigene zu strenge
-  // Liveness-Heuristik. Echte Sync.so-Failures bleiben terminal.
-  const sceneFailedSelfInflicted =
-    ((scene as any).lip_sync_status === "failed" ||
-      (scene.dialog_shots as any)?.status === "failed") &&
-    typeof (scene as any).clip_error === "string" &&
-    /^watchdog_(provider_timeout|auto_retry_|hard_timeout)/.test((scene as any).clip_error ?? "");
-  const dsForRecover: any = scene.dialog_shots ?? {};
-  const passesForRecover: any[] = Array.isArray(dsForRecover?.passes) ? dsForRecover.passes : [];
-  const jobKnown = passesForRecover.some((p: any) => p?.job_id === jobId) ||
-    dsForRecover?.sync_job_id === jobId;
-
   if (
     ((scene as any).lip_sync_status === "failed" ||
       (scene.dialog_shots as any)?.status === "failed")
   ) {
-    if (status === "COMPLETED" && outputUrl && sceneFailedSelfInflicted && jobKnown) {
-      console.log(
-        `[sync-so-webhook] v131.8 recover_from_self_inflicted_fail scene=${sceneId} job=${jobId} ` +
-        `prev_clip_error=${(scene as any).clip_error} — resetting status to running and continuing pass merge`,
-      );
-      await supabase
-        .from("composer_scenes")
-        .update({
-          lip_sync_status: "running",
-          twoshot_stage: dsForRecover?.engine === "sync-segments" ? "syncso_fanout_recovering" : "running",
-          clip_error: null,
-          dialog_shots: { ...dsForRecover, status: "rendering", recovered_from_watchdog_at: new Date().toISOString() },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
-      (scene as any).lip_sync_status = "running";
-      (scene.dialog_shots as any).status = "rendering";
-      // fall through into the normal v5 success branch below
-    } else {
-      console.log(
-        `[sync-so-webhook] v129.4a ignored_due_scene_failed scene=${sceneId} job=${jobId} status=${status}`,
-      );
-      return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
-    }
+    console.log(
+      `[sync-so-webhook] v379 terminal_no_revive scene=${sceneId} job=${jobId} status=${status}`,
+    );
+    return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
   }
 
   const state = scene.dialog_shots ?? null;
