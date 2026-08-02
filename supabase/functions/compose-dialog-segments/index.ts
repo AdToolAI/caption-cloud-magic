@@ -8361,13 +8361,14 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: "lipsync_running",
           lip_sync_source_clip_url: sourceClipUrl,
           replicate_prediction_id: `sync:${jobId}`,
           clip_error: null,
           updated_at: nowIso,
         })
         .eq("id", sceneId);
+      await advanceScene("lipsync_running");
+
     }
 
     // ── Plan D (v93) — flag-gated parallel fan-out, supersedes hard `false`.
