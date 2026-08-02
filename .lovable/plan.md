@@ -1,24 +1,59 @@
-## Warum im Hard-Reset überhaupt erstattet wird
+## Bewertung der externen Analyse
 
-Verifiziert im Code:
+Drei Punkte sind gegen den Code verifiziert und echte Defekte:
 
-- `_shared/lipsync-fail.ts` erstattet nur, wenn `dialog_shots.refunded !== true` **und** `lip_sync_applied_at` leer ist. Fertige Lip-Sync-Szenen steigen früh mit `already_applied` aus.
-- `_shared/scene-hard-reset.ts` Zeile 178–190 ruft `failLipSync` mit `refundCredits = dialog_shots.cost_credits` auf.
+1. **Generations-Race (belegt)** — `stamp_plate_generation` stempelt `plate_generation` zum Schreibzeitpunkt. Ein verspäteter Render aus einer alten Generation wird als aktuell markiert. Der Generations-Vertrag aus v373 hat hier ein Loch.
+2. **4 Frames pro Pass (belegt)** — `mouth-motion-verdict.ts:111`. Beweist „kein Passthrough", nicht „guter Sync".
+3. **Kein Final-Output-Gate** — T16 setzt direkt `ready`.
 
-Die automatische Erstattung hängt am Fehler-Event. Beim Hard-Reset gibt es kein Fehler-Event — der Nutzer bricht selbst ab. Ohne den Aufruf würden reservierte Credits eines laufenden Sync.so-/Render-Jobs verfallen. Das ist der einzige Grund für die Zeile.
+Nicht übernommen (bewusst): AV-Sync-Score (T15c), Outbox-Pattern, Fencing-Token. Zu großer Aufwand für den Nutzen bei 3 Slots und einem Watchdog; als Backlog nach Launch.
 
-## Die reale Lücke
+## v375 — Unveränderliche Plate-Generation
 
-Der Guard prüft nur `lip_sync_applied_at`. Eine Szene, deren **Plate erfolgreich gerendert** wurde (Video geliefert, Provider bezahlt), die aber nie Lip-Sync erreicht hat, erfüllt diese Bedingung nicht. Klickt der Nutzer dort auf „Clip generieren", wird der gelieferte Clip erstattet — eine Gratis-Wiederholung auf Kosten der Marge.
+- Neue Tabelle `plate_attempts` (`scene_id`, `expected_plate_generation`, `provider`, `provider_job_id`, `status`, `clip_url`, `superseded_at`).
+- `compose-video-clips` legt den Attempt **vor** dem Provider-Dispatch mit der zum Dispatch gültigen Generation an.
+- Das Render-Ergebnis schreibt nur noch über den Attempt: `UPDATE ... WHERE id = :attempt AND expected_plate_generation = (SELECT plate_generation FROM composer_scenes ...) AND status='rendering'`. Trifft es nicht, wird der Attempt als `superseded` abgelegt und `composer_scenes` **nicht** angefasst.
+- `stamp_plate_generation` stempelt nicht mehr blind; die Generation kommt aus dem Attempt.
 
-## Änderung (v374)
+## v376 — Hard-Reset: erst invalidieren, dann aufräumen
 
-1. In `scene-hard-reset.ts` die Erstattung an einen expliziten Zustandstest binden statt sie pauschal mitzugeben:
-   - erstatten nur wenn der Job **offen** ist: `dialog_shots.status` in `queued|dispatched|running|rendering_preflight` oder eine aktive `syncso_inflight_jobs`-Zeile bzw. `replicate_prediction_id` existiert.
-   - liegt ein verwertbares Ergebnis vor (`clip_url` der aktuellen Generation vorhanden **oder** `dialog_shots.status = 'completed'`), wird `refundCredits: 0` übergeben; Abbruch/Cleanup/Generationswechsel laufen unverändert.
-2. `HardResetResult` um `refund_decision: 'refunded' | 'skipped_delivered' | 'skipped_already_refunded' | 'nothing_open'` erweitern und in `composer-hard-reset-scene` mitloggen, damit der Grund in den Logs nachvollziehbar ist.
-3. Regressionstests in `supabase/functions/_shared/scene-hard-reset.test.ts`: laufender Job → Erstattung; gelieferte Plate ohne Lip-Sync → keine Erstattung; bereits erstattet → keine Doppelerstattung; fertiges Lip-Sync → unverändert `already_applied`.
+Reihenfolge in `_shared/scene-hard-reset.ts` umdrehen:
+1. Transaktion: `plate_generation + 1`, offene Attempts + Passes auf `superseded` mit `superseded_by_generation`.
+2. Commit.
+3. Danach best-effort: Provider-Cancel, Slot-Freigabe.
+4. Artefakt-Purge nur für Generationen, die älter als die vorletzte sind (Tombstone statt Sofortlöschung), damit verspätete Webhooks ihren Bezug behalten.
+
+## v377 — Plate-Viability-Audit (T7.5)
+
+Neues Gate nach dem Plate-Render, vor der Dialog-Segmentierung. Nutzt das bereits vorhandene Rekognition-Tracking:
+- Cast-Identität pro Sprecher gegen die Face-Collection (`_shared/rekognition-face-collection.ts`).
+- Identity-bound Tracking: nach Track-Verlust wird **nicht** die nächstliegende Box übernommen, sondern per FaceId re-identifiziert; scheitert das, gilt der Turn als nicht auditierbar.
+- Sichtbarkeit + Mundgröße **innerhalb des jeweiligen Sprechintervalls**, nicht global.
+- Ergebnis als `plate_viability` in `composer_scenes`; Fail → Szene fehlschlagen + Refund, statt teuer zu dispatchen.
+
+## v378 — Turn-basiertes Verdict statt Pass-Verdict
+
+`mouth-motion-verdict.ts` bekommt Prüf-Fenster **pro Turn** statt 4 Frames pro Pass:
+- je Turn 3 Fenster, gelegt auf Audio-Energiespitzen des Turn-Audios.
+- Pass besteht nur, wenn jeder relevante Turn besteht.
+- Aufteilung der Verdikte: `T15a ingest` (Datei lesbar, Dauer, Auflösung, Checksumme, Übernahme in eigenen Storage) → `T15b motion` (bestehend) → `T15d collateral` (Nicht-Sprecher dürfen sich im Pass nicht bewegen — Mund-ROI der übrigen Cast-Mitglieder gegen das Plate vergleichen).
+
+## v379 — Final-Scene-Verdict + atomarer Publish
+
+- T16 setzt künftig `clip_status = 'rendered'`, nicht `ready`.
+- Neue Prüfung `final-scene-verdict`: Datei vollständig, Dauer in Toleranz, Audio-Stream vorhanden, keine Black/Freeze-Sequenzen, richtiger Sprecher bewegt sich je Turn, keine sichtbaren Cropnähte.
+- Erst danach in einer Transition `ready` + Credit-Commit.
+
+## v380 — Reservierungsmodell für Credits
+
+- Reservierung bei T1, Provider-Kosten am Run, Commit erst bei erfolgreichem Publish (T18), Freigabe bei terminalem Systemfehler.
+- Append-only Ledger mit Unique-Constraint auf (`run_id`, `reason_code`), damit doppelte Refunds technisch unmöglich sind.
+- `decideRefund` bekommt die vom Reviewer genannten fünf Fälle; „Nutzer-Reset nach kostenpflichtigem Dispatch" wird gezählt und ab einem Schwellwert nicht mehr voll erstattet.
+
+## Reihenfolge
+
+v375 + v376 zuerst (echte Datenkorruption). Dann v378, dann v379. v377 und v380 danach.
 
 ## Technische Details
 
-Keine Schemaänderung. Reine Entscheidungslogik vor dem `failLipSync`-Aufruf; die Idempotenz-Garantien in `lipsync-fail.ts` bleiben unangetastet, damit alle anderen Aufrufer (Watchdog, Webhook, Dispatch-Guards) ihr Verhalten behalten.
+Betroffen: Migration für `plate_attempts` + Ledger, `_shared/scene-hard-reset.ts`, `compose-video-clips`, `compose-dialog-segments`, `_shared/mouth-motion-verdict.ts`, `sync-so-webhook`, `render-sync-segments-audio-mux`, `lipsync-watchdog` (muss `slot_wait` von `provider_runtime` unterscheiden, sonst timeoutet Sprecher 4 fälschlich).

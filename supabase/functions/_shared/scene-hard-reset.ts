@@ -23,6 +23,7 @@
  */
 
 import { failLipSync } from "./lipsync-fail.ts";
+import { supersedeOpenPlateAttempts } from "./plate-attempt.ts";
 
 type SupabaseLike = {
   from: (t: string) => any;
@@ -67,6 +68,8 @@ export interface HardResetResult {
   generation: number;
   deletedObjects: number;
   canceledJobs: number;
+  /** v376 — open plate attempts tombstoned by this reset. */
+  supersededAttempts: number;
   refundDecision: RefundDecision;
   errors: string[];
 }
@@ -269,10 +272,47 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
 
   const refund = decideRefund({ scene, knownJobIds: jobIds, hasInflightRows });
 
-  // 2. Cancel provider jobs + free inflight slots. Credits are refunded ONLY
-  //    for an open job we are about to cancel (v374). `failLipSync` prefers
-  //    the persisted cost over the hint, so a non-refund is expressed by
-  //    withholding the userId — that is the flag it gates the payout on.
+  const nextGeneration = Number(scene?.plate_generation ?? 1) + 1;
+
+  // ── 2. v376 — INVALIDATE LOGICALLY FIRST ────────────────────────────────
+  // Provider cancellation is never fully reliable: the job may already be past
+  // the cancel window, the API call may fail, the network may drop. So the
+  // generation bump — not the cancel — is the wall. It is written and committed
+  // BEFORE any best-effort teardown, so from this instant on every in-flight
+  // callback of the previous run is structurally unable to write to the scene
+  // (`plate_attempts` rows are tombstoned by the `supersede_plate_attempts`
+  // trigger, and the webhook write is generation-scoped).
+  let supersededAttempts = 0;
+  try {
+    const { error } = await supabase
+      .from("composer_scenes")
+      .update({
+        plate_generation: nextGeneration,
+        plate_generation_started_at: nowIso,
+        plate_ready_generation: null,
+        plate_ready_at: null,
+        updated_at: nowIso,
+      })
+      .eq("id", sceneId);
+    if (error) errors.push(`invalidate:${(error as any).message ?? "unknown"}`);
+  } catch (e) {
+    errors.push(`invalidate:${(e as Error).message}`.slice(0, 120));
+  }
+
+  // The DB trigger already supersedes open attempts on the bump; this call is
+  // the belt-and-braces path for rows the trigger could not see (and it gives
+  // us the count for the audit log).
+  supersededAttempts = await supersedeOpenPlateAttempts(
+    supabase,
+    sceneId,
+    nextGeneration,
+  );
+
+  // ── 3. BEST-EFFORT TEARDOWN ─────────────────────────────────────────────
+  // Cancel provider jobs + free inflight slots. Credits are refunded ONLY
+  // for an open job we are about to cancel (v374). `failLipSync` prefers
+  // the persisted cost over the hint, so a non-refund is expressed by
+  // withholding the userId — that is the flag it gates the payout on.
   try {
     await failLipSync({
       supabase,
@@ -288,7 +328,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   }
 
 
-  // 3. Drop dispatch locks so the next run is never blocked by a stale lease.
+  // Drop dispatch locks so the next run is never blocked by a stale lease.
   try {
     await supabase.from("dialog_dispatch_locks").delete().eq("scene_id", sceneId);
   } catch {
@@ -300,7 +340,10 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     /* non-fatal */
   }
 
-  // 4. Purge artifacts (plate, preclips, anchors, tracking, pass videos, VO).
+  // ── 4. PHYSICAL CLEANUP ─────────────────────────────────────────────────
+  // Purge artifacts (plate, preclips, anchors, tracking, pass videos, VO).
+  // Safe to run late: the scene is already logically invalidated, so nothing
+  // that is still in flight can attach itself to the new generation.
   const deletedObjects = await purgeArtifacts(
     supabase,
     sceneId,
@@ -309,12 +352,14 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     errors,
   );
 
-  // 5. Bump generation + clear ALL pipeline state. This is the point after
-  //    which a new run may start.
+  // ── 5. CLEAR PIPELINE STATE ─────────────────────────────────────────────
+  // This runs last so it also wipes anything `failLipSync` wrote during the
+  // teardown above. The generation itself was already bumped in step 2 and is
+  // re-asserted here only to keep the row consistent if step 2 partially failed.
   //
-  //    `audio_plan` keeps the user-authored plan (voices, turns, timing) but
-  //    loses every derived pipeline artifact — a stale faceMap or preclip
-  //    payload from the previous generation must never survive the reset.
+  // `audio_plan` keeps the user-authored plan (voices, turns, timing) but
+  // loses every derived pipeline artifact — a stale faceMap or preclip
+  // payload from the previous generation must never survive the reset.
   const prevPlan = (scene?.audio_plan ?? null) as Record<string, unknown> | null;
   let cleanedPlan: Record<string, unknown> | null = null;
   if (prevPlan && typeof prevPlan === "object") {
@@ -324,7 +369,6 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     delete (cleanedPlan as any).segments_payload;
   }
 
-  const nextGeneration = Number(scene?.plate_generation ?? 1) + 1;
   try {
     const { error } = await supabase
       .from("composer_scenes")
@@ -356,7 +400,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   }
 
   console.log(
-    `[v373_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
+    `[v376_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} attempts_superseded=${supersededAttempts} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
   );
 
   return {
@@ -365,6 +409,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     generation: nextGeneration,
     deletedObjects,
     canceledJobs: jobIds.length,
+    supersededAttempts,
     refundDecision: refund.decision,
     errors,
   };

@@ -11,6 +11,11 @@ import {
   hardSanitizeForHappyHorse,
   extractCastNames,
 } from "../_shared/happyhorse-green-net.ts";
+import {
+  checkPlateAttempt,
+  completePlateAttempt,
+  failPlateAttempt,
+} from "../_shared/plate-attempt.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
@@ -129,6 +134,25 @@ serve(async (req) => {
 
     const { id: predictionId, status, output, error: predError } = payload;
 
+    // ── v375 GENERATION GUARD ────────────────────────────────────────────────
+    // A provider callback may only touch the scene when the attempt it belongs
+    // to is still the current generation. After a hard reset the attempt is
+    // tombstoned (`superseded`) and this late result is dropped instead of
+    // overwriting the fresh run's plate. We ACK with 200 so the provider stops
+    // redelivering.
+    const attemptCheck = await checkPlateAttempt(supabase, sceneId, predictionId);
+    if (!attemptCheck.ok) {
+      console.log(
+        `[compose-clip-webhook v375] ignored_stale scene=${sceneId} job=${predictionId} ` +
+          `verdict=${attemptCheck.verdict} expected_gen=${attemptCheck.expectedGeneration} ` +
+          `current_gen=${attemptCheck.currentGeneration}`,
+      );
+      return new Response(
+        JSON.stringify({ ok: true, ignored_stale: true, verdict: attemptCheck.verdict }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+      );
+    }
+
     if (status === 'succeeded' && output) {
       const videoUrl = Array.isArray(output) ? output[0] : output;
       console.log(`[compose-clip-webhook] Clip ready: ${videoUrl}`);
@@ -190,10 +214,29 @@ serve(async (req) => {
         sceneUpdate.lip_sync_status = 'pending';
         sceneUpdate.twoshot_stage = 'master_clip';
       }
-      await supabase
+      // v375 — the write itself is generation-scoped, so a hard reset that
+      // lands between the guard above and this update can no longer be
+      // overwritten (compare-and-set instead of blind write).
+      let plateWrite = supabase
         .from('composer_scenes')
         .update(sceneUpdate)
         .eq('id', sceneId);
+      if (attemptCheck.expectedGeneration !== null) {
+        plateWrite = plateWrite.eq('plate_generation', attemptCheck.expectedGeneration);
+      }
+      const { data: writtenRows } = await plateWrite.select('id');
+
+      if (Array.isArray(writtenRows) && writtenRows.length === 0) {
+        console.log(
+          `[compose-clip-webhook v375] ignored_stale_on_write scene=${sceneId} job=${predictionId} ` +
+            `expected_gen=${attemptCheck.expectedGeneration}`,
+        );
+        return new Response(
+          JSON.stringify({ ok: true, ignored_stale: true, verdict: 'lost_race' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+        );
+      }
+      await completePlateAttempt(supabase, attemptCheck.attemptId, permanentUrl);
 
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
       // Even if the full project never finishes, or the user later regenerates the
@@ -466,6 +509,8 @@ serve(async (req) => {
       // Enrich silent Hailuo / generic model fails by re-fetching the prediction.
       const enrichedError = await enrichEmptyPredError(predictionId, predError);
       console.error(`[compose-clip-webhook] Clip failed:`, enrichedError);
+      // v375 — close the attempt so the watchdog never counts it as open work.
+      await failPlateAttempt(supabase, sceneId, predictionId);
 
       // Get current retry count
       const { data: scene } = await supabase
