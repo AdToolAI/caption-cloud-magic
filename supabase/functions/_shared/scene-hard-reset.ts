@@ -281,7 +281,13 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
 
   const refund = decideRefund({ scene, knownJobIds: jobIds, hasInflightRows });
 
-  const nextGeneration = Number(scene?.plate_generation ?? 1) + 1;
+  // v377 — when the caller already acquired the run atomically, its generation
+  // is authoritative and must not be bumped again.
+  const preInvalidated =
+    args.generationOverride !== null && args.generationOverride !== undefined;
+  const nextGeneration = preInvalidated
+    ? Number(args.generationOverride)
+    : Number(scene?.plate_generation ?? 1) + 1;
 
   // ── 2. v376 — INVALIDATE LOGICALLY FIRST ────────────────────────────────
   // Provider cancellation is never fully reliable: the job may already be past
@@ -292,20 +298,22 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   // (`plate_attempts` rows are tombstoned by the `supersede_plate_attempts`
   // trigger, and the webhook write is generation-scoped).
   let supersededAttempts = 0;
-  try {
-    const { error } = await supabase
-      .from("composer_scenes")
-      .update({
-        plate_generation: nextGeneration,
-        plate_generation_started_at: nowIso,
-        plate_ready_generation: null,
-        plate_ready_at: null,
-        updated_at: nowIso,
-      })
-      .eq("id", sceneId);
-    if (error) errors.push(`invalidate:${(error as any).message ?? "unknown"}`);
-  } catch (e) {
-    errors.push(`invalidate:${(e as Error).message}`.slice(0, 120));
+  if (!preInvalidated) {
+    try {
+      const { error } = await supabase
+        .from("composer_scenes")
+        .update({
+          plate_generation: nextGeneration,
+          plate_generation_started_at: nowIso,
+          plate_ready_generation: null,
+          plate_ready_at: null,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+      if (error) errors.push(`invalidate:${(error as any).message ?? "unknown"}`);
+    } catch (e) {
+      errors.push(`invalidate:${(e as Error).message}`.slice(0, 120));
+    }
   }
 
   // The DB trigger already supersedes open attempts on the bump; this call is
@@ -316,6 +324,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     sceneId,
     nextGeneration,
   );
+
 
   // ── 3. BEST-EFFORT TEARDOWN ─────────────────────────────────────────────
   // Cancel provider jobs + free inflight slots. Credits are refunded ONLY
