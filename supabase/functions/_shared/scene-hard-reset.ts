@@ -337,7 +337,10 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     /* non-fatal */
   }
 
-  // 4. Purge artifacts (plate, preclips, anchors, tracking, pass videos, VO).
+  // ── 4. PHYSICAL CLEANUP ─────────────────────────────────────────────────
+  // Purge artifacts (plate, preclips, anchors, tracking, pass videos, VO).
+  // Safe to run late: the scene is already logically invalidated, so nothing
+  // that is still in flight can attach itself to the new generation.
   const deletedObjects = await purgeArtifacts(
     supabase,
     sceneId,
@@ -346,12 +349,14 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     errors,
   );
 
-  // 5. Bump generation + clear ALL pipeline state. This is the point after
-  //    which a new run may start.
+  // ── 5. CLEAR PIPELINE STATE ─────────────────────────────────────────────
+  // This runs last so it also wipes anything `failLipSync` wrote during the
+  // teardown above. The generation itself was already bumped in step 2 and is
+  // re-asserted here only to keep the row consistent if step 2 partially failed.
   //
-  //    `audio_plan` keeps the user-authored plan (voices, turns, timing) but
-  //    loses every derived pipeline artifact — a stale faceMap or preclip
-  //    payload from the previous generation must never survive the reset.
+  // `audio_plan` keeps the user-authored plan (voices, turns, timing) but
+  // loses every derived pipeline artifact — a stale faceMap or preclip
+  // payload from the previous generation must never survive the reset.
   const prevPlan = (scene?.audio_plan ?? null) as Record<string, unknown> | null;
   let cleanedPlan: Record<string, unknown> | null = null;
   if (prevPlan && typeof prevPlan === "object") {
@@ -361,7 +366,6 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     delete (cleanedPlan as any).segments_payload;
   }
 
-  const nextGeneration = Number(scene?.plate_generation ?? 1) + 1;
   try {
     const { error } = await supabase
       .from("composer_scenes")
@@ -393,7 +397,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
   }
 
   console.log(
-    `[v373_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
+    `[v376_hard_reset] scene=${sceneId} gen=${nextGeneration} jobs_canceled=${jobIds.length} attempts_superseded=${supersededAttempts} objects_deleted=${deletedObjects} refund=${refund.decision}(${refund.amount}) errors=${errors.length}`,
   );
 
   return {
