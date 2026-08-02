@@ -1,86 +1,150 @@
-# Plan v377 — Alte Pipeline-Läufe strukturell unmöglich machen
+## Ziel: Diese beiden Fehler werden strukturell unmöglich
 
-## Warum dieser Plan und kein weiterer Patch
+### Fehler 1
+Nach „Clip neu generieren“ leben alte Clip-, Preclip-, Lip-Sync-, Render- oder Webhook-Jobs weiter und schreiben später in den neuen Lauf.
 
-Die bisherigen Versionen v373–v376 waren inhaltlich richtig, aber an der falschen Stelle verankert: Der „harte Neustart" ist heute eine **Frontend-Konvention**. Jeder Aufrufpfad, der sie nicht befolgt, umgeht sie folgenlos.
+### Fehler 2
+Eine fehlgeschlagene Szene startet oder продолжает trotzdem Audio-Prep/Lip-Sync/Provider/Mux und der Fortschrittsbalken läuft weiter.
 
-Nachgewiesen am letzten Lauf:
+## Bestätigte Ursache im letzten Run
 
-- Drei **gleichzeitig offene** Plate-Attempts in **derselben Generation 1**.
-- `AnchorPreviewGate` startet den Render direkt, komplett ohne Hard-Reset.
-- `useSceneGenerate` wartet zwar auf den Reset, ignoriert aber dessen Fehlschlag und rendert trotzdem weiter.
-- Der `audio_plan` trug noch abgeleitete Daten vom 01.08., 21:28.
-- Die Datenbank erlaubt mehrere offene Läufe pro Szene; der vorhandene Index verhindert nur identische Provider-Job-IDs.
-
-Konsequenz: Der Vertrag muss dorthin, wo er nicht umgangen werden kann — in die Datenbank und in genau **einen** Startpunkt. Bewusst **keine** zusätzlichen Watchdogs, Retries oder Heuristiken; davon existieren bereits zu viele und sie waren mehrfach selbst Fehlerquelle.
+- Der konkrete Preclip ist mit **`supabaseAdmin is not defined`** fehlgeschlagen.
+- Zu diesem Zeitpunkt waren bereits andere Sync.so-Pässe gestartet.
+- `compose-dialog-segments` prüft am Server-Eingang aktuell nicht vollständig `clip_status`, `clip_error` und `active_run_id`.
+- Alte Sync.so- und Render-Callbacks sind nicht lückenlos an Generation + Run-ID gebunden.
+- Mehrere Start-/Recovery-Pfade können terminale Zustände wieder auf `pending/running` setzen.
+- Die Szene endete deshalb inkonsistent mit `clip_status='generating'`, aber gleichzeitig `clip_error` und `dialog_shots.status='failed'`.
 
 ## Umsetzung
 
-### 1. Genau eine Eintrittstür
+### 1. „Neu generieren“ wird eine einzige atomare Serveroperation
 
-Neue Funktion `composer-start-scene-generation` wird der **einzige** erlaubte Weg, einen kostenpflichtigen Clip-Render zu starten:
+Jeder Button und jeder interne Startpfad verwendet ausschließlich `composer-start-scene-generation`.
 
-1. Szene exklusiv sperren
-2. Generation atomar erhöhen, alte Attempts tombstonen
-3. Locks, Inflight-Slots und abgeleitete Zustände löschen
-4. Alte Artefakte entfernen
-5. Unveränderliche `run_id` erzeugen
-6. Erst danach `compose-video-clips` mit `scene_id + generation + run_id` starten
+Unter einer Datenbanksperre geschieht in dieser Reihenfolge:
 
-Reset und Render sind damit **eine** Transaktion statt zweier Client-Requests.
+1. Alten Run terminal als `superseded` markieren.
+2. Provider-Cancel für sämtliche bekannten Clip- und Lip-Sync-Jobs auslösen.
+3. Alle lokalen aktiven Jobs, Dispatch-Logs, Locks und Renderzuordnungen des alten Runs tombstonen.
+4. Alle alten Szenenartefakte löschen:
+   - Master-Clip
+   - Anchor/Reference-Ausgaben des Laufs
+   - Preclips
+   - Face-/Tracking-Dateien
+   - Voiceover-/Pass-Audio des Laufs
+   - Lip-Sync-Ausgaben
+   - Mux-/Stitch-Ausgaben
+5. Abgeleitete Felder in `audio_plan`, `dialog_shots`, Job-IDs und Fehlerstatus entfernen.
+6. Erst danach neue `generation` und neue `run_id` erzeugen.
+7. Nur wenn der vollständige Teardown erfolgreich war, darf der neue Clip dispatcht werden.
 
-### 2. Invariante in der Datenbank statt im Client
+Bei Teardown-/Cancel-Fehler: **kein neuer Job, keine Abbuchung, klare Fehlermeldung**.
 
-Migration ergänzt:
+### 2. Run-ID und Generation auf jeden Job schreiben
 
-- `run_id` auf `plate_attempts` und am aktuellen Szenenlauf
-- Partieller Unique Index: **höchstens ein offener Attempt pro Szene**
-- Atomare Startfunktion mit Row Lock, die Generation und Run-ID gemeinsam setzt
-- Attempts werden nur registriert, wenn Generation **und** Run-ID zum aktuellen Lauf passen
+Die Tabellen/Datensätze für Clip-Attempts, Sync.so-Dispatches, Preclips und Remotion-Renders erhalten verbindlich:
 
-Ein zweiter Dispatch wird abgelehnt, **bevor** Providerkosten entstehen. Grants, RLS und Service-Role-Zugriff werden in derselben Migration gesetzt.
+- `scene_id`
+- `run_id`
+- `generation`
+- `status`
+- `superseded_at`
 
-### 3. Ein Reset darf nicht mehr still scheitern
+Jeder ausgehende Provider-Request und jede Webhook-URL trägt Run-ID + Generation. Ein Callback darf nur schreiben, wenn:
 
-- `hardResetSceneJob` liefert ein typisiertes Ergebnis statt `boolean`
-- Fehler beim logischen Invalidieren **stoppen** den Start hart
-- Nur physische Löschwarnungen sind tolerierbar, und auch nur wenn Generation und Run-ID sicher invalidiert wurden
-- `composer-hard-reset-scene` meldet nicht länger `ok: true`, wenn intern Fehler auftraten
+```text
+callback.run_id == scene.active_run_id
+AND callback.generation == scene.plate_generation
+AND run.status == 'active'
+```
 
-### 4. Alle Startpfade vereinheitlichen
+Andernfalls wird er protokolliert und ohne Zustandsänderung mit `ignored_stale` beendet. Damit kann ein alter Job selbst dann nichts beschädigen, wenn der externe Provider ihn nicht rechtzeitig abbrechen konnte.
 
-Umgestellt werden: einzelnes „Clip generieren" / „Neu rendern", „Alle Clips generieren", Anchor-Preview → „Bestätigen & rendern", Preview-Neuerstellung sowie verbleibende direkte `compose-video-clips`-Aufrufe.
+### 3. Datenbank erzwingt „nur ein aktiver Run“
 
-Preview-only bleibt kostenfrei, bekommt aber eine Preview-ID — bestätigt werden kann ausschließlich die aktuelle Preview.
+- Pro Szene darf exakt ein aktiver Run existieren.
+- Neue Run-Übernahme invalidiert den bisherigen Run atomar.
+- Job-/Webhook-Statusübergänge laufen über abgesicherte Datenbankfunktionen mit Compare-and-Set auf Run-ID und Generation.
+- Direkte Statusschreibweisen, die einen superseded/failed Run wieder auf `running` setzen könnten, werden entfernt.
 
-### 5. Nur Nutzerinhalte überleben den Neustart
+### 4. Globaler serverseitiger Terminal-Guard
 
-Erhalten bleiben: Skript, Sprecher- und Stimmauswahl, Timing-Vorgaben.
+Eine gemeinsame Guard-Funktion wird vor **jedem** Schritt verwendet:
 
-Gelöscht werden alle abgeleiteten Laufdaten: `audio_plan.twoshot`, `lipsync`, `segments_payload`, alte Dispatch-/Mux-/Preclip-/FaceMap-/Tracking-Daten, `dialog_shots`, `dialog_takes`, Provider-IDs, Locks, Inflight-Zeilen und Storage-Artefakte.
+- Audio-Prep
+- Dialog-Dispatch
+- Preclip-Erzeugung
+- Sync.so-Aufruf
+- Retry/Advance
+- Motion-Probe
+- Mux/Stitch
+- Webhook-Schreibzugriff
 
-### 6. Webhooks an die Run-ID binden
+Weiterarbeit ist nur erlaubt, wenn:
 
-- Plate-, Audio-, Sync.so- und Mux-Callbacks müssen `scene_id + generation + run_id` nachweisen
-- `unregistered` ist für neue Jobs **nicht mehr** fail-open
-- Nur ausdrücklich markierte Legacy-Jobs dürfen übergangsweise ohne Run-ID durch
-- Watchdog und Recovery starten keinen Job, solange ein aktueller offener Attempt existiert
+```text
+clip_status == 'ready'
+clip_error ist leer oder ausdrücklich nur ein Recovery-Marker
+lip_sync_status nicht failed/canceled
+scene.active_run_id == request.run_id
+plate_ready_generation == plate_generation
+run.status == 'active'
+```
 
-### 7. Die aktuell blockierte Szene bereinigen
+Jeder harte Szenenfehler stoppt sofort den gesamten Run.
 
-Konkurrierende Attempts tombstonen, Locks und Inflight-Zeilen löschen, abgeleiteten Audio-/Lip-Sync-Zustand entfernen, Szene in einen sauberen Ruhezustand versetzen. **Kein automatischer kostenpflichtiger Neustart.**
+### 5. Fehler atomar auf die ganze Szene anwenden
 
-## Verifikation
+Eine zentrale `fail_scene_run`-Routine:
 
-Regressionstests:
+- setzt Run auf `failed`
+- setzt Szene/Lip-Sync/Dialog-Stufe konsistent terminal
+- beendet alle offenen Pass-/Preclip-/Renderjobs
+- gibt Locks und Provider-Slots frei
+- storniert Providerjobs bestmöglich
+- erstattet Credits genau einmal
+- verhindert danach jeden weiteren Dispatch oder Callback-Write
 
-1. Doppelklick erzeugt genau einen Provider-Job
-2. Anchor-Confirm kann den Reset nicht umgehen
-3. Fehlgeschlagener Reset verhindert jeden Dispatch
-4. Alter Webhook kann die neue Generation nicht beschreiben
-5. Zwei parallele Starts ergeben einen Gewinner und einen sauberen Konflikt
-6. Alte Audio-/Lip-Sync-Daten überleben den Neustart nicht
-7. Watchdog erzeugt keinen zweiten Attempt
-8. Fehlgeschlagene Szene beendet Fortschrittsanzeige und Locks
+Der erste harte Fehler gewinnt. Parallele Pässe dürfen den Zustand anschließend nicht mehr ändern.
 
-Danach ein kontrollierter Testlauf mit Prüfung von Logs und Datenbank: genau eine aktuelle Run-ID, genau ein offener Attempt, kein wiederverwendetes Artefakt.
+### 6. Automatisches Wiederbeleben entfernen
+
+- `v100 auto-reset-stale-failed` wird entfernt.
+- Watchdog, Auto-Trigger und Recovery dürfen nur nichtterminale Wartezustände reparieren.
+- `failed`, `canceled` und `superseded` bleiben terminal.
+- Nur ein expliziter Klick des Nutzers erzeugt einen komplett neuen Run.
+
+### 7. Konkreten Crash reparieren
+
+Die undefinierte Referenz `supabaseAdmin` im Preclip-Pfad wird durch den vorhandenen authentifizierten Backend-Client ersetzt bzw. korrekt injiziert. Zusätzlich wird dieser Pfad durch einen Test abgedeckt, damit derselbe Boot-/Scope-Fehler nicht erneut deployt werden kann.
+
+### 8. Sämtliche Bypass-Startpfade schließen
+
+Alle direkten Aufrufe von `compose-video-clips` aus SceneCard, ClipsTab, FaceMapReview, AnchorPreview und DialogStudio werden auf den zentralen Start-Endpunkt umgestellt. Ein direkter Dispatch ohne vorher erworbene Run-ID wird serverseitig abgelehnt.
+
+### 9. Fortschrittsanzeige sofort stoppen
+
+- Bei `failed/canceled/superseded` werden alle aktiven UI-Phasen beendet.
+- Persistierter Fortschritt wird gelöscht.
+- Alte Passdaten dürfen keine laufende Lip-Sync-Anzeige erzeugen.
+- Der Kunde sieht nur eine kurze verständliche Fehlermeldung und „Neu rendern“; technische Details bleiben in Logs.
+
+## Verbindliche Regressionstests
+
+1. Clipfehler vor Lip-Sync → **0 Sync.so-/Preclip-/Mux-Dispatches**.
+2. Fehler während paralleler Preclips → alle Geschwisterjobs werden gestoppt; kein weiterer Provideraufruf.
+3. „Neu generieren“ bei laufendem Clip → alter Run superseded, alter Callback wirkungslos.
+4. „Neu generieren“ bei laufendem Sync.so → Provider-Cancel + Slotfreigabe + alter Webhook wirkungslos.
+5. Alter Remotion-Webhook nach Neustart → `ignored_stale`, keine Änderung der Szene.
+6. Watchdog/Auto-Trigger auf failed/superseded → kein Neustart.
+7. Teardown schlägt fehl → kein neuer Run und keine Kosten.
+8. Zwei schnelle Klicks → genau ein aktiver Run.
+9. Preclip-Exception → konsistenter terminaler Zustand + einmalige Erstattung + gestoppter Balken.
+10. Erfolgreicher bewusster Neustart → frische Run-ID, frische Generation, keine alten Artefakte oder Job-IDs.
+
+## Abnahmekriterien
+
+- Nach „Neu generieren“ existiert kein alter Job mehr, der für die Szene gültig schreiben kann.
+- Selbst ein nicht abbrechbarer externer Altjob ist durch Run-ID + Generation vollständig unschädlich.
+- Sobald eine Szene terminal fehlschlägt, startet ab diesem Datenbank-Commit kein weiterer Audio-, Preclip-, Lip-Sync-, Retry-, Mux- oder Render-Schritt dieses Runs.
+- Es gibt keinen direkten Render-Start mehr, der den atomaren Teardown umgehen kann.
