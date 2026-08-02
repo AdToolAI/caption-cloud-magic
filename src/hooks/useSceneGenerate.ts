@@ -13,7 +13,7 @@
  */
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { resetSceneLipSync } from '@/lib/lipsyncReset';
+import { hardResetSceneJob } from '@/lib/lipsyncReset';
 import { toast } from '@/hooks/use-toast';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
