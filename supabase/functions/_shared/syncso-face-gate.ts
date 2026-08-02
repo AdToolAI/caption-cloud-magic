@@ -227,58 +227,234 @@ export async function verifyFaceBeforeDispatch(
   };
 
 
-  // ── Stage 1 — resolve a real still image of the ASD frame ───────
-  // Client-canvas frames are authoritative. Server extraction only checks
+  // Rekognition braucht Bildmasse, um relative Boxen in Pixel zu wandeln.
+  const W = Math.max(0, Number(input.plateWidth ?? 0));
+  const H = Math.max(0, Number(input.plateHeight ?? 0));
+  const rekW = W > 0 ? W : 1280;
+  const rekH = H > 0 ? H : 720;
 
-  // the deterministic cache path; it never calls Replicate/lucataco.
+  // ── v397 Forensik-Sammler ────────────────────────────────────────
+  const probeStillUrls: string[] = [];
+  const probeStillBytes: number[] = [];
+  const probeFrameIndices: number[] = [];
+  const probeVerdicts: string[] = [];
+
   let frameJpegUrl: string | undefined;
   let frameCached = false;
   let extractMs = 0;
-  if (typeof input.prebuiltFrameUrl === "string" && input.prebuiltFrameUrl.startsWith("http")) {
-    frameJpegUrl = input.prebuiltFrameUrl;
-    frameCached = true;
-  } else if (frame != null) {
-    const extracted = await extractFrameForFaceProbe({
-      videoUrl: input.videoUrl,
-      // v396 — auf einem Preclip zählt der geprüfte LOKALE Index, nie der
-      // durchgereichte absolute Plate-Frame.
-      frameNumber: verifiedPreclipFrame ?? frame,
+  let rek: Awaited<ReturnType<typeof detectFacesMediaPipe>> | null = null;
+  let awsMs = 0;
 
-      fps: input.fps ?? 30,
-      userId: input.userId,
-      projectId: input.projectId,
-      sceneId: input.sceneId,
-      passIdx: input.passIdx,
-    });
-    extractMs = extracted.latencyMs ?? 0;
-    if (!extracted.ok || !extracted.frameUrl) {
-      // v395 — A preclip mouth-gate must inspect the exact artifact sent to
-      // Sync.so. The legacy extractor only checks a deterministic cache and
-      // therefore returned `probe_unavailable` for valid freshly rendered
-      // preclips. Render a still from that preclip on AWS instead.
-      if (input.requireMouth === true && awsFrameProbeAvailable()) {
-        const exactStill = await renderAwsStill({
+  /** Ein Still auswerten: erst Bildinhalt, dann Gesichter. */
+  const probeStill = async (
+    url: string,
+    frameIdx: number,
+  ): Promise<
+    | { state: "faces"; rek: Awaited<ReturnType<typeof detectFacesMediaPipe>>; ms: number }
+    | { state: "zero"; ms: number }
+    | { state: "blank"; code: string }
+    | { state: "detector_error"; error: string; ms: number }
+  > => {
+    const sanity = await inspectStill(url);
+    probeStillUrls.push(url);
+    probeStillBytes.push(sanity.bytes);
+    probeFrameIndices.push(frameIdx);
+    if (!sanity.usable) {
+      probeVerdicts.push(sanity.code);
+      console.warn(
+        `[face-gate] ${GATE_VERSION} still_not_usable frame=${frameIdx} code=${sanity.code} ` +
+        `reason=${sanity.reason ?? "-"} bytes=${sanity.bytes}`,
+      );
+      return { state: "blank", code: sanity.code };
+    }
+    const t0 = Date.now();
+    try {
+      const r = await detectFacesMediaPipe({
+        videoUrl: input.videoUrl,
+        plateWidth: rekW,
+        plateHeight: rekH,
+        durationSec: 1,
+        prebuiltFrameUrls: [url],
+      });
+      const ms = Date.now() - t0;
+      if (!r.ok) {
+        probeVerdicts.push(`detector_error:${r.error ?? "unknown"}`);
+        return { state: "detector_error", error: r.error ?? "unknown", ms };
+      }
+      if ((r.faces?.length ?? 0) === 0) {
+        probeVerdicts.push("zero_faces");
+        return { state: "zero", ms };
+      }
+      probeVerdicts.push(`faces:${r.faces.length}`);
+      return { state: "faces", rek: r, ms };
+    } catch (e) {
+      const ms = Date.now() - t0;
+      probeVerdicts.push("detector_threw");
+      return { state: "detector_error", error: (e as Error)?.message ?? String(e), ms };
+    }
+  };
+
+  const forensicMeta = () => ({
+    probe_still_urls: [...probeStillUrls],
+    probe_still_bytes: [...probeStillBytes],
+    probe_frame_indices: [...probeFrameIndices],
+    probe_verdicts: [...probeVerdicts],
+  });
+
+  // ── Stage 1/2 (Preclip) — Konsens über bis zu 3 Frames ───────────
+  if (input.requireMouth === true && awsFrameProbeAvailable()) {
+    const total = decodedFrameCount ?? 0;
+    const base = verifiedPreclipFrame ?? 0;
+    const span = Math.max(1, Math.round(total * 0.15));
+    const candidates: number[] = [];
+    for (const idx of [base, base + span, base - span]) {
+      const checked = checkPreclipFrame(idx, total);
+      if (checked.ok && !candidates.includes(Number(checked.frame))) {
+        candidates.push(Number(checked.frame));
+      }
+    }
+    if (candidates.length === 0) candidates.push(0);
+
+    const fps = Number.isFinite(input.fps) && Number(input.fps) > 0 ? Number(input.fps) : 30;
+    let zeroCount = 0;
+    let usableCount = 0;
+    let detectorError: string | null = null;
+
+    // Ein bereits vorhandenes Client-Canvas-Frame ist autoritativ und wird
+    // als erster Kandidat geprüft.
+    const prebuilt = typeof input.prebuiltFrameUrl === "string" && input.prebuiltFrameUrl.startsWith("http")
+      ? input.prebuiltFrameUrl
+      : null;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const idx = candidates[i];
+      let url: string | null = null;
+      let cached = false;
+      if (i === 0 && prebuilt) {
+        url = prebuilt;
+        cached = true;
+      } else {
+        const t0 = Date.now();
+        const still = await renderAwsStill({
           videoUrl: input.videoUrl,
-          // v396 — kein Sekunden-Raten mehr. `verifiedPreclipFrame` ist ein
-          // gegen die dekodierte Framezahl geprüfter LOKALER Preclip-Index;
-          // der Zeitstempel wird nur noch daraus abgeleitet.
-          timestamp: exactProbeTimestamp(),
+          // v396 — kein Sekunden-Raten. Der Zeitstempel folgt streng dem
+          // gegen die dekodierte Framezahl geprüften LOKALEN Index.
+          timestamp: (idx + 0.5) / fps,
           frameSize: Math.max(64, Number(input.plateWidth ?? input.plateHeight ?? 720)),
           deadline: Date.now() + Math.max(15_000, input.timeoutMs ?? 45_000),
         });
+        extractMs += Date.now() - t0;
+        if (!still.url) {
+          probeFrameIndices.push(idx);
+          probeVerdicts.push(`still_render_failed:${still.error ?? "unknown"}`);
+          continue;
+        }
+        url = still.url;
+      }
 
-        if (exactStill.url) {
-          frameJpegUrl = exactStill.url;
-          frameCached = false;
-        } else {
+      const res = await probeStill(url, idx);
+      if (res.state === "faces") {
+        frameJpegUrl = url;
+        frameCached = cached;
+        rek = res.rek;
+        awsMs += res.ms;
+        usableCount++;
+        break;
+      }
+      if (res.state === "zero") {
+        frameJpegUrl = frameJpegUrl ?? url;
+        awsMs += res.ms;
+        usableCount++;
+        zeroCount++;
+        continue;
+      }
+      if (res.state === "detector_error") {
+        awsMs += res.ms;
+        detectorError = res.error;
+        continue;
+      }
+      // blank → Messausfall, nächster Kandidat
+    }
+
+    if (!rek) {
+      const baseFail = {
+        frame_jpeg_url: frameJpegUrl,
+        frame_cached: frameCached,
+        extract_ms: extractMs,
+        gemini_ms: awsMs,
+        ...forensicMeta(),
+      };
+
+      // Zwei auswertbare Stills, beide ohne Gesicht → belastbarer Befund.
+      if (zeroCount >= 2) {
+        console.warn(`[face-gate] ${GATE_VERSION} no_face consensus zero=${zeroCount}/${usableCount}`);
+        return {
+          ok: false,
+          code: "no_face",
+          reason:
+            `AWS Rekognition detected no human face in ${zeroCount} independent preclip stills ` +
+            `(frames ${probeFrameIndices.join(",")}) — Sync.so cannot lipsync.`,
+          raw_reply: `aws_rek:0_face x${zeroCount}`,
+          ...baseFail,
+        };
+      }
+
+      // Alle Stills leer/schwarz → Messausfall, KEIN Befund.
+      if (usableCount === 0) {
+        const allBlank = probeVerdicts.length > 0 &&
+          probeVerdicts.every((v) => v.startsWith("still_"));
+        if (allBlank && input.preclipTrusted === true && input.geometryContractOk === true) {
+          console.warn(
+            `[face-gate] ${GATE_VERSION} probe_degraded — all stills blank, but preclip is ` +
+            `single-face validated and geometry roundtrip passed. Dispatching under degraded trust.`,
+          );
           return {
-            ok: false,
-            code: "probe_unavailable",
-            reason: `exact_preclip_probe_unavailable:${exactStill.error ?? extracted.reason ?? "unknown"}`,
-            extract_ms: extractMs,
+            ok: true,
+            code: "probe_degraded",
+            reason: `still_blank_all:${probeVerdicts.join(",")} — dispatch under degraded trust (preclip validated).`,
+            ...baseFail,
           };
         }
-      } else {
+        return {
+          ok: false,
+          code: allBlank ? "still_blank" : "probe_unavailable",
+          reason: allBlank
+            ? `exact_preclip_probe_unavailable:still_blank_all:${probeVerdicts.join(",")}`
+            : `exact_preclip_probe_unavailable:${detectorError ?? probeVerdicts.join(",") || "no_frame"}`,
+          ...baseFail,
+        };
+      }
+
+      // Genau ein auswertbares Still ohne Gesicht — zu dünn für ein hartes
+      // Urteil (v397: no_face braucht Konsens).
+      return {
+        ok: false,
+        code: "probe_unavailable",
+        reason:
+          `exact_preclip_probe_inconclusive:zero_faces_on_single_still ` +
+          `(usable=${usableCount}, verdicts=${probeVerdicts.join(",")})`,
+        ...baseFail,
+      };
+    }
+  }
+
+  // ── Stage 1 (Nicht-Preclip) — bestehendes Verhalten ──────────────
+  if (!rek) {
+    if (typeof input.prebuiltFrameUrl === "string" && input.prebuiltFrameUrl.startsWith("http")) {
+      frameJpegUrl = input.prebuiltFrameUrl;
+      frameCached = true;
+    } else if (frame != null) {
+      const extracted = await extractFrameForFaceProbe({
+        videoUrl: input.videoUrl,
+        frameNumber: verifiedPreclipFrame ?? frame,
+        fps: input.fps ?? 30,
+        userId: input.userId,
+        projectId: input.projectId,
+        sceneId: input.sceneId,
+        passIdx: input.passIdx,
+      });
+      extractMs += extracted.latencyMs ?? 0;
+      if (!extracted.ok || !extracted.frameUrl) {
         return {
           ok: input.requireMouth !== true,
           code: "probe_unavailable",
@@ -286,84 +462,52 @@ export async function verifyFaceBeforeDispatch(
             ? `exact_preclip_probe_unavailable:${extracted.reason ?? "unknown"}`
             : `frame_probe_unavailable: ${extracted.reason ?? "unknown"}; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
           extract_ms: extractMs,
+          ...forensicMeta(),
         };
       }
-    }
-    if (!frameJpegUrl) {
       frameJpegUrl = extracted.frameUrl;
       frameCached = !!extracted.cached;
     }
-  }
 
-  if (!frameJpegUrl) {
-    if (input.requireMouth === true && awsFrameProbeAvailable()) {
-      const exactStill = await renderAwsStill({
-        videoUrl: input.videoUrl,
-        timestamp: exactProbeTimestamp(),
-        frameSize: Math.max(64, Number(input.plateWidth ?? input.plateHeight ?? 720)),
-        deadline: Date.now() + Math.max(15_000, input.timeoutMs ?? 45_000),
-      });
-      if (exactStill.url) {
-        frameJpegUrl = exactStill.url;
-        frameCached = false;
-      } else {
-        return {
-          ok: false,
-          code: "probe_unavailable",
-          reason: `exact_preclip_probe_unavailable:${exactStill.error ?? "unknown"}`,
-          extract_ms: extractMs,
-        };
-      }
+    if (!frameJpegUrl) {
+      return {
+        ok: input.requireMouth !== true,
+        code: "probe_unavailable",
+        reason: input.requireMouth === true
+          ? "exact_preclip_probe_unavailable:no_frame"
+          : `no_client_canvas_frame; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
+        extract_ms: extractMs,
+        ...forensicMeta(),
+      };
     }
+
+    // ── Stage 2 — AWS Rekognition auf dem extrahierten Bild ────────
+    const awsStart = Date.now();
+    try {
+      rek = await detectFacesMediaPipe({
+        videoUrl: input.videoUrl,
+        plateWidth: rekW,
+        plateHeight: rekH,
+        durationSec: 1,
+        prebuiltFrameUrls: [frameJpegUrl],
+      });
+    } catch (e) {
+      return {
+        ok: input.requireMouth !== true,
+        code: "probe_unavailable",
+        reason: input.requireMouth === true
+          ? `exact_preclip_face_probe_threw:${(e as Error)?.message ?? String(e)}`
+          : `aws_rekognition_threw: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
+        frame_jpeg_url: frameJpegUrl,
+        frame_cached: frameCached,
+        extract_ms: extractMs,
+        gemini_ms: Date.now() - awsStart,
+        ...forensicMeta(),
+      };
+    }
+    awsMs += Date.now() - awsStart;
   }
 
-  if (!frameJpegUrl) {
-    return {
-      ok: input.requireMouth !== true,
-      code: "probe_unavailable",
-      reason: input.requireMouth === true
-        ? "exact_preclip_probe_unavailable:no_frame"
-        : `no_client_canvas_frame; source=${input.preclipTrusted ? "preclip-validated" : "none"} — dispatch will proceed unchecked.`,
-      extract_ms: extractMs,
-    };
-  }
-
-  // ── Stage 2 — AWS Rekognition on the extracted JPEG ─────────────
-  // v252: primary detector is AWS Rekognition, not Gemini. Deterministic
-  // bboxes with confidence; no text parsing, no rate-limit surprises.
-  const W = Math.max(0, Number(input.plateWidth ?? 0));
-  const H = Math.max(0, Number(input.plateHeight ?? 0));
-  // Rekognition needs plate dims to convert its relative bbox to pixel
-  // space. When callers didn't provide them, fall back to a 1x1 unit box —
-  // the face count is still trustworthy, we just can't do coord-tolerance
-  // or safe-zone snapping.
-  const rekW = W > 0 ? W : 1280;
-  const rekH = H > 0 ? H : 720;
-
-  const awsStart = Date.now();
-  let rek: Awaited<ReturnType<typeof detectFacesMediaPipe>>;
-  try {
-    rek = await detectFacesMediaPipe({
-      videoUrl: input.videoUrl,
-      plateWidth: rekW,
-      plateHeight: rekH,
-      durationSec: 1,
-      prebuiltFrameUrls: [frameJpegUrl],
-    });
-  } catch (e) {
-    return {
-      ok: input.requireMouth !== true,
-      code: "probe_unavailable",
-      reason: input.requireMouth === true
-        ? `exact_preclip_face_probe_threw:${(e as Error)?.message ?? String(e)}`
-        : `aws_rekognition_threw: ${(e as Error)?.message ?? String(e)} — dispatch will proceed unchecked.`,
-      frame_jpeg_url: frameJpegUrl,
-      frame_cached: frameCached,
-      extract_ms: extractMs,
-      gemini_ms: Date.now() - awsStart,
-    };
-  }
-  const awsMs = Date.now() - awsStart;
   const faceCount = rek.faces?.length ?? 0;
   const rawReply = rek.ok
     ? `aws_rek:${faceCount}_face${faceCount === 1 ? `@${Math.round(rek.faces[0].center[0])},${Math.round(rek.faces[0].center[1])}` : ""}`
@@ -374,9 +518,13 @@ export async function verifyFaceBeforeDispatch(
     frame_cached: frameCached,
     extract_ms: extractMs,
     gemini_ms: awsMs, // reused meta field for wall-clock (kept name for schema compat)
+    ...forensicMeta(),
   } as const;
 
   if (!rek.ok) {
+    // v397 — hier landen nur noch ECHTE Ausfälle (Credentials, Fetch, HTTP).
+    // "0 Gesichter" ist seit v397 `ok:true, faces:[]` und fällt unten in den
+    // korrekten `no_face`-Pfad.
     return {
       ok: input.requireMouth !== true,
       code: "probe_unavailable",
@@ -388,6 +536,7 @@ export async function verifyFaceBeforeDispatch(
       ...baseMeta,
     };
   }
+
 
   // ── Verdict from face count ──────────────────────────────────────
   if (faceCount === 0) {
