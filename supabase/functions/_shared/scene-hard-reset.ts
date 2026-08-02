@@ -214,6 +214,19 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
 
   // 5. Bump generation + clear ALL pipeline state. This is the point after
   //    which a new run may start.
+  //
+  //    `audio_plan` keeps the user-authored plan (voices, turns, timing) but
+  //    loses every derived pipeline artifact — a stale faceMap or preclip
+  //    payload from the previous generation must never survive the reset.
+  const prevPlan = (scene?.audio_plan ?? null) as Record<string, unknown> | null;
+  let cleanedPlan: Record<string, unknown> | null = null;
+  if (prevPlan && typeof prevPlan === "object") {
+    cleanedPlan = { ...prevPlan };
+    delete (cleanedPlan as any).twoshot;
+    delete (cleanedPlan as any).lipsync;
+    delete (cleanedPlan as any).segments_payload;
+  }
+
   const nextGeneration = Number(scene?.plate_generation ?? 1) + 1;
   try {
     const { error } = await supabase
@@ -233,6 +246,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
         twoshot_stage: null,
         dialog_shots: null,
         dialog_takes: null,
+
         audio_plan: null,
         replicate_prediction_id: null,
         retry_count: 0,
