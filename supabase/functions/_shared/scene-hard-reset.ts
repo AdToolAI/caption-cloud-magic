@@ -392,7 +392,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     const { data } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, replicate_prediction_id, lip_sync_applied_at",
+        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, scene_assets, replicate_prediction_id, lip_sync_applied_at",
       )
       .eq("id", sceneId)
       .maybeSingle();
