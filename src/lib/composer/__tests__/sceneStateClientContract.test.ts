@@ -33,6 +33,27 @@ describe('composer client enum contract', () => {
     expect(canDispatchLipsync(audioReady)).toBe(true);
   });
 
+  it('v394 — trennt Start und Fortsetzung des Lip-Syncs', () => {
+    const plate = {
+      clipUrl: 'https://current.example/plate.mp4',
+      plateGeneration: 4,
+      plateReadyGeneration: 4,
+    };
+    const audioReady = { ...plate, pipelineState: 'audio_ready' };
+    const running = { ...plate, pipelineState: 'lipsync_running' };
+    const failed = { ...plate, pipelineState: 'failed' };
+
+    expect(canDispatchLipsync(audioReady)).toBe(true);
+    expect(canContinueLipsync(audioReady)).toBe(false);
+
+    expect(canDispatchLipsync(running)).toBe(false);
+    expect(canContinueLipsync(running)).toBe(true);
+
+    expect(canDispatchLipsync(failed)).toBe(false);
+    expect(canContinueLipsync(failed)).toBe(false);
+  });
+
+
   it('projects the legacy clipStatus display value from the state machine only', () => {
     // Alt-Spalte sagt "fertig", der Zustandsautomat sagt "rendert" —
     // die Anzeige muss dem Zustandsautomaten folgen.
