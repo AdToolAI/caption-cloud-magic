@@ -716,15 +716,17 @@ serve(async (req) => {
           console.error(
             `[compose-twoshot-audio] v201_id_only_required_block scene=${scene_id} reason=${ensured.reason} details=${JSON.stringify(ensured.details ?? {})}`,
           );
+          await transitionScene(supabase, scene_id, "failed", {
+            detail: `id_only_dialog_turns_required:${ensured.reason}`,
+          });
           await supabase
             .from("composer_scenes")
             .update({
-              twoshot_stage: "failed",
-              lip_sync_status: "failed",
               clip_error: `id_only_dialog_turns_required:${ensured.reason}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene_id);
+
           return json({ error: "id_only_dialog_turns_required", reason: ensured.reason, details: ensured.details ?? null }, 422);
         }
       }
