@@ -153,17 +153,14 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
                 twoshotStage: 'audio',
               });
             }
-            if (forceCinematicSync) {
-              // v351 — clear dialog_shots via the safe path so any in-flight
-              // Sync.so job is cancelled and its slot released first.
-              await resetSceneLipSync(
-                workingScene.id,
-                (workingScene as any).dialogShots ?? null,
-                preMark,
-              );
-            } else {
-              await supabase.from('composer_scenes').update(preMark).eq('id', workingScene.id);
-            }
+            // v373 — "Clip generieren" ist ein HARTER Neustart: erst alle
+            // Provider-Jobs abbrechen, Slots freigeben, Credits erstatten und
+            // sämtliche Artefakte des vorherigen Laufs löschen, DANN erst den
+            // neuen Job starten. Ohne dieses await schnitt die Lip-Sync-Kette
+            // Preclips aus der Plate des vorherigen Laufs (Race vom 02.08.).
+            await hardResetSceneJob(workingScene.id, 'user_regenerate');
+            await supabase.from('composer_scenes').update(preMark).eq('id', workingScene.id);
+
           } catch (preErr) {
             console.warn('[useSceneGenerate] pre-mark failed', preErr);
           }
