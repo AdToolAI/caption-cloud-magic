@@ -80,6 +80,9 @@ export function AnchorPreviewGate({
   const [anchorUrl, setAnchorUrl] = useState<string | null>(null);
   const [audit, setAudit] = useState<PreviewAudit | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  /** True once this gate owns an active server-side run for the scene. */
+  const runReadyRef = useRef(false);
+
 
   const invokePreview = useCallback(async () => {
     setPhase("composing");
