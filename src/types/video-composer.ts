@@ -332,6 +332,13 @@ export interface ComposerScene {
   ignoreWorldRefs?: boolean;
   clipUrl?: string;
   clipStatus: ClipStatus;
+  /** Authoritative lifecycle state. Legacy status fields are display-only mirrors. */
+  pipelineState?: import('@/lib/composer/sceneState').SceneState;
+  pipelineStateAt?: string;
+  pipelineStateRunId?: string | null;
+  activeRunId?: string | null;
+  plateGeneration?: number;
+  plateReadyGeneration?: number | null;
   /**
    * Seconds to skip at the start of clipUrl playback.
    * Hides the frozen reference-image opening frame that i2v providers
