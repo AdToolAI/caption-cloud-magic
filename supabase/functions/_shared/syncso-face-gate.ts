@@ -437,7 +437,7 @@ export async function verifyFaceBeforeDispatch(
           code: allBlank ? "still_blank" : "probe_unavailable",
           reason: allBlank
             ? `exact_preclip_probe_unavailable:still_blank_all:${probeVerdicts.join(",")}`
-            : `exact_preclip_probe_unavailable:${detectorError ?? probeVerdicts.join(",") || "no_frame"}`,
+            : `exact_preclip_probe_unavailable:${detectorError ?? (probeVerdicts.join(",") || "no_frame")}`,
           ...baseFail,
         };
       }
