@@ -246,37 +246,6 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
 
     if (!data) return;
 
-    // ── Self-Heal: Stuck-Scene-Recovery ───────────────────────────────────
-    // Wenn der Webhook (Replicate, Sync.so, …) den Status nicht finalisiert
-    // hat, die Szene aber bereits eine `clip_url` hat, behandeln wir sie als
-    // "ready". Verhindert das endlose "Wird generiert…" nach gelegentlichen
-    // Webhook-Drops.
-    //
-    // Cinematic-Sync: Hailuo-Render UND Lip-Sync sind getrennte Phasen.
-    // Sobald clip_url existiert, ist der Hailuo-Render fertig — die Szene
-    // muss als clip_status='ready' markiert werden, auch wenn der Lip-Sync
-    // noch läuft / pending ist. Die UI zeigt den Lip-Sync-Status separat.
-    const stuck = (data as any[]).filter(
-      (d) =>
-        d.clip_status === 'generating' &&
-        typeof d.clip_url === 'string' &&
-        d.clip_url.length > 0,
-    );
-    if (stuck.length > 0) {
-      await Promise.all(
-        stuck.map((d) =>
-          supabase
-            .from('composer_scenes')
-            .update({ clip_status: 'ready', clip_error: null })
-            .eq('id', d.id),
-        ),
-      );
-      stuck.forEach((d) => {
-        d.clip_status = 'ready';
-        d.clip_error = null;
-      });
-    }
-
     // ── Cinematic-Sync Auto-Trigger ───────────────────────────────────────
     // Disabled here: `useTwoShotAutoTrigger` is now the single source of truth
     // for Cinematic-Sync auto-starts (tab-independent, no optimistic

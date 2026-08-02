@@ -23,7 +23,6 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { canDispatchLipsync, canStartAudioPrep, sceneState } from '@/lib/composer/sceneState';
 import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
-import { resetSceneLipSync } from '@/lib/lipsyncReset';
 
 // v94: 8s → 2.5s. Saves up to ~5.5s per stage transition (×3-4 transitions
 // per scene). DB select is filtered by project_id + indexed, load negligible.
@@ -92,96 +91,6 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           .eq('project_id', projectId);
         if (error || !data) return;
 
-        // ── Talking-Head Master Self-Heal ───────────────────────────────
-        // Cinematic-Sync scenes whose `clip_url` is a raw `/talking-head-renders/`
-        // file are invalid masters for v5 lip-sync. compose-dialog-segments
-        // blocks them with `raw_talking_head_source_blocked`; here we reset
-        // BEFORE audio-prep / candidate selection so the next "Alle generieren"
-        // produces a real Hailuo/HappyHorse scene plate instead of looping.
-        const isTalkingHeadUrl = (u: any) =>
-          typeof u === 'string' && u.includes('/talking-head-renders/');
-        const talkingHeadMasters = (data as any[]).filter(
-          (d) =>
-            isDialogEngine(d.engine_override) &&
-            !d.lip_sync_applied_at &&
-            // v317: never re-queue a terminally failed clip (Content-Filter).
-            d.clip_status !== 'failed' &&
-            isTalkingHeadUrl(d.clip_url),
-        );
-
-        if (talkingHeadMasters.length > 0) {
-          console.warn(
-            `[useTwoShotAutoTrigger] self-heal: clearing ${talkingHeadMasters.length} talking-head master(s) for cinematic-sync`,
-          );
-          await Promise.all(
-            talkingHeadMasters.map((d) => {
-              inflight.current.delete(d.id);
-              inflight.current.delete(`audio-prep:${d.id}`);
-              // Mutate in place so this tick's downstream filters see the reset.
-              const prevShots = d.dialog_shots;
-              d.clip_url = null;
-              d.clip_status = 'pending';
-              d.lip_sync_status = 'pending';
-              d.lip_sync_source_clip_url = null;
-              d.lip_sync_applied_at = null;
-              d.twoshot_stage = null;
-              d.dialog_shots = null;
-              d.replicate_prediction_id = null;
-              // v351 — route through reset-lipsync-scene when passes are live
-              // so Sync.so slots are released instead of leaked.
-              return resetSceneLipSync(d.id, prevShots, {
-                clip_url: null,
-                clip_status: 'pending',
-                lip_sync_status: 'pending',
-                lip_sync_source_clip_url: null,
-                lip_sync_applied_at: null,
-                twoshot_stage: null,
-                replicate_prediction_id: null,
-                clip_error:
-                  'auto-reset: talking_head_master_invalid_for_cinematic_sync — bitte Clip neu generieren',
-              });
-            }),
-          );
-        }
-
-
-        const now = Date.now();
-        const STALE_MS = 6 * 60 * 1000; // 6min: pipeline takes ~3min, double for safety
-        const STALE_PREFLIGHT_MS = 2 * 60 * 1000; // CPU/preflight abort before a Sync.so job exists
-        const STALE_SYNC_MS = 12 * 60 * 1000; // Sync.so should settle well before this; avoid endless spinner
-
-        const hasSyncSoJob = (d: any) =>
-          typeof d.replicate_prediction_id === 'string' &&
-          d.replicate_prediction_id.startsWith('sync:');
-        const hasRecordedProviderJob = (d: any) => {
-          const plan = d.audio_plan as any;
-          const jobs = plan?.twoshot?.syncJobs?.jobs;
-          const ds = d.dialog_shots as any;
-          // v4 OR v5+shots[] (per-turn) — any shot with a sync_job_id or
-          // non-terminal status counts as an active provider job.
-          const shotsArr = Array.isArray(ds?.shots) ? ds.shots : [];
-          const dialogJobs = shotsArr.some(
-            (s: any) =>
-              s?.sync_job_id ||
-              ['lipsyncing', 'ready', 'pending', 'generated'].includes(String(s?.status ?? '')),
-          );
-          // v5 sync-segments multi-pass passes[]
-          const passesArr = Array.isArray(ds?.passes) ? ds.passes : [];
-          const passJobs = passesArr.some(
-            (p: any) => p?.job_id || p?.status === 'rendering' || p?.status === 'rendering_preflight',
-          );
-          const v5SegmentsJob =
-            ds?.version === 5 && ds?.engine === 'sync-segments' && !!ds?.sync_job_id;
-          return (
-            hasSyncSoJob(d) ||
-            dialogJobs ||
-            passJobs ||
-            v5SegmentsJob ||
-            !!plan?.twoshot?.heartbeat?.syncJobId ||
-            (Array.isArray(jobs) && jobs.length > 0)
-          );
-        };
-
         // v70: legacy per-turn v4 / v5+shots[] dispatcher (poll-dialog-shots)
         // removed. v69 multi-pass writes `dialog_shots.passes[]`, advanced
         // entirely via sync-so-webhook → render-sync-segments-audio-mux.
@@ -211,7 +120,6 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // die Szene endlos → UI hängt bei „Lip-Sync startet…". Wir bauen
         // sie hier deterministisch nach, BEVOR der eigentliche v5-Dispatch
         // läuft.
-        const AUDIO_PREP_STALE_MS = 3 * 60 * 1000; // 3min: TTS+Mux dauert ~10–30s
         // v172: erlaube Em-Dash / En-Dash / Klammern / Mood-Suffixe im
         // Sprecher-Label (z.B. "SAMUEL DUSATKO — CASUAL:" oder
         // "ANNA (verzweifelt):"). Vorher fielen solche Skripte aus dem

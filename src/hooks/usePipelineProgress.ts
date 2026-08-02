@@ -124,7 +124,6 @@ const PHASE_NOMINAL_SECONDS: Record<PipelinePhaseId, number> = {
 // v231 — `needs_clip_rerender` is a terminal FAIL state (hard-fail after noop
 // ladder). Without it here, the progress bar hangs at ~23% because the scene
 // is never counted as "settled" (see sync-so-webhook v134 hard-fail branch).
-const TERMINAL_TWOSHOT_STAGES = new Set(['done', 'complete', 'failed', 'audio_mux_failed', 'canceled', 'needs_clip_rerender']);
 const TERMINAL_DIALOG_SHOT_STATUSES = new Set(['done', 'failed', 'canceled']);
 
 function isCanceledLipsyncScene(scene: any) {
@@ -134,10 +133,6 @@ function isCanceledLipsyncScene(scene: any) {
     scene?.dialogShots?.status === 'canceled' ||
     scene?.dialog_shots?.status === 'canceled'
   );
-}
-
-function isActiveTwoshotStage(stage: unknown) {
-  return !!stage && !TERMINAL_TWOSHOT_STAGES.has(String(stage));
 }
 
 function isActiveDialogShots(dialogShots: any) {
@@ -346,9 +341,6 @@ export function usePipelineProgress({
 
 
   // ── Derived per-phase progress (from real state, relative to baseline) ──
-  const dialogVoiceCount = (s: ComposerScene) =>
-    s.dialogVoices ? countSceneSpeakers(s) : 0;
-
   const hasLipsyncScenes = useMemo(
     () =>
       scenes.some(
