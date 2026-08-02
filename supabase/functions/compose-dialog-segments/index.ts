@@ -121,9 +121,11 @@ import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
 // v357 — echtes Per-Frame-Gesichts-Tracking statt wiederholter Standbox.
 import {
   trackFaceAcrossTurn,
+  detectAnchorBoxOnClip,
   interpolateBoxes,
   withContextPadding,
   clampBoxArea,
+
   MAX_DISPATCH_BOX_AREA_FRAC,
   trackMovementPx,
 } from "../_shared/face-track.ts";
