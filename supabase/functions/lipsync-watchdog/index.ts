@@ -30,6 +30,7 @@ import {
   sweepOrphanInflightSyncJobs,
 } from "../_shared/syncso-preflight.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
+import { transitionScene } from "../_shared/scene-state.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
