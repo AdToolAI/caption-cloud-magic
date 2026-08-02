@@ -560,7 +560,12 @@ serve(async (req) => {
         payload.input &&
         typeof payload.input === 'object'
       ) {
-        const repaired = hardSanitizeForHappyHorse(originalPrompt);
+        // v370 — keep the cast identity through the repair retry: names are
+        // rescued first, then re-emitted as one canonical clause.
+        const repaired = hardSanitizeForHappyHorse(
+          originalPrompt,
+          extractCastNames(originalPrompt),
+        );
         const repairedPrompt = repaired.emptied ? '' : repaired.clean.trim();
 
         if (repairedPrompt && repairedPrompt !== originalPrompt.trim()) {
