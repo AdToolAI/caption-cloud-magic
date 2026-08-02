@@ -674,13 +674,31 @@ export async function renderPassFacePreclip(
     },
   };
 
+  // v394.1 — Der Preclip-Dispatch ist ein reiner Gateway-Aufruf. Ein
+  // transientes 502/503/504 (oder ein Netzabbruch) hat bisher die ganze Szene
+  // terminal fallen lassen, obwohl noch gar keine Arbeit verrichtet war.
+  // Kurzer Backoff-Retry: gleiche `renderId`, keine Doppelarbeit bei Erfolg.
   const dispatchStart = Date.now();
-  const invokeResp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-    body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
-  });
+  let invokeResp!: Response;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      invokeResp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
+      });
+    } catch (netErr) {
+      invokeResp = new Response(`network_error: ${(netErr as Error)?.message ?? netErr}`, { status: 599 });
+    }
+    if (invokeResp.ok || invokeResp.status < 500) break;
+    await invokeResp.text().catch(() => "");
+    console.warn(
+      `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v394_invoke_retry attempt=${attempt}/3 status=${invokeResp.status}`,
+    );
+    if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 1500));
+  }
   const dispatchMs = Date.now() - dispatchStart;
+
   if (!invokeResp.ok) {
     const t = await invokeResp.text().catch(() => "");
     await supabase
