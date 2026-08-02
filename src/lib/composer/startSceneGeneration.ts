@@ -52,31 +52,11 @@ function messageForCode(code: string, fallback?: string): string {
   }
 }
 
-export async function startSceneGeneration(params: {
-  sceneIds: string[];
-  /** Body forwarded verbatim to `compose-video-clips`. */
-  compose: Record<string, unknown>;
-  reason?: string;
-}): Promise<StartSceneGenerationResult> {
-  const sceneIds = params.sceneIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-  if (sceneIds.length === 0) {
-    throw new SceneGenerationStartError(
-      'no_persisted_scene',
-      'Die Szene wurde noch nicht gespeichert.',
-    );
-  }
-
+async function callStart(body: Record<string, unknown>): Promise<any> {
   const { data, error } = await supabase.functions.invoke(
     'composer-start-scene-generation',
-    {
-      body: {
-        scene_ids: sceneIds,
-        compose: params.compose,
-        reason: params.reason ?? 'user_regenerate',
-      },
-    },
+    { body },
   );
-
   if (error) {
     throw new SceneGenerationStartError(
       'invoke_failed',
@@ -90,9 +70,61 @@ export async function startSceneGeneration(params: {
       messageForCode(code, (data as any)?.message),
     );
   }
+  return data;
+}
 
+function requireIds(sceneIds: string[]): string[] {
+  const ids = sceneIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  if (ids.length === 0) {
+    throw new SceneGenerationStartError(
+      'no_persisted_scene',
+      'Die Szene wurde noch nicht gespeichert.',
+    );
+  }
+  return ids;
+}
+
+export async function startSceneGeneration(params: {
+  sceneIds: string[];
+  /** Body forwarded verbatim to `compose-video-clips`. */
+  compose: Record<string, unknown>;
+  reason?: string;
+  /**
+   * Set when the run was already acquired via `prepareSceneRuns()`. Skips the
+   * reset and dispatches against the existing run.
+   */
+  useExistingRun?: boolean;
+}): Promise<StartSceneGenerationResult> {
+  const data = await callStart({
+    scene_ids: requireIds(params.sceneIds),
+    compose: params.compose,
+    reason: params.reason ?? 'user_regenerate',
+    use_existing_run: params.useExistingRun === true,
+  });
   return {
-    runs: ((data as any).runs ?? {}) as Record<string, SceneRunInfo>,
-    compose: (data as any).compose,
+    runs: (data.runs ?? {}) as Record<string, SceneRunInfo>,
+    compose: data.compose,
   };
 }
+
+/**
+ * First leg of the split start, for "alle Clips generieren".
+ *
+ * That flow renders fresh scene anchors between reset and dispatch, so the
+ * purge must happen BEFORE the anchors exist — otherwise it deletes the very
+ * anchors the new run needs. This acquires the run (generation bump + fresh
+ * run id + full teardown) and returns; the caller must finish with
+ * `startSceneGeneration({ useExistingRun: true })`.
+ */
+export async function prepareSceneRuns(params: {
+  sceneIds: string[];
+  reason?: string;
+}): Promise<Record<string, SceneRunInfo>> {
+  const data = await callStart({
+    scene_ids: requireIds(params.sceneIds),
+    prepare_only: true,
+    reason: params.reason ?? 'user_regenerate_all',
+  });
+  return (data.runs ?? {}) as Record<string, SceneRunInfo>;
+}
+
