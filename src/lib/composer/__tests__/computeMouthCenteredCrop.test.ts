@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { computeMouthCenteredCrop } from "../computeMouthCenteredCrop";
 
 describe("computeMouthCenteredCrop (v247)", () => {
-  it("v360: anchors low on the mouth but keeps the whole head inside the crop", () => {
+  it("centers on mouth when landmark is present, not face-bbox center", () => {
     const r = computeMouthCenteredCrop({
       face: {
         bbox: [500, 200, 700, 500], // 200x300 face
@@ -14,11 +14,9 @@ describe("computeMouthCenteredCrop (v247)", () => {
     });
     expect(r.anchor).toBe("mouth");
     const cy = r.crop.y + r.crop.size / 2;
-    expect(cy).toBeLessThan(440); // mouth below center, forehead kept
-    expect(r.headContained).toBe(true);
-    expect(r.crop.y).toBeLessThanOrEqual(200);
+    expect(Math.abs(cy - 440)).toBeLessThanOrEqual(1);
+    expect(r.mouthOffsetPx).toBeLessThanOrEqual(1);
   });
-
 
   it("falls back to face-center when mouth landmark missing", () => {
     const r = computeMouthCenteredCrop({

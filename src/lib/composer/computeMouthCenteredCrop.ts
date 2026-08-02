@@ -13,12 +13,18 @@
  *      requested crop cannot fit while keeping the mouth inside, the crop
  *      shrinks and re-centers on the mouth.
  *
- * Mirror of supabase/functions/_shared/compute-mouth-centered-crop.ts —
- * keep both files in sync (v360: anchor repair + head containment).
+ * Fixes the v247 "small face in plate → Sync.so no-op" failure mode where
+ * the previous face-bbox-centered crop wasted resolution above the eyes.
+ *
+ * Pure function; no side effects; safe to unit-test in Node + Deno.
  */
+
 export interface FaceGeometry {
+  /** Pixel bbox [x1, y1, x2, y2] of the face inside the source plate. */
   bbox: [number, number, number, number];
+  /** Pixel [cx, cy] of the face bbox center (fallback anchor). */
   center: [number, number];
+  /** Optional mouth-center pixel [x, y] — preferred anchor when present. */
   mouth?: [number, number];
 }
 
@@ -26,47 +32,36 @@ export interface MouthCenteredCropInput {
   face: FaceGeometry;
   plateWidth: number;
   plateHeight: number;
+  /** Target ratio of face-bbox area to preclip area. Default 0.42. */
   targetFaceShare?: number;
+  /** Absolute minimum crop side (pixels) — prevents micro-crops. */
   minSize?: number;
+  /** Output resolution the preclip will be resampled to. Default 720. */
   outputSize?: number;
 }
 
 export interface MouthCenteredCropResult {
+  /** Preclip crop rectangle on the source plate. */
   crop: { x: number; y: number; size: number; outputSize: number };
+  /** Anchor used ("mouth" | "face_center"). */
   anchor: "mouth" | "face_center";
-  /** Area ratio (faceW*faceH / size²) — telemetry only. */
+  /** Actual ratio of face bbox area to crop area after clamping. */
   faceShareInCrop: number;
-  /**
-   * v344.1 — LINEAR share: max(faceW, faceH) / cropSize. This is the metric
-   * that correlates with Sync.so actually animating the mouth; the area
-   * ratio penalises non-square faces and small `minSize`-widened crops.
-   */
-  faceSideShare: number;
-  /** Longest face side in plate pixels. */
-  faceSidePx: number;
-  /** True when `minSize` (not the target share) determined the crop size. */
-  minSizeWidened: boolean;
+  /** Distance in pixels between mouth and crop center (0 when anchor=mouth and no clamp). */
   mouthOffsetPx: number;
+  /** True when clamping forced the crop away from the ideal center. */
   clamped: boolean;
-  /**
-   * v360 — true when the requested anchor lay outside the face bbox and was
-   * replaced by the bbox-derived mouth point (lower third). Belegter Fall:
-   * Matthew (Szene 89c5e01c) — der Anker lag 18 px UNTER dem Kinn, der
-   * 145-px-Crop begann dadurch auf Mundhöhe und schnitt Augen und Stirn ab.
-   * Sync.so bekam ein halbes Gesicht und reichte den Clip unverändert durch.
-   */
-  anchorRepaired: boolean;
-  /** v360 — true when the crop was grown/moved so the whole head fits in. */
-  headContained: boolean;
-  /** v393 — vertical mouth position inside the crop (0 = top, 1 = bottom). */
-  mouthBandY: number;
-  /** v393 — pixels between the mouth anchor and the lower crop edge. */
-  mouthMarginBelowPx: number;
-  /** v393 — mouth anchor lies inside the crop with usable margin. */
-  mouthInsideCrop: boolean;
 }
 
-
+/**
+ * Compute a mouth-centered square crop for lip-sync preclip.
+ *
+ * Behavior:
+ *   - Anchor = mouth landmark when present, else face-bbox center.
+ *   - Crop side = clamp(faceBboxSide / sqrt(targetFaceShare), min, maxFit).
+ *   - If anchor is inside plate but crop would spill, we shift the crop back
+ *     inside the plate while keeping the mouth strictly within the crop.
+ */
 export function computeMouthCenteredCrop(
   input: MouthCenteredCropInput,
 ): MouthCenteredCropResult {
@@ -91,54 +86,37 @@ export function computeMouthCenteredCrop(
   const faceH = Math.max(1, y2 - y1);
   const faceSide = Math.max(faceW, faceH);
 
+  // Ideal crop side: face-bbox side / sqrt(targetFaceShare).
+  // e.g. share 0.42 → side ≈ faceSide / 0.648 ≈ 1.543 × faceSide.
   const idealSide = faceSide / Math.sqrt(targetFaceShare);
   const maxSide = Math.min(plateWidth, plateHeight);
   let size = Math.round(Math.min(maxSide, Math.max(minSize, idealSide)));
 
-  // v360 — Anker-Plausibilität. Der übergebene Punkt (Detektor-Mund oder
-  // Router-Koordinate) muss im Gesicht liegen. Liegt er darunter/daneben,
-  // ist er unbrauchbar: der quadratische Crop wandert nach unten und
-  // schneidet Augen und Stirn ab. Dann nehmen wir den aus der Bbox
-  // abgeleiteten Mundpunkt (unteres Drittel).
-  const derivedMouth: [number, number] = [
-    Math.round((x1 + x2) / 2),
-    Math.round(y1 + faceH * 0.72),
-  ];
-  const rawAnchor: [number, number] | null =
-    Array.isArray(face.mouth) &&
-      Number.isFinite(face.mouth[0]) &&
-      Number.isFinite(face.mouth[1])
-      ? [Number(face.mouth[0]), Number(face.mouth[1])]
-      : Array.isArray(face.center) &&
-          Number.isFinite(face.center[0]) &&
-          Number.isFinite(face.center[1])
-        ? [Number(face.center[0]), Number(face.center[1])]
-        : null;
-  const anchorInsideFace =
-    rawAnchor !== null &&
-    rawAnchor[0] >= x1 - faceW * 0.15 &&
-    rawAnchor[0] <= x2 + faceW * 0.15 &&
-    rawAnchor[1] >= y1 &&
-    rawAnchor[1] <= y2 + faceH * 0.1;
-  const anchorRepaired = !anchorInsideFace;
+  // Anchor selection: mouth preferred.
   const usingMouth =
     Array.isArray(face.mouth) &&
     Number.isFinite(face.mouth[0]) &&
     Number.isFinite(face.mouth[1]);
   const anchor: "mouth" | "face_center" = usingMouth ? "mouth" : "face_center";
-  const [ax, ay] = anchorInsideFace ? (rawAnchor as [number, number]) : derivedMouth;
+  const [ax, ay] = usingMouth
+    ? (face.mouth as [number, number])
+    : face.center;
 
+  // Ideal top-left so anchor is centered.
   let x = Math.round(ax - size / 2);
   let y = Math.round(ay - size / 2);
 
+  // Clamp to plate bounds.
   const rawX = x;
   const rawY = y;
   x = Math.max(0, Math.min(plateWidth - size, x));
   y = Math.max(0, Math.min(plateHeight - size, y));
 
+  // If mouth anchor is close to a plate edge and size exceeds available
+  // room around the anchor, shrink size to keep the anchor inside.
   const maxRoomAround = Math.min(
-    ax * 2,
-    (plateWidth - ax) * 2,
+    ax * 2,               // fit left of anchor
+    (plateWidth - ax) * 2, // fit right of anchor
     ay * 2,
     (plateHeight - ay) * 2,
   );
@@ -148,85 +126,23 @@ export function computeMouthCenteredCrop(
     y = Math.max(0, Math.min(plateHeight - size, Math.round(ay - size / 2)));
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // v393 — MUND-VORRANG-FRAMING (ersetzt das kopf-zentrierte Containment)
-  //
-  // Belegter Fehler (Szene 9eded574, Plate 1928x1076): das v360-Containment
-  // setzte `y = needY1` (30 % über dem Scheitel). Dadurch lag der Mund am
-  // UNTEREN Rand des Crops bzw. bei einer leicht zu hohen Bbox komplett
-  // ausserhalb. Sync.so bekam Stirn + Augen ohne Mund und reichte den Clip
-  // unveraendert durch ("Passthrough").
-  //
-  // Neue Regel, in dieser Reihenfolge:
-  //   1. Groesse waechst, bis Kopf UND Mundrand hineinpassen (nie schieben).
-  //   2. Position wird so gesetzt, dass der Mund bei ~58 % der Crop-Hoehe
-  //      liegt — mit garantiertem Rand unter dem Mund.
-  //   3. Wenn beides nicht gleichzeitig geht, gewinnt der MUND. Eine
-  //      angeschnittene Stirn kostet nichts, ein fehlender Mund kostet
-  //      den ganzen Lip-Sync.
-  // ══════════════════════════════════════════════════════════════════
-  const MOUTH_BAND = 0.58; // Ziel-Position des Mundes in der Crop-Hoehe
-  const MOUTH_MARGIN_BELOW = 0.18; // Mindestrand unter dem Mund (Anteil size)
-
-  const needX1 = Math.max(0, x1 - faceW * 0.1);
-  const needX2 = Math.min(plateWidth, x2 + faceW * 0.1);
-  const needY1 = Math.max(0, y1 - faceH * 0.3);
-  const needY2 = Math.min(plateHeight, y2 + faceH * 0.1);
-  // Der Crop muss den Kopf UND den Mundrand fassen koennen.
-  const needSide = Math.ceil(
-    Math.max(needX2 - needX1, needY2 - needY1, (ay - needY1) / MOUTH_BAND),
-  );
-  size = Math.round(Math.min(maxSide, Math.max(size, needSide)));
-
-  // Position: Mund horizontal mittig, vertikal auf MOUTH_BAND.
-  const framedCx = (needX1 + needX2) / 2;
-  x = Math.max(0, Math.min(plateWidth - size, Math.round(framedCx - size / 2)));
-  y = Math.max(0, Math.min(plateHeight - size, Math.round(ay - size * MOUTH_BAND)));
-
-  // Harte Mund-Garantie nach dem Clamping: der Mund darf nie naeher als
-  // MOUTH_MARGIN_BELOW an den unteren Rand und nie ueber die Crop-Mitte.
-  const minBottom = Math.ceil(ay + size * MOUTH_MARGIN_BELOW);
-  if (y + size < minBottom) {
-    y = Math.max(0, Math.min(plateHeight - size, minBottom - size));
-  }
-  if (y > ay - size * 0.4) {
-    y = Math.max(0, Math.min(plateHeight - size, Math.round(ay - size * 0.4)));
-  }
-
-  const headContained =
-    x <= needX1 + 1 && y <= needY1 + 1 && x + size >= needX2 - 1 && y + size >= needY2 - 1;
-
   const clamped = x !== rawX || y !== rawY;
 
-
+  // Report metrics.
   const cropArea = size * size;
   const faceArea = faceW * faceH;
   const faceShareInCrop = Math.min(1, faceArea / cropArea);
-  const faceSideShare = Math.min(1, faceSide / Math.max(1, size));
-  const minSizeWidened = minSize > idealSide && size >= minSize;
   const cropCx = x + size / 2;
   const cropCy = y + size / 2;
-  const mouthOffsetPx = Math.round(Math.hypot(ax - cropCx, ay - cropCy));
-  const mouthBandY = (ay - y) / Math.max(1, size);
-  const mouthMarginBelowPx = Math.round(y + size - ay);
-  const mouthInsideCrop =
-    ax >= x && ax <= x + size && mouthBandY > 0.2 && mouthBandY < 0.9;
+  const mouthOffsetPx = usingMouth
+    ? Math.round(Math.hypot(ax - cropCx, ay - cropCy))
+    : 0;
 
   return {
     crop: { x, y, size, outputSize },
     anchor,
     faceShareInCrop,
-    faceSideShare,
-    faceSidePx: faceSide,
-    minSizeWidened,
     mouthOffsetPx,
     clamped,
-    anchorRepaired,
-    headContained,
-    mouthBandY,
-    mouthMarginBelowPx,
-    mouthInsideCrop,
   };
-
-
 }
