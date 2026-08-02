@@ -28,8 +28,6 @@ import { buildSceneAssetsForRender } from '@/lib/motion-studio/buildSceneAssetsF
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
-import { prepareSceneRuns, startSceneGeneration } from '@/lib/composer/startSceneGeneration';
-
 import { emitStageEvent } from '@/lib/stage/stageEvents';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 
@@ -205,32 +203,6 @@ export function useGenerateAllClips({
           ),
       );
 
-      // 2b. v377 — Run serverseitig übernehmen, DANN erst abräumen.
-      // `prepareSceneRuns` erhöht die Generation, vergibt eine frische
-      // run_id und führt den vollständigen Teardown aus (Provider-Jobs,
-      // Slots, Credits, Artefakte). Erst danach werden Anchor und Prompt
-      // gebaut — die Reihenfolge ist zwingend, weil der Artefakt-Purge einen
-      // bereits erzeugten neuen Anchor sonst wieder mitlöschen würde.
-      // Schlägt das fehl, wird NICHTS gestartet und nichts berechnet.
-      // Jede persistierte Szene bekommt einen Run — auch eine, die noch nie
-      // gelaufen ist. Nur so ist der Dispatch danach lückenlos an
-      // `scene_id + generation + run_id` gebunden; der Teardown einer frischen
-      // Szene ist ohnehin ein No-Op.
-      const runnableScenes = eligibleScenes.filter((s) =>
-        /^[0-9a-f-]{36}$/i.test(s.id),
-      );
-      const preparedSceneIds = new Set<string>();
-      if (runnableScenes.length > 0) {
-        const runs = await prepareSceneRuns({
-          sceneIds: runnableScenes.map((s) => s.id),
-          reason: 'user_regenerate_all',
-        });
-        Object.keys(runs).forEach((id) => preparedSceneIds.add(id));
-      }
-
-
-
-
       // 3. compose prompts
       const composedByScene = new Map<string, ReturnType<typeof composeFinalPrompt>>();
       for (const s of eligibleScenes) {
@@ -323,27 +295,10 @@ export function useGenerateAllClips({
       });
       onUpdateScenes(optimistic);
 
-      const composeBody = { projectId: pid, scenes: scenesPayload, visualStyle, characters };
-      let data: any;
-      const dispatchIds = scenesPayload
-        .map((p) => p.id)
-        .filter((id) => preparedSceneIds.has(id));
-      if (dispatchIds.length > 0) {
-        // v377 — Dispatch gegen den bereits übernommenen Run. Der Server
-        // bindet jeden Provider-Job an `scene_id + generation + run_id`;
-        // ein Job aus einem älteren Lauf kann das Ergebnis nicht mehr
-        // überschreiben.
-        const started = await startSceneGeneration({
-          sceneIds: dispatchIds,
-          compose: composeBody,
-          reason: 'user_regenerate_all',
-          useExistingRun: true,
-        });
-        data = started.compose;
-      } else {
-        throw new Error('Keine gespeicherte Szene konnte atomar gestartet werden.');
-      }
-
+      const { data, error } = await supabase.functions.invoke('compose-video-clips', {
+        body: { projectId: pid, scenes: scenesPayload, visualStyle, characters },
+      });
+      if (error) throw error;
 
       // Edge function returns HTTP 200 with `{ok:false}` on early-phase crashes.
       if (data && (data as any).ok === false) {

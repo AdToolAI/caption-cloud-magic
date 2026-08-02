@@ -34,30 +34,12 @@ import {
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
-import { dedupeCharacterShots } from "../_shared/canonical-cast.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
-// v357 — Regie-Entscheidung statt Blocker (Gruppenshot / Punch-in / Coverage).
-import { decideDialogMode, directorLabel, DIALOG_DIRECTOR_TAG } from "../_shared/dialog-director.ts";
-
-import {
-  assertPlateFaceContract,
-  closeupFramingSuffix,
-  closeupOnlyEnabled,
-  lipsyncPlateResolution,
-  requiredFaceWidthRatio,
-} from "../_shared/lipsync-closeup-contract.ts";
 import { resolveIdentityViaRekognition } from "../_shared/resolveIdentityViaRekognition.ts";
 import { buildAnchorLayoutFromV274 } from "../_shared/plateFaceSlotRouter.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
-import { sceneState, transitionScene, failSceneState } from "../_shared/scene-state.ts";
-import { sanitizeForHappyHorse, hardSanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
-import {
-  buildCastClause,
-  extractCastNames,
-  normalizeCastInPrompt,
-  validateCastContract,
-} from "../_shared/cast-clause.ts";
+import { sanitizeForHappyHorse } from "../_shared/happyhorse-green-net.ts";
 import {
   ensureDialogTurnsForScene,
   fetchDialogTurnsForScenes,
@@ -73,34 +55,6 @@ import {
   type AssetRef,
 } from "../_shared/asset-ref.ts";
 const ANCHOR_AUDIT_VERSION = 15;
-
-/**
- * v388 — Plate-Pfad-Vertrag.
- *
- * Der Plate-Pfad hat den Zustand bisher an 13 Stellen direkt geschrieben.
- * Ein direkter Schreibvorgang kennt weder Zeilensperre noch Lauf-/Generations-
- * Abgleich — genau darüber sind Szenen verfrüht weitergerückt. Ab hier läuft
- * jeder Wechsel nach `plate_rendering` über die geprüfte Übergangsfunktion.
- *
- * Nebenfelder (clip_quality, replicate_prediction_id, …) bleiben in ihrem
- * eigenen `.update()` — der Zustandswechsel folgt danach als letztes,
- * verbindliches Signal.
- */
-async function enterPlateRendering(
-  supabaseAdmin: any,
-  sceneIdOrIds: string | string[],
-): Promise<void> {
-  const ids = Array.isArray(sceneIdOrIds) ? sceneIdOrIds : [sceneIdOrIds];
-  for (const id of ids) {
-    if (!id) continue;
-    await transitionScene(supabaseAdmin, id, "plate_rendering", {
-      from: ["idle", "plate_queued", "plate_rendering"],
-      detail: "v388_plate_dispatch",
-    });
-  }
-}
-
-
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -216,9 +170,6 @@ interface ClipRequest {
    *  spend. The client then shows the preview and re-invokes without this
    *  flag once the user confirms. */
   previewOnly?: boolean;
-  /** v377/v378: mandatory proof that each persisted scene belongs to the
-   * currently active, atomically acquired generation run. */
-  run_context?: Record<string, { generation: number; run_id: string }>;
 }
 
 
@@ -263,7 +214,7 @@ serve(async (req) => {
     __stage = "parse_body";
     const body: ClipRequest = await req.json();
     __parsedBody = body;
-    const { projectId, scenes, visualStyle, characters, previewOnly, run_context: runContext } = body;
+    const { projectId, scenes, visualStyle, characters, previewOnly } = body;
 
     if (!projectId) {
       return new Response(
@@ -291,26 +242,6 @@ serve(async (req) => {
       );
     }
 
-    // v378 — direct dispatch is forbidden. Every persisted scene must first
-    // pass through composer-start-scene-generation, which invalidates and
-    // tears down the previous run before forwarding this request.
-    const persistedSceneIds = scenes
-      .map((scene) => String(scene?.id ?? ""))
-      .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-    if (
-      persistedSceneIds.length > 0 &&
-      persistedSceneIds.some((id) => !runContext?.[id]?.run_id)
-    ) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: "scene_run_required",
-          message: "Renderstart abgelehnt: Die Szene wurde nicht atomar neu gestartet.",
-        }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     // Verify project ownership
     __stage = "verify_project";
     const { data: project, error: projError } = await supabaseAdmin
@@ -331,34 +262,6 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
-    }
-
-
-    // Compare-and-set guard before any charge/provider call. A second click or
-    // reset can supersede the forwarded request while it is in flight.
-    if (persistedSceneIds.length > 0) {
-      const { data: runRows, error: runErr } = await supabaseAdmin
-        .from("composer_scenes")
-        .select("id, plate_generation, active_run_id")
-        .in("id", persistedSceneIds);
-      if (runErr) {
-        return new Response(JSON.stringify({ ok: false, error: "scene_run_lookup_failed" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const stale = (runRows ?? []).find((row: any) => {
-        const expected = runContext?.[String(row.id)];
-        return !expected ||
-          String(row.active_run_id ?? "") !== String(expected.run_id) ||
-          Number(row.plate_generation) !== Number(expected.generation);
-      });
-      if (stale) {
-        return new Response(
-          JSON.stringify({ ok: false, error: "scene_run_superseded", scene_id: stale.id }),
-          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
     }
 
     // ── v202: Cast & World ID-Registry — JIT scene_assets backfill ────────
@@ -500,12 +403,11 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
+            clip_status: "generating",
             clip_error: null,
             updated_at: new Date().toISOString(),
           })
           .in("id", earlyAiSceneIds);
-        // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-        await enterPlateRendering(supabaseAdmin, earlyAiSceneIds);
       }
     } catch (preMarkErr) {
       console.warn(
@@ -597,6 +499,7 @@ serve(async (req) => {
       isCinematicSyncScene: boolean,
       clipError?: string,
     ): Record<string, unknown> => ({
+      clip_status: "failed",
       // v264 — Never allow silent failures. A missing clip_error paired with
       // clip_status='failed' is a bug (produces the "Fehlgeschlagen"-Badge
       // with no explanation and orphans the lip-sync spinner).
@@ -604,7 +507,12 @@ serve(async (req) => {
         ? clipError
         : "unknown_failure_no_details").slice(0, 500),
       ...(isCinematicSyncScene
-        ? { lip_sync_source_clip_url: null, dialog_shots: null }
+        ? {
+            lip_sync_status: null,
+            twoshot_stage: null,
+            lip_sync_source_clip_url: null,
+            dialog_shots: null,
+          }
         : {}),
       updated_at: new Date().toISOString(),
     });
@@ -640,17 +548,17 @@ serve(async (req) => {
       try {
         const { data: current } = await supabaseAdmin
           .from("composer_scenes")
-          .select("clip_url, pipeline_state, plate_generation, active_run_id")
+          .select("clip_url, clip_status, lip_sync_status")
           .eq("id", sceneId)
           .maybeSingle();
         const hasClipUrl =
           typeof current?.clip_url === "string" && current.clip_url.length > 0;
-        const st = sceneState(current);
         const lipsyncLive =
-          st === "lipsync_running" || st === "lipsync_muxing" || st === "complete";
+          current?.lip_sync_status === "running" ||
+          current?.lip_sync_status === "done";
         if (hasClipUrl || lipsyncLive) {
           console.warn(
-            `[compose-video-clips] v264_safe_fail_skip scene=${sceneId} reason=already_succeeded clip_url=${hasClipUrl} state=${st} would_have_written=${clipError.slice(0, 120)}`,
+            `[compose-video-clips] v264_safe_fail_skip scene=${sceneId} reason=already_succeeded clip_url=${hasClipUrl} lip_sync_status=${current?.lip_sync_status ?? "null"} would_have_written=${clipError.slice(0, 120)}`,
           );
           // Preserve the concern as a diagnostic note but do NOT flip status.
           try {
@@ -678,29 +586,7 @@ serve(async (req) => {
         .from("composer_scenes")
         .update(payload)
         .eq("id", sceneId);
-      // v385 — Zustand ausschließlich über die Zustandsmaschine.
-      await transitionScene(supabaseAdmin, sceneId, "failed", {
-        detail: clipError.slice(0, 200),
-      });
       return "failed";
-    };
-
-    /**
-     * v385 — Direkter Fehl-Schreibpfad: Nutzdaten + validierter Übergang.
-     * `failedClipUpdate` allein setzt keinen Zustand mehr.
-     */
-    const writeSceneFailure = async (
-      sceneId: string,
-      isCinematicSyncScene: boolean,
-      clipError?: string,
-    ): Promise<void> => {
-      await supabaseAdmin
-        .from("composer_scenes")
-        .update(failedClipUpdate(isCinematicSyncScene, clipError))
-        .eq("id", sceneId);
-      await transitionScene(supabaseAdmin, sceneId, "failed", {
-        detail: (clipError ?? "unknown_failure_no_details").slice(0, 200),
-      });
     };
 
 
@@ -779,76 +665,6 @@ serve(async (req) => {
       );
     }
 
-    // v318 — Identity-based cast dedupe -------------------------------------
-    // A scene can carry the SAME person twice: once as the brand UUID and once
-    // as a drifted slug ("samuel-dusatko"). Left alone, the anchor composer
-    // burns two portrait slots on one face (visible clone) and the lip-sync
-    // router builds a ghost speaker pass. Collapse them now, before any
-    // portrait / prompt / pass logic reads `characterShots`.
-    {
-      const castPool = Array.from(charById.values()).map((c) => ({
-        id: c.id,
-        name: (c as any).name ?? null,
-        // v320 — Cast & World UUID is the canonical identity of a briefing row.
-        brandCharacterId:
-          (c as any).brandCharacterId ?? (c as any).brand_character_id ?? null,
-      }));
-      // v319 — outfit look → avatar UUID, so `outfit:<lookId>` slots resolve to
-      // their parent character instead of surviving as a second identity.
-      const outfitLookMap = new Map<string, string>();
-      try {
-        const lookIds = new Set<string>();
-        for (const s of scenes) {
-          for (const slot of [
-            ...(s.characterShots ?? []),
-            ...(s.characterShot ? [s.characterShot] : []),
-          ]) {
-            const id = String((slot as any)?.characterId ?? "");
-            if (id.startsWith("outfit:") || id.startsWith("catalog:")) {
-              const lookId = id.split(":", 2)[1]?.trim();
-              if (lookId) lookIds.add(lookId);
-            }
-          }
-        }
-        if (lookIds.size > 0) {
-          const { data: looks } = await supabaseAdmin
-            .from("avatar_outfit_looks")
-            .select("id, avatar_id")
-            .in("id", Array.from(lookIds));
-          for (const l of looks ?? []) {
-            if ((l as any)?.id && (l as any)?.avatar_id) {
-              outfitLookMap.set((l as any).id, (l as any).avatar_id);
-            }
-          }
-        }
-      } catch (lookErr) {
-        console.warn("[compose-video-clips] outfit look map failed:", lookErr);
-      }
-      let collapsed = 0;
-      for (const s of scenes) {
-        const before = [
-          ...(s.characterShots ?? []),
-          ...(s.characterShot ? [s.characterShot] : []),
-        ];
-        if (before.length < 2) continue;
-        const after = dedupeCharacterShots(before as any, castPool, false, outfitLookMap);
-
-        if (after.length !== before.length) {
-          collapsed += before.length - after.length;
-        }
-        s.characterShots = after as any;
-        if (s.characterShot) {
-          s.characterShot = (after[0] ?? s.characterShot) as any;
-        }
-      }
-      if (collapsed > 0) {
-        console.log(
-          `[compose-video-clips] v318_cast_dedupe collapsed=${collapsed} duplicate cast slot(s)`,
-        );
-      }
-    }
-
-
     // ID-Only Cast Resolution ------------------------------------------------
     // Fetch canonical dialog_turns for every scene up-front. When present,
     // the two speaker-resolution sites below skip name-based fuzzy matching
@@ -890,11 +706,10 @@ serve(async (req) => {
           console.error(
             `[compose-video-clips] v201_id_only_required_block scene=${scene.id} reason=${result.reason} details=${JSON.stringify(result.details ?? {})}`,
           );
-          await writeSceneFailure(
-            scene.id,
-            true,
-            `id_only_dialog_turns_required:${result.reason}`,
-          );
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update(failedClipUpdate(true, `id_only_dialog_turns_required:${result.reason}`))
+            .eq("id", scene.id);
           return new Response(
             JSON.stringify({
               error: "id_only_dialog_turns_required",
@@ -1231,13 +1046,9 @@ serve(async (req) => {
       // share — required for slot-based face targeting in
       // compose-dialog-segments.
       const n = Math.max(cleanNames.length, fallbackCount, 1);
-      // v370 — the cast block is built ONCE, deterministically, from the
-      // resolved names. Stated count and listed names can no longer diverge
-      // (the "Exactly four people in frame: Samuel Dusatko." contradiction
-      // that HappyHorse answered with InvalidParameter).
-      const castSentence = buildCastClause(cleanNames, n) ??
-        `Exactly ${n} ${n === 1 ? "person" : "people"} in frame.`;
-
+      const named =
+        cleanNames.length > 0 ? `: ${cleanNames.join(", ")}` : "";
+      const subject = n === 1 ? "Exactly 1 person" : `Exactly ${n} distinct people`;
       const asymBlocking = opts.asymmetric && n >= 3
         ? `all present in the same physical room as a natural asymmetric ensemble captured in one continuous cinematic frame. Each person appears exactly once and performs their own distinct assigned task (foreground / midground / background depth staging is required — do NOT force a symmetric side-by-side line-up). Preserve practical office / on-set blocking and depth: some subjects closer to camera, others further away, each occupying a different area of the room. Every face still stays clearly readable enough for lip-sync — front, three-quarter or natural profile is acceptable — with mouth and jaw unobstructed by hands, phones, microphones or props`
         : null;
@@ -1258,10 +1069,10 @@ serve(async (req) => {
       // requires it) but keeps body / head / gesture motion free so the
       // scene performance still surfaces.
       if (n === 1) {
-        return `${castSentence} ${visibility.charAt(0).toUpperCase()}${visibility.slice(1)}. Lips soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can drive the mouth cleanly in post), but the mouth stays softly closed in a natural neutral resting position on the raw plate — no idle mouth motion, no jaw motion, no lip-flap, no muttering, no chewing. Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression. LOCKED static camera on a fixed tripod for the entire clip — no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no shot change; the focal length, framing and the subject's position and size in the frame stay identical from the first frame to the last frame. Natural body motion, gestures and head motion driven by the scene performance are allowed, but the camera itself never moves. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+        return `${subject}${named}, ${visibility}. Lips soft, clearly visible and unobstructed (lip-ready so the downstream lipsync model can drive the mouth cleanly in post), but the mouth stays softly closed in a natural neutral resting position on the raw plate — no idle mouth motion, no jaw motion, no lip-flap, no muttering, no chewing. Eyes open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy). Natural neutral facial expression. LOCKED static camera on a fixed tripod for the entire clip — no zoom in, no zoom out, no push-in, no pull-out, no dolly, no crane, no pan, no tilt, no reframing, no shot change; the focal length, framing and the subject's position and size in the frame stay identical from the first frame to the last frame. Natural body motion, gestures and head motion driven by the scene performance are allowed, but the camera itself never moves. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
       }
 
-      return `${castSentence} ${visibility.charAt(0).toUpperCase()}${visibility.slice(1)}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. Non-speakers stay silently at rest — lips softly closed, breathing calmly through the nose, only micro facial life (occasional blinks, tiny weight shifts, a soft swallow at most). No lip-flap, no chewing pattern, no rhythmic mouth motion, no whispering shapes; a non-speaker's mouth never forms syllables. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `${subject}${named}, ${visibility}. Lips relaxed and softly closed in a neutral resting position with a soft, clearly visible lip-line (mouth area unobstructed by hands, microphones or props — lip-ready so a downstream lipsync model can drive it cleanly in post). EVERY visible person continuously shows subtle idle BODY motion throughout the entire clip — visible breathing (chest and shoulders rising and falling), subtle natural weight shifts and tiny shoulder/torso adjustments (NO repeated head nodding, NO up-and-down head bobbing, heads stay steady), eyes stay open, alert and clearly visible throughout the entire clip with gaze softly engaged with the scene (only very rare natural blinks — eyes are NEVER held closed, NEVER squinting, NEVER sleepy), no person ever fully static or statue-like. Non-speakers stay silently at rest — lips softly closed, breathing calmly through the nose, only micro facial life (occasional blinks, tiny weight shifts, a soft swallow at most). No lip-flap, no chewing pattern, no rhythmic mouth motion, no whispering shapes; a non-speaker's mouth never forms syllables. Only the speaker driven by the lipsync model in post will open their mouth; everyone else listens attentively with closed lips. Natural neutral facial expressions. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     /**
@@ -1684,12 +1495,11 @@ serve(async (req) => {
         await supabaseAdmin
           .from("composer_scenes")
           .update({
+            clip_status: "generating",
             clip_error: null,
             updated_at: new Date().toISOString(),
           })
           .in("id", aiSceneIds);
-        // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-        await enterPlateRendering(supabaseAdmin, aiSceneIds);
       }
     } catch (preMarkErr) {
       console.warn(
@@ -1767,6 +1577,8 @@ serve(async (req) => {
                   .update({
                     engine_override: "auto",
                     lip_sync_with_voiceover: false,
+                    lip_sync_status: null,
+                    twoshot_stage: null,
                     updated_at: new Date().toISOString(),
                   })
                   .eq("id", scene.id);
@@ -1824,26 +1636,26 @@ serve(async (req) => {
         const { data: dbRow } = await supabaseAdmin
           .from("composer_scenes")
           .select(
-            "cinematic_preset_slug, engine_override, pipeline_state, clip_url, character_audio_url",
+            "cinematic_preset_slug, engine_override, clip_status, clip_url, character_audio_url",
           )
           .eq("id", scene.id)
           .maybeSingle();
         const slug = (dbRow as any)?.cinematic_preset_slug as string | null;
         const dbEngine = (dbRow as any)?.engine_override as string | null;
-        const status = sceneState(dbRow);
+        const status = (dbRow as any)?.clip_status as string | null;
         const hasAudio = !!(dbRow as any)?.character_audio_url;
         if (
           dbEngine !== "cinematic-sync" &&
           slug &&
           slug.startsWith("dialog-srs:") &&
-          (hasAudio || status === "plate_rendering" || status === "plate_ready")
+          (hasAudio || status === "generating" || status === "ready")
         ) {
           console.log(
             `[compose-video-clips] Skipping SRS lip-sync sub-scene ${scene.id} (slug=${slug}, status=${status})`,
           );
           results.push({
             sceneId: scene.id,
-            status: status === "plate_ready" ? "ready" : "generating",
+            status: status === "ready" ? "ready" : "generating",
           });
           continue;
         }
@@ -1907,11 +1719,9 @@ serve(async (req) => {
             .update({
               engine_override: "cinematic-sync",
               lip_sync_with_voiceover: true,
-              // v387 — KEIN Zustandssprung hier. Diese Function baut nur die
-              // Plate; `audio_prep` darf ausschliesslich nach bestaetigtem
-              // `plate_ready` (Provider-Callback) gesetzt werden.
+              lip_sync_status: "pending",
+              twoshot_stage: "audio",
               clip_error: null,
-
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
@@ -2113,18 +1923,57 @@ serve(async (req) => {
           // This is what makes the "Artlist Two-Shot Hook" work end-to-end:
           // Hailuo renders the 10s two-shot, then Sync.so lip-syncs against
           // the merged audio.
-          // v387 — Der frühere Two-Shot-Audio-Vorgriff wurde hier ENTFERNT.
-          //
-          // Bis v386 hat diese Function bei Dialogszenen direkt
-          // `pipeline_state='audio_prep'` geschrieben, `compose-twoshot-audio`
-          // aufgerufen und danach `audio_ready` gesetzt — und zwar BEVOR die
-          // Plate überhaupt gerendert war. Beide Writes umgingen
-          // `composer_scene_transition()`. Genau daher sprang die UI direkt
-          // auf „Lip-Sync startet", während HappyHorse noch rechnete.
-          //
-          // Audio-Prep wird jetzt ausschließlich nach bestätigtem
-          // `plate_ready` ausgelöst (compose-clip-webhook + Auto-Trigger).
-
+          try {
+            const dlg = String((scene as any).dialogScript ?? "");
+            const speakerLines = dlg
+              .split(/\r?\n/)
+              .filter((l) =>
+                /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/.test(l),
+              );
+            if (speakerLines.length >= 1) {
+              // Mark stage = 'audio' so the UI can show step 1/6.
+              await supabaseAdmin
+                .from("composer_scenes")
+                .update({
+                  twoshot_stage: "audio",
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", scene.id);
+              const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-twoshot-audio`;
+              const r = await fetch(fnUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                },
+                body: JSON.stringify({ scene_id: scene.id }),
+              });
+              // Drain body to avoid leak; capture text on failure for logs.
+              const respText = await r.text().catch(() => "");
+              if (!r.ok) {
+                console.warn(
+                  `[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status} ${respText.slice(0, 300)}`,
+                );
+              } else {
+                console.log(
+                  `[compose-video-clips] twoshot-audio prep OK for ${scene.id}`,
+                );
+                // Stage = 'master_clip' — Hailuo render begins next.
+                await supabaseAdmin
+                  .from("composer_scenes")
+                  .update({
+                    twoshot_stage: "master_clip",
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", scene.id);
+              }
+            }
+          } catch (twoshotErr) {
+            console.warn(
+              `[compose-video-clips] twoshot-audio prep exception for ${scene.id}:`,
+              twoshotErr,
+            );
+          }
 
           const { data: voClips } = await supabaseAdmin
             .from("scene_audio_clips")
@@ -2398,6 +2247,7 @@ serve(async (req) => {
                 );
                 await safeMarkSceneFailed(scene.id, msg, {
                   isCinematicSyncScene: true,
+                  extra: { twoshot_stage: "failed" },
                 });
                 results.push({ sceneId: scene.id, status: "failed", error: msg });
                 continue;
@@ -2478,14 +2328,7 @@ serve(async (req) => {
                         faceLockMode: faceLock,
                         wardrobeLock: wardrobeLockNamesCS.length > 0,
                         wardrobeLockNames: wardrobeLockNamesCS,
-                        // v354 — contract framing is the DEFAULT, not a
-                        // retry-only measure: ask for close-up framing on
-                        // the very first attempt so the plate conforms by
-                        // construction.
-                        framingSuffix: framingSuffix ||
-                          (closeupOnlyEnabled()
-                            ? closeupFramingSuffix(portraitUrls.length)
-                            : ""),
+                        framingSuffix,
                       }),
                     },
                   );
@@ -2756,27 +2599,6 @@ serve(async (req) => {
                         plateHeight: 1000,
                         expectedSpeakers: expectedFaces,
                       });
-                      // v357 — DIALOG DIRECTOR: Die Gesichtsgröße auf dem
-                      // Anchor entscheidet nicht mehr über "läuft / läuft
-                      // nicht", sondern über die Bildregie. Es gibt hier
-                      // bewusst KEINEN Abbruch — nur eine Entscheidung
-                      // zwischen Gruppenshot, Punch-in und Coverage. Das
-                      // passiert VOR dem Videorender, also bevor Kosten
-                      // entstehen.
-                      const director = decideDialogMode({
-                        faces: detect.faces.map((f) => ({ bbox: f.bbox })),
-                        plateWidth: 1000,
-                        plateHeight: 1000,
-                        nativePlateWidth: 1920,
-                        expectedSpeakers: expectedFaces,
-                      });
-                      (scene as any).__dialogDirector = director;
-                      console.log(
-                        `[compose-video-clips] ${DIALOG_DIRECTOR_TAG} scene=${scene.id} ` +
-                        `mode=${director.mode} min_face_px=${director.minFaceWidthPx} ` +
-                        `zoom=${director.punchInZoom} reason=${director.reason} ` +
-                        `label="${directorLabel(director.mode)}"`,
-                      );
                       console.log(
                         `[compose-video-clips] v262_min_face_gate scene=${scene.id} ` +
                         `ok=${check.ok ? 1 : 0} minRatio=${check.minWidthRatio.toFixed(3)} ` +
@@ -2791,13 +2613,10 @@ serve(async (req) => {
                         retried: false,
                         reason: check.reason,
                       };
-                      // Neuer Anchor-Versuch, sobald der Director eine
-                      // engere Einstellung verlangt (Punch-in oder Coverage).
-                      const v357NeedsReframe = director.mode !== "group_shot";
-                      if (!check.ok || v357NeedsReframe) {
+                      if (!check.ok) {
                         console.log(
-                          `[compose-video-clips] v357_framing_retry scene=${scene.id} ` +
-                          `→ neuer Anchor für Modus ${director.mode} (${directorLabel(director.mode)})`,
+                          `[compose-video-clips] v262_framing_retry scene=${scene.id} ` +
+                          `→ re-composing anchor with framing suffix (${check.suggestion})`,
                         );
                         await invalidateCache();
                         const retryUrl = await composeAnchor(
@@ -2806,9 +2625,8 @@ serve(async (req) => {
                           false,
                           [],
                           false,
-                          director.framingSuffix || check.framingSuffix,
+                          check.framingSuffix,
                         );
-
                         if (retryUrl) {
                           // Re-audit the retry: identity + size.
                           const eRetry = await evaluate(retryUrl, "attempt-4-framing");
@@ -2890,104 +2708,6 @@ serve(async (req) => {
                   }
                 }
                 (scene as any).__minFaceCheck = minFaceCheck;
-
-                // ══════════════════════════════════════════════════════
-                // v355 — ANCHOR FRAMING RETRY (advisory, never fatal)
-                //
-                // v354 turned this into a hard block on a RATIO and
-                // immediately proved itself wrong: a 4-person conference
-                // table was stopped at 5.8 % against a required 16 %, a
-                // threshold four faces together can never reach.
-                //
-                // The anchor is a still whose pixel dimensions say nothing
-                // about the final render, so the only meaningful check
-                // here is compositional: is the framing tight enough to be
-                // worth another try? One retry with the close-up suffix,
-                // then we continue either way. The binding gate is the
-                // PIXEL contract on the rendered plate
-                // (compose-dialog-segments), where the numbers are real.
-                // ══════════════════════════════════════════════════════
-                if (
-                  closeupOnlyEnabled() &&
-                  composedUrl &&
-                  minFaceCheck &&
-                  minFaceCheck.ok === false &&
-                  identityFailure === null
-                ) {
-                  try {
-                    await invalidateCache();
-                    const retry2Url = await composeAnchor(
-                      "attempt-5-closeup-contract",
-                      false,
-                      false,
-                      [],
-                      false,
-                      closeupFramingSuffix(expectedFaces),
-                    );
-                    if (retry2Url) {
-                      const e2 = await evaluate(retry2Url, "attempt-5-closeup-contract");
-                      const d2 = await detectFacesMediaPipe({
-                        videoUrl: retry2Url,
-                        plateWidth: 1000,
-                        plateHeight: 1000,
-                        durationSec: 0,
-                        prebuiltFrameUrls: [retry2Url],
-                      });
-                      const c2 = d2.ok && d2.faces.length > 0
-                        ? assertPlateFaceContract({
-                            faces: d2.faces.map((f) => f.bbox as [number, number, number, number]),
-                            plateWidth: 1000,
-                            speakers: expectedFaces,
-                            mode: "ratio",
-                          })
-                        : null;
-                      console.log(
-                        `[compose-video-clips] v355_framing_retry scene=${scene.id} ` +
-                        `identity=${e2.identity ?? "ok"} ok=${c2?.ok ? 1 : 0} ` +
-                        `minRatio=${c2?.minWidthRatio.toFixed(3) ?? "?"} required=${c2?.requiredRatio.toFixed(3) ?? "?"}`,
-                      );
-                      if (
-                        e2.identity === null && c2 &&
-                        c2.minWidthRatio > minFaceCheck.minWidthRatio
-                      ) {
-                        composedUrl = retry2Url;
-                        faceCount = e2.faceCount;
-                        humanCount = e2.humanCount;
-                        identityFailure = e2.identity;
-                        identityNotes = e2.notes;
-                        identityMismatched = e2.mismatched ?? [];
-                        identityMissing = e2.missing ?? [];
-                        identityDuplicated = e2.duplicated ?? [];
-                        minFaceCheck = {
-                          ok: c2.ok,
-                          minWidthRatio: c2.minWidthRatio,
-                          minWidthPx: c2.minWidthPx,
-                          suggestion: minFaceCheck.suggestion,
-                          retried: true,
-                          reason: c2.reason,
-                        };
-                        (scene as any).__minFaceCheck = minFaceCheck;
-                      }
-                    }
-                  } catch (e) {
-                    console.warn(
-                      `[compose-video-clips] v355_framing_retry scene=${scene.id} exception: ${(e as Error).message}`,
-                    );
-                  }
-
-                  if (minFaceCheck.ok === false) {
-                    // Advisory only — the scene proceeds. The rendered
-                    // plate is measured in real pixels before any provider
-                    // credit is spent.
-                    console.warn(
-                      `[compose-video-clips] v355_framing_advisory scene=${scene.id} ` +
-                      `minRatio=${minFaceCheck.minWidthRatio.toFixed(3)} ` +
-                      `guideline=${requiredFaceWidthRatio(expectedFaces).toFixed(3)} n=${expectedFaces} — ` +
-                      `continuing; pixel contract decides on the rendered plate`,
-                    );
-                  }
-                }
-
 
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
@@ -3170,88 +2890,28 @@ serve(async (req) => {
                             `slots=${anchorFaceLayout.slots.length}/${expected} ` +
                             `source=geometry_plus_prompt_order biometric=${resolved}/${expected}`,
                           );
-                          // v326 — Geometry fallback. AWS CompareFaces returns no
-                          // similarity for stylised anchors quite often; when the
-                          // detector still found EXACTLY as many faces as we have
-                          // speakers, the mapping is unambiguous via the anchor
-                          // layout (prompt/row-major order). Lock it instead of
-                          // parking the scene in `awaiting_manual_face_map`.
-                          const geometryLock: Record<string, string> = {};
-                          if (resolved < expected && anchorLayoutComplete) {
-                            for (const slot of anchorFaceLayout.slots) {
-                              // v387 — nur Slots der aktuellen Sprecherzahl.
-                              // Vorher konnten Layout-Slots > expected in den
-                              // Lock wandern (locked_slots=5/4) und beim
-                              // Dispatch eine Identitaets-Kollision ausloesen.
-                              const si = Number(slot?.slotIndex);
-                              if (!Number.isInteger(si) || si < 0 || si >= expected) continue;
-                              if (slot?.characterId) geometryLock[String(si)] = slot.characterId;
-                            }
-                          }
-                          const useGeometryLock =
-                            resolved < expected &&
-                            anchorLayoutComplete &&
-                            Object.keys(geometryLock).length >= expected;
-                          if (useGeometryLock) {
-                            const _mergedLock: Record<string, string> = {
-                              ...geometryLock,
-                              ...(idResolved.assignmentLock ?? {}),
-                            };
-                            anchorIdentityPayload.assignmentLock = Object.fromEntries(
-                              Object.entries(_mergedLock).filter(([k]) => {
-                                const i = Number(k);
-                                return Number.isInteger(i) && i >= 0 && i < expected;
-                              }),
-                            );
-
-                            (anchorIdentityPayload as any).assignmentLockSource = "v326_geometry_rowmajor";
-                            (anchorIdentityPayload as any).status = "geometry";
-                            (anchorIdentityPayload as any).resolvedCount = expected;
-                            console.log(
-                              `[compose-video-clips] v326_geometry_lock scene=${scene.id} ` +
-                              `biometric=${resolved}/${expected} → geometry lock applied, no manual review`,
-                            );
-                          }
-
                           const nextDialogShots = {
                             ...nextDialogShotsBase,
                             anchor_face_layout: anchorFaceLayout,
                             plate_identity: {
                               ...(nextDialogShotsBase.plate_identity ?? {}),
                               method: idResolved.method,
-                              status: useGeometryLock ? "geometry" : identityStatus,
-                              assignmentLockSource: useGeometryLock
-                                ? "v326_geometry_rowmajor"
-                                : assignmentLockSource,
+                              status: identityStatus,
+                              assignmentLockSource,
                               dims: idResolved.dims,
                               faces: idResolved.faces,
-                              assignmentLock: anchorIdentityPayload.assignmentLock,
-                              // v329 — Identity/Geometry-Split: die Slot→Character
-                              // Zuordnung wird plate-unabhängig gespiegelt, damit sie
-                              // eine Geometrie-Eviction (v325) überlebt und später
-                              // per Slot-Index an frisch detektierte Faces gebunden
-                              // werden kann.
-                              identity: {
-                                bySlot: { ...(anchorIdentityPayload.assignmentLock ?? {}) },
-                                source: useGeometryLock
-                                  ? "v326_geometry_rowmajor"
-                                  : (assignmentLockSource ?? null),
-                              },
-                              resolvedCount: useGeometryLock ? expected : resolved,
+                              assignmentLock: idResolved.assignmentLock,
+                              resolvedCount: resolved,
                               expectedCount: expected,
                               v278AnchorLayoutSlots: anchorFaceLayout.slots.length,
                               v278AnchorLayoutComplete: anchorLayoutComplete,
                             },
                           };
                           // v276: hard-block only on total miss (0/N) when soft-gate enabled.
-                          // v326: … and only when the geometry fallback can't resolve it either.
                           // Legacy hard-gate (any partial for N>=3) restored via V276_SOFT_GATE=false.
-                          const needsManualReview = useGeometryLock
-                            ? false
-                            : softGateEnabled
-                              ? isTotalMiss
-                              : (expected >= 3 && (!idResolved.ok || resolved < expected));
-
+                          const needsManualReview = softGateEnabled
+                            ? isTotalMiss
+                            : (expected >= 3 && (!idResolved.ok || resolved < expected));
                           await supabaseAdmin
                             .from("composer_scenes")
                             .update({
@@ -3623,6 +3283,7 @@ serve(async (req) => {
           );
           await safeMarkSceneFailed(scene.id, msg, {
             isCinematicSyncScene: true,
+            extra: { twoshot_stage: "failed" },
           });
           results.push({ sceneId: scene.id, status: "failed", error: msg });
           continue;
@@ -3956,14 +3617,10 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               clip_url: scene.uploadUrl,
+              clip_status: "ready",
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v385 — Nutzdaten und Zustandsübergang NIE im selben Update:
-          // der Bridge-Trigger spiegelt die Legacy-Spalten sonst nicht.
-          await transitionScene(supabaseAdmin, scene.id, "plate_ready", {
-            detail: "compose-video-clips upload",
-          });
           results.push({
             sceneId: scene.id,
             status: "ready",
@@ -3991,20 +3648,20 @@ serve(async (req) => {
               .from("composer_scenes")
               .update({
                 clip_url: bestVideo.url,
+                clip_status: "ready",
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);
-            // v385 — siehe oben: Zustand separat schalten.
-            await transitionScene(supabaseAdmin, scene.id, "plate_ready", {
-              detail: "compose-video-clips stock",
-            });
             results.push({
               sceneId: scene.id,
               status: "ready",
               clipUrl: bestVideo.url,
             });
           } else {
-            await writeSceneFailure(scene.id, false, "No stock videos found");
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update(failedClipUpdate(false))
+              .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4018,47 +3675,35 @@ serve(async (req) => {
           // otherwise render 6s. Previously `>= 8 ? 10 : 6` silently rounded
           // 8s/9s scenes up to 10s and triggered Pro+10s API rejections.
           const duration = Number(scene.durationSeconds) === 10 ? 10 : 6;
-          const isI2V = !!scene.referenceImageUrl;
-          const isCinematicSyncScene =
-            (scene.engineOverride ?? "auto") === "cinematic-sync" ||
-            (scene.engineOverride ?? "auto") === "sync-segments";
           // Hailuo API constraint: 1080p is only accepted for 6s. 10s requires 768p.
-          // v355 — lip-sync scenes take the highest resolution the constraint
-          // allows, because the face contract is measured in native pixels.
-          const resolution = duration === 10
-            ? "768p"
-            : lipsyncPlateResolution(
-                isCinematicSyncScene,
-                ["768p", "1080p"],
-                quality === "pro" ? "1080p" : "768p",
-              );
+          const resolution =
+            duration === 10 ? "768p" : quality === "pro" ? "1080p" : "768p";
           if (quality === "pro" && duration === 10) {
             console.warn(
               `[compose-video-clips] Hailuo Pro+10s API-incompatible — downgrading resolution to 768p (Scene ${scene.id}).`,
             );
           }
-          if (isCinematicSyncScene) {
-            console.log(
-              `[compose-video-clips] v355_lipsync_resolution scene=${scene.id} hailuo=${resolution} duration=${duration}s`,
-            );
-          }
-
+          const isI2V = !!scene.referenceImageUrl;
+          const isCinematicSyncScene =
+            (scene.engineOverride ?? "auto") === "cinematic-sync" ||
+            (scene.engineOverride ?? "auto") === "sync-segments";
 
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               ...(isCinematicSyncScene
                 ? {
                     lip_sync_source_clip_url: null,
+                    lip_sync_status: "pending",
+                    twoshot_stage: "master_clip",
                   }
                 : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-hailuo", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const masterPrompt = isCinematicSyncScene
             ? buildCinematicSyncMasterPrompt(scene)
@@ -4091,6 +3736,7 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               replicate_prediction_id: prediction.id,
+              ...(isCinematicSyncScene ? { twoshot_stage: "master_clip" } : {}),
             })
             .eq("id", scene.id);
 
@@ -4105,13 +3751,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-kling", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           // Kling 3 Omni: Replicate accepts 3–15s. Snap to Toolkit-aligned buckets.
           const klingDuration = snapDuration(scene.durationSeconds, [3, 5, 8, 10, 15]);
@@ -4177,12 +3822,11 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const enrichedPrompt = enrichPrompt(
             scene.aiPrompt,
@@ -4214,11 +3858,15 @@ serve(async (req) => {
               imgResp.status,
               errBody,
             );
-            await writeSceneFailure(
-              scene.id,
-              (scene.engineOverride ?? "auto") === "cinematic-sync",
-              `Image generation failed (${imgResp.status})`
-              );
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Image generation failed (${imgResp.status})`,
+                ),
+              )
+              .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4238,13 +3886,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-wan", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const wanModel = isI2V
             ? "wan-video/wan-2.5-i2v"
@@ -4291,6 +3938,7 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim(
                 "ai-seedance",
@@ -4299,8 +3947,6 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           // Seedance Lite supports 5/8/10/12s (Toolkit ground-truth) — snap to nearest.
           const seedDuration = snapDuration(scene.durationSeconds, [5, 8, 10, 12]);
@@ -4343,13 +3989,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-luma", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           // Luma Ray 2 only supports 5 or 9 seconds — snap to nearest allowed value
           const lumaDuration = snapDuration(scene.durationSeconds, [5, 9]);
@@ -4398,13 +4043,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-veo", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const veoModel =
             quality === "pro" ? "google/veo-3.1" : "google/veo-3.1-fast";
@@ -4479,12 +4123,11 @@ serve(async (req) => {
             await supabaseAdmin
               .from("composer_scenes")
               .update({
+                clip_status: "generating",
                 clip_quality: "standard",
                 replicate_prediction_id: fallbackPred.id,
               })
               .eq("id", scene.id);
-            // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-            await enterPlateRendering(supabaseAdmin, scene.id);
             results.push({
               sceneId: scene.id,
               status: "generating",
@@ -4496,12 +4139,11 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const runwayDuration = scene.durationSeconds >= 8 ? 10 : 5;
           const runwayResp = await fetch(
@@ -4529,11 +4171,15 @@ serve(async (req) => {
               runwayResp.status,
               errBody,
             );
-            await writeSceneFailure(
-              scene.id,
-              (scene.engineOverride ?? "auto") === "cinematic-sync",
-              `Runway ${runwayResp.status}`
-              );
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Runway ${runwayResp.status}`,
+                ),
+              )
+              .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4564,13 +4210,12 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim("ai-pika", isI2V),
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const pikaDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const pikaResp = await fetch(
@@ -4599,11 +4244,15 @@ serve(async (req) => {
               pikaResp.status,
               errBody,
             );
-            await writeSceneFailure(
-              scene.id,
-              (scene.engineOverride ?? "auto") === "cinematic-sync",
-              `Pika ${pikaResp.status}`
-              );
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  `Pika ${pikaResp.status}`,
+                ),
+              )
+              .eq("id", scene.id);
             results.push({
               sceneId: scene.id,
               status: "failed",
@@ -4664,10 +4313,13 @@ serve(async (req) => {
           await supabaseAdmin
             .from("composer_scenes")
             .update({
+              clip_status: "generating",
               clip_quality: quality,
               ...(isCinematicSyncHH
                 ? {
                     lip_sync_source_clip_url: null,
+                    lip_sync_status: "pending",
+                    twoshot_stage: "master_clip",
                     dialog_shots: null,
                     replicate_prediction_id: null,
                     lip_sync_applied_at: null,
@@ -4680,29 +4332,12 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
-          // v388 — Zustandswechsel ausschliesslich ueber den Vertrag.
-          await enterPlateRendering(supabaseAdmin, scene.id);
 
           const hhDuration = Math.min(
             15,
             Math.max(3, Math.round(scene.durationSeconds)),
           );
-          // v355 — Lip-sync scenes always render at the model's highest
-          // resolution. The contract is measured in NATIVE face pixels, and
-          // resolution is the only lever that adds real mouth detail
-          // without changing the director's framing: at identical framing
-          // 1080p carries 1.5× the face pixels of 720p (a 74 px face on the
-          // failed 1284 px plate becomes ~111 px at 1920 px).
-          const hhResolution = lipsyncPlateResolution(
-            isCinematicSyncHH,
-            ["720p", "1080p"],
-            quality === "pro" ? "1080p" : "720p",
-          );
-          if (isCinematicSyncHH && hhResolution !== (quality === "pro" ? "1080p" : "720p")) {
-            console.log(
-              `[compose-video-clips] v355_lipsync_resolution scene=${scene.id} forced=${hhResolution} (quality=${quality})`,
-            );
-          }
+          const hhResolution = quality === "pro" ? "1080p" : "720p";
           const hhPromptRaw = isCinematicSyncHH
             ? buildCinematicSyncMasterPrompt(scene)
             : scene.aiPrompt;
@@ -4710,35 +4345,8 @@ serve(async (req) => {
           // tags, dark-bedroom/3-AM/laptop-screen triggers, duplicates.
           // The Alibaba content filter rejects raw prompts with these
           // tokens BEFORE GPU spend (DataInspectionFailed).
-          // v369 — dialog plates (cinematic-sync) go through the aggressive
-          // sanitizer + lip-ready compressor right away: their prompts are the
-          // longest and the ones HappyHorse rejects with InvalidParameter /
-          // Green Net. Lip motion comes from Sync.so, not from this prompt.
-          // v370 — the resolved cast names travel with the prompt so the
-          // sanitizer rebuilds ONE canonical clause instead of regex-patching
-          // whatever it finds.
-          const hhCastNames = extractCastNames(String(hhPromptRaw ?? ""));
-          const hhSan = isCinematicSyncHH
-            ? hardSanitizeForHappyHorse(String(hhPromptRaw ?? ""), hhCastNames)
-            : sanitizeForHappyHorse(String(hhPromptRaw ?? ""), { castNames: hhCastNames });
-          let hhCleanPrompt = hhSan.emptied ? String(hhPromptRaw ?? "") : hhSan.clean;
-
-          // Pre-Dispatch-Contract: nothing leaves this function with a
-          // bracket tag, a duplicated cast clause or a count/name mismatch —
-          // the exact triad behind "InvalidParameter - Could not process with
-          // this prompt".
-          const hhContract = validateCastContract(hhCleanPrompt);
-          if (!hhContract.ok) {
-            const rebuilt = normalizeCastInPrompt(hhCleanPrompt, hhCastNames);
-            hhCleanPrompt = rebuilt.out.replace(/\[[^\]]*\]/g, " ")
-              .replace(/[ \t]+/g, " ").trim();
-            console.warn(
-              `[compose-video-clips] v370_cast_contract_rebuilt scene=${scene.id} issues=${
-                hhContract.issues.map((i) => `${i.code}(${i.detail})`).join(", ")
-              }`,
-            );
-          }
-
+          const hhSan = sanitizeForHappyHorse(String(hhPromptRaw ?? ""));
+          const hhCleanPrompt = hhSan.emptied ? String(hhPromptRaw ?? "") : hhSan.clean;
           if (hhSan.touched.length > 0) {
             console.log(
               `[compose-video-clips] HappyHorse scene ${scene.id} green-net sanitized: ${hhSan.touched.join(", ")}`,
@@ -4795,11 +4403,15 @@ serve(async (req) => {
       } catch (sceneError) {
         const errMsg = errorToString(sceneError);
         console.error(`[compose-video-clips] Scene ${scene.id} error:`, errMsg);
-        await writeSceneFailure(
-          scene.id,
-          (scene.engineOverride ?? "auto") === "cinematic-sync",
-          errMsg
-          );
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update(
+            failedClipUpdate(
+              (scene.engineOverride ?? "auto") === "cinematic-sync",
+              errMsg,
+            ),
+          )
+          .eq("id", scene.id);
         results.push({ sceneId: scene.id, status: "failed", error: errMsg });
       }
     }
@@ -4912,14 +4524,12 @@ serve(async (req) => {
           // once it starts. Preserve the diagnostic as a clip_error note.
           const { data: liveRows } = await admin
             .from("composer_scenes")
-            .select("id, clip_url, pipeline_state")
+            .select("id, clip_url, lip_sync_status")
             .in("id", failedSceneIds);
           const safeToFail = (liveRows ?? [])
             .filter((r) => {
               const hasUrl = typeof r?.clip_url === "string" && r.clip_url.length > 0;
-              const st = sceneState(r);
-              const live =
-                st === "lipsync_running" || st === "lipsync_muxing" || st === "complete";
+              const live = r?.lip_sync_status === "running" || r?.lip_sync_status === "done";
               return !hasUrl && !live;
             })
             .map((r) => r.id as string);
@@ -4942,12 +4552,11 @@ serve(async (req) => {
             await admin
               .from("composer_scenes")
               .update({
+                clip_status: "failed",
                 clip_error: `[${__stage}] ${msg}`.slice(0, 500),
                 updated_at: new Date().toISOString(),
               })
               .in("id", safeToFail);
-            // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-            await failSceneState(admin, safeToFail, "failed");
             const cinematicSafeToFail = cinematicFailedSceneIds.filter((id) =>
               safeToFail.includes(id),
             );
@@ -4955,6 +4564,8 @@ serve(async (req) => {
               await admin
                 .from("composer_scenes")
                 .update({
+                  lip_sync_status: null,
+                  twoshot_stage: null,
                   lip_sync_source_clip_url: null,
                   dialog_shots: null,
                   updated_at: new Date().toISOString(),
