@@ -190,7 +190,17 @@ export const canStartAudioPrep = (row: any): boolean => {
   return isRealizedScene(row) && (s === 'plate_ready' || s === 'audio_prep');
 };
 
+/** START-Vertrag: darf ueberhaupt ein Lip-Sync-Lauf beginnen? */
 export const canDispatchLipsync = (row: any): boolean => {
   const s = sceneState(row);
   return isRealizedScene(row) && (s === 'audio_ready' || s === 'lipsync_dispatched');
+};
+
+/**
+ * v394 — FORTSETZUNGS-Vertrag (Zwilling von `_shared/scene-state.ts`).
+ * Ein weiterer Pass eines bereits laufenden Lip-Syncs darf dispatcht werden.
+ */
+export const canContinueLipsync = (row: any): boolean => {
+  const s = sceneState(row);
+  return isRealizedScene(row) && (s === 'lipsync_dispatched' || s === 'lipsync_running');
 };
