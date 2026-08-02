@@ -11,6 +11,11 @@ import {
   hardSanitizeForHappyHorse,
   extractCastNames,
 } from "../_shared/happyhorse-green-net.ts";
+import {
+  checkPlateAttempt,
+  completePlateAttempt,
+  failPlateAttempt,
+} from "../_shared/plate-attempt.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
