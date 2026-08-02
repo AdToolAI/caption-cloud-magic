@@ -116,8 +116,11 @@ import {
   trackFaceAcrossTurn,
   interpolateBoxes,
   withContextPadding,
+  clampBoxArea,
+  MAX_DISPATCH_BOX_AREA_FRAC,
   trackMovementPx,
 } from "../_shared/face-track.ts";
+
 
 import {
   buildAsdStrategy,
