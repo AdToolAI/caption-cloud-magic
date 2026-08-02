@@ -243,6 +243,49 @@ export function stripDerivedSceneAssets(
 }
 
 /**
+ * v382 — NOT-NULL-Guard für den Reset-Write.
+ *
+ * `composer_scenes.dialog_takes` (default `'{}'`) und `composer_scenes.scene_assets`
+ * (default `'[]'`) sind NOT NULL. Ein einziges `null` in diesem Patch ließ das
+ * gesamte Update — und damit jeden Regenerate einer Dialogszene — an einer
+ * Constraint scheitern; v377 meldete daraufhin korrekt `reset_failed` und die
+ * UI zeigte "Edge Function returned a non-2xx status code".
+ *
+ * Statt sich auf handgepflegte Werte zu verlassen, wird hier jedes `null` auf
+ * einer bekannten NOT-NULL-Spalte auf deren Default korrigiert und geloggt.
+ * Eine künftige Schemaänderung kann den Regenerate so nicht erneut blockieren.
+ */
+const NOT_NULL_SCENE_COLUMN_DEFAULTS: Record<string, unknown> = {
+  dialog_takes: {},
+  scene_assets: [],
+  clip_status: "pending",
+  retry_count: 0,
+  plate_generation: 1,
+};
+
+export function coerceNotNullResetColumns(
+  patch: Record<string, unknown>,
+  sceneId?: string,
+): Record<string, unknown> {
+  const out = { ...patch };
+  const coerced: string[] = [];
+  for (const [col, fallback] of Object.entries(NOT_NULL_SCENE_COLUMN_DEFAULTS)) {
+    if (col in out && (out[col] === null || out[col] === undefined)) {
+      out[col] = fallback;
+      coerced.push(col);
+    }
+  }
+  if (coerced.length > 0) {
+    console.log(
+      `[v382_notnull_coerced] scene=${sceneId ?? "unknown"} columns=${coerced.join(",")}`,
+    );
+  }
+  return out;
+}
+
+
+
+/**
  * v380 — offene `video_renders` der Szene, die zu einer ÄLTEREN Generation
  * gehören, werden als `failed` mit `superseded`-Marker geschlossen. Kein
  * Delete: die Forensik (welcher Lauf hat was gerendert) bleibt erhalten, aber
