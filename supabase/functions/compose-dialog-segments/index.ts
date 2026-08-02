@@ -7665,7 +7665,29 @@ serve(async (req) => {
       // trusted" short-circuit (v131.4) is gone because we no longer dispatch
       // auto_detect on preclips; we send explicit center coords and the gate
       // (+ Sync.so auto-snap) is the safety net against drift.
+      // ── v397 — Geometrie-Roundtrip VOR dem Gate prüfen ────────────────
+      // Nur mit grünem Roundtrip darf ein reiner Messausfall (alle Stills
+      // leer) in einen degradierten Dispatch münden statt hart zu scheitern.
+      let geometryContractOkPre = false;
+      if (usePassPreclip && preclipCropForGate) {
+        try {
+          const tPre = buildPreclipTransform({
+            x: Number(preclipCropForGate.x),
+            y: Number(preclipCropForGate.y),
+            size: Number(preclipCropForGate.size),
+            outputSize: Number(preclipCropForGate.outputSize ?? gateWidth ?? 720),
+          });
+          geometryContractOkPre = assertRoundtrip(tPre, [
+            [tPre.crop.x, tPre.crop.y],
+            [tPre.crop.x + tPre.crop.size, tPre.crop.y + tPre.crop.size],
+          ]).ok;
+        } catch {
+          geometryContractOkPre = false;
+        }
+      }
+
       const gate = await verifyFaceBeforeDispatch({
+
         videoUrl: dispatchVideoUrl,
         frameNumber: gateFrame,
         coord: gateCoord,
