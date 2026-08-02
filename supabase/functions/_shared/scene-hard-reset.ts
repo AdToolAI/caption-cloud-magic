@@ -243,7 +243,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     const { data } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, plate_generation, dialog_shots, audio_plan, replicate_prediction_id, lip_sync_applied_at",
+        "id, project_id, plate_generation, plate_ready_generation, clip_url, clip_status, dialog_shots, audio_plan, replicate_prediction_id, lip_sync_applied_at",
       )
       .eq("id", sceneId)
       .maybeSingle();
@@ -254,21 +254,39 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
 
   const jobIds = collectSyncJobIds(scene);
 
-  // 2. Cancel provider jobs + free inflight slots + refund credits once.
-  //    failLipSync is idempotent and never throws.
+  // 1b. v374 — is provider work actually still open on this scene?
+  let hasInflightRows = false;
+  try {
+    const { data } = await supabase
+      .from("syncso_inflight_jobs")
+      .select("job_id")
+      .eq("scene_id", sceneId)
+      .limit(1);
+    hasInflightRows = Array.isArray(data) && data.length > 0;
+  } catch {
+    /* registry unavailable — fall back to the job ids we already know */
+  }
+
+  const refund = decideRefund({ scene, knownJobIds: jobIds, hasInflightRows });
+
+  // 2. Cancel provider jobs + free inflight slots. Credits are refunded ONLY
+  //    for an open job we are about to cancel (v374). `failLipSync` prefers
+  //    the persisted cost over the hint, so a non-refund is expressed by
+  //    withholding the userId — that is the flag it gates the payout on.
   try {
     await failLipSync({
       supabase,
       sceneId,
-      userId,
+      userId: refund.decision === "refunded" ? userId : null,
       reason: args.reason ?? "v373_hard_reset",
       extraSyncJobIds: jobIds,
-      refundCredits: Number(scene?.dialog_shots?.cost_credits) || 0,
+      refundCredits: refund.amount,
       syncApiKey: args.syncApiKey ?? null,
     });
   } catch (e) {
     errors.push(`cancel:${(e as Error).message}`.slice(0, 120));
   }
+
 
   // 3. Drop dispatch locks so the next run is never blocked by a stale lease.
   try {
