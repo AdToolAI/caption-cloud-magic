@@ -457,6 +457,14 @@ export async function renderPassFacePreclip(
 
 
   const t0 = Date.now();
+  const { data: runRow } = await supabase
+    .from("composer_scenes")
+    .select("plate_generation, active_run_id")
+    .eq("id", sceneId)
+    .maybeSingle();
+  if (!runRow?.active_run_id) {
+    return { ok: false, error: "no_active_scene_run", errorClass: "dispatch_failed" };
+  }
 
   // v188 (Phase 1.2) — Reuse-Guard. If an earlier Lambda run for THIS exact
   // scene+pass with the SAME crop geometry finished within the last 15 min
@@ -474,6 +482,8 @@ export async function renderPassFacePreclip(
       .eq("status", "completed")
       .contains("content_config", {
         composer_scene_id: sceneId,
+        plate_generation: Number(runRow.plate_generation),
+        active_run_id: String(runRow.active_run_id),
         pass_idx: passIdx,
         face_crop: { size: crop.size },
         preclip_pipeline_version: PRECLIP_PIPELINE_VERSION,
@@ -636,6 +646,8 @@ export async function renderPassFacePreclip(
         composer_scene_id: sceneId,
         composer_project_id: projectId,
         pass_idx: passIdx,
+        plate_generation: Number(runRow.plate_generation),
+        active_run_id: String(runRow.active_run_id),
       },
     },
   };

@@ -35,7 +35,7 @@ import { extractFunctionsError } from '@/lib/functionsError';
 // The standalone /talking-head module still owns that hook.
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
-import { resetSceneLipSync } from '@/lib/lipsyncReset';
+import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
 import { parseDialogScript, uniqueSpeakers, type DialogBlock } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { buildInvokePrompt } from '@/lib/motion-studio/buildInvokePrompt';
@@ -1846,18 +1846,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           // is inaudible until the user manually unmutes).
           // v351 — Re-Run: alten Abschluss-Zustand wegräumen, aber laufende
           // Sync.so-Jobs vorher sauber canceln (Slot-Leak-Schutz).
-          await resetSceneLipSync(sceneIdFinal, (scene as any).dialogShots ?? null, {
-            engine_override: 'cinematic-sync',
-            lip_sync_with_voiceover: true,
-            lip_sync_status: 'pending',
-            lip_sync_applied_at: null,
-            lip_sync_source_clip_url: null,
-            twoshot_stage: null,
+          await startSceneGeneration({
+            sceneIds: [sceneIdFinal],
+            reason: 'dialog_studio_regenerate',
+            compose: { projectId: pidFinal, scenes: [scenePayload], characters },
           });
-          const { error: invokeErr } = await supabase.functions.invoke('compose-video-clips', {
-            body: { projectId: pidFinal, scenes: [scenePayload], characters },
-          });
-          if (invokeErr) throw invokeErr;
         } catch (invokeErr) {
           console.error('[SceneDialogStudio] compose-video-clips invoke failed', invokeErr);
           // Roll back the optimistic generating state so user can retry.

@@ -126,6 +126,7 @@ import {
 } from "@/lib/video-composer/modelMapping";
 
 import { AI_VIDEO_TOOLKIT_MODELS } from "@/config/aiVideoModelRegistry";
+import { startSceneGeneration } from "@/lib/composer/startSceneGeneration";
 import { useUnifiedMentionLibrary } from "@/hooks/useUnifiedMentionLibrary";
 import { useStylePresets } from "@/hooks/useStylePresets";
 import { supabase } from "@/integrations/supabase/client";
@@ -2143,48 +2144,17 @@ export default function SceneCard({
                         });
                         if (!ok) return;
                         try {
-                          const prevPlan = ((scene as any).audioPlan ??
-                            {}) as Record<string, any>;
-                          const prevTwoshot = (prevPlan.twoshot ??
-                            {}) as Record<string, any>;
-                          const {
-                            faceMap: _faceMap,
-                            syncJobs: _syncJobs,
-                            heartbeat: _heartbeat,
-                            anchor_face_audit: _anchorAudit,
-                            ...twoshotWithoutAnchorState
-                          } = prevTwoshot;
-                          const resetAudioPlan = {
-                            ...prevPlan,
-                            twoshot: twoshotWithoutAnchorState,
-                          };
-                          await supabase
-                            .from("composer_scenes")
-                            .update({
-                              reference_image_url: null,
-                              clip_url: null,
-                              clip_status: "pending",
-                              clip_error: null,
-                              lip_sync_status: null,
-                              lip_sync_applied_at: null,
-                              lip_sync_source_clip_url: null,
-                              twoshot_stage: null,
-                              replicate_prediction_id: null,
-                              audio_plan: resetAudioPlan,
-                              updated_at: new Date().toISOString(),
-                            })
-                            .eq("id", scene.id);
                           onUpdate({
                             referenceImageUrl: undefined,
                             clipUrl: undefined,
-                            clipStatus: "pending",
+                            clipStatus: "generating",
                             lipSyncStatus: null as any,
                             lipSyncAppliedAt: null as any,
                           });
-                          const { error } = await supabase.functions.invoke(
-                            "compose-video-clips",
-                            {
-                              body: {
+                          await startSceneGeneration({
+                            sceneIds: [scene.id],
+                            reason: "scene_card_full_regenerate",
+                            compose: {
                                 projectId: scene.projectId,
                                 scenes: [
                                   {
@@ -2203,10 +2173,8 @@ export default function SceneCard({
                                   },
                                 ],
                                 characters,
-                              },
                             },
-                          );
-                          if (error) throw error;
+                          });
                         } catch (e) {
                           console.warn(
                             "[SceneCard] re-roll clip + lipsync failed",

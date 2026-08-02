@@ -813,12 +813,51 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, reference_image_url, lock_reference_url, scene_assets, plate_generation, plate_ready_generation",
+        "id, project_id, audio_plan, dialog_script, dialog_turns, character_shots, dialog_shots, clip_url, clip_status, clip_error, lip_sync_source_clip_url, lip_sync_applied_at, lip_sync_status, twoshot_stage, reference_image_url, lock_reference_url, scene_assets, plate_generation, plate_ready_generation, active_run_id",
       )
       .eq("id", sceneId)
       .single();
     if (sceneErr || !scene) {
       return json({ error: "scene_not_found", details: sceneErr?.message }, 404);
+    }
+
+    // v378 — terminal scene/run guard. This is deliberately server-side: the
+    // browser auto-trigger is not the only caller (webhooks and recovery paths
+    // also enter here). A failed master clip, a failed/canceled lip-sync state,
+    // or a scene without an active v377 run may never reach preclip/provider
+    // work. Only a user-triggered composer-start-scene-generation call can mint
+    // a fresh run and clear the terminal state.
+    const terminalClipError =
+      typeof (scene as any).clip_error === "string" &&
+      (scene as any).clip_error.length > 0 &&
+      ![
+        "audio_plan_not_ready_self_heal",
+        "audio_prep_transient_retry",
+        "syncso_concurrency_deferred",
+      ].some((marker) => String((scene as any).clip_error).startsWith(marker));
+    const terminalScene =
+      (scene as any).clip_status !== "ready" ||
+      terminalClipError ||
+      ["failed", "canceled"].includes(String((scene as any).lip_sync_status ?? "")) ||
+      ["failed", "audio_mux_failed", "canceled", "needs_clip_rerender"].includes(
+        String((scene as any).twoshot_stage ?? ""),
+      ) ||
+      ["failed", "canceled"].includes(String((scene as any).dialog_shots?.status ?? ""));
+    if (!(scene as any).active_run_id || terminalScene) {
+      console.warn(
+        `[compose-dialog-segments] v378_terminal_guard scene=${sceneId} ` +
+          `run=${(scene as any).active_run_id ?? "none"} clip=${(scene as any).clip_status ?? "null"} ` +
+          `lip=${(scene as any).lip_sync_status ?? "null"} stage=${(scene as any).twoshot_stage ?? "null"}`,
+      );
+      return json(
+        {
+          error: terminalScene ? "master_clip_failed" : "no_active_scene_run",
+          message: terminalScene
+            ? "Die Szene ist fehlgeschlagen oder noch nicht fertig. Lip-Sync wurde nicht gestartet."
+            : "Für diese Szene existiert kein aktiver Generierungslauf.",
+        },
+        409,
+      );
     }
 
     const { data: project } = await supabase
@@ -1167,14 +1206,9 @@ serve(async (req) => {
       existing &&
       (existingStatus === "failed" || /v68|v58|v41|v56|recovery refund|provider_unknown/i.test(existingError));
     if (isStaleFailedState) {
-      // v100 — Self-heal stale watchdog-killed terminal state on auto-trigger.
-      // When the watchdog (or any prior failure) refunded credits and parked
-      // dialog_shots in {status:failed, refunded:true}, the previous
-      // behaviour returned 409 reset_required, forcing the user to click
-      // "Sauber neu starten" manually. For auto-trigger calls we now clear
-      // the stale state in-line and continue with a clean dispatch. Manual
-      // invocations (auto !== true) still get the 409 so the explicit reset
-      // button remains the user's eskalation path.
+      // v378 — terminal states are never auto-revived. Recovery may repair a
+      // waiting state, but only an explicit user regeneration may mint a new
+      // run after failed/canceled/superseded work.
       const isAutoTrigger = body?.auto === true || body?.recovery === true;
       const existingPasses = Array.isArray((existing as any)?.passes)
         ? ((existing as any).passes as Array<{ status?: string }>)
@@ -1182,52 +1216,16 @@ serve(async (req) => {
       const hasActivePass = existingPasses.some((p) =>
         ["queued", "rendering", "retrying"].includes(String(p?.status ?? "")),
       );
-      const isCleanlyRefunded =
-        (existing as any)?.refunded === true && !hasActivePass;
-      const canAutoReset =
-        isAutoTrigger &&
-        existingStatus === "failed" &&
-        isCleanlyRefunded;
-
-      if (canAutoReset) {
-        console.log(
-          `[compose-dialog-segments] v100 auto-reset-stale-failed scene=${sceneId} prev_error=${existingError.slice(0, 120)}`,
-        );
-        const { error: resetErr } = await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: null,
-            lip_sync_status: "pending",
-            clip_error: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", sceneId);
-        if (resetErr) {
-          console.warn(
-            `[compose-dialog-segments] v100 auto-reset write_failed scene=${sceneId} err=${resetErr.message} — falling back to 409`,
-          );
-          return json(
-            {
-              error: "reset_required",
-              message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before dispatch.",
-            },
-            409,
-          );
-        }
-        // Continue with a clean slate — `existing` is now logically null.
-        (scene as any).dialog_shots = null;
-      } else {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} reset_required — refusing stale failed state status=${existingStatus} error=${existingError.slice(0, 160)} auto=${isAutoTrigger} refunded=${(existing as any)?.refunded === true} hasActivePass=${hasActivePass}`,
-        );
-        return json(
-          {
-            error: "reset_required",
-            message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before v69 dispatch.",
-          },
-          409,
-        );
-      }
+      console.warn(
+        `[compose-dialog-segments] v378_terminal_no_revive scene=${sceneId} status=${existingStatus} error=${existingError.slice(0, 160)} auto=${isAutoTrigger} hasActivePass=${hasActivePass}`,
+      );
+      return json(
+        {
+          error: "reset_required",
+          message: "Der vorherige Lauf ist terminal. Bitte die Szene ausdrücklich neu rendern.",
+        },
+        409,
+      );
     }
 
     if (
@@ -1420,7 +1418,9 @@ serve(async (req) => {
 
     // ── Webhook URL ──────────────────────────────────────────────────────
     const webhookUrl = appendWebhookToken(
-      `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
+      `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
+        `&generation=${encodeURIComponent(String((scene as any).plate_generation))}` +
+        `&run_id=${encodeURIComponent(String((scene as any).active_run_id))}`,
     );
 
     // ── Face-targeting (resolve per-speaker coords) ──────────────────────
@@ -2768,7 +2768,7 @@ serve(async (req) => {
             : `Sprecher ${dupBox} zeigen auf dasselbe Gesicht in der Szene.`) +
           ` Die Sprecher-Zuordnung ist mehrdeutig — bitte Szene mit klar getrennten Sprechern neu generieren.`;
         console.error(`[compose-dialog-segments] scene=${sceneId} v367_identity_collision ${msg}`);
-        await supabaseAdmin
+        await supabase
           .from("composer_scenes")
           .update({
             lip_sync_status: "failed",
@@ -5862,7 +5862,7 @@ serve(async (req) => {
           } catch (collisionErr) {
             const msg = (collisionErr as Error).message;
             console.error(`[compose-dialog-segments] scene=${sceneId} v367_overlay_collision ${msg}`);
-            await supabaseAdmin
+            await supabase
               .from("composer_scenes")
               .update({
                 lip_sync_status: "failed",
