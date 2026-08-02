@@ -887,6 +887,7 @@ serve(async (req) => {
                 .from("composer_scenes")
                 .update({
                   character_audio_url: url,
+                  audio_selfheal_count: 0,
                   audio_plan: {
                     ...latestPlan,
                     twoshot: { ...((latestPlan.twoshot ?? {}) as Record<string, unknown>), ...reusedPlan },
@@ -1508,6 +1509,7 @@ serve(async (req) => {
     const latestTwoshot = (latestAudioPlan.twoshot ?? {}) as Record<string, any>;
     const sceneUpdate: Record<string, unknown> = {
       character_audio_url: publicUrl,
+      audio_selfheal_count: 0,
       audio_plan: {
         ...latestAudioPlan,
         twoshot: {

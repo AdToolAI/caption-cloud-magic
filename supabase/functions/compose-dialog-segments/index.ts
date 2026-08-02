@@ -1041,24 +1041,41 @@ serve(async (req) => {
     }
 
     if (!masterAudioUrl || speakers.length === 0 || totalSec <= 0) {
-      // v172 self-heal: NICHT als hartes failed markieren — der Audio-Prep
-      // (compose-twoshot-audio) ist hier einfach noch nicht durchgelaufen
-      // oder hat keinen master geschrieben. twoshot_stage auf null setzen,
-      // damit der Client-Trigger (useTwoShotAutoTrigger) im nächsten Tick
-      // den Audio-Prep nachholt. Vorher blieb die Szene ewig auf
-      // "Lip-Sync wird gestartet…" weil der Status pending blieb und
-      // gleichzeitig twoshot_stage='master_clip' den Re-Try blockierte.
-      await supabase
+      // v390 bounded self-heal: transient ordering gets three retries, but an
+      // invalid audio contract must never create an infinite state loop.
+      const nextSelfHealCount = Number((scene as any).audio_selfheal_count ?? 0) + 1;
+      const exhausted = nextSelfHealCount >= 3;
+      const { error: selfHealWriteError } = await supabase
         .from("composer_scenes")
         .update({
-          clip_error: "audio_plan_not_ready_self_heal",
+          audio_selfheal_count: nextSelfHealCount,
+          clip_error: exhausted
+            ? "audio_plan_not_ready_retry_exhausted"
+            : `audio_plan_not_ready_self_heal:${nextSelfHealCount}/3`,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", sceneId);
-      // v388 — Rueckfall auf die fertige Plate laeuft ueber den Vertrag.
+        .eq("id", sceneId)
+        .eq("active_run_id", String((scene as any).active_run_id ?? ""))
+        .eq("plate_generation", Number((scene as any).plate_generation ?? 1));
+      if (selfHealWriteError) {
+        console.error(`[compose-dialog-segments] v390 self-heal counter failed scene=${sceneId}: ${selfHealWriteError.message}`);
+      }
+      if (exhausted) {
+        await failSceneState(supabase, sceneId, "failed", "v390_audio_plan_retry_exhausted");
+        return json(
+          {
+            ok: false,
+            error: "missing_audio_plan_retry_exhausted",
+            message: "Der Audio-Plan konnte nach drei Versuchen nicht vollständig erstellt werden.",
+          },
+          422,
+        );
+      }
       await transitionScene(supabase, sceneId, "plate_ready", {
         from: ["plate_ready", "audio_prep", "audio_ready"],
-        detail: "v388_audio_plan_not_ready_self_heal",
+        detail: `v390_audio_plan_not_ready_self_heal_${nextSelfHealCount}`,
+        runId: String((scene as any).active_run_id ?? ""),
+        generation: Number((scene as any).plate_generation ?? 1),
       });
       return json(
         {
@@ -1066,7 +1083,7 @@ serve(async (req) => {
           self_heal: true,
           error: "missing_audio_plan",
           message:
-            "Audio-Plan ist noch nicht fertig — Stage wurde zurückgesetzt, Trigger holt compose-twoshot-audio im nächsten Tick nach.",
+            `Audio-Plan ist noch nicht fertig — kontrollierter Neuversuch ${nextSelfHealCount}/3.`,
         },
         202,
       );

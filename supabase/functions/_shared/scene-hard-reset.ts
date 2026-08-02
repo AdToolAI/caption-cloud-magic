@@ -617,6 +617,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
 
       replicate_prediction_id: null,
       retry_count: 0,
+      audio_selfheal_count: 0,
       updated_at: nowIso,
     }, sceneId);
 
