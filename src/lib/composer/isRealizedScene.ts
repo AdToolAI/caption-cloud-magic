@@ -42,5 +42,16 @@ export function isRealizedScene(scene: any): boolean {
   if (twoshotStage === 'failed' || twoshotStage === 'audio_mux_failed') return false;
   if (lipSyncStatus === 'failed' || lipSyncStatus === 'canceled') return false;
 
+  // v373 — Generations-Vertrag: die vorliegende Plate muss aus dem AKTUELLEN
+  // Lauf stammen. Sonst startet der Auto-Trigger die Lip-Sync-Kette auf dem
+  // Video eines früheren Durchlaufs, während der neue Render noch läuft.
+  const plateGeneration = scene.plate_generation ?? scene.plateGeneration ?? null;
+  const plateReadyGeneration =
+    scene.plate_ready_generation ?? scene.plateReadyGeneration ?? null;
+  if (plateGeneration != null && Number(plateReadyGeneration) !== Number(plateGeneration)) {
+    return false;
+  }
+
   return true;
 }
+
