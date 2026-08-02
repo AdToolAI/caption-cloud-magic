@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canDispatchLipsync, canStartAudioPrep, sceneState } from '../sceneState';
+import { canDispatchLipsync, canStartAudioPrep, clipStatusFromState, sceneState } from '../sceneState';
 
 describe('composer client enum contract', () => {
   it('never lets stale legacy lipsync fields override a rendering plate', () => {
@@ -31,5 +31,18 @@ describe('composer client enum contract', () => {
     expect(canDispatchLipsync(plateReady)).toBe(false);
     expect(canStartAudioPrep(audioReady)).toBe(false);
     expect(canDispatchLipsync(audioReady)).toBe(true);
+  });
+
+  it('projects the legacy clipStatus display value from the state machine only', () => {
+    // Alt-Spalte sagt "fertig", der Zustandsautomat sagt "rendert" —
+    // die Anzeige muss dem Zustandsautomaten folgen.
+    const scene = { pipelineState: 'plate_rendering', clipStatus: 'ready' } as any;
+    expect(clipStatusFromState(sceneState(scene))).toBe('generating');
+
+    expect(clipStatusFromState('failed')).toBe('failed');
+    expect(clipStatusFromState('idle')).toBe('pending');
+    expect(clipStatusFromState('canceled')).toBe('pending');
+    expect(clipStatusFromState('lipsync_running')).toBe('ready');
+    expect(clipStatusFromState('complete')).toBe('ready');
   });
 });

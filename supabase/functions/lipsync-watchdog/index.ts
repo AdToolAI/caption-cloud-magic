@@ -236,8 +236,9 @@ serve(async (req) => {
   const { data: rows, error } = await supabase
     .from("composer_scenes")
     .select(
-      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
+      "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, clip_url, replicate_prediction_id, dialog_shots, audio_plan, updated_at, pipeline_state, active_run_id, plate_generation, plate_ready_generation",
     )
+
     // v141 — Widen filter to include the zombie state observed on
     // 2026-06-20: `pending + twoshot_stage=syncso_fanout_3_of_4`.
     // After a watchdog auto-retry reset a `rendering` pass to `pending`
@@ -284,6 +285,29 @@ serve(async (req) => {
     await withDialogLock(supabase, d.id, "lipsync-watchdog", async () => {
     const ds: any = d.dialog_shots ?? {};
 
+    // ── v388 Generations-Vertrag ─────────────────────────────────────────
+    // Der Watchdog verliess sich bisher darauf, dass die aufgerufene Funktion
+    // veraltete Laeufe abweist. Er prueft das jetzt selbst: ohne aktiven Lauf
+    // oder mit einer Plate aus einer aelteren Generation wird nichts mehr
+    // angestossen — ein neu gestarteter Clip kann so nicht mehr von einem
+    // Wiederbelebungsversuch des Vorlaufs getroffen werden.
+    {
+      const pipeState = String((d as any).pipeline_state ?? "");
+      const runId = (d as any).active_run_id ?? null;
+      const gen = (d as any).plate_generation ?? null;
+      const readyGen = (d as any).plate_ready_generation ?? null;
+      if (["failed", "canceled", "complete"].includes(pipeState)) {
+        return;
+      }
+      if (!runId || (gen != null && Number(readyGen) !== Number(gen))) {
+        console.log(
+          `[lipsync-watchdog] v388_stale_generation_skip scene=${d.id} ` +
+            `run=${runId ?? "none"} gen=${gen ?? "none"} ready_gen=${readyGen ?? "none"}`,
+        );
+        return;
+      }
+    }
+
     // v129.4a — Terminal no-op guard.
     // The sync-so-webhook is the single source of truth for scene
     // terminalisation. If it has already marked this scene `failed` /
@@ -298,6 +322,7 @@ serve(async (req) => {
     ) {
       return;
     }
+
     // Liveness anchor: prefer first_started_at, fall back to started_at,
     // then earliest pass started_at, then updated_at (last resort).
     const passStarts = Array.isArray(ds?.passes)

@@ -6699,6 +6699,36 @@ export type Database = {
           },
         ]
       }
+      composer_state_guard_violations: {
+        Row: {
+          created_at: string
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          id: string
+          reason: string
+          scene_id: string
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+          verdict: string
+        }
+        Insert: {
+          created_at?: string
+          from_state: Database["public"]["Enums"]["composer_scene_state"]
+          id?: string
+          reason: string
+          scene_id: string
+          to_state: Database["public"]["Enums"]["composer_scene_state"]
+          verdict: string
+        }
+        Update: {
+          created_at?: string
+          from_state?: Database["public"]["Enums"]["composer_scene_state"]
+          id?: string
+          reason?: string
+          scene_id?: string
+          to_state?: Database["public"]["Enums"]["composer_scene_state"]
+          verdict?: string
+        }
+        Relationships: []
+      }
       composer_template_suggestions: {
         Row: {
           aggregation_window_end: string | null

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { sceneState, clipStatusFromState } from '@/lib/composer/sceneState';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -273,9 +275,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).lip_sync_status !== (scene.lipSyncStatus ?? null) ||
           (dbScene as any).twoshot_stage !== (scene.twoshotStage ?? null) ||
           (dbScene as any).continuity_drift_score !== (scene.continuityDriftScore ?? null));
+      // v388 — Anzeige-Status kommt aus dem Zustandsautomaten, nicht aus der
+      // Alt-Spalte `clip_status`. Damit kann diese Ansicht nicht mehr
+      // "fertig"/"baut" zeigen, waehrend der Server etwas anderes fuehrt.
+      const dbClipStatus = dbScene ? clipStatusFromState(sceneState(dbScene)) : null;
       if (
         dbScene &&
-        (dbScene.clip_status !== scene.clipStatus ||
+        (dbClipStatus !== scene.clipStatus ||
           dbScene.clip_url !== scene.clipUrl ||
           (dbScene.upload_type && dbScene.upload_type !== scene.uploadType) ||
           ((dbScene as any).engine_override && (dbScene as any).engine_override !== (scene.engineOverride ?? 'auto')) ||
@@ -284,7 +290,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       ) {
         changed = true;
         // Toast on transition generating → ready
-        if (scene.clipStatus === 'generating' && dbScene.clip_status === 'ready') {
+        if (scene.clipStatus === 'generating' && dbClipStatus === 'ready') {
+
           toast({ title: `Szene ${idx + 1} fertig ✓`, description: SCENE_TYPE_LABELS[scene.sceneType]?.de });
           if (dbScene.clip_url) {
             justReady.push({ sceneId: scene.id, clipUrl: dbScene.clip_url });
@@ -335,7 +342,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             lipSyncTargets.push(scene.id);
           }
         }
-        if (scene.clipStatus === 'generating' && dbScene.clip_status === 'failed') {
+        if (scene.clipStatus === 'generating' && dbClipStatus === 'failed') {
           toast({ title: `Szene ${idx + 1} fehlgeschlagen`, variant: 'destructive' });
         }
         // Cinematic-Sync: notify when Sync.so step finishes
@@ -371,10 +378,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             variant: 'destructive',
           });
         }
-        newPrev[scene.id] = dbScene.clip_status;
+        newPrev[scene.id] = dbClipStatus as string;
         return {
           ...scene,
-          clipStatus: dbScene.clip_status as ComposerScene['clipStatus'],
+          clipStatus: dbClipStatus as ComposerScene['clipStatus'],
+
           clipUrl: dbScene.clip_url || undefined,
           pipelineState: (dbScene as any).pipeline_state,
           pipelineStateAt: (dbScene as any).pipeline_state_at,

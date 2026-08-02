@@ -16,7 +16,7 @@
  * NOT retry storm us. The 60s pg_cron poller is the safety net.
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState } from "../_shared/scene-state.ts";
+import { sceneState, transitionScene, type SceneState } from "../_shared/scene-state.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -421,12 +421,24 @@ serve(async (req) => {
     return ok({ ok: true, skipped: "ignored_due_scene_failed", scene_id: sceneId, job_id: jobId });
   }
 
+  // v388 — Zustandswechsel laufen ausschliesslich ueber den gepruefte Weg
+  // (`composer_scene_transition`): Zeilensperre, Freigabeliste, Lauf- und
+  // Generations-Abgleich in einer atomaren Operation. Ein verspaeteter
+  // Callback eines alten Laufs kann damit strukturell nichts mehr bewegen.
+  const advanceScene = (to: SceneState, from?: SceneState[]) =>
+    transitionScene(supabase, sceneId, to, {
+      from,
+      runId: String((scene as any).active_run_id ?? "") || null,
+      generation: Number((scene as any).plate_generation ?? 1),
+    });
+
   const state = scene.dialog_shots ?? null;
   if (!state) {
     return ok({ ok: true, skipped: "no_state" });
   }
 
   const nowIso = new Date().toISOString();
+
 
   // ── v80: legacy v41-v56 single-call segments[] branch removed ─────────
   // The single-call `sync-3 + segments[]` dispatcher in compose-dialog-
@@ -1105,11 +1117,9 @@ serve(async (req) => {
           // Top-level scene status / counters — non-slot fields, safe to UPDATE.
           await supabase
             .from("composer_scenes")
-            .update({
-              pipeline_state: "lipsync_running",
-              updated_at: nowIso,
-            })
+            .update({ updated_at: nowIso })
             .eq("id", sceneId);
+          await advanceScene("lipsync_running");
         } catch (e) {
           // RPC failure → fall back to the legacy full-array write so a
           // missing/migration-pending RPC never strands a scene.
@@ -1118,11 +1128,12 @@ serve(async (req) => {
             .from("composer_scenes")
             .update({
               dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
-              pipeline_state: "lipsync_running",
               updated_at: nowIso,
             })
             .eq("id", sceneId);
+          await advanceScene("lipsync_running");
         }
+
         console.log(`[sync-so-webhook] v25/plan_d scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
 
         // v94 — Lambda warm-ping. When second-to-last pass completes, wake
@@ -1172,12 +1183,13 @@ serve(async (req) => {
               finished_at: nowIso,
             },
             clip_url: finalUrl,
-            pipeline_state: "complete",
             lip_sync_applied_at: nowIso,
             clip_error: null,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
+        await advanceScene("complete");
+
         console.log(`[sync-so-webhook] v25 scene=${sceneId} single-speaker DONE (no tight, direct finalize)`);
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", applied: true });
       }
@@ -1249,11 +1261,12 @@ serve(async (req) => {
               dispatched_at: nowIso,
             },
           },
-          pipeline_state: "lipsync_muxing",
           clip_error: null,
           updated_at: nowIso,
         })
         .eq("id", sceneId);
+      await advanceScene("lipsync_muxing");
+
       console.log(`[sync-so-webhook] v25 scene=${sceneId} ALL ${totalPasses} passes done → dispatching fan-in compositor`);
       try {
         fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
@@ -1526,10 +1539,11 @@ serve(async (req) => {
                 },
               ].slice(-16),
             },
-            pipeline_state: "lipsync_running",
             updated_at: nowIso,
           })
           .eq("id", sceneId);
+        await advanceScene("lipsync_running");
+
         console.warn(
           `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} → retry ${passRetryCount + 1}/${MAX_V5_RETRIES} variant=${nextVariant}${needsAudioRepair ? " +repair_audio" : ""}`,
         );
@@ -1811,10 +1825,11 @@ serve(async (req) => {
                 final_url: partialMux ? ((lastDonePass as any)?.output_url ?? freshFailState?.final_url ?? null) : freshFailState?.final_url,
                 partial_mux: partialMux ? true : freshFailState?.partial_mux,
               },
-              pipeline_state: partialMux ? "lipsync_muxing" : "lipsync_running",
               updated_at: nowIso,
             })
             .eq("id", sceneId);
+          await advanceScene(partialMux ? "lipsync_muxing" : "lipsync_running");
+
           console.warn(
             `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} FAILED but scene can continue (alive=${aliveSiblings.length}, done=${doneCount}, partialMux=${partialMux}) — no refund yet`,
           );

@@ -11,7 +11,7 @@ import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
 import { useMouthYavgProbe } from '@/hooks/useMouthYavgProbe';
 import { FaceMapReviewDialog } from './FaceMapReviewDialog';
 import { startSceneGeneration } from '@/lib/composer/startSceneGeneration';
-import { sceneState } from '@/lib/composer/sceneState';
+import { sceneState, isRealizedState } from '@/lib/composer/sceneState';
 
 /** Providers that produce an i2v lead-in freeze worth auto-trimming. */
 const I2V_PROVIDERS: ReadonlyArray<string> = [
@@ -43,8 +43,10 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const hasPrompt = !!(scene.aiPrompt && scene.aiPrompt.trim().length >= 4);
   const previewStatus = scene.previewStatus ?? 'idle';
   const hasPreview = !!scene.previewClipUrl && previewStatus === 'ready';
-  const hqReady = scene.clipUrl && scene.clipStatus === 'ready';
+  // v388 — Anzeige leitet sich ausschliesslich aus dem Pipeline-Zustand ab.
   const pipelineState = sceneState(scene);
+  const hqReady = !!scene.clipUrl && isRealizedState(pipelineState);
+
 
   const [busy, setBusy] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
@@ -218,7 +220,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const isDialog =
     isCinematic &&
     !lipSyncCanceled &&
-    scene.clipStatus !== 'failed' &&
+    pipelineState !== 'failed' &&
     (dialogShots.length > 0 || lipSyncRunning);
   const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
   const dialogTotal = dialogShots.length;
@@ -362,7 +364,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   }
 
   // GENERATING (HQ) → Phase 5.2 provider-tinted skeleton with live ETA
-  if (scene.clipStatus === 'generating') {
+  if (pipelineState === 'plate_queued' || pipelineState === 'plate_rendering') {
     return (
       <div className="relative w-full h-full">
         <SceneGenerationSkeleton scene={scene} />
@@ -436,7 +438,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   }
 
   // FAILED (HQ) → red error state (preserve fast-preview retry)
-  if (scene.clipStatus === 'failed') {
+  if (pipelineState === 'failed') {
     return (
       <div className="relative w-full h-full bg-destructive/10 border border-destructive/30 flex flex-col items-center justify-center gap-1">
         <XCircle className="h-5 w-5 text-destructive" />

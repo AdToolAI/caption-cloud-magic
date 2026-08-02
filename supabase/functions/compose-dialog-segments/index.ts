@@ -59,7 +59,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, canDispatchLipsync } from "../_shared/scene-state.ts";
+import { sceneState, canDispatchLipsync, transitionScene, type SceneState } from "../_shared/scene-state.ts";
 import { canonicalizeAssignmentLock, stripVariantPrefix } from "../_shared/assignment-lock.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
@@ -862,6 +862,17 @@ serve(async (req) => {
         409,
       );
     }
+
+    // v388 — Phasenwechsel laufen ausschliesslich ueber den geprueften Weg:
+    // atomar, mit Freigabeliste sowie Lauf- und Generations-Fence.
+    const advanceScene = (to: SceneState, from?: SceneState[]) =>
+      transitionScene(supabase, sceneId, to, {
+        from,
+        runId: String((scene as any).active_run_id ?? "") || null,
+        generation: Number((scene as any).plate_generation ?? 1),
+      });
+
+
 
     const { data: project } = await supabase
       .from("composer_projects")
@@ -8361,13 +8372,14 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: "lipsync_running",
           lip_sync_source_clip_url: sourceClipUrl,
           replicate_prediction_id: `sync:${jobId}`,
           clip_error: null,
           updated_at: nowIso,
         })
         .eq("id", sceneId);
+      await advanceScene("lipsync_running");
+
     }
 
     // ── Plan D (v93) — flag-gated parallel fan-out, supersedes hard `false`.

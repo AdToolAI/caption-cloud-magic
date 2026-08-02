@@ -92,24 +92,14 @@ export default function SceneInlinePlayer({
     needsLipsync &&
     ['audio_prep', 'audio_ready', 'lipsync_dispatched', 'lipsync_running', 'lipsync_muxing'].includes(pipelineState);
 
-  // v131.7 — Stale-Lipsync-Detection (Realtime-Backstop).
-  // Wenn Lipsync >9 min läuft, ohne dass `lipSyncAppliedAt` gesetzt wurde
-  // UND Sync.so seither nichts gemeldet hat, behandeln wir die Szene als
-  // de-facto failed. Schützt gegen den Fall, dass die Postgres-Realtime-
-  // Subscription (`composer-scenes:<id>`) einen Update-Tick verschluckt
-  // und der User stundenlang vor einem Spinner sitzt, obwohl
-  // `lip_sync_status='failed'` längst in der DB steht.
-  const lipsyncStartedAt = (scene as any).audioPlan?.twoshot?.first_started_at as string | undefined;
-  const lipsyncStaleByAge = (() => {
-    if (!lipsyncStartedAt) return false;
-    if ((scene as any).lipSyncAppliedAt) return false;
-    const startedMs = Date.parse(lipsyncStartedAt);
-    if (!Number.isFinite(startedMs)) return false;
-    return Date.now() - startedMs > 9 * 60_000;
-  })();
-
+  // v388 — Die frühere 9-Minuten-Eigenanzeige ist entfernt. Sie hat die
+  // Szene in der Oberfläche als "Fehler" dargestellt, während der Server sie
+  // noch als laufend führte — die Anzeige widersprach damit dem einzigen
+  // gültigen Zustand. Terminal ist eine Szene ausschließlich dann, wenn der
+  // Zustandsautomat das sagt. Für echte Hänger greift der Server-Watchdog.
   const isReady = !!clipUrl && (needsLipsync ? pipelineState === 'complete' : ['plate_ready', 'complete'].includes(pipelineState));
-  const isFailed = pipelineState === 'failed' || lipsyncStaleByAge;
+  const isFailed = pipelineState === 'failed';
+
   // Stage 6 self-heal: a scene marked `generating` is only really working if
   // there is an actual backend handle (Replicate prediction, sync.so job,
   // twoshot stage in flight). Otherwise it's a stale optimistic patch from a

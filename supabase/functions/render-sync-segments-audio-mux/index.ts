@@ -28,7 +28,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState } from "../_shared/scene-state.ts";
+import { sceneState, transitionScene } from "../_shared/scene-state.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
@@ -1029,10 +1029,15 @@ serve(async (req) => {
       .from("composer_scenes")
       .update({
         dialog_shots: updatedState,
-        pipeline_state: "lipsync_muxing",
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
+    // v388 — Phasenwechsel nur ueber den geprueften Weg (Lauf-/Generations-Fence).
+    await transitionScene(supabase, sceneId, "lipsync_muxing", {
+      runId: String((scene as any).active_run_id ?? "") || null,
+      generation: Number((scene as any).plate_generation ?? 1),
+    });
+
 
     const invokeResp = await fetch(
       `${supabaseUrl}/functions/v1/invoke-remotion-render`,
