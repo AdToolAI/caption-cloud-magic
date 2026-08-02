@@ -698,7 +698,7 @@ serve(async (req) => {
       const motionStatic = motion.verdict === "static" || motionPassthrough;
       const motionUnknown = motion.verdict === "unknown";
       console.log(
-        `[sync-so-webhook] v350_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} outVsIn=${motion.outputVsInput ?? "n/a"} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
+        `[sync-so-webhook] v371_motion_verdict scene=${sceneId} pass=${currentPass} verdict=${motion.verdict} score=${motion.score} outVsIn=${motion.outputVsInput ?? "n/a"} median=${(motion as any).outputVsInputMedian ?? "n/a"} criterion=${(motion as any).verdictCriterion ?? "n/a"} frames=${motion.framesDecoded} reason=${motion.reason} ${motion.latencyMs}ms`,
       );
 
       // ══════════════════════════════════════════════════════════════════
