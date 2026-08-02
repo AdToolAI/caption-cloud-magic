@@ -3,6 +3,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
+import { startSceneRun } from "../_shared/scene-run.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
