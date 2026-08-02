@@ -76,11 +76,31 @@ serve(async (req) => {
     );
     if (sceneIds.length === 0) return json({ error: "scene_ids_required" }, 400);
 
+    /**
+     * Two supported shapes:
+     *
+     *  a) `{ compose }`               — reset + dispatch in one request. Use
+     *                                   this whenever the caller can build the
+     *                                   compose payload up front.
+     *  b) `{ prepare_only: true }` … then `{ compose, use_existing_run: true }`
+     *                                 — for "alle Clips": the client must
+     *                                   render fresh scene anchors AFTER the
+     *                                   purge (the purge would otherwise delete
+     *                                   the anchors it just made) and only then
+     *                                   knows the compose payload. The second
+     *                                   call performs NO reset; it dispatches
+     *                                   against the run acquired in step one,
+     *                                   and the DB rejects any attempt whose
+     *                                   run id is not the scene's active one.
+     */
+    const prepareOnly = (body as any)?.prepare_only === true;
+    const useExistingRun = (body as any)?.use_existing_run === true;
     const compose = (body as any)?.compose;
-    if (!compose || typeof compose !== "object") {
+    if (!prepareOnly && (!compose || typeof compose !== "object")) {
       return json({ error: "compose_body_required" }, 400);
     }
     const reason = String((body as any)?.reason ?? "user_regenerate");
+
 
     const admin = createClient(supabaseUrl, serviceKey);
 
