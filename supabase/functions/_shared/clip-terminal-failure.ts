@@ -50,31 +50,40 @@ export const TERMINAL_CLIP_FAILURE_MESSAGE =
   "Bitte den Szenentext anpassen und die Szene erneut rendern.";
 
 /**
+ * v385 — Zielzustand für ein Lip-Sync-Gate, das den Clip neu rendern will.
+ * `failed` wenn die Szene ihre Versuche verbraucht hat, sonst `idle`
+ * (bereit für einen frischen, vom Benutzer ausgelösten Lauf).
+ */
+export function clipRerenderTargetState(
+  scene: { clip_error?: unknown; retry_count?: unknown } | null | undefined,
+): "failed" | "idle" {
+  return scene && isTerminalClipFailure(scene) ? "failed" : "idle";
+}
+
+/**
  * Build the DB patch for a lip-sync gate that wants the clip re-rendered.
- * Returns a terminal `failed` patch when the scene already exhausted its
- * automatic attempts, otherwise the classic re-render reset.
+ *
+ * v385: enthält KEINE Legacy-Statusspalten mehr (`clip_status`,
+ * `twoshot_stage`, `lip_sync_status`) — der Zustand wird über
+ * `pipeline_state` gesetzt und vom Bridge-Trigger gespiegelt.
  */
 export function buildClipRerenderPatch(
   scene: { clip_error?: unknown; retry_count?: unknown } | null | undefined,
   friendlyMessage: string,
-  stage: string = "needs_clip_rerender",
 ): Record<string, unknown> {
   if (scene && isTerminalClipFailure(scene)) {
     return {
-      clip_status: "failed",
+      pipeline_state: "failed",
       clip_url: null,
       lip_sync_source_clip_url: null,
-      lip_sync_status: null,
-      twoshot_stage: null,
       clip_error: `${TERMINAL_CLIP_FAILURE_MESSAGE} (Grund: ${String(scene.clip_error ?? friendlyMessage).slice(0, 200)})`,
     };
   }
   return {
-    lip_sync_status: "failed",
-    twoshot_stage: stage,
-    clip_status: "pending",
+    pipeline_state: "idle",
     clip_url: null,
     lip_sync_source_clip_url: null,
     clip_error: friendlyMessage,
   };
 }
+
