@@ -173,6 +173,14 @@ export interface FaceGateInput {
    * werden. Ist dieser Index gesetzt, wird genau er extrahiert.
    */
   preclipFrameIndex?: number;
+  /**
+   * v397 — true, wenn die v396-Geometrie (Affine + Roundtrip-Beweis) für
+   * diesen Pass verifiziert wurde. Nur dann darf ein reiner Messausfall
+   * (alle Stills leer) in einen degradierten Dispatch münden statt in ein
+   * hartes Scheitern.
+   */
+  geometryContractOk?: boolean;
+
 }
 
 export async function verifyFaceBeforeDispatch(
