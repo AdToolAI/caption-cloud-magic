@@ -131,8 +131,23 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             d.dialog_script,
           );
 
+        // v389 — EIN Besitzer fuer den Ton-Start: `compose-clip-webhook`
+        // ruft `compose-twoshot-audio` serverseitig direkt nach
+        // `plate_ready` auf. Der Client ist nur noch das Nachzuegler-Netz
+        // fuer den Fall, dass dieser Webhook-Aufruf verloren gegangen ist —
+        // er feuert erst, wenn die Szene laenger als 90 s auf `plate_ready`
+        // steht. Vorher gab es zwei Ausloeser fuer denselben Schritt, und
+        // der Client-Pfad feuerte bei Tab-Wechsel/Reload unvorhersehbar.
+        const AUDIO_HANDOFF_GRACE_MS = 90_000;
+        const staleOnPlateReady = (d: any) => {
+          const at = Date.parse(d?.pipeline_state_at ?? '');
+          if (!Number.isFinite(at)) return true; // kein Zeitstempel -> Altzeile, nicht blockieren
+          return Date.now() - at > AUDIO_HANDOFF_GRACE_MS;
+        };
+
         const needsAudioPrep = (data as any[]).filter((d) => {
           if (!canStartAudioPrep(d)) return false;
+          if (!staleOnPlateReady(d)) return false;
           if (!isLipSyncCandidate(d)) return false;
           // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
