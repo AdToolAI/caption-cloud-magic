@@ -104,7 +104,18 @@ export interface FaceGateResult {
   /** v393 — kleinster Abstand des Mundfensters zum Bildrand. */
   mouth_edge_margin_px?: number;
 
+  // ── v397 Forensik: was wurde tatsächlich angeschaut? ──────────────
+  /** Öffentliche URLs aller geprüften Probe-Stills. */
+  probe_still_urls?: string[];
+  /** Bytegrösse je Probe-Still (0 = nicht ladbar). */
+  probe_still_bytes?: number[];
+  /** Lokale Preclip-Frameindizes je Probe. */
+  probe_frame_indices?: number[];
+  /** Verdikt je Probe: `faces:N` | `zero_faces` | `still_blank` | … */
+  probe_verdicts?: string[];
+
 }
+
 
 
 function hasAwsCreds(): boolean {
