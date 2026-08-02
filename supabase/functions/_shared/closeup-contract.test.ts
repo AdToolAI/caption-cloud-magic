@@ -91,14 +91,15 @@ Deno.test("ratio mode stays available as anchor framing guidance", () => {
   assert(r.reason?.startsWith("face_width_ratio_"));
 });
 
-Deno.test("anchor gate keeps steering toward tight framing", () => {
-  const gate = enforceMinFaceSize({
-    faces: [{ bbox: [0, 0, 140, 180] }],
+Deno.test("anchor gate uses the July 2026 baseline floor (12 % face width)", () => {
+  // Rollback 27.07.2026: der harte 30 %-Anker-Floor (v354/v355) ist entfernt.
+  const tooSmall = enforceMinFaceSize({
+    faces: [{ bbox: [0, 0, 80, 100] }],
     plateWidth: 1000,
     plateHeight: 1000,
     expectedSpeakers: 1,
   });
-  assertEquals(gate.ok, false, "single-speaker anchor should still want 30 % face width");
+  assertEquals(tooSmall.ok, false, "8 % face width is below the 12 % baseline floor");
 
   const ok = enforceMinFaceSize({
     faces: [{ bbox: [0, 0, 320, 400] }],
