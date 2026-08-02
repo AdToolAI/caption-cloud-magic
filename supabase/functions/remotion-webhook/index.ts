@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { sceneState, transitionScene } from "../_shared/scene-state.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -212,7 +213,7 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-preclip', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, lip_sync_status, lip_sync_applied_at, plate_generation, active_run_id')
+              .select('dialog_shots, pipeline_state, lip_sync_applied_at, plate_generation, active_run_id')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
@@ -224,7 +225,7 @@ serve(async (req) => {
             // late preclip render — just log the render and exit.
             if (
               (sceneRow as any)?.lip_sync_applied_at ||
-              (sceneRow as any)?.lip_sync_status === 'canceled' ||
+              sceneState(sceneRow) === 'canceled' ||
               prevState?.status === 'canceled'
             ) {
               console.log(`🎬 [dialog-turn-preclip] scene ${composerSceneId} shot ${shotIdx} ignored — scene canceled/applied`);
@@ -274,7 +275,7 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots, lip_sync_status, lip_sync_applied_at, plate_generation, active_run_id')
+              .select('dialog_shots, pipeline_state, lip_sync_applied_at, plate_generation, active_run_id')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
@@ -284,23 +285,18 @@ serve(async (req) => {
             }
             // v18 Cancel-Guard: do not overwrite clip_url for a cancelled scene.
             if (
-              (sceneRow as any)?.lip_sync_status === 'canceled' ||
+              sceneState(sceneRow) === 'canceled' ||
               prevState?.status === 'canceled'
             ) {
               console.log(`💋 [dialog-stitch] scene ${composerSceneId} ignored — scene canceled`);
               return;
             }
             const nowIso = new Date().toISOString();
+            // v385 — Nutzdaten schreiben, Zustand danach über die Maschine.
             await supabaseAdmin.from('composer_scenes').update({
               clip_url: finalOutputUrl,
-              // v268 — dialog-stitch finalisiert die Szene komplett; ohne
-              // clip_status='ready' bleibt die UI ewig auf „Szene wird
-              // gebaut…" obwohl das MP4 längst existiert.
-              clip_status: 'ready',
               lip_sync_source_clip_url: prevState?.source_clip_url ?? null,
               lip_sync_applied_at: nowIso,
-              lip_sync_status: 'done',
-              twoshot_stage: 'done',
               clip_error: null,
               dialog_shots: {
                 ...prevState,
@@ -310,6 +306,10 @@ serve(async (req) => {
               },
               updated_at: nowIso,
             }).eq('id', composerSceneId);
+            await transitionScene(supabaseAdmin, composerSceneId, 'complete', {
+              detail: 'remotion-webhook dialog_stitch',
+              generation: (sceneRow as any)?.plate_generation ?? null,
+            });
           }, { ttlSeconds: 30 });
           console.log(`💋 [dialog-stitch] scene ${composerSceneId} done → ${finalOutputUrl}`);
 
@@ -723,8 +723,6 @@ serve(async (req) => {
               }
             }
             await supabaseAdmin.from('composer_scenes').update({
-              lip_sync_status: 'failed',
-              twoshot_stage: 'failed',
               clip_error: `dialog_stitch_lambda_failed: ${errorMessage}`.slice(0, 300),
               dialog_shots: {
                 ...prevState,
@@ -734,6 +732,10 @@ serve(async (req) => {
               },
               updated_at: new Date().toISOString(),
             }).eq('id', composerSceneId);
+            await transitionScene(supabaseAdmin, composerSceneId, 'failed', {
+              detail: `dialog_stitch_lambda_failed: ${errorMessage}`.slice(0, 200),
+              generation: (sceneRow as any)?.plate_generation ?? null,
+            });
           }, { ttlSeconds: 30 });
           console.log(`💋 [dialog-stitch] scene ${composerSceneId} failed: ${errorMessage.slice(0, 120)}`);
         }
