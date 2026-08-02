@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canDispatchLipsync, canStartAudioPrep, clipStatusFromState, sceneState } from '../sceneState';
+import { canContinueLipsync, canDispatchLipsync, canStartAudioPrep, clipStatusFromState, sceneState } from '../sceneState';
 
 describe('composer client enum contract', () => {
   it('never lets stale legacy lipsync fields override a rendering plate', () => {
