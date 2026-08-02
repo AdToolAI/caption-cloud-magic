@@ -22,20 +22,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
-import { isRealizedScene, sceneState, transitionScene } from "../_shared/scene-state.ts";
 import {
   ensureDialogTurnsForScene,
   normalizeTurns,
   readIdOnlyEnabled,
   type DialogTurn,
 } from "../_shared/scene-dialog-turns.ts";
-import {
-  buildTwoshotPlanFromMetadata,
-  hashTwoshotAudioInput,
-  isCompleteTwoshotPlan,
-  isReusableTwoshotAudio,
-  TWOSHOT_AUDIO_PLAN_VERSION,
-} from "../_shared/twoshot-audio-contract.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -104,62 +96,6 @@ function peakDbFs(samples: Int16Array): number {
   }
   return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
 }
-
-/**
- * v325 — AUDIO-INVARIANT (unified loudness across speakers).
- *
- * ElevenLabs renders different voices at wildly different levels (measured
- * -16 LUFS vs -39 LUFS in one two-shot scene). Since every speaker's PCM
- * feeds BOTH the merged playback track AND the per-speaker Sync.so slice,
- * that spread produced "speaker 1 shouts with a wide-open mouth, speaker 2
- * whispers and barely moves". We therefore normalise every TTS segment
- * bidirectionally (boost AND attenuate) to a common loudness target before
- * it is placed on the timeline, with a peak ceiling to avoid clipping.
- */
-function measureLufsInt16(samples: Int16Array): number {
-  if (!samples.length) return -Infinity;
-  // Gate out silence so a long pause does not drag the measurement down.
-  const gate = 0.0025; // ≈ -52 dBFS
-  let sumSq = 0;
-  let count = 0;
-  for (let i = 0; i < samples.length; i++) {
-    const v = samples[i] / 32768;
-    if (Math.abs(v) < gate) continue;
-    sumSq += v * v;
-    count++;
-  }
-  if (count < 400) return -Infinity;
-  const rms = Math.sqrt(sumSq / count);
-  return rms > 0 ? 20 * Math.log10(rms) : -Infinity;
-}
-
-function normalizeSegmentLoudnessInPlace(
-  samples: Int16Array,
-  targetLufs = -18,
-  maxBoostDb = 14,
-  maxCutDb = 14,
-  peakCeilDbFs = -1,
-): { sourceLufs: number; gainDb: number; resultLufs: number } {
-  const sourceLufs = measureLufsInt16(samples);
-  if (!Number.isFinite(sourceLufs)) return { sourceLufs, gainDb: 0, resultLufs: sourceLufs };
-  let gainDb = targetLufs - sourceLufs;
-  gainDb = Math.max(-maxCutDb, Math.min(maxBoostDb, gainDb));
-  let gain = Math.pow(10, gainDb / 20);
-  // Peak ceiling — never clip after the gain.
-  const peak = peakDbFs(samples);
-  if (Number.isFinite(peak) && peak + gainDb > peakCeilDbFs) {
-    gainDb = peakCeilDbFs - peak;
-    gain = Math.pow(10, gainDb / 20);
-  }
-  if (Math.abs(gainDb) < 0.5) return { sourceLufs, gainDb: 0, resultLufs: sourceLufs };
-  for (let i = 0; i < samples.length; i++) {
-    const v = Math.round(samples[i] * gain);
-    samples[i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
-  }
-  return { sourceLufs, gainDb, resultLufs: sourceLufs + gainDb };
-}
-
-
 
 function samplesToWav(samples: Int16Array): Uint8Array {
   const dataBytes = samples.byteLength;
@@ -628,61 +564,39 @@ serve(async (req) => {
     // Load scene + ownership
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, dialog_script, dialog_turns, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status, pipeline_state, pipeline_state_at, plate_generation, plate_ready_generation, active_run_id")
+      .select("id, project_id, dialog_script, dialog_turns, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status")
       .eq("id", scene_id)
       .single();
     if (sErr || !scene) return json({ error: "scene not found" }, 404);
 
-    // v384 — Realized-Vertrag aus der Zustandsmaschine.
-    //
-    // Vorher (v182) blockierte hier JEDES nicht-leere `clip_error`. Ein
-    // transienter Diagnosetext (z. B. `audio_prep_transient_retry`, den der
-    // Client selbst nach einem Netzfehler schreibt) genügte, um eine
-    // fertig gerenderte Szene terminal zu quittieren
-    // ("scene_not_realized_no_lipsync"). Der Zustand entscheidet jetzt,
-    // nicht der Freitext.
-    const state = sceneState(scene);
-    if (!isRealizedScene(scene)) {
+    // v182: Hard guard — refuse to prep audio for a scene whose master clip
+    // is failed/missing. Prevents phantom lip-sync runs when a client race
+    // fires the audio-prep tick microseconds before the failure webhook
+    // lands. The auto-trigger will silently retry once the master clip is
+    // genuinely ready again.
+    const cs = (scene as any).clip_status;
+    const ce = (scene as any).clip_error;
+    const ts = (scene as any).twoshot_stage;
+    const ls = (scene as any).lip_sync_status;
+    const cu = (scene as any).clip_url;
+    if (
+      cs === "failed" ||
+      ts === "failed" ||
+      ts === "audio_mux_failed" ||
+      ls === "failed" ||
+      ls === "canceled" ||
+      !!ce ||
+      typeof cu !== "string" ||
+      cu.length === 0
+    ) {
       return json(
         {
           error: "scene_not_realized_no_lipsync",
-          detail: {
-            pipeline_state: state,
-            has_clip_url: !!(scene as any).clip_url,
-            plate_generation: (scene as any).plate_generation,
-            plate_ready_generation: (scene as any).plate_ready_generation,
-          },
+          detail: { clip_status: cs, twoshot_stage: ts, lip_sync_status: ls, has_clip_url: !!cu, has_clip_error: !!ce },
         },
         422,
       );
     }
-
-    // v384 — Serverseitiger, atomarer Claim. Ersetzt den rein clientseitigen
-    // `inflight`-Set, der nur pro Browser-Tab galt und deshalb parallele
-    // TTS-Läufe derselben Szene zuließ.
-    if (state !== "audio_prep") {
-      const claim = await transitionScene(supabase, scene_id, "audio_prep", {
-        from: ["plate_ready"],
-        detail: "audio_prep_started",
-        runId: (scene as any).active_run_id ?? null,
-      });
-      if (!claim.applied) {
-        return json(
-          { error: "audio_prep_already_running", detail: { state: claim.state, reason: claim.reason } },
-          202,
-        );
-      }
-    } else if (!force_regenerate) {
-      const claimedAt = Date.parse(String((scene as any).pipeline_state_at ?? "")) || 0;
-      const staleMs = Date.now() - claimedAt;
-      if (claimedAt > 0 && staleMs < 5 * 60_000) {
-        return json(
-          { error: "audio_prep_already_running", detail: { state, claimed_ms_ago: staleMs } },
-          202,
-        );
-      }
-    }
-
 
     const { data: project } = await supabase
       .from("composer_projects")
@@ -723,17 +637,15 @@ serve(async (req) => {
           console.error(
             `[compose-twoshot-audio] v201_id_only_required_block scene=${scene_id} reason=${ensured.reason} details=${JSON.stringify(ensured.details ?? {})}`,
           );
-          await transitionScene(supabase, scene_id, "failed", {
-            detail: `id_only_dialog_turns_required:${ensured.reason}`,
-          });
           await supabase
             .from("composer_scenes")
             .update({
+              twoshot_stage: "failed",
+              lip_sync_status: "failed",
               clip_error: `id_only_dialog_turns_required:${ensured.reason}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", scene_id);
-
           return json({ error: "id_only_dialog_turns_required", reason: ensured.reason, details: ensured.details ?? null }, 422);
         }
       }
@@ -828,21 +740,6 @@ serve(async (req) => {
       { voiceId?: string; elevenlabsVoiceId?: string; isCustom?: boolean }
     >;
 
-    // v390 — scene_id survives regeneration and is therefore not provenance.
-    // Bind generated audio to the exact run, plate generation and authored
-    // audio inputs before allowing idempotent reuse.
-    const audioInputHash = await hashTwoshotAudioInput({
-      dialogScript,
-      dialogTurns: rawTurns,
-      dialogVoices,
-      durationSeconds: Number((scene as any).duration_seconds ?? 0),
-    });
-    const audioIdentity = {
-      activeRunId: String((scene as any).active_run_id ?? ""),
-      plateGeneration: Number((scene as any).plate_generation ?? 1),
-      inputHash: audioInputHash,
-    };
-
     // Idempotency: if we already have a merged voice clip for this scene,
     // return it (unless caller wants a fresh one).
     if (!force_regenerate) {
@@ -860,7 +757,7 @@ serve(async (req) => {
         // byte-based CBR math that caused lip-sync drift) — fall through to
         // regenerate as WAV.
         const isCurrentPipeline = url.includes("/twoshot-vo/") && url.endsWith(".wav");
-        if (isCurrentPipeline && isReusableTwoshotAudio((existing[0] as any).metadata, audioIdentity)) {
+        if (isCurrentPipeline) {
           const existingSceneDur = Number((existing[0] as any)?.metadata?.scene_duration_seconds ?? 0);
           const requestedSceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
           const sceneClipSource = String((scene as any).clip_source ?? "");
@@ -874,50 +771,16 @@ serve(async (req) => {
               `[compose-twoshot-audio] existing Hailuo twoshot WAV duration ${existingSceneDur}s != scene ${requestedSceneDur}s — regenerating instead of reusing stale 10s audio_plan.`,
             );
           } else {
-            const reusedPlan = buildTwoshotPlanFromMetadata(
-              (existing[0] as any).metadata,
+            return json({
+              success: true,
+              already: true,
               url,
-              Number(existing[0].duration ?? 0),
-            );
-            if (!isCompleteTwoshotPlan(reusedPlan)) {
-              console.warn(`[compose-twoshot-audio] v390 incomplete same-run metadata scene=${scene_id}; regenerating`);
-            } else {
-              const latestPlan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
-              const { error: persistReuseError } = await supabase
-                .from("composer_scenes")
-                .update({
-                  character_audio_url: url,
-                  audio_selfheal_count: 0,
-                  audio_plan: {
-                    ...latestPlan,
-                    twoshot: { ...((latestPlan.twoshot ?? {}) as Record<string, unknown>), ...reusedPlan },
-                  },
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", scene_id)
-                .eq("active_run_id", audioIdentity.activeRunId)
-                .eq("plate_generation", audioIdentity.plateGeneration);
-              if (persistReuseError) {
-                throw new Error(`audio_reuse_plan_persist_failed:${persistReuseError.message}`);
-              }
-              const ready = await transitionScene(supabase, scene_id, "audio_ready", {
-              from: ["audio_prep", "plate_ready"],
-              detail: "audio_reused",
-                runId: audioIdentity.activeRunId,
-                generation: audioIdentity.plateGeneration,
-              });
-              if (!ready.applied) throw new Error(`audio_reuse_transition_rejected:${ready.reason ?? ready.state}`);
-              return json({
-                success: true,
-                already: true,
-                url,
-                duration: existing[0].duration,
-                speakers: (existing[0] as any).metadata.speakers,
-              });
-            }
+              duration: existing[0].duration,
+              speakers: Array.isArray((existing[0] as any)?.metadata?.speakers)
+                ? (existing[0] as any).metadata.speakers
+                : blocks.length,
+            });
           }
-        } else if (isCurrentPipeline) {
-          console.info(`[compose-twoshot-audio] v390 stale audio row ignored scene=${scene_id} current_run=${audioIdentity.activeRunId} generation=${audioIdentity.plateGeneration}`);
         }
       }
     }
@@ -1101,17 +964,6 @@ serve(async (req) => {
       }
       const block = blocks[i];
       const { pcm, ttsDiag, voice } = res;
-      // v325 Audio-Invariant — unify loudness BEFORE the PCM is placed on
-      // the timeline. `pcm` is shared by the merged track, the per-speaker
-      // track and the Sync.so slice, so one in-place pass covers all three.
-      const loud = normalizeSegmentLoudnessInPlace(pcm);
-      if (loud.gainDb !== 0) {
-        console.log(
-          `[compose-twoshot-audio] scene ${scene_id} v325_loudness speaker=${block.speakerName} ` +
-          `src=${loud.sourceLufs.toFixed(1)}LUFS gain=${loud.gainDb.toFixed(1)}dB → ${loud.resultLufs.toFixed(1)}LUFS`,
-        );
-      }
-
       // Insert pause as PCM silence BEFORE every non-first utterance.
       if (i > 0 && INTER_SPEAKER_PAUSE_SEC > 0) {
         const pause = silenceSamples(INTER_SPEAKER_PAUSE_SEC);
@@ -1462,10 +1314,6 @@ serve(async (req) => {
         total_samples: totalSamples,
         segments: publicSegments,
         speakers: publicSpeakerTracks,
-        active_run_id: audioIdentity.activeRunId,
-        plate_generation: audioIdentity.plateGeneration,
-        audio_plan_version: TWOSHOT_AUDIO_PLAN_VERSION,
-        audio_input_hash: audioInputHash,
       },
     });
     if (insertRes.error) {
@@ -1509,7 +1357,6 @@ serve(async (req) => {
     const latestTwoshot = (latestAudioPlan.twoshot ?? {}) as Record<string, any>;
     const sceneUpdate: Record<string, unknown> = {
       character_audio_url: publicUrl,
-      audio_selfheal_count: 0,
       audio_plan: {
         ...latestAudioPlan,
         twoshot: {
@@ -1534,26 +1381,10 @@ serve(async (req) => {
     if (!isHailuoScene && dialogOverflowExtended && totalSec > originalSceneDur + 0.05) {
       sceneUpdate.duration_seconds = Math.round(totalSec * 1000) / 1000;
     }
-    if (!isCompleteTwoshotPlan((sceneUpdate.audio_plan as any)?.twoshot)) {
-      throw new Error("audio_plan_incomplete_before_ready");
-    }
-    const { error: sceneUpdateError } = await supabase
+    await supabase
       .from("composer_scenes")
       .update(sceneUpdate)
-      .eq("id", scene_id)
-      .eq("active_run_id", audioIdentity.activeRunId)
-      .eq("plate_generation", audioIdentity.plateGeneration);
-    if (sceneUpdateError) throw new Error(`audio_plan_persist_failed:${sceneUpdateError.message}`);
-
-    // v384 — Audio liegt vor: Zustand weiterschalten. Der Dispatcher liest
-    // ausschliesslich diesen Zustand, kein `twoshot_stage`-Freitext mehr.
-    const ready = await transitionScene(supabase, scene_id, "audio_ready", {
-      from: ["audio_prep", "plate_ready"],
-      detail: "audio_ready",
-      runId: audioIdentity.activeRunId,
-      generation: audioIdentity.plateGeneration,
-    });
-    if (!ready.applied) throw new Error(`audio_ready_transition_rejected:${ready.reason ?? ready.state}`);
+      .eq("id", scene_id);
 
     return json({
       success: true,

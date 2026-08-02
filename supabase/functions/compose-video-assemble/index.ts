@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { sceneState, isRealizedScene } from "../_shared/scene-state.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
@@ -147,7 +146,7 @@ serve(async (req) => {
     //    Partial-render policy: skip not-ready scenes instead of failing,
     //    so users can render with a subset of finished clips.
     const isRenderable = (s: any) =>
-      isRealizedScene(s) ||
+      (s.clip_status === 'ready' && !!s.clip_url) ||
       (s.clip_source === 'upload' && !!s.upload_url);
 
     const totalScenesCount = (scenes || []).length;
@@ -161,7 +160,7 @@ serve(async (req) => {
     if (skippedScenes > 0 && scenes) {
       const skippedDetails = (scenes || [])
         .filter(s => !isRenderable(s))
-        .map(s => `Szene ${(s.order_index ?? 0) + 1} (status: ${sceneState(s)})`)
+        .map(s => `Szene ${(s.order_index ?? 0) + 1} (status: ${s.clip_status})`)
         .join(', ');
       console.log(`[compose-video-assemble] Partial render: ${skippedScenes}/${totalScenesCount} scene(s) skipped → ${skippedDetails}`);
       // Mutate the array in place so all downstream logic (probe, remotionScenes,

@@ -3,7 +3,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
-import { startSceneRun } from "../_shared/scene-run.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 const corsHeaders = {
@@ -231,47 +230,25 @@ serve(async (req) => {
       return jsonResponse({ error: "DB_ERROR", message: scenesErr.message }, 500);
     }
 
-    // v380 — Single-Run-Vertrag: auch der Autopilot-Pfad muss pro Szene einen
-    // atomaren Lauf erwerben, sonst weist `compose-video-clips` den Dispatch
-    // mit `missing_run_context` ab. Schlägt der Erwerb fehl, wird die Szene
-    // nicht dispatcht (kein bezahlter Render ohne gültigen Lauf).
-    const runContext: Record<string, { generation: number; run_id: string }> = {};
-    const dispatchScenes: any[] = [];
-    for (const s of insertedScenes ?? []) {
-      try {
-        const run = await startSceneRun(supabaseAdmin as any, s.id);
-        runContext[s.id] = { generation: run.generation, run_id: run.runId };
-        dispatchScenes.push(s);
-      } catch (e) {
-        console.error(
-          `[auto-director] start_run_failed scene=${s.id}: ${(e as Error).message}`,
-        );
-      }
-    }
-
     // Trigger compose-video-clips asynchronously (fire-and-forget — caller polls scene status)
     const clipsPayload = {
       projectId: project.id,
-      scenes: dispatchScenes.map((s: any) => ({
+      scenes: (insertedScenes ?? []).map((s: any) => ({
         id: s.id,
         clipSource: s.clip_source,
         clipQuality: s.clip_quality,
         aiPrompt: s.ai_prompt,
         durationSeconds: Number(s.duration_seconds),
       })),
-      run_context: runContext,
     };
 
     // Async invoke without awaiting result — clips run in background
-    if (dispatchScenes.length > 0) {
-      supabaseClient.functions.invoke('compose-video-clips', {
-        body: clipsPayload,
-        headers: { Authorization: authHeader },
-      }).catch((err) => {
-        console.error('[auto-director] async clips invoke error:', err);
-      });
-    }
-
+    supabaseClient.functions.invoke('compose-video-clips', {
+      body: clipsPayload,
+      headers: { Authorization: authHeader },
+    }).catch((err) => {
+      console.error('[auto-director] async clips invoke error:', err);
+    });
 
     return jsonResponse({
       ok: true,

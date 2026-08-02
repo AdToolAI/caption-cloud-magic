@@ -5,20 +5,9 @@ import Replicate from "npm:replicate@0.25.2";
 import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { CLIP_COSTS } from "../_shared/clip-costs.ts";
 import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-speakers.ts";
-import {
-  isGreenNetRejection,
-  classifyProviderRejection,
-  hardSanitizeForHappyHorse,
-  extractCastNames,
-} from "../_shared/happyhorse-green-net.ts";
-import {
-  checkPlateAttempt,
-  completePlateAttempt,
-  failPlateAttempt,
-} from "../_shared/plate-attempt.ts";
+import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
-import { transitionScene } from "../_shared/scene-state.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -40,10 +29,6 @@ const corsHeaders = {
 function isRetryableTransientError(predError: unknown): boolean {
   const s = String(predError ?? '').toLowerCase();
   if (!s) return false;
-  // v369 — a prompt rejection is never transient. Replicate wraps it as
-  // "Prediction failed: … InvalidParameter …", which used to match the
-  // generic 'prediction failed' token below and burned two identical retries.
-  if (classifyProviderRejection(predError) !== 'none') return false;
   return (
     s.includes('read timed out') ||
     s.includes('read timeout') ||
@@ -135,25 +120,6 @@ serve(async (req) => {
 
     const { id: predictionId, status, output, error: predError } = payload;
 
-    // ── v375 GENERATION GUARD ────────────────────────────────────────────────
-    // A provider callback may only touch the scene when the attempt it belongs
-    // to is still the current generation. After a hard reset the attempt is
-    // tombstoned (`superseded`) and this late result is dropped instead of
-    // overwriting the fresh run's plate. We ACK with 200 so the provider stops
-    // redelivering.
-    const attemptCheck = await checkPlateAttempt(supabase, sceneId, predictionId);
-    if (!attemptCheck.ok) {
-      console.log(
-        `[compose-clip-webhook v375] ignored_stale scene=${sceneId} job=${predictionId} ` +
-          `verdict=${attemptCheck.verdict} expected_gen=${attemptCheck.expectedGeneration} ` +
-          `current_gen=${attemptCheck.currentGeneration}`,
-      );
-      return new Response(
-        JSON.stringify({ ok: true, ignored_stale: true, verdict: attemptCheck.verdict }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
-      );
-    }
-
     if (status === 'succeeded' && output) {
       const videoUrl = Array.isArray(output) ? output[0] : output;
       console.log(`[compose-clip-webhook] Clip ready: ${videoUrl}`);
@@ -197,10 +163,9 @@ serve(async (req) => {
         .maybeSingle();
       const isCinematicSync =
         String((preUpdateScene as any)?.engine_override ?? '') === 'cinematic-sync';
-      // v385 — `pipeline_state` ist der einzige Zustand; hier werden nur
-      // noch Nutzdaten geschrieben, der Übergang folgt nach dem CAS-Write.
       const sceneUpdate: Record<string, unknown> = {
         clip_url: permanentUrl,
+        clip_status: 'ready',
         clip_error: null,
         updated_at: new Date().toISOString(),
       };
@@ -213,62 +178,13 @@ serve(async (req) => {
         // overrode every successful HH render and the UI lied "Hailuo".
         // clip_source is now left untouched — the provider the user picked
         // is the provider we report.
+        sceneUpdate.lip_sync_status = 'pending';
+        sceneUpdate.twoshot_stage = 'master_clip';
       }
-      // v375 — the write itself is generation-scoped, so a hard reset that
-      // lands between the guard above and this update can no longer be
-      // overwritten (compare-and-set instead of blind write).
-      let plateWrite = supabase
+      await supabase
         .from('composer_scenes')
         .update(sceneUpdate)
         .eq('id', sceneId);
-      if (attemptCheck.expectedGeneration !== null) {
-        plateWrite = plateWrite.eq('plate_generation', attemptCheck.expectedGeneration);
-      }
-      const { data: writtenRows } = await plateWrite.select('id');
-
-      if (Array.isArray(writtenRows) && writtenRows.length === 0) {
-        console.log(
-          `[compose-clip-webhook v375] ignored_stale_on_write scene=${sceneId} job=${predictionId} ` +
-            `expected_gen=${attemptCheck.expectedGeneration}`,
-        );
-        return new Response(
-          JSON.stringify({ ok: true, ignored_stale: true, verdict: 'lost_race' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
-        );
-      }
-      // v385 — Plate ist da: validierter Übergang, generationsgebunden.
-      await transitionScene(supabase, sceneId, 'plate_ready', {
-        detail: 'compose-clip-webhook',
-        generation: attemptCheck.expectedGeneration ?? null,
-      });
-      await completePlateAttempt(supabase, attemptCheck.attemptId, permanentUrl);
-
-      // v387 — Erst JETZT (bestätigte Plate des aktuellen Runs) darf die
-      // Audio-Stufe starten. Vorher lief dieser Aufruf in
-      // `compose-video-clips`, also noch während des Provider-Renders.
-      if (isCinematicSync) {
-        try {
-          const audioUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-twoshot-audio`;
-          const r = await fetch(audioUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            },
-            body: JSON.stringify({ scene_id: sceneId }),
-          });
-          const t = await r.text().catch(() => '');
-          console.log(
-            `[compose-clip-webhook] v387_audio_after_plate_ready scene=${sceneId} http=${r.status} ${t.slice(0, 200)}`,
-          );
-        } catch (audioErr) {
-          console.warn(
-            `[compose-clip-webhook] v387_audio_dispatch_failed scene=${sceneId}`,
-            audioErr,
-          );
-        }
-      }
-
 
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
       // Even if the full project never finishes, or the user later regenerates the
@@ -291,17 +207,7 @@ serve(async (req) => {
           typeof sceneFull.clip_source === 'string' &&
           sceneFull.clip_source.startsWith('ai-');
 
-        // v367 — Canonical Dialog Asset Contract:
-        // A cinematic-sync master plate is an INTERNAL intermediate. It still
-        // carries the provider's own (English/gibberish) audio and un-synced
-        // mouths. Only the final dialog-stitch mux may enter the library,
-        // otherwise the user sees 3+ "versions" of the same scene where the
-        // plate speaker appears to speak every line.
-        if (isCinematicSync) {
-          console.log(
-            `[compose-clip-webhook] v367 library archive skipped for scene ${sceneId} — cinematic-sync master plate is internal`,
-          );
-        } else if (sceneFull && projectMeta?.user_id && isRealAiClip) {
+        if (sceneFull && projectMeta?.user_id && isRealAiClip) {
           // Mark previous active library entries for this scene as superseded
           // so that regenerations keep the older versions visible.
           const { data: previousEntries } = await supabase
@@ -515,15 +421,15 @@ serve(async (req) => {
             await supabase
               .from('composer_scenes')
               .update({
+                clip_status: 'failed',
                 clip_error: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.',
+                lip_sync_status: null,
+                twoshot_stage: null,
                 dialog_shots: null,
                 lip_sync_source_clip_url: null,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', sceneId);
-            await transitionScene(supabase, sceneId, 'failed', {
-              detail: 'legacy_talking_head_route_blocked',
-            });
           } catch (blockErr) {
             console.error(
               '[compose-clip-webhook] legacy-route fail-mark error:',
@@ -541,13 +447,11 @@ serve(async (req) => {
       // Enrich silent Hailuo / generic model fails by re-fetching the prediction.
       const enrichedError = await enrichEmptyPredError(predictionId, predError);
       console.error(`[compose-clip-webhook] Clip failed:`, enrichedError);
-      // v375 — close the attempt so the watchdog never counts it as open work.
-      await failPlateAttempt(supabase, sceneId, predictionId);
 
       // Get current retry count
       const { data: scene } = await supabase
         .from('composer_scenes')
-        .select('retry_count, clip_source, clip_quality, engine_override, clip_error')
+        .select('retry_count, clip_source, clip_quality, engine_override')
         .eq('id', sceneId)
         .single();
 
@@ -593,15 +497,13 @@ serve(async (req) => {
           await supabase
             .from('composer_scenes')
             .update({
+              clip_status: 'generating',
               retry_count: currentRetry + 1,
               replicate_prediction_id: retried.id,
               clip_error: null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', sceneId);
-          await transitionScene(supabase, sceneId, 'plate_rendering', {
-            detail: 'compose-clip-webhook auto_retry',
-          });
 
           console.log(
             `[compose-clip-webhook] auto-retry ${currentRetry + 1}/${MAX_AUTO_RETRY} for scene ${sceneId} → new pred ${retried.id} (transient: "${String(enrichedError).slice(0, 80)}")`,
@@ -619,95 +521,6 @@ serve(async (req) => {
         }
       }
 
-      // ── v369 · Prompt-Repair-Retry (exactly once) ─────────────────────────
-      // HappyHorse rejects the plate prompt either via Green Net or via
-      // "InvalidParameter - Could not process with this prompt". Re-sending the
-      // identical prompt is pointless, so we harden it once (aggressive
-      // sanitizer + lip-ready compressor) and dispatch a single repaired run
-      // before falling through to fail + refund.
-      const rejectionKind = classifyProviderRejection(enrichedError);
-      const alreadyRepaired = String((scene as any)?.clip_error ?? '')
-        .includes('[prompt_repair_retry]');
-      const originalPrompt = String(
-        (payload?.input as Record<string, unknown> | undefined)?.prompt ?? '',
-      );
-
-      if (
-        rejectionKind !== 'none' &&
-        !alreadyRepaired &&
-        originalPrompt.trim().length > 0 &&
-        (payload.model || payload.version) &&
-        payload.input &&
-        typeof payload.input === 'object'
-      ) {
-        // v370 — keep the cast identity through the repair retry: names are
-        // rescued first, then re-emitted as one canonical clause.
-        const repaired = hardSanitizeForHappyHorse(
-          originalPrompt,
-          extractCastNames(originalPrompt),
-        );
-        const repairedPrompt = repaired.emptied ? '' : repaired.clean.trim();
-
-        if (repairedPrompt && repairedPrompt !== originalPrompt.trim()) {
-          try {
-            const replicateKey = Deno.env.get('REPLICATE_API_KEY');
-            if (!replicateKey) throw new Error('REPLICATE_API_KEY missing');
-            const replicate = new Replicate({ auth: replicateKey });
-
-            const webhookBase = appendWebhookToken(
-              `${supabaseUrl}/functions/v1/compose-clip-webhook`,
-            );
-            const newWebhook = `${webhookBase}&scene_id=${sceneId}&project_id=${projectId}`;
-
-            const repairArgs: Record<string, unknown> = {
-              input: { ...(payload.input as Record<string, unknown>), prompt: repairedPrompt },
-              webhook: newWebhook,
-              webhook_events_filter: ['completed'],
-            };
-            if (payload.model) repairArgs.model = payload.model;
-            else repairArgs.version = payload.version;
-
-            const repairedPred = await replicate.predictions.create(
-              repairArgs as Parameters<typeof replicate.predictions.create>[0],
-            );
-
-            await supabase
-              .from('composer_scenes')
-              .update({
-                retry_count: currentRetry + 1,
-                replicate_prediction_id: repairedPred.id,
-                ai_prompt: repairedPrompt,
-                clip_error: `[prompt_repair_retry] ${rejectionKind}: ${String(enrichedError ?? '').slice(0, 200)}`,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', sceneId);
-            await transitionScene(supabase, sceneId, 'plate_rendering', {
-              detail: 'compose-clip-webhook prompt_repair_retry',
-            });
-
-            console.warn(
-              `[compose-clip-webhook] v369 prompt-repair retry for scene ${sceneId} (${rejectionKind}) → pred ${repairedPred.id}; touched: ${repaired.touched.join(', ')}`,
-            );
-
-            return new Response(
-              JSON.stringify({ ok: true, retried: true, prompt_repair: true }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-            );
-          } catch (repairErr) {
-            console.error(
-              '[compose-clip-webhook] v369 prompt-repair dispatch failed, falling through to refund:',
-              repairErr,
-            );
-          }
-        } else {
-          console.warn(
-            `[compose-clip-webhook] v369 prompt-repair skipped for scene ${sceneId}: sanitizer produced no change`,
-          );
-        }
-      }
-
-
-
       // ── Green-Net (Alibaba HappyHorse content filter) → tag, do NOT switch ──
       // v176: previously we silently rewrote clip_source to ai-hailuo so the
       // next "Neu rendern" click bypassed HH. That overrode the user's
@@ -716,32 +529,27 @@ serve(async (req) => {
       const isGreenNet =
         isGreenNetRejection(enrichedError) &&
         String((scene as any)?.clip_source ?? '') === 'ai-happyhorse';
-      // v369 — distinguish the two rejection channels for the UI copy and mark
-      // whether the automatic prompt repair had already been tried.
-      const rejectionTag = isGreenNet
-        ? (rejectionKind === 'invalid_prompt'
-            ? '[invalid_prompt_rejected] '
-            : '[green_net_rejected] ')
-        : '';
-      const repairTag = alreadyRepaired ? '[prompt_repair_exhausted] ' : '';
-      const taggedError = rejectionTag + repairTag +
-        (String(enrichedError ?? '').slice(0, 440) || 'unknown_error');
+      const taggedError = (isGreenNet ? '[green_net_rejected] ' : '') +
+        (String(enrichedError ?? '').slice(0, 480) || 'unknown_error');
 
       await supabase
         .from('composer_scenes')
         .update({
+          clip_status: 'failed',
           retry_count: currentRetry + 1,
           clip_error: taggedError,
           // v176: clip_source stays untouched on Green-Net — user decides.
           ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
-            ? { lip_sync_source_clip_url: null, dialog_shots: null }
+            ? {
+                lip_sync_status: null,
+                twoshot_stage: null,
+                lip_sync_source_clip_url: null,
+                dialog_shots: null,
+              }
             : {}),
           updated_at: new Date().toISOString(),
         })
         .eq('id', sceneId);
-      await transitionScene(supabase, sceneId, 'failed', {
-        detail: taggedError.slice(0, 200),
-      });
 
       if (isGreenNet) {
         console.warn(
