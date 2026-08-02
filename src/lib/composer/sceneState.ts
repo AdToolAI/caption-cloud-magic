@@ -141,6 +141,33 @@ export const isSceneInFlight = (row: any) => isInFlightState(sceneState(row));
 export const sceneProgressPercent = (row: any) => stateProgress(sceneState(row));
 
 /**
+ * v388 — Legacy-Projektion.
+ * Einzige erlaubte Quelle fuer die alten `clipStatus`-Anzeigewerte in der
+ * Oberflaeche. Komponenten, die noch auf `pending | generating | ready |
+ * failed` verzweigen, bekommen den Wert aus dem Zustandsautomaten statt aus
+ * der Alt-Spalte — damit kann die Anzeige dem Server nicht mehr
+ * widersprechen.
+ */
+export function clipStatusFromState(
+  s: SceneState,
+): 'pending' | 'generating' | 'ready' | 'failed' {
+  switch (s) {
+    case 'failed':
+      return 'failed';
+    case 'plate_queued':
+    case 'plate_rendering':
+      return 'generating';
+    case 'idle':
+    case 'canceled':
+      return 'pending';
+    default:
+      // plate_ready, audio_prep, audio_ready, lipsync_*, complete
+      return 'ready';
+  }
+}
+
+
+/**
  * v384 — Realized-Vertrag: belastbare Master-Plate aus dem AKTUELLEN Lauf.
  * Kein Diagnosetext (`clip_error`) beeinflusst dieses Urteil mehr.
  */
