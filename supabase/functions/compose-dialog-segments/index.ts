@@ -105,6 +105,10 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 // multi-speaker: no full-plate fallback after a preclip timeout/failure.
 import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
 import {
+  assertGenerationProvenance,
+  provenanceMessage,
+} from "../_shared/generation-provenance.ts";
+import {
   assertPlateFaceContract,
 } from "../_shared/lipsync-closeup-contract.ts";
 
