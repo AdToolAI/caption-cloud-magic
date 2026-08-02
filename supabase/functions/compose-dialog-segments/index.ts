@@ -2744,9 +2744,23 @@ serve(async (req) => {
       });
     }
     const mergedFallbackLock = { ...(freshLock ?? existingLock) };
-    const finalAssignmentLock = anchorRekLockSeed
+    const _preCanonLock = anchorRekLockSeed
       ? { ...mergedFallbackLock, ...anchorRekLockSeed }
       : mergedFallbackLock;
+    // v387 — Der Lock wird pro Lauf aus der AKTUELLEN Sprecherliste gebaut.
+    // Persistierte Slots aus einem früheren Lauf (z. B. 5 Slots bei 4
+    // Sprechern) werden verworfen statt in den Injektivitätstest zu laufen.
+    const _canon = canonicalizeAssignmentLock(
+      _preCanonLock,
+      speakers.map((sp) => sp.character_id ?? null),
+    );
+    const finalAssignmentLock = _canon.lock;
+    if (_canon.droppedSlots.length > 0) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v387_stale_lock_slots_dropped ` +
+        `dropped=${_canon.droppedSlots.join(",")} speakers=${speakers.length}`,
+      );
+    }
     const lockSource = anchorRekLockComplete
       ? "v277_anchor_rekognition_complete"
       : anchorRekLockPartial
@@ -2754,6 +2768,7 @@ serve(async (req) => {
         : freshLock
           ? "v242_fresh"
           : "existing";
+
     const v153PlateIdentitySnapshot = {
       version: "v242" as const,
       dims: plateDims,
