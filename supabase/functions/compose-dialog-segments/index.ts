@@ -1050,11 +1050,15 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: "plate_ready",
           clip_error: "audio_plan_not_ready_self_heal",
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
+      // v388 — Rueckfall auf die fertige Plate laeuft ueber den Vertrag.
+      await transitionScene(supabase, sceneId, "plate_ready", {
+        from: ["plate_ready", "audio_prep", "audio_ready"],
+        detail: "v388_audio_plan_not_ready_self_heal",
+      });
       return json(
         {
           ok: false,
@@ -1178,7 +1182,6 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           clip_url: null,
-          pipeline_state: "idle",
           lip_sync_source_clip_url: null,
           lip_sync_applied_at: null,
           dialog_shots: null,
@@ -1389,11 +1392,22 @@ serve(async (req) => {
       await supabase
         .from("composer_scenes")
         .update({
-          pipeline_state: keepRunning ? "lipsync_running" : "audio_ready",
           clip_error: `syncso_circuit_open:${circuit.reason ?? "unknown"}`,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
+      // v388 — auch der Circuit-Breaker-Parkzustand laeuft ueber den Vertrag.
+      await transitionScene(
+        supabase,
+        sceneId,
+        keepRunning ? "lipsync_running" : "audio_ready",
+        {
+          from: keepRunning
+            ? ["lipsync_dispatched", "lipsync_running", "lipsync_muxing"]
+            : ["audio_prep", "audio_ready", "lipsync_dispatched"],
+          detail: "v388_syncso_circuit_open",
+        },
+      );
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "CIRCUIT_BLOCKED", error_class: "rate_limited",
