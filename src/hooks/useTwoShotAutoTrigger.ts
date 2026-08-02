@@ -87,7 +87,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, lip_sync_with_voiceover, dialog_mode, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id, plate_generation, plate_ready_generation, pipeline_state')
+          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, lip_sync_with_voiceover, dialog_mode, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id, plate_generation, plate_ready_generation, pipeline_state, pipeline_state_at')
           .eq('project_id', projectId);
         if (error || !data) return;
 
