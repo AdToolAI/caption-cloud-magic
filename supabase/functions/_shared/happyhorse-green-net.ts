@@ -14,6 +14,16 @@
 // returns the cleaned prompt plus the list of tokens it touched so the
 // caller can persist it for forensics.
 
+import {
+  buildCastClause,
+  extractCastNames,
+  isCastClauseSentence,
+  normalizeCastInPrompt,
+  validateCastContract,
+} from "./cast-clause.ts";
+
+export { buildCastClause, extractCastNames, validateCastContract };
+
 export interface GreenNetSanitizeResult {
   clean: string;
   touched: string[];
