@@ -1,41 +1,41 @@
-# v385 — Enum-Umbau zu Ende bringen
+## Kurze Antwort
 
-## Ist-Zustand (verifiziert)
-- Neu genutzt (`transitionScene` / `pipeline_state`): `composer-start-scene-generation`, `compose-twoshot-audio`, `_shared/scene-state.ts`, Client `sceneState.ts` / `isRealizedScene.ts`, `useTwoShotAutoTrigger.ts`.
-- Noch Legacy: ca. 48 Dateien schreiben oder lesen weiterhin `clip_status` / `twoshot_stage` / `lip_sync_status` direkt. Schwerpunkte: `compose-dialog-segments` (61), `compose-video-clips` (40), `sync-so-webhook` (22), `render-sync-segments-audio-mux` (12), `compose-clip-webhook` (11), `lipsync-watchdog` (8), `remotion-webhook` (7), `_shared/clip-terminal-failure.ts` (7), `qa-watchdog` (5).
-- Fazit: Der Zustand ist noch nicht Single-Source-of-Truth; die Bridge-Trigger halten das System nur zusammen.
+Ja — bis einschließlich Plate-Fertigstellung läuft es jetzt sauber, danach hängt es weiter am Bridge-Trigger.
 
-## Ziel
-`pipeline_state` ist der einzige geschriebene Zustand. Legacy-Spalten werden ausschließlich vom DB-Trigger gepflegt und nirgends mehr in Code geschrieben oder für Kontrollfluss gelesen.
+Verifiziert in diesem Turn:
+- `compose-dialog-segments` (61), `sync-so-webhook` (22), `render-sync-segments-audio-mux` (12), `lipsync-watchdog` (8) enthalten weiterhin ausschließlich Legacy-Schreibstellen; `pipeline_state` / `transitionScene` kommt in keiner dieser Dateien vor.
+- Der DB-Trigger `composer_scene_state_bridge` spiegelt in beide Richtungen. Der Lip-Sync-Teil funktioniert deshalb weiter, ist aber noch nicht validiert: veraltete Callbacks können den Zustand dort weiterhin ohne Run-/Generations-Prüfung setzen.
 
-## Umsetzung in vier Wellen
+## Eine echte Lücke, die dabei aufgefallen ist
 
-### Welle A — Terminal- und Abbruchpfade (höchster Nutzen)
-Auf `transitionScene(... 'failed' | 'canceled')` umstellen:
-`_shared/clip-terminal-failure.ts`, `_shared/lipsync-fail.ts`, `composer-cancel-scene`, `composer-cancel-project`, `cancel-dialog-lipsync`, `reset-lipsync-scene`, `_shared/scene-hard-reset.ts`.
-Damit gilt: ein „failed" ist ein validierter Übergang mit Run-/Generations-Prüfung — veraltete Callbacks können eine Szene nicht mehr reaktivieren.
+Der Bridge-Trigger zieht die Legacy-Spalten **nur** nach, wenn im selben Statement keine Legacy-Spalte (inkl. `clip_url`) verändert wurde. Zwei in Welle B migrierte Stellen in `compose-video-clips` (Upload-Pfad und Stock-Pfad) schreiben `clip_url` und `pipeline_state: 'plate_ready'` in **einem** Statement — dort bleibt `clip_status` auf dem alten Wert stehen, während `pipeline_state` bereits `plate_ready` ist. Legacy-Leser sehen dann einen veralteten Status.
 
-### Welle B — Plate-Pfad
-`compose-video-clips` (`plate_queued` → `plate_rendering`), `compose-clip-webhook` und `remotion-webhook` (`plate_ready` / `failed`), `compose-scene-anchor`, `generate-composer-image-scene`, `hybrid-extend-scene`.
-Jeder Übergang bekommt `runId` + `generation` mit; abgelehnte Übergänge werden geloggt statt still ignoriert.
+## Plan — Welle C (Dialog-/Lip-Sync-Pfad)
 
-### Welle C — Dialog-/Lip-Sync-Pfad
-`compose-dialog-segments` (`audio_ready` → `lipsync_dispatched`), `sync-so-webhook` (`lipsync_running` → `lipsync_muxing` → `complete`), `render-sync-segments-audio-mux`, `report-lipsync-motion-probe`, `compose-stitch-and-handoff`, `compose-video-assemble`.
-Das ist die größte Datei-Menge; hier ersetzt der Zustandsautomat die verstreuten Stage-Strings.
+### C0 — Bridge-Lücke schließen (zuerst, klein)
+- In `compose-video-clips` Upload-/Stock-Pfad: `clip_url` schreiben, Übergang danach per `transitionScene(..., 'plate_ready')` — zwei Statements, wie im Webhook.
+- Regel dokumentieren: Nutzdaten und Zustandsübergang nie im selben Update.
 
-### Welle D — Watchdogs, Autopilot, Client-Leser
-`lipsync-watchdog`, `qa-watchdog`, `qa-weekly-deep-sweep`, `recover-stuck-composer-clip`, `_shared/autopilotComposerBridge.ts`, `auto-director-compose`, `motion-studio-superuser`, `generate-talking-head`.
-Client: `usePipelineProgress`, `useSceneGenerate`, `useGenerateAllClips`, `useRenderQueueLive`, `useComposerPersistence`, `useApplyProductionPlan`, `ClipsTab`, `SceneCard`, `AnchorPreviewGate`, `SceneInlinePlayer`, `FaceMapReviewDialog`, `VideoComposerDashboard`, `RenderQueue`, `DebugLipsync`, `StudioMode`, `sceneSnapshot.ts`, `lipSyncPending.ts` — lesen nur noch über `sceneState()` / `SCENE_STATE_LABEL`.
+### C1 — `compose-dialog-segments`
+- Audio-/Dispatch-Kette auf `transitionScene` umstellen: `audio_ready` → `lipsync_dispatched`.
+- Vorbedingung nicht mehr über `twoshot_stage`-Strings, sondern über `canDispatchLipsync()` aus `_shared/scene-state.ts`.
+- Jeder Übergang mit `runId` + `generation`; abgelehnte Übergänge als `v385_stale_transition` loggen statt still zu ignorieren.
 
-### Welle E — Sperre und Beweis
-1. DB-Trigger `composer_scenes_reject_legacy_writes`: direkte Schreibzugriffe auf die drei Legacy-Spalten ohne begleitendes `pipeline_state` werden abgelehnt (Ausnahme: der Bridge-Trigger selbst).
-2. Guard-Test im Repo (wie beim AWS-only-Probe-Guard): schlägt fehl, sobald irgendwo `clip_status:` / `twoshot_stage:` / `lip_sync_status:` in einem Update-Payload auftaucht.
-3. `composer-reset-selftest` um Zustands-Assertions erweitern: nach Reset muss `pipeline_state = 'idle'` und Legacy-Spiegel konsistent sein.
+### C2 — `sync-so-webhook`
+- `lipsync_running` → `lipsync_muxing` → `complete`, Fehlerpfade über `transitionScene(..., 'failed')`.
+- Verdict-Gate (Passthrough/Static) bleibt inhaltlich unverändert, schreibt aber nur noch `clip_error` als Anzeigetext.
 
-## Technische Details
-- Jeder `transitionScene`-Aufruf übergibt `runId` und `generation`; die RPC `composer_scene_transition` lehnt Übergänge veralteter Läufe ab. Abgelehnte Übergänge werden mit `v385_stale_transition` protokolliert, nicht als Fehler eskaliert.
-- Bridge-Trigger bleibt zunächst aktiv (Rückwärtskompatibilität für Analytics/Views) und wird erst nach zwei stabilen Wochen entfernt.
-- Keine Schema-Änderung nötig außer dem Reject-Trigger in Welle E.
+### C3 — `render-sync-segments-audio-mux` und `compose-stitch-and-handoff`
+- Mux-Start → `lipsync_muxing`, Mux-Erfolg → `complete`, Mux-Fehler → `failed`.
 
-## Risiko und Reihenfolge
-Wellen A–C sind unabhängig deploybar; nach jeder Welle empfiehlt sich ein realer Szenenlauf zur Verifikation. Welle E erst starten, wenn A–D vollständig sind, sonst blockiert der Reject-Trigger noch nicht migrierte Funktionen.
+### C4 — `report-lipsync-motion-probe`, `compose-video-assemble`
+- Nur noch Telemetrie bzw. `failed`-Übergang; keine direkten Stage-Strings mehr.
+
+### Technische Details
+- Alle Übergänge laufen über die vorhandene RPC `composer_scene_transition` (Run-/Generations-Prüfung).
+- Legacy-Spalten werden in Welle C ausschließlich noch vom Trigger gepflegt.
+- Keine Schema-Änderung nötig; der Reject-Trigger kommt erst in Welle E.
+
+### Prüfung nach Welle C
+- Ein realer Dialoglauf mit 2 und mit 4 Sprechern.
+- Kontrolle, dass `pipeline_state` und Legacy-Spiegel zu jedem Zeitpunkt konsistent sind (`composer-reset-selftest`).
