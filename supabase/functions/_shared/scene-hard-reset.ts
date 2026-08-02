@@ -409,6 +409,7 @@ export async function hardResetScene(args: HardResetArgs): Promise<HardResetResu
     generation: nextGeneration,
     deletedObjects,
     canceledJobs: jobIds.length,
+    supersededAttempts,
     refundDecision: refund.decision,
     errors,
   };
