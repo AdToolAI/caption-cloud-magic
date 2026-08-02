@@ -1,43 +1,51 @@
-## Diagnose (belegt, nicht vermutet)
+## Der neue Vertrag
 
-Szene `6bf4e815…`, Pass 1 (Samuel):
+„Clip generieren" bedeutet ab sofort: **Der alte Job wird vollständig beendet und gelöscht, bevor der neue überhaupt beginnt.** Kein Artefakt, kein Provider-Auftrag und kein Zustandsfeld aus dem vorherigen Lauf überlebt den Klick.
 
-- Korrekte Clip-Gesichtsbox war **[154,113,561,624]** (≈ 40 %).
-- Turn nur 1,18 s → Tracking lieferte `anchor_fallback`.
-- Die bereits gepaddete Box wurde **erneut** aufgeweitet: **[52,0,663,720]** = **84,86 %**.
-- Die drei erfolgreichen Sprecher lagen bei **38–41 %** und wurden alle korrekt animiert.
-- Sync.so bekam damit fast das ganze Bild statt einer Gesichtsregion und gab den Preclip unverändert zurück. Das v371-Verdikt hat diesen echten Passthrough korrekt gemeldet.
+Damit ist der belegte Fehler vom 02.08. strukturell ausgeschlossen: Dort lief die Lip-Sync-Kette um 11:04:42 noch auf der Plate von gestern 21:28, während die Neuerzeugung ab 11:04:35 erst startete und ihr Ergebnis um 11:08:57 lieferte.
 
-Zwei strukturelle Ursachen, nicht eine:
+## Umsetzung v373
 
-1. **Padding hat keine eindeutige Zuständigkeit.** Getrackte Boxen werden in `face-track.ts` gepaddet; die Anchor-Box wird in `compose-dialog-segments` gepaddet — und im Fallback zusätzlich ein zweites Mal.
-2. **Das Sanity-Gate deckt den Fall nicht ab.** Im Preclip-Modus ist die Obergrenze 0.98, eine Fast-Vollbildbox gilt dort als plausibel.
+### 1. Abbruchphase vor jedem Neustart
+Beim Klick läuft zuerst eine abgeschlossene Aufräumphase. Der neue Job startet erst, wenn diese vollständig durch ist:
 
-Der `CreateCollection AccessDeniedException` ist ein separater Warnpfad und war für diesen Pass nicht ursächlich: Preclip, Audio und Clip-Koordinaten wurden korrekt erzeugt.
+- Laufende Provider-Aufträge der Szene bei Sync.so und beim Videomodell abbrechen.
+- Belegte Provider-Slots und Dispatch-Sperren der Szene freigeben.
+- Offene Credit-Reservierungen der Szene auflösen beziehungsweise erstatten.
+- Alle Lip-Sync-Zustandsfelder, Passzähler, Zwischenstufen und Fehlermeldungen leeren.
+- Alle Artefakte der Szene löschen: Plate, Preclips, Anchorbilder, Trackingdaten, Passvideos, Zwischen-Voiceover.
+- Erst danach den neuen Lauf eröffnen.
 
-## Plan v372 — Eine Padding-Zuständigkeit statt Symptomfix
+### 2. Generationsnummer als Abgrenzung
+- Jeder Neustart erhöht eine Generationsnummer der Szene.
+- Alle Artefakte des Laufs liegen unter einem Pfad mit dieser Nummer, nichts wird mehr überschrieben.
+- Jeder Provider-Auftrag trägt die Nummer mit sich.
+- Ein verspäteter Webhook einer alten Generation wird verworfen und protokolliert, statt den neuen Lauf zu beeinflussen. Genau das hatte zuletzt die frische Szene fehlschlagen lassen.
 
-### 1. Padding genau einmal, an einer Stelle
-- `face-track.ts` liefert **rohe** Gesichtsboxen zurück (Keyframes und Fallback-Anchor gleichermaßen), ohne Kontextaufschlag.
-- Der Kontextaufschlag wird ausschließlich beim Bau der Dispatch-Box in `compose-dialog-segments` angewendet — für getrackte und ungetrackte Boxen identisch.
-- Ergebnis: Tracking-Erfolg oder -Ausfall ändert die Boxgeometrie nicht mehr systematisch. Genau das war der Unterschied zwischen Samuel und den drei funktionierenden Sprechern.
+### 3. Lip-Sync startet erst nach fertiger Plate
+- Der Lip-Sync-Start wird serverseitig vom Render-Abschluss ausgelöst.
+- Der Client-Poller startet nichts mehr, er zeigt nur noch an.
+- Vor dem Provider-Dispatch wird geprüft, dass die verwendete Plate zur aktuellen Generation gehört.
 
-### 2. Obergrenze an der Empirie ausrichten, ohne neue Abbruch-Lotterie
-- Für den Preclip-Pfad die Fläche der Dispatch-Box auf einen an den erfolgreichen Läufen gemessenen Bereich **begrenzen statt abzubrechen**: Boxen über der Grenze werden auf das Gesichtszentrum zurückgeschnitten, nicht verworfen.
-- Der bestehende Hard-Fail bleibt nur für tatsächlich unmögliche Geometrie (leere oder außerhalb liegende Box).
-- Begründung: v344–v355 haben gezeigt, dass zusätzliche harte Schwellen legitime Szenen blockieren. Ein Clamp korrigiert, ohne Credits zu vernichten.
+### 4. Eindeutige Phasen im Zustand
+Ein Statusfeld mit festen Übergängen ersetzt das heutige Nebeneinander mehrerer Felder:
 
-### 3. Forensik
-- Pro Pass festhalten: Tracking-Quelle, Box vor und nach Padding, finale Flächenangabe und ob geclampt wurde.
-- Damit ist beim nächsten Fall in einer Zeile sichtbar, ob Geometrie oder Provider die Ursache war.
+```text
+idle → cleanup → plate_rendering → plate_ready
+     → lipsync_running → muxing → done
+                       ↘ failed (terminal)
+```
 
-### Verifikation
-- Regressionstests: Fallback-Anchor und getrackte Box ergeben nach dem Dispatch-Bau dieselbe Flächenordnung (≈ 40 %, nicht 85 %); die realen Samuel-Werte dürfen nicht mehr auf `[52,0,663,720]` wachsen.
-- `compose-dialog-segments` deployen, den betroffenen Pass erneut fahren und in den Logs prüfen: Box ≈ `[154,113,561,624]`, Fläche ≈ 40 %, kein Passthrough-Verdikt.
-- Anschließend ein vollständiger 4-Sprecher-Lauf derselben Szene.
+- Übergänge nur vorwärts und nur an den erwarteten Vorzustand gekoppelt.
+- Terminalzustände bleiben bestehen, bis der Nutzer neu startet.
+- Der aktuelle Widerspruch dieser Szene, Clipstatus „fertig" bei Lip-Sync „fehlgeschlagen", ist damit nicht mehr darstellbar.
 
-### Bewusst nicht angefasst
-v371-Verdiktlogik, Preclip-Rendering, Mux und Dispatch-Reihenfolge. Die Änderung betrifft ausschließlich die Erzeugung der Ziel-Bounding-Box.
+### 5. Oberfläche
+- Nach dem Klick zeigt die Szene zuerst kurz „Alter Job wird verworfen", dann „Video wird erzeugt", dann „Lip-Sync läuft (Pass x/y)", dann „Zusammenführen".
+- Bei Fehlschlag bleibt es beim Fehlschlag, ohne Fortschrittsbalken und ohne Rücksprung auf „läuft".
+- Kostet der Neustart Video-Credits, wird das vor der Bestätigung angezeigt.
 
-### Offener, getrennt zu behandelnder Punkt
-Der Rekognition-`AccessDeniedException` sollte separat geprüft werden. Er hat diesen Fehlschlag nicht verursacht, kostet aber bei jedem Lauf die Identitäts-Absicherung über die Face-Collection.
+### 6. Absicherung
+- Watchdog bricht eine hängende Aufräumphase nach einer festen Frist ab und meldet sie klar, statt stillschweigend den alten Zustand weiterlaufen zu lassen.
+- Tests: Klick während laufender Passes beendet diese nachweislich; kein Provider-Aufruf vor fertiger Plate; alter Webhook lässt neuen Lauf unberührt; nach Neustart existiert kein Artefakt der Vorgängergeneration mehr.
+- Praxisnachweis: Der erste Preclip-Zeitstempel liegt nach dem Zeitstempel der fertigen Plate, und alle Passartefakte tragen dieselbe Generationsnummer.
