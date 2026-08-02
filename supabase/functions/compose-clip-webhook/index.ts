@@ -18,6 +18,7 @@ import {
 } from "../_shared/plate-attempt.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { transitionScene } from "../_shared/scene-state.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -196,9 +197,10 @@ serve(async (req) => {
         .maybeSingle();
       const isCinematicSync =
         String((preUpdateScene as any)?.engine_override ?? '') === 'cinematic-sync';
+      // v385 — `pipeline_state` ist der einzige Zustand; hier werden nur
+      // noch Nutzdaten geschrieben, der Übergang folgt nach dem CAS-Write.
       const sceneUpdate: Record<string, unknown> = {
         clip_url: permanentUrl,
-        clip_status: 'ready',
         clip_error: null,
         updated_at: new Date().toISOString(),
       };
@@ -211,8 +213,6 @@ serve(async (req) => {
         // overrode every successful HH render and the UI lied "Hailuo".
         // clip_source is now left untouched — the provider the user picked
         // is the provider we report.
-        sceneUpdate.lip_sync_status = 'pending';
-        sceneUpdate.twoshot_stage = 'master_clip';
       }
       // v375 — the write itself is generation-scoped, so a hard reset that
       // lands between the guard above and this update can no longer be
@@ -236,6 +236,11 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
         );
       }
+      // v385 — Plate ist da: validierter Übergang, generationsgebunden.
+      await transitionScene(supabase, sceneId, 'plate_ready', {
+        detail: 'compose-clip-webhook',
+        generation: attemptCheck.expectedGeneration ?? null,
+      });
       await completePlateAttempt(supabase, attemptCheck.attemptId, permanentUrl);
 
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
@@ -483,15 +488,15 @@ serve(async (req) => {
             await supabase
               .from('composer_scenes')
               .update({
-                clip_status: 'failed',
                 clip_error: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.',
-                lip_sync_status: null,
-                twoshot_stage: null,
                 dialog_shots: null,
                 lip_sync_source_clip_url: null,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', sceneId);
+            await transitionScene(supabase, sceneId, 'failed', {
+              detail: 'legacy_talking_head_route_blocked',
+            });
           } catch (blockErr) {
             console.error(
               '[compose-clip-webhook] legacy-route fail-mark error:',
@@ -561,13 +566,15 @@ serve(async (req) => {
           await supabase
             .from('composer_scenes')
             .update({
-              clip_status: 'generating',
               retry_count: currentRetry + 1,
               replicate_prediction_id: retried.id,
               clip_error: null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', sceneId);
+          await transitionScene(supabase, sceneId, 'plate_rendering', {
+            detail: 'compose-clip-webhook auto_retry',
+          });
 
           console.log(
             `[compose-clip-webhook] auto-retry ${currentRetry + 1}/${MAX_AUTO_RETRY} for scene ${sceneId} → new pred ${retried.id} (transient: "${String(enrichedError).slice(0, 80)}")`,
@@ -640,7 +647,6 @@ serve(async (req) => {
             await supabase
               .from('composer_scenes')
               .update({
-                clip_status: 'generating',
                 retry_count: currentRetry + 1,
                 replicate_prediction_id: repairedPred.id,
                 ai_prompt: repairedPrompt,
@@ -648,6 +654,9 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
               .eq('id', sceneId);
+            await transitionScene(supabase, sceneId, 'plate_rendering', {
+              detail: 'compose-clip-webhook prompt_repair_retry',
+            });
 
             console.warn(
               `[compose-clip-webhook] v369 prompt-repair retry for scene ${sceneId} (${rejectionKind}) → pred ${repairedPred.id}; touched: ${repaired.touched.join(', ')}`,
@@ -694,21 +703,18 @@ serve(async (req) => {
       await supabase
         .from('composer_scenes')
         .update({
-          clip_status: 'failed',
           retry_count: currentRetry + 1,
           clip_error: taggedError,
           // v176: clip_source stays untouched on Green-Net — user decides.
           ...(String((scene as any)?.engine_override ?? '') === 'cinematic-sync'
-            ? {
-                lip_sync_status: null,
-                twoshot_stage: null,
-                lip_sync_source_clip_url: null,
-                dialog_shots: null,
-              }
+            ? { lip_sync_source_clip_url: null, dialog_shots: null }
             : {}),
           updated_at: new Date().toISOString(),
         })
         .eq('id', sceneId);
+      await transitionScene(supabase, sceneId, 'failed', {
+        detail: taggedError.slice(0, 200),
+      });
 
       if (isGreenNet) {
         console.warn(
