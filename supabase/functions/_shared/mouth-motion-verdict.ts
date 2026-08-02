@@ -145,6 +145,10 @@ export interface MouthMotionVerdictResult {
   outputVsInput?: number | null;
   /** v350 — all output↔input deltas, for forensics. */
   outputVsInputDeltas?: number[];
+  /** v371 — median output↔input delta; null when not measured. */
+  outputVsInputMedian?: number | null;
+  /** v371 — which rule produced the verdict (forensics, shown in logs). */
+  verdictCriterion?: string;
   /**
    * v346 — Per-frame extractor outcome. Without this a probe failure was
    * indistinguishable from a provider no-op in the logs.
