@@ -1811,10 +1811,11 @@ serve(async (req) => {
                 final_url: partialMux ? ((lastDonePass as any)?.output_url ?? freshFailState?.final_url ?? null) : freshFailState?.final_url,
                 partial_mux: partialMux ? true : freshFailState?.partial_mux,
               },
-              pipeline_state: partialMux ? "lipsync_muxing" : "lipsync_running",
               updated_at: nowIso,
             })
             .eq("id", sceneId);
+          await advanceScene(partialMux ? "lipsync_muxing" : "lipsync_running");
+
           console.warn(
             `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} FAILED but scene can continue (alive=${aliveSiblings.length}, done=${doneCount}, partialMux=${partialMux}) — no refund yet`,
           );
