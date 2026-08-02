@@ -243,6 +243,33 @@ serve(async (req) => {
       });
       await completePlateAttempt(supabase, attemptCheck.attemptId, permanentUrl);
 
+      // v387 — Erst JETZT (bestätigte Plate des aktuellen Runs) darf die
+      // Audio-Stufe starten. Vorher lief dieser Aufruf in
+      // `compose-video-clips`, also noch während des Provider-Renders.
+      if (isCinematicSync) {
+        try {
+          const audioUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-twoshot-audio`;
+          const r = await fetch(audioUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({ scene_id: sceneId }),
+          });
+          const t = await r.text().catch(() => '');
+          console.log(
+            `[compose-clip-webhook] v387_audio_after_plate_ready scene=${sceneId} http=${r.status} ${t.slice(0, 200)}`,
+          );
+        } catch (audioErr) {
+          console.warn(
+            `[compose-clip-webhook] v387_audio_dispatch_failed scene=${sceneId}`,
+            audioErr,
+          );
+        }
+      }
+
+
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).
       // Even if the full project never finishes, or the user later regenerates the
       // scene, the user keeps access to every clip they paid credits for.
