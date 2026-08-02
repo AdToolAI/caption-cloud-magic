@@ -35,6 +35,7 @@ import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 import { judgeMouthMotion, mouthRectFromPass } from "../_shared/mouth-motion-verdict.ts";
 import { assertGenerationProvenance } from "../_shared/generation-provenance.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { failLipSync } from "../_shared/lipsync-fail.ts";
 
 
 const corsHeaders = {
@@ -926,15 +927,17 @@ serve(async (req) => {
           ? `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Der Anbieter hat das Video unverändert zurückgegeben (keine Mundbewegung erzeugt, ${evidence}). Bitte die Szene mit größeren Gesichtern neu rendern.`
           : `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s): Ergebnis konnte nicht geprüft werden (Messung nicht möglich, ${evidence}). Bitte erneut versuchen.`;
 
-        await supabase
-          .from("composer_scenes")
-          .update({
-            clip_error: userMsg,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        // v388 — Terminalzustand ausschliesslich ueber den Vertrag.
-        await failSceneState(supabase, sceneId, "failed");
+        // v395 — One terminal helper owns dialog_shots.status, clip_error,
+        // state transition and inflight cleanup. Previously this branch only
+        // changed pipeline_state, leaving dialog_shots.status="rendering".
+        await failLipSync({
+          supabase,
+          sceneId,
+          reason: userMsg,
+          userId: String((freshScene as any)?.user_id ?? "") || null,
+          extraSyncJobIds: jobId ? [jobId] : [],
+          syncApiKey: Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY"),
+        });
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
           engine: "sync-segments",

@@ -7753,10 +7753,8 @@ serve(async (req) => {
         });
       }
 
-      // Honest non-blocking signal: when the Lovable AI gateway can't probe
-      // (extract failure or transient 5xx), log it but let the dispatch
-      // through. The Forensik UI surfaces this clearly so we don't silently
-      // pretend the probe passed.
+      // v395 — probe outages are non-blocking only for plate diagnostics.
+      // Exact provider preclips use requireMouth and fail closed above.
       if (gate.ok && gate.code === "probe_unavailable") {
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
@@ -7783,7 +7781,7 @@ serve(async (req) => {
               extract_ms: gate.extract_ms,
               gemini_ms: gate.gemini_ms,
             },
-            non_blocking: true,
+            non_blocking: !usePassPreclip,
           },
         });
       }
