@@ -620,7 +620,7 @@ serve(async (req) => {
     // Load scene + ownership
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, dialog_script, dialog_turns, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status, pipeline_state, plate_generation, plate_ready_generation, active_run_id")
+      .select("id, project_id, dialog_script, dialog_turns, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds, clip_source, clip_status, clip_url, clip_error, twoshot_stage, lip_sync_status, pipeline_state, pipeline_state_at, plate_generation, plate_ready_generation, active_run_id")
       .eq("id", scene_id)
       .single();
     if (sErr || !scene) return json({ error: "scene not found" }, 404);
