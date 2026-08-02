@@ -1,45 +1,35 @@
-Beide Schritte sind **begonnen, aber nicht abgeschlossen**. Ich habe den aktuellen Stand gerade geprüft — hier ist, was wirklich steht und was fehlt.
+## Befund (geprüft, nicht vermutet)
 
-## Stand heute (geprüft)
+Ich habe den Weg vom Klick bis zur fertigen Szene durchgesehen — Code, Datenbankwächter und Übergangstabelle.
 
-**Schritt 1 — teilweise erledigt.** Umgestellt sind: der Sync.so-Webhook (Vorwärtswechsel), der Mux-Versand und der zentrale Lip-Sync-Anstoß im Dialogpfad.
+**Was jetzt sauber ist:**
 
-Noch direkt schreibend (56 Stellen in 9 Dateien):
+1. **Ein Einstieg.** Kein einziger Client-Aufruf geht mehr direkt an `compose-video-clips`; alle sechs Startpunkte (SceneCard, ClipsTab, AnchorPreviewGate, FaceMapReviewDialog, SceneClipProgress, SceneDialogStudio) laufen über `startSceneGeneration` → `composer-start-scene-generation`.
+2. **Ein Schreibpfad.** Im gesamten Funktionsbestand schreibt nur noch `scene-hard-reset.ts` (legitimer Zwangsschreiber) direkt auf `pipeline_state`. Alles andere geht über `transitionScene` / `failSceneState`.
+3. **Wächter scharf.** Die Datenbankfunktion weist Klasse A (Wiederbelebung terminaler Szenen), Klasse B (Sprung in Ton/Lip-Sync ohne fertige Plate) und Klasse C (jeder nicht freigegebene Übergang) zurück und rollt inklusive Legacy-Spalten zurück.
+4. **Protokolltabelle leer** — allerdings heißt das nur, dass seit dem Scharfschalten noch kein Durchlauf lief. Es ist noch **kein Praxisbeweis**, nur die Abwesenheit von Gegenbeweisen.
 
-| Datei | direkte Schreibvorgänge | davon vorwärts |
-|---|---|---|
-| `compose-dialog-segments` | 27 | 5 (`plate_ready`, `idle`, `audio_ready` ×3, `lipsync_running`) |
-| `compose-video-clips` | 14 | 13 (alle `plate_rendering`) |
-| `render-sync-segments-audio-mux` | 5 | 0 |
-| `sync-so-webhook` | 4 | 0 |
-| `_shared/clip-terminal-failure.ts`, `report-lipsync-motion-probe`, `hybrid-extend-scene`, `compose-twoshot-audio`, `_shared/scene-hard-reset.ts` | je 1–2 | gemischt |
+## Drei verbliebene Widersprüche
 
-**Schritt 2 — halb scharf.** Der Wächter `composer_scene_state_guard()` läuft, blockt aber nur zwei Klassen:
-- Klasse A: Wiederbelebung einer fehlgeschlagenen/abgebrochenen Szene → blockiert
-- Klasse B: Sprung in Ton-/Lip-Sync-Phase ohne fertige Plate → blockiert
-- Klasse C: jeder andere nicht freigegebene Wechsel → **nur protokolliert, nicht abgewiesen**
+**A — Toter Schreibpfad in `_shared/clip-terminal-failure.ts`.** `buildClipRerenderPatch()` baut ein rohes `{ pipeline_state: 'failed' | 'idle', ... }`-Objekt für ein `.update()`. Aufrufer gibt es aktuell keine — aber die Datei steht auf der Ausnahmeliste des Vertragstests. Wer sie morgen wieder benutzt, bekommt keinen Testfehler und keinen Laufzeitfehler: Der Wächter rollt den Zustand still zurück, die Nebenfelder (`clip_url: null`) bleiben aber geschrieben. Das ist genau die Sorte halb angewendeter Schreibvorgang, die früher Szenen zerlegt hat.
 
-Genau das ist die Lücke: Solange Klasse C nur mitschreibt, bleibt der Vertrag Konvention. Die Protokolltabelle ist derzeit leer — seit dem Ausrollen des Wächters lief noch kein Durchlauf, es gibt also noch keine Praxisdaten.
+**B — Zwei Besitzer für den Ton-Start.** Nach `plate_ready` ruft sowohl `compose-clip-webhook` (Server, Zeile ~251) als auch `useTwoShotAutoTrigger` (Client, Zeile ~155) `compose-twoshot-audio` auf. Der atomare Claim auf `audio_prep` verhindert den Doppellauf, aber es gibt zwei Auslöser für einen Schritt — und der Client-Pfad ist der, der bei Tab-Wechsel/Reload unvorhersehbar feuert.
+
+**C — Rückwege in der Übergangstabelle sind asymmetrisch.** Aus `lipsync_muxing` führt kein Weg zurück nach `audio_ready` oder `plate_ready` (nur `complete`/`failed`/`idle`/`canceled`). Wenn ein Mux-Retry das versucht, wird er still zurückgerollt statt sichtbar zu scheitern. Aus `lipsync_running`/`lipsync_dispatched` existieren diese Rückwege dagegen. Entweder die Rückwege sind erlaubt — dann fehlt einer — oder sie sind es nicht, dann gehören die anderen weg.
 
 ## Der Plan
 
-**1a — Plate-Pfad umstellen (`compose-video-clips`).** Die 13 `plate_rendering`-Schreibvorgänge laufen künftig über `transitionScene(..., { from, runId, generation })`. Das ist der Pfad, der zuletzt Szenen verfrüht weitergeschoben hat; er bekommt damit Zeilensperre und Generationsabgleich.
+**1 — Toten Schreibpfad entfernen.** `buildClipRerenderPatch()` und `clipRerenderTargetState()` aus `_shared/clip-terminal-failure.ts` löschen (nur `isTerminalClipFailure` und die Meldungstexte bleiben — die haben Aufrufer). Danach `clip-terminal-failure.ts` von der Ausnahmeliste in `scene-state-write-contract.test.ts` streichen, damit die Datei künftig wieder vom Vertragstest bewacht wird.
 
-**1b — Dialogpfad-Reste (`compose-dialog-segments`).** Die 5 verbliebenen Vorwärtswechsel umstellen. Der `idle`-Schreibvorgang (Zeile 1181) wird zusätzlich geprüft: Ein Rücksetzen auf `idle` mitten im Lauf gehört in den Reset, nicht in den Dialogpfad.
+**2 — Ton-Start auf einen Besitzer.** Der Server behält ihn: `compose-clip-webhook` bleibt der Auslöser nach `plate_ready`. Im Client wird der `compose-twoshot-audio`-Aufruf in `useTwoShotAutoTrigger` zum reinen Nachzügler-Netz — er feuert nur noch, wenn die Szene länger als 90 Sekunden auf `plate_ready` steht (Server-Webhook verloren gegangen). Der Lip-Sync-Zweig (Zeile ~296) bleibt unverändert.
 
-**1c — Randfunktionen.** `report-lipsync-motion-probe`, `hybrid-extend-scene`, `compose-twoshot-audio` und `_shared/clip-terminal-failure.ts` auf denselben Weg ziehen. `_shared/scene-hard-reset.ts` bleibt bewusst direkt — der Reset ist der einzige legitime Zwangsschreiber und bekommt stattdessen die Sitzungsmarkierung des Wächters.
+**3 — Übergangstabelle symmetrisch machen.** Migration, die `lipsync_muxing → audio_ready` und `lipsync_muxing → plate_ready` ergänzt, damit ein Mux-Retry denselben Rückweg hat wie ein Lip-Sync-Retry. Reine Datenzeilen, keine Schemaänderung.
 
-**1d — Fehlerpfade.** Die ~40 `failed`-Schreibvorgänge bleiben inhaltlich, werden aber über den einheitlichen Helfer geführt, damit Protokoll, Erstattung und Zustand immer zusammen passieren statt an 40 Stellen getrennt.
-
-**2 — Wächter scharf schalten.** Klasse C wechselt von „protokollieren" auf „abweisen": Jede Zustandsänderung ohne die Sitzungsmarkierung der Übergangsfunktion wird zurückgerollt und protokolliert. Reihenfolge ist wichtig — das passiert **nach** 1a–1d, sonst blockiert der Wächter noch nicht umgestellte Pfade und die Pipeline steht.
-
-**3 — Absicherung vor dem Scharfschalten.** Ein Trockenlauf: Wächter bleibt im Protokollmodus, ein vollständiger 4-Sprecher-Durchlauf läuft durch, danach muss die Protokolltabelle **leer** sein. Erst wenn sie leer ist, wird abgewiesen. Findet sie Einträge, sind das exakt die vergessenen Stellen — die kommen zuerst dran.
+**4 — Praxisnachweis.** Ein vollständiger 4-Sprecher-Durchlauf, danach Kontrolle von `composer_state_guard_violations`. Bleibt sie leer, hält der Vertrag über einen echten Lauf. Einträge zeigen exakt die verbliebene Stelle mit Szene, Von-Zustand, Nach-Zustand und Grund — die kommt dann zuerst dran.
 
 ### Technische Details
 
-- Umstellungsmuster überall gleich: `.update({ pipeline_state: X, ... })` → `transitionScene(supabase, sceneId, { to: X, from: erwarteterZustand, runId, generation, reason })`; Nebenfelder (`clip_url`, `dialog_shots`, …) bleiben im selben Aufruf als Nutzlast erhalten
-- Reset-Ausnahme: `scene-hard-reset.ts` setzt `set_config('composer.transition_scene', scene_id, true)` in seiner Transaktion
-- Schritt 2 als Migration, die nur den Klasse-C-Zweig der bestehenden Wächterfunktion ersetzt — keine Schemaänderung, keine Datenmigration
-- Vertragstest (Deno): scannt die vier Hauptfunktionen auf `pipeline_state:` in `.update(`-Aufrufen und lässt den Build scheitern, sobald wieder direkt geschrieben wird — Ausnahmeliste nur für `scene-hard-reset.ts`
-
-Der Aufwand liegt in 1a–1d. Schritt 2 selbst ist ein kleiner Migrationseingriff — aber er ist der, der die Fehlerklasse endgültig schließt.
+- Punkt 1 ist eine Löschung plus eine Zeile aus der `ALLOWED`-Menge des Vertragstests; anschließend muss der Test weiterhin grün laufen.
+- Punkt 2: Bedingung im Kandidatenfilter ergänzen — `canStartAudioPrep(d) && Date.now() - Date.parse(d.pipeline_state_at) > 90_000`. Dafür muss `pipeline_state_at` in die Select-Liste von Zeile 90 aufgenommen werden.
+- Punkt 3: `INSERT INTO composer_scene_transitions ... ON CONFLICT DO NOTHING` für die zwei Paare.
+- Kein Eingriff in `scene-hard-reset.ts`, `composer-start-scene-generation` oder die Wächterfunktion selbst — die drei sind geprüft und stimmig.
