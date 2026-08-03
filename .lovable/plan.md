@@ -10,7 +10,7 @@ Ehrliche Einordnung vorab: Punkt 1 und 3 sind Handwerk, keine Kreativität — s
 
 ## Der kreative Kern: ein Beweis, kein Werbeblock
 
-Wichtig zur Einordnung: hier wird **nichts live generiert**. Es ist ein einziger, vorab produzierter Clip, der als Datei ausgeliefert wird — keine Modell-Kosten pro Besucher, keine Wartezeit, kein Risiko, dass ein Besucher vor einem Ladebalken sitzt.
+Wichtig zur Einordnung: hier wird **nichts live generiert** — aber es ist auch nichts erfunden. Der Clip wird **einmal mit unserem eigenen Studio wirklich produziert**: echtes Briefing eingeben, echten Durchlauf starten, fertigen Clip exportieren. Dieses Ergebnis liegt dann als Datei auf der Startseite. Der Text, der sich links eintippt, ist wortwörtlich das Briefing, mit dem dieser Clip entstanden ist — nachgestellt ist nur der Tippvorgang, nicht das Ergebnis. Also: keine Modell-Kosten pro Besucher, keine Wartezeit, und trotzdem ein echter Beweis statt einer Animation.
 
 Statt eines weiteren Demo-Karussells ein einziger Moment direkt unter dem Hero:
 
