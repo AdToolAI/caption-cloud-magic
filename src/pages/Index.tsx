@@ -17,6 +17,8 @@ import { InstantAvatarDemo } from "@/components/landing/InstantAvatarDemo";
 // TestimonialSpotlight hidden during Beta — real testimonials pending
 
 import { TrialPromiseStrip } from "@/components/landing/TrialPromiseStrip";
+import { ProofMoment } from "@/components/landing/ProofMoment";
+import { PricingSection } from "@/components/landing/PricingSection";
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
 import { FAQ } from "@/components/FAQ";
 
@@ -97,6 +99,9 @@ const Index = () => {
           {/* Hero Section - Black Tie */}
           <BlackTieHero />
 
+          {/* Proof Moment — Briefing links, echter Clip rechts */}
+          <ProofMoment />
+
           {/* Social Proof Strip */}
           <SocialProofStrip />
 
@@ -115,8 +120,11 @@ const Index = () => {
           {/* AI Arsenal - all integrated AI modules */}
           <AIArsenalShowcase />
 
+          {/* Pricing — was 14,99 € konkret enthält */}
+          <PricingSection />
 
           {/* Testimonial Spotlight hidden during Beta — will return with real user quotes */}
+
 
           {/* FAQ Section */}
           <section id="faq" className="py-24 px-4 bg-card/30">
