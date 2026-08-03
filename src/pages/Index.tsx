@@ -17,6 +17,8 @@ import { InstantAvatarDemo } from "@/components/landing/InstantAvatarDemo";
 // TestimonialSpotlight hidden during Beta — real testimonials pending
 
 import { TrialPromiseStrip } from "@/components/landing/TrialPromiseStrip";
+import { ProofMoment } from "@/components/landing/ProofMoment";
+import { PricingSection } from "@/components/landing/PricingSection";
 import { BlackTieFooter } from "@/components/landing/BlackTieFooter";
 import { FAQ } from "@/components/FAQ";
 
