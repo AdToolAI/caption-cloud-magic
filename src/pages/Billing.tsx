@@ -38,6 +38,7 @@ const Billing = () => {
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const planInfo = getProductInfo(productId);
 
