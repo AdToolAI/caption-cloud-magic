@@ -396,19 +396,24 @@ serve(async (req) => {
     // immediately we guarantee the UI sees `generating` even if the
     // background dispatch later crashes — and the heartbeat watchdog can
     // then auto-fail stale `generating` rows after 15 min.
+    // Since 2026-08-03 this is ALSO the single definition of "a new run
+    // begins": beginSceneRun() cancels in-flight provider jobs, purges the
+    // previous run's lip-sync state and visible clip, and stamps a fresh
+    // active_run_id / plate_generation before anything is dispatched.
+    let sceneRunStamps = new Map<string, { runId: string; generation: number }>();
     try {
       const earlyAiSceneIds = (scenes as Array<{ id: string; clipSource?: string }>)
         .filter((s) => s.clipSource?.startsWith("ai-"))
         .map((s) => s.id);
       if (earlyAiSceneIds.length > 0) {
-        await supabaseAdmin
-          .from("composer_scenes")
-          .update({
-            clip_status: "generating",
-            clip_error: null,
-            updated_at: new Date().toISOString(),
-          })
-          .in("id", earlyAiSceneIds);
+        const stamps = await beginSceneRun(
+          supabaseAdmin,
+          earlyAiSceneIds,
+          "compose-video-clips",
+        );
+        sceneRunStamps = new Map(
+          stamps.map((s) => [s.sceneId, { runId: s.runId, generation: s.generation }]),
+        );
       }
     } catch (preMarkErr) {
       console.warn(
@@ -416,6 +421,7 @@ serve(async (req) => {
         preMarkErr,
       );
     }
+    void sceneRunStamps;
 
 
     const replicate = new Replicate({
