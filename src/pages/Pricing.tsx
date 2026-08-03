@@ -30,6 +30,8 @@ const Pricing = () => {
   const { t, language } = useTranslation();
   const [searchParams] = useSearchParams();
   const isReactivation = searchParams.get("reactivate") === "1";
+  const isCanceled =
+    searchParams.get("canceled") === "1" || searchParams.get("canceled") === "true";
 
   const [proLoading, setProLoading] = useState(false);
   const [packLoading, setPackLoading] = useState<string | null>(null);
