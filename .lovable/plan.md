@@ -1,49 +1,34 @@
-## Befund
+# Stand der Lip-Sync-Pipeline im Motion Studio
 
-Nein — der aktive Composer-Pfad ist **noch nicht vollständig 1:1 wie am 27.07.2026**.
+## Was geprüft ist
 
-Der letzte Lauf `d7402a67-d10d-493d-8fe5-aefb91b6ccc9` lief technisch bis zum fertigen Ergebnis:
+- Der Composer-/Lip-Sync-Code trägt durchgehend den Juli-Marker `v283-baseline-27-07-full-composer-rollback`. In `compose-dialog-segments`, `sync-so-webhook`, `remotion-webhook`, `render-sync-segments-audio-mux`, `compose-video-clips`, `compose-clip-webhook`, `compose-twoshot-audio` und `lipsync-watchdog` findet sich kein `active_run_id`-, `plate_generation`- oder Enum-Guard-Rest mehr.
+- Der Datenbank-Guard `composer_scene_state_guard` protokolliert nur noch (`v400_july_baseline_observe_only`) und blockiert keinen Abschluss.
+- Die zuletzt gelaufene Szene `d7402a67…` steht sauber auf `complete / done / ready` mit finalem Clip.
 
-```text
-Master-Clip gespeichert
-→ Dialog-Audio für 4 Sprecher erstellt
-→ 4/4 Sync.so-Pässe erfolgreich
-→ finaler Dialog-Stitch erfolgreich gerendert
-→ fertige MP4 vorhanden
-→ Abschluss-Webhook verwirft das Ergebnis als „stale callback“
-→ Szene bleibt auf audio_muxing / plate_ready
-→ UI schaltet den Lip-Sync-Prozess wieder ab
-```
+## Was noch offen ist
 
-Der konkrete Widerspruch ist im Code bestätigt:
+- Seit der letzten Reparatur (02.08., 23:37 UTC) gab es **keinen neuen Lauf**. „Läuft jetzt problemlos durch“ ist damit nicht belegt, nur plausibel.
+- Zwei Geschwisterszenen desselben Projekts (`dc220c23…`, `b88b7dac…`) endeten um 00:36 UTC mit `watchdog_never_dispatched` — sie wurden nie an die Lip-Sync-Kette übergeben. Ob das noch am alten Guard lag oder an einem eigenen Dispatch-Problem, ist unbestätigt.
+- Die neuen Zustandsmodule werden noch von Randfunktionen (`composer-cancel-scene`, `composer-hard-reset-scene`, `composer-reset-selftest`, `composer-start-scene-generation`) genutzt. Sie liegen nicht im Hauptpfad, könnten aber beim Abbrechen/Zurücksetzen einer Szene wieder abweichende Zustände schreiben.
 
-- `render-sync-segments-audio-mux` sendet beim finalen Render **keine** `plate_generation` und **keine** `active_run_id` im Callback (`index.ts:838–852`). Das entspricht dem zurückgesetzten Juli-Pfad.
-- `remotion-webhook` enthält aber weiterhin den späteren **v379-Run-Guard**, der genau diese beiden Werte zwingend verlangt (`index.ts:53–60`, `282–285`).
-- Deshalb wurde um `23:29:11 UTC` der erfolgreich fertiggestellte Clip mit `v379 stale callback ignored` verworfen.
-- Der ursprüngliche Plate-Clip wurde nicht gelöscht: Die Szene hat weiterhin `clip_status=ready` und eine gültige `clip_url`. Nur der fertige Lip-Sync-Clip wurde nicht übernommen.
+## Vorgehen
 
-## Umsetzung
+1. **Verifikationslauf statt weiterer Codeänderung**
+   - Ein 4-Sprecher-Projekt neu erzeugen und den kompletten Weg beobachten: Plate → Audio → 4/4 Sync.so → Audio-Mux → Callback → `complete`.
+   - Parallel Logs von `compose-dialog-segments`, `sync-so-webhook`, `remotion-webhook` und `lipsync-watchdog` mitlesen.
 
-1. **Dialog-Stitch-Abschluss auf Juli-Baseline zurücksetzen**
-   - Den post-Juli-v379-Run-Guard ausschließlich aus dem Composer-Dialog-Stitch-Erfolgs- und Fehlerpfad entfernen.
-   - Erfolgreiche Juli-Callbacks wieder `clip_url`, `lip_sync_applied_at`, `dialog_shots.status=done`, `lip_sync_status` und `twoshot_stage` finalisieren lassen.
-   - Andere Remotion-Pfade wie Director’s Cut und Long Form unverändert lassen.
+2. **`watchdog_never_dispatched` klären**
+   - Die beiden betroffenen Szenen und die Watchdog-Logs des Zeitfensters auswerten.
+   - Nur falls sich ein echter Dispatch-Fehler zeigt: gezielt die Übergabe von Szene 2..n an `compose-dialog-segments` reparieren, ohne neue Gates einzuführen.
 
-2. **Verwandte Composer-Callbacks abgleichen**
-   - `dialog-turn-preclip` und Dialog-Stitch-Fehlerbehandlung gegen Commit `58060cffe` prüfen.
-   - Weitere post-Juli-Abhängigkeiten auf `active_run_id`, `plate_generation` oder Enum-Transitions im Composer-spezifischen Callback entfernen, sofern sie die Juli-Nutzdaten blockieren.
-   - Die additive Datenbank-Bridge darf nur spiegeln/telemetrieren und keinen Juli-Abschluss verhindern.
+3. **Randfunktionen angleichen**
+   - Prüfen, ob Abbrechen/Hard-Reset einen Zustand hinterlässt, den die Juli-Kette nicht wieder aufnehmen kann.
+   - Falls ja: diese Funktionen so anpassen, dass sie zusätzlich die Legacy-Felder konsistent zurücksetzen.
 
-3. **Erfolgreichen Abschluss atomar machen**
-   - Erst finalen Clip und Dialogstatus speichern, dann den kompatiblen Abschlussstatus setzen.
-   - Ein nachgelagerter Statusfehler darf den bereits fertig gerenderten Clip weder ausblenden noch zurücksetzen.
-   - Wiederholte Webhooks bleiben idempotent und dürfen denselben fertigen Clip erneut bestätigen.
+4. **Ergebnis festhalten**
+   - Nach grünem Lauf `docs/lipsync-baseline-v283.md` um das Verifikationsdatum ergänzen.
 
-4. **Gezielte Verifikation**
-   - Tests für einen Dialog-Stitch-Callback ohne `active_run_id`/`plate_generation` ergänzen — genau die Juli-Payload.
-   - Nach Deployment einen 4-Sprecher-Lauf prüfen: 4/4 Sync.so → Stitch → Callback → `done` → finale `clip_url` sichtbar.
-   - Zusätzlich belegen, dass kein `stale callback ignored` mehr im Composer-Dialog-Stitch-Pfad erscheint und fertige Plates währenddessen sichtbar bleiben.
+## Kurzantwort
 
-## Wichtig
-
-Der aktuelle Fehler liegt **nicht bei Sync.so** und nicht beim generierten Video. Der fertige Lip-Sync-Render existiert; ausschließlich ein übrig gebliebener post-Juli-v379-Guard verhindert seine Übernahme.
+Der Code und die Datenbank stehen auf dem Juli-Stand, und der letzte Lauf ist vollständig durchgelaufen. Garantieren lässt sich der störungsfreie Ablauf aber erst nach einem frischen 4-Sprecher-Lauf — den sollten wir als nächsten Schritt machen.
