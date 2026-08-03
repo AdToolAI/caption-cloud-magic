@@ -75,6 +75,15 @@ function AutopilotReal() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<AutopilotSlot | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  // First Production: kommt der Nutzer direkt aus dem Studio-Setup,
+  // öffnet sich der Brief-Wizard sofort — kein leeres Cockpit.
+  useEffect(() => {
+    if (searchParams.get('firstProduction') === '1') {
+      setWizardOpen(true);
+    }
+  }, [searchParams]);
 
   const isActive = !!brief?.is_active;
   const isLocked = !!(brief?.locked_until && new Date(brief.locked_until) > new Date());
