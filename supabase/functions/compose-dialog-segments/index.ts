@@ -1581,7 +1581,25 @@ serve(async (req) => {
         : [];
     const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
     let anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
+    // v400 — Stale-Layout-Guard. Ein persistiertes Face-Layout gilt nur, wenn es
+    // auf demselben Anker gemessen wurde, aus dem die aktuelle Plate stammt.
+    // Andernfalls verwerfen wir es und lassen es neu aus dem aktuellen Anker
+    // rekonstruieren (facemap_recovery).
+    if (
+      anchorLayoutRaw &&
+      anchorUrl &&
+      typeof (anchorLayoutRaw as any).anchorUrl === "string" &&
+      (anchorLayoutRaw as any).anchorUrl.startsWith("http") &&
+      (anchorLayoutRaw as any).anchorUrl !== anchorUrl
+    ) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v400_stale_anchor_layout_discarded ` +
+        `layout_anchor=${String((anchorLayoutRaw as any).anchorUrl).slice(-40)} plate_anchor=${anchorUrl.slice(-40)}`,
+      );
+      anchorLayoutRaw = null;
+    }
     let anchorLayoutSource: "persisted" | "facemap_recovery" | "missing" = anchorLayoutRaw ? "persisted" : "missing";
+
     const normalizeCharacterIdForRouting = (id?: string | null) =>
       String(id ?? "")
         .toLowerCase()
