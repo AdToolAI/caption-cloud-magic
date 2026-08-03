@@ -1,7 +1,14 @@
-// AdTool Activation Drip Email Templates
+// AdTool / Studio Activation Email Templates
 // Branding: #0a0a0f BG, #F5C76A Gold, Inter
+// Positioning: "Ein Creator. Ein ganzes Studio."
 
-export type ActivationStage = "day_0" | "day_1" | "day_3" | "day_7";
+export type ActivationStage =
+  | "day_0"
+  | "day_2"
+  | "day_5"
+  | "day_5_series"
+  | "day_9"
+  | "day_13";
 export type Lang = "de" | "en" | "es";
 
 interface ActivationInput {
@@ -11,6 +18,7 @@ interface ActivationInput {
   userEmail: string;
   displayName?: string;
   trialDaysRemaining?: number;
+  unsubscribeUrl?: string;
 }
 
 interface RenderOutput {
@@ -28,162 +36,235 @@ interface ActivationCopy {
   footnote: string;
 }
 
+// Single destination for every activation CTA: the first production entry point.
+const FIRST_PRODUCTION_PATH = "/autopilot?firstProduction=1";
+
 const stageCopy: Record<ActivationStage, Record<Lang, ActivationCopy>> = {
   day_0: {
     de: {
-      subject: "Willkommen bei AdTool – dein 14-Tage Enterprise-Trial ist live 🚀",
-      heading: "Willkommen an Bord 👋",
+      subject: "Dein Studio ist offen",
+      heading: "Dein Studio ist offen",
       intro:
-        "Schön, dass du da bist! Du hast jetzt <strong>14 Tage Enterprise-Zugang</strong> – inkl. 5.000 Credits, KI-Video-Studio, Director's Cut und allen Premium-Features.",
-      highlight: "14 Tage Enterprise – komplett gratis",
-      cta: "Erstes KI-Video erstellen",
-      ctaPath: "/ai-video-studio",
-      footnote: "Tipp: Starte mit dem KI-Video-Studio für dein erstes Aha-Erlebnis.",
+        "Ein Creator. Ein ganzes Studio. Ab jetzt übernimmst du Regie – Skript, Stimme, Charaktere und Schnitt laufen bei dir zusammen. Der schnellste Weg zum ersten Ergebnis: eine Produktion starten und zusehen.",
+      highlight: "Erste Produktion in wenigen Minuten",
+      cta: "Erste Produktion starten",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Diese Mail bekommst du einmalig zum Studio-Einzug.",
     },
     en: {
-      subject: "Welcome to AdTool – your 14-day Enterprise trial is live 🚀",
-      heading: "Welcome aboard 👋",
+      subject: "Your studio is open",
+      heading: "Your studio is open",
       intro:
-        "Glad you're here! You now have <strong>14 days of Enterprise access</strong> – including 5,000 credits, AI Video Studio, Director's Cut, and all premium features.",
-      highlight: "14 days Enterprise – completely free",
-      cta: "Create your first AI video",
-      ctaPath: "/ai-video-studio",
-      footnote: "Tip: Start with AI Video Studio for your first aha moment.",
+        "One creator. A whole studio. From now on you direct – script, voice, characters and edit all come together in one place. The fastest path to a first result: start one production and watch it build.",
+      highlight: "First production in minutes",
+      cta: "Start your first production",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "You receive this email once, when your studio opens.",
     },
     es: {
-      subject: "Bienvenido a AdTool – tu prueba Enterprise de 14 días está activa 🚀",
-      heading: "Bienvenido a bordo 👋",
+      subject: "Tu estudio está abierto",
+      heading: "Tu estudio está abierto",
       intro:
-        "¡Nos alegra verte! Ahora tienes <strong>14 días de acceso Enterprise</strong> – con 5.000 créditos, AI Video Studio, Director's Cut y todas las funciones premium.",
-      highlight: "14 días Enterprise – completamente gratis",
-      cta: "Crear tu primer video IA",
-      ctaPath: "/ai-video-studio",
-      footnote: "Consejo: Empieza con el AI Video Studio para tu primer momento aha.",
+        "Un creador. Un estudio entero. A partir de ahora tú diriges: guion, voz, personajes y montaje en un solo lugar. El camino más rápido a tu primer resultado: iniciar una producción y verla construirse.",
+      highlight: "Primera producción en minutos",
+      cta: "Iniciar tu primera producción",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Recibes este correo una sola vez, al abrir tu estudio.",
     },
   },
-  day_1: {
+  day_2: {
     de: {
-      subject: "Brauchst du Hilfe beim Start? 🎬",
-      heading: "Lass uns starten 🎬",
+      subject: "Eine Vorlage für deine Nische",
+      heading: "Eine Vorlage, ein Ergebnis",
       intro:
-        "Wir haben gesehen, dass du noch nichts erstellt hast. Kein Stress – in 3 Minuten hast du dein erstes KI-Video. Wir zeigen dir wie.",
-      highlight: "3-Minuten Quickstart",
-      cta: "Quickstart-Tour öffnen",
-      ctaPath: "/home?tour=true",
-      footnote: "Noch 13 Tage Enterprise-Trial verbleiben.",
+        "Du hast noch keinen fertigen Clip. Das ist normal – der Einstieg ist leichter mit einer konkreten Vorlage. Wir haben eine passend zu deiner Nische vorbereitet: Briefing, Szenen und Sprecher sind gesetzt, du musst nur noch starten.",
+      highlight: "Vorbereitetes Briefing für deine Nische",
+      cta: "Vorlage im Studio öffnen",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Sobald dein erster Clip fertig ist, hört diese Strecke auf.",
     },
     en: {
-      subject: "Need help getting started? 🎬",
-      heading: "Let's get you rolling 🎬",
+      subject: "A template for your niche",
+      heading: "One template, one result",
       intro:
-        "We noticed you haven't created anything yet. No stress – your first AI video is just 3 minutes away. We'll show you how.",
-      highlight: "3-minute quickstart",
-      cta: "Open quickstart tour",
-      ctaPath: "/home?tour=true",
-      footnote: "13 days of Enterprise trial remaining.",
+        "You don't have a finished clip yet. That's normal – starting is easier with a concrete template. We prepared one for your niche: briefing, scenes and speakers are set, you only need to press start.",
+      highlight: "Prepared briefing for your niche",
+      cta: "Open the template in your studio",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Once your first clip is done, this sequence stops.",
     },
     es: {
-      subject: "¿Necesitas ayuda para empezar? 🎬",
-      heading: "Empecemos 🎬",
+      subject: "Una plantilla para tu nicho",
+      heading: "Una plantilla, un resultado",
       intro:
-        "Vimos que aún no has creado nada. Sin estrés – tu primer video IA está a 3 minutos. Te mostramos cómo.",
-      highlight: "Inicio rápido en 3 minutos",
-      cta: "Abrir tour rápido",
-      ctaPath: "/home?tour=true",
-      footnote: "Quedan 13 días de prueba Enterprise.",
+        "Todavía no tienes un clip terminado. Es normal: empezar es más fácil con una plantilla concreta. Preparamos una para tu nicho: briefing, escenas y voces ya están listos, solo tienes que empezar.",
+      highlight: "Briefing preparado para tu nicho",
+      cta: "Abrir la plantilla en tu estudio",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "En cuanto tengas tu primer clip, esta secuencia se detiene.",
     },
   },
-  day_3: {
+  day_5: {
     de: {
-      subject: "Verbinde deine Social Accounts und automatisiere deine Posts 📲",
-      heading: "Verbinde dein Social Setup 📲",
+      subject: "Der Autopilot schreibt dein Skript",
+      heading: "Zweiter Weg hinein",
       intro:
-        "Jetzt kommt der Game-Changer: Verbinde Instagram, TikTok oder LinkedIn und lass AdTool deine Posts automatisch zur besten Zeit veröffentlichen.",
-      highlight: "Auto-Posting auf 5 Plattformen",
-      cta: "Accounts verbinden",
-      ctaPath: "/account?tab=integrations",
-      footnote: "Noch 11 Tage Enterprise-Trial verbleiben.",
+        "Wenn das leere Briefing der Grund ist, warum noch nichts fertig ist: Der Autopilot übernimmt Idee, Skript und Szenenaufbau. Du sagst nur, worum es geht – den Rest baut das Studio.",
+      highlight: "Idee rein, fertiger Clip raus",
+      cta: "Autopilot starten",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Kein Skript nötig – ein Satz reicht als Ausgangspunkt.",
     },
     en: {
-      subject: "Connect your socials and automate your posts 📲",
-      heading: "Connect your social stack 📲",
+      subject: "Autopilot writes your script",
+      heading: "A second way in",
       intro:
-        "Here's the game-changer: connect Instagram, TikTok or LinkedIn and let AdTool auto-publish your posts at the best times.",
-      highlight: "Auto-posting on 5 platforms",
-      cta: "Connect accounts",
-      ctaPath: "/account?tab=integrations",
-      footnote: "11 days of Enterprise trial remaining.",
+        "If the blank briefing is what's holding you back: Autopilot takes over idea, script and scene structure. You say what it's about – the studio builds the rest.",
+      highlight: "Idea in, finished clip out",
+      cta: "Start Autopilot",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "No script needed – one sentence is enough to start.",
     },
     es: {
-      subject: "Conecta tus redes y automatiza tus publicaciones 📲",
-      heading: "Conecta tus redes 📲",
+      subject: "El Autopilot escribe tu guion",
+      heading: "Una segunda vía",
       intro:
-        "Aquí viene el cambio de juego: conecta Instagram, TikTok o LinkedIn y deja que AdTool publique automáticamente en los mejores momentos.",
-      highlight: "Auto-publicación en 5 plataformas",
-      cta: "Conectar cuentas",
-      ctaPath: "/account?tab=integrations",
-      footnote: "Quedan 11 días de prueba Enterprise.",
+        "Si el briefing en blanco es lo que te frena: el Autopilot se encarga de la idea, el guion y la estructura de escenas. Tú dices de qué va, el estudio construye lo demás.",
+      highlight: "Una idea entra, un clip sale",
+      cta: "Iniciar Autopilot",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "No hace falta guion: una frase basta para empezar.",
     },
   },
-  day_7: {
+  day_5_series: {
     de: {
-      subject: "Halbzeit deines Enterprise-Trials – nutze deine Credits 🎯",
-      heading: "Halbzeit erreicht 🎯",
+      subject: "Aus einem Clip wird eine Serie",
+      heading: "Aus einem Clip wird eine Serie",
       intro:
-        "Du hast noch <strong>7 Tage</strong> Enterprise-Zugang. Falls du die Premium-Features noch nicht ausprobiert hast – jetzt ist die beste Zeit. Sora 2, Director's Cut und der KI-Video-Translator warten auf dich.",
-      highlight: "7 Tage Premium – verbleibend",
-      cta: "Premium-Features entdecken",
-      ctaPath: "/home",
-      footnote: "Nach Tag 14 wird dein Konto pausiert, falls du nicht abonnierst.",
+        "Dein erster Clip steht – das ist der schwierige Teil. Der Rest ist Wiederholung: gleiche Charaktere, gleicher Look, neues Thema. Genau dafür sind Cast & World gedacht, damit dein Kanal wiedererkennbar bleibt.",
+      highlight: "Gleicher Cast, neue Folge",
+      cta: "Nächste Folge produzieren",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Das ist die letzte Mail dieser Strecke an dich.",
     },
     en: {
-      subject: "Halftime on your Enterprise trial – use your credits 🎯",
-      heading: "Halftime reached 🎯",
+      subject: "Turn one clip into a series",
+      heading: "Turn one clip into a series",
       intro:
-        "You have <strong>7 days</strong> of Enterprise access left. If you haven't tried the premium features yet – now is the perfect time. Sora 2, Director's Cut and the AI Video Translator are waiting.",
-      highlight: "7 days premium – remaining",
-      cta: "Explore premium features",
-      ctaPath: "/home",
-      footnote: "After day 14, your account will be paused unless you subscribe.",
+        "Your first clip is done – that was the hard part. The rest is repetition: same characters, same look, new topic. That's exactly what Cast & World is for, so your channel stays recognisable.",
+      highlight: "Same cast, next episode",
+      cta: "Produce the next episode",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "This is the last email of this sequence for you.",
     },
     es: {
-      subject: "Mitad de tu prueba Enterprise – usa tus créditos 🎯",
-      heading: "Mitad alcanzada 🎯",
+      subject: "Convierte un clip en una serie",
+      heading: "Convierte un clip en una serie",
       intro:
-        "Te quedan <strong>7 días</strong> de acceso Enterprise. Si aún no has probado las funciones premium – ahora es el momento. Sora 2, Director's Cut y el AI Video Translator te esperan.",
-      highlight: "7 días premium – restantes",
-      cta: "Explorar funciones premium",
-      ctaPath: "/home",
-      footnote: "Después del día 14, tu cuenta se pausará si no te suscribes.",
+        "Tu primer clip está listo: esa era la parte difícil. El resto es repetición: mismos personajes, mismo estilo, nuevo tema. Para eso está Cast & World, para que tu canal se reconozca al instante.",
+      highlight: "Mismo reparto, siguiente episodio",
+      cta: "Producir el siguiente episodio",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Este es el último correo de esta secuencia para ti.",
+    },
+  },
+  day_9: {
+    de: {
+      subject: "Woran hakt es gerade?",
+      heading: "Woran hakt es gerade?",
+      intro:
+        "Dein Studio steht bereit, aber es war eine Weile still. Falls etwas nicht funktioniert hat oder eine Frage offen ist: Antworte einfach auf diese Mail – ein Mensch liest mit. Wenn du direkt weitermachen willst, geht es hier weiter.",
+      highlight: "Antworte einfach – wir helfen",
+      cta: "Zurück ins Studio",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Kein Verkauf, nur ein Angebot zu helfen.",
+    },
+    en: {
+      subject: "What's blocking you?",
+      heading: "What's blocking you?",
+      intro:
+        "Your studio is ready, but it's been quiet for a while. If something didn't work or a question is open: just reply to this email – a human reads it. If you'd rather continue right away, pick up here.",
+      highlight: "Just reply – we'll help",
+      cta: "Back to your studio",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "No pitch, just an offer to help.",
+    },
+    es: {
+      subject: "¿Qué te está frenando?",
+      heading: "¿Qué te está frenando?",
+      intro:
+        "Tu estudio está listo, pero lleva un tiempo en silencio. Si algo no funcionó o tienes una duda: responde a este correo, lo lee una persona. Y si prefieres seguir ahora mismo, continúa aquí.",
+      highlight: "Responde y te ayudamos",
+      cta: "Volver a tu estudio",
+      ctaPath: FIRST_PRODUCTION_PATH,
+      footnote: "Sin venta, solo una oferta de ayuda.",
+    },
+  },
+  day_13: {
+    de: {
+      subject: "Dein Test endet morgen",
+      heading: "Dein Test endet morgen",
+      intro:
+        "Morgen endet dein Testzeitraum. Wenn du weiter produzieren willst, läuft dein Studio für <strong>14,99 € im Monat</strong> weiter – mit allem, was du bisher aufgebaut hast: Charaktere, Stimmen, Look und Projekte bleiben erhalten.",
+      highlight: "Weiter für 14,99 € / Monat",
+      cta: "Studio behalten",
+      ctaPath: "/pricing",
+      footnote: "Ohne Verlängerung bleiben deine Daten gespeichert, die Produktion pausiert.",
+    },
+    en: {
+      subject: "Your trial ends tomorrow",
+      heading: "Your trial ends tomorrow",
+      intro:
+        "Your trial ends tomorrow. If you want to keep producing, your studio continues for <strong>€14.99 per month</strong> – with everything you built so far: characters, voices, look and projects all stay.",
+      highlight: "Continue for €14.99 / month",
+      cta: "Keep your studio",
+      ctaPath: "/pricing",
+      footnote: "Without renewal your data stays stored, production pauses.",
+    },
+    es: {
+      subject: "Tu prueba termina mañana",
+      heading: "Tu prueba termina mañana",
+      intro:
+        "Tu prueba termina mañana. Si quieres seguir produciendo, tu estudio continúa por <strong>14,99 € al mes</strong>, con todo lo que has construido: personajes, voces, estilo y proyectos se mantienen.",
+      highlight: "Continúa por 14,99 € / mes",
+      cta: "Conservar tu estudio",
+      ctaPath: "/pricing",
+      footnote: "Sin renovación tus datos se conservan y la producción se pausa.",
     },
   },
 };
 
 const trialExpiredCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
   de: {
-    subject: "Dein 14-Tage Enterprise-Trial ist abgelaufen 🔒",
-    heading: "Dein Trial ist beendet",
+    subject: "Dein Testzeitraum ist beendet",
+    heading: "Dein Testzeitraum ist beendet",
     intro:
-      "Dein 14-Tage Enterprise-Trial ist heute abgelaufen. Damit du wieder posten, generieren und veröffentlichen kannst, wähle jetzt einen Plan – schon ab €19/Monat.",
-    cta: "Plan wählen & freischalten",
+      "Dein Testzeitraum ist heute abgelaufen. Damit du weiter produzieren kannst, wähle einen Plan – dein Studio läuft ab 14,99 € im Monat weiter.",
+    cta: "Studio weiterführen",
     footnote: "Deine Daten und Assets bleiben gespeichert. Du verlierst nichts.",
   },
   en: {
-    subject: "Your 14-day Enterprise trial has ended 🔒",
+    subject: "Your trial has ended",
     heading: "Your trial has ended",
     intro:
-      "Your 14-day Enterprise trial expired today. To resume creating, generating and publishing, pick a plan – starting at €19/month.",
-    cta: "Choose plan & unlock",
+      "Your trial expired today. To keep producing, pick a plan – your studio continues from €14.99 per month.",
+    cta: "Continue your studio",
     footnote: "Your data and assets stay safe. Nothing is lost.",
   },
   es: {
-    subject: "Tu prueba Enterprise de 14 días ha terminado 🔒",
+    subject: "Tu prueba ha terminado",
     heading: "Tu prueba ha terminado",
     intro:
-      "Tu prueba Enterprise de 14 días expiró hoy. Para seguir creando, generando y publicando, elige un plan – desde €19/mes.",
-    cta: "Elegir plan y desbloquear",
+      "Tu prueba expiró hoy. Para seguir produciendo, elige un plan: tu estudio continúa desde 14,99 € al mes.",
+    cta: "Continuar tu estudio",
     footnote: "Tus datos y assets siguen seguros. No pierdes nada.",
   },
+};
+
+const unsubscribeLabel: Record<Lang, string> = {
+  de: "Keine Studio-Impulse mehr erhalten",
+  en: "Stop receiving studio nudges",
+  es: "Dejar de recibir estos correos",
 };
 
 const baseStyles = `
@@ -196,21 +277,26 @@ const baseStyles = `
   .pill { display:inline-block; background:rgba(245,199,106,0.12); border:1px solid rgba(245,199,106,0.4); color:#F5C76A; padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600; margin:8px 0 24px; }
   .cta { display:inline-block; background:linear-gradient(135deg,#F5C76A,#e0a847); color:#0a0a0f !important; text-decoration:none; padding:14px 28px; border-radius:12px; font-weight:700; font-size:15px; box-shadow:0 8px 24px rgba(245,199,106,0.25); }
   .foot { color:#7a7770; font-size:12px; margin-top:32px; text-align:center; }
+  .foot a { color:#7a7770; }
 `;
 
 export function renderActivationEmail(input: ActivationInput): RenderOutput {
   const copy = stageCopy[input.stage][input.lang];
-  const ctaUrl = `${input.appUrl.replace(/\/$/, "")}${copy.ctaPath}`;
+  const base = input.appUrl.replace(/\/$/, "");
+  const ctaUrl = `${base}${copy.ctaPath}`;
+  const unsubscribe = input.unsubscribeUrl
+    ? `<div style="margin-top:8px;"><a href="${input.unsubscribeUrl}">${unsubscribeLabel[input.lang]}</a></div>`
+    : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>${baseStyles}</style></head><body>
     <div class="wrap"><div class="card">
       <div class="logo">AdTool AI</div>
       <h1>${copy.heading}</h1>
       <p>${copy.intro}</p>
-      <div class="pill">✨ ${copy.highlight}</div>
+      <div class="pill">${copy.highlight}</div>
       <p style="margin-bottom:28px;"><a class="cta" href="${ctaUrl}">${copy.cta}</a></p>
       <p style="color:#8a8780;font-size:13px;border-top:1px solid rgba(255,255,255,0.05);padding-top:20px;">${copy.footnote}</p>
     </div>
-    <div class="foot">AdTool AI · ${input.userEmail}</div>
+    <div class="foot">AdTool AI · ${input.userEmail}${unsubscribe}</div>
     </div></body></html>`;
   return { subject: copy.subject, html };
 }
