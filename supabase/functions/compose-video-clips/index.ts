@@ -3475,10 +3475,18 @@ serve(async (req) => {
                       reference_image_url: aj.composedUrl,
                       updated_at: new Date().toISOString(),
                     };
-                    if (isDialogScene && !scene.lockReferenceUrl) {
+                    // v400 — Anchor/Plate-Kohärenz. Der Lock MUSS immer auf den
+                    // Anker zeigen, aus dem diese Plate erzeugt wird. Früher wurde
+                    // er nur beim allerersten Lauf gesetzt (`!scene.lockReferenceUrl`);
+                    // bei jeder Neugenerierung entstand ein neuer Anker mit anderer
+                    // Bildkomposition, während die Gesichts-Geometrie weiter auf dem
+                    // alten Lock-Anker gemessen wurde → alle Preclips landen neben
+                    // den Gesichtern → Sync.so bekommt kein Gesicht → kein Lip-Sync.
+                    if (isDialogScene) {
                       updatePayload.lock_reference_url = aj.composedUrl;
                       scene.lockReferenceUrl = aj.composedUrl;
                     }
+
                     await supabaseAdmin
                       .from("composer_scenes")
                       .update(updatePayload)
