@@ -788,12 +788,21 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
 
       await prepareSceneRuns({ sceneIds: [targetScene.id], reason: 'clips_tab_generate_one' });
 
-      // Optimistic update
+      // Optimistic update — alten Clip sofort wegräumen (lokal-only, damit der
+      // gebündelte Projekt-Speichervorgang ihn nicht zurückschreibt).
       if (targetScene.clipSource.startsWith('ai-')) {
         const optimistic = pScenes.map(s =>
-          s.id === targetScene.id ? { ...s, clipStatus: 'generating' as const } : s
+          s.id === targetScene.id
+            ? ({
+                ...s,
+                clipStatus: 'generating' as const,
+                clipUrl: undefined,
+                lipSyncAppliedAt: null,
+                lipSyncStatus: null,
+              } as typeof s)
+            : s
         );
-        onUpdateScenes(optimistic);
+        (onUpdateScenesLocalOnly ?? onUpdateScenes)(optimistic);
       }
 
       const brandCharacterInputSingle = buildBrandInputForScene(targetScene);
