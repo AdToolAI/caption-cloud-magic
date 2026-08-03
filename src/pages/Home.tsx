@@ -27,7 +27,6 @@ import { useNewsRadar } from "@/hooks/useNewsRadar";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
-import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
 import { WelcomeBonusModal } from "@/components/welcome/WelcomeBonusModal";
 import { useWelcomeBonus } from "@/hooks/useWelcomeBonus";
 import { type WeekPost } from "@/components/dashboard/WeekDayCard";
@@ -59,7 +58,6 @@ const Home = () => {
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showNicheTutorial, setShowNicheTutorial] = useState(false);
   const [nicheCheckDone, setNicheCheckDone] = useState(false);
   const [editingPost, setEditingPost] = useState<WeekPost | null>(null);
   const [editingDate, setEditingDate] = useState<string>("");
