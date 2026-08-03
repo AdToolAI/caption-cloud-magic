@@ -14,30 +14,37 @@ Der Studio-Einzug (ein Onboarding, direkte Übergabe in die erste Produktion, ei
 **1. Eine Strecke: Aktivierung gewinnt**
 `process-activation-emails` wird die einzige Onboarding-Strecke. Anker bleibt `email_verified_at` — nur wer verifiziert hat, ist ein echter Nutzer. `process-drip-emails` wird stillgelegt (Cron abbestellt, Funktion bleibt als Code stehen, damit nichts unwiederbringlich verloren geht). Winback bleibt unangetastet, das ist eine andere Lebensphase.
 
-**2. Zurückhaltende Taktung — maximal drei Mails, oft weniger**
-Statt vier Stufen bleiben drei. Jede Mail muss sich rechtfertigen: sie wird nur versendet, wenn der Nutzer sie in diesem Moment wirklich braucht. Wer aktiv ist oder schon produziert, bekommt weniger — nicht mehr.
+**2. Taktung: fünf mögliche Kontaktpunkte, im Regelfall deutlich weniger**
+Professionell ist nicht „wenig Mails", sondern „keine überflüssige Mail". Der Rahmen wird auf fünf Stufen in 14 Tagen gesetzt — aber jede Stufe hat eine Bedingung, sodass ein aktiver Nutzer real nur ein bis zwei davon sieht. Sechs Mails wären möglich, kosten aber genau an dem Punkt Vertrauen, an dem der Nutzer ohnehin schon produziert; die zwei stärksten Momente (Tag 0 und Trial-Ende) tragen den Großteil der Wirkung.
 
 ```text
 verifiziert
    |
-   +-- Tag 0   "Dein Studio ist offen"   -> immer (die einzige Pflicht-Mail)
+   +-- Tag 0    "Dein Studio ist offen"        -> immer (Pflicht-Mail)
    |
-   +-- Tag 2   nur wenn NOCH KEIN Clip: eine konkrete Vorlage fuer die
-   |           eigene Nische. Wer schon produziert hat: keine Mail.
+   +-- Tag 2    nur ohne fertigen Clip: eine konkrete Vorlage
+   |            fuer die eigene Nische
    |
-   +-- Tag 6   nur wenn Trial laeuft und Nutzer inaktiv ODER Trial endet:
-               eine ruhige Erinnerung. Sonst: keine Mail.
+   +-- Tag 5    nur ohne fertigen Clip: ein zweiter Weg rein
+   |            (Autopilot uebernimmt das Skript)
+   |            MIT Clip: einmalig "so wird daraus eine Serie"
+   |
+   +-- Tag 9    nur bei Inaktivitaet >72h: ruhige Erinnerung,
+   |            Hilfeangebot statt Verkauf
+   |
+   +-- Tag 13   Trial endet morgen: Ergebnisstand + 14,99 EUR
+                -> immer (transaktionsnah, sachlich)
 ```
 
 Harte Regeln gegen Zuspammen:
-- Höchstens **drei** Mails in den ersten 14 Tagen, mindestens **48 h** Abstand.
-- Wer in den letzten 72 h aktiv war, bekommt gar keine Aktivierungsmail — das Produkt spricht dann schon für sich (bisher waren es 24 h).
-- Wer bereits einen fertigen Clip hat, verlässt die Strecke komplett. Kein „zweiter Clip"-Nachfassen, keine Autopilot-Werbemail.
-- Ein Abmeldelink in jeder nicht-transaktionalen Mail, und ein einziger Klick genügt.
+- Höchstens **fünf** Mails in den ersten 14 Tagen, mindestens **48 h** Abstand.
+- Wer in den letzten 72 h aktiv war, überspringt die Aktivierungsstufen (Tag 2/5/9) — nur Tag 0 und Tag 13 bleiben.
+- Wer bereits produziert, bekommt maximal **eine** Serien-Mail (Tag 5), danach nichts mehr aus dieser Strecke.
+- Ein Abmeldelink in jeder nicht-transaktionalen Mail, ein Klick genügt. Abmeldung stoppt auch Winback.
 
-Ergebnis für einen typischen aktiven Nutzer: **eine einzige Mail** (Tag 0). Für einen abgesprungenen Nutzer: höchstens drei.
+Realistisches Ergebnis: aktiver Nutzer **2 Mails** in 14 Tagen, abgesprungener Nutzer **4–5**.
 
-**Bewusst gestrichen** gegenüber heute: die Tag-1- und Tag-7-Stufe der Aktivierungsstrecke sowie die komplette Drip-Strecke.
+**Bewusst gestrichen** gegenüber heute: die komplette Drip-Strecke, damit nie zwei Erzählungen parallel laufen.
 
 
 **3. Studio-Sprache in allen Stufen, DE/EN/ES**
