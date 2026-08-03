@@ -714,6 +714,8 @@ export async function resolveSceneFaceMap(args: {
       width: Number(cachedFaceMap.width),
       height: Number(cachedFaceMap.height),
       source: "cache",
+      anchorUrl: cachedAnchorUrl ?? anchorUrl ?? null,
+
     };
   }
 
@@ -791,7 +793,7 @@ export async function resolveSceneFaceMap(args: {
     );
   }
 
-  const result: FaceMap = { ...norm, source: "anchor" };
+  const result: FaceMap = { ...norm, source: "anchor", anchorUrl: anchorUrl ?? null };
   try {
     const { data: row } = await supabase
       .from("composer_scenes")
