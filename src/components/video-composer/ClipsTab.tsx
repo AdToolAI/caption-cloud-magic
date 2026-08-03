@@ -690,11 +690,20 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           const frozenRef = prep?.composed && prep.firstFrameUrl
             ? prep.firstFrameUrl
             : s.referenceImageUrl;
-          return { ...s, clipStatus: 'generating' as const, referenceImageUrl: frozenRef };
+          return {
+            ...s,
+            clipStatus: 'generating' as const,
+            referenceImageUrl: frozenRef,
+            // Ergebnis des Vorlaufs sofort ausblenden — der Server leert es
+            // ohnehin in beginSceneRun().
+            clipUrl: undefined,
+            lipSyncAppliedAt: null,
+            lipSyncStatus: null,
+          } as typeof s;
         }
         return s;
       });
-      onUpdateScenes(optimistic);
+      (onUpdateScenesLocalOnly ?? onUpdateScenes)(optimistic);
 
       const started = await startSceneGeneration({
         sceneIds: scenesPayload.map((item) => item.id),
@@ -779,12 +788,21 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
 
       await prepareSceneRuns({ sceneIds: [targetScene.id], reason: 'clips_tab_generate_one' });
 
-      // Optimistic update
+      // Optimistic update — alten Clip sofort wegräumen (lokal-only, damit der
+      // gebündelte Projekt-Speichervorgang ihn nicht zurückschreibt).
       if (targetScene.clipSource.startsWith('ai-')) {
         const optimistic = pScenes.map(s =>
-          s.id === targetScene.id ? { ...s, clipStatus: 'generating' as const } : s
+          s.id === targetScene.id
+            ? ({
+                ...s,
+                clipStatus: 'generating' as const,
+                clipUrl: undefined,
+                lipSyncAppliedAt: null,
+                lipSyncStatus: null,
+              } as typeof s)
+            : s
         );
-        onUpdateScenes(optimistic);
+        (onUpdateScenesLocalOnly ?? onUpdateScenes)(optimistic);
       }
 
       const brandCharacterInputSingle = buildBrandInputForScene(targetScene);
@@ -907,13 +925,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     //    sees immediate feedback regardless of how slow the backend is.
     const optimistic = scenes.map((s) =>
       s.id === scene.id
-        ? {
+        ? ({
             ...s,
             engineOverride: 'cinematic-sync' as const,
             clipSource: newClipSource,
             clipStatus: 'generating' as const,
             lipSyncStatus: 'pending' as const,
-          }
+            clipUrl: undefined,
+            lipSyncAppliedAt: null,
+          } as typeof s)
         : s,
     );
     // Use the local-only updater so the debounced full-scenes flush in the

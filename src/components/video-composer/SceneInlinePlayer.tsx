@@ -222,7 +222,8 @@ export default function SceneInlinePlayer({
           )}
           {/* Stage 5 warn: legacy HappyHorse master with multi-speaker dialog →
               lip-sync was generated against the wrong plate. Re-render swaps to Hailuo. */}
-          {scene.clipSource === 'ai-happyhorse' &&
+          {!isWorking &&
+            scene.clipSource === 'ai-happyhorse' &&
             scene.engineOverride === 'cinematic-sync' &&
             dialogVoiceCount >= 2 && (
               <span
@@ -235,8 +236,10 @@ export default function SceneInlinePlayer({
         </div>
 
 
-        {/* Media layer */}
-        {isReady ? (
+        {/* Media layer — während eines laufenden Neustarts darf NIE das
+            Ergebnis des Vorlaufs zu sehen sein (sonst wirkt der Re-Render,
+            als würde nichts passieren). */}
+        {isReady && !isWorking ? (
           <video
             ref={videoRef}
             src={clipUrl}
@@ -247,7 +250,7 @@ export default function SceneInlinePlayer({
             preload="metadata"
             className="absolute inset-0 w-full h-full object-cover"
           />
-        ) : posterUrl ? (
+        ) : posterUrl && !isWorking ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={posterUrl}
