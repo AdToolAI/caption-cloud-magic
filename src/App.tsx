@@ -85,6 +85,7 @@ const EmailPreferences = lazy(() => import("./pages/EmailPreferences"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Billing = lazy(() => import("./pages/Billing"));
+const Welcome = lazy(() => import("./pages/Welcome"));
 const Support = lazy(() => import("./pages/Support"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Legal = lazy(() => import("./pages/Legal"));
