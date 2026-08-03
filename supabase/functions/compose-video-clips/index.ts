@@ -1,6 +1,7 @@
 // compose-video-clips v2.4.0 — v81 shared CLIP_COSTS + dialog-speakers
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
+import { beginSceneRun } from "../_shared/scene-run-begin.ts";
 import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
 import {
   countDialogSpeakers,
