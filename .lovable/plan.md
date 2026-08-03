@@ -14,25 +14,31 @@ Der Studio-Einzug (ein Onboarding, direkte Übergabe in die erste Produktion, ei
 **1. Eine Strecke: Aktivierung gewinnt**
 `process-activation-emails` wird die einzige Onboarding-Strecke. Anker bleibt `email_verified_at` — nur wer verifiziert hat, ist ein echter Nutzer. `process-drip-emails` wird stillgelegt (Cron abbestellt, Funktion bleibt als Code stehen, damit nichts unwiederbringlich verloren geht). Winback bleibt unangetastet, das ist eine andere Lebensphase.
 
-**2. Verhaltensbasierte Verzweigung statt starrer Tage**
-Jede Stufe prüft vor Versand den einzig relevanten Zustand: **Hat dieser Nutzer schon einen fertigen Clip?**
+**2. Zurückhaltende Taktung — maximal drei Mails, oft weniger**
+Statt vier Stufen bleiben drei. Jede Mail muss sich rechtfertigen: sie wird nur versendet, wenn der Nutzer sie in diesem Moment wirklich braucht. Wer aktiv ist oder schon produziert, bekommt weniger — nicht mehr.
 
 ```text
 verifiziert
    |
-   +-- Tag 0  "Dein Studio ist offen"        -> immer
+   +-- Tag 0   "Dein Studio ist offen"   -> immer (die einzige Pflicht-Mail)
    |
-   +-- Tag 1  kein Clip? "Erste Produktion in 12 Minuten"
-   |          Clip da?   "Dein zweiter Clip - anderes Format"
+   +-- Tag 2   nur wenn NOCH KEIN Clip: eine konkrete Vorlage fuer die
+   |           eigene Nische. Wer schon produziert hat: keine Mail.
    |
-   +-- Tag 3  kein Clip? konkrete Vorlage fuer die eigene Nische
-   |          Clip da?   Autopilot-Einladung (Wochenplan)
-   |
-   +-- Tag 7  kein Clip? letzte Aktivierung + Hilfeangebot
-              Clip da?   Trial-Ende + 14,99 EUR Angebot
+   +-- Tag 6   nur wenn Trial laeuft und Nutzer inaktiv ODER Trial endet:
+               eine ruhige Erinnerung. Sonst: keine Mail.
 ```
 
-Aktive Nutzer (letzte 24 h aktiv) werden wie bisher übersprungen.
+Harte Regeln gegen Zuspammen:
+- Höchstens **drei** Mails in den ersten 14 Tagen, mindestens **48 h** Abstand.
+- Wer in den letzten 72 h aktiv war, bekommt gar keine Aktivierungsmail — das Produkt spricht dann schon für sich (bisher waren es 24 h).
+- Wer bereits einen fertigen Clip hat, verlässt die Strecke komplett. Kein „zweiter Clip"-Nachfassen, keine Autopilot-Werbemail.
+- Ein Abmeldelink in jeder nicht-transaktionalen Mail, und ein einziger Klick genügt.
+
+Ergebnis für einen typischen aktiven Nutzer: **eine einzige Mail** (Tag 0). Für einen abgesprungenen Nutzer: höchstens drei.
+
+**Bewusst gestrichen** gegenüber heute: die Tag-1- und Tag-7-Stufe der Aktivierungsstrecke sowie die komplette Drip-Strecke.
+
 
 **3. Studio-Sprache in allen Stufen, DE/EN/ES**
 Alle Betreffzeilen und Texte werden auf das Studio-Motiv umgeschrieben: ein Ergebnis pro Mail, ein Button, der in dieselbe erste Produktion führt wie das Onboarding. Keine Feature-Listen.
