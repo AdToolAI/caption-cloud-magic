@@ -24,19 +24,39 @@ Generieren-Button auf der Kachel — tun das nicht.
 
 ## Was geändert wird
 
-**1. Server räumt beim Neustart auf (Kern der Korrektur)**
+**1. Neustart leert die Lip-Sync-Pipeline vollständig (Kern der Korrektur)**
 
-In `compose-video-clips`: eine gemeinsame Hilfsfunktion für den Übergang
-„Szene startet neu". Sie schreibt zusätzlich zu `clip_status: 'generating'`
-konsequent:
+Heute schreiben die Startstellen in `compose-video-clips` nur
+`clip_status: 'generating'` + `clip_error: null`. Alles andere aus dem
+Vorlauf bleibt stehen — genau die Grundlage für Überlappungen: ein noch
+laufender Sync.so-Pass des alten Laufs schreibt sein Ergebnis später in
+dieselbe Zeile, belegt weiter einen Slot und kann den neuen Clip überdecken.
 
-- `clip_url: null`, `first_frame_url: null`, `last_frame_url: null`
-- `clip_error: null`, `lip_sync_applied_at: null`, `lip_sync_source_clip_url: null`
+Neu: eine gemeinsame Serverfunktion „Szene startet neu", die vor dem Dispatch
+in dieser Reihenfolge arbeitet:
+
+1. Laufende Provider-Jobs der Szene beenden und Slots freigeben — über den
+   bestehenden Weg `reset-lipsync-scene` (kündigt Sync.so-Jobs, gibt Slots
+   frei, erstattet Credits). Nur wenn tatsächlich aktive Pässe existieren.
+2. Lip-Sync-Zustand hart leeren: `dialog_shots`, `lip_sync_status`,
+   `twoshot_stage`, `lip_sync_applied_at`, `lip_sync_source_clip_url`,
+   `dialog_audio`-/Preclip-Referenzen des Vorlaufs, plus die Sperren in
+   `dialog_dispatch_locks`.
+3. Sichtbares Ergebnis des Vorlaufs leeren: `clip_url`, `first_frame_url`,
+   `last_frame_url`, `clip_error`.
+4. Erst danach `clip_status: 'generating'` und der eigentliche Dispatch.
 
 Alle bestehenden `clip_status: 'generating'`-Schreibstellen werden auf diese
-Hilfsfunktion umgestellt, damit es genau eine Definition von „neuer Lauf" gibt.
+eine Funktion umgestellt, damit es genau eine Definition von „neuer Lauf" gibt.
 
-**2. Frontend zeigt sofort den Neustart**
+**2. Späte Ergebnisse des alten Laufs werden abgewiesen**
+
+Damit ein Ergebnis, das trotz Kündigung noch eintrifft, den neuen Lauf nicht
+überschreibt: `sync-so-webhook` und der Mux-Pfad verwerfen ein Resultat, dessen
+Job-ID nicht mehr in den aktuellen `dialog_shots` der Szene steht — mit
+Protokolleintrag statt stiller Übernahme.
+
+**3. Frontend zeigt sofort den Neustart**
 
 - `ClipsTab.handleGenerateSingle` und der Cinematic-Sync-Start setzen im
   optimistischen Update zusätzlich `clipUrl: undefined` und
@@ -46,7 +66,7 @@ Hilfsfunktion umgestellt, damit es genau eine Definition von „neuer Lauf" gibt
   noch eine `clipUrl` im Zustand steht. Damit kann ein alter Clip nie mehr einen
   laufenden Re-Render überdecken.
 
-**3. Kein Zurückschreiben durch den verzögerten Speichervorgang**
+**4. Kein Zurückschreiben durch den verzögerten Speichervorgang**
 
 Der Re-Roll-Pfad nutzt — wie der Cinematic-Sync-Pfad — den lokal-only-Updater,
 damit der gebündelte Projekt-Speichervorgang den gerade geleerten Clip nicht
@@ -54,9 +74,10 @@ damit der gebündelte Projekt-Speichervorgang den gerade geleerten Clip nicht
 
 ## Nicht Teil dieser Änderung
 
-Die Lip-Sync-Kette selbst (v400 Anker/Plate-Kohärenz, Preclip, Sync.so-Dispatch,
-Mux) bleibt unangetastet. Hier geht es ausschließlich darum, dass ein Neustart
-sichtbar ist und nicht durch das Ergebnis des Vorlaufs verdeckt wird.
+Die Lip-Sync-Kette selbst (v400 Anker/Plate-Kohärenz, Preclip-Geometrie,
+Sync.so-Dispatch, Mux-Overlay) bleibt inhaltlich unangetastet. Hier geht es
+ausschließlich darum, dass ein Neustart sauber bei null beginnt und sichtbar
+ist.
 
 ## Technische Details
 
