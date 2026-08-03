@@ -48,8 +48,8 @@ Jeder CTA führt auf denselben Einstieg wie der Onboarding-Abschluss (First Prod
 
 ## Technische Details
 
-- `supabase/functions/process-activation-emails/index.ts`: pro Nutzer einmalig prüfen, ob ein fertiger Clip existiert (Abfrage auf die bestehenden Produktions-/Video-Tabellen), Ergebnis als `hasClip` an das Template durchreichen.
-- `supabase/functions/process-activation-emails/templates.ts`: `renderActivationEmail` erhält `hasClip`; je Stufe zwei Varianten pro Sprache. Bestehende Signatur bleibt abwärtskompatibel (`hasClip` optional, Default = Variante „kein Clip").
+- `supabase/functions/process-activation-emails/index.ts`: Stufen auf `day_0`, `day_2`, `day_6` reduzieren; pro Nutzer prüfen, ob ein fertiger Clip existiert (Abfrage auf die bestehenden Produktions-/Video-Tabellen) — bei `true` wird die Strecke beendet. Aktivitätsfenster von 24 h auf 72 h anheben, Mindestabstand 48 h und Deckel von drei Mails pro Nutzer über `email_send_log` prüfen.
+- `supabase/functions/process-activation-emails/templates.ts`: Templates für `day_1`/`day_7` entfallen, `day_2`/`day_6` in DE/EN/ES neu getextet, jeweils ein Ergebnis und ein Button.
 - Drip-Cron via `supabase--insert` abbestellen (`cron.unschedule`), Funktion selbst nicht löschen.
 - Kein Schema-Umbau nötig: `email_send_log` und die Frequenzsperre bleiben wie sie sind.
 - Danach Deploy von `process-activation-emails`.
