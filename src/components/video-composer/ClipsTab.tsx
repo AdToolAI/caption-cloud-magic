@@ -925,13 +925,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     //    sees immediate feedback regardless of how slow the backend is.
     const optimistic = scenes.map((s) =>
       s.id === scene.id
-        ? {
+        ? ({
             ...s,
             engineOverride: 'cinematic-sync' as const,
             clipSource: newClipSource,
             clipStatus: 'generating' as const,
             lipSyncStatus: 'pending' as const,
-          }
+            clipUrl: undefined,
+            lipSyncAppliedAt: null,
+          } as typeof s)
         : s,
     );
     // Use the local-only updater so the debounced full-scenes flush in the
