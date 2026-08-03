@@ -10,7 +10,9 @@ Ehrliche Einordnung vorab: Punkt 1 und 3 sind Handwerk, keine Kreativität — s
 
 ## Der kreative Kern: ein Beweis, kein Werbeblock
 
-Statt eines weiteren Demo-Karussells ein einziger Moment direkt unter dem Hero, der die gesamte Behauptung in einem Atemzug belegt:
+Wichtig zur Einordnung: hier wird **nichts live generiert**. Es ist ein einziger, vorab produzierter Clip, der als Datei ausgeliefert wird — keine Modell-Kosten pro Besucher, keine Wartezeit, kein Risiko, dass ein Besucher vor einem Ladebalken sitzt.
+
+Statt eines weiteren Demo-Karussells ein einziger Moment direkt unter dem Hero:
 
 ```text
  [ Dein Briefing ]                 [ Das Ergebnis ]
@@ -18,15 +20,20 @@ Statt eines weiteren Demo-Karussells ein einziger Moment direkt unter dem Hero, 
   Kaffee-Shop, 15s,                │                  │
   warm, deutsch"                   │   Clip laeuft    │
                                    │                  │
- -> Skript      0:04               └──────────────────┘
- -> Stimme      0:09                 15s · deutsch · Lip-Sync
- -> Lip-Sync    0:21
- -> Fertig      0:47
+ -> Skript                         └──────────────────┘
+ -> Stimme                           15s · deutsch · Lip-Sync
+ -> Lip-Sync
+ -> Fertiger Clip
 ```
 
-Links tippt sich das Briefing selbst — dieselben drei Zeilen, die der Nutzer gleich im Studio eingibt. Rechts läuft das Ergebnis. Dazwischen die Zeitleiste der Schritte, die währenddessen abhakt. Kein Ton per Vorgabe, ein Klick schaltet ihn an. Der Block läuft einmal durch, wenn er in den Blick kommt, und friert dann auf dem fertigen Bild ein — kein Dauerloop.
+Links tippt sich das Briefing selbst — dieselben drei Zeilen, die der Nutzer gleich im Studio eingibt. Rechts läuft das fertige Ergebnis. Dazwischen die vier Arbeitsschritte, die das Studio übernimmt.
 
-Warum das trägt: es zeigt genau die Arbeit, die der Nutzer sonst selbst hätte, in der Zeit, die sie mit dem Studio kostet. Der Button darunter ist derselbe wie überall, und er startet exakt mit diesem Briefing im Feld.
+**Bewusst ohne Stoppuhr.** Ein sichtbarer Timer ("0:47") wäre ein Versprechen, das die Pipeline nicht in jedem Fall hält — ein Clip kann auch über zwei Minuten brauchen. Ein enttäuschtes Zeitversprechen kostet mehr Vertrauen, als es Aufmerksamkeit bringt. Der Vergleich läuft deshalb nicht gegen die Uhr, sondern gegen den Aufwand: "Skript, Stimme, Kamera, Schnitt, Lip-Sync — sonst ein Team und mehrere Tage."
+
+Kein Ton per Vorgabe, ein Klick schaltet ihn an. Der Block läuft einmal durch, wenn er in den Blick kommt, und friert dann auf dem fertigen Bild ein — kein Dauerloop.
+
+Warum das trägt: es zeigt genau die Arbeit, die der Nutzer sonst selbst hätte. Der Button darunter ist derselbe wie überall, und er startet exakt mit diesem Briefing im Feld.
+
 
 ## Das Handwerk drumherum
 
