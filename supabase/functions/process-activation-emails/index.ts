@@ -22,23 +22,49 @@ const normalizeLang = (raw?: string | null): Lang => {
   return "en";
 };
 
-const STAGE_DAYS: Record<ActivationStage, number> = {
+// v402 Activation Contract — max 5 emails in 14 days, behaviour-gated.
+// Day 0 and Day 13 are the only unconditional touchpoints.
+type StageKey = "day_0" | "day_2" | "day_5" | "day_9" | "day_13";
+const STAGE_DAYS: Record<StageKey, number> = {
   day_0: 0,
-  day_1: 1,
-  day_3: 3,
-  day_7: 7,
+  day_2: 2,
+  day_5: 5,
+  day_9: 9,
+  day_13: 13,
 };
+const STAGES: StageKey[] = ["day_0", "day_2", "day_5", "day_9", "day_13"];
+
+const MAX_ACTIVATION_EMAILS = 5;
+const MIN_GAP_MS = 48 * 3600000; // 48h between any two activation emails
+const ACTIVITY_SILENCE_MS = 72 * 3600000; // active in the last 72h -> no nudge
+
+/** Number of finished clips the user has produced. */
+async function countFinishedClips(
+  supabase: ReturnType<typeof createClient>,
+  userId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("video_creations")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .not("output_url", "is", null);
+  if (error) {
+    console.error("[activation] clip count error:", error);
+    return 0;
+  }
+  return count ?? 0;
+}
 
 async function processStage(
   supabase: ReturnType<typeof createClient>,
-  stage: ActivationStage
+  stage: StageKey
 ): Promise<{ sent: number; skipped: number }> {
   const days = STAGE_DAYS[stage];
   const now = Date.now();
   // Window anchored to email_verified_at (not created_at) so day_0 only fires AFTER verification
   const lower = new Date(now - (days + 1) * 86400000).toISOString();
   const upper = new Date(now - days * 86400000).toISOString();
-  const activeCutoff = new Date(now - 24 * 3600000).toISOString();
+  const activeCutoff = new Date(now - ACTIVITY_SILENCE_MS).toISOString();
 
   const { data: users, error } = await supabase
     .from("profiles")
@@ -58,22 +84,61 @@ async function processStage(
 
   let sent = 0, skipped = 0;
   for (const u of users) {
-    // Idempotency
     const sentMap = (u.activation_emails_sent as Record<string, string>) || {};
-    if (sentMap[stage]) {
+    const sentKeys = Object.keys(sentMap);
+
+    // Idempotency: this stage (in either variant) already went out
+    if (sentMap[stage] || (stage === "day_5" && sentMap["day_5_series"])) {
       skipped++;
       continue;
     }
 
-    // Activity-suppression for day_1+ (skip if active in last 24h)
-    if (stage !== "day_0" && u.last_active_at && u.last_active_at > activeCutoff) {
+    // Hard cap: never more than 5 activation emails per user
+    if (sentKeys.length >= MAX_ACTIVATION_EMAILS) {
       skipped++;
       continue;
     }
 
-    // Global 3-day frequency cap (day_0 = welcome bypasses cap as transactional-class)
-    const tpl = `activation_${stage}`;
-    if (stage !== "day_0" && !(await canSendMarketingEmail(supabase, u.id, tpl))) {
+    // Minimum 48h gap between any two activation emails
+    const lastSentAt = sentKeys
+      .map((k) => Date.parse(sentMap[k]))
+      .filter((t) => Number.isFinite(t))
+      .sort((a, b) => b - a)[0];
+    if (lastSentAt && now - lastSentAt < MIN_GAP_MS) {
+      skipped++;
+      continue;
+    }
+
+    const isNudge = stage === "day_2" || stage === "day_5" || stage === "day_9";
+
+    // Activity suppression: an active creator does not need nudges (day_0 / day_13 exempt)
+    if (isNudge && u.last_active_at && (u.last_active_at as string) > activeCutoff) {
+      skipped++;
+      continue;
+    }
+
+    // Behaviour gate
+    let templateStage: ActivationStage = stage;
+    if (isNudge) {
+      const clips = await countFinishedClips(supabase, u.id as string);
+      if (stage === "day_2" && clips > 0) {
+        skipped++;
+        continue;
+      }
+      if (stage === "day_5") {
+        // With a finished clip the user gets exactly one "make it a series" email
+        templateStage = clips > 0 ? "day_5_series" : "day_5";
+      }
+      if (stage === "day_9" && clips > 0) {
+        // Producers exit the sequence after the series email
+        skipped++;
+        continue;
+      }
+    }
+
+    // Global frequency cap for pure nudges (day_0 welcome and day_13 trial notice bypass)
+    const tpl = `activation_${templateStage}`;
+    if (isNudge && !(await canSendMarketingEmail(supabase, u.id, tpl))) {
       skipped++;
       continue;
     }
@@ -81,7 +146,7 @@ async function processStage(
     try {
       const lang = normalizeLang(u.language as string);
       const { subject, html } = renderActivationEmail({
-        stage,
+        stage: templateStage,
         lang,
         appUrl: APP_URL,
         userEmail: u.email as string,
@@ -91,18 +156,18 @@ async function processStage(
         subject,
         html,
         template: tpl,
-        category: "marketing",
+        category: isNudge ? "marketing" : "transactional",
       });
 
-      // Mark as sent
+      // Mark as sent (store under the canonical stage key + variant marker)
+      const stamp = new Date().toISOString();
+      const nextMap: Record<string, string> = { ...sentMap, [templateStage]: stamp };
+      if (templateStage === "day_5_series") nextMap["day_5"] = stamp;
       await supabase
         .from("profiles")
-        .update({
-          activation_emails_sent: { ...sentMap, [stage]: new Date().toISOString() },
-        })
+        .update({ activation_emails_sent: nextMap })
         .eq("id", u.id);
 
-      // Always mark send so the 3-day cap starts (day_0 included)
       await markMarketingEmailSent(supabase, u.id);
 
       sent++;
@@ -124,7 +189,7 @@ serve(async (req) => {
   const results: Record<string, { sent: number; skipped: number }> = {};
 
   try {
-    for (const stage of ["day_0", "day_1", "day_3", "day_7"] as ActivationStage[]) {
+    for (const stage of STAGES) {
       results[stage] = await processStage(supabase, stage);
     }
     return new Response(
