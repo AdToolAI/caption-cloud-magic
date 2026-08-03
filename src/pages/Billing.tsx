@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CancelIntentDialog } from "@/components/billing/CancelIntentDialog";
 
 interface Invoice {
   id: string;
