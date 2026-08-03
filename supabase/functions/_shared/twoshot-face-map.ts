@@ -814,6 +814,8 @@ export async function resolveSceneFaceMap(args: {
               width: result.width,
               height: result.height,
               source: result.source,
+              anchorUrl: result.anchorUrl ?? null,
+
             },
           },
         },
