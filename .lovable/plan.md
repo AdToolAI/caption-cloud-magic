@@ -1,45 +1,50 @@
-# Lip-Sync-Reparatur: Provider-Passthrough darf nie wieder als fertig gelten
+# Lip-Sync: Beweisgeführte Ursachenklärung statt weiterer Patches
 
-## Belegter Befund am letzten Run
+## Was ich gemessen habe (und was das widerlegt)
 
-- Szene `c934a823…` hat vier korrekt gerenderte **720×720** Einzelsprecher-Preclips; der zuvor vermutete 1284×718-Renderfehler liegt in den tatsächlichen Dateien nicht vor.
-- Alle vier Sync.so-Ausgaben sind ebenfalls 720×720, haben die korrekte Dauer und wurden gespeichert.
-- Der direkte Input/Output-Vergleich zeigt jedoch nur minimale Änderungen (durchschnittlicher PSNR ca. **43–50 dB**). Das ist konsistent mit Re-Encoding bzw. nahezu unverändertem Video, nicht mit belastbarer neuer Mundanimation.
-- Die vier Face-Selection-Dateien enthalten jeweils durchgehende Bounding Boxes; der Anbieter wurde also auf einen Gesichtsbereich angesetzt.
-- Der Webhook prüft Multi-Speaker-Ausgaben aktuell nur auf identische Datei-Metadaten oder falsche Auflösung. Die aussagekräftigere Re-Encoding-Heuristik ist für Multi-Speaker ausdrücklich deaktiviert. Deshalb werden nahezu unveränderte Outputs als `done` markiert und anschließend in den finalen Clip gemuxt.
+Ich habe die defekte Szene von heute (`c934a823…`) und die funktionierende Referenzszene vom 27.07. (`c01d339d…`) mit exakt derselben Methode verglichen.
+
+- Meine vorherige These „Provider liefert unverändert zurück, erkennbar am Bildvergleich" ist **widerlegt**. Der 27.07.-Lauf zeigt praktisch dieselben Vergleichswerte wie heute. Dieses Signal taugt nicht als Unterscheidungsmerkmal.
+- Die Preclips sind in beiden Läufen korrekt 720x720. Der zuvor vermutete 1284x718-Renderfehler existiert in den echten Dateien nicht.
+- Messbar unterschiedlich ist das Ergebnis: Im Endclip vom 27.07. bewegt sich die Mundregion in allen vier Sprecherfenstern deutlich. Im heutigen Endclip ist sie in drei von vier Fenstern nahezu regungslos.
+- Ebenfalls messbar: Die heutige Master-Plate ist als Ganzes fast eingefroren, die vom 27.07. hat durchgehend natürliche Bewegung. Die Passes 3 und 4 von heute zeigen im Anbieter-Output exakt so wenig Bewegung wie in ihrem Eingang, die Passes 1 und 2 dagegen mehr.
+- Die Gesichtsgrößen sind **kein** Unterscheidungsmerkmal: Am 27.07. gab es Szenen mit ebenso kleinen Gesichtern.
+
+Damit ist belegt **dass** heute Mundbewegung fehlt, aber **noch nicht bewiesen**, an welcher Station sie verloren geht. Genau das klärt Schritt 1, bevor irgendetwas geändert wird.
 
 ## Umsetzung
 
-1. **Mundbewegung statt Dateigröße messen**
-   - Einen gemeinsamen, deterministischen Qualitätsprüfer für Provider-Input und Provider-Output einführen.
-   - Mehrere zeitlich verteilte Frames aus beiden Clips vergleichen und ausschließlich die aus der Face-BBox abgeleitete Mundregion bewerten.
-   - Re-Encoding, globale Kamerabewegung und Änderungen außerhalb des Mundes dürfen nicht als erfolgreiches Lip-Sync zählen.
+1. **Kontrollierter A/B-Nachweis, keine Codeänderung**
+   - Die vier Preclips und Audiospuren vom 27.07. unverändert durch die heutige Kette schicken.
+   - Ergebnis vergleichen: Kommt dieselbe Mundbewegung heraus wie am 27.07., liegt der Bruch **vor** dem Anbieter (Plate/Preclip). Kommt sie nicht heraus, liegt er **im Anbieter-Aufruf oder danach**.
+   - Zusätzlich die heutigen Anbieter-Ausgaben durch den Stitch vom 27.07. schicken, um Stitch und Anbieter sauber zu trennen.
+   - Ergebnis dieses Schritts entscheidet, welcher der folgenden Punkte überhaupt umgesetzt wird.
 
-2. **Webhook fail-closed machen**
-   - Nach jedem `COMPLETED`-Webhook zuerst den Mundbewegungsnachweis ausführen.
-   - Nur `motion_confirmed` darf den Pass auf `done` setzen.
-   - `static`, praktisch unverändert oder nicht prüfbar wird als `provider_passthrough` beendet; kein automatischer NOOP-Retry und kein Mux eines ungeprüften Outputs.
-   - Den Grund, Messwerte und geprüften Framebereich pro Pass in der bestehenden Dispatch-Telemetrie speichern.
+2. **Wenn der Bruch vor dem Anbieter liegt (Plate-Pfad)**
+   - Die heutigen Plate-Parameter Feld für Feld gegen einen 27.07.-Lauf stellen: Bildausschnitt, Bewegungsvorgaben, Modell und Prompt-Bausteine.
+   - Nur die tatsächlich abweichenden Felder zurückführen, damit die Plate wieder lebendige, sprechfähige Gesichter liefert.
+   - Eine fast eingefrorene Plate vor dem Lip-Sync erkennen und als Klartext-Fehler mit Erstattung beenden, statt sie weiterzureichen.
 
-3. **Erfolgspfad und Rückerstattung vereinheitlichen**
-   - Alle vier Passes müssen erfolgreich verifiziert sein, bevor `render-sync-segments-audio-mux` startet.
-   - Bei einem fehlgeschlagenen Pass die Szene verständlich als fehlgeschlagen markieren und den bestehenden idempotenten Refund-Pfad verwenden.
-   - Bestehende ältere Statusfelder synchron halten, ohne eine neue State Machine oder weitere Retry-Ladder einzuführen.
+3. **Wenn der Bruch beim Anbieter liegt**
+   - Den heutigen Anbieter-Aufruf Feld für Feld gegen den 27.07.-Aufruf stellen: Modell, Gesichtsauswahl, Zeitfenster und Audiozuschnitt.
+   - Abweichungen exakt auf den 27.07.-Stand bringen, ohne neue Varianten oder Wiederholungsketten einzuführen.
 
-4. **Finalen Stitch zusätzlich absichern**
-   - Nach dem Mux die jeweiligen Sprecher-Zeitfenster im finalen Vollbild erneut gegen die Master-Plate prüfen.
-   - Nur wenn die verifizierte Änderung in der zurückprojizierten Mundregion sichtbar bleibt, darf die Szene `ready` werden.
-   - So wird zusätzlich verhindert, dass eine falsche Maske oder Rückprojektion vorhandene Provider-Bewegung wieder verdeckt.
+4. **Wenn der Bruch im Stitch liegt**
+   - Prüfen, ob die Anbieter-Bewegung bei der Rückprojektion durch Maske, Zeitversatz oder darüberliegende Standbilder verdeckt wird.
+   - Nur den betroffenen Teil auf den 27.07.-Stand zurückführen.
 
-5. **Gezielte Regressionstests**
-   - Positivtest: echte Mundbewegung wird akzeptiert.
-   - Negativtest: identische Datei, neu encodierter Passthrough, Bewegung nur außerhalb des Mundes und nicht verfügbare Frames werden abgewiesen.
-   - Stitch-Test: nachgewiesene Bewegung muss im finalen Sprecherfenster erhalten bleiben.
-   - Kontrolllauf mit einer frischen Vier-Sprecher-Szene; Freigabe erst, wenn jeder Sprecher nur in seinem Dialogfenster sichtbar den Mund bewegt.
+5. **Belastbares Abnahmekriterium**
+   - Erst nach der Korrektur eine Qualitätsprüfung einbauen, deren Schwelle aus den gemessenen 27.07.-Werten abgeleitet ist statt geraten.
+   - Prüfpunkt ist die Mundregion im Sprecherfenster des fertigen Clips, verglichen mit derselben Region außerhalb des Fensters.
+   - Fällt die Prüfung durch, wird die Szene verständlich als fehlgeschlagen gemeldet und über den bestehenden idempotenten Weg erstattet.
+
+6. **Freigabe**
+   - Frische Vier-Sprecher-Szene erzeugen und dieselben Messungen fahren wie in Schritt 1.
+   - Freigabe nur, wenn jeder Sprecher in seinem Dialogfenster messbar den Mund bewegt und die Werte im Bereich des 27.07.-Laufs liegen.
 
 ## Technische Leitplanken
 
-- Keine weitere Änderung an Crop-Größe, Face-Mapping oder Juli-Bildpfad ohne neuen Beleg; diese Teile waren im untersuchten Run korrekt verdrahtet.
-- Keine Byte-Ratio als Qualitätsentscheidung und keine allgemeine Ganzbild-Bewegungsmessung.
-- Kein automatischer NOOP-Retry; ein nachgewiesener Passthrough ist terminal und erstattungsfähig.
-- Bestehende AWS/Remotion-Frame-Infrastruktur verwenden; keinen zusätzlichen externen Analyseanbieter einführen.
+- In Schritt 1 wird nichts geändert; er dient ausschließlich der Eingrenzung.
+- Keine neue Retry-Ladder, keine neue Zustandsmaschine, keine weiteren Heuristiken auf Dateigröße.
+- Änderungen nur an den Feldern, die der A/B-Nachweis konkret als abweichend ausweist.
+- Fehlerpfade bleiben an die bestehende automatische, idempotente Rückerstattung gebunden.
