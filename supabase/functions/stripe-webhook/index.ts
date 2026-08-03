@@ -572,6 +572,55 @@ serve(withTelemetry('stripe-webhook', async (req) => {
       }
     }
 
+    // === v403 Dunning: fehlgeschlagene Zahlung ===
+    if (event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object as Stripe.Invoice;
+      console.log('[STRIPE-WEBHOOK] Processing invoice.payment_failed:', invoice.id);
+      try {
+        const customerEmail = invoice.customer_email
+          || (invoice.customer_address?.email)
+          || null;
+
+        if (customerEmail) {
+          const { data: prof } = await supabaseAdmin
+            .from('profiles')
+            .select('language')
+            .eq('email', customerEmail)
+            .maybeSingle();
+
+          const attempt = invoice.attempt_count || 1;
+          const { subject, html } = renderPaymentFailedEmail({
+            lang: normalizeLifecycleLang(prof?.language as string | null),
+            appUrl: APP_URL,
+            userEmail: customerEmail,
+            hostedInvoiceUrl: invoice.hosted_invoice_url,
+          });
+
+          // Idempotent pro Rechnung UND Versuch: Stripe wiederholt automatisch,
+          // jeder neue Versuch erzeugt genau eine weitere Erinnerung.
+          const result = await sendEmail({
+            to: customerEmail,
+            subject,
+            html,
+            template: `payment_failed:${invoice.id}:${attempt}`,
+            category: 'transactional',
+            replyTo: 'info@useadtool.ai',
+          });
+          if (!result.ok && !result.skipped) {
+            console.error('[STRIPE-WEBHOOK] Dunning email failed:', result.error);
+          } else {
+            console.log('[STRIPE-WEBHOOK] Dunning email sent to', customerEmail, 'attempt', attempt);
+          }
+        } else {
+          console.warn('[STRIPE-WEBHOOK] No customer_email on failed invoice', invoice.id);
+        }
+      } catch (dunningError) {
+        console.error('[STRIPE-WEBHOOK] Dunning email error:', dunningError);
+      }
+    }
+
+
+
     return new Response(JSON.stringify({ received: true }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
