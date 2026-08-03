@@ -313,11 +313,30 @@ serve(async (req) => {
       .maybeSingle();
 
     if (cached?.composed_url) {
+      // v400 — Anchor/Plate-Kohärenz: auch auf dem Cache-Hit-Pfad muss der
+      // Continuity-Lock auf den Anker zeigen, aus dem die Plate erzeugt wird.
+      // Sonst bleibt ein alter Anker als `lock_reference_url` stehen, die
+      // Gesichts-Geometrie wird auf dem falschen Bild gemessen und jeder
+      // Preclip landet neben dem Gesicht (kein Lip-Sync).
+      if (portraits.length >= 2 && speakerFocusIdx < 0) {
+        try {
+          await admin
+            .from("composer_scenes")
+            .update({
+              lock_reference_url: cached.composed_url,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", body.sceneId);
+        } catch (e) {
+          console.warn("[compose-scene-anchor] v400 cache-hit lock persist failed (non-fatal)", e);
+        }
+      }
       return new Response(
         JSON.stringify({ composedUrl: cached.composed_url, cached: true, strategy: "first-frame-composed" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
 
     // --- Build edit prompt ---
     const aspect = body.aspectRatio ?? "16:9";
@@ -828,6 +847,7 @@ serve(async (req) => {
         console.warn("[compose-scene-anchor] lock_reference_url persist failed (non-fatal)", e);
       }
     }
+
 
     return new Response(
       JSON.stringify({ composedUrl, cached: false, strategy: "first-frame-composed" }),

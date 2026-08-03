@@ -1351,10 +1351,22 @@ serve(async (req) => {
 
     // ── Face-targeting (resolve per-speaker coords) ──────────────────────
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    const anchorUrl =
-      (scene as any).lock_reference_url ||
-      (scene as any).reference_image_url ||
-      null;
+    // v400 — Anchor/Plate-Kohärenz.
+    // Die Gesichts-Geometrie MUSS auf genau dem Bild gemessen werden, aus dem
+    // die Plate erzeugt wurde. Das ist `reference_image_url` (i2v-First-Frame).
+    // `lock_reference_url` ist nur ein Continuity-Lock und kann aus einem
+    // früheren Lauf stammen — dann zeigt er eine andere Bildkomposition und
+    // jede daraus abgeleitete Crop-Koordinate landet neben dem Gesicht.
+    const refAnchorUrl = ((scene as any).reference_image_url || "").trim() || null;
+    const lockAnchorUrl = ((scene as any).lock_reference_url || "").trim() || null;
+    const anchorUrl = refAnchorUrl || lockAnchorUrl;
+    if (refAnchorUrl && lockAnchorUrl && refAnchorUrl !== lockAnchorUrl) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v400_anchor_divergence ` +
+        `plate_anchor=${refAnchorUrl.slice(-40)} stale_lock=${lockAnchorUrl.slice(-40)} — using plate anchor`,
+      );
+    }
+
     const characterIds = speakers.map((sp) => sp.character_id ?? null);
     const characters = await resolveCharacterPortraits(supabase, userId, characterIds);
     const cachedFaceMap = (twoshot as any).faceMap ?? null;
@@ -1569,7 +1581,25 @@ serve(async (req) => {
         : [];
     const v278Enabled = (Deno.env.get("V278_HUNGARIAN_ROUTER_N3") ?? "true").toLowerCase() !== "false";
     let anchorLayoutRaw = ((scene as any)?.dialog_shots?.anchor_face_layout ?? null) as AnchorFaceLayout | null;
+    // v400 — Stale-Layout-Guard. Ein persistiertes Face-Layout gilt nur, wenn es
+    // auf demselben Anker gemessen wurde, aus dem die aktuelle Plate stammt.
+    // Andernfalls verwerfen wir es und lassen es neu aus dem aktuellen Anker
+    // rekonstruieren (facemap_recovery).
+    if (
+      anchorLayoutRaw &&
+      anchorUrl &&
+      typeof (anchorLayoutRaw as any).anchorUrl === "string" &&
+      (anchorLayoutRaw as any).anchorUrl.startsWith("http") &&
+      (anchorLayoutRaw as any).anchorUrl !== anchorUrl
+    ) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v400_stale_anchor_layout_discarded ` +
+        `layout_anchor=${String((anchorLayoutRaw as any).anchorUrl).slice(-40)} plate_anchor=${anchorUrl.slice(-40)}`,
+      );
+      anchorLayoutRaw = null;
+    }
     let anchorLayoutSource: "persisted" | "facemap_recovery" | "missing" = anchorLayoutRaw ? "persisted" : "missing";
+
     const normalizeCharacterIdForRouting = (id?: string | null) =>
       String(id ?? "")
         .toLowerCase()

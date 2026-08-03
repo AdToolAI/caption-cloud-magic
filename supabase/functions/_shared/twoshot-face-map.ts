@@ -48,7 +48,10 @@ export interface FaceMap {
   width: number;
   height: number;
   source: "cache" | "anchor" | "heuristic-fallback";
+  /** v400 — anchor image this map was measured on (staleness binding). */
+  anchorUrl?: string | null;
 }
+
 
 const DEFAULT_DIMS = { width: 1280, height: 720 };
 const GEMINI_TIMEOUT_MS = 20_000;
@@ -673,11 +676,28 @@ export async function resolveSceneFaceMap(args: {
   if (cachedFaceMap) {
     migratedCache = migrateCachedFaces(cachedFaceMap);
   }
+  // v400 — Stale-Cache-Guard: eine Gesichtskarte gilt nur für genau das
+  // Ankerbild, auf dem sie gemessen wurde. Wurde die Szene neu generiert
+  // (neuer Anker, andere Bildkomposition), ist die alte Karte wertlos und
+  // erzeugt Crops neben den Gesichtern.
+  const cachedAnchorUrl =
+    typeof cachedFaceMap?.anchorUrl === "string" ? cachedFaceMap.anchorUrl : null;
+  const cacheAnchorMismatch =
+    !!cachedAnchorUrl && !!anchorUrl && cachedAnchorUrl !== anchorUrl;
+  if (cacheAnchorMismatch) {
+    console.warn(
+      `[twoshot-face-map] scene=${sceneId} v400_stale_facemap_discarded ` +
+      `cached_anchor=${cachedAnchorUrl.slice(-40)} current_anchor=${String(anchorUrl).slice(-40)}`,
+    );
+    migratedCache = null;
+  }
   const cacheLooksValid =
+    !cacheAnchorMismatch &&
     !!migratedCache &&
     migratedCache.length >= 1 &&
     Number(cachedFaceMap.width) > 0 &&
     Number(cachedFaceMap.height) > 0;
+
   const needIdentities = characters.length >= 2;
   const cacheHasIdentities =
     cacheLooksValid &&
@@ -694,6 +714,8 @@ export async function resolveSceneFaceMap(args: {
       width: Number(cachedFaceMap.width),
       height: Number(cachedFaceMap.height),
       source: "cache",
+      anchorUrl: cachedAnchorUrl ?? anchorUrl ?? null,
+
     };
   }
 
@@ -771,7 +793,7 @@ export async function resolveSceneFaceMap(args: {
     );
   }
 
-  const result: FaceMap = { ...norm, source: "anchor" };
+  const result: FaceMap = { ...norm, source: "anchor", anchorUrl: anchorUrl ?? null };
   try {
     const { data: row } = await supabase
       .from("composer_scenes")
@@ -792,6 +814,8 @@ export async function resolveSceneFaceMap(args: {
               width: result.width,
               height: result.height,
               source: result.source,
+              anchorUrl: result.anchorUrl ?? null,
+
             },
           },
         },
