@@ -14,7 +14,8 @@ import { Check, Volume2, VolumeX, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
-import { DEMO_VIDEO } from "@/constants/demo-video";
+const PROOF_CLIP = "/videos/proof-clip.mp4";
+const PROOF_POSTER = "/videos/proof-clip-poster.jpg";
 
 const COPY = {
   de: {
@@ -22,10 +23,10 @@ const COPY = {
     title1: "Ein Briefing.",
     title2: "Ein fertiger Clip.",
     briefLabel: "Dein Briefing",
-    brief: "Werbeclip für meinen Kaffee-Shop, 15 Sekunden, warm, deutsch.",
+    brief: "Büroszene, vier Kolleg:innen im Dialog, deutsch gesprochen, 8 Sekunden.",
     resultLabel: "Das Ergebnis",
-    steps: ["Skript", "Stimme", "Lip-Sync", "Fertiger Clip"],
-    meta: "15s · Deutsch · Lip-Sync",
+    steps: ["Skript & Cast", "Stimmen", "Lip-Sync", "Fertiger Clip"],
+    meta: "8s · Deutsch · 4 Sprecher · Lip-Sync",
     note: "Skript, Stimme, Kamera, Schnitt, Lip-Sync — sonst ein Team und mehrere Tage.",
     cta: "Mit diesem Briefing starten",
     sound: "Ton",
@@ -36,10 +37,10 @@ const COPY = {
     title1: "One briefing.",
     title2: "One finished clip.",
     briefLabel: "Your briefing",
-    brief: "Ad clip for my coffee shop, 15 seconds, warm, German.",
+    brief: "Office scene, four colleagues in dialogue, spoken German, 8 seconds.",
     resultLabel: "The result",
     steps: ["Script", "Voice", "Lip-sync", "Finished clip"],
-    meta: "15s · German · lip-sync",
+    meta: "8s · German · 4 speakers · lip-sync",
     note: "Script, voice, camera, edit, lip-sync — otherwise a team and several days.",
     cta: "Start with this briefing",
     sound: "Sound",
@@ -50,10 +51,10 @@ const COPY = {
     title1: "Un briefing.",
     title2: "Un clip terminado.",
     briefLabel: "Tu briefing",
-    brief: "Clip publicitario para mi cafetería, 15 segundos, cálido, en alemán.",
+    brief: "Escena de oficina, cuatro colegas dialogando, en alemán, 8 segundos.",
     resultLabel: "El resultado",
     steps: ["Guion", "Voz", "Lip-sync", "Clip terminado"],
-    meta: "15s · alemán · lip-sync",
+    meta: "8s · alemán · 4 hablantes · lip-sync",
     note: "Guion, voz, cámara, montaje, lip-sync — de otro modo, un equipo y varios días.",
     cta: "Empezar con este briefing",
     sound: "Sonido",
@@ -200,7 +201,8 @@ export const ProofMoment = () => {
             <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-black shadow-[var(--shadow-glow-gold)]">
               <video
                 ref={videoRef}
-                src={DEMO_VIDEO.output_url}
+                src={PROOF_CLIP}
+                poster={PROOF_POSTER}
                 className="aspect-video w-full object-cover"
                 muted={muted}
                 playsInline
