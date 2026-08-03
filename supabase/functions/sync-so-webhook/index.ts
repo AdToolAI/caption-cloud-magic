@@ -364,6 +364,39 @@ serve(async (req) => {
     return ok({ ok: true, skipped: "no_scene_match", job_id: jobId });
   }
 
+  // ── Run-Guard (2026-08-03) ────────────────────────────────────────────────
+  // A restart purges `dialog_shots`. Any result that arrives afterwards
+  // belongs to the PREVIOUS run and must never touch the new one. We only
+  // discard when the scene actually tracks job ids and this one is not among
+  // them — a webhook that races the initial `dialog_shots` write (no job ids
+  // recorded yet) is still accepted, exactly as before.
+  {
+    const ds: any = scene.dialog_shots ?? null;
+    const shots = Array.isArray(ds?.shots) ? ds.shots : [];
+    const passes = Array.isArray(ds?.passes) ? ds.passes : [];
+    const knownJobIds = [
+      ...shots.map((s: any) => s?.sync_job_id),
+      ...passes.map((p: any) => p?.job_id),
+      ds?.sync_job_id,
+    ].filter((v: unknown) => typeof v === "string" && v.length > 0);
+
+    const purged = ds === null;
+    const stale = knownJobIds.length > 0 && !knownJobIds.includes(jobId);
+
+    if (purged || stale) {
+      console.warn(
+        `[sync-so-webhook] run_guard_discarded scene=${sceneId} job=${jobId} ` +
+          `reason=${purged ? "dialog_shots_purged" : "job_not_in_current_run"}`,
+      );
+      return ok({
+        ok: true,
+        skipped: "stale_run_result",
+        scene_id: sceneId,
+        job_id: jobId,
+      });
+    }
+  }
+
   if (scene.lip_sync_applied_at) {
     return ok({ ok: true, skipped: "already_applied" });
   }
