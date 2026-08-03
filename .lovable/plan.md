@@ -1,16 +1,17 @@
 # Phase 5: Beweis auf der Startseite + eine funktionierende Testphase
 
-Onboarding (Phase 3) und die eine E-Mail-Strecke (Phase 4) stehen. Der Funnel hat jetzt zwei belegte Lücken: die Startseite nennt keinen Preis, und die Testphase existiert in der Datenbank praktisch nicht.
+Onboarding (Phase 3) und die eine E-Mail-Strecke (Phase 4) stehen. Der Preis steht bereits im Hero ("Ab 14,99 €/Monat · 14 Tage testen · Kein Auto-Abo") — was fehlt, ist die Auflösung dieses Versprechens: eine Stelle, an der steht, was für 14,99 € enthalten ist, und eine Testphase, die in der Datenbank tatsächlich existiert.
 
 ## Was geprüft wurde
 
-- `src/pages/Index.tsx` rendert Hero, Demos, Arsenal, FAQ — aber **keine** Preis-Sektion. `src/components/landing/PricingSection.tsx` existiert, wird auf der Startseite nirgends eingebunden.
-- In `profiles`: 57 Konten, davon **28 ohne `trial_ends_at`**, und **kein einziges** mit `trial_status = 'active'` (30 `converted`, 27 `expired`). Es läuft aktuell also keine echte Testphase — weder für Neuanmeldungen noch für Bestandskonten.
+- Der Hero nennt Preis und Testphase korrekt. `src/pages/Index.tsx` rendert danach Hero, Demos, Arsenal, FAQ — aber **keine** Preis-/Leistungs-Sektion. `src/components/landing/PricingSection.tsx` existiert, wird auf der Startseite nirgends eingebunden.
+- In `profiles`: 57 Konten, davon **28 ohne `trial_ends_at`**, und **kein einziges** mit `trial_status = 'active'` (30 `converted`, 27 `expired`). Es läuft aktuell also keine echte Testphase — weder für Neuanmeldungen noch für Bestandskonten. Der Hero verspricht 14 Tage, das Produkt löst sie nicht ein.
 
 ## Was gebaut wird
 
-**1. Preis und Angebot auf die Startseite**
-`PricingSection` wird zwischen Arsenal und FAQ eingebunden: ein Plan, 14,99 EUR/Monat, was enthalten ist, Gründer-Rabatt als Hinweis, ein Button — derselbe Einstieg wie überall ("Studio öffnen" → erste Produktion). Kein zweiter konkurrierender CTA.
+**1. Was 14,99 € beinhaltet — einmal ausformuliert**
+Der Preis bleibt im Hero, wo er ist. Zusätzlich wird `PricingSection` zwischen Arsenal und FAQ eingebunden: was im Monat enthalten ist, Gründer-Rabatt als Hinweis, ein Button — derselbe Einstieg wie überall ("Studio öffnen" → erste Produktion). Kein zweiter konkurrierender CTA, keine zweite Preisangabe, die der Hero-Angabe widersprechen kann.
+
 
 **2. Beweis statt Behauptung**
 Direkt unter dem Hero ein kurzer Vorher/Nachher-Beweis: Briefing-Text links, fertiger Clip rechts, Laufzeit sichtbar. Nutzt den vorhandenen `LiveDemoShowcase`-Aufbau, wird aber auf ein Ergebnis zugespitzt statt mehrerer Beispiele.
