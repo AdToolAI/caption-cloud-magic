@@ -36,6 +36,8 @@ import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
 import { appendWebhookToken } from "./webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
 import { computeMouthCenteredCrop } from "./compute-mouth-centered-crop.ts";
+// v400 Freeze: alle Tuning-Werte kommen aus dem eingefrorenen Vertrag.
+import { PRECLIP } from "./lipsync-frozen-contract.ts";
 
 export interface PassPreclipInput {
   sceneId: string;
@@ -187,9 +189,9 @@ export async function renderPassFacePreclip(
       },
       plateWidth: sW,
       plateHeight: sH,
-      targetFaceShare: 0.42,
-      minSize: 128,
-      outputSize: 720,
+      targetFaceShare: PRECLIP.targetFaceShare,
+      minSize: PRECLIP.minCropSizePx,
+      outputSize: PRECLIP.outputSizePx,
     });
     crop0X = r.crop.x;
     crop0Y = r.crop.y;
@@ -202,7 +204,7 @@ export async function renderPassFacePreclip(
       `[pass-face-preclip] scene=${sceneId} pass=${passIdx} v247_mouth_anchor_preclip anchor=${anchor} face_share=${faceShareInCrop.toFixed(3)} mouth_offset_px=${mouthOffsetPx} clamped=${clampedAnchor} crop=${crop0X},${crop0Y},${crop0Size}`,
     );
   } else {
-    const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, 512, siblingCoords ?? null);
+    const cf = computeFaceCrop(coords, bbox ?? null, sW, sH, PRECLIP.legacyFallbackOutputPx, siblingCoords ?? null);
     crop0X = cf.x;
     crop0Y = cf.y;
     crop0Size = cf.size;
@@ -243,7 +245,7 @@ export async function renderPassFacePreclip(
   // (safety margin above 480p) and caps at 1280p so cost/latency stay
   // bounded. Lanczos upscale lives in the Remotion DialogTurnFaceCropVideo
   // composition via width/height inputProps below.
-  const nativeOut = Math.min(1280, Math.max(720, expandedSize));
+  const nativeOut = Math.min(PRECLIP.nativeOutputMaxPx, Math.max(PRECLIP.nativeOutputMinPx, expandedSize));
   const evenNative = nativeOut % 2 === 0 ? nativeOut : nativeOut - 1;
   const crop = { x: expandedX, y: expandedY, size: expandedSize, outputSize: evenNative };
   const outW = crop.outputSize;
