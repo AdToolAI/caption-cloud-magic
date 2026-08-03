@@ -5,6 +5,13 @@ import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { isDuplicateStripeEvent } from "../_shared/stripeIdempotency.ts";
+import {
+  renderPurchaseWelcomeEmail,
+  renderPaymentFailedEmail,
+  normalizeLifecycleLang,
+} from "../_shared/lifecycle-emails.ts";
+
+const APP_URL = Deno.env.get("APP_URL") || "https://useadtool.ai";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
