@@ -157,6 +157,37 @@ serve(withTelemetry('stripe-webhook', async (req) => {
           stripe_customer_id: customerId,
           stripe_subscription_id: session.subscription,
         });
+
+        // === v403: Kauf-Willkommensmail (idempotent über session.id) ===
+        try {
+          const { data: prof } = await supabaseAdmin
+            .from('profiles')
+            .select('language')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const { subject, html } = renderPurchaseWelcomeEmail({
+            lang: normalizeLifecycleLang(prof?.language as string | null),
+            appUrl: APP_URL,
+            userEmail: email,
+          });
+
+          const welcomeResult = await sendEmail({
+            to: email,
+            subject,
+            html,
+            template: `purchase_welcome:${session.id}`,
+            category: 'transactional',
+            replyTo: 'info@useadtool.ai',
+          });
+          if (!welcomeResult.ok && !welcomeResult.skipped) {
+            console.error('[STRIPE-WEBHOOK] Welcome email failed:', welcomeResult.error);
+          }
+        } catch (welcomeError) {
+          console.error('[STRIPE-WEBHOOK] Welcome email error:', welcomeError);
+        }
+
+
         
         // Track referral if promo code was used
         if (session.promotion_code) {
