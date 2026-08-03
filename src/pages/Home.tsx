@@ -27,7 +27,6 @@ import { useNewsRadar } from "@/hooks/useNewsRadar";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
-import { NicheTutorialModal } from "@/components/onboarding/NicheTutorialModal";
 import { WelcomeBonusModal } from "@/components/welcome/WelcomeBonusModal";
 import { useWelcomeBonus } from "@/hooks/useWelcomeBonus";
 import { type WeekPost } from "@/components/dashboard/WeekDayCard";
@@ -59,7 +58,6 @@ const Home = () => {
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showNicheTutorial, setShowNicheTutorial] = useState(false);
   const [nicheCheckDone, setNicheCheckDone] = useState(false);
   const [editingPost, setEditingPost] = useState<WeekPost | null>(null);
   const [editingDate, setEditingDate] = useState<string>("");
@@ -181,33 +179,33 @@ const Home = () => {
   // Transform API data to heatmap format
   const heatmapData = transformPostingSlotsToHeatmap(postingTimesData, 7);
 
-  // Check if user has onboarding profile
+  // Studio-Einzug: Wer noch kein Studio-Setup hat, wird ins Onboarding geleitet.
+  // Es gibt genau EINEN Onboarding-Pfad (/onboarding) — kein zweites Modal auf Home.
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     const checkOnboardingProfile = async () => {
       const { data } = await supabase
         .from("onboarding_profiles")
         .select("id")
         .eq("user_id", user.id)
         .maybeSingle();
+      if (cancelled) return;
       if (!data) {
-        setShowNicheTutorial(true);
+        navigate("/onboarding", { replace: true });
+        return;
       }
       setNicheCheckDone(true);
     };
     checkOnboardingProfile();
-  }, [user]);
+    return () => { cancelled = true; };
+  }, [user, navigate]);
 
   useEffect(() => {
-    if (user && nicheCheckDone && !showNicheTutorial) {
+    if (user && nicheCheckDone) {
       loadDashboardData();
     }
-  }, [user, nicheCheckDone, showNicheTutorial]);
-
-  const handleTutorialComplete = () => {
-    setShowNicheTutorial(false);
-    loadDashboardData();
-  };
+  }, [user, nicheCheckDone]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -514,8 +512,7 @@ const Home = () => {
 
   return (
     <div className="bg-background">
-      {showNicheTutorial && <NicheTutorialModal onComplete={handleTutorialComplete} />}
-      {!showNicheTutorial && welcomeBonus.shouldShow && welcomeBonus.bonusAmount && welcomeBonus.bonusCurrency && (
+      {welcomeBonus.shouldShow && welcomeBonus.bonusAmount && welcomeBonus.bonusCurrency && (
         <WelcomeBonusModal
           open={welcomeBonus.shouldShow}
           bonusAmount={welcomeBonus.bonusAmount}

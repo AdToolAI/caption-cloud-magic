@@ -3905,7 +3905,7 @@ export const translations: Record<Language, any> = {
         headline2: "A whole studio.",
         subline: "Produce complete AI videos with the leading models, voices and lip-sync tools in a single workflow — from idea to finished video, without a film crew and without switching platforms.",
         pricingHint: "From €14.99/month · 14-day trial · No auto-subscription",
-        ctaPrimary: "Start for free",
+        ctaPrimary: "Open your studio",
         ctaSecondary: "Watch demo",
         stats: {
           creators: "Public Beta",
@@ -8754,7 +8754,7 @@ export const translations: Record<Language, any> = {
         headline2: "Ein ganzes Studio.",
         subline: "Erstelle komplette KI-Videos mit den führenden Modellen, Stimmen und Lip-Sync-Tools in einem einzigen Workflow — von der Idee zum fertigen Video, ohne Filmteam und ohne Plattformwechsel.",
         pricingHint: "Ab 14,99 €/Monat · 14 Tage testen · Kein Auto-Abo",
-        ctaPrimary: "Kostenlos starten",
+        ctaPrimary: "Studio öffnen",
         ctaSecondary: "Demo ansehen",
         stats: {
           creators: "Public Beta",
@@ -13388,7 +13388,7 @@ export const translations: Record<Language, any> = {
         headline2: "Un estudio completo.",
         subline: "Crea vídeos de IA completos con los modelos, voces y herramientas de lip-sync líderes en un único flujo de trabajo — de la idea al vídeo final, sin equipo de rodaje y sin cambiar de plataforma.",
         pricingHint: "Desde 14,99 €/mes · 14 días de prueba · Sin suscripción automática",
-        ctaPrimary: "Empezar gratis",
+        ctaPrimary: "Abre tu estudio",
         ctaSecondary: "Ver demo",
         stats: {
           creators: "Beta pública",
