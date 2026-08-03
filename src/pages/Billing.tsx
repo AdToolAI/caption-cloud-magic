@@ -230,7 +230,7 @@ const Billing = () => {
                 </CardTitle>
                 <CardDescription>{t.manageDesc}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   onClick={handleOpenPortal}
                   disabled={loading}
@@ -244,7 +244,21 @@ const Billing = () => {
                   )}
                   {t.openPortal}
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  disabled={loading}
+                  onClick={() => setCancelOpen(true)}
+                  className="w-full sm:w-auto text-muted-foreground"
+                >
+                  {language === "de"
+                    ? "Abo kündigen"
+                    : language === "es"
+                    ? "Cancelar suscripción"
+                    : "Cancel subscription"}
+                </Button>
               </CardContent>
+
             </Card>
 
             {/* Invoices Table */}
