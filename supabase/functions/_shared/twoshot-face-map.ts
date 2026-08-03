@@ -48,7 +48,10 @@ export interface FaceMap {
   width: number;
   height: number;
   source: "cache" | "anchor" | "heuristic-fallback";
+  /** v400 — anchor image this map was measured on (staleness binding). */
+  anchorUrl?: string | null;
 }
+
 
 const DEFAULT_DIMS = { width: 1280, height: 720 };
 const GEMINI_TIMEOUT_MS = 20_000;
