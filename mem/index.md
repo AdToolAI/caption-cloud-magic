@@ -1,5 +1,6 @@
 # Memory: index.md
 Updated: today
+- [v400 Lip-Sync Feature Freeze](mem://architecture/lipsync/v400-feature-freeze) — **VERBINDLICH & AKTUELL.** Kette ist ab 03.08.2026 eingefroren. Alle Tuning-Werte nur noch in `_shared/lipsync-frozen-contract.ts`, bewacht durch Deno- + vitest-Test. Health-Check via Edge Function `lipsync-selftest` (kreditfrei). Keine neuen Gates, Provider oder Retries ohne "unfreeze lipsync".
 - [v397 Zero-Face-Konsens & Still-Sanity](mem://architecture/lipsync/v397-zero-face-consensus) — **Aktuell.** Rekognition-Nulltreffer = Messergebnis (`ok:true, zeroFaces`), leeres/schwarzes Probe-Still = Messausfall (`still-sanity.ts`). `no_face` nur bei Konsens aus ≥2 auswertbaren Stills; `probe_degraded` nur bei validiertem Preclip + grünem v396-Roundtrip.
 - [v373 Harter Neustart & Generations-Vertrag](mem://architecture/lipsync/v373-hard-reset-generation-contract) — „Clip generieren" löscht den alten Job vollständig (Jobs abbrechen, Slots frei, Credits zurück, Artefakte purgen) und zählt `plate_generation` hoch. Lip-Sync läuft nur, wenn `plate_ready_generation === plate_generation`.
 
