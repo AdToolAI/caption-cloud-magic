@@ -129,7 +129,7 @@ serve(async (req) => {
       // (zusätzlich verschicken wir aus dem Webhook eine gebrandete Quittung).
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
-      success_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/billing?success=true`,
+      success_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/willkommen?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/pricing?canceled=true`,
       metadata: {
         userId: user.id,
