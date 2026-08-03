@@ -8,37 +8,39 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Check, Sparkles } from "lucide-react";
-import { pricingPlans, type PlanType } from "@/config/pricing";
+import { Check, Sparkles, Clapperboard, ArrowRight } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { NicheStep } from "@/components/onboarding/NicheStep";
 import { PlatformStep } from "@/components/onboarding/PlatformStep";
-import { GoalsStep } from "@/components/onboarding/GoalsStep";
-import { StarterPlanPreview } from "@/components/onboarding/StarterPlanPreview";
 
-const STEPS = ["language", "niche", "platforms", "goals", "brand", "plan"] as const;
+/**
+ * Studio-Einzug — „Ein Creator. Ein ganzes Studio."
+ *
+ * Genau EIN Onboarding-Pfad. Drei Fragen, die ausschließlich die erste
+ * Produktion füttern (Nische, Format/Plattform, Look/Marke), danach die
+ * direkte Übergabe in die First Production. Es wird hier nicht verkauft.
+ */
+const STEPS = ["language", "niche", "platforms", "brand", "launch"] as const;
 type Step = typeof STEPS[number];
 
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState<Step>("language");
   const [selectedLang, setSelectedLang] = useState<string>("en");
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>("basic");
   const [brandName, setBrandName] = useState("");
-  const [brandColor, setBrandColor] = useState("#6366F1");
+  const [brandColor, setBrandColor] = useState("#F5C76A");
   const [loading, setLoading] = useState(false);
 
-  // New onboarding data
   const [businessType, setBusinessType] = useState("creator");
   const [niche, setNiche] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-  const [postingGoal, setPostingGoal] = useState("grow_audience");
-  const [postsPerWeek, setPostsPerWeek] = useState(3);
-  const [experienceLevel, setExperienceLevel] = useState("beginner");
-  const [starterPlans, setStarterPlans] = useState<any[]>([]);
-  const [planLoading, setPlanLoading] = useState(false);
-  const [planError, setPlanError] = useState<string | null>(null);
 
-  const { t, language, setLanguage } = useTranslation();
+  // Feste Defaults — die frühere Ziele-Abfrage entfällt, die Werte bleiben
+  // erhalten, damit Wochenplan und Kalender weiterhin befüllt werden.
+  const postingGoal = "grow_audience";
+  const postsPerWeek = 3;
+  const experienceLevel = "beginner";
+
+  const { setLanguage } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [checkingStatus, setCheckingStatus] = useState(true);
@@ -55,7 +57,6 @@ export default function Onboarding() {
       if (cancelled) return;
       const alreadyDone = (profileRes.data as any)?.onboarding_completed === true || !!onboardingRes.data;
       if (alreadyDone) {
-        toast.info("Onboarding ist bereits abgeschlossen");
         navigate("/home", { replace: true });
       } else {
         setCheckingStatus(false);
@@ -85,11 +86,16 @@ export default function Onboarding() {
     );
   };
 
-  const handleBrandNext = async () => {
+  /**
+   * Abschluss des Studio-Setups: schreibt Profil + Flags atomar,
+   * stößt Wochenplan und erste Video-Prompts im Hintergrund an
+   * (Fehler dort blockieren den Nutzer nie) und übergibt an die
+   * First Production.
+   */
+  const handleFinishSetup = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Save onboarding profile
       const { error: profileError } = await supabase.from("onboarding_profiles").upsert({
         user_id: user.id,
         niche,
@@ -99,75 +105,60 @@ export default function Onboarding() {
         posts_per_week: postsPerWeek,
         experience_level: experienceLevel,
       }, { onConflict: "user_id" });
-
       if (profileError) throw profileError;
 
-      // Save brand info
       const { error: brandError } = await supabase.from("profiles").update({
-        brand_name: brandName || "My Brand",
+        brand_name: brandName || "My Studio",
         brand_color: brandColor,
-      }).eq("id", user.id);
-
-      if (brandError) throw brandError;
-
-      setCurrentStep("plan");
-      generatePlan();
-    } catch (err) {
-      console.error("Save error:", err);
-      toast.error("Fehler beim Speichern");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generatePlan = async () => {
-    setPlanLoading(true);
-    setPlanError(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-starter-plan", {
-        body: { niche, business_type: businessType, platforms: selectedPlatforms, posting_goal: postingGoal, posts_per_week: postsPerWeek, experience_level: experienceLevel },
-      });
-
-      if (error) throw error;
-      if (data?.plans) setStarterPlans(data.plans);
-      else throw new Error("No plans returned");
-    } catch (err: any) {
-      console.error("Plan generation error:", err);
-      setPlanError("Plan konnte nicht erstellt werden. Bitte versuche es erneut.");
-    } finally {
-      setPlanLoading(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const { error } = await supabase.from("profiles").update({
         onboarding_completed: true,
-        plan: selectedPlan,
       }).eq("id", user.id);
-
-      if (error) throw error;
+      if (brandError) throw brandError;
 
       trackEvent(ANALYTICS_EVENTS.ONBOARDING_FINISHED, {
         brand_name: brandName,
         niche,
         business_type: businessType,
         platforms: selectedPlatforms,
-        posting_goal: postingGoal,
-        posts_per_week: postsPerWeek,
         user_id: user.id,
       });
 
-      toast.success("Willkommen bei AdTool AI! 🚀");
-      navigate("/home");
+      // Hintergrund-Setup — darf den Nutzer nicht aufhalten.
+      void supabase.functions
+        .invoke("generate-starter-plan", {
+          body: {
+            niche,
+            business_type: businessType,
+            platforms: selectedPlatforms,
+            posting_goal: postingGoal,
+            posts_per_week: postsPerWeek,
+            experience_level: experienceLevel,
+          },
+        })
+        .catch((e) => console.warn("starter-plan generation failed:", e));
+
+      void supabase.functions
+        .invoke("generate-first-video-prompts", {
+          body: {
+            language: typeof navigator !== "undefined" ? (navigator.language?.slice(0, 2) || "en") : "en",
+          },
+        })
+        .catch((e) => console.warn("first-video-prompts generation failed:", e));
+
+      setCurrentStep("launch");
     } catch (err) {
-      console.error("Complete error:", err);
-      toast.error("Fehler beim Abschließen");
+      console.error("Setup error:", err);
+      toast.error("Dein Studio konnte nicht eingerichtet werden. Bitte versuche es erneut.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const startFirstProduction = () => {
+    trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_COMPLETED, { step: 5, step_name: "first_production" });
+    const params = new URLSearchParams({ firstProduction: "1" });
+    if (niche) params.set("niche", niche);
+    if (selectedPlatforms[0]) params.set("platform", selectedPlatforms[0]);
+    navigate(`/autopilot?${params.toString()}`);
   };
 
   if (checkingStatus) {
@@ -187,28 +178,30 @@ export default function Onboarding() {
             <span className="text-2xl font-bold">AdTool AI</span>
           </div>
           <CardTitle className="text-3xl">
-            {currentStep === "plan" ? "Dein Starter-Plan" : "Willkommen!"}
+            {currentStep === "launch" ? "Dein Studio ist offen" : "Ein Creator. Ein ganzes Studio."}
           </CardTitle>
           <CardDescription>
-            {currentStep === "plan"
-              ? "Dein personalisierter Wochenplan"
-              : `Schritt ${stepIndex + 1} von ${STEPS.length}`}
+            {currentStep === "launch"
+              ? "Deine erste Produktion steht bereit"
+              : `Studio-Setup — Schritt ${stepIndex + 1} von ${STEPS.length - 1}`}
           </CardDescription>
 
-          <div className="flex justify-center gap-1.5 mt-6">
-            {STEPS.map((_, idx) => (
-              <div
-                key={idx}
-                className={`h-2 w-12 rounded-full transition-all ${
-                  stepIndex >= idx ? "bg-primary" : "bg-muted"
-                }`}
-              />
-            ))}
-          </div>
+          {currentStep !== "launch" && (
+            <div className="flex justify-center gap-1.5 mt-6">
+              {STEPS.slice(0, -1).map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`h-2 w-12 rounded-full transition-all ${
+                    stepIndex >= idx ? "bg-primary" : "bg-muted"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Step 1: Language */}
+          {/* Schritt 1: Sprache */}
           {currentStep === "language" && (
             <div className="space-y-4">
               <h3 className="text-xl font-semibold text-center">Wähle deine Sprache</h3>
@@ -233,7 +226,7 @@ export default function Onboarding() {
             </div>
           )}
 
-          {/* Step 2: Niche */}
+          {/* Schritt 2: Nische */}
           {currentStep === "niche" && (
             <NicheStep
               businessType={businessType}
@@ -248,52 +241,35 @@ export default function Onboarding() {
             />
           )}
 
-          {/* Step 3: Platforms */}
+          {/* Schritt 3: Format & Plattform */}
           {currentStep === "platforms" && (
             <PlatformStep
               selectedPlatforms={selectedPlatforms}
               onToggle={handlePlatformToggle}
               onNext={() => {
                 trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_COMPLETED, { step: 3, step_name: "platforms", platforms: selectedPlatforms });
-                setCurrentStep("goals");
+                setCurrentStep("brand");
               }}
               onBack={() => setCurrentStep("niche")}
             />
           )}
 
-          {/* Step 4: Goals */}
-          {currentStep === "goals" && (
-            <GoalsStep
-              postingGoal={postingGoal}
-              postsPerWeek={postsPerWeek}
-              experienceLevel={experienceLevel}
-              onGoalChange={setPostingGoal}
-              onPostsPerWeekChange={setPostsPerWeek}
-              onExperienceChange={setExperienceLevel}
-              onNext={() => {
-                trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_COMPLETED, { step: 4, step_name: "goals", posting_goal: postingGoal, posts_per_week: postsPerWeek });
-                setCurrentStep("brand");
-              }}
-              onBack={() => setCurrentStep("platforms")}
-            />
-          )}
-
-          {/* Step 5: Brand */}
+          {/* Schritt 4: Look & Marke */}
           {currentStep === "brand" && (
             <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-center">Richte deine Marke ein</h3>
+              <h3 className="text-xl font-semibold text-center">Gib deinem Studio einen Namen</h3>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="brandName">Markenname</Label>
+                  <Label htmlFor="brandName">Studio- bzw. Markenname</Label>
                   <Input
                     id="brandName"
-                    placeholder="Meine Marke"
+                    placeholder="Mein Studio"
                     value={brandName}
                     onChange={(e) => setBrandName(e.target.value)}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="brandColor">Markenfarbe</Label>
+                  <Label htmlFor="brandColor">Signaturfarbe</Label>
                   <div className="flex gap-4 items-center">
                     <Input
                       id="brandColor"
@@ -305,31 +281,47 @@ export default function Onboarding() {
                     <Input
                       value={brandColor}
                       onChange={(e) => setBrandColor(e.target.value)}
-                      placeholder="#6366F1"
+                      placeholder="#F5C76A"
                     />
                   </div>
                 </div>
               </div>
               <div className="flex gap-4">
-                <Button onClick={() => setCurrentStep("goals")} variant="outline" size="lg" className="w-full">
+                <Button onClick={() => setCurrentStep("platforms")} variant="outline" size="lg" className="w-full">
                   Zurück
                 </Button>
-                <Button onClick={handleBrandNext} size="lg" className="w-full" disabled={loading || !brandName}>
-                  {loading ? "Speichern..." : "Plan erstellen"}
+                <Button onClick={handleFinishSetup} size="lg" className="w-full" disabled={loading || !brandName}>
+                  {loading ? "Studio wird eingerichtet..." : "Studio öffnen"}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Step 6: Starter Plan */}
-          {currentStep === "plan" && (
-            <StarterPlanPreview
-              plans={starterPlans}
-              loading={planLoading}
-              error={planError}
-              onComplete={handleComplete}
-              onRetry={generatePlan}
-            />
+          {/* Schritt 5: Übergabe in die First Production */}
+          {currentStep === "launch" && (
+            <div className="space-y-6 text-center">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-primary/10 p-5">
+                  <Clapperboard className="h-10 w-10 text-primary" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-semibold">
+                  {brandName || "Dein Studio"} ist bereit
+                </h3>
+                <p className="text-muted-foreground">
+                  Wir haben eine erste Produktion für {niche || "deine Nische"} vorbereitet.
+                  Du musst sie nur noch starten — den Rest übernimmt dein Studio.
+                </p>
+              </div>
+              <Button onClick={startFirstProduction} size="lg" className="w-full">
+                Erste Produktion starten
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => navigate("/home")}>
+                Später — zuerst umsehen
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
