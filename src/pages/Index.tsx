@@ -99,6 +99,9 @@ const Index = () => {
           {/* Hero Section - Black Tie */}
           <BlackTieHero />
 
+          {/* Proof Moment — Briefing links, echter Clip rechts */}
+          <ProofMoment />
+
           {/* Social Proof Strip */}
           <SocialProofStrip />
 
@@ -117,8 +120,11 @@ const Index = () => {
           {/* AI Arsenal - all integrated AI modules */}
           <AIArsenalShowcase />
 
+          {/* Pricing — was 14,99 € konkret enthält */}
+          <PricingSection />
 
           {/* Testimonial Spotlight hidden during Beta — will return with real user quotes */}
+
 
           {/* FAQ Section */}
           <section id="faq" className="py-24 px-4 bg-card/30">
