@@ -514,8 +514,7 @@ const Home = () => {
 
   return (
     <div className="bg-background">
-      {showNicheTutorial && <NicheTutorialModal onComplete={handleTutorialComplete} />}
-      {!showNicheTutorial && welcomeBonus.shouldShow && welcomeBonus.bonusAmount && welcomeBonus.bonusCurrency && (
+      {welcomeBonus.shouldShow && welcomeBonus.bonusAmount && welcomeBonus.bonusCurrency && (
         <WelcomeBonusModal
           open={welcomeBonus.shouldShow}
           bonusAmount={welcomeBonus.bonusAmount}
