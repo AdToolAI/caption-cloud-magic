@@ -690,11 +690,20 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           const frozenRef = prep?.composed && prep.firstFrameUrl
             ? prep.firstFrameUrl
             : s.referenceImageUrl;
-          return { ...s, clipStatus: 'generating' as const, referenceImageUrl: frozenRef };
+          return {
+            ...s,
+            clipStatus: 'generating' as const,
+            referenceImageUrl: frozenRef,
+            // Ergebnis des Vorlaufs sofort ausblenden — der Server leert es
+            // ohnehin in beginSceneRun().
+            clipUrl: undefined,
+            lipSyncAppliedAt: null,
+            lipSyncStatus: null,
+          } as typeof s;
         }
         return s;
       });
-      onUpdateScenes(optimistic);
+      (onUpdateScenesLocalOnly ?? onUpdateScenes)(optimistic);
 
       const started = await startSceneGeneration({
         sceneIds: scenesPayload.map((item) => item.id),
