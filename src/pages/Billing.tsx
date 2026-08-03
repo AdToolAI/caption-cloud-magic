@@ -331,7 +331,16 @@ const Billing = () => {
         )}
       </main>
 
+      <CancelIntentDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        language={language}
+        plan={productId || "unknown"}
+        onProceed={handleOpenPortal}
+      />
+
       <Footer />
+
     </div>
   );
 };
