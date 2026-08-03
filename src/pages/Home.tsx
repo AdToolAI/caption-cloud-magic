@@ -181,33 +181,33 @@ const Home = () => {
   // Transform API data to heatmap format
   const heatmapData = transformPostingSlotsToHeatmap(postingTimesData, 7);
 
-  // Check if user has onboarding profile
+  // Studio-Einzug: Wer noch kein Studio-Setup hat, wird ins Onboarding geleitet.
+  // Es gibt genau EINEN Onboarding-Pfad (/onboarding) — kein zweites Modal auf Home.
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     const checkOnboardingProfile = async () => {
       const { data } = await supabase
         .from("onboarding_profiles")
         .select("id")
         .eq("user_id", user.id)
         .maybeSingle();
+      if (cancelled) return;
       if (!data) {
-        setShowNicheTutorial(true);
+        navigate("/onboarding", { replace: true });
+        return;
       }
       setNicheCheckDone(true);
     };
     checkOnboardingProfile();
-  }, [user]);
+    return () => { cancelled = true; };
+  }, [user, navigate]);
 
   useEffect(() => {
-    if (user && nicheCheckDone && !showNicheTutorial) {
+    if (user && nicheCheckDone) {
       loadDashboardData();
     }
-  }, [user, nicheCheckDone, showNicheTutorial]);
-
-  const handleTutorialComplete = () => {
-    setShowNicheTutorial(false);
-    loadDashboardData();
-  };
+  }, [user, nicheCheckDone]);
 
   const loadDashboardData = async () => {
     setLoading(true);
