@@ -5,6 +5,13 @@ import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { isDuplicateStripeEvent } from "../_shared/stripeIdempotency.ts";
+import {
+  renderPurchaseWelcomeEmail,
+  renderPaymentFailedEmail,
+  normalizeLifecycleLang,
+} from "../_shared/lifecycle-emails.ts";
+
+const APP_URL = Deno.env.get("APP_URL") || "https://useadtool.ai";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -157,6 +164,37 @@ serve(withTelemetry('stripe-webhook', async (req) => {
           stripe_customer_id: customerId,
           stripe_subscription_id: session.subscription,
         });
+
+        // === v403: Kauf-Willkommensmail (idempotent über session.id) ===
+        try {
+          const { data: prof } = await supabaseAdmin
+            .from('profiles')
+            .select('language')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const { subject, html } = renderPurchaseWelcomeEmail({
+            lang: normalizeLifecycleLang(prof?.language as string | null),
+            appUrl: APP_URL,
+            userEmail: email,
+          });
+
+          const welcomeResult = await sendEmail({
+            to: email,
+            subject,
+            html,
+            template: `purchase_welcome:${session.id}`,
+            category: 'transactional',
+            replyTo: 'info@useadtool.ai',
+          });
+          if (!welcomeResult.ok && !welcomeResult.skipped) {
+            console.error('[STRIPE-WEBHOOK] Welcome email failed:', welcomeResult.error);
+          }
+        } catch (welcomeError) {
+          console.error('[STRIPE-WEBHOOK] Welcome email error:', welcomeError);
+        }
+
+
         
         // Track referral if promo code was used
         if (session.promotion_code) {
@@ -533,6 +571,55 @@ serve(withTelemetry('stripe-webhook', async (req) => {
         // Never fail the webhook because of a receipt email
       }
     }
+
+    // === v403 Dunning: fehlgeschlagene Zahlung ===
+    if (event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object as Stripe.Invoice;
+      console.log('[STRIPE-WEBHOOK] Processing invoice.payment_failed:', invoice.id);
+      try {
+        const customerEmail = invoice.customer_email
+          || (invoice.customer_address?.email)
+          || null;
+
+        if (customerEmail) {
+          const { data: prof } = await supabaseAdmin
+            .from('profiles')
+            .select('language')
+            .eq('email', customerEmail)
+            .maybeSingle();
+
+          const attempt = invoice.attempt_count || 1;
+          const { subject, html } = renderPaymentFailedEmail({
+            lang: normalizeLifecycleLang(prof?.language as string | null),
+            appUrl: APP_URL,
+            userEmail: customerEmail,
+            hostedInvoiceUrl: invoice.hosted_invoice_url,
+          });
+
+          // Idempotent pro Rechnung UND Versuch: Stripe wiederholt automatisch,
+          // jeder neue Versuch erzeugt genau eine weitere Erinnerung.
+          const result = await sendEmail({
+            to: customerEmail,
+            subject,
+            html,
+            template: `payment_failed:${invoice.id}:${attempt}`,
+            category: 'transactional',
+            replyTo: 'info@useadtool.ai',
+          });
+          if (!result.ok && !result.skipped) {
+            console.error('[STRIPE-WEBHOOK] Dunning email failed:', result.error);
+          } else {
+            console.log('[STRIPE-WEBHOOK] Dunning email sent to', customerEmail, 'attempt', attempt);
+          }
+        } else {
+          console.warn('[STRIPE-WEBHOOK] No customer_email on failed invoice', invoice.id);
+        }
+      } catch (dunningError) {
+        console.error('[STRIPE-WEBHOOK] Dunning email error:', dunningError);
+      }
+    }
+
+
 
     return new Response(JSON.stringify({ received: true }), {
       status: 200,

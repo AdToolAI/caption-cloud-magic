@@ -85,6 +85,7 @@ const EmailPreferences = lazy(() => import("./pages/EmailPreferences"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Billing = lazy(() => import("./pages/Billing"));
+const Welcome = lazy(() => import("./pages/Welcome"));
 const Support = lazy(() => import("./pages/Support"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Legal = lazy(() => import("./pages/Legal"));
@@ -208,6 +209,8 @@ function AppLayout() {
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/billing" element={<Billing />} />
+                    <Route path="/willkommen" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
+                    <Route path="/welcome" element={<Navigate to="/willkommen" replace />} />
                     {/* /credits retired — Beta abo deckt alles ab. Media-Credits im AI Video Studio. */}
                     <Route path="/credits" element={<Navigate to="/billing" replace />} />
                     {/* Beta: single plan only — legacy Enterprise upgrade path redirects to /pricing */}

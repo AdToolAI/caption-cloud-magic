@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CancelIntentDialog } from "@/components/billing/CancelIntentDialog";
 
 interface Invoice {
   id: string;
@@ -38,6 +39,7 @@ const Billing = () => {
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const planInfo = getProductInfo(productId);
 
@@ -230,7 +232,7 @@ const Billing = () => {
                 </CardTitle>
                 <CardDescription>{t.manageDesc}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   onClick={handleOpenPortal}
                   disabled={loading}
@@ -244,7 +246,21 @@ const Billing = () => {
                   )}
                   {t.openPortal}
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  disabled={loading}
+                  onClick={() => setCancelOpen(true)}
+                  className="w-full sm:w-auto text-muted-foreground"
+                >
+                  {language === "de"
+                    ? "Abo kündigen"
+                    : language === "es"
+                    ? "Cancelar suscripción"
+                    : "Cancel subscription"}
+                </Button>
               </CardContent>
+
             </Card>
 
             {/* Invoices Table */}
@@ -315,7 +331,16 @@ const Billing = () => {
         )}
       </main>
 
+      <CancelIntentDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        language={language}
+        plan={productId || "unknown"}
+        onProceed={handleOpenPortal}
+      />
+
       <Footer />
+
     </div>
   );
 };
