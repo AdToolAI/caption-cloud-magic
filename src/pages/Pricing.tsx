@@ -221,7 +221,61 @@ const Pricing = () => {
             </div>
           )}
 
+          {/* Checkout abgebrochen — ruhige Rückkehr statt Sackgasse */}
+          {isCanceled && !isReactivation && (
+            <div className="max-w-3xl mx-auto mb-10 rounded-2xl border border-border/70 bg-card/60 backdrop-blur-sm px-6 py-6">
+              <h2 className="text-lg font-bold text-foreground mb-3">
+                {language === "de"
+                  ? "Kein Problem — nichts wurde abgebucht."
+                  : language === "es"
+                  ? "Sin problema: no se ha cobrado nada."
+                  : "No worries — nothing was charged."}
+              </h2>
+              <ul className="space-y-2 text-sm text-muted-foreground mb-5">
+                <li className="flex items-start gap-2">
+                  <Check className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                  <span>
+                    {language === "de"
+                      ? "Monatlich kündbar — keine Mindestlaufzeit, keine Kündigungsfrist."
+                      : language === "es"
+                      ? "Cancelable cada mes: sin permanencia ni preaviso."
+                      : "Cancel monthly — no minimum term, no notice period."}
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                  <span>
+                    {language === "de"
+                      ? "Ein Preis für das ganze Studio: Skript, Stimmen, Charaktere, Lip-Sync, Schnitt und Export."
+                      : language === "es"
+                      ? "Un precio para todo el estudio: guion, voces, personajes, lip-sync, montaje y exportación."
+                      : "One price for the whole studio: script, voices, characters, lip-sync, edit and export."}
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                  <span>
+                    {language === "de"
+                      ? "Deine Charaktere, Stimmen und Projekte bleiben erhalten."
+                      : language === "es"
+                      ? "Tus personajes, voces y proyectos se conservan."
+                      : "Your characters, voices and projects stay."}
+                  </span>
+                </li>
+              </ul>
+              <Button onClick={handleProCheckout} disabled={proLoading} className="font-semibold">
+                {language === "de"
+                  ? "Zurück zum Checkout"
+                  : language === "es"
+                  ? "Volver al pago"
+                  : "Back to checkout"}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          )}
+
           {couponCode && <CouponBanner code={couponCode} onRemove={clearCoupon} />}
+
 
           {/* Header */}
           <motion.div
