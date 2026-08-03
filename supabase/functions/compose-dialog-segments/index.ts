@@ -135,7 +135,7 @@ const SYNC_API_BASE = "https://api.sync.so/v2";
 // we can prove which build dispatched any given pass in <5s of SQL.
 // Bump on any dispatch-path change so production failures are
 // trivially attributable to a specific deploy.
-const COMPOSE_DIALOG_SEGMENTS_VERSION = "v283-baseline-27-07-full-composer-rollback";
+const COMPOSE_DIALOG_SEGMENTS_VERSION = "v401-july-image-path-single-face-isolation";
 
 // v249 — Slice A: surface v247 mouth-anchor preclip metrics as top-level columns
 // on `syncso_dispatch_log` so v248-Slice-4 ladder in `report-lipsync-motion-probe`
@@ -5251,7 +5251,11 @@ serve(async (req) => {
       const siblingCoords: Array<[number, number]> = [];
       for (let i = 0; i < speakers.length; i++) {
         if (i === pass.speaker_idx) continue;
-        const c = (speakers as any[])[i]?.coords;
+        // `speakers[]` contains script/character metadata, not resolved plate
+        // coordinates. Reading `speakers[i].coords` left this list empty and
+        // allowed a nominal single-face crop to include adjacent cast members.
+        // `speakerCoords[]` is the plate-native, identity-resolved authority.
+        const c = speakerCoords[i];
         if (Array.isArray(c) && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1]))) {
           siblingCoords.push([Number(c[0]), Number(c[1])]);
         }
