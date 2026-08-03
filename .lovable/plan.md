@@ -1,34 +1,43 @@
-# Stand der Lip-Sync-Pipeline im Motion Studio
+# Lip-Sync-Reparatur: tatsächliche Mundbewegung statt falschem „fertig“
 
-## Was geprüft ist
+## Belegter Befund
 
-- Der Composer-/Lip-Sync-Code trägt durchgehend den Juli-Marker `v283-baseline-27-07-full-composer-rollback`. In `compose-dialog-segments`, `sync-so-webhook`, `remotion-webhook`, `render-sync-segments-audio-mux`, `compose-video-clips`, `compose-clip-webhook`, `compose-twoshot-audio` und `lipsync-watchdog` findet sich kein `active_run_id`-, `plate_generation`- oder Enum-Guard-Rest mehr.
-- Der Datenbank-Guard `composer_scene_state_guard` protokolliert nur noch (`v400_july_baseline_observe_only`) und blockiert keinen Abschluss.
-- Die zuletzt gelaufene Szene `d7402a67…` steht sauber auf `complete / done / ready` mit finalem Clip.
+- Die untersuchte Szene `d7402a67…` wurde formal mit vier erfolgreichen Provider-Pässen abgeschlossen, visuell aber nicht korrekt.
+- Alle vier Provider-Ausgaben sind quadratische 720×720-Preclips. Pass 2–4 enthalten nahezu keine Pixelbewegung; Pass 2 und Pass 3 zeigen außerdem mehr als eine Person. Die angebliche Einzelgesicht-Isolation funktioniert damit nicht zuverlässig.
+- Der finale 1284×718-Clip ist dem Quellclip extrem ähnlich. Die Lippenbewegung aus den Pässen kommt im sichtbaren Ergebnis nicht belastbar an.
+- Der aktuelle `DialogStitchVideo` ist **nicht** 1:1 die Version vom 27.07.: 84 Zeilen unterscheiden sich, insbesondere Crop-Skalierung, Maskenkern und bewegte Crop-Pfade. Auch `compose-dialog-segments` enthält noch eine Abweichung.
+- Ein Status `done` beweist momentan nur, dass Dateien erzeugt und gemuxt wurden — nicht, dass im Zielmund Bewegung vorhanden ist.
 
-## Was noch offen ist
+## Umsetzung
 
-- Seit der letzten Reparatur (02.08., 23:37 UTC) gab es **keinen neuen Lauf**. „Läuft jetzt problemlos durch“ ist damit nicht belegt, nur plausibel.
-- Zwei Geschwisterszenen desselben Projekts (`dc220c23…`, `b88b7dac…`) endeten um 00:36 UTC mit `watchdog_never_dispatched` — sie wurden nie an die Lip-Sync-Kette übergeben. Ob das noch am alten Guard lag oder an einem eigenen Dispatch-Problem, ist unbestätigt.
-- Die neuen Zustandsmodule werden noch von Randfunktionen (`composer-cancel-scene`, `composer-hard-reset-scene`, `composer-reset-selftest`, `composer-start-scene-generation`) genutzt. Sie liegen nicht im Hauptpfad, könnten aber beim Abbrechen/Zurücksetzen einer Szene wieder abweichende Zustände schreiben.
+1. **Juli-Bildpfad vollständig wiederherstellen**
+   - `DialogStitchVideo` und `DialogTurnFaceCropVideo` exakt auf Commit `58060cffe` zurückführen.
+   - Die verbliebene Abweichung in `compose-dialog-segments` nur dort auf Juli-Parität bringen, wo sie Preclip, Timing oder Dispatch beeinflusst; den notwendigen serverseitigen Audio-Hand-off nicht blind entfernen.
+   - `render-sync-segments-audio-mux` gegen den Juli-Commit verifizieren und unverändert lassen, falls bereits identisch.
 
-## Vorgehen
+2. **Echte Einzelgesicht-Preclips erzwingen**
+   - Vor dem Provider-Dispatch jeden gerenderten Preclip prüfen: genau ein Gesicht, Zielgesicht vollständig im Bild, Mund innerhalb des sicheren Innenbereichs.
+   - Enthält ein Preclip null oder mehrere Gesichter, den Crop einmal deterministisch enger neu rendern; danach bei erneut falschem Ergebnis den Pass abbrechen und automatisch erstatten.
+   - Keine mehrgesichtigen 720×720-Clips mehr als erfolgreichen Einzelsprecher-Input akzeptieren.
 
-1. **Verifikationslauf statt weiterer Codeänderung**
-   - Ein 4-Sprecher-Projekt neu erzeugen und den kompletten Weg beobachten: Plate → Audio → 4/4 Sync.so → Audio-Mux → Callback → `complete`.
-   - Parallel Logs von `compose-dialog-segments`, `sync-so-webhook`, `remotion-webhook` und `lipsync-watchdog` mitlesen.
+3. **Qualität vor `done` prüfen**
+   - Für jeden Provider-Output die Mundregion über mehrere Frames mit dem Input vergleichen.
+   - Nur wenn im Zielmund zeitliche Veränderung gegenüber dem Input nachweisbar ist, darf der Pass `done` werden.
+   - Statische oder praktisch unveränderte Outputs als `provider_passthrough` behandeln, Szene verständlich fehlschlagen lassen und Credits idempotent erstatten.
 
-2. **`watchdog_never_dispatched` klären**
-   - Die beiden betroffenen Szenen und die Watchdog-Logs des Zeitfensters auswerten.
-   - Nur falls sich ein echter Dispatch-Fehler zeigt: gezielt die Übergabe von Szene 2..n an `compose-dialog-segments` reparieren, ohne neue Gates einzuführen.
+4. **Finalen Stitch verifizieren**
+   - Nach dem Mux dieselben Sprecher-Zeitfenster im finalen Vollbild prüfen.
+   - Sicherstellen, dass der aktive 720×720-Pass exakt in seinen ursprünglichen Plate-Crop zurückprojiziert wird und der Mund nicht durch die Maske oder die Quellplatte verdeckt bleibt.
+   - Ein technisch fertiger Render ohne nachweisbare finale Mundbewegung darf nicht als `ready` erscheinen.
 
-3. **Randfunktionen angleichen**
-   - Prüfen, ob Abbrechen/Hard-Reset einen Zustand hinterlässt, den die Juli-Kette nicht wieder aufnehmen kann.
-   - Falls ja: diese Funktionen so anpassen, dass sie zusätzlich die Legacy-Felder konsistent zurücksetzen.
+5. **Kontrolllauf und Nachweis**
+   - Frische 4-Sprecher-Szene durchlaufen lassen.
+   - Für jeden Sprecher Input-Preclip, Provider-Output und finalen Zeitabschnitt als Framefolge vergleichen.
+   - Erst freigeben, wenn alle vier Sprecher ausschließlich in ihren Dialogfenstern sichtbar den Mund bewegen; danach die verifizierte Baseline dokumentieren.
 
-4. **Ergebnis festhalten**
-   - Nach grünem Lauf `docs/lipsync-baseline-v283.md` um das Verifikationsdatum ergänzen.
+## Technische Leitplanken
 
-## Kurzantwort
-
-Der Code und die Datenbank stehen auf dem Juli-Stand, und der letzte Lauf ist vollständig durchgelaufen. Garantieren lässt sich der störungsfreie Ablauf aber erst nach einem frischen 4-Sprecher-Lauf — den sollten wir als nächsten Schritt machen.
+- Keine neuen Identitäts-, State-Machine- oder Run-Guard-Umbauten.
+- Keine Reaktivierung der nach dem 27.07. eingeführten bewegten Crop-Pfade.
+- Qualitätsgate misst die Mundregion, nicht allgemeine Körper- oder Kamerabewegung.
+- Fehlerpfade bleiben mit der bestehenden automatischen, idempotenten Rückerstattung verbunden.
