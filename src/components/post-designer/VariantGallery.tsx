@@ -8,13 +8,16 @@ interface VariantGalleryProps {
   variants: PostDesign[];
   loading?: boolean;
   stage?: string;
+  /** KI-Motiv rendert noch — Bildebenen zeigen solange einen Ladezustand. */
+  imagePending?: boolean;
   onPick: (design: PostDesign) => void;
   onShuffle?: (index: number) => void;
 }
 
 const STAGES = ["Motiv", "Typografie", "Marke", "Feinschliff"];
 
-export function VariantGallery({ variants, loading, stage, onPick, onShuffle }: VariantGalleryProps) {
+export function VariantGallery({ variants, loading, stage, imagePending, onPick, onShuffle }: VariantGalleryProps) {
+
   if (loading) {
     return (
       <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
