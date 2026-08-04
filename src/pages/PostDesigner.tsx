@@ -442,7 +442,7 @@ export default function PostDesigner() {
             <div className="space-y-3 text-center">
               <h2 className="font-display text-4xl tracking-tight">Ein Briefing. Ein fertiger Post.</h2>
               <p className="text-muted-foreground">
-                Beschreibe kurz, worum es geht — du bekommst vier professionell gesetzte Layouts, die du frei bearbeitest.
+                Beschreibe kurz, worum es geht — du bekommst acht professionell gesetzte Layouts inklusive KI-Motiv, alles frei bearbeitbar.
               </p>
             </div>
 
