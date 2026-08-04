@@ -680,6 +680,13 @@ export default function PostDesigner() {
                 {imageBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
                 Motiv neu denken
               </Button>
+              {imageBusy && (
+                <p className="text-[11px] text-muted-foreground">Motiv wird erzeugt … es setzt sich automatisch ein.</p>
+              )}
+              {!imageBusy && imageError && (
+                <p className="text-[11px] text-destructive">{imageError}</p>
+              )}
+
               <Button variant="outline" size="sm" className="w-full" onClick={handleAddCarouselSlides} disabled={carouselLoading}>
                 {carouselLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
                 Karussell ergänzen
