@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FOUNDERS_MAX_SLOTS } from "@/config/stripe";
+import { useFounderStatus } from "@/hooks/useFounderStatus";
 
 interface Props {
   className?: string;
@@ -10,9 +11,13 @@ interface Props {
 /**
  * Live counter showing how many of the first 1000 Founders slots are still available.
  * Founders pay the same €14.99 subscription — their benefit is 20% off every AI credit purchase for 24 months.
+ *
+ * ANONYMITY CONTRACT: hidden for users who already hold a founder slot — the
+ * counter combined with their own join time would let them infer their position.
  */
 export const FoundersSlotBadge = ({ className = "" }: Props) => {
   const [claimed, setClaimed] = useState<number | null>(null);
+  const founder = useFounderStatus();
 
   useEffect(() => {
     let cancelled = false;
