@@ -10679,6 +10679,45 @@ export type Database = {
         }
         Relationships: []
       }
+      post_designs: {
+        Row: {
+          brand_kit_id: string | null
+          created_at: string
+          design: Json
+          format: string
+          id: string
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          created_at?: string
+          design: Json
+          format?: string
+          id?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          brand_kit_id?: string | null
+          created_at?: string
+          design?: Json
+          format?: string
+          id?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
       post_drafts: {
         Row: {
           ai_output_json: Json | null
