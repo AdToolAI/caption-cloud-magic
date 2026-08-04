@@ -195,7 +195,7 @@ function LayerView({ layer, design, pending }: { layer: Layer; design: PostDesig
  * Derselbe Pfad bedient Vorschau, Varianten-Galerie und Export (WYSIWYG).
  */
 export const SlideRenderer = forwardRef<HTMLDivElement, SlideRendererProps>(
-  ({ slide, design, size, className }, ref) => {
+  ({ slide, design, size, className, pendingImage }, ref) => {
     const scale = size / CANVAS_SIZE;
     return (
       <div style={{ width: size, height: size, overflow: "hidden" }} className={className}>
