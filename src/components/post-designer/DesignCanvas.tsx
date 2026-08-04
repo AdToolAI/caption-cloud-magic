@@ -39,6 +39,8 @@ export function DesignCanvas({
   onCommit,
   showSafeZone = true,
   exportRef,
+  pendingImage,
+
 }: DesignCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
