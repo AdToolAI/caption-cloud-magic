@@ -90,21 +90,8 @@ async function rehostAndPersist(params: {
           })
           .eq("id", generationId);
 
-        await supabaseAdmin.from("video_creations").insert({
-          user_id: userId,
-          template_id: null,
-          output_url: permanentUrl,
-          status: "completed",
-          metadata: {
-            ai_generation_id: generationId,
-            model,
-            prompt,
-            aspect_ratio: aspectRatio,
-            duration_seconds: duration,
-            source: "pika-2-2",
-          },
-          credits_used: 0,
-        });
+        // Mediathek-Eintrag wird zentral vom DB-Trigger auto_save_ai_video_to_library
+        // erzeugt (idempotent). Kein zweiter Insert hier — sonst Duplikate.
 
         console.log(`[generate-pika-video] ✅ Completed ${generationId}`);
         return;
