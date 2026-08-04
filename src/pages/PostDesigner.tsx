@@ -138,6 +138,55 @@ export default function PostDesigner() {
     [activeSlide, updateSlide],
   );
 
+  const buildVariants = useCallback(
+    (
+      copy: CopyPayload,
+      templates: typeof DESIGN_TEMPLATES,
+      img: string | null,
+      mood: MoodId,
+      copyOffset = 0,
+    ): PostDesign[] => {
+      const active = MOODS.find((m) => m.id === mood) ?? MOODS[0];
+      return templates.map((template, i) => {
+        const v = copy.variants?.[(i + copyOffset) % Math.max(1, copy.variants?.length ?? 1)];
+        const base = template.build({ image: img });
+        const filled = fillCopy(base, {
+          headline: v?.headline || copy.headline,
+          subline: v?.subline || copy.subline,
+          cta: copy.cta,
+          badge: copy.badge,
+        });
+        const branded = applyBrandKit(
+          { ...filled, variantName: v?.name || template.name, title: copy.headline?.slice(0, 60) || "Neuer Post" },
+          brandKit,
+        );
+        return applyMood(branded, active);
+      });
+    },
+    [brandKit],
+  );
+
+  /** KI-Motiv über das Picture Studio erzeugen. */
+  const generateImage = useCallback(async (prompt: string): Promise<string | null> => {
+    if (!prompt.trim()) return null;
+    setImageBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-studio-image", {
+        body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast" },
+      });
+      if (error) throw error;
+      if (data?.ok === false || data?.error) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
+      const url: string | undefined = data?.image?.url ?? data?.image;
+      if (!url) throw new Error("Kein Bild erhalten");
+      return url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen");
+      return null;
+    } finally {
+      setImageBusy(false);
+    }
+  }, []);
+
   const handleGenerate = async () => {
     if (!brief.trim()) {
       toast.error("Bitte kurz beschreiben, worum es geht");
@@ -146,37 +195,78 @@ export default function PostDesigner() {
     setGenerating(true);
     setStage("variants");
     setVariants([]);
+    setVariantOffset(0);
     try {
       const { data, error } = await supabase.functions.invoke("generate-post-design", {
         body: { brief, platform, language, tone, brandName: brandKit?.name ?? "" },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      const copy = data.copy as {
-        headline: string; subline: string; cta: string; badge: string; caption: string;
-        variants: { name: string; headline: string; subline: string }[];
-      };
+      const copy = data.copy as CopyPayload;
+      copyRef.current = copy;
       setCaption(copy.caption ?? "");
-      const templates = pickVariantTemplates();
-      const built = templates.map((template, i) => {
-        const v = copy.variants?.[i];
-        const base = template.build({ image });
-        const filled = fillCopy(base, {
-          headline: v?.headline || copy.headline,
-          subline: v?.subline || copy.subline,
-          cta: copy.cta,
-          badge: copy.badge,
-        });
-        return applyBrandKit({ ...filled, variantName: v?.name || template.name, title: copy.headline?.slice(0, 60) || "Neuer Post" }, brandKit);
-      });
-      setVariants(built);
+
+      const templates = pickVariants(platform, tone, 8, 0);
+      templatesRef.current = templates;
+      const startImage = imageMode === "none" ? null : image;
+      setVariants(buildVariants(copy, templates, startImage, moodId));
+      setGenerating(false);
+
+      if (imageMode === "ai") {
+        const url = await generateImage(copy.imagePrompt || brief);
+        if (url) {
+          setImage(url);
+          setVariants((prev) => prev.map((v) => ({ ...v, slides: v.slides.map((s) => setSlideImage(s, url)) })));
+        }
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Generierung fehlgeschlagen");
       setStage("brief");
-    } finally {
       setGenerating(false);
     }
   };
+
+  const handleMoreVariants = () => {
+    const copy = copyRef.current;
+    if (!copy) return;
+    const next = variantOffset + 4;
+    const templates = pickVariants(platform, tone, 4, next + 4);
+    templatesRef.current = [...templatesRef.current, ...templates];
+    setVariants((prev) => [...prev, ...buildVariants(copy, templates, image, moodId, next)]);
+    setVariantOffset(next);
+  };
+
+  const handleShuffleVariant = (index: number) => {
+    const copy = copyRef.current;
+    const template = templatesRef.current[index];
+    if (!copy || !template) return;
+    const shift = 1 + Math.floor(Math.random() * Math.max(1, (copy.variants?.length ?? 1) - 1));
+    const [rebuilt] = buildVariants(copy, [template], image, moodId, index + shift);
+    setVariants((prev) => prev.map((v, i) => (i === index ? rebuilt : v)));
+  };
+
+  const handleMoodChange = (next: MoodId) => {
+    setMoodId(next);
+    const copy = copyRef.current;
+    if (!copy || !templatesRef.current.length) return;
+    setVariants(buildVariants(copy, templatesRef.current, image, next));
+  };
+
+  /** Alternatives Motiv zum gleichen Briefing erzeugen. */
+  const handleRethinkImage = async () => {
+    const prompt = copyRef.current?.imagePrompt || brief;
+    const angles = [
+      "different camera angle, wider framing",
+      "different mood and lighting, closer framing",
+      "alternative composition, softer light",
+    ];
+    const url = await generateImage(`${prompt}. ${angles[Math.floor(Math.random() * angles.length)]}`);
+    if (!url) return;
+    setImage(url);
+    updateSlide(activeSlide, (s) => setSlideImage(s, url));
+    toast.success("Neues Motiv gesetzt");
+  };
+
 
   const openDesign = (next: PostDesign) => {
     setDesign(next);
