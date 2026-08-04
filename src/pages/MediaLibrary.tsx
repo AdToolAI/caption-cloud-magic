@@ -48,7 +48,14 @@ interface NormalizedMediaItem {
   fileSizeMb?: number;
   storageLocation?: 'local' | 'cloud';
   driveFileId?: string;
+  /** Motion-Studio Szenen-Gruppierung */
+  sceneId?: string;
+  isSuperseded?: boolean;
+  olderVersionCount?: number;
 }
+
+/** Interne Pipeline-Artefakte (Preclips, Dialog-Stitch-Zwischenschritte) gehören nicht in die Mediathek. */
+const INTERNAL_ARTIFACT_PATTERN = /dialog-pass-preclip|dialog-turn-preclip|dialog-stitch/i;
 
 export default function MediaLibrary() {
   const { t } = useTranslation();
@@ -70,6 +77,7 @@ export default function MediaLibrary() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [studioImageCount, setStudioImageCount] = useState(0);
   const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
+  const [expandedScenes, setExpandedScenes] = useState<string[]>([]);
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
 
   // Pagination: how many cards we actually render
@@ -248,7 +256,7 @@ export default function MediaLibrary() {
   useEffect(() => {
     applyFilters();
     setVisibleCount(PAGE_SIZE);
-  }, [media, searchQuery, filterType, categoryFilter, cloudFiles]);
+  }, [media, searchQuery, filterType, categoryFilter, cloudFiles, expandedScenes]);
 
   // Auto-load cloud files when cloud tab is selected
   useEffect(() => {
@@ -340,7 +348,12 @@ export default function MediaLibrary() {
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
-      let normalizedVideoCreations: NormalizedMediaItem[] = (videoCreations || []).map(video => {
+      // Interne Pipeline-Artefakte (Lip-Sync-Preclips etc.) ausblenden
+      const userFacingCreations = (videoCreations || []).filter(
+        (v: any) => !INTERNAL_ARTIFACT_PATTERN.test(v.output_url || '')
+      );
+
+      let normalizedVideoCreations: NormalizedMediaItem[] = userFacingCreations.map(video => {
         // Check if it's a Sora-2-AI, Director's Cut Enhancement, Director's Cut, or Universal Creator video
         const metadata = video.metadata as any;
         const isSoraAI = metadata?.source === 'sora-2-ai';
@@ -384,8 +397,24 @@ export default function MediaLibrary() {
           url: video.output_url || '',
           thumbUrl: video.output_url || '',
           createdAt: video.created_at,
+          sceneId: isMotionStudioClip ? (metadata?.scene_id as string | undefined) : undefined,
+          isSuperseded: isMotionStudioClip ? isSuperseded : false,
         };
       });
+
+      // Motion-Studio: pro Szene nur die aktuellste Version als Hauptkarte,
+      // ältere Versionen bleiben erhalten und sind aufklappbar.
+      const versionCounts = new Map<string, number>();
+      normalizedVideoCreations.forEach(item => {
+        if (item.sceneId && item.isSuperseded) {
+          versionCounts.set(item.sceneId, (versionCounts.get(item.sceneId) || 0) + 1);
+        }
+      });
+      normalizedVideoCreations = normalizedVideoCreations.map(item =>
+        item.sceneId && !item.isSuperseded
+          ? { ...item, olderVersionCount: versionCounts.get(item.sceneId) || 0 }
+          : item
+      );
 
       // Inject demo video if user has no video creations
       if (normalizedVideoCreations.length === 0) {
@@ -482,6 +511,11 @@ export default function MediaLibrary() {
       // "all" tab: only show videos, images are only in Albums
       filtered = filtered.filter(item => item.type === 'video');
     }
+
+    // Motion-Studio: ältere Szenenversionen nur zeigen, wenn aufgeklappt
+    filtered = filtered.filter(
+      item => !item.isSuperseded || (item.sceneId ? expandedScenes.includes(item.sceneId) : true)
+    );
 
     // Search filter
     if (searchQuery) {
@@ -1159,6 +1193,32 @@ export default function MediaLibrary() {
                 <div className="absolute top-2 right-2 z-10">
                   {getSourceBadge(item.source)}
                 </div>
+
+                {/* Motion-Studio Versionen */}
+                {item.sceneId && !!item.olderVersionCount && (
+                  <button
+                    type="button"
+                    className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur hover:bg-background"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedScenes(prev =>
+                        prev.includes(item.sceneId!)
+                          ? prev.filter(id => id !== item.sceneId)
+                          : [...prev, item.sceneId!]
+                      );
+                    }}
+                  >
+                    {expandedScenes.includes(item.sceneId)
+                      ? 'Ältere Versionen ausblenden'
+                      : `+${item.olderVersionCount} ältere Version${item.olderVersionCount > 1 ? 'en' : ''}`}
+                  </button>
+                )}
+                {item.isSuperseded && (
+                  <div className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur">
+                    Ältere Version
+                  </div>
+                )}
+
 
                 {item.type === 'video' && item.url ? (
                   <LazyVideoThumb
