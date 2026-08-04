@@ -1,27 +1,50 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import type { TextOverlay } from '@/types/directors-cut';
+import { isGraphicOverlay } from '@/lib/directors-cut/overlayModel';
+import { OverlayGraphic } from '@/remotion/components/OverlayGraphic';
 
-interface TextOverlayData {
-  id: string;
-  text: string;
-  animation: 'fadeIn' | 'scaleUp' | 'bounce' | 'typewriter' | 'highlight' | 'glitch';
-  position: string;
-  customPosition?: { x: number; y: number };
-  startTime: number;
-  style: {
-    fontSize?: string;
-    color?: string;
-    backgroundColor?: string;
-    shadow?: boolean;
-    fontFamily?: string;
-    fontWeight?: string;
-  };
-}
+type TextOverlayData = TextOverlay;
 
 interface NativeTextOverlayRendererProps {
   overlay: TextOverlayData;
   displayTime: number;
   isPlaying?: boolean;
 }
+
+/**
+ * Grafik-Overlays (Banner, Lower Third, Badge …) laufen über denselben
+ * `OverlayGraphic`, den auch der Remotion-Export benutzt — WYSIWYG-Parität.
+ * Reine Alt-Text-Overlays behalten den bewährten CSS-Pfad darunter.
+ */
+const GraphicOverlayPreview: React.FC<NativeTextOverlayRendererProps> = ({ overlay, displayTime }) => {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(1080);
+
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const measure = () => setWidth(el.clientWidth || 1080);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const duration =
+    overlay.endTime != null ? Math.max(0.1, overlay.endTime - overlay.startTime) : Number.POSITIVE_INFINITY;
+
+  return (
+    <div ref={hostRef} className="absolute inset-0 pointer-events-none z-[15]">
+      <OverlayGraphic
+        overlay={overlay}
+        t={Math.max(0, displayTime - overlay.startTime)}
+        duration={duration}
+        canvasWidth={width}
+      />
+    </div>
+  );
+};
+
 
 const FONT_SIZE_MAP: Record<string, string> = {
   sm: '24px',
@@ -93,7 +116,7 @@ const ANIM_DURATIONS: Record<string, number> = {
 
 type Phase = 'waiting' | 'animating' | 'settled';
 
-export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps> = ({ overlay, displayTime, isPlaying = false }) => {
+const LegacyTextOverlayPreview: React.FC<NativeTextOverlayRendererProps> = ({ overlay, displayTime, isPlaying = false }) => {
   ensureKeyframes();
 
   const [phase, setPhase] = useState<Phase>('waiting');
@@ -265,4 +288,11 @@ export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps>
       </div>
     </div>
   );
+};
+
+export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps> = (props) => {
+  if (isGraphicOverlay(props.overlay)) {
+    return <GraphicOverlayPreview {...props} />;
+  }
+  return <LegacyTextOverlayPreview {...props} />;
 };

@@ -23,25 +23,77 @@ import {
 // Font: Inter loaded via native FontFace API
 const fontFamily = 'Inter';
 
-// Text Overlay Schema
+// Overlay Schema (v407) — Text plus Grafik-Bausteine.
+// Alle neuen Felder sind optional, damit ältere Payloads valide bleiben.
+const OverlayAnimationEnum = z.enum([
+  'none',
+  'fadeIn',
+  'scaleUp',
+  'bounce',
+  'typewriter',
+  'highlight',
+  'glitch',
+  'slideLeft',
+  'slideRight',
+  'slideUp',
+  'slideDown',
+  'wipe',
+  'pop',
+  'blurIn',
+  'stagger',
+  'tickerLoop',
+]);
+
 const TextOverlayStyleSchema = z.object({
   fontSize: z.enum(['sm', 'md', 'lg', 'xl']),
   color: z.string(),
   backgroundColor: z.string(),
   shadow: z.boolean(),
   fontFamily: z.string(),
+  // v407
+  fontSizeRel: z.number().optional(),
+  fontWeight: z.number().optional(),
+  uppercase: z.boolean().optional(),
+  letterSpacing: z.number().optional(),
+  lineHeight: z.number().optional(),
+  align: z.enum(['left', 'center', 'right']).optional(),
+  fill: z.string().optional(),
+  gradient: z.tuple([z.string(), z.string()]).nullable().optional(),
+  borderColor: z.string().optional(),
+  borderWidth: z.number().optional(),
+  radius: z.number().optional(),
+  opacity: z.number().optional(),
+  rotation: z.number().optional(),
+  accentColor: z.string().optional(),
+  padding: z.number().optional(),
 });
 
-const TextOverlaySchema = z.object({
+export const TextOverlaySchema = z.object({
   id: z.string(),
   text: z.string(),
-  animation: z.enum(['fadeIn', 'scaleUp', 'bounce', 'typewriter', 'highlight', 'glitch']),
+  animation: OverlayAnimationEnum,
   position: z.enum(['top', 'center', 'bottom', 'bottomLeft', 'bottomRight', 'topLeft', 'topRight', 'centerLeft', 'centerRight', 'custom']),
   customPosition: z.object({ x: z.number(), y: z.number() }).optional(),
   startTime: z.number(),
   endTime: z.number().nullable(),
   style: TextOverlayStyleSchema,
+  // v407
+  kind: z
+    .enum(['text', 'lowerThird', 'banner', 'badge', 'card', 'cta', 'ticker', 'logo', 'callout', 'quote', 'progress'])
+    .optional(),
+  box: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).optional(),
+  enter: OverlayAnimationEnum.optional(),
+  exit: OverlayAnimationEnum.optional(),
+  slots: z
+    .object({
+      title: z.string().optional(),
+      subtitle: z.string().optional(),
+      badge: z.string().optional(),
+      imageUrl: z.string().nullable().optional(),
+    })
+    .optional(),
 });
+
 
 // Transition Schema
 const TransitionSchema = z.object({

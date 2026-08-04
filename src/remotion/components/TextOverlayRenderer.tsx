@@ -1,23 +1,16 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig, Easing } from 'remotion';
 import { safeInterpolate, safeSpring as spring } from '../utils/safeInterpolate';
+import type { TextOverlay } from '@/types/directors-cut';
+import { isGraphicOverlay } from '@/lib/directors-cut/overlayModel';
+import { OverlayElementRenderer } from './OverlayElementRenderer';
 
-export interface TextOverlayProps {
-  id: string;
-  text: string;
-  animation: 'fadeIn' | 'scaleUp' | 'bounce' | 'typewriter' | 'highlight' | 'glitch';
-  position: 'top' | 'center' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight' | 'centerLeft' | 'centerRight' | 'custom';
-  customPosition?: { x: number; y: number };
-  startTime: number;
-  endTime: number | null;
-  style: {
-    fontSize: 'sm' | 'md' | 'lg' | 'xl';
-    color: string;
-    backgroundColor: string;
-    shadow: boolean;
-    fontFamily: string;
-  };
-}
+/**
+ * Kompatibilitätstyp: entspricht dem Alt-Text-Overlay. Neue Bausteine
+ * (Banner, Lower Third, Badge …) laufen über `OverlayElementRenderer`.
+ */
+export type TextOverlayProps = TextOverlay;
+
 
 const POSITION_STYLES: Record<string, React.CSSProperties> = {
   top: { top: '10%', left: '50%', transform: 'translateX(-50%)' },
@@ -38,7 +31,7 @@ const FONT_SIZES: Record<string, string> = {
   xl: '72px',
 };
 
-export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ overlay }) => {
+const LegacyTextOverlay: React.FC<{ overlay: TextOverlayProps }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -158,4 +151,16 @@ export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ o
       )}
     </div>
   );
+};
+
+/**
+ * Einstiegspunkt für alle Overlays im Export. Alt-Text-Overlays behalten
+ * exakt den bisherigen Renderpfad; Grafik-Bausteine gehen an den
+ * geteilten Overlay-Renderer.
+ */
+export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ overlay }) => {
+  if (isGraphicOverlay(overlay)) {
+    return <OverlayElementRenderer overlay={overlay} />;
+  }
+  return <LegacyTextOverlay overlay={overlay} />;
 };
