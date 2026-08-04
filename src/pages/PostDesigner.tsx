@@ -97,6 +97,10 @@ export default function PostDesigner() {
   const [caption, setCaption] = useState("");
   const [imageMode, setImageMode] = useState<ImageMode>("ai");
   const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  /** true, sobald der Nutzer selbst ein Bild gesetzt hat — dann kein Auto-Überschreiben. */
+  const userImageRef = useRef(false);
+
   const [moodId, setMoodId] = useState<MoodId>("brand");
   const [variantOffset, setVariantOffset] = useState(0);
   const copyRef = useRef<CopyPayload | null>(null);
