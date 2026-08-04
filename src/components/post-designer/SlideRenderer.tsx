@@ -121,35 +121,52 @@ function LayerView({
     const fontFamily = FONT_STACKS[l.font](design.fonts);
     const fontSize = fitTextSize(l, fontFamily);
     return (
-      <div
-        style={{
-          ...box,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-start",
-          alignItems: l.align === "center" ? "center" : l.align === "right" ? "flex-end" : "flex-start",
-          textAlign: l.align,
-          color: l.color,
-          fontFamily,
-          fontSize,
-          fontWeight: l.weight,
-          lineHeight: l.lineHeight ?? 1.15,
-          letterSpacing: `${(l.letterSpacing ?? 0) * fontSize}px`,
-          textTransform: l.uppercase ? "uppercase" : "none",
-          textShadow: l.shadow ? "0 2px 24px rgba(0,0,0,0.45)" : "none",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          overflow: "hidden",
-        }}
-      >
-        {l.highlight ? (
-          <span style={{ background: l.highlight, padding: "0.05em 0.2em", borderRadius: 8 }}>{l.text}</span>
-        ) : (
-          l.text
+      <>
+        {softScrim && (
+          <div
+            style={{
+              position: "absolute",
+              left: `${Math.max(0, l.x - 0.06) * 100}%`,
+              top: `${Math.max(0, (yOverride ?? l.y) - 0.05) * 100}%`,
+              width: `${Math.min(1, l.w + 0.12) * 100}%`,
+              height: `${Math.min(1, l.h + 0.1) * 100}%`,
+              background:
+                "radial-gradient(ellipse at center, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.22) 55%, rgba(0,0,0,0) 78%)",
+              pointerEvents: "none",
+            }}
+          />
         )}
-      </div>
+        <div
+          style={{
+            ...box,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-start",
+            alignItems: l.align === "center" ? "center" : l.align === "right" ? "flex-end" : "flex-start",
+            textAlign: l.align,
+            color: l.color,
+            fontFamily,
+            fontSize,
+            fontWeight: l.weight,
+            lineHeight: l.lineHeight ?? 1.15,
+            letterSpacing: `${(l.letterSpacing ?? 0) * fontSize}px`,
+            textTransform: l.uppercase ? "uppercase" : "none",
+            textShadow: l.shadow ? "0 2px 24px rgba(0,0,0,0.45)" : "none",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            overflow: "hidden",
+          }}
+        >
+          {l.highlight ? (
+            <span style={{ background: l.highlight, padding: "0.05em 0.2em", borderRadius: 8 }}>{l.text}</span>
+          ) : (
+            l.text
+          )}
+        </div>
+      </>
     );
   }
+
 
   if (layer.type === "badge") {
     const l = layer as BadgeLayer;
