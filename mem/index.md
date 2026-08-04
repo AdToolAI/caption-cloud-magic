@@ -37,6 +37,7 @@ Updated: today
 - **Director's Cut Export**: Hard-crop for burned-in subtitles. WYSIWYG parity between Studio state and snake_case export payload.
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
+- **Founders-Anonymität**: Nie Platznummer/Position/Rang/Beitrittsdatum eines Gründers anzeigen — nur Restlaufzeit. Siehe [Founders Circle UI](mem://features/founders-circle-ui).
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
 - **Lip-Sync Sync.so Compliance**: Never send undocumented `segments_secs`; gate silent speaker audio before Sync.so dispatch.
 - **Lip-Sync Unified Pipeline (v60+v61+v62+v64+v129.29+v130+v140)**: Every dialog scene uses the chained per-speaker Sync.so pipeline. **`sync-3` is the ONLY model for dialog lip-sync**; `lipsync-2`/`lipsync-2-pro` disabled. **v140 (2026-06-20)**: final Sync.so wire ASD is canonicalized exactly once immediately before fetch; no post-payload ASD mutations. Valid shapes only: auto, flat `[x,y]`, bbox_url, bbox_inline.
