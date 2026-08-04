@@ -31,7 +31,7 @@ const FONT_SIZES: Record<string, string> = {
   xl: '72px',
 };
 
-export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ overlay }) => {
+const LegacyTextOverlay: React.FC<{ overlay: TextOverlayProps }> = ({ overlay }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
