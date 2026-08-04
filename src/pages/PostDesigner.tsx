@@ -260,7 +260,7 @@ export default function PostDesigner() {
         user_id: user.id,
         title: design.title || "Neuer Post",
         format: design.format,
-        design: design as unknown as Record<string, unknown>,
+        design: JSON.parse(JSON.stringify(design)),
         brand_kit_id: (brandKit?.id as string) ?? null,
       };
       if (designId) {
