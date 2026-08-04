@@ -289,3 +289,10 @@ const LegacyTextOverlayPreview: React.FC<NativeTextOverlayRendererProps> = ({ ov
     </div>
   );
 };
+
+export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps> = (props) => {
+  if (isGraphicOverlay(props.overlay)) {
+    return <GraphicOverlayPreview {...props} />;
+  }
+  return <LegacyTextOverlayPreview {...props} />;
+};
