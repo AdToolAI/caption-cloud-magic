@@ -116,7 +116,7 @@ const ANIM_DURATIONS: Record<string, number> = {
 
 type Phase = 'waiting' | 'animating' | 'settled';
 
-export const NativeTextOverlayRenderer: React.FC<NativeTextOverlayRendererProps> = ({ overlay, displayTime, isPlaying = false }) => {
+const LegacyTextOverlayPreview: React.FC<NativeTextOverlayRendererProps> = ({ overlay, displayTime, isPlaying = false }) => {
   ensureKeyframes();
 
   const [phase, setPhase] = useState<Phase>('waiting');
