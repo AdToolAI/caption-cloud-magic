@@ -152,3 +152,15 @@ const LegacyTextOverlay: React.FC<{ overlay: TextOverlayProps }> = ({ overlay })
     </div>
   );
 };
+
+/**
+ * Einstiegspunkt für alle Overlays im Export. Alt-Text-Overlays behalten
+ * exakt den bisherigen Renderpfad; Grafik-Bausteine gehen an den
+ * geteilten Overlay-Renderer.
+ */
+export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ overlay }) => {
+  if (isGraphicOverlay(overlay)) {
+    return <OverlayElementRenderer overlay={overlay} />;
+  }
+  return <LegacyTextOverlay overlay={overlay} />;
+};
