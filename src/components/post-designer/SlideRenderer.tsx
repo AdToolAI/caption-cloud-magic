@@ -214,7 +214,7 @@ export const SlideRenderer = forwardRef<HTMLDivElement, SlideRendererProps>(
           }}
         >
           {slide.layers.map((layer) => (
-            <LayerView key={layer.id} layer={layer} design={design} />
+            <LayerView key={layer.id} layer={layer} design={design} pending={pendingImage} />
           ))}
         </div>
       </div>
