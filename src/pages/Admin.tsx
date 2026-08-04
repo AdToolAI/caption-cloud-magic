@@ -15,6 +15,8 @@ import { MarketplaceReviewPanel } from '@/components/admin/MarketplaceReviewPane
 import { CharacterMarketplaceReviewPanel } from '@/components/admin/CharacterMarketplaceReviewPanel';
 import { BetaHealth } from '@/components/admin/BetaHealth';
 import { RenderLoadWidget } from '@/components/admin/RenderLoadWidget';
+import { LaunchRadarCard } from '@/components/admin/LaunchRadarCard';
+
 import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles, Zap } from 'lucide-react';
 
 export default function Admin() {
