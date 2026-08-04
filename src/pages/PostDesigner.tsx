@@ -404,6 +404,7 @@ export default function PostDesigner() {
   };
 
   const handlePickImage = (url: string) => {
+    userImageRef.current = true;
     if (imageDialog === "brief") {
       setImage(url);
       return;
@@ -414,6 +415,7 @@ export default function PostDesigner() {
     }
     updateSlide(activeSlide, (s) => setSlideImage(s, url));
   };
+
 
   return (
     <div className="min-h-screen bg-background">
