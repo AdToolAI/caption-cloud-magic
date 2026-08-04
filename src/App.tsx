@@ -266,6 +266,8 @@ function AppLayout() {
                     <Route path="/brand-kit" element={<BrandKit />} />
                     <Route path="/carousel" element={<Carousel />} />
                     <Route path="/ai-post-generator" element={<AIPostGenerator />} />
+                    <Route path="/post-designer" element={<PostDesigner />} />
+
            <Route path="/background-replacer" element={<Navigate to="/picture-studio?tab=background" replace />} />
            <Route path="/picture-studio" element={<PictureStudio />} />
           <Route path="/trend-radar" element={<TrendRadar />} />
