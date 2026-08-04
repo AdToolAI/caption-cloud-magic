@@ -13,7 +13,10 @@ interface DesignCanvasProps {
   onCommit: () => void;
   showSafeZone?: boolean;
   exportRef?: React.RefObject<HTMLDivElement>;
+  /** KI-Motiv rendert noch. */
+  pendingImage?: boolean;
 }
+
 
 type DragMode = "move" | "resize" | null;
 
