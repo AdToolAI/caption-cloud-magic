@@ -31,7 +31,9 @@ export async function sendAdminEmail(opts: {
       html: opts.html,
       text: opts.text ?? opts.subject,
       purpose: "transactional",
+      idempotency_key: messageId,
       label: opts.label,
+
       queued_at: new Date().toISOString(),
     },
   });
