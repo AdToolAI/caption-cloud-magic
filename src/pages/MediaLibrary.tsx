@@ -512,6 +512,11 @@ export default function MediaLibrary() {
       filtered = filtered.filter(item => item.type === 'video');
     }
 
+    // Motion-Studio: ältere Szenenversionen nur zeigen, wenn aufgeklappt
+    filtered = filtered.filter(
+      item => !item.isSuperseded || (item.sceneId ? expandedScenes.includes(item.sceneId) : true)
+    );
+
     // Search filter
     if (searchQuery) {
       filtered = filtered.filter(item => 
