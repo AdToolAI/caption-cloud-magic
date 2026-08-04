@@ -379,7 +379,6 @@ export function TextOverlayEditor2028({
   const [hoveredAnimation, setHoveredAnimation] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
 
-  const selectedOverlay = overlays.find(o => o.id === selectedOverlayId);
 
   const [showLibrary, setShowLibrary] = useState(true);
   const { data: brandKit } = useActiveBrandKit();
