@@ -7,6 +7,7 @@ import { SEO } from "@/components/SEO";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
+import { FounderStatusCard } from "@/components/founders/FounderStatusCard";
 
 const copy = {
   de: {
