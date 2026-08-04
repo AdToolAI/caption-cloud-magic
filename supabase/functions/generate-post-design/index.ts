@@ -8,6 +8,7 @@ interface DesignCopy {
   variants: { name: string; headline: string; subline: string }[];
   caption: string;
   hashtags: string[];
+  imagePrompt: string;
 }
 
 const SYSTEM = `Du bist Art Director und Werbetexter für Social-Media-Bildposts.
@@ -19,7 +20,9 @@ Regeln:
 - Badge maximal 2 Wörter (z.B. "Neu", "Nur heute").
 - Keine Emojis in Headline/Badge/CTA. Keine Anführungszeichen um die Texte.
 - Sprache exakt wie angefragt.
-- Liefere 4 Varianten mit unterschiedlicher Tonalität: Bold Statement, Editorial, Split Layout, Minimal Overlay.`;
+- Liefere 8 Varianten mit unterschiedlicher Tonalität und Blickwinkel (z.B. Bold Statement, Editorial, Split Layout, Minimal Overlay, Angebot, Frage, Beweis, Ankündigung). Jede Variante braucht einen kurzen deutschen Namen.
+- Zusätzlich: imagePrompt — ein englischer Bild-Prompt (max. 60 Wörter) für ein fotorealistisches, werbetaugliches Hintergrundmotiv zum Briefing.
+  Der Prompt muss ruhige, texttaugliche Negativflächen enthalten ("generous empty negative space in the lower third", "clean uncluttered background") und darf KEINEN Text, keine Buchstaben, Logos oder Wasserzeichen im Bild erzeugen ("no text, no letters, no logo, no watermark").`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -72,6 +75,7 @@ Deno.serve(async (req) => {
                 badge: { type: 'string' },
                 caption: { type: 'string' },
                 hashtags: { type: 'array', items: { type: 'string' } },
+                imagePrompt: { type: 'string' },
                 variants: {
                   type: 'array',
                   items: {
@@ -86,7 +90,7 @@ Deno.serve(async (req) => {
                   },
                 },
               },
-              required: ['headline', 'subline', 'cta', 'badge', 'caption', 'hashtags', 'variants'],
+              required: ['headline', 'subline', 'cta', 'badge', 'caption', 'hashtags', 'imagePrompt', 'variants'],
             },
           },
         },
