@@ -12,6 +12,14 @@
 - Anchor-Refresh, Auto Cut-Down, Master-Snapshot, Voice-Lock are the four
   moat features — keep them stable, do not extend surface area.
 
+## Gezielte Entfrostung: Grafik-Overlays (v407, freigegeben vom Nutzer)
+- Overlay-Ebene erweitert: Lower Thirds, Banner, Störer, Schilder, CTA,
+  Ticker, Logo-Bug, Callout, Zitat, Fortschritt (`overlayPresets.ts`).
+- Relative Box-Koordinaten (0..1) — Studio-Vorschau und Remotion-Export
+  teilen sich `OverlayGraphic.tsx`, damit 1080p/4K identisch aussieht.
+- Alt-Overlays werden über `upgradeOverlay()` verlustfrei migriert.
+- Sonst bleibt der Freeze bestehen.
+
 ## Allowed changes while frozen
 - P0 crash / data-loss fixes.
 - Backend-only stability (Lambda config, refund automation).
