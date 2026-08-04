@@ -21,7 +21,8 @@ import { SlideStrip } from "@/components/post-designer/SlideStrip";
 import { VariantGallery } from "@/components/post-designer/VariantGallery";
 import { TemplateGallery } from "@/components/post-designer/TemplateGallery";
 import { ImageSourceDialog } from "@/components/post-designer/ImageSourceDialog";
-import { DESIGN_TEMPLATES } from "@/lib/post-design/templates";
+import { DESIGN_TEMPLATES, pickVariants } from "@/lib/post-design/templates";
+import { MOODS, applyMood, type MoodId } from "@/lib/post-design/moods";
 import { applyBrandKit, setSlideImage, type BrandKitLike } from "@/lib/post-design/brand";
 import { elementToPngBlob, downloadBlob, safeFileName, slidesToZip } from "@/lib/post-design/export";
 import {
@@ -31,16 +32,18 @@ import {
 
 type Stage = "brief" | "variants" | "editor";
 
-const VARIANT_TEMPLATE_IDS = ["bold-statement", "editorial-serif", "split-duo", "minimal-overlay"];
+type ImageMode = "ai" | "own" | "none";
 
-function pickVariantTemplates() {
-  const picked = VARIANT_TEMPLATE_IDS
-    .map((id) => DESIGN_TEMPLATES.find((t) => t.id === id))
-    .filter(Boolean) as typeof DESIGN_TEMPLATES;
-  if (picked.length === 4) return picked;
-  const rest = DESIGN_TEMPLATES.filter((t) => !picked.includes(t));
-  return [...picked, ...rest].slice(0, 4);
+interface CopyPayload {
+  headline: string;
+  subline: string;
+  cta: string;
+  badge: string;
+  caption: string;
+  imagePrompt?: string;
+  variants: { name: string; headline: string; subline: string }[];
 }
+
 
 function fillCopy(design: PostDesign, copy: { headline: string; subline: string; cta: string; badge: string }) {
   const next = cloneDesign(design);
@@ -86,6 +89,13 @@ export default function PostDesigner() {
   const [carouselLoading, setCarouselLoading] = useState(false);
   const [designId, setDesignId] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
+  const [imageMode, setImageMode] = useState<ImageMode>("ai");
+  const [imageBusy, setImageBusy] = useState(false);
+  const [moodId, setMoodId] = useState<MoodId>("brand");
+  const [variantOffset, setVariantOffset] = useState(0);
+  const copyRef = useRef<CopyPayload | null>(null);
+  const templatesRef = useRef<typeof DESIGN_TEMPLATES>([]);
+
 
   const exportRef = useRef<HTMLDivElement>(null);
   const [exportSlideIndex, setExportSlideIndex] = useState(0);
@@ -128,6 +138,55 @@ export default function PostDesigner() {
     [activeSlide, updateSlide],
   );
 
+  const buildVariants = useCallback(
+    (
+      copy: CopyPayload,
+      templates: typeof DESIGN_TEMPLATES,
+      img: string | null,
+      mood: MoodId,
+      copyOffset = 0,
+    ): PostDesign[] => {
+      const active = MOODS.find((m) => m.id === mood) ?? MOODS[0];
+      return templates.map((template, i) => {
+        const v = copy.variants?.[(i + copyOffset) % Math.max(1, copy.variants?.length ?? 1)];
+        const base = template.build({ image: img });
+        const filled = fillCopy(base, {
+          headline: v?.headline || copy.headline,
+          subline: v?.subline || copy.subline,
+          cta: copy.cta,
+          badge: copy.badge,
+        });
+        const branded = applyBrandKit(
+          { ...filled, variantName: v?.name || template.name, title: copy.headline?.slice(0, 60) || "Neuer Post" },
+          brandKit,
+        );
+        return applyMood(branded, active);
+      });
+    },
+    [brandKit],
+  );
+
+  /** KI-Motiv über das Picture Studio erzeugen. */
+  const generateImage = useCallback(async (prompt: string): Promise<string | null> => {
+    if (!prompt.trim()) return null;
+    setImageBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-studio-image", {
+        body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast" },
+      });
+      if (error) throw error;
+      if (data?.ok === false || data?.error) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
+      const url: string | undefined = data?.image?.url ?? data?.image;
+      if (!url) throw new Error("Kein Bild erhalten");
+      return url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen");
+      return null;
+    } finally {
+      setImageBusy(false);
+    }
+  }, []);
+
   const handleGenerate = async () => {
     if (!brief.trim()) {
       toast.error("Bitte kurz beschreiben, worum es geht");
@@ -136,37 +195,78 @@ export default function PostDesigner() {
     setGenerating(true);
     setStage("variants");
     setVariants([]);
+    setVariantOffset(0);
     try {
       const { data, error } = await supabase.functions.invoke("generate-post-design", {
         body: { brief, platform, language, tone, brandName: brandKit?.name ?? "" },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      const copy = data.copy as {
-        headline: string; subline: string; cta: string; badge: string; caption: string;
-        variants: { name: string; headline: string; subline: string }[];
-      };
+      const copy = data.copy as CopyPayload;
+      copyRef.current = copy;
       setCaption(copy.caption ?? "");
-      const templates = pickVariantTemplates();
-      const built = templates.map((template, i) => {
-        const v = copy.variants?.[i];
-        const base = template.build({ image });
-        const filled = fillCopy(base, {
-          headline: v?.headline || copy.headline,
-          subline: v?.subline || copy.subline,
-          cta: copy.cta,
-          badge: copy.badge,
-        });
-        return applyBrandKit({ ...filled, variantName: v?.name || template.name, title: copy.headline?.slice(0, 60) || "Neuer Post" }, brandKit);
-      });
-      setVariants(built);
+
+      const templates = pickVariants(platform, tone, 8, 0);
+      templatesRef.current = templates;
+      const startImage = imageMode === "none" ? null : image;
+      setVariants(buildVariants(copy, templates, startImage, moodId));
+      setGenerating(false);
+
+      if (imageMode === "ai") {
+        const url = await generateImage(copy.imagePrompt || brief);
+        if (url) {
+          setImage(url);
+          setVariants((prev) => prev.map((v) => ({ ...v, slides: v.slides.map((s) => setSlideImage(s, url)) })));
+        }
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Generierung fehlgeschlagen");
       setStage("brief");
-    } finally {
       setGenerating(false);
     }
   };
+
+  const handleMoreVariants = () => {
+    const copy = copyRef.current;
+    if (!copy) return;
+    const next = variantOffset + 4;
+    const templates = pickVariants(platform, tone, 4, next + 4);
+    templatesRef.current = [...templatesRef.current, ...templates];
+    setVariants((prev) => [...prev, ...buildVariants(copy, templates, image, moodId, next)]);
+    setVariantOffset(next);
+  };
+
+  const handleShuffleVariant = (index: number) => {
+    const copy = copyRef.current;
+    const template = templatesRef.current[index];
+    if (!copy || !template) return;
+    const shift = 1 + Math.floor(Math.random() * Math.max(1, (copy.variants?.length ?? 1) - 1));
+    const [rebuilt] = buildVariants(copy, [template], image, moodId, index + shift);
+    setVariants((prev) => prev.map((v, i) => (i === index ? rebuilt : v)));
+  };
+
+  const handleMoodChange = (next: MoodId) => {
+    setMoodId(next);
+    const copy = copyRef.current;
+    if (!copy || !templatesRef.current.length) return;
+    setVariants(buildVariants(copy, templatesRef.current, image, next));
+  };
+
+  /** Alternatives Motiv zum gleichen Briefing erzeugen. */
+  const handleRethinkImage = async () => {
+    const prompt = copyRef.current?.imagePrompt || brief;
+    const angles = [
+      "different camera angle, wider framing",
+      "different mood and lighting, closer framing",
+      "alternative composition, softer light",
+    ];
+    const url = await generateImage(`${prompt}. ${angles[Math.floor(Math.random() * angles.length)]}`);
+    if (!url) return;
+    setImage(url);
+    updateSlide(activeSlide, (s) => setSlideImage(s, url));
+    toast.success("Neues Motiv gesetzt");
+  };
+
 
   const openDesign = (next: PostDesign) => {
     setDesign(next);
@@ -342,7 +442,7 @@ export default function PostDesigner() {
             <div className="space-y-3 text-center">
               <h2 className="font-display text-4xl tracking-tight">Ein Briefing. Ein fertiger Post.</h2>
               <p className="text-muted-foreground">
-                Beschreibe kurz, worum es geht — du bekommst vier professionell gesetzte Layouts, die du frei bearbeitest.
+                Beschreibe kurz, worum es geht — du bekommst acht professionell gesetzte Layouts inklusive KI-Motiv, alles frei bearbeitbar.
               </p>
             </div>
 
@@ -388,15 +488,48 @@ export default function PostDesigner() {
               </div>
 
               <div className="space-y-2">
-                <Label>Bild (optional)</Label>
-                <div className="flex items-center gap-3">
-                  <Button variant="outline" onClick={() => setImageDialog("brief")}>
-                    <ImageIcon className="mr-2 h-4 w-4" /> Bild wählen
-                  </Button>
-                  {image && (
-                    <img src={image} alt="" className="h-12 w-12 rounded-lg object-cover" />
-                  )}
+                <Label>Bild</Label>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {([
+                    { id: "ai" as const, label: "KI-Motiv", hint: "Aus dem Briefing" },
+                    { id: "own" as const, label: "Eigenes Bild", hint: "Upload / Stock" },
+                    { id: "none" as const, label: "Ohne Bild", hint: "Reine Typografie" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setImageMode(opt.id);
+                        if (opt.id === "none") setImage(null);
+                      }}
+                      className={
+                        "rounded-xl border px-3 py-2.5 text-left transition-all " +
+                        (imageMode === opt.id
+                          ? "border-primary/70 bg-primary/10 shadow-[0_0_30px_-14px_hsl(var(--primary)/0.8)]"
+                          : "border-border/60 bg-card/40 hover:border-primary/40")
+                      }
+                    >
+                      <span className="block text-sm font-medium">{opt.label}</span>
+                      <span className="block text-[11px] text-muted-foreground">{opt.hint}</span>
+                    </button>
+                  ))}
                 </div>
+
+                {imageMode === "own" && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <Button variant="outline" onClick={() => setImageDialog("brief")}>
+                      <ImageIcon className="mr-2 h-4 w-4" /> Bild wählen
+                    </Button>
+                    {image && <img src={image} alt="" className="h-12 w-12 rounded-lg object-cover" />}
+                  </div>
+                )}
+
+                {imageMode === "ai" && (
+                  <p className="pt-1 text-[11px] text-muted-foreground">
+                    Die KI schreibt den Bild-Prompt selbst und erzeugt das Motiv im Picture Studio.
+                    Kosten: 1 Bild-Credit. Ohne Bild bleibt der Entwurf kostenfrei.
+                  </p>
+                )}
               </div>
 
               <Button size="lg" className="w-full" onClick={handleGenerate} disabled={generating}>
@@ -410,18 +543,56 @@ export default function PostDesigner() {
 
       {stage === "variants" && (
         <main className="mx-auto max-w-[1400px] px-5 py-10">
-          <div className="mb-6 flex items-end justify-between gap-4">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="font-display text-2xl tracking-tight">Wähle deine Richtung</h2>
-              <p className="text-sm text-muted-foreground">Alles bleibt danach frei editierbar.</p>
+              <p className="text-sm text-muted-foreground">
+                {imageBusy ? "KI-Motiv wird gerade gerendert — die Layouts stehen schon." : "Alles bleibt danach frei editierbar."}
+              </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setTemplateDialog(true)}>
-              <LayoutTemplate className="mr-1.5 h-4 w-4" /> Alle Vorlagen
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/60 p-1">
+                {MOODS.map((mood) => (
+                  <button
+                    key={mood.id}
+                    type="button"
+                    title={mood.label}
+                    onClick={() => handleMoodChange(mood.id)}
+                    className={
+                      "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors " +
+                      (moodId === mood.id ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground")
+                    }
+                  >
+                    <span className="flex">
+                      {mood.swatch.map((c) => (
+                        <span
+                          key={c}
+                          className="h-3 w-3 rounded-full ring-1 ring-background -ml-1 first:ml-0"
+                          style={{ background: c }}
+                        />
+                      ))}
+                    </span>
+                    {mood.label}
+                  </button>
+                ))}
+              </div>
+              <Button variant="outline" size="sm" onClick={handleMoreVariants} disabled={generating}>
+                <Sparkles className="mr-1.5 h-4 w-4" /> Mehr Richtungen
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setTemplateDialog(true)}>
+                <LayoutTemplate className="mr-1.5 h-4 w-4" /> Alle Vorlagen
+              </Button>
+            </div>
           </div>
-          <VariantGallery variants={variants} loading={generating} onPick={openDesign} />
+          <VariantGallery
+            variants={variants}
+            loading={generating}
+            onPick={openDesign}
+            onShuffle={handleShuffleVariant}
+          />
         </main>
       )}
+
 
       {stage === "editor" && slide && (
         <main className="mx-auto flex max-w-[1600px] gap-5 px-5 py-5">
@@ -456,6 +627,10 @@ export default function PostDesigner() {
               </Button>
               <Button variant="outline" size="sm" className="w-full" onClick={() => setImageDialog("background")}>
                 <ImageIcon className="mr-1.5 h-4 w-4" /> Bild tauschen
+              </Button>
+              <Button variant="outline" size="sm" className="w-full" onClick={handleRethinkImage} disabled={imageBusy}>
+                {imageBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
+                Motiv neu denken
               </Button>
               <Button variant="outline" size="sm" className="w-full" onClick={handleAddCarouselSlides} disabled={carouselLoading}>
                 {carouselLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
