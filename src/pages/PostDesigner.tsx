@@ -711,7 +711,9 @@ export default function PostDesigner() {
                 onLayerChange={handleLayerChange}
                 onCommit={() => undefined}
                 showSafeZone={showSafeZone}
+                pendingImage={imageBusy}
               />
+
             </div>
             <div className="mt-3 rounded-2xl border border-border/60 bg-card/40">
               <SlideStrip
