@@ -12,7 +12,24 @@ Der KI Post-Generator liefert heute nur Text (Hook, Caption, Hashtags) zu einem 
 5  Export                          PNG 1080x1080, Slide-Set, Mediathek, Kalender
 ```
 
+## UI-Niveau: Studio statt Formular
+
+Der Designer bekommt dieselbe Bond-2028-Sprache wie Motion Studio, Autopilot und Founders-UI — kein Formular mit Vorschau, sondern eine echte Studio-Oberfläche:
+
+- **Dunkle Studio-Bühne**: Deep-Black-Arbeitsfläche mit sanftem Gold-Vignettenlicht, die Canvas schwebt zentriert mit weichem Schatten und feinem Goldrand — das Design steht im Rampenlicht, alle Werkzeuge treten optisch zurück.
+- **Drei-Zonen-Layout**: links schmale Werkzeugleiste (Vorlagen, Bildquellen, Text, Marke, Formen) als Icon-Rail mit Glass-Panels, mittig die Bühne, rechts ein kontextsensitiver Inspector, der nur zeigt, was zum ausgewählten Element gehört.
+- **Varianten als Kinoreihe**: Die 4 KI-Vorschläge erscheinen als große Karten mit Gold-Glow beim Hover und weichem Cross-Fade beim Wechsel — Auswahl fühlt sich wie Casting an, nicht wie Radiobuttons.
+- **Live-Generierungsdramaturgie**: Während die KI die Layouts baut, laufen Shimmer-Platzhalter in Postformat statt eines Spinners, mit kurzen Statuszeilen („Bildanalyse", „Typografie", „Markenfarben").
+- **Glass & Gold Controls**: Glassmorphism-Panels, goldene Aktiv-Zustände, Mikro-Interaktionen (Snap-Feedback, sanftes Einrasten der Guides, 150–200 ms Übergänge), Tastenkürzel-Hinweise.
+- **Slide-Filmstreifen**: Karussell-Slides als Filmstreifen unter der Bühne mit Drag-Sortierung, Nummerierung und Gold-Rahmen für den aktiven Slide.
+- **Plattform-Kontext-Ansicht**: Umschalter zwischen „Bühne" und „Im Feed", der das Design in den bestehenden Instagram/LinkedIn/TikTok-Vorschauen zeigt.
+- **Export-Moment**: Statt stiller Download-Button ein kurzer Reveal des fertigen Posts mit Gold-Sheen und direkten Aktionen (Mediathek, Kalender, Download).
+- Mobil: Bühne oben, Werkzeuge als Bottom-Sheet, damit die Oberfläche auf dem Handy nutzbar bleibt.
+
+Alle Farben und Effekte laufen über die bestehenden Design-Tokens in `index.css` — keine hartkodierten Farbklassen.
+
 ## Was gebaut wird
+
 
 ### 1. KI-Design-Engine
 Neue Edge Function `generate-post-design`: nimmt Briefing, Bild, Plattform, Brand Kit und liefert 4 Design-Varianten als strukturiertes Layout-JSON (kein Bild-Rendering) — Hintergrundbehandlung, Textblöcke mit Position/Größe/Gewicht, Akzentformen, Logo-Slot, CTA-Badge. Die Varianten sind bewusst unterschiedlich: Bold Statement, Editorial, Split-Layout, Minimal Overlay.
