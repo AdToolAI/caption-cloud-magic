@@ -77,6 +77,7 @@ export default function MediaLibrary() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [studioImageCount, setStudioImageCount] = useState(0);
   const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
+  const [expandedScenes, setExpandedScenes] = useState<string[]>([]);
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
 
   // Pagination: how many cards we actually render
