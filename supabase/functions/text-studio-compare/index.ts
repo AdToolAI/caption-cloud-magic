@@ -104,7 +104,9 @@ async function callModel(
             ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
             { role: "user", content: prompt },
           ],
+          ...(route.apiModel.startsWith("openai/") ? { reasoning_effort: "none" } : {}),
         }),
+
       });
       if (!r.ok) return { ok: false, error: await r.text(), model: modelId };
       const j = await r.json();
