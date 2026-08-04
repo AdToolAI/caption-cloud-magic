@@ -22,6 +22,8 @@ import { VariantGallery } from "@/components/post-designer/VariantGallery";
 import { TemplateGallery } from "@/components/post-designer/TemplateGallery";
 import { ImageSourceDialog } from "@/components/post-designer/ImageSourceDialog";
 import { DESIGN_TEMPLATES, pickVariants } from "@/lib/post-design/templates";
+import { detectIntent, isPostIntent, seedFromText, type PostIntent } from "@/lib/post-design/intent";
+import { buildImagePrompt, negativeZoneForDesign, type NegativeZone } from "@/lib/post-design/imagePrompt";
 import { MOODS, applyMood, type MoodId } from "@/lib/post-design/moods";
 import { applyBrandKit, setSlideImage, type BrandKitLike } from "@/lib/post-design/brand";
 import { elementToPngBlob, downloadBlob, safeFileName, slidesToZip } from "@/lib/post-design/export";
@@ -41,6 +43,7 @@ interface CopyPayload {
   badge: string;
   caption: string;
   imagePrompt?: string;
+  intent?: string;
   variants: { name: string; headline: string; subline: string }[];
 }
 
@@ -104,6 +107,8 @@ export default function PostDesigner() {
   const [moodId, setMoodId] = useState<MoodId>("brand");
   const [variantOffset, setVariantOffset] = useState(0);
   const copyRef = useRef<CopyPayload | null>(null);
+  const intentRef = useRef<PostIntent>("statement");
+  const zoneRef = useRef<NegativeZone>("bottom");
   const templatesRef = useRef<typeof DESIGN_TEMPLATES>([]);
 
 
@@ -220,9 +225,6 @@ export default function PostDesigner() {
     setImageError(null);
     userImageRef.current = imageMode === "own" && !!image;
 
-    // Motiv sofort parallel zur Copy anstoßen — nicht erst danach.
-    const imagePromise = imageMode === "ai" ? generateImage(brief) : Promise.resolve(null);
-
     try {
       const { data, error } = await supabase.functions.invoke("generate-post-design", {
         body: { brief, platform, language, tone, brandName: brandKit?.name ?? "" },
@@ -233,19 +235,32 @@ export default function PostDesigner() {
       copyRef.current = copy;
       setCaption(copy.caption ?? "");
 
-      const templates = pickVariants(platform, tone, 8, 0);
+      // Layout-First: erst Intent + Layouts, dann das Motiv passend dazu.
+      const intent = isPostIntent(copy.intent) ? copy.intent : detectIntent(brief);
+      intentRef.current = intent;
+      const templates = pickVariants(platform, tone, 8, 0, {
+        intent,
+        seed: seedFromText(`${brief}|${platform}`),
+        headlineLength: (copy.headline ?? "").length,
+      });
       templatesRef.current = templates;
       const startImage = imageMode === "none" ? null : image;
-      setVariants(buildVariants(copy, templates, startImage, moodId));
+      const built = buildVariants(copy, templates, startImage, moodId);
+      setVariants(built);
       setGenerating(false);
 
-      const url = await imagePromise;
-      if (url) applyGeneratedImage(url);
+      zoneRef.current = built[0] ? negativeZoneForDesign(built[0]) : "bottom";
+
+      if (imageMode === "ai") {
+        const url = await generateImage(
+          buildImagePrompt({ imagePrompt: copy.imagePrompt, brief, zone: zoneRef.current }),
+        );
+        if (url) applyGeneratedImage(url);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Generierung fehlgeschlagen");
       setStage("brief");
       setGenerating(false);
-      void imagePromise.then((url) => url && applyGeneratedImage(url));
     }
   };
 
@@ -254,7 +269,11 @@ export default function PostDesigner() {
     const copy = copyRef.current;
     if (!copy) return;
     const next = variantOffset + 4;
-    const templates = pickVariants(platform, tone, 4, next + 4);
+    const templates = pickVariants(platform, tone, 4, next + 4, {
+      intent: intentRef.current,
+      seed: seedFromText(`${brief}|${platform}|${next}`),
+      headlineLength: (copy.headline ?? "").length,
+    });
     templatesRef.current = [...templatesRef.current, ...templates];
     setVariants((prev) => [...prev, ...buildVariants(copy, templates, image, moodId, next)]);
     setVariantOffset(next);
@@ -278,13 +297,21 @@ export default function PostDesigner() {
 
   /** Alternatives Motiv zum gleichen Briefing erzeugen. */
   const handleRethinkImage = async () => {
-    const prompt = copyRef.current?.imagePrompt || brief;
     const angles = [
       "different camera angle, wider framing",
       "different mood and lighting, closer framing",
       "alternative composition, softer light",
     ];
-    const url = await generateImage(`${prompt}. ${angles[Math.floor(Math.random() * angles.length)]}`);
+    const zone =
+      stage === "editor" && design.slides[0] ? negativeZoneForDesign(design) : zoneRef.current;
+    const url = await generateImage(
+      buildImagePrompt({
+        imagePrompt: copyRef.current?.imagePrompt,
+        brief,
+        zone,
+        angle: angles[Math.floor(Math.random() * angles.length)],
+      }),
+    );
     if (!url) return;
     if (stage === "editor") {
       setImage(url);
