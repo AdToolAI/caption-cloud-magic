@@ -19,7 +19,10 @@ export const FoundersSlotBadge = ({ className = "" }: Props) => {
   const [claimed, setClaimed] = useState<number | null>(null);
   const founder = useFounderStatus();
 
+  const isFounder = !founder.loading && founder.isActive;
+
   useEffect(() => {
+    if (isFounder) return;
     let cancelled = false;
     const load = async () => {
       const { data, error } = await supabase.rpc("count_founders_claimed");
@@ -33,11 +36,14 @@ export const FoundersSlotBadge = ({ className = "" }: Props) => {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [isFounder]);
+
+  if (isFounder) return null;
 
   const remaining =
     claimed === null ? null : Math.max(0, FOUNDERS_MAX_SLOTS - claimed);
   const soldOut = remaining === 0;
+
 
   return (
     <div className={`inline-flex flex-col items-center gap-1 ${className}`}>
