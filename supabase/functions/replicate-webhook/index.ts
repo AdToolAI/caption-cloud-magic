@@ -115,31 +115,10 @@ serve(async (req) => {
         throw updateError;
       }
 
-      // 5. Auto-save to video_creations (Mediathek)
-      const { error: creationError } = await supabase
-        .from('video_creations')
-        .insert({
-          user_id: generation.user_id,
-          template_id: null,
-          output_url: permanentUrl,
-          status: 'completed',
-          metadata: {
-            ai_generation_id: generation.id,
-            model: generation.model,
-            prompt: generation.prompt,
-            aspect_ratio: generation.aspect_ratio,
-            resolution: generation.resolution,
-            duration_seconds: generation.duration_seconds,
-            source: 'sora-2-ai'
-          },
-          credits_used: 0
-        });
+      // 5. Mediathek-Eintrag: wird zentral vom DB-Trigger
+      //    auto_save_ai_video_to_library erzeugt (idempotent).
+      //    Kein zweiter Insert hier — das erzeugte sonst Duplikate.
 
-      if (creationError) {
-        console.error('[Replicate Webhook] video_creations insert error:', creationError);
-      } else {
-        console.log('[Replicate Webhook] Video auto-saved to Mediathek');
-      }
 
       console.log('[Replicate Webhook] Generation completed and saved:', generation.id);
 
