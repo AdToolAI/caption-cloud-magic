@@ -520,3 +520,54 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
 ];
 
 export const TEMPLATE_CATEGORIES = Array.from(new Set(DESIGN_TEMPLATES.map((t) => t.category)));
+
+/** Design-Familien für die Varianten-Auswahl. */
+const FAMILY_ORDER: Record<string, string[]> = {
+  bold: ["bold-statement", "poster", "announcement", "launch"],
+  editorial: ["editorial", "quote", "testimonial", "grid-type"],
+  split: ["split", "before-after", "duotone", "framed"],
+  minimal: ["minimal-overlay", "spotlight", "stat", "question"],
+  utility: ["offer", "tips", "checklist", "steps", "event", "cover-carousel"],
+};
+
+const PLATFORM_BIAS: Record<string, string[]> = {
+  instagram: ["bold", "minimal", "split", "editorial", "utility"],
+  linkedin: ["editorial", "utility", "minimal", "bold", "split"],
+  facebook: ["utility", "bold", "split", "editorial", "minimal"],
+  tiktok: ["bold", "split", "minimal", "utility", "editorial"],
+};
+
+function byId(id: string): DesignTemplate | undefined {
+  return DESIGN_TEMPLATES.find((t) => t.id === id);
+}
+
+/**
+ * Wählt `count` Vorlagen, gemischt über die Design-Familien und gewichtet
+ * nach Plattform. `offset` blättert weiter ("Mehr Richtungen").
+ */
+export function pickVariants(
+  platform: string,
+  tone: string,
+  count = 8,
+  offset = 0,
+): DesignTemplate[] {
+  const families = PLATFORM_BIAS[platform] ?? PLATFORM_BIAS.instagram;
+  const quiet = /ruhig|minimal|elegant|serios|seriös/i.test(tone);
+  const ordered = quiet
+    ? [...families].sort((a, b) => (a === "minimal" ? -1 : b === "minimal" ? 1 : 0))
+    : families;
+
+  const picked: DesignTemplate[] = [];
+  let round = 0;
+  while (picked.length < count + offset && round < 8) {
+    for (const family of ordered) {
+      const id = FAMILY_ORDER[family]?.[round];
+      const tpl = id ? byId(id) : undefined;
+      if (tpl && !picked.includes(tpl)) picked.push(tpl);
+      if (picked.length >= count + offset) break;
+    }
+    round += 1;
+  }
+  const rest = DESIGN_TEMPLATES.filter((t) => !picked.includes(t));
+  return [...picked, ...rest].slice(offset, offset + count);
+}
