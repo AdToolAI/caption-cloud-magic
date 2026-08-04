@@ -45,27 +45,33 @@ interface CopyPayload {
 }
 
 
+/** Literale "\n"-Sequenzen aus KI-Antworten in echte Umbrüche wandeln. */
+function nl(value: string | undefined | null): string {
+  return (value ?? "").replace(/\\r\\n|\\n|\\r/g, "\n");
+}
+
 function fillCopy(design: PostDesign, copy: { headline: string; subline: string; cta: string; badge: string }) {
   const next = cloneDesign(design);
   let headlineDone = false;
   let sublineDone = false;
   next.slides[0].layers = next.slides[0].layers.map((layer) => {
-    if (layer.type === "badge" && copy.badge) return { ...layer, text: copy.badge };
+    if (layer.type === "badge" && copy.badge) return { ...layer, text: nl(copy.badge) };
     if (layer.type !== "text") return layer;
     const t = layer as TextLayer;
     if (!headlineDone && t.size >= 0.06) {
       headlineDone = true;
-      return { ...t, text: copy.headline || t.text };
+      return { ...t, text: nl(copy.headline) || t.text };
     }
     if (!sublineDone && t.size < 0.06 && t.size >= 0.028) {
       sublineDone = true;
-      return { ...t, text: copy.subline || t.text };
+      return { ...t, text: nl(copy.subline) || t.text };
     }
-    if (t.size < 0.028 && copy.cta) return { ...t, text: copy.cta };
+    if (t.size < 0.028 && copy.cta) return { ...t, text: nl(copy.cta) };
     return t;
   });
   return next;
 }
+
 
 export default function PostDesigner() {
   const { user } = useAuth();
@@ -91,6 +97,10 @@ export default function PostDesigner() {
   const [caption, setCaption] = useState("");
   const [imageMode, setImageMode] = useState<ImageMode>("ai");
   const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  /** true, sobald der Nutzer selbst ein Bild gesetzt hat — dann kein Auto-Überschreiben. */
+  const userImageRef = useRef(false);
+
   const [moodId, setMoodId] = useState<MoodId>("brand");
   const [variantOffset, setVariantOffset] = useState(0);
   const copyRef = useRef<CopyPayload | null>(null);
@@ -170,6 +180,7 @@ export default function PostDesigner() {
   const generateImage = useCallback(async (prompt: string): Promise<string | null> => {
     if (!prompt.trim()) return null;
     setImageBusy(true);
+    setImageError(null);
     try {
       const { data, error } = await supabase.functions.invoke("generate-studio-image", {
         body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast" },
@@ -180,11 +191,21 @@ export default function PostDesigner() {
       if (!url) throw new Error("Kein Bild erhalten");
       return url;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen");
+      const message = err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen";
+      setImageError(message);
+      toast.error(message);
       return null;
     } finally {
       setImageBusy(false);
     }
+  }, []);
+
+  /** Motiv in Varianten UND in das bereits geöffnete Design spiegeln. */
+  const applyGeneratedImage = useCallback((url: string) => {
+    setImage(url);
+    setVariants((prev) => prev.map((v) => ({ ...v, slides: v.slides.map((s) => setSlideImage(s, url)) })));
+    if (userImageRef.current) return;
+    setDesign((prev) => ({ ...prev, slides: prev.slides.map((s) => setSlideImage(s, url)) }));
   }, []);
 
   const handleGenerate = async () => {
@@ -196,6 +217,12 @@ export default function PostDesigner() {
     setStage("variants");
     setVariants([]);
     setVariantOffset(0);
+    setImageError(null);
+    userImageRef.current = imageMode === "own" && !!image;
+
+    // Motiv sofort parallel zur Copy anstoßen — nicht erst danach.
+    const imagePromise = imageMode === "ai" ? generateImage(brief) : Promise.resolve(null);
+
     try {
       const { data, error } = await supabase.functions.invoke("generate-post-design", {
         body: { brief, platform, language, tone, brandName: brandKit?.name ?? "" },
@@ -212,19 +239,16 @@ export default function PostDesigner() {
       setVariants(buildVariants(copy, templates, startImage, moodId));
       setGenerating(false);
 
-      if (imageMode === "ai") {
-        const url = await generateImage(copy.imagePrompt || brief);
-        if (url) {
-          setImage(url);
-          setVariants((prev) => prev.map((v) => ({ ...v, slides: v.slides.map((s) => setSlideImage(s, url)) })));
-        }
-      }
+      const url = await imagePromise;
+      if (url) applyGeneratedImage(url);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Generierung fehlgeschlagen");
       setStage("brief");
       setGenerating(false);
+      void imagePromise.then((url) => url && applyGeneratedImage(url));
     }
   };
+
 
   const handleMoreVariants = () => {
     const copy = copyRef.current;
@@ -262,10 +286,16 @@ export default function PostDesigner() {
     ];
     const url = await generateImage(`${prompt}. ${angles[Math.floor(Math.random() * angles.length)]}`);
     if (!url) return;
-    setImage(url);
-    updateSlide(activeSlide, (s) => setSlideImage(s, url));
+    if (stage === "editor") {
+      setImage(url);
+      userImageRef.current = true;
+      updateSlide(activeSlide, (s) => setSlideImage(s, url));
+    } else {
+      applyGeneratedImage(url);
+    }
     toast.success("Neues Motiv gesetzt");
   };
+
 
 
   const openDesign = (next: PostDesign) => {
@@ -380,6 +410,7 @@ export default function PostDesigner() {
   };
 
   const handlePickImage = (url: string) => {
+    userImageRef.current = true;
     if (imageDialog === "brief") {
       setImage(url);
       return;
@@ -390,6 +421,7 @@ export default function PostDesigner() {
     }
     updateSlide(activeSlide, (s) => setSlideImage(s, url));
   };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -584,12 +616,28 @@ export default function PostDesigner() {
               </Button>
             </div>
           </div>
+          {imageBusy && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              Motiv wird erzeugt … es erscheint automatisch in allen Layouts.
+            </div>
+          )}
+          {!imageBusy && imageError && imageMode === "ai" && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs">
+              <span className="text-muted-foreground">Motiv konnte nicht erzeugt werden: {imageError}</span>
+              <Button variant="outline" size="sm" onClick={handleRethinkImage}>
+                <Wand2 className="mr-1.5 h-3.5 w-3.5" /> Motiv erneut erzeugen
+              </Button>
+            </div>
+          )}
           <VariantGallery
             variants={variants}
             loading={generating}
+            imagePending={imageBusy}
             onPick={openDesign}
             onShuffle={handleShuffleVariant}
           />
+
         </main>
       )}
 
@@ -632,6 +680,13 @@ export default function PostDesigner() {
                 {imageBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
                 Motiv neu denken
               </Button>
+              {imageBusy && (
+                <p className="text-[11px] text-muted-foreground">Motiv wird erzeugt … es setzt sich automatisch ein.</p>
+              )}
+              {!imageBusy && imageError && (
+                <p className="text-[11px] text-destructive">{imageError}</p>
+              )}
+
               <Button variant="outline" size="sm" className="w-full" onClick={handleAddCarouselSlides} disabled={carouselLoading}>
                 {carouselLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
                 Karussell ergänzen
@@ -663,7 +718,9 @@ export default function PostDesigner() {
                 onLayerChange={handleLayerChange}
                 onCommit={() => undefined}
                 showSafeZone={showSafeZone}
+                pendingImage={imageBusy}
               />
+
             </div>
             <div className="mt-3 rounded-2xl border border-border/60 bg-card/40">
               <SlideStrip

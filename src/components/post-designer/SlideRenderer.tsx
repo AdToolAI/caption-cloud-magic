@@ -19,7 +19,10 @@ interface SlideRendererProps {
   /** Darstellungsgröße in px; intern wird immer 1080 gerendert und skaliert. */
   size: number;
   className?: string;
+  /** Zeigt in leeren Bildebenen einen ruhigen Ladezustand, solange das KI-Motiv rendert. */
+  pendingImage?: boolean;
 }
+
 
 function scrimGradient(layer: ImageLayer): string | undefined {
   const a = layer.scrim ?? 0;
@@ -36,7 +39,7 @@ function scrimGradient(layer: ImageLayer): string | undefined {
   }
 }
 
-function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
+function LayerView({ layer, design, pending }: { layer: Layer; design: PostDesign; pending?: boolean }) {
   const box: React.CSSProperties = {
     position: "absolute",
     left: `${layer.x * 100}%`,
@@ -64,6 +67,15 @@ function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
               transform: `scale(${zoom}) translate(${(l.offsetX ?? 0) * 100}%, ${(l.offsetY ?? 0) * 100}%)`,
             }}
           />
+        ) : pending ? (
+          <div
+            className="animate-pulse"
+            style={{
+              width: "100%",
+              height: "100%",
+              background: `linear-gradient(135deg, ${design.palette.surface}, ${design.palette.background} 60%, ${design.palette.surface})`,
+            }}
+          />
         ) : (
           <div
             style={{
@@ -73,6 +85,7 @@ function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
             }}
           />
         )}
+
         {scrimGradient(l) && (
           <div style={{ position: "absolute", inset: 0, background: scrimGradient(l) }} />
         )}
@@ -182,7 +195,7 @@ function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
  * Derselbe Pfad bedient Vorschau, Varianten-Galerie und Export (WYSIWYG).
  */
 export const SlideRenderer = forwardRef<HTMLDivElement, SlideRendererProps>(
-  ({ slide, design, size, className }, ref) => {
+  ({ slide, design, size, className, pendingImage }, ref) => {
     const scale = size / CANVAS_SIZE;
     return (
       <div style={{ width: size, height: size, overflow: "hidden" }} className={className}>
@@ -201,7 +214,7 @@ export const SlideRenderer = forwardRef<HTMLDivElement, SlideRendererProps>(
           }}
         >
           {slide.layers.map((layer) => (
-            <LayerView key={layer.id} layer={layer} design={design} />
+            <LayerView key={layer.id} layer={layer} design={design} pending={pendingImage} />
           ))}
         </div>
       </div>

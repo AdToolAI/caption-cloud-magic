@@ -8,13 +8,16 @@ interface VariantGalleryProps {
   variants: PostDesign[];
   loading?: boolean;
   stage?: string;
+  /** KI-Motiv rendert noch — Bildebenen zeigen solange einen Ladezustand. */
+  imagePending?: boolean;
   onPick: (design: PostDesign) => void;
   onShuffle?: (index: number) => void;
 }
 
 const STAGES = ["Motiv", "Typografie", "Marke", "Feinschliff"];
 
-export function VariantGallery({ variants, loading, stage, onPick, onShuffle }: VariantGalleryProps) {
+export function VariantGallery({ variants, loading, stage, imagePending, onPick, onShuffle }: VariantGalleryProps) {
+
   if (loading) {
     return (
       <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
@@ -62,7 +65,7 @@ export function VariantGallery({ variants, loading, stage, onPick, onShuffle }: 
             )}
           >
             <div className="aspect-square w-full overflow-hidden transition-transform duration-500 group-hover:scale-[1.02]">
-              <SlideRenderer slide={variant.slides[0]} design={variant} size={280} className="w-full" />
+              <SlideRenderer slide={variant.slides[0]} design={variant} size={280} className="w-full" pendingImage={imagePending} />
             </div>
 
             <div
