@@ -15,6 +15,15 @@ Zwei getrennte Ursachen, keine davon ist ein Lip-Sync-Fehler:
    als „Vorgängerversion" markiert — aber flach neben dem aktuellen Clip angezeigt.
    Zwei Szenen haben so je 12 Einträge.
 
+## Kein Risiko für die Lip-Sync-Pipeline
+
+Geprüft: keine Funktion der Kette liest die Mediathek. Der Preclip-Schritt wartet auf
+`video_renders`, der Szenenzustand liegt in `composer_scenes` / `dialog_shots` /
+`plate_attempts`. In `compose-dialog-segments`, `compose-video-clips`, `sync-so-webhook`
+und allen `_shared`-Dateien gibt es keinen Lesezugriff auf `video_creations`;
+`compose-clip-webhook` schreibt dort nur das Archiv. Die Mediathek ist reine
+Anzeige-Schicht — ein fehlender oder gelöschter Eintrag kann keinen Schritt blockieren.
+
 ## Umsetzung
 
 1. **Interne Artefakte gar nicht erst speichern**
