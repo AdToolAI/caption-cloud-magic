@@ -20,6 +20,24 @@ export async function sendAdminEmail(opts: {
 
   const messageId = `${opts.label}-${crypto.randomUUID()}`;
 
+  // Every app email needs an unsubscribe token bound to the recipient.
+  let unsubscribeToken: string | null = null;
+  const { data: existing } = await svc
+    .from("email_unsubscribe_tokens")
+    .select("token")
+    .eq("email", opts.to)
+    .maybeSingle();
+  if (existing?.token) {
+    unsubscribeToken = existing.token;
+  } else {
+    const token = crypto.randomUUID().replace(/-/g, "");
+    const { error: tokenError } = await svc
+      .from("email_unsubscribe_tokens")
+      .insert({ token, email: opts.to });
+    if (tokenError) console.error("[ADMIN-MAIL] token insert:", tokenError.message);
+    unsubscribeToken = token;
+  }
+
   const { error } = await svc.rpc("enqueue_email", {
     queue_name: "transactional_emails",
     payload: {
@@ -32,7 +50,9 @@ export async function sendAdminEmail(opts: {
       text: opts.text ?? opts.subject,
       purpose: "transactional",
       idempotency_key: messageId,
+      unsubscribe_token: unsubscribeToken,
       label: opts.label,
+
 
       queued_at: new Date().toISOString(),
     },
