@@ -40,16 +40,29 @@ function scrimGradient(layer: ImageLayer): string | undefined {
   }
 }
 
-function LayerView({ layer, design, pending }: { layer: Layer; design: PostDesign; pending?: boolean }) {
+function LayerView({
+  layer,
+  design,
+  pending,
+  yOverride,
+  softScrim,
+}: {
+  layer: Layer;
+  design: PostDesign;
+  pending?: boolean;
+  yOverride?: number;
+  softScrim?: boolean;
+}) {
   const box: React.CSSProperties = {
     position: "absolute",
     left: `${layer.x * 100}%`,
-    top: `${layer.y * 100}%`,
+    top: `${(yOverride ?? layer.y) * 100}%`,
     width: `${layer.w * 100}%`,
     height: `${layer.h * 100}%`,
     opacity: layer.opacity ?? 1,
     transform: layer.rotation ? `rotate(${layer.rotation}deg)` : undefined,
   };
+
 
   if (layer.type === "image") {
     const l = layer as ImageLayer;
