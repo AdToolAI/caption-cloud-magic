@@ -90,6 +90,8 @@ function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
 
   if (layer.type === "text") {
     const l = layer as TextLayer;
+    const fontFamily = FONT_STACKS[l.font](design.fonts);
+    const fontSize = fitTextSize(l, fontFamily);
     return (
       <div
         style={{
@@ -100,15 +102,16 @@ function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
           alignItems: l.align === "center" ? "center" : l.align === "right" ? "flex-end" : "flex-start",
           textAlign: l.align,
           color: l.color,
-          fontFamily: FONT_STACKS[l.font](design.fonts),
-          fontSize: l.size * CANVAS_SIZE,
+          fontFamily,
+          fontSize,
           fontWeight: l.weight,
           lineHeight: l.lineHeight ?? 1.15,
-          letterSpacing: `${(l.letterSpacing ?? 0) * l.size * CANVAS_SIZE}px`,
+          letterSpacing: `${(l.letterSpacing ?? 0) * fontSize}px`,
           textTransform: l.uppercase ? "uppercase" : "none",
           textShadow: l.shadow ? "0 2px 24px rgba(0,0,0,0.45)" : "none",
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
+          overflow: "hidden",
         }}
       >
         {l.highlight ? (
