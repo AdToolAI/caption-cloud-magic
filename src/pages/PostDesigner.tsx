@@ -628,6 +628,10 @@ export default function PostDesigner() {
               <Button variant="outline" size="sm" className="w-full" onClick={() => setImageDialog("background")}>
                 <ImageIcon className="mr-1.5 h-4 w-4" /> Bild tauschen
               </Button>
+              <Button variant="outline" size="sm" className="w-full" onClick={handleRethinkImage} disabled={imageBusy}>
+                {imageBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
+                Motiv neu denken
+              </Button>
               <Button variant="outline" size="sm" className="w-full" onClick={handleAddCarouselSlides} disabled={carouselLoading}>
                 {carouselLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
                 Karussell ergänzen
