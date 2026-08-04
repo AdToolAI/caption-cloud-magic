@@ -39,7 +39,7 @@ function scrimGradient(layer: ImageLayer): string | undefined {
   }
 }
 
-function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
+function LayerView({ layer, design, pending }: { layer: Layer; design: PostDesign; pending?: boolean }) {
   const box: React.CSSProperties = {
     position: "absolute",
     left: `${layer.x * 100}%`,
@@ -67,6 +67,15 @@ function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
               transform: `scale(${zoom}) translate(${(l.offsetX ?? 0) * 100}%, ${(l.offsetY ?? 0) * 100}%)`,
             }}
           />
+        ) : pending ? (
+          <div
+            className="animate-pulse"
+            style={{
+              width: "100%",
+              height: "100%",
+              background: `linear-gradient(135deg, ${design.palette.surface}, ${design.palette.background} 60%, ${design.palette.surface})`,
+            }}
+          />
         ) : (
           <div
             style={{
@@ -76,6 +85,7 @@ function LayerView({ layer, design }: { layer: Layer; design: PostDesign }) {
             }}
           />
         )}
+
         {scrimGradient(l) && (
           <div style={{ position: "absolute", inset: 0, background: scrimGradient(l) }} />
         )}
