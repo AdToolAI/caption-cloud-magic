@@ -224,23 +224,127 @@ export const AVAILABLE_FILTERS = [
 export type FilterId = typeof AVAILABLE_FILTERS[number]['id'];
 export type FilterCategory = 'basic' | 'creative';
 
-// Text Overlay for VFX Step
+// ============================================================================
+// Overlay-Ebene (v407) — Text, Banner, Schilder, Lower Thirds …
+// Alle neuen Felder sind optional, damit gespeicherte Alt-Projekte
+// unverändert weiterlaufen (siehe upgradeOverlay()).
+// ============================================================================
+
+/** Bausteinart eines Overlays. `text` = klassisches Text-Overlay (Alt-Verhalten). */
+export type OverlayKind =
+  | 'text'
+  | 'lowerThird'
+  | 'banner'
+  | 'badge'
+  | 'card'
+  | 'cta'
+  | 'ticker'
+  | 'logo'
+  | 'callout'
+  | 'quote'
+  | 'progress';
+
+/** Relative Box (0..1) bezogen auf die Canvas-Kante — wie im Post Designer. */
+export interface OverlayBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export type OverlayAnimation =
+  | 'none'
+  | 'fadeIn'
+  | 'scaleUp'
+  | 'bounce'
+  | 'typewriter'
+  | 'highlight'
+  | 'glitch'
+  | 'slideLeft'
+  | 'slideRight'
+  | 'slideUp'
+  | 'slideDown'
+  | 'wipe'
+  | 'pop'
+  | 'blurIn'
+  | 'stagger'
+  | 'tickerLoop';
+
+export const OVERLAY_ANIMATIONS: { id: OverlayAnimation; name: string; description: string }[] = [
+  { id: 'fadeIn', name: 'Fade In', description: 'Sanftes Einblenden' },
+  { id: 'scaleUp', name: 'Scale Up', description: 'Vergrößern von klein' },
+  { id: 'bounce', name: 'Bounce', description: 'Hüpfende Animation' },
+  { id: 'typewriter', name: 'Typewriter', description: 'Schreibmaschine' },
+  { id: 'highlight', name: 'Highlight', description: 'Marker-Effekt' },
+  { id: 'glitch', name: 'Glitch', description: 'Digitaler Störeffekt' },
+  { id: 'slideLeft', name: 'Slide ←', description: 'Von rechts hereinfahren' },
+  { id: 'slideRight', name: 'Slide →', description: 'Von links hereinfahren' },
+  { id: 'slideUp', name: 'Slide ↑', description: 'Von unten hereinfahren' },
+  { id: 'slideDown', name: 'Slide ↓', description: 'Von oben hereinfahren' },
+  { id: 'wipe', name: 'Wipe', description: 'Balken schiebt frei' },
+  { id: 'pop', name: 'Pop', description: 'Kurzer Feder-Impuls' },
+  { id: 'blurIn', name: 'Blur In', description: 'Aus der Unschärfe' },
+  { id: 'stagger', name: 'Zeilen-Stagger', description: 'Wörter nacheinander' },
+  { id: 'tickerLoop', name: 'Ticker', description: 'Endlos durchlaufend' },
+  { id: 'none', name: 'Ohne', description: 'Hart einblenden' },
+];
+
+export interface OverlayStyle {
+  fontSize: 'sm' | 'md' | 'lg' | 'xl';
+  color: string;
+  backgroundColor: string;
+  shadow: boolean;
+  fontFamily: string;
+  /** Schriftgrad relativ zur Canvas-Breite (überschreibt fontSize, z. B. 0.045). */
+  fontSizeRel?: number;
+  fontWeight?: number;
+  uppercase?: boolean;
+  letterSpacing?: number;
+  lineHeight?: number;
+  align?: 'left' | 'center' | 'right';
+  /** Flächenfarbe des Bausteins (Balken, Karte, Badge …). */
+  fill?: string;
+  /** Optionaler Verlauf für die Fläche. */
+  gradient?: [string, string] | null;
+  borderColor?: string;
+  borderWidth?: number;
+  radius?: number;
+  opacity?: number;
+  rotation?: number;
+  /** Akzentfarbe für Linien, Pfeile, Fortschritt. */
+  accentColor?: string;
+  /** Innenabstand relativ zur Canvas-Breite. */
+  padding?: number;
+}
+
+export interface OverlaySlots {
+  title?: string;
+  subtitle?: string;
+  badge?: string;
+  imageUrl?: string | null;
+}
+
+// Text Overlay for VFX Step (ab v407 = universelles Overlay-Element)
 export interface TextOverlay {
   id: string;
   text: string;
-  animation: 'fadeIn' | 'scaleUp' | 'bounce' | 'typewriter' | 'highlight' | 'glitch';
+  animation: OverlayAnimation;
   position: 'top' | 'center' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight' | 'centerLeft' | 'centerRight' | 'custom';
   customPosition?: { x: number; y: number };
   startTime: number;
   endTime: number | null; // null = bis Ende
-  style: {
-    fontSize: 'sm' | 'md' | 'lg' | 'xl';
-    color: string;
-    backgroundColor: string;
-    shadow: boolean;
-    fontFamily: string;
-  };
+  style: OverlayStyle;
+  /** v407 */
+  kind?: OverlayKind;
+  box?: OverlayBox;
+  enter?: OverlayAnimation;
+  exit?: OverlayAnimation;
+  slots?: OverlaySlots;
 }
+
+/** Alias mit sprechendem Namen — identisch zu TextOverlay. */
+export type OverlayElement = TextOverlay;
+
 
 // Text Overlay Templates
 export const TEXT_OVERLAY_TEMPLATES = [
