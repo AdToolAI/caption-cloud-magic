@@ -15,6 +15,8 @@ import { MarketplaceReviewPanel } from '@/components/admin/MarketplaceReviewPane
 import { CharacterMarketplaceReviewPanel } from '@/components/admin/CharacterMarketplaceReviewPanel';
 import { BetaHealth } from '@/components/admin/BetaHealth';
 import { RenderLoadWidget } from '@/components/admin/RenderLoadWidget';
+import { LaunchRadarCard } from '@/components/admin/LaunchRadarCard';
+
 import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store, Sparkles, Zap } from 'lucide-react';
 
 export default function Admin() {
@@ -26,6 +28,12 @@ export default function Admin() {
           Überwache das System, die Conversion und Email-Zustellung
         </p>
       </div>
+
+      <div className="mb-8">
+        <LaunchRadarCard />
+      </div>
+
+
 
       <Tabs defaultValue="beta-health" className="space-y-6">
         <TabsList className="flex-wrap h-auto">

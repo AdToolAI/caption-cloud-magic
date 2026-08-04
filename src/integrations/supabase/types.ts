@@ -9089,6 +9089,30 @@ export type Database = {
         }
         Relationships: []
       }
+      launch_milestones: {
+        Row: {
+          achieved_at: string
+          created_at: string
+          key: string
+          label: string | null
+          payload: Json
+        }
+        Insert: {
+          achieved_at?: string
+          created_at?: string
+          key: string
+          label?: string | null
+          payload?: Json
+        }
+        Update: {
+          achieved_at?: string
+          created_at?: string
+          key?: string
+          label?: string | null
+          payload?: Json
+        }
+        Relationships: []
+      }
       license_certificates: {
         Row: {
           asset_id: string
