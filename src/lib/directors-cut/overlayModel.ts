@@ -113,3 +113,15 @@ export function upgradeOverlays(overlays: TextOverlay[] = []): TextOverlay[] {
 export function isGraphicOverlay(overlay: TextOverlay): boolean {
   return Boolean((overlay.kind && overlay.kind !== 'text') || overlay.box);
 }
+
+/** Box in den sichtbaren Bereich zwingen. */
+export function clampBox(box: OverlayBox): OverlayBox {
+  const w = Math.min(1, Math.max(0.04, box.w));
+  const h = Math.min(1, Math.max(0.02, box.h));
+  return {
+    w,
+    h,
+    x: Math.min(1 - w, Math.max(0, box.x)),
+    y: Math.min(1 - h, Math.max(0, box.y)),
+  };
+}
