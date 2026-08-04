@@ -1194,6 +1194,32 @@ export default function MediaLibrary() {
                   {getSourceBadge(item.source)}
                 </div>
 
+                {/* Motion-Studio Versionen */}
+                {item.sceneId && !!item.olderVersionCount && (
+                  <button
+                    type="button"
+                    className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur hover:bg-background"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedScenes(prev =>
+                        prev.includes(item.sceneId!)
+                          ? prev.filter(id => id !== item.sceneId)
+                          : [...prev, item.sceneId!]
+                      );
+                    }}
+                  >
+                    {expandedScenes.includes(item.sceneId)
+                      ? 'Ältere Versionen ausblenden'
+                      : `+${item.olderVersionCount} ältere Version${item.olderVersionCount > 1 ? 'en' : ''}`}
+                  </button>
+                )}
+                {item.isSuperseded && (
+                  <div className="absolute bottom-2 left-2 z-10 rounded-md bg-background/80 px-2 py-1 text-xs backdrop-blur">
+                    Ältere Version
+                  </div>
+                )}
+
+
                 {item.type === 'video' && item.url ? (
                   <LazyVideoThumb
                     src={item.url}
