@@ -11,6 +11,7 @@ import {
   type ShapeLayer,
   type TextLayer,
 } from "@/lib/post-design/schema";
+import { fitTextSize } from "@/lib/post-design/autofit";
 
 interface SlideRendererProps {
   slide: PostSlide;
