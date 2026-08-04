@@ -50,7 +50,7 @@ export function LaunchRadarCard() {
         { icon: Users, label: 'Registrierungen (24h)', value: stats.users_24h, sub: `${stats.users_7d} in 7 Tagen` },
         { icon: Film, label: 'Videos (24h)', value: stats.videos_24h, sub: `${stats.videos_7d} in 7 Tagen` },
         { icon: CreditCard, label: 'Zahlende Kunden', value: stats.paying_customers, sub: `${stats.users_total} Nutzer gesamt` },
-        { icon: Activity, label: 'App-Ereignisse (24h)', value: stats.events_24h, sub: 'Tracking-Signal' },
+        { icon: Activity, label: 'Automations-Events (24h)', value: stats.events_24h, sub: 'interner Event-Bus' },
       ]
     : [];
 
