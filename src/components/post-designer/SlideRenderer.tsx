@@ -269,10 +269,6 @@ export const SlideRenderer = forwardRef<HTMLDivElement, SlideRendererProps>(
       </div>
     );
   },
-
-      </div>
-    );
-  },
 );
 
 SlideRenderer.displayName = "SlideRenderer";
