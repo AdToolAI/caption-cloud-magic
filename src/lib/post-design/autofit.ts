@@ -74,3 +74,56 @@ export function fitTextSize(layer: TextLayer, fontFamily: string): number {
   }
   return size;
 }
+
+/** Gemessene tatsächliche Texthöhe (1080er-Raum) bei effektiver Schriftgröße. */
+export function measureTextBlock(
+  layer: TextLayer,
+  fontFamily: string,
+): { fontSize: number; height: number } {
+  const fontSize = fitTextSize(layer, fontFamily);
+  const c = getCtx();
+  const text = layer.uppercase ? layer.text.toUpperCase() : layer.text;
+  const lineHeight = layer.lineHeight ?? 1.15;
+  if (!c || !text.trim()) return { fontSize, height: 0 };
+  c.font = `${layer.weight} ${fontSize}px ${fontFamily}`;
+  const { lines } = wrapLines(c, text, Math.max(1, layer.w * CANVAS_SIZE));
+  return { fontSize, height: lines.length * fontSize * lineHeight };
+}
+
+const GAP = 0.018;
+
+/**
+ * Verhindert, dass sich Textebenen überlagern. Ebenen werden anhand ihrer
+ * tatsächlich gemessenen Höhe nach unten geschoben (und notfalls minimal
+ * nach oben geklemmt), solange sie sich horizontal überschneiden.
+ *
+ * Liefert eine Map layerId -> korrigiertes y (relativ 0..1).
+ */
+export function resolveTextCollisions(
+  layers: TextLayer[],
+  fontFor: (layer: TextLayer) => string,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  const placed: { x: number; right: number; top: number; bottom: number }[] = [];
+
+  const sorted = [...layers].sort((a, b) => a.y - b.y);
+  for (const layer of sorted) {
+    const { height } = measureTextBlock(layer, fontFor(layer));
+    const h = Math.max(0, Math.min(layer.h, height / CANVAS_SIZE));
+    let top = layer.y;
+    const left = layer.x;
+    const right = layer.x + layer.w;
+
+    for (const p of placed) {
+      const horizontal = left < p.right - 0.01 && right > p.x + 0.01;
+      if (!horizontal) continue;
+      if (top < p.bottom + GAP) top = p.bottom + GAP;
+    }
+
+    // Nie aus dem Canvas schieben.
+    top = Math.max(0.02, Math.min(top, 1 - h - 0.02));
+    placed.push({ x: left, right, top, bottom: top + h });
+    result[layer.id] = top;
+  }
+  return result;
+}
