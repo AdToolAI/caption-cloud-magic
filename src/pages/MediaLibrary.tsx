@@ -396,8 +396,24 @@ export default function MediaLibrary() {
           url: video.output_url || '',
           thumbUrl: video.output_url || '',
           createdAt: video.created_at,
+          sceneId: isMotionStudioClip ? (metadata?.scene_id as string | undefined) : undefined,
+          isSuperseded: isMotionStudioClip ? isSuperseded : false,
         };
       });
+
+      // Motion-Studio: pro Szene nur die aktuellste Version als Hauptkarte,
+      // ältere Versionen bleiben erhalten und sind aufklappbar.
+      const versionCounts = new Map<string, number>();
+      normalizedVideoCreations.forEach(item => {
+        if (item.sceneId && item.isSuperseded) {
+          versionCounts.set(item.sceneId, (versionCounts.get(item.sceneId) || 0) + 1);
+        }
+      });
+      normalizedVideoCreations = normalizedVideoCreations.map(item =>
+        item.sceneId && !item.isSuperseded
+          ? { ...item, olderVersionCount: versionCounts.get(item.sceneId) || 0 }
+          : item
+      );
 
       // Inject demo video if user has no video creations
       if (normalizedVideoCreations.length === 0) {
