@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { DashboardVideoCarousel } from "@/components/dashboard/DashboardVideoCarousel";
 import { FirstVideoExpressHero } from "@/components/dashboard/FirstVideoExpressHero";
+import { FounderStatusCard } from "@/components/founders/FounderStatusCard";
 
 
 import { useNewsRadar } from "@/hooks/useNewsRadar";
