@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { DashboardVideoCarousel } from "@/components/dashboard/DashboardVideoCarousel";
 import { FirstVideoExpressHero } from "@/components/dashboard/FirstVideoExpressHero";
+import { FounderStatusCard } from "@/components/founders/FounderStatusCard";
 
 
 import { useNewsRadar } from "@/hooks/useNewsRadar";
@@ -560,6 +561,9 @@ const Home = () => {
       )}
 
       <div className="container mx-auto px-4 py-8 max-w-7xl space-y-10">
+        {/* Founders Circle — only visible for active founders */}
+        {user && <FounderStatusCard />}
+
         {/* Express start: First-time users with starter credits → Hailuo 2.3 in 90 seconds */}
         {user && <FirstVideoExpressHero />}
 

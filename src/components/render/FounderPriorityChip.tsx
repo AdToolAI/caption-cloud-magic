@@ -25,7 +25,7 @@ export function FounderPriorityChip({ className = '' }: Props) {
   if (isFounder && load.state !== 'idle') {
     return (
       <span
-        className={`inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-500 ${className}`}
+        className={`inline-flex items-center gap-1.5 rounded-full border border-primary/45 bg-gradient-to-r from-primary/15 via-primary/5 to-primary/15 px-2.5 py-1 text-xs font-medium text-primary shadow-[0_0_18px_-6px_hsl(var(--primary)/0.7)] ${className}`}
       >
         <Crown className="h-3 w-3" />
         Priority-Slot aktiv
