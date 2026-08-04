@@ -745,6 +745,8 @@ export function TextOverlayEditor2028({
                   </div>
                 </div>
               </div>
+              </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
