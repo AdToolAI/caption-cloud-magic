@@ -5,7 +5,7 @@
 //   await sendRadarAlert({ kind: "purchase", title: "Neues Abo", lines: [...] });
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.39.3";
-import { sendEmail } from "./email-send.ts";
+import { sendAdminEmail } from "./admin-mail.ts";
 import { ADMIN_ALERT_EMAIL } from "./admin-config.ts";
 
 export type RadarKind = "signup" | "first_render" | "purchase" | "milestone";
