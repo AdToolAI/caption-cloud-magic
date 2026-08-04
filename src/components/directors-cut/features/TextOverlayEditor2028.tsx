@@ -381,6 +381,24 @@ export function TextOverlayEditor2028({
 
   const selectedOverlay = overlays.find(o => o.id === selectedOverlayId);
 
+  const [showLibrary, setShowLibrary] = useState(true);
+  const { data: brandKit } = useActiveBrandKit();
+
+  const selectedOverlay = overlays.find(o => o.id === selectedOverlayId);
+  const selectedIsGraphic = selectedOverlay ? isGraphicOverlay(selectedOverlay) : false;
+
+  const addFromPreset = (preset: OverlayPreset) => {
+    const defaultEnd = Math.min(videoDuration, currentTime + 4);
+    const created = instantiatePreset(preset, currentTime, defaultEnd >= videoDuration ? null : defaultEnd);
+    const branded = brandKit ? applyBrandToOverlays([created], brandKit)[0] : created;
+    onOverlaysChange([...overlays, branded]);
+    setSelectedOverlayId(branded.id);
+  };
+
+  const applyBrand = () => {
+    onOverlaysChange(applyBrandToOverlays(overlays.map(upgradeOverlay), brandKit));
+  };
+
   const addOverlay = (template?: typeof TEXT_OVERLAY_TEMPLATES[number]) => {
     const newOverlay: TextOverlay = {
       id: `overlay-${Date.now()}`,
