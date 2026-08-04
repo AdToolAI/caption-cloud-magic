@@ -48,7 +48,14 @@ interface NormalizedMediaItem {
   fileSizeMb?: number;
   storageLocation?: 'local' | 'cloud';
   driveFileId?: string;
+  /** Motion-Studio Szenen-Gruppierung */
+  sceneId?: string;
+  isSuperseded?: boolean;
+  olderVersionCount?: number;
 }
+
+/** Interne Pipeline-Artefakte (Preclips, Dialog-Stitch-Zwischenschritte) gehören nicht in die Mediathek. */
+const INTERNAL_ARTIFACT_PATTERN = /dialog-pass-preclip|dialog-turn-preclip|dialog-stitch/i;
 
 export default function MediaLibrary() {
   const { t } = useTranslation();
