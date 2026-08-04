@@ -120,6 +120,10 @@ const Welcome = () => {
             </ul>
           </div>
 
+          <FounderStatusCard className="mt-6 text-left" />
+
+
+
           <Button
             size="lg"
             className="mt-10 w-full sm:w-auto px-10 h-14 text-base font-bold"
