@@ -180,6 +180,7 @@ export default function PostDesigner() {
   const generateImage = useCallback(async (prompt: string): Promise<string | null> => {
     if (!prompt.trim()) return null;
     setImageBusy(true);
+    setImageError(null);
     try {
       const { data, error } = await supabase.functions.invoke("generate-studio-image", {
         body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast" },
@@ -190,11 +191,21 @@ export default function PostDesigner() {
       if (!url) throw new Error("Kein Bild erhalten");
       return url;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen");
+      const message = err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen";
+      setImageError(message);
+      toast.error(message);
       return null;
     } finally {
       setImageBusy(false);
     }
+  }, []);
+
+  /** Motiv in Varianten UND in das bereits geöffnete Design spiegeln. */
+  const applyGeneratedImage = useCallback((url: string) => {
+    setImage(url);
+    setVariants((prev) => prev.map((v) => ({ ...v, slides: v.slides.map((s) => setSlideImage(s, url)) })));
+    if (userImageRef.current) return;
+    setDesign((prev) => ({ ...prev, slides: prev.slides.map((s) => setSlideImage(s, url)) }));
   }, []);
 
   const handleGenerate = async () => {
@@ -206,6 +217,12 @@ export default function PostDesigner() {
     setStage("variants");
     setVariants([]);
     setVariantOffset(0);
+    setImageError(null);
+    userImageRef.current = imageMode === "own" && !!image;
+
+    // Motiv sofort parallel zur Copy anstoßen — nicht erst danach.
+    const imagePromise = imageMode === "ai" ? generateImage(brief) : Promise.resolve(null);
+
     try {
       const { data, error } = await supabase.functions.invoke("generate-post-design", {
         body: { brief, platform, language, tone, brandName: brandKit?.name ?? "" },
@@ -222,19 +239,16 @@ export default function PostDesigner() {
       setVariants(buildVariants(copy, templates, startImage, moodId));
       setGenerating(false);
 
-      if (imageMode === "ai") {
-        const url = await generateImage(copy.imagePrompt || brief);
-        if (url) {
-          setImage(url);
-          setVariants((prev) => prev.map((v) => ({ ...v, slides: v.slides.map((s) => setSlideImage(s, url)) })));
-        }
-      }
+      const url = await imagePromise;
+      if (url) applyGeneratedImage(url);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Generierung fehlgeschlagen");
       setStage("brief");
       setGenerating(false);
+      void imagePromise.then((url) => url && applyGeneratedImage(url));
     }
   };
+
 
   const handleMoreVariants = () => {
     const copy = copyRef.current;
