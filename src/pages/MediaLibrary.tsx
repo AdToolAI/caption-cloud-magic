@@ -347,7 +347,12 @@ export default function MediaLibrary() {
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
-      let normalizedVideoCreations: NormalizedMediaItem[] = (videoCreations || []).map(video => {
+      // Interne Pipeline-Artefakte (Lip-Sync-Preclips etc.) ausblenden
+      const userFacingCreations = (videoCreations || []).filter(
+        (v: any) => !INTERNAL_ARTIFACT_PATTERN.test(v.output_url || '')
+      );
+
+      let normalizedVideoCreations: NormalizedMediaItem[] = userFacingCreations.map(video => {
         // Check if it's a Sora-2-AI, Director's Cut Enhancement, Director's Cut, or Universal Creator video
         const metadata = video.metadata as any;
         const isSoraAI = metadata?.source === 'sora-2-ai';
