@@ -31,16 +31,18 @@ import {
 
 type Stage = "brief" | "variants" | "editor";
 
-const VARIANT_TEMPLATE_IDS = ["bold-statement", "editorial-serif", "split-duo", "minimal-overlay"];
+type ImageMode = "ai" | "own" | "none";
 
-function pickVariantTemplates() {
-  const picked = VARIANT_TEMPLATE_IDS
-    .map((id) => DESIGN_TEMPLATES.find((t) => t.id === id))
-    .filter(Boolean) as typeof DESIGN_TEMPLATES;
-  if (picked.length === 4) return picked;
-  const rest = DESIGN_TEMPLATES.filter((t) => !picked.includes(t));
-  return [...picked, ...rest].slice(0, 4);
+interface CopyPayload {
+  headline: string;
+  subline: string;
+  cta: string;
+  badge: string;
+  caption: string;
+  imagePrompt?: string;
+  variants: { name: string; headline: string; subline: string }[];
 }
+
 
 function fillCopy(design: PostDesign, copy: { headline: string; subline: string; cta: string; badge: string }) {
   const next = cloneDesign(design);
