@@ -228,6 +228,17 @@ function LayerView({
 export const SlideRenderer = forwardRef<HTMLDivElement, SlideRendererProps>(
   ({ slide, design, size, className, pendingImage }, ref) => {
     const scale = size / CANVAS_SIZE;
+
+    // Kollisionsfreie Textpositionen (Headline/Subline/CTA überlagern sich nie).
+    const yMap = useMemo(() => {
+      const texts = slide.layers.filter((l): l is TextLayer => l.type === "text");
+      if (texts.length < 2) return {} as Record<string, number>;
+      return resolveTextCollisions(texts, (l) => FONT_STACKS[l.font](design.fonts));
+    }, [slide.layers, design.fonts]);
+
+    // Scrim hinter Text nur, wenn ein echtes Bildmotiv dahinterliegt.
+    const hasPhoto = slide.layers.some((l) => l.type === "image" && !!(l as ImageLayer).src);
+
     return (
       <div style={{ width: size, height: size, overflow: "hidden" }} className={className}>
         <div
@@ -245,9 +256,20 @@ export const SlideRenderer = forwardRef<HTMLDivElement, SlideRendererProps>(
           }}
         >
           {slide.layers.map((layer) => (
-            <LayerView key={layer.id} layer={layer} design={design} pending={pendingImage} />
+            <LayerView
+              key={layer.id}
+              layer={layer}
+              design={design}
+              pending={pendingImage}
+              yOverride={yMap[layer.id]}
+              softScrim={hasPhoto && layer.type === "text"}
+            />
           ))}
         </div>
+      </div>
+    );
+  },
+
       </div>
     );
   },
