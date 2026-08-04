@@ -88,6 +88,13 @@ export default function PostDesigner() {
   const [carouselLoading, setCarouselLoading] = useState(false);
   const [designId, setDesignId] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
+  const [imageMode, setImageMode] = useState<ImageMode>("ai");
+  const [imageBusy, setImageBusy] = useState(false);
+  const [moodId, setMoodId] = useState<MoodId>("brand");
+  const [variantOffset, setVariantOffset] = useState(0);
+  const copyRef = useRef<CopyPayload | null>(null);
+  const templatesRef = useRef<typeof DESIGN_TEMPLATES>([]);
+
 
   const exportRef = useRef<HTMLDivElement>(null);
   const [exportSlideIndex, setExportSlideIndex] = useState(0);
