@@ -45,6 +45,7 @@ export function AppHeader() {
           <div className="lg:hidden">
             <Brand compact showText={false} />
           </div>
+          {user && <FounderCrest className="ml-1" />}
         </div>
 
         {/* Center-Right: Command Bar + Social Icons */}
