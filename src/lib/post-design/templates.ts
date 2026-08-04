@@ -543,25 +543,40 @@ function byId(id: string): DesignTemplate | undefined {
 
 /**
  * Wählt `count` Vorlagen, gemischt über die Design-Familien und gewichtet
- * nach Plattform. `offset` blättert weiter ("Mehr Richtungen").
+ * nach Intent, Plattform und Textlänge. `offset` blättert weiter
+ * ("Mehr Richtungen"), `seed` sorgt für briefing-abhängige Vielfalt.
  */
 export function pickVariants(
   platform: string,
   tone: string,
   count = 8,
   offset = 0,
+  options: { intent?: PostIntent; seed?: number; headlineLength?: number } = {},
 ): DesignTemplate[] {
-  const families = PLATFORM_BIAS[platform] ?? PLATFORM_BIAS.instagram;
-  const quiet = /ruhig|minimal|elegant|serios|seriös/i.test(tone);
-  const ordered = quiet
-    ? [...families].sort((a, b) => (a === "minimal" ? -1 : b === "minimal" ? 1 : 0))
-    : families;
+  const platformFamilies = PLATFORM_BIAS[platform] ?? PLATFORM_BIAS.instagram;
+  const intentFamilies = options.intent ? INTENT_FAMILY_BIAS[options.intent] : [];
 
+  // Intent führt, Plattform ergänzt.
+  const ordered: string[] = [];
+  for (const f of [...intentFamilies, ...platformFamilies]) {
+    if (!ordered.includes(f)) ordered.push(f);
+  }
+
+  const quiet = /ruhig|minimal|elegant|serios|seriös/i.test(tone);
+  if (quiet) ordered.sort((a, b) => (a === "minimal" ? -1 : b === "minimal" ? 1 : 0));
+
+  // Lange Headlines vertragen keine engen Poster-Layouts.
+  const longHeadline = (options.headlineLength ?? 0) > 42;
+  if (longHeadline) ordered.sort((a, b) => (a === "editorial" ? -1 : b === "editorial" ? 1 : 0));
+
+  const seed = options.seed ?? 0;
   const picked: DesignTemplate[] = [];
   let round = 0;
   while (picked.length < count + offset && round < 8) {
-    for (const family of ordered) {
-      const id = FAMILY_ORDER[family]?.[round];
+    for (let i = 0; i < ordered.length; i += 1) {
+      const family = ordered[(i + (seed % ordered.length)) % ordered.length];
+      const ids = FAMILY_ORDER[family] ?? [];
+      const id = ids[(round + seed) % Math.max(1, ids.length)];
       const tpl = id ? byId(id) : undefined;
       if (tpl && !picked.includes(tpl)) picked.push(tpl);
       if (picked.length >= count + offset) break;
@@ -571,3 +586,4 @@ export function pickVariants(
   const rest = DESIGN_TEMPLATES.filter((t) => !picked.includes(t));
   return [...picked, ...rest].slice(offset, offset + count);
 }
+
