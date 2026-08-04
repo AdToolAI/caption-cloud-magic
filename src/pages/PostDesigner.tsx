@@ -610,12 +610,28 @@ export default function PostDesigner() {
               </Button>
             </div>
           </div>
+          {imageBusy && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              Motiv wird erzeugt … es erscheint automatisch in allen Layouts.
+            </div>
+          )}
+          {!imageBusy && imageError && imageMode === "ai" && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs">
+              <span className="text-muted-foreground">Motiv konnte nicht erzeugt werden: {imageError}</span>
+              <Button variant="outline" size="sm" onClick={handleRethinkImage}>
+                <Wand2 className="mr-1.5 h-3.5 w-3.5" /> Motiv erneut erzeugen
+              </Button>
+            </div>
+          )}
           <VariantGallery
             variants={variants}
             loading={generating}
+            imagePending={imageBusy}
             onPick={openDesign}
             onShuffle={handleShuffleVariant}
           />
+
         </main>
       )}
 
