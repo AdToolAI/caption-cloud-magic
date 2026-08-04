@@ -21,7 +21,8 @@ import { SlideStrip } from "@/components/post-designer/SlideStrip";
 import { VariantGallery } from "@/components/post-designer/VariantGallery";
 import { TemplateGallery } from "@/components/post-designer/TemplateGallery";
 import { ImageSourceDialog } from "@/components/post-designer/ImageSourceDialog";
-import { DESIGN_TEMPLATES } from "@/lib/post-design/templates";
+import { DESIGN_TEMPLATES, pickVariants } from "@/lib/post-design/templates";
+import { MOODS, applyMood, type MoodId } from "@/lib/post-design/moods";
 import { applyBrandKit, setSlideImage, type BrandKitLike } from "@/lib/post-design/brand";
 import { elementToPngBlob, downloadBlob, safeFileName, slidesToZip } from "@/lib/post-design/export";
 import {
