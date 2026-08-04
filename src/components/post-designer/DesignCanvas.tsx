@@ -112,7 +112,7 @@ export function DesignCanvas({
       onPointerDown={() => onSelect(null)}
     >
       <div className="absolute inset-0 rounded-[2px] overflow-hidden shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9)] ring-1 ring-primary/20">
-        <SlideRenderer ref={exportRef} slide={slide} design={design} size={size} />
+        <SlideRenderer ref={exportRef} slide={slide} design={design} size={size} pendingImage={pendingImage} />
       </div>
 
       {showSafeZone && (
