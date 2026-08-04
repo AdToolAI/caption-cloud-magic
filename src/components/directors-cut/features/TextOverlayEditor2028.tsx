@@ -528,6 +528,52 @@ export function TextOverlayEditor2028({
           )}
         </AnimatePresence>
 
+        {/* Bühne: Overlays direkt auf dem Bild platzieren */}
+        <div className="space-y-2 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label className="text-sm font-medium">Bühne</Label>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!brandKit || overlays.length === 0}
+              onClick={applyBrand}
+              className="px-2"
+            >
+              <Palette className="h-4 w-4 mr-1" />
+              Markenfarben anwenden
+            </Button>
+          </div>
+          <OverlayCanvasEditor
+            videoUrl={videoUrl}
+            currentTime={currentTime}
+            overlays={overlays.map(upgradeOverlay)}
+            selectedId={selectedOverlayId}
+            onSelect={setSelectedOverlayId}
+            onChange={(id, patch) => updateOverlay(id, patch)}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Ziehen zum Verschieben, Ecke zum Skalieren — die Position gilt 1:1 für den Export.
+          </p>
+        </div>
+
+        {/* Baustein-Bibliothek */}
+        <div className="space-y-2 min-w-0">
+          <button
+            onClick={() => setShowLibrary(!showLibrary)}
+            className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
+          >
+            <LayoutTemplate className="h-4 w-4" />
+            Bausteine: Banner, Schilder, Lower Thirds
+          </button>
+          <AnimatePresence initial={false}>
+            {showLibrary && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                <OverlayLibrary onPick={addFromPreset} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Visual Timeline */}
         <VisualTimeline
           overlays={overlays}
