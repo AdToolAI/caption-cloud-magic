@@ -45,27 +45,33 @@ interface CopyPayload {
 }
 
 
+/** Literale "\n"-Sequenzen aus KI-Antworten in echte Umbrüche wandeln. */
+function nl(value: string | undefined | null): string {
+  return (value ?? "").replace(/\\r\\n|\\n|\\r/g, "\n");
+}
+
 function fillCopy(design: PostDesign, copy: { headline: string; subline: string; cta: string; badge: string }) {
   const next = cloneDesign(design);
   let headlineDone = false;
   let sublineDone = false;
   next.slides[0].layers = next.slides[0].layers.map((layer) => {
-    if (layer.type === "badge" && copy.badge) return { ...layer, text: copy.badge };
+    if (layer.type === "badge" && copy.badge) return { ...layer, text: nl(copy.badge) };
     if (layer.type !== "text") return layer;
     const t = layer as TextLayer;
     if (!headlineDone && t.size >= 0.06) {
       headlineDone = true;
-      return { ...t, text: copy.headline || t.text };
+      return { ...t, text: nl(copy.headline) || t.text };
     }
     if (!sublineDone && t.size < 0.06 && t.size >= 0.028) {
       sublineDone = true;
-      return { ...t, text: copy.subline || t.text };
+      return { ...t, text: nl(copy.subline) || t.text };
     }
-    if (t.size < 0.028 && copy.cta) return { ...t, text: copy.cta };
+    if (t.size < 0.028 && copy.cta) return { ...t, text: nl(copy.cta) };
     return t;
   });
   return next;
 }
+
 
 export default function PostDesigner() {
   const { user } = useAuth();
