@@ -1,5 +1,7 @@
 import type { PostDesign, PostSlide } from "./schema";
 import { DEFAULT_FONTS, DEFAULT_PALETTE, uid } from "./schema";
+import { INTENT_FAMILY_BIAS, type PostIntent } from "./intent";
+
 
 export interface DesignTemplate {
   id: string;
