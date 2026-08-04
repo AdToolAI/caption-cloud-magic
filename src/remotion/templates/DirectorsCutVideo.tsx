@@ -68,7 +68,7 @@ const TextOverlayStyleSchema = z.object({
   padding: z.number().optional(),
 });
 
-const TextOverlaySchema = z.object({
+export const TextOverlaySchema = z.object({
   id: z.string(),
   text: z.string(),
   animation: OverlayAnimationEnum,
