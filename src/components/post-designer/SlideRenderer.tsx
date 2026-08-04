@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 import {
   CANVAS_SIZE,
   FONT_STACKS,
@@ -11,7 +11,8 @@ import {
   type ShapeLayer,
   type TextLayer,
 } from "@/lib/post-design/schema";
-import { fitTextSize } from "@/lib/post-design/autofit";
+import { fitTextSize, resolveTextCollisions } from "@/lib/post-design/autofit";
+
 
 interface SlideRendererProps {
   slide: PostSlide;
