@@ -7,10 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { 
-  Type, Plus, Trash2, Copy, Sparkles, GripHorizontal, Play, Pause
+  Type, Plus, Trash2, Copy, Sparkles, GripHorizontal, Play, Pause, LayoutTemplate, Palette
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TextOverlay, TEXT_OVERLAY_TEMPLATES } from '@/types/directors-cut';
+import { OverlayLibrary } from './overlays/OverlayLibrary';
+import { OverlayCanvasEditor } from './overlays/OverlayCanvasEditor';
+import { OverlayInspector } from './overlays/OverlayInspector';
+import { instantiatePreset, applyBrandToOverlays, type OverlayPreset } from '@/lib/directors-cut/overlayPresets';
+import { isGraphicOverlay, upgradeOverlay } from '@/lib/directors-cut/overlayModel';
+import { useActiveBrandKit } from '@/hooks/useActiveBrandKit';
 
 interface TextOverlayEditor2028Props {
   overlays: TextOverlay[];
