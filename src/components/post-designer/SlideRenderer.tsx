@@ -19,7 +19,10 @@ interface SlideRendererProps {
   /** Darstellungsgröße in px; intern wird immer 1080 gerendert und skaliert. */
   size: number;
   className?: string;
+  /** Zeigt in leeren Bildebenen einen ruhigen Ladezustand, solange das KI-Motiv rendert. */
+  pendingImage?: boolean;
 }
+
 
 function scrimGradient(layer: ImageLayer): string | undefined {
   const a = layer.scrim ?? 0;
