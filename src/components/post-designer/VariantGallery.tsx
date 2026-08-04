@@ -65,7 +65,7 @@ export function VariantGallery({ variants, loading, stage, imagePending, onPick,
             )}
           >
             <div className="aspect-square w-full overflow-hidden transition-transform duration-500 group-hover:scale-[1.02]">
-              <SlideRenderer slide={variant.slides[0]} design={variant} size={280} className="w-full" />
+              <SlideRenderer slide={variant.slides[0]} design={variant} size={280} className="w-full" pendingImage={imagePending} />
             </div>
 
             <div
