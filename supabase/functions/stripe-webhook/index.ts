@@ -5,6 +5,8 @@ import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { isDuplicateStripeEvent } from "../_shared/stripeIdempotency.ts";
+import { notifyRevenueEvent } from "../_shared/launch-radar-stripe.ts";
+
 import {
   renderPurchaseWelcomeEmail,
   renderPaymentFailedEmail,
@@ -83,6 +85,12 @@ serve(withTelemetry('stripe-webhook', async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // === Launch Radar: Umsatz-Signal an die Plattform-Adresse ===
+    // Rein beobachtend, wirft nie und verändert keine Geschäftslogik.
+    await notifyRevenueEvent(event, stripe, getPlanFromProductId);
+
+
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
