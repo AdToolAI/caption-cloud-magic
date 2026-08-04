@@ -393,8 +393,14 @@ serve(async (req) => {
             },
           }).eq('render_id', matchedRender.render_id);
 
-          // Media Library
-          if (matchedRender.user_id) {
+          // Media Library — interne Pipeline-Artefakte (Lip-Sync-Preclips, Dialog-Stitch) überspringen
+          const artifactHint = `${outName || ''} ${finalOutputUrl || ''} ${source || ''}`;
+          const isInternalArtifact = isDialogStitch || isDialogTurnPreclip ||
+            /dialog-pass-preclip|dialog-turn-preclip|dialog-stitch/i.test(artifactHint);
+
+          if (isInternalArtifact) {
+            console.log('⏭️ Skipping Media Library save for internal artifact:', outName || finalOutputUrl);
+          } else if (matchedRender.user_id) {
             const { data: ev } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', finalOutputUrl).maybeSingle();
             if (!ev) {
               await supabaseAdmin.from('video_creations').insert({
