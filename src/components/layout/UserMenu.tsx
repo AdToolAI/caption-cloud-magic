@@ -11,16 +11,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useFounderStatus } from "@/hooks/useFounderStatus";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const founder = useFounderStatus();
 
   if (!user) return null;
 
   const userEmail = user.email || "";
   const displayName = userEmail.split("@")[0];
+  const isFounder = !founder.loading && founder.isActive;
 
   return (
     <DropdownMenu>
