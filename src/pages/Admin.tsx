@@ -27,6 +27,12 @@ export default function Admin() {
         </p>
       </div>
 
+      <div className="mb-8">
+        <LaunchRadarCard />
+      </div>
+
+
+
       <Tabs defaultValue="beta-health" className="space-y-6">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="beta-health" className="flex items-center gap-2">
