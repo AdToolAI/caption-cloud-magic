@@ -15,15 +15,28 @@ const corsHeaders = {
 
 // --- Pricing (EUR per 1k tokens, end-user prices with margin) ---
 const PRICING: Record<string, { input: number; output: number }> = {
+  "openai-gpt-5-6-luna": { input: 0.0004, output: 0.0026 },
+  "openai-gpt-5-6-terra": { input: 0.0021, output: 0.0169 },
+  "openai-gpt-5-6-sol": { input: 0.0195, output: 0.0975 },
+  "google-gemini-3-1-flash-lite": { input: 0.00013, output: 0.0005 },
+  "google-gemini-3-6-flash": { input: 0.0005, output: 0.0033 },
   "google-gemini-3-1-pro": { input: 0.0016, output: 0.013 },
-  "openai-gpt-5-5-pro": { input: 0.0195, output: 0.0975 },
   "anthropic-claude-4-1-opus": { input: 0.0195, output: 0.0975 },
 };
 
 const PROVIDER_MAP: Record<string, { provider: "gateway" | "anthropic"; apiModel: string }> = {
+  "openai-gpt-5-6-luna": { provider: "gateway", apiModel: "openai/gpt-5.6-luna" },
+  "openai-gpt-5-6-terra": { provider: "gateway", apiModel: "openai/gpt-5.6-terra" },
+  "openai-gpt-5-6-sol": { provider: "gateway", apiModel: "openai/gpt-5.6-sol" },
+  "google-gemini-3-1-flash-lite": { provider: "gateway", apiModel: "google/gemini-3.1-flash-lite" },
+  "google-gemini-3-6-flash": { provider: "gateway", apiModel: "google/gemini-3.6-flash" },
   "google-gemini-3-1-pro": { provider: "gateway", apiModel: "google/gemini-3.1-pro-preview" },
-  "openai-gpt-5-5-pro": { provider: "gateway", apiModel: "openai/gpt-5.5-pro" },
   "anthropic-claude-4-1-opus": { provider: "anthropic", apiModel: "claude-opus-4-1" },
+};
+
+// Legacy IDs from the previous registry
+const LEGACY_ALIASES: Record<string, string> = {
+  "openai-gpt-5-5-pro": "openai-gpt-5-6-sol",
 };
 
 function estimateTokens(text: string): number {
@@ -66,8 +79,10 @@ Deno.serve(async (req) => {
     const {
       conversationId: convIdInput,
       messages,
-      model: modelId,
+      model: modelIdRaw,
       reasoningEffort,
+      maxOutputTokens,
+      temperature,
       systemPrompt,
       personaId,
       isPrivate,
@@ -79,6 +94,8 @@ Deno.serve(async (req) => {
       messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
       model: string;
       reasoningEffort?: string;
+      maxOutputTokens?: number;
+      temperature?: number;
       systemPrompt?: string;
       personaId?: string;
       isPrivate?: boolean;
@@ -90,9 +107,17 @@ Deno.serve(async (req) => {
     if (!Array.isArray(messages) || messages.length === 0) {
       return jsonResponse({ error: "messages required" }, 400);
     }
+    const modelId = LEGACY_ALIASES[modelIdRaw] ?? modelIdRaw;
     const route = PROVIDER_MAP[modelId];
     const pricing = PRICING[modelId];
     if (!route || !pricing) return jsonResponse({ error: "Unknown model" }, 400);
+
+    const outputTokenCap = Math.min(Math.max(Number(maxOutputTokens) || 1800, 256), 8192);
+    const temp =
+      typeof temperature === "number" && temperature >= 0 && temperature <= 2
+        ? temperature
+        : undefined;
+
 
     // Anthropic key check
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -181,14 +206,21 @@ Deno.serve(async (req) => {
 
     let upstream: Response;
     if (route.provider === "gateway") {
+      const isOpenAI = route.apiModel.startsWith("openai/");
       const reqBody: Record<string, unknown> = {
         model: route.apiModel,
         messages: [...sysMsg, ...cleanMessages],
         stream: true,
       };
-      if (reasoningEffort && PRICING[modelId] && modelId === "openai-gpt-5-5-pro") {
-        reqBody.reasoning = { effort: reasoningEffort };
+      if (isOpenAI) {
+        // GPT-5.6 models require an explicit reasoning_effort; "none" disables thinking.
+        reqBody.reasoning_effort = reasoningEffort && reasoningEffort !== "none" ? reasoningEffort : "none";
+        reqBody.max_completion_tokens = outputTokenCap;
+      } else {
+        reqBody.max_tokens = outputTokenCap;
+        if (temp !== undefined) reqBody.temperature = temp;
       }
+
       upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -211,7 +243,8 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: route.apiModel,
-          max_tokens: 4096,
+          max_tokens: outputTokenCap,
+          ...(temp !== undefined ? { temperature: Math.min(temp, 1) } : {}),
           system: systemPrompt || undefined,
           messages: anthroMsgs,
           stream: true,

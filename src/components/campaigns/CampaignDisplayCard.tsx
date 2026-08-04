@@ -493,7 +493,7 @@ export const CampaignDisplayCard = ({
                               variant="ghost"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate("/generator", { state: { prefillCaption: displayCaption } });
+                                navigate("/ai-text-studio", { state: { prefillCaption: displayCaption } });
                               }}
                               className="gap-1.5 text-xs hover:bg-accent/10"
                             >

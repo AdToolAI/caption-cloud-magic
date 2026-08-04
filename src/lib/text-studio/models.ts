@@ -1,63 +1,160 @@
 // AI Text Studio - Model Registry
-// Pricing in EUR per 1M tokens (with 30% margin applied)
+// Auswahl in zwei Schritten: Anbieter -> Qualitätsstufe.
+// Preise in EUR pro 1k Tokens (Endkundenpreis inkl. Marge).
 
 export type TextModelId =
+  // OpenAI
+  | "openai-gpt-5-6-luna"
+  | "openai-gpt-5-6-terra"
+  | "openai-gpt-5-6-sol"
+  // Google
+  | "google-gemini-3-1-flash-lite"
+  | "google-gemini-3-6-flash"
   | "google-gemini-3-1-pro"
-  | "openai-gpt-5-5-pro"
+  // Anthropic
   | "anthropic-claude-4-1-opus";
 
 export type TextProvider = "lovable-gateway" | "anthropic";
+export type TextProviderKey = "openai" | "google" | "anthropic";
+export type TextTier = "fast" | "balanced" | "max";
 
 export interface TextModel {
   id: TextModelId;
   label: string;
   provider: TextProvider;
+  providerKey: TextProviderKey;
+  tier: TextTier;
   /** Gateway/provider-internal model identifier */
   apiModel: string;
   description: string;
-  /** End-user price in EUR per 1k input tokens (provider price * 1.30) */
+  /** End-user price in EUR per 1k input tokens */
   inputPricePer1k: number;
-  /** End-user price in EUR per 1k output tokens (provider price * 1.30) */
+  /** End-user price in EUR per 1k output tokens */
   outputPricePer1k: number;
   /** Best-fit use cases shown as badges in UI */
   strengths: string[];
   /** Whether this model supports a reasoning_effort parameter */
   supportsReasoningEffort: boolean;
-  /** Optional context window in tokens for display */
+  /** Context window in tokens for display */
   contextWindow: number;
   /** Whether the model is enabled by default (Claude requires ANTHROPIC_API_KEY) */
   requiresExternalKey?: boolean;
 }
 
+export const PROVIDER_LABELS: Record<TextProviderKey, string> = {
+  openai: "OpenAI",
+  google: "Google",
+  anthropic: "Anthropic",
+};
+
+export const TIER_LABELS: Record<TextTier, string> = {
+  fast: "Schnell",
+  balanced: "Ausgewogen",
+  max: "Maximum",
+};
+
+export const TIER_DESCRIPTIONS: Record<TextTier, string> = {
+  fast: "Sekundenschnell, günstig – ideal für kurze Texte und viele Varianten",
+  balanced: "Bestes Verhältnis aus Qualität, Tempo und Preis",
+  max: "Höchste Qualität für komplexe Analysen und lange Texte",
+};
+
 export const TEXT_MODELS: Record<TextModelId, TextModel> = {
+  // ---------- OpenAI ----------
+  "openai-gpt-5-6-luna": {
+    id: "openai-gpt-5-6-luna",
+    label: "GPT-5.6 Luna",
+    provider: "lovable-gateway",
+    providerKey: "openai",
+    tier: "fast",
+    apiModel: "openai/gpt-5.6-luna",
+    description: "Schnell & günstig für kurze Texte, Varianten und Umschreibungen",
+    inputPricePer1k: 0.0004,
+    outputPricePer1k: 0.0026,
+    strengths: ["Schnell", "Günstig", "Varianten"],
+    supportsReasoningEffort: true,
+    contextWindow: 400_000,
+  },
+  "openai-gpt-5-6-terra": {
+    id: "openai-gpt-5-6-terra",
+    label: "GPT-5.6 Terra",
+    provider: "lovable-gateway",
+    providerKey: "openai",
+    tier: "balanced",
+    apiModel: "openai/gpt-5.6-terra",
+    description: "Alltags-Arbeitspferd: starke Qualität zu moderatem Preis",
+    inputPricePer1k: 0.0021,
+    outputPricePer1k: 0.0169,
+    strengths: ["Ausgewogen", "Marketing", "Struktur"],
+    supportsReasoningEffort: true,
+    contextWindow: 400_000,
+  },
+  "openai-gpt-5-6-sol": {
+    id: "openai-gpt-5-6-sol",
+    label: "GPT-5.6 Sol",
+    provider: "lovable-gateway",
+    providerKey: "openai",
+    tier: "max",
+    apiModel: "openai/gpt-5.6-sol",
+    description: "Flaggschiff für die härtesten Reasoning- und Strategieaufgaben",
+    inputPricePer1k: 0.0195,
+    outputPricePer1k: 0.0975,
+    strengths: ["Reasoning", "Strategie", "Premium"],
+    supportsReasoningEffort: true,
+    contextWindow: 400_000,
+  },
+
+  // ---------- Google ----------
+  "google-gemini-3-1-flash-lite": {
+    id: "google-gemini-3-1-flash-lite",
+    label: "Gemini 3.1 Flash Lite",
+    provider: "lovable-gateway",
+    providerKey: "google",
+    tier: "fast",
+    apiModel: "google/gemini-3.1-flash-lite",
+    description: "Günstigstes Modell – perfekt für Massen-Text und Zusammenfassungen",
+    inputPricePer1k: 0.00013,
+    outputPricePer1k: 0.0005,
+    strengths: ["Sehr günstig", "Schnell", "Zusammenfassen"],
+    supportsReasoningEffort: false,
+    contextWindow: 1_000_000,
+  },
+  "google-gemini-3-6-flash": {
+    id: "google-gemini-3-6-flash",
+    label: "Gemini 3.6 Flash",
+    provider: "lovable-gateway",
+    providerKey: "google",
+    tier: "balanced",
+    apiModel: "google/gemini-3.6-flash",
+    description: "Schnelles Allround-Modell mit 1M Kontext",
+    inputPricePer1k: 0.0005,
+    outputPricePer1k: 0.0033,
+    strengths: ["Allround", "1M Context", "Schnell"],
+    supportsReasoningEffort: false,
+    contextWindow: 1_000_000,
+  },
   "google-gemini-3-1-pro": {
     id: "google-gemini-3-1-pro",
     label: "Gemini 3.1 Pro",
     provider: "lovable-gateway",
+    providerKey: "google",
+    tier: "max",
     apiModel: "google/gemini-3.1-pro-preview",
     description: "Multimodal Powerhouse · 1M Context · günstigstes Pro-Modell",
     inputPricePer1k: 0.0016,
     outputPricePer1k: 0.013,
-    strengths: ["Multimodal", "1M Context", "Günstig"],
+    strengths: ["Multimodal", "1M Context", "Analyse"],
     supportsReasoningEffort: false,
     contextWindow: 1_000_000,
   },
-  "openai-gpt-5-5-pro": {
-    id: "openai-gpt-5-5-pro",
-    label: "GPT-5.5",
-    provider: "lovable-gateway",
-    apiModel: "openai/gpt-5.5",
-    description: "OpenAI Top-Modell · Reasoning · Code · komplexe Aufgaben",
-    inputPricePer1k: 0.0195,
-    outputPricePer1k: 0.0975,
-    strengths: ["Reasoning", "Code", "Premium"],
-    supportsReasoningEffort: true,
-    contextWindow: 400_000,
-  },
+
+  // ---------- Anthropic ----------
   "anthropic-claude-4-1-opus": {
     id: "anthropic-claude-4-1-opus",
     label: "Claude 4.1 Opus",
     provider: "anthropic",
+    providerKey: "anthropic",
+    tier: "max",
     apiModel: "claude-opus-4-1",
     description: "Best-in-Class Schreiben · lange Texte · nuancierte Analyse",
     inputPricePer1k: 0.0195,
@@ -71,13 +168,62 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
 
 export const TEXT_MODEL_LIST = Object.values(TEXT_MODELS);
 
-export const DEFAULT_TEXT_MODEL: TextModelId = "google-gemini-3-1-pro";
+export const PROVIDER_ORDER: TextProviderKey[] = ["openai", "google", "anthropic"];
+export const TIER_ORDER: TextTier[] = ["fast", "balanced", "max"];
 
-export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
-export const REASONING_EFFORT_OPTIONS: ReasoningEffort[] = [
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-];
+export function modelsByProvider(providerKey: TextProviderKey): TextModel[] {
+  return TEXT_MODEL_LIST.filter((m) => m.providerKey === providerKey).sort(
+    (a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier),
+  );
+}
+
+export function findModel(providerKey: TextProviderKey, tier: TextTier): TextModel | undefined {
+  return TEXT_MODEL_LIST.find((m) => m.providerKey === providerKey && m.tier === tier);
+}
+
+export const DEFAULT_TEXT_MODEL: TextModelId = "google-gemini-3-6-flash";
+
+/** Legacy IDs from the previous registry -> current equivalents */
+export const LEGACY_MODEL_ALIASES: Record<string, TextModelId> = {
+  "openai-gpt-5-5-pro": "openai-gpt-5-6-sol",
+  "google-gemini-3-1-pro": "google-gemini-3-1-pro",
+};
+
+export function resolveModelId(id: string | null | undefined): TextModelId {
+  if (!id) return DEFAULT_TEXT_MODEL;
+  if ((TEXT_MODELS as Record<string, TextModel>)[id]) return id as TextModelId;
+  return LEGACY_MODEL_ALIASES[id] ?? DEFAULT_TEXT_MODEL;
+}
+
+export type ReasoningEffort = "none" | "low" | "medium" | "high";
+export const REASONING_EFFORT_OPTIONS: ReasoningEffort[] = ["none", "low", "medium", "high"];
+export const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = {
+  none: "Aus",
+  low: "Leicht",
+  medium: "Mittel",
+  high: "Tief",
+};
+
+export type ResponseLength = "short" | "normal" | "long";
+export const RESPONSE_LENGTH_LABELS: Record<ResponseLength, string> = {
+  short: "Kurz",
+  normal: "Normal",
+  long: "Ausführlich",
+};
+export const RESPONSE_LENGTH_TOKENS: Record<ResponseLength, number> = {
+  short: 600,
+  normal: 1800,
+  long: 4096,
+};
+
+export type CreativityLevel = "precise" | "balanced" | "creative";
+export const CREATIVITY_LABELS: Record<CreativityLevel, string> = {
+  precise: "Präzise",
+  balanced: "Ausgewogen",
+  creative: "Kreativ",
+};
+export const CREATIVITY_TEMPERATURE: Record<CreativityLevel, number> = {
+  precise: 0.2,
+  balanced: 0.7,
+  creative: 1.1,
+};

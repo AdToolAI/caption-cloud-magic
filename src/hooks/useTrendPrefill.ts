@@ -25,7 +25,7 @@ export function useTrendPrefill() {
     }, { silent: true });
 
     // Navigate to generator with prefilled content
-    navigate(`/generator?prefill=${encodeURIComponent(prefillText)}&platform=${platform}`);
+    navigate(`/ai-text-studio?prefill=${encodeURIComponent(prefillText)}`);
   };
 
   return { openGeneratorWithTrend };

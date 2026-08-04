@@ -89,7 +89,7 @@ const PromptWizard = () => {
 
   const handleUseInGenerator = () => {
     localStorage.setItem("wizardPrompt", optimizedPrompt);
-    navigate("/generator");
+    navigate("/ai-text-studio");
   };
 
   const handleNewIdea = () => {

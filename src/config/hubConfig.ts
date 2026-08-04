@@ -16,7 +16,6 @@ import coverPlanenPlanner from "@/assets/hub-covers/planen/planner.jpg";
 import coverPlanenComposer from "@/assets/hub-covers/planen/composer.jpg";
 import coverPlanenPostingTimes from "@/assets/hub-covers/planen/posting-times.jpg";
 
-import coverOptTextStudio from "@/assets/hub-covers/optimieren/text-studio.jpg";
 import coverOptAiPost from "@/assets/hub-covers/optimieren/ai-post.jpg";
 import coverOptImageCaption from "@/assets/hub-covers/optimieren/image-caption.jpg";
 import coverOptCoach from "@/assets/hub-covers/optimieren/coach.jpg";
@@ -95,7 +94,6 @@ export const hubDefinitions: HubDefinition[] = [
     titleKey: "hubs.optimieren",
     descKey: "hubDesc.optimieren",
     items: [
-      { route: "/generator", titleKey: "nav.textStudio", descKey: "hubItemDesc.generator", icon: Sparkles, cover: coverOptTextStudio },
       { route: "/ai-post-generator", titleKey: "nav.aiPostGenerator", descKey: "hubItemDesc.aiPost", icon: Bot, cover: coverOptAiPost },
       { route: "/image-caption-pairing", titleKey: "nav.imageCaptionPairing", descKey: "hubItemDesc.imageCaption", icon: ImagePlus, cover: coverOptImageCaption },
       { route: "/coach", titleKey: "nav.coach", descKey: "hubItemDesc.coach", icon: MessageSquare, cover: coverOptCoach },
@@ -114,7 +112,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/analytics/posthog", titleKey: "PostHog Dashboard", descKey: "hubItemDesc.posthog", icon: BarChart3, cover: coverAnalyticsPosthog },
       { route: "/analytics/usage-reports", titleKey: "Usage Reports", descKey: "hubItemDesc.usageReports", icon: Coins, cover: coverAnalyticsUsage },
       { route: "/trend-radar", titleKey: "nav.trendRadar", descKey: "hubItemDesc.trendRadar", icon: Radar, cover: coverAnalyticsTrendRadar },
-      { route: "/ai-text-studio", titleKey: "AI Text Studio", descKey: "GPT-5.5 Pro, Gemini 3.1 Pro & Claude 4.1 Opus in einem Reasoning-Hub", icon: Sparkles, cover: coverAnalyticsAiText },
+      { route: "/ai-text-studio", titleKey: "AI Text Studio", descKey: "OpenAI, Google und Claude in drei Qualitätsstufen — ein Reasoning-Hub für alle Texte", icon: Sparkles, cover: coverAnalyticsAiText },
     ],
   },
   {

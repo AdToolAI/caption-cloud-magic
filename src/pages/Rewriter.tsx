@@ -141,7 +141,7 @@ const Rewriter = () => {
 
   const useInGenerator = () => {
     if (result?.rewritten) {
-      navigate(`/generator?prefill=${encodeURIComponent(result.rewritten)}`);
+      navigate(`/ai-text-studio?prefill=${encodeURIComponent(result.rewritten)}`);
     }
   };
 
