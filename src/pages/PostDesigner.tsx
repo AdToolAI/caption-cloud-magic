@@ -488,15 +488,48 @@ export default function PostDesigner() {
               </div>
 
               <div className="space-y-2">
-                <Label>Bild (optional)</Label>
-                <div className="flex items-center gap-3">
-                  <Button variant="outline" onClick={() => setImageDialog("brief")}>
-                    <ImageIcon className="mr-2 h-4 w-4" /> Bild wählen
-                  </Button>
-                  {image && (
-                    <img src={image} alt="" className="h-12 w-12 rounded-lg object-cover" />
-                  )}
+                <Label>Bild</Label>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {([
+                    { id: "ai" as const, label: "KI-Motiv", hint: "Aus dem Briefing" },
+                    { id: "own" as const, label: "Eigenes Bild", hint: "Upload / Stock" },
+                    { id: "none" as const, label: "Ohne Bild", hint: "Reine Typografie" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setImageMode(opt.id);
+                        if (opt.id === "none") setImage(null);
+                      }}
+                      className={
+                        "rounded-xl border px-3 py-2.5 text-left transition-all " +
+                        (imageMode === opt.id
+                          ? "border-primary/70 bg-primary/10 shadow-[0_0_30px_-14px_hsl(var(--primary)/0.8)]"
+                          : "border-border/60 bg-card/40 hover:border-primary/40")
+                      }
+                    >
+                      <span className="block text-sm font-medium">{opt.label}</span>
+                      <span className="block text-[11px] text-muted-foreground">{opt.hint}</span>
+                    </button>
+                  ))}
                 </div>
+
+                {imageMode === "own" && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <Button variant="outline" onClick={() => setImageDialog("brief")}>
+                      <ImageIcon className="mr-2 h-4 w-4" /> Bild wählen
+                    </Button>
+                    {image && <img src={image} alt="" className="h-12 w-12 rounded-lg object-cover" />}
+                  </div>
+                )}
+
+                {imageMode === "ai" && (
+                  <p className="pt-1 text-[11px] text-muted-foreground">
+                    Die KI schreibt den Bild-Prompt selbst und erzeugt das Motiv im Picture Studio.
+                    Kosten: 1 Bild-Credit. Ohne Bild bleibt der Entwurf kostenfrei.
+                  </p>
+                )}
               </div>
 
               <Button size="lg" className="w-full" onClick={handleGenerate} disabled={generating}>
@@ -510,18 +543,56 @@ export default function PostDesigner() {
 
       {stage === "variants" && (
         <main className="mx-auto max-w-[1400px] px-5 py-10">
-          <div className="mb-6 flex items-end justify-between gap-4">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="font-display text-2xl tracking-tight">Wähle deine Richtung</h2>
-              <p className="text-sm text-muted-foreground">Alles bleibt danach frei editierbar.</p>
+              <p className="text-sm text-muted-foreground">
+                {imageBusy ? "KI-Motiv wird gerade gerendert — die Layouts stehen schon." : "Alles bleibt danach frei editierbar."}
+              </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setTemplateDialog(true)}>
-              <LayoutTemplate className="mr-1.5 h-4 w-4" /> Alle Vorlagen
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/60 p-1">
+                {MOODS.map((mood) => (
+                  <button
+                    key={mood.id}
+                    type="button"
+                    title={mood.label}
+                    onClick={() => handleMoodChange(mood.id)}
+                    className={
+                      "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors " +
+                      (moodId === mood.id ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground")
+                    }
+                  >
+                    <span className="flex">
+                      {mood.swatch.map((c) => (
+                        <span
+                          key={c}
+                          className="h-3 w-3 rounded-full ring-1 ring-background -ml-1 first:ml-0"
+                          style={{ background: c }}
+                        />
+                      ))}
+                    </span>
+                    {mood.label}
+                  </button>
+                ))}
+              </div>
+              <Button variant="outline" size="sm" onClick={handleMoreVariants} disabled={generating}>
+                <Sparkles className="mr-1.5 h-4 w-4" /> Mehr Richtungen
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setTemplateDialog(true)}>
+                <LayoutTemplate className="mr-1.5 h-4 w-4" /> Alle Vorlagen
+              </Button>
+            </div>
           </div>
-          <VariantGallery variants={variants} loading={generating} onPick={openDesign} />
+          <VariantGallery
+            variants={variants}
+            loading={generating}
+            onPick={openDesign}
+            onShuffle={handleShuffleVariant}
+          />
         </main>
       )}
+
 
       {stage === "editor" && slide && (
         <main className="mx-auto flex max-w-[1600px] gap-5 px-5 py-5">
