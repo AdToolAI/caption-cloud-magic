@@ -286,10 +286,16 @@ export default function PostDesigner() {
     ];
     const url = await generateImage(`${prompt}. ${angles[Math.floor(Math.random() * angles.length)]}`);
     if (!url) return;
-    setImage(url);
-    updateSlide(activeSlide, (s) => setSlideImage(s, url));
+    if (stage === "editor") {
+      setImage(url);
+      userImageRef.current = true;
+      updateSlide(activeSlide, (s) => setSlideImage(s, url));
+    } else {
+      applyGeneratedImage(url);
+    }
     toast.success("Neues Motiv gesetzt");
   };
+
 
 
   const openDesign = (next: PostDesign) => {
