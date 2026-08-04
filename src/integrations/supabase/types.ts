@@ -16039,11 +16039,14 @@ export type Database = {
           branch_label: string | null
           branched_from_message_id: string | null
           created_at: string
+          creativity: string
           id: string
           is_private: boolean
           model: string
           parent_conversation_id: string | null
           persona_id: string | null
+          reasoning_effort: string | null
+          response_length: string
           title: string
           total_cost_eur: number
           total_input_tokens: number
@@ -16055,11 +16058,14 @@ export type Database = {
           branch_label?: string | null
           branched_from_message_id?: string | null
           created_at?: string
+          creativity?: string
           id?: string
           is_private?: boolean
           model: string
           parent_conversation_id?: string | null
           persona_id?: string | null
+          reasoning_effort?: string | null
+          response_length?: string
           title?: string
           total_cost_eur?: number
           total_input_tokens?: number
@@ -16071,11 +16077,14 @@ export type Database = {
           branch_label?: string | null
           branched_from_message_id?: string | null
           created_at?: string
+          creativity?: string
           id?: string
           is_private?: boolean
           model?: string
           parent_conversation_id?: string | null
           persona_id?: string | null
+          reasoning_effort?: string | null
+          response_length?: string
           title?: string
           total_cost_eur?: number
           total_input_tokens?: number

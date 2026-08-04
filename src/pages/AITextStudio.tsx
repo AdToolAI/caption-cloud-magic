@@ -30,9 +30,27 @@ import {
   TEXT_MODELS,
   DEFAULT_TEXT_MODEL,
   REASONING_EFFORT_OPTIONS,
+  REASONING_EFFORT_LABELS,
+  RESPONSE_LENGTH_LABELS,
+  RESPONSE_LENGTH_TOKENS,
+  CREATIVITY_LABELS,
+  CREATIVITY_TEMPERATURE,
+  PROVIDER_LABELS,
+  PROVIDER_ORDER,
+  TIER_LABELS,
+  TIER_DESCRIPTIONS,
+  TIER_ORDER,
+  modelsByProvider,
+  findModel,
+  resolveModelId,
   type TextModelId,
+  type TextProviderKey,
+  type TextTier,
   type ReasoningEffort,
+  type ResponseLength,
+  type CreativityLevel,
 } from "@/lib/text-studio/models";
+
 import { estimateTokens, estimateCost, formatEUR } from "@/lib/text-studio/pricing";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -63,6 +81,10 @@ interface Conversation {
   updated_at: string;
   parent_conversation_id?: string | null;
   branch_label?: string | null;
+  response_length?: string | null;
+  creativity?: string | null;
+  reasoning_effort?: string | null;
+
 }
 
 export default function AITextStudio() {
@@ -73,6 +95,9 @@ export default function AITextStudio() {
   // Chat state
   const [model, setModel] = useState<TextModelId>(DEFAULT_TEXT_MODEL);
   const [reasoning, setReasoning] = useState<ReasoningEffort>("medium");
+  const [responseLength, setResponseLength] = useState<ResponseLength>("normal");
+  const [creativity, setCreativity] = useState<CreativityLevel>("balanced");
+
   const [personaId, setPersonaId] = useState<string>("none");
   const [isPrivate, setIsPrivate] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -86,6 +111,12 @@ export default function AITextStudio() {
   const [comparePrompt, setComparePrompt] = useState("");
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareResults, setCompareResults] = useState<Record<string, any> | null>(null);
+  const [compareModels, setCompareModels] = useState<TextModelId[]>([
+    "openai-gpt-5-6-terra",
+    "google-gemini-3-6-flash",
+    "google-gemini-3-1-pro",
+  ]);
+
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -128,7 +159,24 @@ export default function AITextStudio() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  // Persist per-conversation settings so they are restored on reload
+  useEffect(() => {
+    if (!conversationId || isPrivate) return;
+    void supabase
+      .from("text_studio_conversations")
+      .update({
+        model,
+        response_length: responseLength,
+        creativity,
+        reasoning_effort: TEXT_MODELS[model]?.supportsReasoningEffort ? reasoning : null,
+      })
+      .eq("id", conversationId);
+  }, [conversationId, model, responseLength, creativity, reasoning, isPrivate]);
+
   const selectedModel = TEXT_MODELS[model];
+  const providerKey = selectedModel.providerKey;
+  const availableTiers = useMemo(() => modelsByProvider(providerKey), [providerKey]);
+
   const selectedPersona = personas.find((p) => p.id === personaId);
 
   // Current chat root + sibling branches (same root)
@@ -263,9 +311,14 @@ export default function AITextStudio() {
           messages: next,
           model,
           reasoningEffort: selectedModel.supportsReasoningEffort ? reasoning : undefined,
+          responseLength,
+          maxOutputTokens: RESPONSE_LENGTH_TOKENS[responseLength],
+          temperature: CREATIVITY_TEMPERATURE[creativity],
+          creativity,
           systemPrompt: selectedPersona?.system_prompt,
           personaId: personaId && personaId !== "none" ? personaId : undefined,
           isPrivate,
+
         }),
       });
 
@@ -336,23 +389,23 @@ export default function AITextStudio() {
   async function loadConversation(id: string) {
     setConversationId(id);
     let conv = history.find((c) => c.id === id);
-    if (!conv) {
-      const { data } = await supabase
-        .from("text_studio_conversations")
-        .select("id,title,model,updated_at,parent_conversation_id,branch_label")
-        .eq("id", id)
-        .maybeSingle();
-      if (data) conv = data as Conversation;
-    }
+    const { data: settings } = await supabase
+      .from("text_studio_conversations")
+      .select("id,title,model,updated_at,parent_conversation_id,branch_label,response_length,creativity,reasoning_effort")
+      .eq("id", id)
+      .maybeSingle();
+    if (settings) conv = settings as Conversation;
     if (!conv) {
       // Conversation no longer exists (deleted or not accessible) — clear stale pointer
       writeLastConv(null);
       setConversationId(null);
       return;
     }
-    if (conv.model && (TEXT_MODELS as any)[conv.model]) {
-      setModel(conv.model as TextModelId);
-    }
+    setModel(resolveModelId(conv.model));
+    if (settings?.response_length) setResponseLength(settings.response_length as ResponseLength);
+    if (settings?.creativity) setCreativity(settings.creativity as CreativityLevel);
+    if (settings?.reasoning_effort) setReasoning(settings.reasoning_effort as ReasoningEffort);
+
     const { data } = await supabase
       .from("text_studio_messages")
       .select("role,content")
@@ -376,7 +429,7 @@ export default function AITextStudio() {
     setCompareResults(null);
     try {
       const { data, error } = await supabase.functions.invoke("text-studio-compare", {
-        body: { prompt: comparePrompt, systemPrompt: selectedPersona?.system_prompt },
+        body: { prompt: comparePrompt, systemPrompt: selectedPersona?.system_prompt, models: compareModels },
       });
       if (error) throw error;
       setCompareResults(data?.results || null);
@@ -396,7 +449,7 @@ export default function AITextStudio() {
         <div>
           <h1 className="text-3xl font-display font-bold">AI Text Studio</h1>
           <p className="text-sm text-muted-foreground">
-            Premium Reasoning & Writing — GPT-5.5 Pro · Gemini 3.1 Pro · Claude 4.1 Opus
+            Premium Reasoning & Writing — OpenAI, Google und Anthropic in drei Qualitätsstufen
           </p>
         </div>
       </div>
@@ -410,50 +463,130 @@ export default function AITextStudio() {
 
         {/* CHAT TAB */}
         <TabsContent value="chat" className="space-y-4">
-          <Card className="p-4 grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto] items-end">
-            <div>
-              <Label className="text-xs">Modell</Label>
-              <Select value={model} onValueChange={(v) => handleModelChange(v as TextModelId)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TEXT_MODEL_LIST.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.label} {m.requiresExternalKey && <Lock className="inline h-3 w-3 ml-1" />}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Persona</Label>
-              <Select value={personaId} onValueChange={setPersonaId}>
-                <SelectTrigger><SelectValue placeholder="(keine)" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— Keine —</SelectItem>
-                  {personas.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {selectedModel.supportsReasoningEffort && (
+          <Card className="p-4 space-y-4">
+            <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] items-end">
               <div>
-                <Label className="text-xs">Reasoning</Label>
-                <Select value={reasoning} onValueChange={(v) => setReasoning(v as ReasoningEffort)}>
+                <Label className="text-xs">Anbieter</Label>
+                <Select
+                  value={providerKey}
+                  onValueChange={(v) => {
+                    const key = v as TextProviderKey;
+                    const next =
+                      findModel(key, selectedModel.tier) ?? modelsByProvider(key)[0];
+                    if (next) handleModelChange(next.id);
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {REASONING_EFFORT_OPTIONS.map((r) => (
-                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    {PROVIDER_ORDER.map((p) => (
+                      <SelectItem key={p} value={p}>{PROVIDER_LABELS[p]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Switch id="priv" checked={isPrivate} onCheckedChange={setIsPrivate} />
-              <Label htmlFor="priv" className="text-xs">Privat</Label>
+              <div>
+                <Label className="text-xs">Persona</Label>
+                <Select value={personaId} onValueChange={setPersonaId}>
+                  <SelectTrigger><SelectValue placeholder="(keine)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Keine —</SelectItem>
+                    {personas.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="priv" checked={isPrivate} onCheckedChange={setIsPrivate} />
+                <Label htmlFor="priv" className="text-xs">Privat</Label>
+              </div>
+            </div>
+
+            {/* Qualitätsstufen des gewählten Anbieters */}
+            <div className="grid gap-2 sm:grid-cols-3">
+              {TIER_ORDER.map((tier) => {
+                const m = findModel(providerKey, tier);
+                if (!m) return null;
+                const active = m.id === model;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => handleModelChange(m.id)}
+                    className={`text-left rounded-lg border p-3 transition-colors ${
+                      active
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50 bg-card/50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+                        {TIER_LABELS[tier]}
+                      </span>
+                      {m.requiresExternalKey && <Lock className="h-3 w-3 text-muted-foreground" />}
+                    </div>
+                    <div className="text-sm font-medium">{m.label}</div>
+                    <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                      {TIER_DESCRIPTIONS[tier]}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-2">
+                      {formatEUR(m.inputPricePer1k)} / {formatEUR(m.outputPricePer1k)} pro 1k Tokens ·{" "}
+                      {(m.contextWindow / 1000).toFixed(0)}k Kontext
+                    </div>
+                  </button>
+                );
+              })}
+              {availableTiers.length === 1 && (
+                <div className="sm:col-span-2 text-xs text-muted-foreground self-center">
+                  {PROVIDER_LABELS[providerKey]} bietet in diesem Studio nur die Maximum-Stufe an.
+                </div>
+              )}
+            </div>
+
+            {/* Feineinstellungen */}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <Label className="text-xs">Antwortlänge</Label>
+                <Select value={responseLength} onValueChange={(v) => setResponseLength(v as ResponseLength)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(RESPONSE_LENGTH_LABELS) as ResponseLength[]).map((r) => (
+                      <SelectItem key={r} value={r}>{RESPONSE_LENGTH_LABELS[r]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Kreativität</Label>
+                <Select value={creativity} onValueChange={(v) => setCreativity(v as CreativityLevel)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CREATIVITY_LABELS) as CreativityLevel[]).map((c) => (
+                      <SelectItem key={c} value={c}>{CREATIVITY_LABELS[c]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedModel.supportsReasoningEffort ? (
+                <div>
+                  <Label className="text-xs">Denk-Tiefe</Label>
+                  <Select value={reasoning} onValueChange={(v) => setReasoning(v as ReasoningEffort)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {REASONING_EFFORT_OPTIONS.map((r) => (
+                        <SelectItem key={r} value={r}>{REASONING_EFFORT_LABELS[r]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="text-[11px] text-muted-foreground self-end pb-2">
+                  Denk-Tiefe ist bei {selectedModel.label} nicht einstellbar.
+                </div>
+              )}
             </div>
           </Card>
+
 
           <div className="flex flex-wrap gap-2 text-xs">
             {selectedModel.strengths.map((s) => (
@@ -575,16 +708,52 @@ export default function AITextStudio() {
             <Textarea
               value={comparePrompt}
               onChange={(e) => setComparePrompt(e.target.value)}
-              placeholder="Frage gleichzeitig an alle 3 Modelle senden…"
+              placeholder="Denselben Prompt an bis zu 3 Modelle gleichzeitig senden…"
               className="min-h-[100px]"
             />
-            <Button onClick={runCompare} disabled={compareLoading || !comparePrompt.trim()}>
-              {compareLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Läuft…</> : "Run on all 3"}
+            <div>
+              <Label className="text-xs">Modelle (max. 3)</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {TEXT_MODEL_LIST.map((m) => {
+                  const active = compareModels.includes(m.id);
+                  return (
+                    <Button
+                      key={m.id}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      className="h-7 text-xs"
+                      onClick={() =>
+                        setCompareModels((prev) =>
+                          prev.includes(m.id)
+                            ? prev.filter((id) => id !== m.id)
+                            : prev.length >= 3
+                              ? prev
+                              : [...prev, m.id],
+                        )
+                      }
+                    >
+                      {PROVIDER_LABELS[m.providerKey]} · {TIER_LABELS[m.tier]}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+            <Button
+              onClick={runCompare}
+              disabled={compareLoading || !comparePrompt.trim() || compareModels.length === 0}
+            >
+              {compareLoading ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Läuft…</>
+              ) : (
+                `Vergleich starten (${compareModels.length})`
+              )}
             </Button>
           </Card>
 
           <div className="grid md:grid-cols-3 gap-4">
-            {TEXT_MODEL_LIST.map((m) => {
+            {compareModels.map((id) => {
+              const m = TEXT_MODELS[id];
               const r = compareResults?.[m.id];
               return (
                 <Card key={m.id} className="p-4 space-y-2">
@@ -605,6 +774,7 @@ export default function AITextStudio() {
               );
             })}
           </div>
+
         </TabsContent>
 
         {/* HISTORY TAB */}

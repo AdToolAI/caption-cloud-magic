@@ -30,7 +30,7 @@ export const CommandPalette = () => {
 
   const commands: Command[] = [
     // Create
-    { id: "generator", label: t("nav.textStudio"), icon: "Sparkles", route: "/generator", category: "create", keywords: ["caption", "generate", "erstellen", "text", "studio", "prompt"] },
+    { id: "generator", label: t("nav.textStudio"), icon: "Sparkles", route: "/ai-text-studio", category: "create", keywords: ["caption", "generate", "erstellen", "text", "studio", "prompt"] },
     
     { id: "rewriter", label: t("nav.rewriter"), icon: "RefreshCw", route: "/rewriter", category: "create", keywords: ["rewrite", "umschreiben", "verbessern"] },
     { id: "carousel", label: "Carousel Generator", icon: "LayoutGrid", route: "/carousel", category: "create", keywords: ["carousel", "slides", "präsentation"] },

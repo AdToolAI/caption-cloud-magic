@@ -232,7 +232,7 @@ const VerifyEmail = () => {
             <CardContent className="space-y-4">
               {status === "success" && (
                 <Button
-                  onClick={() => navigate("/generator")}
+                  onClick={() => navigate("/ai-text-studio")}
                   className="w-full bg-gradient-to-r from-primary to-primary/80"
                 >
                   {t("verifyEmail.goDashboard")}

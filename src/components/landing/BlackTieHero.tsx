@@ -75,7 +75,7 @@ export const BlackTieHero = () => {
                 size="lg" 
                 className="bg-gradient-to-r from-primary to-gold-dark text-primary-foreground font-semibold shadow-[var(--shadow-glow-gold)] hover:shadow-[0_0_50px_hsla(43,90%,68%,0.5)] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border-0 h-12 px-8"
               >
-                <Link to="/generator">
+                <Link to="/ai-text-studio">
                   {t('landing.hero.ctaPrimary')}
                 </Link>
               </Button>

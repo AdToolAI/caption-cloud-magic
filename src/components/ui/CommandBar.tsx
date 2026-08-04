@@ -60,7 +60,7 @@ export function CommandBar({ inline = false }: CommandBarProps) {
     { name: t("nav.postTimeAdvisor"), path: "/post-time-advisor", icon: Clock, category: t("hubs.planen") },
     
     // Optimieren (KI-Tools)
-    { name: t("nav.textStudio"), path: "/generator", icon: Sparkles, category: t("hubs.optimieren") },
+    { name: t("nav.textStudio"), path: "/ai-text-studio", icon: Sparkles, category: t("hubs.optimieren") },
     
     
     

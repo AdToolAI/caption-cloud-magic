@@ -61,7 +61,7 @@ const PAGE_ACTIONS: Record<string, QuickAction[]> = {
     { label: 'Medien organisieren', icon: <Sparkles className="w-3 h-3" />, prompt: 'Wie kann ich meine Medien am besten organisieren?' },
     { label: 'Video zu Projekt', icon: <Video className="w-3 h-3" />, prompt: 'Wie verwende ich ein Video aus der Library in einem Projekt?' },
   ],
-  '/generator': [
+  '/ai-text-studio': [
     { label: 'Caption erstellen', icon: <Wand2 className="w-3 h-3" />, prompt: 'Wie erstelle ich die beste Caption mit dem KI-Generator?' },
     { label: 'Tone auswählen', icon: <Sparkles className="w-3 h-3" />, prompt: 'Welcher Ton ist für welche Plattform am besten?' },
     { label: 'Hashtag Strategie', icon: <HelpCircle className="w-3 h-3" />, prompt: 'Wie viele Hashtags sollte ich nutzen und welche?' },

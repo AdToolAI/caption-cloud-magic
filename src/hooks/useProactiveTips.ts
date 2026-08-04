@@ -28,7 +28,7 @@ const PAGE_TIPS: Record<string, ProactiveTip> = {
     message: '💡 Tipp: Aktiviere Auto-Publish für geplante Posts um sie automatisch zu veröffentlichen!',
     type: 'info'
   },
-  '/generator': {
+  '/ai-text-studio': {
     message: '💡 Tipp: Probiere verschiedene Töne (Humorvoll, Inspirierend) für bessere Ergebnisse!',
     type: 'info'
   },

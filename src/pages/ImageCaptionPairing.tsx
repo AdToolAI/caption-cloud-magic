@@ -268,7 +268,7 @@ const ImageCaptionPairing = () => {
       hashtags: hashtags,
       platform: platform.toLowerCase()
     }));
-    navigate('/generator');
+    navigate('/ai-text-studio');
     toast({
       title: t("imgcap_caption_sent_generator"),
     });

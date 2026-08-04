@@ -11,15 +11,28 @@ const corsHeaders = {
 };
 
 const PRICING: Record<string, { input: number; output: number }> = {
+  "openai-gpt-5-6-luna": { input: 0.0004, output: 0.0026 },
+  "openai-gpt-5-6-terra": { input: 0.0021, output: 0.0169 },
+  "openai-gpt-5-6-sol": { input: 0.0195, output: 0.0975 },
+  "google-gemini-3-1-flash-lite": { input: 0.00013, output: 0.0005 },
+  "google-gemini-3-6-flash": { input: 0.0005, output: 0.0033 },
   "google-gemini-3-1-pro": { input: 0.0016, output: 0.013 },
-  "openai-gpt-5-5-pro": { input: 0.0195, output: 0.0975 },
   "anthropic-claude-4-1-opus": { input: 0.0195, output: 0.0975 },
 };
 
 const PROVIDER_MAP: Record<string, { provider: "gateway" | "anthropic"; apiModel: string }> = {
+  "openai-gpt-5-6-luna": { provider: "gateway", apiModel: "openai/gpt-5.6-luna" },
+  "openai-gpt-5-6-terra": { provider: "gateway", apiModel: "openai/gpt-5.6-terra" },
+  "openai-gpt-5-6-sol": { provider: "gateway", apiModel: "openai/gpt-5.6-sol" },
+  "google-gemini-3-1-flash-lite": { provider: "gateway", apiModel: "google/gemini-3.1-flash-lite" },
+  "google-gemini-3-6-flash": { provider: "gateway", apiModel: "google/gemini-3.6-flash" },
   "google-gemini-3-1-pro": { provider: "gateway", apiModel: "google/gemini-3.1-pro-preview" },
-  "openai-gpt-5-5-pro": { provider: "gateway", apiModel: "openai/gpt-5.5-pro" },
   "anthropic-claude-4-1-opus": { provider: "anthropic", apiModel: "claude-opus-4-1" },
+};
+
+// Legacy IDs from the previous registry
+const LEGACY_ALIASES: Record<string, string> = {
+  "openai-gpt-5-5-pro": "openai-gpt-5-6-sol",
 };
 
 function estimateTokens(text: string): number {
@@ -165,7 +178,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const models = Object.keys(PROVIDER_MAP);
+    const requested = Array.isArray((body as { models?: unknown }).models)
+      ? ((body as { models: string[] }).models)
+          .map((m) => LEGACY_ALIASES[m] ?? m)
+          .filter((m) => !!PROVIDER_MAP[m])
+          .slice(0, 3)
+      : [];
+    const models = requested.length > 0
+      ? requested
+      : ["openai-gpt-5-6-sol", "google-gemini-3-1-pro", "anthropic-claude-4-1-opus"];
     const results = await Promise.all(
       models.map((m) => callModel(m, prompt, systemPrompt, { lovable, anthropic })),
     );

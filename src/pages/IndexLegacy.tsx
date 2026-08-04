@@ -75,7 +75,7 @@ const Index = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
               <Button asChild size="lg" className="shadow-lg hover:shadow-xl transition-smooth">
-                <Link to="/generator">
+                <Link to="/ai-text-studio">
                   {t('cta_try')}
                 </Link>
               </Button>

@@ -96,7 +96,7 @@ const Auth = () => {
 
   if (user) {
     const composerImport = localStorage.getItem('composer_import');
-    const redirectTo = composerImport ? '/composer' : '/generator';
+    const redirectTo = composerImport ? '/composer' : '/ai-text-studio';
     return <Navigate to={redirectTo} replace />;
   }
 

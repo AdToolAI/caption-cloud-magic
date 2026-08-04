@@ -41,7 +41,6 @@ import PinnedChatWindow from "@/components/text-studio/PinnedChatWindow";
 
 const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
-const Generator = lazy(() => import("./pages/Generator"));
 const PromptWizard = lazy(() => import("./pages/PromptWizard"));
 const PostingTimes = lazy(() => import("./pages/PostingTimes"));
 
@@ -237,9 +236,9 @@ function AppLayout() {
                     <Route path="/brand/:token" element={<SharedBrandKit />} />
                     
                     {/* Feature pages - enabled */}
-                    <Route path="/generator" element={<Generator />} />
+                    <Route path="/generator" element={<Navigate to="/ai-text-studio" replace />} />
                     <Route path="/ai-text-studio" element={<AITextStudio />} />
-                    <Route path="/prompt-wizard" element={<Navigate to="/generator" replace />} />
+                    <Route path="/prompt-wizard" element={<Navigate to="/ai-text-studio" replace />} />
                     
                     <Route path="/rewriter" element={<Rewriter />} />
                     <Route path="/post-time-advisor" element={<PostingTimes />} />
