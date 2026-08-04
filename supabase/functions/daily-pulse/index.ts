@@ -4,7 +4,7 @@
 
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
-import { sendEmail } from '../_shared/email-send.ts';
+import { sendAdminEmail } from '../_shared/admin-mail.ts';
 import { ADMIN_ALERT_EMAIL } from '../_shared/admin-config.ts';
 
 const LAUNCH_DATE = '2026-07-26T00:00:00Z';
