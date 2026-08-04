@@ -9,6 +9,7 @@ interface DesignCopy {
   caption: string;
   hashtags: string[];
   imagePrompt: string;
+  intent: string;
 }
 
 const SYSTEM = `Du bist Art Director und Werbetexter für Social-Media-Bildposts.
@@ -21,8 +22,9 @@ Regeln:
 - Keine Emojis in Headline/Badge/CTA. Keine Anführungszeichen um die Texte.
 - Sprache exakt wie angefragt.
 - Liefere 8 Varianten mit unterschiedlicher Tonalität und Blickwinkel (z.B. Bold Statement, Editorial, Split Layout, Minimal Overlay, Angebot, Frage, Beweis, Ankündigung). Jede Variante braucht einen kurzen deutschen Namen.
+- Zusätzlich: intent — genau einer von: offer, product, knowledge, proof, launch, event, engagement, statement. Wähle den, der das Briefing am besten beschreibt.
 - Zusätzlich: imagePrompt — ein englischer Bild-Prompt (max. 60 Wörter) für ein fotorealistisches, werbetaugliches Hintergrundmotiv zum Briefing.
-  Der Prompt muss ruhige, texttaugliche Negativflächen enthalten ("generous empty negative space in the lower third", "clean uncluttered background") und darf KEINEN Text, keine Buchstaben, Logos oder Wasserzeichen im Bild erzeugen ("no text, no letters, no logo, no watermark").`;
+  imagePrompt ist IMMER auf Englisch, auch wenn die Copy deutsch ist. Beschreibe ausschließlich das Motiv (Subjekt, Umgebung, Licht, Stimmung, Kamera) — KEINE Textinhalte, keine Schilder, keine Logos, keine Slogans, keine Marken- oder Produktnamen als sichtbare Beschriftung. Keine Angaben zu Layout-Zonen (die setzt das System selbst).`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -76,6 +78,7 @@ Deno.serve(async (req) => {
                 caption: { type: 'string' },
                 hashtags: { type: 'array', items: { type: 'string' } },
                 imagePrompt: { type: 'string' },
+                intent: { type: 'string', enum: ['offer','product','knowledge','proof','launch','event','engagement','statement'] },
                 variants: {
                   type: 'array',
                   items: {
@@ -90,7 +93,7 @@ Deno.serve(async (req) => {
                   },
                 },
               },
-              required: ['headline', 'subline', 'cta', 'badge', 'caption', 'hashtags', 'imagePrompt', 'variants'],
+              required: ['headline', 'subline', 'cta', 'badge', 'caption', 'hashtags', 'imagePrompt', 'intent', 'variants'],
             },
           },
         },
