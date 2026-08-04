@@ -430,3 +430,40 @@
   0%, 100% { opacity: 0.55; transform: scale(1); }
   50%      { opacity: 1;    transform: scale(1.06); }
 }
+
+/* ============================================================
+   FOUNDERS CIRCLE — exclusive gold layer for the first 1.000
+   Activated by FounderExperience via <html data-founder="true">.
+   Never expresses a slot number, position or rank.
+   ============================================================ */
+[data-founder="true"] {
+  /* one notch deeper black + slightly warmer gold ring */
+  --background: 232 34% 3%;
+  --card: 224 38% 5%;
+  --border: 40 26% 16%;
+  --ring: 43 96% 72%;
+}
+
+[data-founder="true"] body {
+  background-image:
+    radial-gradient(1100px 520px at 50% -10%, hsl(var(--primary) / 0.09), transparent 65%),
+    radial-gradient(760px 420px at 100% 100%, hsl(var(--primary) / 0.05), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* Header signature line */
+[data-founder="true"] header[role="banner"] {
+  border-bottom-color: hsl(var(--primary) / 0.28);
+  box-shadow: 0 1px 24px -14px hsl(var(--primary) / 0.85);
+}
+
+/* Sidebar gold seam */
+[data-founder="true"] [data-sidebar="sidebar"] {
+  border-right-color: hsl(var(--primary) / 0.22);
+}
+
+/* Primary actions get a subtle gold sheen */
+[data-founder="true"] .bg-primary {
+  box-shadow: 0 8px 30px -14px hsl(var(--primary) / 0.75);
+}
+
