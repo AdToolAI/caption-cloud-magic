@@ -465,6 +465,23 @@ export default function AIPostGenerator() {
         {/* Hero Header */}
         <PostGeneratorHeroHeader />
 
+        <a
+          href="/post-designer"
+          className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/25
+                     bg-gradient-to-r from-primary/10 via-transparent to-primary/5 px-5 py-4 backdrop-blur-xl
+                     transition-all hover:border-primary/50 hover:shadow-[0_0_40px_-12px_hsl(var(--primary)/0.5)]"
+        >
+          <div>
+            <p className="font-display text-base tracking-tight">Neu: Post Designer Studio</p>
+            <p className="text-sm text-muted-foreground">
+              Aus einem Briefing entstehen vier fertig gesetzte Layouts — voll editierbar, Export in 1080 px.
+            </p>
+          </div>
+          <span className="rounded-full border border-primary/40 px-4 py-1.5 text-sm text-primary">Studio öffnen</span>
+        </a>
+
+
+
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Input Panel (Links) - Glassmorphism */}
           <motion.div

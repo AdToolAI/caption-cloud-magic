@@ -58,6 +58,7 @@ const Coach = lazy(() => import("./pages/Coach"));
 const Campaigns = lazy(() => import("./pages/Campaigns"));
 
 const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
+const PostDesigner = lazy(() => import("./pages/PostDesigner"));
 const Planner = lazy(() => import("./pages/Planner"));
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
 const PictureStudio = lazy(() => import("./pages/PictureStudio"));
@@ -265,6 +266,8 @@ function AppLayout() {
                     <Route path="/brand-kit" element={<BrandKit />} />
                     <Route path="/carousel" element={<Carousel />} />
                     <Route path="/ai-post-generator" element={<AIPostGenerator />} />
+                    <Route path="/post-designer" element={<PostDesigner />} />
+
            <Route path="/background-replacer" element={<Navigate to="/picture-studio?tab=background" replace />} />
            <Route path="/picture-studio" element={<PictureStudio />} />
           <Route path="/trend-radar" element={<TrendRadar />} />
