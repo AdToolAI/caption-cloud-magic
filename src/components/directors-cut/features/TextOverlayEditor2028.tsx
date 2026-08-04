@@ -616,6 +616,14 @@ export function TextOverlayEditor2028({
               exit={{ opacity: 0, y: -20 }}
               className="space-y-5 pt-4 border-t border-white/10 min-w-0 max-w-full overflow-hidden"
             >
+              {selectedIsGraphic ? (
+                <OverlayInspector
+                  overlay={selectedOverlay}
+                  onUpdate={(patch) => updateOverlay(selectedOverlay.id, patch)}
+                  onUpdateStyle={(patch) => updateOverlayStyle(selectedOverlay.id, patch)}
+                />
+              ) : (
+              <>
               {/* Text Input */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Text</Label>
