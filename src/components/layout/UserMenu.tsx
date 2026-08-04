@@ -31,7 +31,11 @@ export function UserMenu() {
         <Button 
           variant="ghost" 
           size="icon"
-          className="rounded-xl hover:bg-muted/50 transition-smooth"
+          className={`rounded-xl hover:bg-muted/50 transition-smooth ${
+            isFounder
+              ? "ring-1 ring-primary/60 text-primary shadow-[0_0_16px_-6px_hsl(var(--primary)/0.8)]"
+              : ""
+          }`}
           aria-label={t("header.userMenu")}
         >
           <User className="h-5 w-5" />
@@ -46,6 +50,11 @@ export function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{displayName}</p>
+            {isFounder && (
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                Founders Circle
+              </p>
+            )}
             <p className="text-xs leading-none text-muted-foreground truncate">
               {userEmail}
             </p>
