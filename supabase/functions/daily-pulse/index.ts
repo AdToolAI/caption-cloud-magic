@@ -122,17 +122,17 @@ Deno.serve(async (req) => {
       </div></body></html>`;
 
     const stamp = new Date(now).toISOString().slice(0, 10);
-    const result = await sendEmail({
+    const result = await sendAdminEmail({
       to: ADMIN_ALERT_EMAIL,
       subject: `Daily Pulse · ${headline}`,
       html,
-      template: `daily_pulse:${stamp}`,
-      category: 'system',
+      label: `daily_pulse_${stamp}`,
     });
 
-    if (!result.ok && !result.skipped) {
+    if (!result.ok) {
       console.error('[DAILY-PULSE] email failed:', result.error);
     }
+
 
     return json({ ok: true, signups, videos, events, payingCount, daysSinceLaunch });
   } catch (e) {
