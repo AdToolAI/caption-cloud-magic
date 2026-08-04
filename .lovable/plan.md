@@ -35,26 +35,29 @@ Eigene, hervorgehobene Benachrichtigung bei den Ereignissen, die wirklich zähle
 - 10., 50., 100. Nutzer
 
 
-### 3. Täglicher Puls (auch bei Null)
-Jeden Morgen eine kurze Mail mit den Zahlen von gestern: Besucher, Registrierungen, gestartete Trials, erstellte Videos, Käufe — plus Vergleich zum Vortag.
+### 4. Täglicher Puls (auch bei Null)
+Jeden Morgen eine kurze Mail mit den Zahlen von gestern: Besucher, Registrierungen, gestartete Trials, erstellte Videos, Umsatz — plus Vergleich zum Vortag.
 Wichtig: Die Mail kommt **auch bei 0** und zählt "Tag 9 seit Launch, noch keine Registrierung". Stille wird damit zu einer Information statt zu einer Lücke.
 
-### 4. Launch Radar im Admin-Bereich
+### 5. Launch Radar im Admin-Bereich
 Eine Karte ganz oben unter `/admin`, die auf einen Blick zeigt:
 Besucher heute → Registrierungen → erstes Video → Kauf, dazu die letzten Ereignisse live.
 Ein Ort, statt vier Dashboards.
 
-### 5. Tracking-Prüfung (Voraussetzung für alles andere)
+### 6. Tracking-Prüfung (Voraussetzung für alles andere)
 Da seit 7 Tagen keine App-Events ankommen, wird zuerst verifiziert, dass Seitenaufrufe, Registrierung und Videoerstellung tatsächlich aufgezeichnet werden. Sonst meldet der Radar dauerhaft Null, obwohl etwas passiert.
 
 ## Technische Umsetzung
 
-- Neue Edge Function `launch-radar-notify`: nimmt ein Ereignis (`signup`, `first_render`, `first_payment`, `milestone`) entgegen, entprellt über `alert_notifications` (kein Doppelversand), verschickt über den bestehenden `sendEmail`-Helper an `ADMIN_ALERT_EMAIL` aus `_shared/admin-config.ts`.
-- Auslöser: Datenbank-Trigger auf der bestehenden Profil-Anlage bei Registrierung (kein Eingriff ins `auth`-Schema) ruft die Function per `pg_net` auf. Kauf-Signal wird im vorhandenen `stripe-webhook` bei `checkout.session.completed` ergänzt.
+- `_shared/admin-config.ts`: Standardempfänger wird auf `info@useadtool.ai` gesetzt (der `ADMIN_ALERT_EMAIL`-Secret-Override bleibt bestehen). Damit gehen auch die vorhandenen Health- und Wochenberichte an die Plattform-Adresse.
+- Neue Edge Function `launch-radar-notify`: nimmt ein Ereignis (`signup`, `first_render`, `purchase`, `milestone`) entgegen, entprellt über `alert_notifications` (kein Doppelversand), verschickt über den bestehenden `sendEmail`-Helper an `ADMIN_ALERT_EMAIL`.
+- Auslöser Registrierung: Datenbank-Trigger auf der bestehenden Profil-Anlage (kein Eingriff ins `auth`-Schema) ruft die Function per `pg_net` auf.
+- Auslöser Umsatz: im vorhandenen `stripe-webhook` an den bereits behandelten Stellen `checkout.session.completed`, `customer.subscription.updated` (Planwechsel per Vorher/Nachher-Vergleich der Price-ID), `invoice.paid`, `invoice.payment_failed` und `customer.subscription.deleted` je ein Aufruf ergänzen — die bestehende Geschäftslogik bleibt unangetastet.
 - Neue Edge Function `daily-pulse` + `pg_cron`-Eintrag `daily-pulse-8am` (`0 6 * * *` UTC). Aggregiert Registrierungen, Trials, `video_creations`, Zahlungen und Lovable-Analytics-Besucher der letzten 24 h.
 - Neue Tabelle `launch_milestones` (erreichte Meilensteine, damit jeder nur einmal feuert) inkl. GRANTs und RLS (nur `service_role` schreibt, Admins lesen).
 - Frontend: `src/components/admin/LaunchRadarCard.tsx`, eingebunden oben in `src/pages/Admin.tsx`; nutzt die vorhandene Admin-Rollenprüfung.
 - Tracking-Audit: `trackEvent`-Aufrufe für Landingpage-Aufruf, Registrierung und Video-Fertigstellung prüfen und dort ergänzen, wo sie fehlen.
+
 
 ## Was dieser Plan bewusst nicht macht
 
