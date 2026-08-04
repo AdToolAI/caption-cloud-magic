@@ -123,17 +123,17 @@ export async function sendRadarAlert(opts: RadarAlertOptions): Promise<void> {
       message: opts.title,
     });
 
-    const result = await sendEmail({
+    const result = await sendAdminEmail({
       to: ADMIN_ALERT_EMAIL,
       subject: `${opts.highlight ? "🏆 " : ""}${opts.title}`,
       html: renderHtml(opts),
-      template: `launch_radar:${opts.kind}`,
-      category: "system",
+      label: `launch_radar_${opts.kind}`,
     });
 
-    if (!result.ok && !result.skipped) {
+    if (!result.ok) {
       console.error("[LAUNCH-RADAR] email failed:", result.error);
     }
+
   } catch (e) {
     // Radar must never break the caller's business logic.
     console.error("[LAUNCH-RADAR] sendRadarAlert error:", e instanceof Error ? e.message : e);
