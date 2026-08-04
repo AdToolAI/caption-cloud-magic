@@ -12,17 +12,28 @@ Kurz: Die Plattform ist live, aber sie tippt dir nicht auf die Schulter, wenn et
 
 ## Was gebaut wird
 
+Alle Benachrichtigungen gehen an **info@useadtool.ai** (löst die bisher hinterlegte private Adresse als Standardempfänger ab).
+
 ### 1. Sofort-Signal bei jedem neuen Nutzer
-Bei jeder neuen Registrierung geht sofort eine E-Mail an die Admin-Adresse:
+Bei jeder neuen Registrierung geht sofort eine E-Mail:
 "Neuer Nutzer Nr. 3 — registriert um 14:22, Sprache DE, Trial läuft bis …".
 So erfährst du es innerhalb von Sekunden, ohne irgendwo nachzusehen.
 
-### 2. Meilenstein-Alarme
+### 2. Umsatz-Signal bei jedem Kauf
+Sofortige E-Mail bei **jedem** zahlungsrelevanten Ereignis, jeweils mit Betrag, Kunde, Plan und Gründer-Rabatt (ja/nein):
+- neues Abo abgeschlossen
+- Abo-Upgrade oder -Downgrade (Planwechsel, mit "vorher → nachher")
+- Credit-/Guthaben-Kauf
+- monatliche Verlängerung erfolgreich abgebucht
+- Zahlung fehlgeschlagen und Kündigung (beides ergänzt die bereits vorhandene Dunning-Mail an den Kunden um eine Info an dich)
+
+### 3. Meilenstein-Alarme
 Eigene, hervorgehobene Benachrichtigung bei den Ereignissen, die wirklich zählen:
 - allererster echter Nutzer nach Launch
 - erstes fertig gerendertes Video eines echten Nutzers (= Produkt funktioniert im Feld)
-- erster zahlender Kunde
+- **erster zahlender Kunde**
 - 10., 50., 100. Nutzer
+
 
 ### 3. Täglicher Puls (auch bei Null)
 Jeden Morgen eine kurze Mail mit den Zahlen von gestern: Besucher, Registrierungen, gestartete Trials, erstellte Videos, Käufe — plus Vergleich zum Vortag.
