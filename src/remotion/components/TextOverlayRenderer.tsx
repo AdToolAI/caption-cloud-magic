@@ -1,23 +1,16 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig, Easing } from 'remotion';
 import { safeInterpolate, safeSpring as spring } from '../utils/safeInterpolate';
+import type { TextOverlay } from '@/types/directors-cut';
+import { isGraphicOverlay } from '@/lib/directors-cut/overlayModel';
+import { OverlayElementRenderer } from './OverlayElementRenderer';
 
-export interface TextOverlayProps {
-  id: string;
-  text: string;
-  animation: 'fadeIn' | 'scaleUp' | 'bounce' | 'typewriter' | 'highlight' | 'glitch';
-  position: 'top' | 'center' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight' | 'centerLeft' | 'centerRight' | 'custom';
-  customPosition?: { x: number; y: number };
-  startTime: number;
-  endTime: number | null;
-  style: {
-    fontSize: 'sm' | 'md' | 'lg' | 'xl';
-    color: string;
-    backgroundColor: string;
-    shadow: boolean;
-    fontFamily: string;
-  };
-}
+/**
+ * Kompatibilitätstyp: entspricht dem Alt-Text-Overlay. Neue Bausteine
+ * (Banner, Lower Third, Badge …) laufen über `OverlayElementRenderer`.
+ */
+export type TextOverlayProps = TextOverlay;
+
 
 const POSITION_STYLES: Record<string, React.CSSProperties> = {
   top: { top: '10%', left: '50%', transform: 'translateX(-50%)' },
