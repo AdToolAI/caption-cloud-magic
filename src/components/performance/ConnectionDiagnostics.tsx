@@ -121,7 +121,13 @@ export function ConnectionDiagnostics() {
           publishingNote = t('connectionDiagnostics.connectFirst');
         } else {
           publishing = 'ok';
-          publishingNote = channel.id === 'tiktok' ? t('connectionDiagnostics.tiktokLive') : undefined;
+          if (channel.id === 'tiktok') {
+            const env = (health as any)?.env;
+            publishingNote =
+              env && env !== 'production'
+                ? t('connectionDiagnostics.tiktokSandbox').replace('{env}', env)
+                : t('connectionDiagnostics.tiktokLive');
+          }
         }
 
         return {
