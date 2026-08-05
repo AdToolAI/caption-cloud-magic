@@ -19569,3 +19569,56 @@ export const detectBrowserLanguage = (): Language => {
   if (browserLang.startsWith('es')) return 'es';
   return 'en';
 };
+// ============================================================
+// Connection Diagnostics (Social) — v413
+// ============================================================
+Object.assign(translations.en, {
+  connectionDiagnostics: {
+    title: 'Connection diagnostics',
+    description: 'Credentials, token validity and posting readiness per channel.',
+    refresh: 'Recheck',
+    checking: 'Checking channels…',
+    credentials: 'Credentials',
+    connection: 'Connection',
+    publishing: 'Publishing',
+    notConnected: 'Not connected — connect the channel to publish.',
+    connectFirst: 'Connect first, then publishing is available.',
+    credentialsMissing: 'Server credentials missing — publishing disabled.',
+    expiresInDays: 'Token expires in {days} days',
+    tiktokLive: 'TikTok content posting approved (production).',
+  },
+});
+
+Object.assign(translations.de, {
+  connectionDiagnostics: {
+    title: 'Verbindungs-Diagnose',
+    description: 'Zugangsdaten, Token-Gültigkeit und Posting-Bereitschaft je Kanal.',
+    refresh: 'Erneut prüfen',
+    checking: 'Kanäle werden geprüft…',
+    credentials: 'Zugangsdaten',
+    connection: 'Verbindung',
+    publishing: 'Posten',
+    notConnected: 'Nicht verbunden — Kanal verbinden, um zu posten.',
+    connectFirst: 'Zuerst verbinden, danach ist Posten möglich.',
+    credentialsMissing: 'Server-Zugangsdaten fehlen — Posten deaktiviert.',
+    expiresInDays: 'Token läuft in {days} Tagen ab',
+    tiktokLive: 'TikTok Content-Posting genehmigt (Produktion).',
+  },
+});
+
+Object.assign(translations.es, {
+  connectionDiagnostics: {
+    title: 'Diagnóstico de conexiones',
+    description: 'Credenciales, validez del token y disponibilidad de publicación por canal.',
+    refresh: 'Volver a comprobar',
+    checking: 'Comprobando canales…',
+    credentials: 'Credenciales',
+    connection: 'Conexión',
+    publishing: 'Publicación',
+    notConnected: 'No conectado — conecta el canal para publicar.',
+    connectFirst: 'Conecta primero; después podrás publicar.',
+    credentialsMissing: 'Faltan credenciales del servidor — publicación desactivada.',
+    expiresInDays: 'El token caduca en {days} días',
+    tiktokLive: 'Publicación de contenido de TikTok aprobada (producción).',
+  },
+});
