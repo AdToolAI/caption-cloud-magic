@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Gift, Loader2, Sparkles, Ticket } from "lucide-react";
+import { Gift, Loader2, Sparkles, Ticket, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,7 @@ export const PromoCodeSection = () => {
   const [code, setCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [releasing, setReleasing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [benefit, setBenefit] = useState<string | null>(null);
@@ -85,6 +86,25 @@ export const PromoCodeSection = () => {
       });
     } finally {
       setRedeeming(false);
+    }
+  };
+
+  const handleRelease = async () => {
+    setReleasing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("release-promo-code");
+      if (error || !data?.ok) throw error ?? new Error("release failed");
+      setBenefit(null);
+      toast({ title: t("account.promo.released") });
+      await loadRedemptions();
+    } catch (e) {
+      toast({
+        title: t("account.promo.error.title"),
+        description: t("account.promo.error.internal"),
+        variant: "destructive",
+      });
+    } finally {
+      setReleasing(false);
     }
   };
 
