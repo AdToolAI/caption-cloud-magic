@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { ConnectionDiagnostics } from "@/components/performance/ConnectionDiagnostics";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
