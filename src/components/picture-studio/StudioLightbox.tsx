@@ -1,4 +1,5 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ExportActionBar } from "@/components/publishing/ExportActionBar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, FolderPlus, Trash2, X, Sparkles, Loader2 } from "lucide-react";
