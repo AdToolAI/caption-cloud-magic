@@ -24,6 +24,7 @@ import { ImageSourceDialog } from "@/components/post-designer/ImageSourceDialog"
 import { DESIGN_TEMPLATES, pickVariants } from "@/lib/post-design/templates";
 import { detectIntent, isPostIntent, seedFromText, type PostIntent } from "@/lib/post-design/intent";
 import { buildImagePrompt, negativeZoneForDesign, type NegativeZone } from "@/lib/post-design/imagePrompt";
+import { detectImageText } from "@/lib/post-design/detectImageText";
 import { MOODS, applyMood, type MoodId } from "@/lib/post-design/moods";
 import { applyBrandKit, setSlideImage, type BrandKitLike } from "@/lib/post-design/brand";
 import { elementToPngBlob, downloadBlob, safeFileName, slidesToZip } from "@/lib/post-design/export";
