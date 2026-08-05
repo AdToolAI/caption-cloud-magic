@@ -42,12 +42,10 @@ import PinnedChatWindow from "@/components/text-studio/PinnedChatWindow";
 const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
 const PromptWizard = lazy(() => import("./pages/PromptWizard"));
-const PostingTimes = lazy(() => import("./pages/PostingTimes"));
 
 const Rewriter = lazy(() => import("./pages/Rewriter"));
 const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
 const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
-const CalendarPage = lazy(() => import("./pages/Calendar"));
 const TemplateManager = lazy(() => import("./pages/TemplateManager"));
 const ReviewLink = lazy(() => import("./pages/ReviewLink"));
 const BioOptimizer = lazy(() => import("./pages/BioOptimizer"));
@@ -59,7 +57,7 @@ const Campaigns = lazy(() => import("./pages/Campaigns"));
 
 const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
 const PostDesigner = lazy(() => import("./pages/PostDesigner"));
-const Planner = lazy(() => import("./pages/Planner"));
+const CommandCenter = lazy(() => import("./pages/CommandCenter"));
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
 const PictureStudio = lazy(() => import("./pages/PictureStudio"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
@@ -74,7 +72,6 @@ const AdvancedAnalytics = lazy(() => import("./pages/AdvancedAnalytics"));
 const SmartScheduler = lazy(() => import("./pages/SmartScheduler"));
 const WhiteLabel = lazy(() => import("./pages/WhiteLabel"));
 const InstagramPublishing = lazy(() => import("./pages/InstagramPublishing"));
-const Composer = lazy(() => import("./pages/Composer"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -242,12 +239,13 @@ function AppLayout() {
                     <Route path="/prompt-wizard" element={<Navigate to="/ai-text-studio" replace />} />
                     
                     <Route path="/rewriter" element={<Rewriter />} />
-                    <Route path="/post-time-advisor" element={<PostingTimes />} />
-                    <Route path="/posting-times" element={<PostingTimes />} />
+                    <Route path="/command-center" element={<CommandCenter />} />
+                    <Route path="/post-time-advisor" element={<Navigate to="/command-center?view=times" replace />} />
+                    <Route path="/posting-times" element={<Navigate to="/command-center?view=times" replace />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/performance" element={<PerformanceTracker />} />
-                    <Route path="/calendar" element={<CalendarPage />} />
-                    <Route path="/planner" element={<Planner />} />
+                    <Route path="/calendar" element={<Navigate to="/command-center?view=calendar" replace />} />
+                    <Route path="/planner" element={<Navigate to="/command-center?view=posts" replace />} />
                     <Route path="/template-manager" element={<TemplateManager />} />
                     <Route path="/review/:token" element={<ReviewLink />} />
                     <Route path="/bio" element={<BioOptimizer />} />
@@ -290,7 +288,7 @@ function AppLayout() {
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />
           <Route path="/instagram-publishing" element={<InstagramPublishing />} />
-          <Route path="/composer" element={<Composer />} />
+          <Route path="/composer" element={<Navigate to="/command-center?compose=1" replace />} />
           {/* Unified AI Video Toolkit — replaces former individual studios */}
           <Route path="/ai-video-studio" element={<AIVideoToolkit />} />
           <Route path="/ai-video-toolkit" element={<Navigate to="/ai-video-studio" replace />} />

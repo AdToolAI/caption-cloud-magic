@@ -60,6 +60,10 @@ import { de, enUS, es } from "date-fns/locale";
 
 interface PlannerV2Props {
   className?: string;
+  /** Eingebettet im Content Command Center: eigene Kopfzeile und Tabs entfallen. */
+  embedded?: boolean;
+  /** Erzwingt eine Ansicht (Beiträge oder Kampagnen) im eingebetteten Modus. */
+  forcedTab?: "posts" | "campaigns";
 }
 
 interface ScheduledPost {
@@ -84,10 +88,10 @@ type FilterStatus = "all" | "draft" | "scheduled" | "approved" | "queued" | "pub
 
 const localeMap = { en: enUS, de, es } as const;
 
-export function PlannerV2({ className }: PlannerV2Props) {
+export function PlannerV2({ className, embedded, forcedTab }: PlannerV2Props) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'campaigns' ? 'campaigns' : 'posts';
+  const initialTab = forcedTab ?? (searchParams.get('tab') === 'campaigns' ? 'campaigns' : 'posts');
   const initialOpenTemplates = searchParams.get('newCampaign') === '1';
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   useEffect(() => {
@@ -353,7 +357,8 @@ export function PlannerV2({ className }: PlannerV2Props) {
 
   return (
     <div className={className}>
-      {/* Header */}
+      {/* Header — im eingebetteten Modus übernimmt das Command Center die Kopfzeile */}
+      {!embedded && (
       <Card className="p-6 mb-6 bg-gradient-to-r from-primary/10 via-purple-500/10 to-blue-500/10 border-primary/20">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -386,9 +391,10 @@ export function PlannerV2({ className }: PlannerV2Props) {
           </Button>
         </div>
       </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-        <TabsList className="mb-4">
+        <TabsList className={embedded ? "hidden" : "mb-4"}>
           <TabsTrigger value="posts" className="gap-2">
             <FileText className="h-4 w-4" />
             Posts

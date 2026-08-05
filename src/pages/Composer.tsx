@@ -34,7 +34,7 @@ interface ChannelConfig {
 
 const DRAFT_KEY = "composer_draft";
 
-export default function Composer() {
+export default function Composer({ embedded }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -677,15 +677,15 @@ export default function Composer() {
     allChannelsExceedLimit;
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className={embedded ? "px-4 py-4 space-y-6" : "container mx-auto py-6 space-y-6"}>
       {/* Breadcrumbs + Credit Balance */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <Breadcrumbs category="publish" feature="Composer" />
+        {embedded ? <span /> : <Breadcrumbs category="publish" feature="Composer" />}
         <CreditBalance />
       </div>
 
       {/* Hero Header */}
-      <ComposerHeroHeader selectedChannelCount={selectedChannels.length} />
+      {!embedded && <ComposerHeroHeader selectedChannelCount={selectedChannels.length} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Main Form */}

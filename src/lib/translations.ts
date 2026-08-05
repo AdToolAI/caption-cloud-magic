@@ -1786,6 +1786,7 @@ export const translations: Record<Language, any> = {
       gaming: "Stream tools, clip creator & content automation for gamers",
     },
     hubItemDesc: {
+      commandCenter: "Create, plan and publish your content across all platforms — at the best time.",
       calendar: "Visual calendar for scheduling and managing all your posts",
       planner: "Drag-and-drop content planner for organized workflows",
       composer: "Write and compose posts with AI assistance",
@@ -2802,6 +2803,7 @@ export const translations: Record<Language, any> = {
     nav: {
       home: "Home",
       calendar: "Smart Calendar",
+      commandCenter: "Content Command Center",
       contentPlanner: "Content Planner",
       composer: "Composer",
       postTimeAdvisor: "Post Time Advisor",
@@ -6636,6 +6638,7 @@ export const translations: Record<Language, any> = {
       gaming: "Stream-Tools, Clip-Creator & Content-Automation für Gamer",
     },
     hubItemDesc: {
+      commandCenter: "Erstelle, optimiere, plane und veröffentliche deine Inhalte über alle verbundenen Plattformen – zum optimalen Zeitpunkt.",
       calendar: "Visueller Kalender zum Planen und Verwalten aller Posts",
       planner: "Drag-and-Drop Content-Planer für organisierte Workflows",
       composer: "Schreibe und verfasse Posts mit KI-Unterstützung",
@@ -7635,6 +7638,7 @@ export const translations: Record<Language, any> = {
     nav: {
       home: "Startseite",
       calendar: "Intelligenter Kalender",
+      commandCenter: "Content Command Center",
       contentPlanner: "Content-Planer",
       composer: "Composer",
       postTimeAdvisor: "Posting-Zeit-Berater",
@@ -11438,6 +11442,7 @@ export const translations: Record<Language, any> = {
       gaming: "Herramientas de streaming, clips y automatización para gamers",
     },
     hubItemDesc: {
+      commandCenter: "Crea, planifica y publica tu contenido en todas las plataformas, en el mejor momento.",
       calendar: "Calendario visual para programar y gestionar todos tus posts",
       planner: "Planificador de contenido con arrastrar y soltar",
       composer: "Escribe y compone posts con asistencia de IA",
@@ -12247,6 +12252,7 @@ export const translations: Record<Language, any> = {
     nav: {
       home: "Inicio",
       calendar: "Calendario Inteligente",
+      commandCenter: "Content Command Center",
       contentPlanner: "Planificador de Contenido",
       composer: "Composer",
       postTimeAdvisor: "Asesor de Horarios",
