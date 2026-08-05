@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ExportActionBar } from '@/components/publishing/ExportActionBar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Download, Loader2, Check, AlertCircle, Play, Monitor, Smartphone, Square, RefreshCw, ExternalLink, Crown
