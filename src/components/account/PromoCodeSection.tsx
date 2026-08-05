@@ -143,10 +143,21 @@ export const PromoCodeSection = () => {
               <p className="text-sm text-muted-foreground">
                 {benefit ?? t("account.promo.reservedHint")}
               </p>
-              <Button onClick={handleActivate} disabled={activating} className="gap-2">
-                {activating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {t("account.promo.activate")}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleActivate} disabled={activating || releasing} className="gap-2">
+                  {activating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {t("account.promo.activate")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleRelease}
+                  disabled={releasing || activating}
+                  className="gap-2 text-muted-foreground"
+                >
+                  {releasing ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                  {t("account.promo.release")}
+                </Button>
+              </div>
             </div>
           )}
 
