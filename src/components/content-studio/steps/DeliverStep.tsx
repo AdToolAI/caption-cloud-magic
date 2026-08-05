@@ -220,7 +220,7 @@ export function DeliverStep() {
         )}
 
         {series && seriesDone && (
-          <Button variant="outline" size="sm" onClick={() => navigate("/command-center?tab=calendar")}>
+          <Button variant="outline" size="sm" onClick={() => navigate("/command-center?view=calendar")}>
             <CalendarPlus className="mr-1.5 h-4 w-4" /> Im Kalender ansehen
           </Button>
         )}
