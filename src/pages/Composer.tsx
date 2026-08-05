@@ -34,7 +34,10 @@ interface ChannelConfig {
 
 const DRAFT_KEY = "composer_draft";
 
-export default function Composer({ embedded }: { embedded?: boolean } = {}) {
+export default function Composer({
+  embedded,
+  onPublished,
+}: { embedded?: boolean; onPublished?: () => void } = {}) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -632,6 +635,8 @@ export default function Composer({ embedded }: { embedded?: boolean } = {}) {
         setImportedMediaUrl(null);
         setPostData(null);
         localStorage.removeItem(DRAFT_KEY);
+        // Eingebettet im Command Center: Ebene nach vollem Erfolg schließen.
+        onPublished?.();
       }
     } catch (error: any) {
       console.error("Publishing error:", error);

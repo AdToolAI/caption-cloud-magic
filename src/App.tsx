@@ -58,6 +58,7 @@ const Campaigns = lazy(() => import("./pages/Campaigns"));
 const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
 const PostDesigner = lazy(() => import("./pages/PostDesigner"));
 const CommandCenter = lazy(() => import("./pages/CommandCenter"));
+import { CommandCenterRedirect } from "./components/routing/CommandCenterRedirect";
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
 const PictureStudio = lazy(() => import("./pages/PictureStudio"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
@@ -240,12 +241,12 @@ function AppLayout() {
                     
                     <Route path="/rewriter" element={<Rewriter />} />
                     <Route path="/command-center" element={<CommandCenter />} />
-                    <Route path="/post-time-advisor" element={<Navigate to="/command-center?view=times" replace />} />
-                    <Route path="/posting-times" element={<Navigate to="/command-center?view=times" replace />} />
+                    <Route path="/post-time-advisor" element={<CommandCenterRedirect view="times" />} />
+                    <Route path="/posting-times" element={<CommandCenterRedirect view="times" />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/performance" element={<PerformanceTracker />} />
-                    <Route path="/calendar" element={<Navigate to="/command-center?view=calendar" replace />} />
-                    <Route path="/planner" element={<Navigate to="/command-center?view=posts" replace />} />
+                    <Route path="/calendar" element={<CommandCenterRedirect view="calendar" />} />
+                    <Route path="/planner" element={<CommandCenterRedirect view="posts" />} />
                     <Route path="/template-manager" element={<TemplateManager />} />
                     <Route path="/review/:token" element={<ReviewLink />} />
                     <Route path="/bio" element={<BioOptimizer />} />
@@ -288,7 +289,7 @@ function AppLayout() {
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />
           <Route path="/instagram-publishing" element={<InstagramPublishing />} />
-          <Route path="/composer" element={<Navigate to="/command-center?compose=1" replace />} />
+          <Route path="/composer" element={<CommandCenterRedirect compose />} />
           {/* Unified AI Video Toolkit — replaces former individual studios */}
           <Route path="/ai-video-studio" element={<AIVideoToolkit />} />
           <Route path="/ai-video-toolkit" element={<Navigate to="/ai-video-studio" replace />} />

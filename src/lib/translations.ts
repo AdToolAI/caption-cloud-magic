@@ -2799,6 +2799,19 @@ export const translations: Record<Language, any> = {
       subtitle: "Everything you need for social media success"
     },
     
+    cc: {
+      title: "Content Command Center",
+      subtitle: "Create, schedule and publish your content across every platform.",
+      tagline: "AI composer · Content calendar · Campaigns · Best posting times · Multi-channel publishing",
+      cta: "Plan content",
+      newPost: "New post",
+      newPostDesc: "Create a post and schedule it on your channels.",
+      calendar: "Calendar",
+      posts: "Posts",
+      campaigns: "Campaigns",
+      times: "Best times",
+      views: "Views",
+    },
     // Navigation (kept for compatibility)
     nav: {
       home: "Home",
@@ -7634,6 +7647,19 @@ export const translations: Record<Language, any> = {
       subtitle: "Alles was du für Social Media Erfolg brauchst"
     },
     
+    cc: {
+      title: "Content Command Center",
+      subtitle: "Erstelle, plane und veröffentliche deinen Content über alle Plattformen.",
+      tagline: "KI-Composer · Content-Kalender · Kampagnen · Beste Posting-Zeiten · Multi-Channel-Publishing",
+      cta: "Content planen",
+      newPost: "Neuer Post",
+      newPostDesc: "Erstelle einen Beitrag und plane ihn für deine Kanäle ein.",
+      calendar: "Kalender",
+      posts: "Beiträge",
+      campaigns: "Kampagnen",
+      times: "Beste Zeiten",
+      views: "Ansichten",
+    },
     // Navigation (kept for compatibility)
     nav: {
       home: "Startseite",
@@ -12248,6 +12274,19 @@ export const translations: Record<Language, any> = {
       subtitle: "Todo lo que necesitas para el éxito en redes sociales"
     },
     
+    cc: {
+      title: "Content Command Center",
+      subtitle: "Crea, planifica y publica tu contenido en todas las plataformas.",
+      tagline: "Composer con IA · Calendario de contenido · Campañas · Mejores horarios · Publicación multicanal",
+      cta: "Planificar contenido",
+      newPost: "Nuevo post",
+      newPostDesc: "Crea una publicación y prográmala en tus canales.",
+      calendar: "Calendario",
+      posts: "Publicaciones",
+      campaigns: "Campañas",
+      times: "Mejores horas",
+      views: "Vistas",
+    },
     // Navigation (kept for compatibility)
     nav: {
       home: "Inicio",
