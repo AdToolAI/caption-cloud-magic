@@ -101,15 +101,21 @@ export function MotifStep() {
         <p className="text-xs text-muted-foreground">{verdict.hint}</p>
       </div>
 
-      <Button
-        onClick={() => {
-          s.buildLayouts();
-          s.goTo("layout");
-        }}
-        disabled={s.imageBusy}
-      >
-        Layouts erzeugen <ArrowRight className="ml-2 h-4 w-4" />
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="ghost" onClick={s.back}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Zurück
+        </Button>
+        <Button
+          onClick={() => {
+            s.buildLayouts();
+            s.goTo("layout");
+          }}
+          disabled={s.imageBusy}
+        >
+          Layouts erzeugen <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+
 
       <ImageSourceDialog open={dialog} onOpenChange={setDialog} onPick={(url) => s.setUserImage(url)} />
     </motion.div>
