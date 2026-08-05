@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { ExportActionBar } from '@/components/publishing/ExportActionBar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Loader2, Download, Video, Sparkles, Coins, FolderOpen, Volume2, Trash2 } from 'lucide-react';
@@ -772,6 +773,7 @@ export function PreviewExportStep({
                         mediaType: 'video',
                         source: 'universal_creator',
                         platforms: [job.format.platform],
+                        aspectRatio: job.format.aspectRatio,
                       }}
                     />
 
