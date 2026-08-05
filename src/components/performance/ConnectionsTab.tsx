@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { ConnectionDiagnostics } from "@/components/performance/ConnectionDiagnostics";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -380,6 +381,39 @@ export const ConnectionsTab = () => {
         return;
       }
 
+      // YouTube: backend OAuth start (client id from server secrets, offline access)
+      if (providerId === 'youtube') {
+        try {
+          const { data: session } = await supabase.auth.getSession();
+          if (!session.session?.access_token) {
+            toast({
+              title: t('socialIntegrations.authRequired') || 'Auth required',
+              description: t('socialIntegrations.pleaseReLogin') || 'Please log in again',
+              variant: 'destructive',
+            });
+            return;
+          }
+          const { data, error } = await supabase.functions.invoke('youtube-oauth-start', {
+            body: { returnTo: window.location.href },
+            headers: {
+              Authorization: `Bearer ${session.session.access_token}`,
+            },
+          });
+
+          if (error) throw error;
+          if (!data?.authUrl) throw new Error('No auth URL received');
+          window.location.href = data.authUrl;
+        } catch (error: any) {
+          toast({
+            title: t('common.error'),
+            description: error?.message || 'Failed to start YouTube connection',
+            variant: 'destructive',
+          });
+        }
+        return;
+      }
+
+
       // Facebook: Use backend OAuth flow on Graph API v24 (v18 triggers Meta "Feature unavailable")
       if (providerId === 'facebook') {
         try {
@@ -471,11 +505,10 @@ export const ConnectionsTab = () => {
           const scopes = 'tweet.read users.read offline.access';
           return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_X_CLIENT_ID}&redirect_uri=${encodeURIComponent(fullRedirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&code_challenge=${pkceChallenge}&code_challenge_method=S256`;
         })(),
-        youtube: (() => {
-          const fullRedirectUri = `${redirectUri}?provider=youtube`;
-          const scopes = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl';
-          return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(fullRedirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
-        })()
+        // NOTE: YouTube is intentionally NOT in this map anymore — it is
+        // handled exclusively by the `youtube-oauth-start` Edge Function
+        // (single source of truth, client id lives in server secrets).
+
       };
 
       // Special handling for TikTok and LinkedIn (Edge Functions)
@@ -1133,6 +1166,8 @@ export const ConnectionsTab = () => {
           </div>
         </CardContent>
       </Card>
+
+      <ConnectionDiagnostics />
 
 
       {/* CSV Upload Section */}

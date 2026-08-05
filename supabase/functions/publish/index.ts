@@ -613,14 +613,12 @@ async function publishToFacebook(
       .maybeSingle();
 
     if (connectionError || !connection) {
-      console.log('[Facebook] No connection - mocking success');
+      console.log('[Facebook] No connection — failing honestly');
       return {
         provider: 'facebook',
-        ok: true,
-        external_id: 'mock_fb_' + Date.now(),
-        permalink: undefined,
-        error_code: 'FB_MOCK',
-        error_message: 'Facebook not connected - simulated success for MVP',
+        ok: false,
+        error_code: 'FB_NO_CONNECTION',
+        error_message: 'Facebook-Seite nicht verbunden. Bitte unter Verbindungen verknüpfen.',
       };
     }
 
@@ -1034,14 +1032,12 @@ async function publishToYouTube(
       .maybeSingle();
 
     if (connectionError || !connection) {
-      console.log('[YouTube] No connection - mocking success');
+      console.log('[YouTube] No connection — failing honestly');
       return {
         provider: 'youtube',
-        ok: true,
-        external_id: 'mock_yt_' + Date.now(),
-        permalink: undefined,
-        error_code: 'YT_MOCK',
-        error_message: 'YouTube not connected - simulated success for MVP',
+        ok: false,
+        error_code: 'YT_NO_CONNECTION',
+        error_message: 'YouTube-Kanal nicht verbunden. Bitte unter Verbindungen verknüpfen.',
       };
     }
 
