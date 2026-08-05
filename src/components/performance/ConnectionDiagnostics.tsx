@@ -123,10 +123,12 @@ export function ConnectionDiagnostics() {
           publishing = 'ok';
           if (channel.id === 'tiktok') {
             const env = (health as any)?.env;
-            publishingNote =
-              env && env !== 'production'
-                ? t('connectionDiagnostics.tiktokSandbox').replace('{env}', env)
-                : t('connectionDiagnostics.tiktokLive');
+            if (env && env !== 'production') {
+              publishing = 'warn';
+              publishingNote = t('connectionDiagnostics.tiktokSandbox').replace('{env}', env);
+            } else {
+              publishingNote = t('connectionDiagnostics.tiktokLive');
+            }
           }
         }
 
