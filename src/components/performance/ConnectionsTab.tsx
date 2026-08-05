@@ -1166,6 +1166,8 @@ export const ConnectionsTab = () => {
         </CardContent>
       </Card>
 
+      <ConnectionDiagnostics />
+
 
       {/* CSV Upload Section */}
       <Card>
