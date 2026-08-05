@@ -124,6 +124,7 @@ export default function ContentStudio() {
   const step: StudioStep = raw && STUDIO_STEPS.includes(raw) ? raw : "brief";
   const coachOpen = searchParams.get("coach") === "1";
   const templatesOpen = searchParams.get("templates") === "1";
+  const series = searchParams.get("mode") === "series";
 
   const setParam = useCallback(
     (key: string, value: string | null, replace = false) => {
@@ -142,6 +143,18 @@ export default function ContentStudio() {
 
   const goTo = useCallback((next: StudioStep) => setParam("step", next), [setParam]);
 
+  /** Alle Studio-Parameter entfernen — sauberer Neustart. */
+  const clearParams = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        ["step", "mode", "coach", "templates"].forEach((key) => params.delete(key));
+        return params;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
+
   const helmet = useMemo(
     () => (
       <Helmet>
@@ -159,7 +172,7 @@ export default function ContentStudio() {
     <PageWrapper>
       {helmet}
       <div className="mx-auto max-w-[1500px] px-1 py-2">
-        <ContentStudioProvider step={step} goTo={goTo}>
+        <ContentStudioProvider step={step} goTo={goTo} series={series} clearParams={clearParams}>
           <StudioBody
             coachOpen={coachOpen}
             setCoachOpen={(o) => setParam("coach", o ? "1" : null, !o)}
