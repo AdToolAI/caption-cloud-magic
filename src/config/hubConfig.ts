@@ -108,13 +108,23 @@ export const hubDefinitions: HubDefinition[] = [
     titleKey: "hubs.optimieren",
     descKey: "hubDesc.optimieren",
     items: [
-      { route: "/ai-post-generator", titleKey: "nav.aiPostGenerator", descKey: "hubItemDesc.aiPost", icon: Bot, cover: coverOptAiPost },
-      { route: "/image-caption-pairing", titleKey: "nav.imageCaptionPairing", descKey: "hubItemDesc.imageCaption", icon: ImagePlus, cover: coverOptImageCaption },
-      { route: "/coach", titleKey: "nav.coach", descKey: "hubItemDesc.coach", icon: MessageSquare, cover: coverOptCoach },
-      { route: "/comment-manager", titleKey: "nav.commentManager", descKey: "hubItemDesc.comments", icon: MessageCircle, cover: coverOptComments },
-      { route: "/template-manager", titleKey: "nav.templateManager", descKey: "hubItemDesc.templates", icon: BookTemplate, cover: coverOptTemplates },
-      { route: "/campaigns", titleKey: "nav.campaigns", descKey: "hubItemDesc.campaigns", icon: Workflow, cover: coverOptCampaigns },
+      {
+        route: "/content-studio",
+        titleKey: "Content Studio",
+        descKey: "Ein Ablauf vom Briefing bis zum fertigen Beitrag: Copy, KI-Motiv, Layout, Serie & Veröffentlichung.",
+        icon: Sparkles,
+        cover: coverOptAiPost,
+        wide: true,
+        previews: [
+          { route: "/content-studio?step=copy", labelKey: "Copy & Varianten", cover: coverOptAiPost },
+          { route: "/content-studio?step=motif", labelKey: "Motiv & Pairing", cover: coverOptImageCaption },
+          { route: "/content-studio?step=layout", labelKey: "Layout-Designer", cover: coverOptTemplates },
+          { route: "/content-studio?step=deliver&mode=series", labelKey: "Serie & Ausspielen", cover: coverOptCampaigns },
+          { route: "/content-studio?coach=1", labelKey: "Coach", cover: coverOptCoach },
+        ],
+      },
     ],
+
   },
   {
     key: "analysieren",
