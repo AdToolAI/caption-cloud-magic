@@ -253,13 +253,7 @@ export default function HubPage() {
                 className="h-full sm:col-span-2 lg:col-span-3"
               >
                 <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-card/60 backdrop-blur-md">
-                  <div
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                      background:
-                        "radial-gradient(120% 140% at 0% 0%, hsla(43,90%,68%,0.14), transparent 55%), radial-gradient(100% 120% at 100% 100%, hsla(187,84%,55%,0.10), transparent 60%)",
-                    }}
-                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 via-transparent to-accent/10" />
                   <div className="relative grid gap-6 p-6 md:grid-cols-[1.1fr_1fr] md:items-center">
                     <div className="min-w-0">
                       <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] uppercase tracking-widest text-primary">
@@ -270,20 +264,16 @@ export default function HubPage() {
                         {t(item.titleKey)}
                       </h2>
                       <p className="mt-2 text-sm md:text-base text-muted-foreground">{t(item.descKey)}</p>
-                      <p className="mt-3 text-xs text-muted-foreground/80">
-                        KI-Composer · Content-Kalender · Kampagnen · Beste Posting-Zeiten · Multi-Channel-Publishing
-                      </p>
+                      <p className="mt-3 text-xs text-muted-foreground/80">{t("cc.tagline")}</p>
                       <Link
                         to={locked ? "#" : item.route}
                         onClick={(e) => locked && e.preventDefault()}
                         className={cn(
                           "mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-all",
-                          locked
-                            ? "opacity-50 cursor-not-allowed"
-                            : "hover:shadow-[0_0_30px_hsla(43,90%,68%,0.35)]",
+                          locked ? "opacity-50 cursor-not-allowed" : "hover:shadow-glow-gold",
                         )}
                       >
-                        Content planen
+                        {t("cc.cta")}
                         <ArrowRight className="h-4 w-4" />
                       </Link>
                     </div>
@@ -294,7 +284,7 @@ export default function HubPage() {
                           key={preview.route}
                           to={locked ? "#" : preview.route}
                           onClick={(e) => locked && e.preventDefault()}
-                          className="group relative aspect-video overflow-hidden rounded-xl border border-white/10"
+                          className="group relative aspect-video overflow-hidden rounded-xl border border-border/60"
                         >
                           <img
                             src={preview.cover}
@@ -302,13 +292,16 @@ export default function HubPage() {
                             loading="lazy"
                             className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-                          <span className="absolute bottom-2 left-3 text-xs font-medium text-white">
-                            {preview.label}
+                          <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/40 to-transparent" />
+                          <span className="absolute bottom-2 left-3 text-xs font-medium text-foreground">
+                            {t(preview.labelKey)}
                           </span>
                         </Link>
                       ))}
                     </div>
+                  </div>
+                </div>
+
                   </div>
                 </div>
               </motion.div>
