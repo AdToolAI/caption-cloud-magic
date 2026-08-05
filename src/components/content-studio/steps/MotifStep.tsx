@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Image as ImageIcon, Loader2, Wand2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Image as ImageIcon, Loader2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ImageSourceDialog } from "@/components/post-designer/ImageSourceDialog";
