@@ -182,28 +182,53 @@ export default function PostDesigner() {
   );
 
   /** KI-Motiv über das Picture Studio erzeugen. */
-  const generateImage = useCallback(async (prompt: string): Promise<string | null> => {
-    if (!prompt.trim()) return null;
-    setImageBusy(true);
-    setImageError(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-studio-image", {
-        body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast" },
-      });
-      if (error) throw error;
-      if (data?.ok === false || data?.error) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
-      const url: string | undefined = data?.image?.url ?? data?.image;
-      if (!url) throw new Error("Kein Bild erhalten");
-      return url;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen";
-      setImageError(message);
-      toast.error(message);
-      return null;
-    } finally {
-      setImageBusy(false);
-    }
+  const requestImage = useCallback(async (prompt: string): Promise<string> => {
+    const { data, error } = await supabase.functions.invoke("generate-studio-image", {
+      body: {
+        prompt: prompt.trim(),
+        style: "realistic",
+        aspectRatio: "1:1",
+        quality: "fast",
+        textFree: true,
+      },
+    });
+    if (error) throw error;
+    if (data?.ok === false || data?.error) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
+    const url: string | undefined = data?.image?.url ?? data?.image;
+    if (!url) throw new Error("Kein Bild erhalten");
+    return url;
   }, []);
+
+  /**
+   * Motiv erzeugen. Enthält das Ergebnis sichtbare Schrift, wird genau einmal
+   * mit verschärftem Textverbot neu erzeugt.
+   */
+  const generateImage = useCallback(
+    async (prompt: string, strictPrompt?: string): Promise<string | null> => {
+      if (!prompt.trim()) return null;
+      setImageBusy(true);
+      setImageError(null);
+      try {
+        const url = await requestImage(prompt);
+        if (strictPrompt && (await detectImageText(url))) {
+          try {
+            return await requestImage(strictPrompt);
+          } catch {
+            return url;
+          }
+        }
+        return url;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen";
+        setImageError(message);
+        toast.error(message);
+        return null;
+      } finally {
+        setImageBusy(false);
+      }
+    },
+    [requestImage],
+  );
 
   /** Motiv in Varianten UND in das bereits geöffnete Design spiegeln. */
   const applyGeneratedImage = useCallback((url: string) => {
