@@ -2799,6 +2799,13 @@ export const translations: Record<Language, any> = {
       subtitle: "Everything you need for social media success"
     },
     
+    publishBar: {
+      download: "Download",
+      publishNow: "Publish now",
+      schedule: "Schedule",
+      noChannelTitle: "No channel connected",
+      noChannelDesc: "Connect a channel first — then you can publish in one click.",
+    },
     cc: {
       title: "Content Command Center",
       subtitle: "Create, schedule and publish your content across every platform.",
@@ -7647,6 +7654,13 @@ export const translations: Record<Language, any> = {
       subtitle: "Alles was du für Social Media Erfolg brauchst"
     },
     
+    publishBar: {
+      download: "Herunterladen",
+      publishNow: "Jetzt veröffentlichen",
+      schedule: "Einplanen",
+      noChannelTitle: "Kein Kanal verbunden",
+      noChannelDesc: "Verbinde zuerst einen Kanal — danach veröffentlichst du mit einem Klick.",
+    },
     cc: {
       title: "Content Command Center",
       subtitle: "Erstelle, plane und veröffentliche deinen Content über alle Plattformen.",
@@ -12274,6 +12288,13 @@ export const translations: Record<Language, any> = {
       subtitle: "Todo lo que necesitas para el éxito en redes sociales"
     },
     
+    publishBar: {
+      download: "Descargar",
+      publishNow: "Publicar ahora",
+      schedule: "Programar",
+      noChannelTitle: "Ningún canal conectado",
+      noChannelDesc: "Conecta primero un canal — después publicas con un clic.",
+    },
     cc: {
       title: "Content Command Center",
       subtitle: "Crea, planifica y publica tu contenido en todas las plataformas.",
