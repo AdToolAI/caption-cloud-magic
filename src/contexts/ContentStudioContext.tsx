@@ -528,6 +528,7 @@ export function ContentStudioProvider({
     design, setDesign, openDesign, hasDesign, activeSlide, setActiveSlide,
     selectedId, setSelectedId, updateSlide, changeLayer,
     brandKit, reset,
+    furthestAllowed, canEnter, restored, dismissRestored,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
