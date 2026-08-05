@@ -471,11 +471,10 @@ export const ConnectionsTab = () => {
           const scopes = 'tweet.read users.read offline.access';
           return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_X_CLIENT_ID}&redirect_uri=${encodeURIComponent(fullRedirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&code_challenge=${pkceChallenge}&code_challenge_method=S256`;
         })(),
-        youtube: (() => {
-          const fullRedirectUri = `${redirectUri}?provider=youtube`;
-          const scopes = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl';
-          return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(fullRedirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
-        })()
+        // NOTE: YouTube is intentionally NOT in this map anymore — it is
+        // handled exclusively by the `youtube-oauth-start` Edge Function
+        // (single source of truth, client id lives in server secrets).
+
       };
 
       // Special handling for TikTok and LinkedIn (Edge Functions)
