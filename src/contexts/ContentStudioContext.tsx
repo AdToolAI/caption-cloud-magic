@@ -125,6 +125,28 @@ interface ContentStudioValue {
 
 const Ctx = createContext<ContentStudioValue | null>(null);
 
+const DRAFT_VERSION = 1;
+const DRAFT_PREFIX = "content-studio:draft:";
+
+interface StudioDraft {
+  v: number;
+  brief: string;
+  platform: string;
+  language: string;
+  tone: string;
+  copy: CopyPayload | null;
+  copyIndex: number;
+  caption: string;
+  image: string | null;
+  imageMode: ImageMode;
+  variants: PostDesign[];
+  moodId: MoodId;
+  design: PostDesign | null;
+  hasDesign: boolean;
+  savedAt: number;
+}
+
+
 export function useContentStudio(): ContentStudioValue {
   const value = useContext(Ctx);
   if (!value) throw new Error("useContentStudio muss innerhalb von ContentStudioProvider genutzt werden");
