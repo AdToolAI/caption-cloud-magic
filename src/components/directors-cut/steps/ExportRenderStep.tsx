@@ -820,11 +820,18 @@ export function ExportRenderStep({
                     </p>
                   </div>
                   
-                  {/* Download Button */}
-                  <Button className="w-full" onClick={handleDownload}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Video herunterladen
-                  </Button>
+                  {/* Herunterladen · Veröffentlichen · Einplanen */}
+                  <ExportActionBar
+                    className="justify-center"
+                    onDownload={handleDownload}
+                    handoff={{
+                      mediaUrl: renderedVideoUrl,
+                      mediaType: "video",
+                      source: "directors_cut_export",
+                      aspectRatio: exportSettings.aspectRatio,
+                    }}
+                  />
+
                   
                   {/* Post-Export Actions */}
                   <div className="grid grid-cols-2 gap-2">
