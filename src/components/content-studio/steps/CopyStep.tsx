@@ -77,6 +77,9 @@ export function CopyStep() {
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Button variant="ghost" onClick={s.back}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Zurück
+        </Button>
         <Button onClick={() => s.goTo("motif")}>
           Weiter zum Motiv <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
