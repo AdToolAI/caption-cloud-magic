@@ -198,7 +198,10 @@ export function LayoutStep() {
             }
           />
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={s.back}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Zurück
+          </Button>
           <Button onClick={() => s.goTo("deliver")}>
             Weiter zum Ausspielen <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
