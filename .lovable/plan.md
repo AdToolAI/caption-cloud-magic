@@ -28,8 +28,8 @@ Zusätzlich: Für Instagram- und Facebook-Posting braucht Meta die freigeschalte
 - Ein Diagnose-Panel in den Verbindungen zeigt pro Kanal: Zugangsdaten hinterlegt, Redirect-URI gesetzt, Token gültig/abgelaufen, Posting freigeschaltet. Nutzt die vorhandenen Health-Funktionen (`health-ig`, `health-tt`, `health-yt`, `health-li`, `health-x`) und `social-health`.
 - Nicht postfähige Kanäle werden klar als „Verbinden möglich, Posten noch in Prüfung" markiert, statt einen Fehler am Ende des Flows zu produzieren.
 
-**D. Kontrolle des TikTok-Modus**
-- Der aktuelle Modus wird im Diagnose-Panel angezeigt, damit Sandbox nicht unbemerkt im Livebetrieb läuft.
+**D. TikTok-Modus sichtbar machen**
+- Der aktive Modus (Produktion/Sandbox) wird im Diagnose-Panel ausgewiesen, damit die genehmigte Live-Integration nicht unbemerkt in Sandbox läuft.
 
 ## Technische Details
 
