@@ -1,41 +1,52 @@
-# Text-Overlays im Director's Cut: Rahmen-Treue (v409)
+# Director's Cut — Textoverlays: Prüfung und Ausbau
 
-## Was schiefläuft
+Zwei Teile: erst alle bestehenden Overlays sauber prüfen und die gefundenen Schwächen beheben, danach die Bibliothek deutlich erweitern.
 
-Im Screenshot ist das Video ein Hochformat-Clip, der im Player mittig mit schwarzen Balken links/rechts liegt. Die Overlays werden aber über die **gesamte Player-Fläche** gelegt, nicht über das tatsächlich sichtbare Videobild. Ergebnis: Text sitzt im schwarzen Balken bzw. schiebt sich "aus dem Rahmen".
+## Teil A — Prüfung und Reparatur der bestehenden Overlays
 
-Bestätigt im Code:
-- `DirectorsCutPreviewPlayer.tsx` (Z. 1801, 1943-1946): Video liegt als `object-contain` im Container, die Overlays sind Geschwister mit `absolute inset-0` auf dem Container.
-- `OverlayCanvasEditor.tsx` (Z. 151-154): Bühne ist fest `aspect-video`, das Video darin `object-contain` — bei Hochformat zeigt der Editor also eine andere Fläche als das Bild.
-- `NativeTextOverlayRenderer.tsx`: Alt-Text-Overlays nutzen feste Pixel-Schriftgrößen (24/36/48/72px) und `maxWidth: 80%` bezogen auf den Container — kein Bezug zur Videobreite, keine Begrenzung nach oben/unten.
+Geprüft werden alle 11 Bausteinarten (Text, Lower Third, Banner, Störer/Badge, Schild/Card, CTA, Ticker, Logo, Callout, Zitat, Fortschritt) in Bibliothek, Editor, Vorschau und Export.
 
-## Was gebaut wird
+Bekannte Schwachpunkte, die behoben werden:
 
-1. **Gemeinsame Bühnen-Berechnung**
-   Eine kleine Hilfsfunktion/Hook, die aus Containergröße + Video-Seitenverhältnis das exakte sichtbare Bildrechteck (Breite, Höhe, Offset links/oben) liefert. Quelle des Seitenverhältnisses: `videoWidth/videoHeight` des Video-Elements, Fallback auf die Szenen-/Projekt-Ratio, Fallback 16:9.
+1. **Overlays laufen aus dem Bild** (Hochformat). Vorschau und Overlay-Editor legen die Overlay-Ebene über den gesamten schwarzen Player, nicht über das tatsächlich sichtbare Videobild. Ergebnis: Text steht in den Balken. Behebung: eine gemeinsame Bühnen-Berechnung (Videoformat statt Containerformat), die Vorschau, Overlay-Editor und Untertitel-Ebene identisch nutzen.
+2. **Alte Text-Overlays skalieren nicht mit.** Reine Text-Overlays ohne Box benutzen in der Vorschau feste Pixelgrößen (24/36/48/72), im Export dagegen die Canvas-Breite. Behebung: einheitlich relativ zur Bühnenbreite rechnen — damit stimmt Vorschau = Export.
+3. **Ausgang-Animation falsch vorbelegt.** Die Presets setzen als Exit "fadeIn"; sinngemäß muss der Ausgang ausblenden bzw. spiegelbildlich zum Eingang laufen. Behebung: Exit-Vorgabe korrigieren und Ausgang sauber am Overlay-Ende auslösen (auch bei "bis Ende").
+4. **Bausteine ohne Text-Felder.** Der Inspector bietet Titel/Untertitel nur bei vier Arten; Badge, CTA, Callout, Ticker und Fortschritt haben Felder, die nicht bedienbar sind (z. B. Badge-Zeile, Fortschrittswert). Behebung: Feldsatz pro Bausteinart vollständig.
+5. **Logo/Bild nur per URL.** Behebung: Datei-Upload aus dem Brand Kit bzw. der Mediathek direkt im Inspector.
+6. **Bibliotheks-Kacheln immer 16:9.** Behebung: Vorschaukachel übernimmt das Projektformat, damit die Wirkung im Hochformat stimmt.
+7. **Lesbarkeit und Sicherheitsrand.** Automatischer Sicherheitsrand (Titelsicherheit) und optionaler weicher Abdunkler hinter Text auf unruhigem Bild; Warnhinweis, wenn eine Box außerhalb des Sicherheitsrands liegt.
+8. **Abnahme:** jede Bausteinart wird mit Ein-/Ausgang in Hoch- und Querformat in Vorschau und Testexport gegengeprüft; Ergebnisse als kurze Checkliste dokumentiert.
 
-2. **Overlay-Bühne statt Vollfläche (Vorschau)**
-   Im Preview-Player bekommen alle Overlays einen eigenen Wrapper, der genau auf diesem Bildrechteck sitzt. Alle relativen Boxen (0..1) und Alt-Positionen beziehen sich dann auf das Videobild — identisch zum Export.
+## Teil B — Mehr Overlay-Möglichkeiten
 
-3. **Editor-Bühne folgt dem Video**
-   `OverlayCanvasEditor` verliert das feste `aspect-video`: die Ziehfläche, das Raster und die Snap-Guides nutzen dasselbe Bildrechteck. Damit stimmt Ziehen im Editor, Vorschau und Export überein (WYSIWYG-Parität).
+Neue Bausteinarten inklusive Presets, Inspector-Feldern und identischem Renderpfad für Vorschau und Export:
 
-4. **Overflow-Schutz für Alt-Text-Overlays**
-   - Schriftgröße wird relativ zur Bühnenbreite skaliert (1080px-Referenz, wie `LEGACY_FONT_SIZE_REL`), statt fixer px-Werte.
-   - Text bleibt in einer Safe-Box (max. 86 % Breite, 80 % Höhe), mit Umbruch und mittiger Ausrichtung.
-   - Animations-Transforms (bounce/scaleUp/glitch) werden gedeckelt, damit die Bewegung nicht über den Bildrand hinausläuft.
+- **Sprechblase** (mit Zeiger, links/rechts/oben/unten)
+- **Aufzählung / Bullet-Liste** (Zeilen erscheinen nacheinander)
+- **Kennzahl-Zähler** (Zahl zählt hoch, mit Einheit und Beschriftung)
+- **Countdown / Timer** (Sekunden oder mm:ss)
+- **Kapitel- bzw. Titelkarte** (Vollbild-Zwischentitel mit Nummer)
+- **Social-Handle-Leiste** (Plattform-Symbol + @Name, Follow-Hinweis)
+- **Preisschild / Streichpreis** (alter Preis durchgestrichen, neuer Preis hervorgehoben)
+- **Vorher/Nachher-Label** (Paar-Label mit Trennlinie)
+- **Hinweis-Pfeil / Marker** (Kreis oder Pfeil zum Anzeigen im Bild)
+- **Tag-Chips** (mehrere kleine Schlagworte in einer Reihe)
+- **QR-/Link-Box** (Kurzlink mit Rahmen, optional QR-Bild)
+- **Untertitel-Balken** (fester Sprechertext-Balken, getrennt von den Auto-Untertiteln)
+- **Sticker / Emoji-Stempel** (Bild oder Emoji mit Wackel-Animation)
 
-5. **Grafik-Overlays clampen**
-   Beim Verschieben/Skalieren wird `clampBox` konsequent angewendet, damit keine Box (Banner, Lower Third, Badge) teilweise außerhalb des Bildes landen kann.
+Zusätzlich für alle Bausteine:
 
-## Technische Details
+- **Neue Animationen**: Zoom-Punch, Zeilen-Wipe, Zittern/Shake, Neon-Puls, Slide+Fade kombiniert.
+- **Stilvorlagen** je Marke: ein Klick färbt alle Overlays einer Szene auf das aktive Brand Kit um.
+- **Duplizieren, Reihenfolge (Ebene nach vorn/hinten), Sperren** direkt in der Overlay-Liste.
+- **Zeitliche Feinsteuerung**: Overlay an einen Schnitt/Szene binden, statt nur an absolute Sekunden.
 
-- Neue Datei `src/lib/directors-cut/videoStageRect.ts` mit `computeStageRect({containerW, containerH, aspect})` plus `useVideoStageRect(videoRef, containerRef)`.
-- `DirectorsCutPreviewPlayer.tsx`: Overlay-Map (Z. 1943-1946) und der Untertitel-Layer in einen `<div style={stageRect}>` mit `pointer-events-none` verlagern.
-- `NativeTextOverlayRenderer.tsx`: `GraphicOverlayPreview` misst weiterhin `clientWidth` — durch die neue Bühne ist das automatisch die Videobreite. `LegacyTextOverlayPreview` erhält `stageWidth` und rechnet Schriftgrad = `overlayFontRel(overlay) * stageWidth`.
-- `OverlayCanvasEditor.tsx`: `aspect-video` durch berechnetes Rechteck ersetzen; Pointer-Mathematik (Z. 80, 97) auf das Bühnenrechteck statt auf `getBoundingClientRect()` des Wrappers beziehen.
-- Keine Änderung an `OverlayGraphic`/`OverlayElementRenderer` (Remotion-Export) nötig — dort ist die Fläche bereits das Videobild. Damit bleibt der Export unverändert und die Vorschau zieht nach.
+## Technische Umsetzung
 
-## Nicht Teil dieses Schritts
-
-Keine neuen Overlay-Typen, keine Änderungen an Presets, Brand-Kit-Styling oder Renderpfad im Export.
+- Neue Datei `src/lib/directors-cut/videoStageRect.ts`: berechnet die sichtbare Videofläche (letterbox-korrekt) und wird von `DirectorsCutPreviewPlayer`, `OverlayCanvasEditor` und der Untertitel-Ebene genutzt.
+- `OverlayKind` in `src/types/directors-cut.ts` um die neuen Arten erweitern; `DEFAULT_OVERLAY_BOX` in `overlayModel.ts` je Art ergänzen; Migration bestehender Overlays bleibt verlustfrei (`upgradeOverlay`).
+- `src/remotion/components/OverlayGraphic.tsx` bleibt der einzige Renderer für Vorschau und Export — jede neue Art bekommt dort genau einen Zweig, damit WYSIWYG-Parität erhalten bleibt.
+- `overlayAnim.ts` um die neuen Ein-/Ausgänge erweitern, Exit-Zeitfenster am Overlay-Ende korrekt spiegeln.
+- `overlayPresets.ts` um die neuen Kategorien und Presets erweitern; `OverlayInspector.tsx` bekommt eine feldschema-getriebene Darstellung pro Bausteinart statt fester if-Ketten.
+- Renderpfad und Export-Payload (snake_case) bleiben unverändert; keine Änderungen an Edge Functions oder Render-Schema.
