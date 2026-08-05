@@ -163,6 +163,34 @@ serve(withTelemetry('stripe-webhook', async (req) => {
         }
 
         console.log('[STRIPE-WEBHOOK] Successfully updated plan from checkout to:', plan, 'with', credits, 'credits');
+
+        // === v411: Gutschein-Einlösung als angewendet markieren ===
+        try {
+          const redemptionId = session.metadata?.promo_redemption_id;
+          if (redemptionId) {
+            const { data: applied } = await supabaseAdmin
+              .from('promo_redemptions')
+              .update({ status: 'applied', stripe_session_id: session.id, applied_at: new Date().toISOString() })
+              .eq('id', redemptionId)
+              .eq('status', 'reserved')
+              .select('promo_code_id')
+              .maybeSingle();
+            if (applied?.promo_code_id) {
+              const { data: pc } = await supabaseAdmin
+                .from('promo_codes')
+                .select('redemptions_count')
+                .eq('id', applied.promo_code_id)
+                .maybeSingle();
+              await supabaseAdmin
+                .from('promo_codes')
+                .update({ redemptions_count: (pc?.redemptions_count ?? 0) + 1 })
+                .eq('id', applied.promo_code_id);
+            }
+          }
+        } catch (e) {
+          console.error('[STRIPE-WEBHOOK] promo redemption update failed:', e);
+        }
+
         
         // Track payment completion in PostHog
         await trackBusinessEvent('payment_completed', user.id, {

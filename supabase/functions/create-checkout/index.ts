@@ -88,7 +88,7 @@ serve(async (req) => {
     // Gutschein-Checkouts beanspruchen KEINEN Founders-Slot.
     const { data: reservation } = await supabaseAdmin
       .from("promo_redemptions")
-      .select("id, code, status")
+      .select("id, code, promo_code_id, status")
       .eq("user_id", user.id)
       .eq("status", "reserved")
       .maybeSingle();
@@ -98,18 +98,11 @@ serve(async (req) => {
       const { data: promoRow } = await supabaseAdmin
         .from("promo_codes")
         .select("stripe_promo_id, active, valid_until")
-        .eq("id", (reservation as { promo_code_id?: string }).promo_code_id ?? "")
+        .eq("id", reservation.promo_code_id)
         .maybeSingle();
-      const { data: byCode } = promoRow
-        ? { data: promoRow }
-        : await supabaseAdmin
-          .from("promo_codes")
-          .select("stripe_promo_id, active, valid_until")
-          .eq("code", reservation.code)
-          .maybeSingle();
-      const valid = byCode && byCode.active !== false &&
-        (!byCode.valid_until || new Date(byCode.valid_until).getTime() > Date.now());
-      if (valid) reservedPromotionCode = byCode!.stripe_promo_id as string;
+      const valid = promoRow && promoRow.active !== false &&
+        (!promoRow.valid_until || new Date(promoRow.valid_until).getTime() > Date.now());
+      if (valid) reservedPromotionCode = promoRow!.stripe_promo_id as string;
     }
 
     let foundersSlotReserved = false;
