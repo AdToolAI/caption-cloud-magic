@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Check, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,11 +11,15 @@ export function CopyStep() {
 
   if (!copy) {
     return (
-      <div className="rounded-2xl border border-border/60 bg-card/50 p-8 text-center text-sm text-muted-foreground">
-        Noch keine Copy. Zurück zum Briefing.
+      <div className="space-y-4 rounded-2xl border border-border/60 bg-card/50 p-8 text-center">
+        <p className="text-sm text-muted-foreground">Noch keine Copy vorhanden.</p>
+        <Button variant="outline" onClick={() => s.goTo("brief")}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Zurück zum Briefing
+        </Button>
       </div>
     );
   }
+
 
   const options = copy.variants?.length
     ? copy.variants
