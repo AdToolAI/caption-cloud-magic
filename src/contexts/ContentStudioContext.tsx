@@ -496,10 +496,28 @@ export function ContentStudioProvider({
     setActiveSlide(0);
     setSelectedId(null);
     setReached(["brief"]);
+    setRestored(false);
     templatesRef.current = [];
     userImageRef.current = false;
+    if (draftKey) {
+      try { window.localStorage.removeItem(draftKey); } catch { /* ignoriert */ }
+    }
     goTo("brief");
-  }, [goTo]);
+  }, [draftKey, goTo]);
+
+  const furthestAllowed: StudioStep = useMemo(() => {
+    if (hasDesign) return "deliver";
+    if (copy) return "layout";
+    return "brief";
+  }, [copy, hasDesign]);
+
+  const canEnter = useCallback(
+    (target: StudioStep) => STUDIO_STEPS.indexOf(target) <= STUDIO_STEPS.indexOf(furthestAllowed),
+    [furthestAllowed],
+  );
+
+  const dismissRestored = useCallback(() => setRestored(false), []);
+
 
   const value: ContentStudioValue = {
     step, goTo, reached,
