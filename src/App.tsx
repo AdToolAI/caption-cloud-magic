@@ -60,7 +60,6 @@ const PictureStudio = lazy(() => import("./pages/PictureStudio"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
 const NewsHub = lazy(() => import("./pages/NewsHub"));
 
-const CommentManager = lazy(() => import("./pages/CommentManager"));
 const AllComments = lazy(() => import("./pages/AllComments"));
 const MediaLibrary = lazy(() => import("./pages/MediaLibrary"));
 const MediaProfiles = lazy(() => import("./pages/MediaProfiles"));
