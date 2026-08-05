@@ -35,7 +35,7 @@ Neuer Tab **„Gutschein“** in `/account` (neben Abo):
 
 **Edge Functions**
 - `redeem-promo-code` (neu, JWT-geprüft): validiert Code gegen `promo_codes` (aktiv, nicht abgelaufen, Kontingent frei), prüft per Stripe, dass der Nutzer kein aktives Abo hat, prüft Doppel-Einlösung, legt `promo_redemptions` mit Status `reserved` an und gibt Rabattbeschreibung + Promotion-Code-ID zurück.
-- `create-checkout` (bestehend): nimmt zusätzlich eine reservierte Einlösung des Nutzers auf, wandelt sie in `discounts: [{ promotion_code }]` um und schreibt die Redemption-ID in die Session-Metadaten. Der bestehende Founders-Slot-Pfad bleibt unangetastet.
+- `create-checkout` (bestehend): nimmt zusätzlich eine reservierte Einlösung des Nutzers auf, wandelt sie in `discounts: [{ promotion_code }]` um und schreibt die Redemption-ID in die Session-Metadaten. **Wichtig:** Liegt eine Einlösung vor, wird der `claim_founders_slot`-Aufruf komplett übersprungen und `founders_slot` nicht in die Metadaten geschrieben — Gutschein-Kunden zählen nicht gegen die 1.000 Plätze und bekommen keine Gründer-Vorteile.
 - `stripe-webhook` (bestehend): bei `checkout.session.completed` Redemption auf `applied` setzen und `redemptions_count` hochzählen.
 - `validate-promo-code` bleibt für die Preisseite bestehen, nutzt aber dieselbe Validierungslogik aus einem neuen `_shared/promo.ts`.
 
