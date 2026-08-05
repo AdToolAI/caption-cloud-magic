@@ -167,6 +167,70 @@ export function ContentStudioProvider({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [brandKit, setBrandKit] = useState<BrandKitLike | null>(null);
 
+  const [restored, setRestored] = useState(false);
+  const hydratedRef = useRef(false);
+  const draftKey = user ? `${DRAFT_PREFIX}${user.id}` : null;
+
+  /** Gespeicherten Entwurf laden — genau einmal pro Sitzung. */
+  useEffect(() => {
+    if (!draftKey || hydratedRef.current) return;
+    hydratedRef.current = true;
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as StudioDraft;
+      if (draft?.v !== DRAFT_VERSION) {
+        window.localStorage.removeItem(draftKey);
+        return;
+      }
+      if (!draft.brief && !draft.copy && !draft.hasDesign) return;
+      setBrief(draft.brief ?? "");
+      setPlatform(draft.platform ?? "instagram");
+      setLanguage(draft.language ?? "de");
+      setTone(draft.tone ?? "selbstbewusst, klar");
+      setCopy(draft.copy ?? null);
+      setCopyIndex(draft.copyIndex ?? 0);
+      setCaption(draft.caption ?? "");
+      setImage(draft.image ?? null);
+      setImageMode(draft.imageMode ?? "ai");
+      setVariants(draft.variants ?? []);
+      setMoodId(draft.moodId ?? "brand");
+      if (draft.design) setDesign(draft.design);
+      setHasDesign(!!draft.hasDesign);
+      setRestored(true);
+    } catch {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [draftKey]);
+
+  /** Entwurf entprellt sichern, sobald sich etwas Relevantes ändert. */
+  useEffect(() => {
+    if (!draftKey || !hydratedRef.current) return;
+    const timer = window.setTimeout(() => {
+      const draft: StudioDraft = {
+        v: DRAFT_VERSION,
+        brief, platform, language, tone,
+        copy, copyIndex, caption,
+        image, imageMode,
+        variants, moodId,
+        design: hasDesign ? design : null,
+        hasDesign,
+        savedAt: Date.now(),
+      };
+      try {
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {
+        /* Speicher voll oder blockiert — Entwurf bleibt in-memory. */
+      }
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [
+    draftKey, brief, platform, language, tone, copy, copyIndex, caption,
+    image, imageMode, variants, moodId, design, hasDesign,
+  ]);
+
+
+
   const [reached, setReached] = useState<StudioStep[]>(["brief"]);
   useEffect(() => {
     setReached((prev) => (prev.includes(step) ? prev : [...prev, step]));
