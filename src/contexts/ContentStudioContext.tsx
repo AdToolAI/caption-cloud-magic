@@ -163,10 +163,16 @@ export function useContentStudio(): ContentStudioValue {
 export function ContentStudioProvider({
   step,
   goTo,
+  series = false,
+  clearParams,
   children,
 }: {
   step: StudioStep;
   goTo: (step: StudioStep) => void;
+  /** Serien-Modus aus der URL (`mode=series`). */
+  series?: boolean;
+  /** Räumt die Studio-Parameter aus der URL — wird beim Zurücksetzen genutzt. */
+  clearParams?: () => void;
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
