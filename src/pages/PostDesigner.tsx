@@ -337,13 +337,16 @@ export default function PostDesigner() {
     ];
     const zone =
       stage === "editor" && design.slides[0] ? negativeZoneForDesign(design) : zoneRef.current;
+    const base = {
+      imagePrompt: copyRef.current?.imagePrompt,
+      brief,
+      zone,
+      angle: angles[Math.floor(Math.random() * angles.length)],
+      brandName: brandKit?.name ?? "",
+    };
     const url = await generateImage(
-      buildImagePrompt({
-        imagePrompt: copyRef.current?.imagePrompt,
-        brief,
-        zone,
-        angle: angles[Math.floor(Math.random() * angles.length)],
-      }),
+      buildImagePrompt(base),
+      buildImagePrompt({ ...base, strict: true }),
     );
     if (!url) return;
     if (stage === "editor") {
