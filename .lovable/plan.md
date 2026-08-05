@@ -1,52 +1,64 @@
-# Director's Cut — Textoverlays: Prüfung und Ausbau
+# Content Command Center — die vier „Planen“-Bereiche werden ein Feature
 
-Zwei Teile: erst alle bestehenden Overlays sauber prüfen und die gefundenen Schwächen beheben, danach die Bibliothek deutlich erweitern.
+Kalender, Content-Planer, Composer und Posting-Zeit-Berater sind vier Schritte desselben Ablaufs: Post erstellen → Zeitpunkt wählen → einplanen → verwalten. Sie werden zu einem Hauptbereich zusammengeführt. Kein Feature entfällt.
 
-## Teil A — Prüfung und Reparatur der bestehenden Overlays
+## Der neue Bereich
 
-Geprüft werden alle 11 Bausteinarten (Text, Lower Third, Banner, Störer/Badge, Schild/Card, CTA, Ticker, Logo, Callout, Zitat, Fortschritt) in Bibliothek, Editor, Vorschau und Export.
+**Content Command Center**
+Untertitel: „Erstelle, plane und veröffentliche deinen Content über alle Plattformen.“
+Rechts oben dauerhaft sichtbar: **+ Neuer Post**
 
-Bekannte Schwachpunkte, die behoben werden:
+Vier Ansichten innerhalb der Seite:
 
-1. **Overlays laufen aus dem Bild** (Hochformat). Vorschau und Overlay-Editor legen die Overlay-Ebene über den gesamten schwarzen Player, nicht über das tatsächlich sichtbare Videobild. Ergebnis: Text steht in den Balken. Behebung: eine gemeinsame Bühnen-Berechnung (Videoformat statt Containerformat), die Vorschau, Overlay-Editor und Untertitel-Ebene identisch nutzen.
-2. **Alte Text-Overlays skalieren nicht mit.** Reine Text-Overlays ohne Box benutzen in der Vorschau feste Pixelgrößen (24/36/48/72), im Export dagegen die Canvas-Breite. Behebung: einheitlich relativ zur Bühnenbreite rechnen — damit stimmt Vorschau = Export.
-3. **Ausgang-Animation falsch vorbelegt.** Die Presets setzen als Exit "fadeIn"; sinngemäß muss der Ausgang ausblenden bzw. spiegelbildlich zum Eingang laufen. Behebung: Exit-Vorgabe korrigieren und Ausgang sauber am Overlay-Ende auslösen (auch bei "bis Ende").
-4. **Bausteine ohne Text-Felder.** Der Inspector bietet Titel/Untertitel nur bei vier Arten; Badge, CTA, Callout, Ticker und Fortschritt haben Felder, die nicht bedienbar sind (z. B. Badge-Zeile, Fortschrittswert). Behebung: Feldsatz pro Bausteinart vollständig.
-5. **Logo/Bild nur per URL.** Behebung: Datei-Upload aus dem Brand Kit bzw. der Mediathek direkt im Inspector.
-6. **Bibliotheks-Kacheln immer 16:9.** Behebung: Vorschaukachel übernimmt das Projektformat, damit die Wirkung im Hochformat stimmt.
-7. **Lesbarkeit und Sicherheitsrand.** Automatischer Sicherheitsrand (Titelsicherheit) und optionaler weicher Abdunkler hinter Text auf unruhigem Bild; Warnhinweis, wenn eine Box außerhalb des Sicherheitsrands liegt.
-8. **Abnahme:** jede Bausteinart wird mit Ein-/Ausgang in Hoch- und Querformat in Vorschau und Testexport gegengeprüft; Ergebnisse als kurze Checkliste dokumentiert.
+| Ansicht | Inhalt | Quelle heute |
+|---|---|---|
+| Kalender | Monat, Woche, Liste, Kanban, Heatmap, Filter, Entwürfe, Status | `/calendar` |
+| Beiträge | alle Posts als Grid/Liste, Entwürfe, geplant, veröffentlicht | `/planner` |
+| Kampagnen | mehrteilige Kampagnen mit Zeitstrahl | `/planner` |
+| Beste Zeiten | 14-Tage-Prognose je Plattform | `/posting-times` |
 
-## Teil B — Mehr Overlay-Möglichkeiten
+Der **Composer** ist keine Ansicht mehr, sondern die Aktion hinter „+ Neuer Post“ — er öffnet sich als Vollflächen-Ebene über dem Command Center und schließt zurück in die zuletzt genutzte Ansicht. In der Feature-Sprache heißt er „Post erstellen“ statt „Composer“.
 
-Neue Bausteinarten inklusive Presets, Inspector-Feldern und identischem Renderpfad für Vorschau und Export:
+## Bezeichnung vereinheitlichen
 
-- **Sprechblase** (mit Zeiger, links/rechts/oben/unten)
-- **Aufzählung / Bullet-Liste** (Zeilen erscheinen nacheinander)
-- **Kennzahl-Zähler** (Zahl zählt hoch, mit Einheit und Beschriftung)
-- **Countdown / Timer** (Sekunden oder mm:ss)
-- **Kapitel- bzw. Titelkarte** (Vollbild-Zwischentitel mit Nummer)
-- **Social-Handle-Leiste** (Plattform-Symbol + @Name, Follow-Hinweis)
-- **Preisschild / Streichpreis** (alter Preis durchgestrichen, neuer Preis hervorgehoben)
-- **Vorher/Nachher-Label** (Paar-Label mit Trennlinie)
-- **Hinweis-Pfeil / Marker** (Kreis oder Pfeil zum Anzeigen im Bild)
-- **Tag-Chips** (mehrere kleine Schlagworte in einer Reihe)
-- **QR-/Link-Box** (Kurzlink mit Rahmen, optional QR-Bild)
-- **Untertitel-Balken** (fester Sprechertext-Balken, getrennt von den Auto-Untertiteln)
-- **Sticker / Emoji-Stempel** (Bild oder Emoji mit Wackel-Animation)
+Heute stehen auf derselben Seite drei Namen: Breadcrumb „Intelligenter Kalender“, Badge „Intelligenter Kalender“, Titel „Content Command Center“. Künftig gilt überall nur **Content Command Center**; „Kalender“ ist nur noch der Name der Ansicht.
 
-Zusätzlich für alle Bausteine:
+## Verzahnung der Funktionen
 
-- **Neue Animationen**: Zoom-Punch, Zeilen-Wipe, Zittern/Shake, Neon-Puls, Slide+Fade kombiniert.
-- **Stilvorlagen** je Marke: ein Klick färbt alle Overlays einer Szene auf das aktive Brand Kit um.
-- **Duplizieren, Reihenfolge (Ebene nach vorn/hinten), Sperren** direkt in der Overlay-Liste.
-- **Zeitliche Feinsteuerung**: Overlay an einen Schnitt/Szene binden, statt nur an absolute Sekunden.
+- **Beste Zeiten im Planungsdialog:** beim Terminieren erscheinen drei konkrete Empfehlungen („Heute 21:00 – sehr gut“) direkt zur Auswahl, statt nur als eigene Analyseseite.
+- **Heatmap im Kalender:** die vorhandene Heatmap-Ansicht wird mit denselben Score-Daten gespeist wie der Tab „Beste Zeiten“.
+- **Kalender ↔ Composer:** Klick auf einen Kalendereintrag öffnet ihn direkt im Composer; Speichern springt in die Ausgangsansicht zurück.
+- **Beiträge ↔ Kalender:** ein Entwurf aus der Beiträge-Ansicht lässt sich terminieren und erscheint sofort im Kalender.
+
+## Hub-Kachel „Planen“
+
+Statt vier gleich großer Kacheln eine große Hauptkarte:
+
+> **Content Command Center**
+> Erstelle, optimiere, plane und veröffentliche deine Inhalte über alle verbundenen Plattformen – zum optimalen Zeitpunkt.
+> Kleingedruckt darunter: KI-Composer · Content-Kalender · Kampagnen · Beste Posting-Zeiten · Multi-Channel-Publishing
+> Button: **Content planen**
+
+In der Karte vier kleine Vorschaufelder (Kalender, Beiträge, Kampagnen, Beste Zeiten), die direkt in die jeweilige Ansicht springen — die Fähigkeiten bleiben sichtbar, wirken aber als ein System.
+
+## Visuell
+
+Bond-Gold-Kopfzeile im Stil der übrigen Cockpits: Playfair-Display-Titel, feiner Goldverlauf, Glas-Umschalter für die vier Ansichten mit weichem Goldschimmer auf der aktiven Ansicht, „+ Neuer Post“ als goldener Primärbutton. Innerhalb der Ansichten bleibt das bestehende Layout unverändert, damit nichts an Bedienung verloren geht.
 
 ## Technische Umsetzung
 
-- Neue Datei `src/lib/directors-cut/videoStageRect.ts`: berechnet die sichtbare Videofläche (letterbox-korrekt) und wird von `DirectorsCutPreviewPlayer`, `OverlayCanvasEditor` und der Untertitel-Ebene genutzt.
-- `OverlayKind` in `src/types/directors-cut.ts` um die neuen Arten erweitern; `DEFAULT_OVERLAY_BOX` in `overlayModel.ts` je Art ergänzen; Migration bestehender Overlays bleibt verlustfrei (`upgradeOverlay`).
-- `src/remotion/components/OverlayGraphic.tsx` bleibt der einzige Renderer für Vorschau und Export — jede neue Art bekommt dort genau einen Zweig, damit WYSIWYG-Parität erhalten bleibt.
-- `overlayAnim.ts` um die neuen Ein-/Ausgänge erweitern, Exit-Zeitfenster am Overlay-Ende korrekt spiegeln.
-- `overlayPresets.ts` um die neuen Kategorien und Presets erweitern; `OverlayInspector.tsx` bekommt eine feldschema-getriebene Darstellung pro Bausteinart statt fester if-Ketten.
-- Renderpfad und Export-Payload (snake_case) bleiben unverändert; keine Änderungen an Edge Functions oder Render-Schema.
+- Neue Route `/command-center` mit einer Shell-Komponente (Kopfzeile, Ansichts-Umschalter, Composer-Ebene). Der aktive Tab steht in der URL (`?view=calendar|posts|campaigns|times`), damit Deep-Links und Zurück-Navigation funktionieren.
+- Die bestehenden Seiten `CalendarPage`, `Planner`, `PostingTimes` und `Composer` werden **nicht neu geschrieben**: sie bekommen einen `embedded`-Modus, der die eigene Seitenkopfzeile und den Seitenrahmen ausblendet, und werden in der Shell gerendert. Datenhooks (`usePostingTimes`, Kalender-/Planner-Queries) und alle Edge Functions bleiben unverändert.
+- Aus `Planner` werden „Beiträge“ und „Kampagnen“ als zwei Ansichten desselben Moduls angesteuert (vorhandener interner Umschalter wird per Prop gesetzt).
+- Alte Routen `/calendar`, `/planner`, `/posting-times`, `/composer` bleiben bestehen und leiten mit dem passenden `?view=`-Parameter auf `/command-center` um; bestehende Links und Lesezeichen brechen nicht.
+- `src/config/hubConfig.ts`: die vier Einträge im Bereich „Planen“ werden durch einen breiten Eintrag ersetzt; die vier Cover-Bilder werden in der neuen Karte als Vorschaufelder weiterverwendet.
+- Übersetzungen für EN/DE/ES ergänzen (neuer Bereichsname, Ansichtsnamen, „Post erstellen“).
+- Zeitempfehlungen im Planungsdialog nutzen den vorhandenen `usePostingTimes`-Hook, keine neue Backend-Logik.
+
+## Reihenfolge
+
+1. Shell + Route + URL-Ansichtszustand, alte Seiten eingebettet
+2. Hub-Kachel und Namensvereinheitlichung
+3. Composer als „+ Neuer Post“-Ebene
+4. Verzahnung: Zeitempfehlungen im Planungsdialog, Kalender→Composer, Entwurf→Termin
+5. Redirects der Altrouten
