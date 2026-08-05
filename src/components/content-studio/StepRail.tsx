@@ -15,10 +15,13 @@ export function StepRail({
   step,
   reached,
   onSelect,
+  canEnter,
 }: {
   step: StudioStep;
   reached: StudioStep[];
   onSelect: (next: StudioStep) => void;
+  /** Nur Schritte, die mit dem aktuellen Stand sinnvoll sind, bleiben klickbar. */
+  canEnter?: (next: StudioStep) => boolean;
 }) {
   const index = STUDIO_STEPS.indexOf(step);
 
@@ -34,7 +37,7 @@ export function StepRail({
         {STUDIO_STEPS.map((id, i) => {
           const active = id === step;
           const done = i < index && reached.includes(id);
-          const available = reached.includes(id);
+          const available = (reached.includes(id) || active) && (canEnter ? canEnter(id) : true);
           return (
             <li key={id}>
               <button
