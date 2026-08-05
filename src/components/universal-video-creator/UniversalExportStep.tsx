@@ -329,23 +329,29 @@ export function UniversalExportStep({ project, category, userId, onBack, onCompl
             {t('uvc.exportCompletedCount', { completed: String(completedCount), total: String(renderStatuses.length) })}
           </p>
 
-          <div className="flex flex-wrap justify-center gap-4 mb-8">
+          <div className="flex flex-col items-center gap-4 mb-8">
             {renderStatuses
               .filter(s => s.status === 'completed' && s.outputUrl)
               .map((status) => {
                 const format = EXPORT_FORMATS.find(f => f.id === status.formatId);
                 return (
-                  <Button
-                    key={status.formatId}
-                    onClick={() => downloadVideo(status.outputUrl!, status.formatId)}
-                    className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90 gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    {t('uvc.exportDownload', { label: format?.label || '' })}
-                  </Button>
+                  <div key={status.formatId} className="w-full max-w-2xl rounded-xl border border-border/60 bg-card/50 p-3">
+                    <p className="mb-2 text-sm font-medium">{format?.label || status.formatId}</p>
+                    <ExportActionBar
+                      size="sm"
+                      onDownload={() => downloadVideo(status.outputUrl!, status.formatId)}
+                      handoff={{
+                        mediaUrl: status.outputUrl!,
+                        mediaType: 'video',
+                        source: 'universal_video_creator',
+                        aspectRatio: format?.aspectRatio,
+                      }}
+                    />
+                  </div>
                 );
               })}
           </div>
+
 
           <div className="flex justify-center gap-4">
             <Button variant="outline" onClick={onBack}>{t('uvc.exportNewVideo')}</Button>
