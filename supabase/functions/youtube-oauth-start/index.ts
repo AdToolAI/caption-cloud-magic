@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
       provider: 'youtube',
       csrf_token: csrf,
       expires_at: new Date(timestamp + 300_000).toISOString(),
-      ...(safeReturnTo ? { return_to: safeReturnTo } : {}),
+      ...(safeReturnTo ? { redirect_url: safeReturnTo } : {}),
     });
 
     if (stateError) {
