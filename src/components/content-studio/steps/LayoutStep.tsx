@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowRight, Image as ImageIcon, Layers as LayersIcon, LayoutTemplate, Loader2, Ruler, Sparkles, Wand2,
+  ArrowLeft, ArrowRight, Image as ImageIcon, Layers as LayersIcon, LayoutTemplate, Loader2, Ruler, Sparkles, Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
