@@ -21,15 +21,18 @@ import { generateSeries, resolveWorkspaceId, seriesToCalendar } from "@/lib/cont
 export function DeliverStep() {
   const s = useContentStudio();
   const { user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
   const exportRef = useRef<HTMLDivElement>(null);
   const [exportSlideIndex, setExportSlideIndex] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const series = searchParams.get("mode") === "series";
+  const series = s.series;
   const [weeks, setWeeks] = useState(4);
   const [perWeek, setPerWeek] = useState(3);
   const [seriesBusy, setSeriesBusy] = useState(false);
+  const [seriesDone, setSeriesDone] = useState(false);
+
 
   /** Serien-Modus in der URL halten, damit der Zustand teilbar bleibt. */
   const setSeries = (on: boolean) => {
