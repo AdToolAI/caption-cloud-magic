@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { PROMO_SELECT, type PromoRow, checkPromoRow, normalizeCode } from "../_shared/promo.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,27 +31,18 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Check if promo code exists and is active
-    const { data: promoCode, error } = await supabaseClient
+    const { data: rowRaw } = await supabaseClient
       .from("promo_codes")
-      .select("id, code, discount_percent, max_redemptions, redemptions_count, active, affiliate_id")
-      .eq("code", code.toUpperCase())
-      .eq("active", true)
-      .single();
+      .select(PROMO_SELECT)
+      .eq("code", normalizeCode(code))
+      .maybeSingle();
 
-    if (error || !promoCode) {
-      console.log("Promo code not found or inactive:", code);
+    const promoCode = rowRaw as PromoRow | null;
+    const check = checkPromoRow(promoCode);
+    if (!check.ok || !promoCode) {
+      console.log("Promo code rejected:", code, check.reason);
       return new Response(
-        JSON.stringify({ valid: false, error: "Invalid code" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-      );
-    }
-
-    // Check if max redemptions reached
-    if (promoCode.max_redemptions && promoCode.redemptions_count >= promoCode.max_redemptions) {
-      console.log("Promo code max redemptions reached:", code);
-      return new Response(
-        JSON.stringify({ valid: false, error: "Code has reached maximum uses" }),
+        JSON.stringify({ valid: false, error: check.reason ?? "invalid", reason: check.reason ?? "invalid" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
