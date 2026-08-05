@@ -10,7 +10,7 @@ Technisch ist alles verdrahtet: Instagram, Facebook, TikTok und YouTube haben je
 
 2. **YouTube-Verbindung läuft nicht über eine Backend-Startfunktion.** Instagram, Facebook, TikTok und X starten OAuth serverseitig; YouTube baut die Google-URL im Browser zusammen und liest die Client-ID aus einer Frontend-Variable. Das funktioniert, ist aber der einzige Sonderweg und bricht still, wenn die Variable im Published-Build fehlt.
 
-3. **TikTok-Betriebsmodus prüfen.** Die Umgebung wird über eine Einstellung gesteuert (Sandbox oder Produktion). In Sandbox können sich nur eingetragene Testkonten verbinden und Posts bleiben privat. Vor dem Kundenbetrieb muss der Produktionsmodus bestätigt und der TikTok-Content-Posting-Audit abgeschlossen sein — sonst schlägt „Verbinden" bei echten Kunden fehl.
+3. **TikTok ist genehmigt — nur der Umgebungsschalter muss sichtbar sein.** Der Content-Posting-Audit ist durch, Verbinden und Posten sind für echte Kunden freigegeben. Im Code steuert eine Einstellung weiterhin Sandbox oder Produktion; steht sie versehentlich auf Sandbox, können sich nur eingetragene Testkonten verbinden. Deshalb wird der aktive Modus künftig angezeigt statt still angenommen.
 
 Zusätzlich: Für Instagram- und Facebook-Posting braucht Meta die freigeschalteten Berechtigungen (App Review). Ohne Freigabe können nur Rollen der App posten.
 
