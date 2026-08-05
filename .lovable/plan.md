@@ -1,39 +1,42 @@
-# Posting-Bereich: Bestandsaufnahme statt Blindausbau
+# Feature-Konsolidierung: weniger Kacheln, gleiche Funktionen
 
-Ziel: ein belastbarer Ist-/Soll-Report pro Plattform, der zeigt, welche Kanal-Einstellungen wir heute steuern, welche organisch überhaupt möglich sind, und wo der echte Mehrwert unserer Plattform liegt. Erst danach wird gebaut.
+Ziel: die Feature-Fläche verdichten, ohne Funktionalität zu verlieren. Zusammengelegt wird nur dort, wo Nutzer die Tools ohnehin in einem Arbeitsgang benutzen. Alle bestehenden Routen bleiben als Weiterleitung erhalten, damit Links, SEO und Onboarding nicht brechen.
 
-## Was der Report liefert
+## Was zusammengelegt wird (lohnt sich)
 
-Ein Dokument `docs/posting/channel-capability-report.md` mit:
+### 1. Publish-Cockpit (Hub "Planen": 4 Kacheln -> 1)
+Kalender, Content-Planer, Composer und Posting-Zeit-Berater sind ein einziger Workflow: Post schreiben -> Zeit wählen -> im Kalender/Board sehen.
 
-1. **Ist-Zustand pro Kanal** (Instagram, Facebook, TikTok, X, LinkedIn, YouTube)
-   - welche Felder der Composer heute an die API schickt
-   - welche Felder hart verdrahtet sind (z. B. TikTok `PUBLIC_TO_EVERYONE`)
-   - welche Einstellungen es gar nicht ins UI geschafft haben
-2. **Soll-Zustand: was die APIs organisch erlauben**
-   - pro Kanal die tatsächlich verfügbaren Post-Optionen laut aktueller API-Doku
-   - explizit getrennt: organisch möglich vs. nur über Ads-API (Zielgruppen-Targeting)
-   - Voraussetzungen je Option: Scope, App-Review, Account-Typ, Sandbox-Grenzen
-3. **Lückenliste mit Aufwand/Nutzen**
-   - jede fehlende Option mit Bewertung: Kundennutzen, Umsetzungsaufwand, Risiko (Review/Scope)
-   - Kennzeichnung, was ohne neue Berechtigungen sofort baubar ist
-4. **Mehrwert-Kapitel: was nur wir können**
-   - plattformübergreifende Hebel, die es bei YouTube/Meta nativ nicht gibt: Cross-Post-Varianten, Zeitversatz je Kanal, Posting-Zeit-Empfehlungen, Media-Profile/Auto-Fix, Bulk-Scheduling, Hook-Score, First-Comment-Automation
-   - klare Aussage zur Zielgruppe: organisches Audience-Targeting ist bei Meta/LinkedIn/TikTok praktisch abgeschafft; echtes Targeting läuft nur über Ads-APIs. Der plattformseitige Ersatz ist ein Persona-/Zielgruppen-Layer, der Text, Hashtags, Kanalmix und Zeitpunkt steuert.
-5. **Empfohlene Roadmap in drei Wellen**
-   - Welle 1: fehlende native Optionen ohne neue Scopes
-   - Welle 2: Optionen mit Scope-/Review-Bedarf
-   - Welle 3: Persona-Layer bzw. Ads-Anbindung als eigenes Modul
+Neue Seite `/publish` mit vier Tabs:
+- **Composer** (Schreiben/Medien/Kanäle) — bestehende Composer-Seite als Tab-Inhalt
+- **Kalender** — bestehende Calendar-Seite
+- **Board** — bestehender Content-Planer
+- **Beste Zeiten** — Posting-Zeit-Berater, zusätzlich als Inline-Vorschlag direkt im Composer-Zeitfeld ("beste Zeit übernehmen")
 
-## Vorgehen
+Der Hub "Planen" zeigt danach eine Kachel statt vier.
 
-- Vollständiges Auslesen der Publish-Kette: `supabase/functions/publish/index.ts` (alle sechs `publishTo*`-Funktionen), die dedizierten `publish-to-*`-Functions, `post-first-comment`, `poster-dispatcher`, `calendar-publish-dispatcher`.
-- Auslesen der Composer-UI-Schicht: `src/pages/Composer.tsx`, `ChannelConfigModal`, `YouTubeConfigModal`, `CrossPostMagicPanel`, `PublishToSocialTab`, `src/types/publish.ts`.
-- Abgleich der Scopes in den OAuth-/Connect-Flows und in `social_connections`, um zu bewerten, was mit bestehenden Berechtigungen sofort möglich ist.
-- Recherche der aktuellen Plattform-Dokus (Graph API, TikTok Content Posting API, LinkedIn Posts API, YouTube Data API, X API) für den Soll-Zustand.
+### 2. Bild-Tools (Hub "Erstellen": 3 Kacheln -> 1)
+KI Picture Studio, Post Designer und KI-Post-Generator/Image-Caption-Pairing überschneiden sich stark (Bild erzeugen -> Text drauf -> Caption).
+Zusammenfassung zu **"Image Studio"** mit Tabs: *Motiv erzeugen*, *Post gestalten*, *Caption & Text*. Post Designer bleibt technisch unverändert, wird nur als Tab eingehängt.
 
-## Technische Details
+### 3. Analytics (Hub "Analysieren": 3 Kacheln -> 1)
+Analytics, PostHog Dashboard und Usage Reports werden zu **"Analytics"** mit Tabs *Performance*, *Produkt*, *Verbrauch*. Trend Radar und AI Text Studio bleiben eigenständig (anderer Zweck).
 
-- Der Report ist reine Dokumentation; es werden keine Edge Functions und keine UI-Dateien geändert.
-- Ergebnis pro Kanal als Tabelle: Option | heute im UI | heute an API gesendet | API-fähig | benötigter Scope | Aufwand | Priorität.
-- Bekannte Randbedingungen aus dem Projekt werden berücksichtigt: X nur Basic API, TikTok im Sandbox-Modus, Meta Graph API v24.
+## Was bewusst getrennt bleibt
+- **Motion/Video-Studios** (Universal Creator, Video Composer, Director's Cut, AI Video Studio) — unterschiedliche Pipelines und Laufzeiten; ein Merge würde die Lip-Sync-Kette anfassen. Nicht anrühren.
+- **Cast & World, Creator Library, Marketplace, Lizenzen** — Bibliotheken vs. Handel, unterschiedliche Datenmodelle.
+- **Team, Brand Kit, White Label** — Einstellungsebene, kein Arbeitsablauf.
+- **Autopilot** — bleibt der eine Ein-Klick-Einstieg, wird nicht in ein Cockpit geschoben.
+
+## Technische Umsetzung
+- Neue Container-Seiten `src/pages/PublishCockpit.tsx`, `src/pages/ImageStudio.tsx`, Analytics-Container; jede rendert die bestehenden Seitenkomponenten als Tab-Inhalt (kein Logik-Umbau, kein Edge-Function-Change).
+- Bestehende Seiten werden zu Komponenten mit optionalem `embedded`-Flag (blendet nur die eigene Seitenüberschrift/Padding aus).
+- Tab-Zustand in der URL (`/publish?tab=calendar`), damit Deep-Links und Zurück-Navigation funktionieren.
+- Alte Routen (`/calendar`, `/planner`, `/composer`, `/posting-times`, `/picture-studio`, `/post-designer`, `/analytics/posthog`, `/analytics/usage-reports`) bleiben und leiten per `Navigate` auf den passenden Tab.
+- `src/config/hubConfig.ts`: die zusammengelegten Einträge durch je einen ersetzen, neue Cover-Bilder im Bond-Gold-Stil.
+- Sidebar/Command-Palette-Einträge und `src/config/seo.ts` entsprechend angleichen.
+
+## Reihenfolge
+1. Publish-Cockpit (größter sichtbarer Gewinn)
+2. Image Studio
+3. Analytics-Tabs
