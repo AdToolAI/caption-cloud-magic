@@ -18,10 +18,13 @@ Neuer Tab **„Gutschein“** in `/account` (neben Abo):
 - Ein Code pro Nutzer, ein Nutzer pro Code — serverseitig erzwungen.
 - Codes können ablaufen (`valid_until`) und ein Kontingent haben (`max_redemptions`).
 - Der Rabatt wird nie im Frontend berechnet, sondern immer von Stripe angewendet.
+- **Kein Founders-Status über Gutscheine.** Ein Checkout mit eingelöstem Code beansprucht keinen der 1.000 Gründer-Plätze und erhält keine Gründer-Vorteile (kein 20 %-Credit-Rabatt, keine Gold-UI). Die Plätze bleiben zahlenden Kunden vorbehalten.
+- Wer nach der Gratiszeit regulär weiterzahlt, wird dadurch **nicht** nachträglich Gründer — der Platz wird beim ersten Checkout entschieden und bei Gutschein-Checkouts übersprungen.
 
 ## Der Launch-Code
 
-`LAUNCHADTOOLAI` — 100 % Rabatt für 3 Monate auf das Beta-Abo (14,99 €), gültig bis 01.09.2026, unbegrenzt einlösbar bis dahin. Wird in Stripe als Coupon + Promotion Code angelegt und in der Datenbank verknüpft. Nach 3 Monaten läuft das Abo regulär weiter (kündbar wie immer).
+`LAUNCHADTOOLAI` — 100 % Rabatt für 3 Monate auf das Beta-Abo (14,99 €), gültig bis 01.09.2026, unbegrenzt einlösbar bis dahin. Wird in Stripe als Coupon + Promotion Code angelegt und in der Datenbank verknüpft. Nach 3 Monaten läuft das Abo regulär weiter (kündbar wie immer). Ohne Gründer-Status.
+
 
 ## Technische Umsetzung
 
@@ -32,7 +35,7 @@ Neuer Tab **„Gutschein“** in `/account` (neben Abo):
 
 **Edge Functions**
 - `redeem-promo-code` (neu, JWT-geprüft): validiert Code gegen `promo_codes` (aktiv, nicht abgelaufen, Kontingent frei), prüft per Stripe, dass der Nutzer kein aktives Abo hat, prüft Doppel-Einlösung, legt `promo_redemptions` mit Status `reserved` an und gibt Rabattbeschreibung + Promotion-Code-ID zurück.
-- `create-checkout` (bestehend): nimmt zusätzlich eine reservierte Einlösung des Nutzers auf, wandelt sie in `discounts: [{ promotion_code }]` um und schreibt die Redemption-ID in die Session-Metadaten. Der bestehende Founders-Slot-Pfad bleibt unangetastet.
+- `create-checkout` (bestehend): nimmt zusätzlich eine reservierte Einlösung des Nutzers auf, wandelt sie in `discounts: [{ promotion_code }]` um und schreibt die Redemption-ID in die Session-Metadaten. **Wichtig:** Liegt eine Einlösung vor, wird der `claim_founders_slot`-Aufruf komplett übersprungen und `founders_slot` nicht in die Metadaten geschrieben — Gutschein-Kunden zählen nicht gegen die 1.000 Plätze und bekommen keine Gründer-Vorteile.
 - `stripe-webhook` (bestehend): bei `checkout.session.completed` Redemption auf `applied` setzen und `redemptions_count` hochzählen.
 - `validate-promo-code` bleibt für die Preisseite bestehen, nutzt aber dieselbe Validierungslogik aus einem neuen `_shared/promo.ts`.
 
