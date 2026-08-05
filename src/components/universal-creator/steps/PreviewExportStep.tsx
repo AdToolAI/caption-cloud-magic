@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { ExportActionBar } from '@/components/publishing/ExportActionBar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Loader2, Download, Video, Sparkles, Coins, FolderOpen, Volume2, Trash2 } from 'lucide-react';
@@ -764,15 +765,18 @@ export function PreviewExportStep({
 
                 {job.status === 'completed' && job.downloadUrl && (
                   <div className="space-y-2">
-                    <Button
-                      onClick={() => handleDownload(job.downloadUrl!, job.format.platform)}
-                      variant="outline"
+                    <ExportActionBar
                       size="sm"
-                      className="w-full"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      {t('uc.download')}
-                    </Button>
+                      onDownload={() => handleDownload(job.downloadUrl!, job.format.platform)}
+                      handoff={{
+                        mediaUrl: job.downloadUrl!,
+                        mediaType: 'video',
+                        source: 'universal_creator',
+                        platforms: [job.format.platform],
+                        aspectRatio: job.format.aspectRatio,
+                      }}
+                    />
+
                     
                     <div className="grid grid-cols-3 gap-2">
                       <Button

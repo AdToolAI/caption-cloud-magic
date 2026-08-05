@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -53,7 +53,12 @@ function KeepAlive({
 }) {
   if (!visited) return null;
   return (
-    <div hidden={!active} aria-hidden={!active}>
+    <div
+      hidden={!active}
+      aria-hidden={!active}
+      /* Unsichtbare Ansichten pausieren Animationen und Layout-Arbeit. */
+      style={active ? undefined : { display: "none", contentVisibility: "hidden" }}
+    >
       {children}
     </div>
   );
@@ -68,8 +73,10 @@ export default function CommandCenter() {
   const composerOpen = searchParams.get("compose") === "1";
 
   // Merkt sich, welche Ansichten der Nutzer bereits geöffnet hat (Lazy + KeepAlive).
-  const visited = useRef<Set<CommandCenterView>>(new Set());
-  visited.current.add(view);
+  const [visited, setVisited] = useState<CommandCenterView[]>([view]);
+  useEffect(() => {
+    setVisited((prev) => (prev.includes(view) ? prev : [...prev, view]));
+  }, [view]);
 
   const setView = useCallback(
     (next: CommandCenterView) => {
@@ -185,22 +192,22 @@ export default function CommandCenter() {
         {/* Ansichten — einmal geladen, danach nur noch ein-/ausgeblendet */}
         <Suspense fallback={<ViewFallback />}>
           <div id="cc-panel-calendar" role="tabpanel" aria-labelledby="cc-tab-calendar">
-            <KeepAlive active={view === "calendar"} visited={visited.current.has("calendar")}>
+            <KeepAlive active={view === "calendar"} visited={visited.includes("calendar")}>
               <CalendarPage embedded />
             </KeepAlive>
           </div>
           <div id="cc-panel-posts" role="tabpanel" aria-labelledby="cc-tab-posts">
-            <KeepAlive active={view === "posts"} visited={visited.current.has("posts")}>
+            <KeepAlive active={view === "posts"} visited={visited.includes("posts")}>
               <PlannerV2Lazy embedded forcedTab="posts" />
             </KeepAlive>
           </div>
           <div id="cc-panel-campaigns" role="tabpanel" aria-labelledby="cc-tab-campaigns">
-            <KeepAlive active={view === "campaigns"} visited={visited.current.has("campaigns")}>
+            <KeepAlive active={view === "campaigns"} visited={visited.includes("campaigns")}>
               <PlannerV2Lazy embedded forcedTab="campaigns" />
             </KeepAlive>
           </div>
           <div id="cc-panel-times" role="tabpanel" aria-labelledby="cc-tab-times">
-            <KeepAlive active={view === "times"} visited={visited.current.has("times")}>
+            <KeepAlive active={view === "times"} visited={visited.includes("times")}>
               <PostingTimes embedded />
             </KeepAlive>
           </div>

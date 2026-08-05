@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ExportActionBar } from "@/components/publishing/ExportActionBar";
+import type { PublishHandoff } from "@/lib/publishHandoff";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -445,6 +447,35 @@ export default function PostDesigner() {
     }
   };
 
+  /**
+   * Für "Veröffentlichen"/"Einplanen" braucht der Composer eine öffentliche URL.
+   * Deshalb rendern wir die erste Slide und laden sie nach composer-uploads hoch.
+   */
+  const resolvePublishHandoff = async (): Promise<PublishHandoff | null> => {
+    try {
+      if (!user) throw new Error("Nicht angemeldet");
+      const blob = await renderSlideToBlob(0);
+      const path = `${user.id}/post-designer/${safeFileName(design.title)}-${Date.now()}.png`;
+      const { error } = await supabase.storage
+        .from("composer-uploads")
+        .upload(path, blob, { cacheControl: "3600", upsert: true, contentType: "image/png" });
+      if (error) throw new Error(error.message);
+      const { data } = supabase.storage.from("composer-uploads").getPublicUrl(path);
+      if (!data?.publicUrl) throw new Error("Öffentliche URL konnte nicht erstellt werden");
+      return {
+        mediaUrl: data.publicUrl,
+        mediaType: "image",
+        title: design.title,
+        caption: design.slides[0]?.layers.find((l) => l.type === "text")?.text ?? "",
+        aspectRatio: design.format,
+        source: "post_designer",
+      };
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Veröffentlichen fehlgeschlagen");
+      return null;
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
@@ -521,10 +552,12 @@ export default function PostDesigner() {
                   {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
                   Speichern
                 </Button>
-                <Button size="sm" onClick={handleExport} disabled={exporting}>
-                  {exporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
-                  Export
-                </Button>
+                <ExportActionBar
+                  size="sm"
+                  downloading={exporting}
+                  onDownload={handleExport}
+                  resolveHandoff={resolvePublishHandoff}
+                />
               </>
             )}
           </div>

@@ -762,7 +762,7 @@ export default function MediaLibrary() {
       description: "Wird im Composer geladen...",
     });
     
-    navigate('/composer');
+    navigate('/command-center?compose=1');
   };
 
   // Send to Calendar
@@ -781,7 +781,7 @@ export default function MediaLibrary() {
       description: "Wird im Kalender geladen...",
     });
     
-    navigate('/calendar?prefill=true');
+    navigate('/command-center?view=calendar&prefill=true');
   };
 
   // Send to Background Replacer
@@ -831,7 +831,7 @@ export default function MediaLibrary() {
       description: `${selectedItems.length} Dateien werden im Composer geladen...`,
     });
     
-    navigate('/composer');
+    navigate('/command-center?compose=1');
   };
 
   // Bulk send to AI Post Generator
@@ -880,7 +880,7 @@ export default function MediaLibrary() {
       description: `Erstes Medium wird im Kalender geladen...`,
     });
     
-    navigate('/calendar?prefill=true');
+    navigate('/command-center?view=calendar&prefill=true');
   };
 
   // Bulk send to Background Replacer

@@ -217,7 +217,7 @@ export function CampaignTemplateDialog({
               size="sm"
               onClick={() => {
                 handleClose();
-                navigate("/calendar/templates");
+                navigate("/command-center?view=campaigns");
               }}
             >
               <Library className="w-4 h-4 mr-2" />

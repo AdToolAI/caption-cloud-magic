@@ -232,7 +232,7 @@ export function CalendarToolbar({
                 </DropdownMenuItem>
               )}
               {onOpenCampaignTemplates && (
-                <DropdownMenuItem onClick={() => navigate("/calendar/templates")}>
+                <DropdownMenuItem onClick={() => navigate("/command-center?view=campaigns")}>
                   <Library className="w-4 h-4 mr-2" />
                   {t('calendar.manageTemplates')}
                 </DropdownMenuItem>
