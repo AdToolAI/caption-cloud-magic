@@ -39,7 +39,7 @@ export const CommandPalette = () => {
     // Optimize
     { id: "wizard", label: t("nav.wizard"), icon: "Wand2", route: "/wizard", category: "optimize", keywords: ["prompt", "optimize", "optimieren"] },
     { id: "advisor", label: t("nav.advisor"), icon: "Clock", route: "/post-time-advisor", category: "optimize", keywords: ["time", "zeit", "schedule"] },
-    { id: "calendar", label: "Calendar", icon: "Calendar", route: "/calendar", category: "optimize", keywords: ["calendar", "kalender", "planen"] },
+    { id: "calendar", label: "Calendar", icon: "Calendar", route: "/command-center?view=calendar", category: "optimize", keywords: ["calendar", "kalender", "planen"] },
     
     // Analyze
     { id: "performance", label: t("nav.performance"), icon: "TrendingUp", route: "/performance", category: "analyze", keywords: ["performance", "analytics", "statistik"] },

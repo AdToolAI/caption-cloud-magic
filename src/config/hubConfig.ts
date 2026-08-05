@@ -65,7 +65,7 @@ export interface HubSubItem {
   /** Breite Hauptkarte über die volle Rasterbreite. */
   wide?: boolean;
   /** Kleine Vorschaufelder innerhalb einer breiten Karte. */
-  previews?: { route: string; label: string; cover: string }[];
+  previews?: { route: string; labelKey: string; cover: string }[];
 }
 
 export interface HubDefinition {
@@ -94,10 +94,10 @@ export const hubDefinitions: HubDefinition[] = [
         cover: coverPlanenCalendar,
         wide: true,
         previews: [
-          { route: "/command-center?view=calendar", label: "Kalender", cover: coverPlanenCalendar },
-          { route: "/command-center?view=posts", label: "Beiträge", cover: coverPlanenPlanner },
-          { route: "/command-center?view=campaigns", label: "Kampagnen", cover: coverPlanenComposer },
-          { route: "/command-center?view=times", label: "Beste Zeiten", cover: coverPlanenPostingTimes },
+          { route: "/command-center?view=calendar", labelKey: "cc.calendar", cover: coverPlanenCalendar },
+          { route: "/command-center?view=posts", labelKey: "cc.posts", cover: coverPlanenPlanner },
+          { route: "/command-center?view=campaigns", labelKey: "cc.campaigns", cover: coverPlanenComposer },
+          { route: "/command-center?view=times", labelKey: "cc.times", cover: coverPlanenPostingTimes },
         ],
       },
     ],
