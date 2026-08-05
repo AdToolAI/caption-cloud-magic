@@ -113,6 +113,8 @@ interface ContentStudioValue {
 
   brandKit: BrandKitLike | null;
   reset: () => void;
+  /** Einen Schritt zurück — nie unter „Briefing“. */
+  back: () => void;
 
   /** Höchster Schritt, der mit dem aktuellen Stand sinnvoll erreichbar ist. */
   furthestAllowed: StudioStep;
@@ -120,13 +122,18 @@ interface ContentStudioValue {
   /** True, wenn beim Öffnen ein gespeicherter Entwurf geladen wurde. */
   restored: boolean;
   dismissRestored: () => void;
+  /** Serien-Modus (Quelle der Wahrheit: URL-Parameter `mode=series`). */
+  series: boolean;
 }
+
 
 
 const Ctx = createContext<ContentStudioValue | null>(null);
 
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 const DRAFT_PREFIX = "content-studio:draft:";
+/** Über dieser Größe wird nicht gesichert — der Entwurf bleibt dann nur im Speicher. */
+const DRAFT_MAX_BYTES = 2_000_000;
 
 interface StudioDraft {
   v: number;
@@ -139,12 +146,12 @@ interface StudioDraft {
   caption: string;
   image: string | null;
   imageMode: ImageMode;
-  variants: PostDesign[];
   moodId: MoodId;
   design: PostDesign | null;
   hasDesign: boolean;
   savedAt: number;
 }
+
 
 
 export function useContentStudio(): ContentStudioValue {
@@ -156,10 +163,16 @@ export function useContentStudio(): ContentStudioValue {
 export function ContentStudioProvider({
   step,
   goTo,
+  series = false,
+  clearParams,
   children,
 }: {
   step: StudioStep;
   goTo: (step: StudioStep) => void;
+  /** Serien-Modus aus der URL (`mode=series`). */
+  series?: boolean;
+  /** Räumt die Studio-Parameter aus der URL — wird beim Zurücksetzen genutzt. */
+  clearParams?: () => void;
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
@@ -190,6 +203,7 @@ export function ContentStudioProvider({
   const [brandKit, setBrandKit] = useState<BrandKitLike | null>(null);
 
   const [restored, setRestored] = useState(false);
+  const [reached, setReached] = useState<StudioStep[]>(["brief"]);
   const hydratedRef = useRef(false);
   const draftKey = user ? `${DRAFT_PREFIX}${user.id}` : null;
 
@@ -215,10 +229,18 @@ export function ContentStudioProvider({
       setCaption(draft.caption ?? "");
       setImage(draft.image ?? null);
       setImageMode(draft.imageMode ?? "ai");
-      setVariants(draft.variants ?? []);
       setMoodId(draft.moodId ?? "brand");
       if (draft.design) setDesign(draft.design);
       setHasDesign(!!draft.hasDesign);
+      // Schritt-Historie aus dem tatsächlichen Stand ableiten, damit die
+      // Leiste nach einem Reload nicht künstlich gesperrt ist.
+      setReached(
+        draft.hasDesign
+          ? [...STUDIO_STEPS]
+          : draft.copy
+            ? ["brief", "copy", "motif"]
+            : ["brief"],
+      );
       setRestored(true);
     } catch {
       window.localStorage.removeItem(draftKey);
@@ -233,14 +255,18 @@ export function ContentStudioProvider({
         v: DRAFT_VERSION,
         brief, platform, language, tone,
         copy, copyIndex, caption,
-        image, imageMode,
-        variants, moodId,
+        // Data-URLs sprengen den lokalen Speicher — nur echte Links sichern.
+        image: image && image.startsWith("data:") ? null : image,
+        imageMode,
+        moodId,
         design: hasDesign ? design : null,
         hasDesign,
         savedAt: Date.now(),
       };
       try {
-        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+        const payload = JSON.stringify(draft);
+        if (payload.length > DRAFT_MAX_BYTES) return;
+        window.localStorage.setItem(draftKey, payload);
       } catch {
         /* Speicher voll oder blockiert — Entwurf bleibt in-memory. */
       }
@@ -248,15 +274,13 @@ export function ContentStudioProvider({
     return () => window.clearTimeout(timer);
   }, [
     draftKey, brief, platform, language, tone, copy, copyIndex, caption,
-    image, imageMode, variants, moodId, design, hasDesign,
+    image, imageMode, moodId, design, hasDesign,
   ]);
 
-
-
-  const [reached, setReached] = useState<StudioStep[]>(["brief"]);
   useEffect(() => {
     setReached((prev) => (prev.includes(step) ? prev : [...prev, step]));
   }, [step]);
+
 
   const intentRef = useRef<PostIntent>("statement");
   const zoneRef = useRef<NegativeZone>("bottom");
@@ -502,21 +526,30 @@ export function ContentStudioProvider({
     if (draftKey) {
       try { window.localStorage.removeItem(draftKey); } catch { /* ignoriert */ }
     }
+    clearParams?.();
     goTo("brief");
-  }, [draftKey, goTo]);
+  }, [clearParams, draftKey, goTo]);
 
   const furthestAllowed: StudioStep = useMemo(() => {
     if (hasDesign) return "deliver";
+    // Eine Serie braucht nur ein Briefing — kein Layout.
+    if (series && brief.trim()) return "deliver";
     if (copy) return "layout";
     return "brief";
-  }, [copy, hasDesign]);
+  }, [brief, copy, hasDesign, series]);
 
   const canEnter = useCallback(
     (target: StudioStep) => STUDIO_STEPS.indexOf(target) <= STUDIO_STEPS.indexOf(furthestAllowed),
     [furthestAllowed],
   );
 
+  const back = useCallback(() => {
+    const index = STUDIO_STEPS.indexOf(step);
+    if (index > 0) goTo(STUDIO_STEPS[index - 1]);
+  }, [goTo, step]);
+
   const dismissRestored = useCallback(() => setRestored(false), []);
+
 
 
   const value: ContentStudioValue = {
@@ -527,8 +560,8 @@ export function ContentStudioProvider({
     variants, buildLayouts, moreVariants, shuffleVariant, moodId, setMood,
     design, setDesign, openDesign, hasDesign, activeSlide, setActiveSlide,
     selectedId, setSelectedId, updateSlide, changeLayer,
-    brandKit, reset,
-    furthestAllowed, canEnter, restored, dismissRestored,
+    brandKit, reset, back,
+    furthestAllowed, canEnter, restored, dismissRestored, series,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

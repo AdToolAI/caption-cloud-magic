@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowRight, Image as ImageIcon, Layers as LayersIcon, LayoutTemplate, Loader2, Ruler, Sparkles, Wand2,
+  ArrowLeft, ArrowRight, Image as ImageIcon, Layers as LayersIcon, LayoutTemplate, Loader2, Ruler, Sparkles, Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -198,7 +198,10 @@ export function LayoutStep() {
             }
           />
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={s.back}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Zurück
+          </Button>
           <Button onClick={() => s.goTo("deliver")}>
             Weiter zum Ausspielen <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
