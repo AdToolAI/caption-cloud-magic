@@ -33,11 +33,13 @@ function StudioBody({
   const s = useContentStudio();
   const [mobilePreview, setMobilePreview] = useState(false);
   const wide = s.step === "layout" && s.hasDesign;
+  const { step, furthestAllowed, canEnter, goTo } = s;
 
   // Schritt-Wächter: tiefe Links ohne passenden Stand landen sanft im letzten sinnvollen Schritt.
   useEffect(() => {
-    if (!s.canEnter(s.step)) s.goTo(s.furthestAllowed);
-  }, [s]);
+    if (!canEnter(step)) goTo(furthestAllowed);
+  }, [canEnter, furthestAllowed, goTo, step]);
+
 
   return (
     <>
