@@ -301,9 +301,6 @@ export default function HubPage() {
                     </div>
                   </div>
                 </div>
-
-                  </div>
-                </div>
               </motion.div>
             );
           }
