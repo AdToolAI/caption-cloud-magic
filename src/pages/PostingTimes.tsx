@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,7 +32,12 @@ const PLATFORMS = [
   { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500' },
 ];
 
-export default function PostingTimes() {
+/** Rahmenlose Hülle für die Einbettung im Content Command Center. */
+function EmbeddedShell({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+export default function PostingTimes({ embedded }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [selectedPlatform, setSelectedPlatform] = useState('instagram');
@@ -81,14 +86,16 @@ export default function PostingTimes() {
   const showBenchmarkBanner = data?.metadata && !data.metadata.hasHistory && !bannerDismissed;
   const dataSource = data?.metadata?.dataSource;
 
+  const Shell = embedded ? EmbeddedShell : PageWrapper;
+
   return (
-    <PageWrapper>
-      <div className="container max-w-7xl mx-auto p-6 space-y-6">
-        <PostingTimesHeroHeader
+    <Shell>
+      <div className={embedded ? "space-y-6" : "container max-w-7xl mx-auto p-6 space-y-6"}>
+        {!embedded && <PostingTimesHeroHeader
           metadata={data?.metadata}
           isSyncing={isSyncing}
           onSync={handleSync}
-        />
+        />}
 
         <AnimatePresence>
           {showBenchmarkBanner && (
@@ -232,6 +239,6 @@ export default function PostingTimes() {
           </AnimatePresence>
         </Tabs>
       </div>
-    </PageWrapper>
+    </Shell>
   );
 }

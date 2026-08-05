@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { BestTimeSuggestions } from "@/components/calendar/BestTimeSuggestions";
 import {
   Select,
   SelectContent,
@@ -513,6 +514,14 @@ export function EventCreateDialog({
                   className="w-32"
                 />
               </div>
+              <BestTimeSuggestions
+                className="mt-2"
+                channels={selectedChannels}
+                onPick={(date) => {
+                  setStartDate(date);
+                  setStartTime(format(date, "HH:mm"));
+                }}
+              />
             </div>
 
             <div>

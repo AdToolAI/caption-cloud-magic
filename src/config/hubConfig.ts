@@ -1,5 +1,5 @@
 import {
-  Home, Calendar, LayoutGrid, Edit3, Clock,
+  Home, Calendar,
   Sparkles, Bot, ImagePlus,
   MessageSquare, MessageCircle, BookTemplate, Workflow,
   LineChart, BarChart3, Coins, Radar, Shield,
@@ -62,6 +62,10 @@ export interface HubSubItem {
   plan?: string;
   /** Optional override for the card cover image (defaults to hub-level cover). */
   cover?: string;
+  /** Breite Hauptkarte über die volle Rasterbreite. */
+  wide?: boolean;
+  /** Kleine Vorschaufelder innerhalb einer breiten Karte. */
+  previews?: { route: string; label: string; cover: string }[];
 }
 
 export interface HubDefinition {
@@ -82,10 +86,20 @@ export const hubDefinitions: HubDefinition[] = [
     titleKey: "hubs.planen",
     descKey: "hubDesc.planen",
     items: [
-      { route: "/calendar", titleKey: "nav.calendar", descKey: "hubItemDesc.calendar", icon: Calendar, cover: coverPlanenCalendar },
-      { route: "/planner", titleKey: "nav.contentPlanner", descKey: "hubItemDesc.planner", icon: LayoutGrid, cover: coverPlanenPlanner },
-      { route: "/composer", titleKey: "nav.composer", descKey: "hubItemDesc.composer", icon: Edit3, cover: coverPlanenComposer },
-      { route: "/posting-times", titleKey: "nav.postTimeAdvisor", descKey: "hubItemDesc.postingTimes", icon: Clock, cover: coverPlanenPostingTimes },
+      {
+        route: "/command-center",
+        titleKey: "nav.commandCenter",
+        descKey: "hubItemDesc.commandCenter",
+        icon: Calendar,
+        cover: coverPlanenCalendar,
+        wide: true,
+        previews: [
+          { route: "/command-center?view=calendar", label: "Kalender", cover: coverPlanenCalendar },
+          { route: "/command-center?view=posts", label: "Beiträge", cover: coverPlanenPlanner },
+          { route: "/command-center?view=campaigns", label: "Kampagnen", cover: coverPlanenComposer },
+          { route: "/command-center?view=times", label: "Beste Zeiten", cover: coverPlanenPostingTimes },
+        ],
+      },
     ],
   },
   {

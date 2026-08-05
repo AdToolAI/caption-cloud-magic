@@ -89,7 +89,7 @@ interface BrandKit {
   workspace_id?: string;
 }
 
-export default function Calendar() {
+export default function Calendar({ embedded }: { embedded?: boolean } = {}) {
   // QA test-id (language-neutral selector for smoke missions)
   // Used as data-testid="calendar-page" on the root container below.
   const { t } = useTranslation();
@@ -584,15 +584,18 @@ export default function Calendar() {
   };
 
   return (
-    <div data-testid="calendar-page" className="relative min-h-screen flex flex-col bg-background">
-      <CalendarBackgroundAurora />
-      <main className="relative flex-1 container mx-auto px-4 py-6">
-        <Breadcrumbs category="optimize" feature={t('calendar.smartCalendar')} />
+    <div
+      data-testid="calendar-page"
+      className={embedded ? "relative flex flex-col" : "relative min-h-screen flex flex-col bg-background"}
+    >
+      {!embedded && <CalendarBackgroundAurora />}
+      <main className={embedded ? "relative flex-1" : "relative flex-1 container mx-auto px-4 py-6"}>
+        {!embedded && <Breadcrumbs category="optimize" feature={t('calendar.smartCalendar')} />}
 
         {/* Compact Layout - reduced spacing */}
-        <div className="space-y-3 mt-4">
+        <div className={embedded ? "space-y-3" : "space-y-3 mt-4"}>
           {/* Hero Header - Compact */}
-          <CalendarHeroHeader eventCount={events.length} />
+          {!embedded && <CalendarHeroHeader eventCount={events.length} />}
 
           {/* Scope Switcher + Google (combined row) */}
           <CalendarHeader
@@ -716,7 +719,7 @@ export default function Calendar() {
         </div>
       </main>
 
-      <Footer />
+      {!embedded && <Footer />}
 
       {/* Event Detail Dialog */}
       {selectedEvent && (
