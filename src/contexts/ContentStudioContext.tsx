@@ -113,7 +113,15 @@ interface ContentStudioValue {
 
   brandKit: BrandKitLike | null;
   reset: () => void;
+
+  /** Höchster Schritt, der mit dem aktuellen Stand sinnvoll erreichbar ist. */
+  furthestAllowed: StudioStep;
+  canEnter: (step: StudioStep) => boolean;
+  /** True, wenn beim Öffnen ein gespeicherter Entwurf geladen wurde. */
+  restored: boolean;
+  dismissRestored: () => void;
 }
+
 
 const Ctx = createContext<ContentStudioValue | null>(null);
 
