@@ -46,25 +46,20 @@ const PromptWizard = lazy(() => import("./pages/PromptWizard"));
 const Rewriter = lazy(() => import("./pages/Rewriter"));
 const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
 const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
-const TemplateManager = lazy(() => import("./pages/TemplateManager"));
 const ReviewLink = lazy(() => import("./pages/ReviewLink"));
 const BioOptimizer = lazy(() => import("./pages/BioOptimizer"));
-const ImageCaptionPairing = lazy(() => import("./pages/ImageCaptionPairing"));
 const BrandKit = lazy(() => import("./pages/BrandKit"));
 const Carousel = lazy(() => import("./pages/Carousel"));
-const Coach = lazy(() => import("./pages/Coach"));
-const Campaigns = lazy(() => import("./pages/Campaigns"));
 
-const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
-const PostDesigner = lazy(() => import("./pages/PostDesigner"));
+const ContentStudio = lazy(() => import("./pages/ContentStudio"));
 const CommandCenter = lazy(() => import("./pages/CommandCenter"));
 import { CommandCenterRedirect } from "./components/routing/CommandCenterRedirect";
+import { ContentStudioRedirect } from "./components/routing/ContentStudioRedirect";
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
 const PictureStudio = lazy(() => import("./pages/PictureStudio"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
 const NewsHub = lazy(() => import("./pages/NewsHub"));
 
-const CommentManager = lazy(() => import("./pages/CommentManager"));
 const AllComments = lazy(() => import("./pages/AllComments"));
 const MediaLibrary = lazy(() => import("./pages/MediaLibrary"));
 const MediaProfiles = lazy(() => import("./pages/MediaProfiles"));
@@ -247,7 +242,8 @@ function AppLayout() {
                     <Route path="/performance" element={<PerformanceTracker />} />
                     <Route path="/calendar" element={<CommandCenterRedirect view="calendar" />} />
                     <Route path="/planner" element={<CommandCenterRedirect view="posts" />} />
-                    <Route path="/template-manager" element={<TemplateManager />} />
+                    <Route path="/content-studio" element={<ContentStudio />} />
+                    <Route path="/template-manager" element={<ContentStudioRedirect templates />} />
                     <Route path="/review/:token" element={<ReviewLink />} />
                     <Route path="/bio" element={<BioOptimizer />} />
                     
@@ -256,25 +252,25 @@ function AppLayout() {
                     <Route path="/carousel-builder" element={<ComingSoon />} />
                     <Route path="/hashtag-manager" element={<ComingSoon />} />
                     <Route path="/campaign-reports" element={<ComingSoon />} />
-                    <Route path="/coach" element={<Coach />} />
-                    <Route path="/campaigns" element={<Campaigns />} />
+                    <Route path="/coach" element={<ContentStudioRedirect coach />} />
+                    <Route path="/campaigns" element={<ContentStudioRedirect step="deliver" series />} />
                     
                     
                     {/* Design & Visuals features */}
-                    <Route path="/image-caption-pairing" element={<ImageCaptionPairing />} />
+                    <Route path="/image-caption-pairing" element={<ContentStudioRedirect step="motif" />} />
                     <Route path="/brand-kit" element={<BrandKit />} />
                     <Route path="/carousel" element={<Carousel />} />
-                    <Route path="/ai-post-generator" element={<AIPostGenerator />} />
-                    <Route path="/post-designer" element={<PostDesigner />} />
+                    <Route path="/ai-post-generator" element={<ContentStudioRedirect step="brief" />} />
+                    <Route path="/post-designer" element={<ContentStudioRedirect step="layout" />} />
 
            <Route path="/background-replacer" element={<Navigate to="/picture-studio?tab=background" replace />} />
            <Route path="/picture-studio" element={<PictureStudio />} />
           <Route path="/trend-radar" element={<TrendRadar />} />
           <Route path="/news-hub" element={<NewsHub />} />
           
-                    <Route path="/comment-manager" element={<CommentManager />} />
+                    <Route path="/comment-manager" element={<Navigate to="/all-comments" replace />} />
           <Route path="/all-comments" element={<AllComments />} />
-          <Route path="/comment-manager" element={<CommentManager />} />
+
                 <Route path="/media-library" element={<MediaLibrary />} />
                 <Route path="/media-profiles" element={<MediaProfiles />} />
                 <Route path="/videos" element={<Navigate to="/content-projects" replace />} />

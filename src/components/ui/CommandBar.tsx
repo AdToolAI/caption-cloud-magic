@@ -66,9 +66,10 @@ export function CommandBar({ inline = false }: CommandBarProps) {
     
     // Optimieren
     { name: t("nav.rewriter"), path: "/rewriter", icon: RefreshCw, category: t("hubs.optimieren") },
-    { name: t("nav.coach"), path: "/coach", icon: MessageSquare, category: t("hubs.optimieren") },
+    { name: "Content Studio", path: "/content-studio", icon: Sparkles, category: t("hubs.optimieren") },
+    { name: t("nav.coach"), path: "/content-studio?coach=1", icon: MessageSquare, category: t("hubs.optimieren") },
     { name: t("nav.bioOptimizer"), path: "/bio", icon: User, category: t("hubs.optimieren") },
-    { name: t("nav.commentManager"), path: "/comment-manager", icon: MessageCircle, category: t("hubs.optimieren") },
+    { name: t("nav.commentManager"), path: "/all-comments", icon: MessageCircle, category: t("hubs.optimieren") },
     
     // Analysieren
     { name: t("nav.performance"), path: "/performance", icon: TrendingUp, category: t("hubs.analysieren") },
@@ -76,7 +77,7 @@ export function CommandBar({ inline = false }: CommandBarProps) {
     { name: t("nav.goals"), path: "/goals", icon: Target, category: t("hubs.analysieren") },
     
     // Automatisieren
-    { name: t("nav.campaigns"), path: "/campaigns", icon: Workflow, category: t("hubs.automatisieren") },
+    { name: t("nav.campaigns"), path: "/content-studio?step=deliver&mode=series", icon: Workflow, category: t("hubs.automatisieren") },
     { name: t("nav.integrations"), path: "/instagram-publishing", icon: Share2, category: t("hubs.automatisieren") },
     
     // Andere
