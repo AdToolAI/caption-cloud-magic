@@ -197,6 +197,7 @@ export function ContentStudioProvider({
   const [brandKit, setBrandKit] = useState<BrandKitLike | null>(null);
 
   const [restored, setRestored] = useState(false);
+  const [reached, setReached] = useState<StudioStep[]>(["brief"]);
   const hydratedRef = useRef(false);
   const draftKey = user ? `${DRAFT_PREFIX}${user.id}` : null;
 
@@ -222,10 +223,18 @@ export function ContentStudioProvider({
       setCaption(draft.caption ?? "");
       setImage(draft.image ?? null);
       setImageMode(draft.imageMode ?? "ai");
-      setVariants(draft.variants ?? []);
       setMoodId(draft.moodId ?? "brand");
       if (draft.design) setDesign(draft.design);
       setHasDesign(!!draft.hasDesign);
+      // Schritt-Historie aus dem tatsächlichen Stand ableiten, damit die
+      // Leiste nach einem Reload nicht künstlich gesperrt ist.
+      setReached(
+        draft.hasDesign
+          ? [...STUDIO_STEPS]
+          : draft.copy
+            ? ["brief", "copy", "motif"]
+            : ["brief"],
+      );
       setRestored(true);
     } catch {
       window.localStorage.removeItem(draftKey);
@@ -240,14 +249,18 @@ export function ContentStudioProvider({
         v: DRAFT_VERSION,
         brief, platform, language, tone,
         copy, copyIndex, caption,
-        image, imageMode,
-        variants, moodId,
+        // Data-URLs sprengen den lokalen Speicher — nur echte Links sichern.
+        image: image && image.startsWith("data:") ? null : image,
+        imageMode,
+        moodId,
         design: hasDesign ? design : null,
         hasDesign,
         savedAt: Date.now(),
       };
       try {
-        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+        const payload = JSON.stringify(draft);
+        if (payload.length > DRAFT_MAX_BYTES) return;
+        window.localStorage.setItem(draftKey, payload);
       } catch {
         /* Speicher voll oder blockiert — Entwurf bleibt in-memory. */
       }
@@ -255,15 +268,13 @@ export function ContentStudioProvider({
     return () => window.clearTimeout(timer);
   }, [
     draftKey, brief, platform, language, tone, copy, copyIndex, caption,
-    image, imageMode, variants, moodId, design, hasDesign,
+    image, imageMode, moodId, design, hasDesign,
   ]);
 
-
-
-  const [reached, setReached] = useState<StudioStep[]>(["brief"]);
   useEffect(() => {
     setReached((prev) => (prev.includes(step) ? prev : [...prev, step]));
   }, [step]);
+
 
   const intentRef = useRef<PostIntent>("statement");
   const zoneRef = useRef<NegativeZone>("bottom");
