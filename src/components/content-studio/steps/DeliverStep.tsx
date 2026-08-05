@@ -170,10 +170,6 @@ export function DeliverStep() {
             {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
             Als Vorlage sichern
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
-            {exporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
-            Herunterladen
-          </Button>
           <ExportActionBar size="sm" downloading={exporting} onDownload={handleExport} resolveHandoff={resolvePublishHandoff} />
         </div>
 
