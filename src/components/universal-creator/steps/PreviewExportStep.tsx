@@ -764,15 +764,17 @@ export function PreviewExportStep({
 
                 {job.status === 'completed' && job.downloadUrl && (
                   <div className="space-y-2">
-                    <Button
-                      onClick={() => handleDownload(job.downloadUrl!, job.format.platform)}
-                      variant="outline"
+                    <ExportActionBar
                       size="sm"
-                      className="w-full"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      {t('uc.download')}
-                    </Button>
+                      onDownload={() => handleDownload(job.downloadUrl!, job.format.platform)}
+                      handoff={{
+                        mediaUrl: job.downloadUrl!,
+                        mediaType: 'video',
+                        source: 'universal_creator',
+                        platforms: [job.format.platform],
+                      }}
+                    />
+
                     
                     <div className="grid grid-cols-3 gap-2">
                       <Button
