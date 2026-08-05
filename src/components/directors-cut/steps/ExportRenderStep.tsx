@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ExportActionBar } from '@/components/publishing/ExportActionBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -828,7 +829,7 @@ export function ExportRenderStep({
                       mediaUrl: renderedVideoUrl,
                       mediaType: "video",
                       source: "directors_cut_export",
-                      aspectRatio: exportSettings.aspectRatio,
+                      aspectRatio: exportSettings.aspect_ratio,
                     }}
                   />
 

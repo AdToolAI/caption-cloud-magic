@@ -58,7 +58,6 @@ function KeepAlive({
       aria-hidden={!active}
       /* Unsichtbare Ansichten pausieren Animationen und Layout-Arbeit. */
       style={active ? undefined : { display: "none", contentVisibility: "hidden" }}
-      inert={!active ? "" : undefined}
     >
       {children}
     </div>
