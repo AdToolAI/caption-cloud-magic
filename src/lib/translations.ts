@@ -19586,6 +19586,7 @@ Object.assign(translations.en, {
     credentialsMissing: 'Server credentials missing — publishing disabled.',
     expiresInDays: 'Token expires in {days} days',
     tiktokLive: 'TikTok content posting approved (production).',
+    tiktokSandbox: 'TikTok runs in {env} mode — only test accounts can connect.',
   },
 });
 
@@ -19603,6 +19604,7 @@ Object.assign(translations.de, {
     credentialsMissing: 'Server-Zugangsdaten fehlen — Posten deaktiviert.',
     expiresInDays: 'Token läuft in {days} Tagen ab',
     tiktokLive: 'TikTok Content-Posting genehmigt (Produktion).',
+    tiktokSandbox: 'TikTok läuft im {env}-Modus — nur Testkonten können sich verbinden.',
   },
 });
 
@@ -19620,5 +19622,6 @@ Object.assign(translations.es, {
     credentialsMissing: 'Faltan credenciales del servidor — publicación desactivada.',
     expiresInDays: 'El token caduca en {days} días',
     tiktokLive: 'Publicación de contenido de TikTok aprobada (producción).',
+    tiktokSandbox: 'TikTok está en modo {env} — solo cuentas de prueba pueden conectarse.',
   },
 });
