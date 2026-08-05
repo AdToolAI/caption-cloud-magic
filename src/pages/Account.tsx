@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, User, Shield, CreditCard, Settings, Link2, Eye, Bell } from "lucide-react";
+import { Loader2, User, Shield, CreditCard, Settings, Link2, Eye, Bell, Ticket } from "lucide-react";
 import { AccountHeroHeader } from "@/components/account/AccountHeroHeader";
 import { ProfileTab } from "@/components/account/ProfileTab";
 import { SecurityTab } from "@/components/account/SecurityTab";
 import { SubscriptionTab } from "@/components/account/SubscriptionTab";
 import { AdvancedTab } from "@/components/account/AdvancedTab";
+import { PromoCodeSection } from "@/components/account/PromoCodeSection";
 import { ConnectionsTab } from "@/components/account/ConnectionsTab";
 import { PrivacyTab } from "@/components/account/PrivacyTab";
 import { NotificationSettings } from "@/components/account/NotificationSettings";
@@ -62,7 +63,7 @@ const Account = () => {
         <AccountHeroHeader />
 
         <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 h-14 bg-card/60 backdrop-blur-xl border border-white/10 p-1 rounded-xl">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 h-auto sm:h-14 bg-card/60 backdrop-blur-xl border border-white/10 p-1 rounded-xl">
             <TabsTrigger 
               value="profile" 
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
@@ -106,6 +107,13 @@ const Account = () => {
               <span className="hidden sm:inline">{t("account.tabs.subscription")}</span>
             </TabsTrigger>
             <TabsTrigger 
+              value="promo"
+              className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
+            >
+              <Ticket className="h-4 w-4" />
+              <span className="hidden sm:inline">{t("account.tabs.promo")}</span>
+            </TabsTrigger>
+            <TabsTrigger 
               value="advanced"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg h-full"
             >
@@ -141,6 +149,10 @@ const Account = () => {
 
           <TabsContent value="subscription">
             <SubscriptionTab />
+          </TabsContent>
+
+          <TabsContent value="promo">
+            <PromoCodeSection />
           </TabsContent>
 
           <TabsContent value="advanced">

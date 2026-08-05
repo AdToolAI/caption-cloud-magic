@@ -84,10 +84,31 @@ serve(async (req) => {
     // Founder-Status; der Vorteil (20 % auf jeden Credit-Kauf, 24 Monate) wird
     // in `ai-video-purchase-credits` über FOUNDERS_CREDIT_COUPON angewendet.
     // `couponId`/`promoCode` bleiben für manuelle Support-Fälle möglich.
+    // v411: Gutschein-Einlösung des Nutzers (reserviert) laden.
+    // Gutschein-Checkouts beanspruchen KEINEN Founders-Slot.
+    const { data: reservation } = await supabaseAdmin
+      .from("promo_redemptions")
+      .select("id, code, promo_code_id, status")
+      .eq("user_id", user.id)
+      .eq("status", "reserved")
+      .maybeSingle();
+
+    let reservedPromotionCode: string | null = null;
+    if (reservation) {
+      const { data: promoRow } = await supabaseAdmin
+        .from("promo_codes")
+        .select("stripe_promo_id, active, valid_until")
+        .eq("id", reservation.promo_code_id)
+        .maybeSingle();
+      const valid = promoRow && promoRow.active !== false &&
+        (!promoRow.valid_until || new Date(promoRow.valid_until).getTime() > Date.now());
+      if (valid) reservedPromotionCode = promoRow!.stripe_promo_id as string;
+    }
+
     let foundersSlotReserved = false;
     let foundersSlotNumber: number | null = null;
 
-    if (PRO_PRICE_IDS.has(priceId)) {
+    if (PRO_PRICE_IDS.has(priceId) && !reservedPromotionCode) {
       // Atomic slot claim via SQL function (advisory lock prevents races)
       const { data: claim, error: claimErr } = await supabaseAdmin.rpc("claim_founders_slot", {
         _user_id: user.id,
@@ -135,10 +156,13 @@ serve(async (req) => {
         userId: user.id,
         ...(couponId ? { applied_coupon: couponId } : {}),
         ...(foundersSlotReserved ? { founders_slot: "true" } : {}),
+        ...(reservedPromotionCode && reservation ? { promo_redemption_id: reservation.id } : {}),
       },
     };
 
-    if (promoCode) {
+    if (reservedPromotionCode) {
+      sessionOptions.discounts = [{ promotion_code: reservedPromotionCode }];
+    } else if (promoCode) {
       sessionOptions.discounts = [{ promotion_code: promoCode }];
     } else if (couponId) {
       sessionOptions.discounts = [{ coupon: couponId }];
