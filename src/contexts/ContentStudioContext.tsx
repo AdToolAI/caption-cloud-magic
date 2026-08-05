@@ -130,8 +130,10 @@ interface ContentStudioValue {
 
 const Ctx = createContext<ContentStudioValue | null>(null);
 
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 const DRAFT_PREFIX = "content-studio:draft:";
+/** Über dieser Größe wird nicht gesichert — der Entwurf bleibt dann nur im Speicher. */
+const DRAFT_MAX_BYTES = 2_000_000;
 
 interface StudioDraft {
   v: number;
@@ -144,12 +146,12 @@ interface StudioDraft {
   caption: string;
   image: string | null;
   imageMode: ImageMode;
-  variants: PostDesign[];
   moodId: MoodId;
   design: PostDesign | null;
   hasDesign: boolean;
   savedAt: number;
 }
+
 
 
 export function useContentStudio(): ContentStudioValue {
