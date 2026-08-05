@@ -380,6 +380,39 @@ export const ConnectionsTab = () => {
         return;
       }
 
+      // YouTube: backend OAuth start (client id from server secrets, offline access)
+      if (providerId === 'youtube') {
+        try {
+          const { data: session } = await supabase.auth.getSession();
+          if (!session.session?.access_token) {
+            toast({
+              title: t('socialIntegrations.authRequired') || 'Auth required',
+              description: t('socialIntegrations.pleaseReLogin') || 'Please log in again',
+              variant: 'destructive',
+            });
+            return;
+          }
+          const { data, error } = await supabase.functions.invoke('youtube-oauth-start', {
+            body: { returnTo: window.location.href },
+            headers: {
+              Authorization: `Bearer ${session.session.access_token}`,
+            },
+          });
+
+          if (error) throw error;
+          if (!data?.authUrl) throw new Error('No auth URL received');
+          window.location.href = data.authUrl;
+        } catch (error: any) {
+          toast({
+            title: t('common.error'),
+            description: error?.message || 'Failed to start YouTube connection',
+            variant: 'destructive',
+          });
+        }
+        return;
+      }
+
+
       // Facebook: Use backend OAuth flow on Graph API v24 (v18 triggers Meta "Feature unavailable")
       if (providerId === 'facebook') {
         try {
