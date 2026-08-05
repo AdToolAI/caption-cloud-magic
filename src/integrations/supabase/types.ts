@@ -11500,11 +11500,15 @@ export type Database = {
         Row: {
           active: boolean | null
           affiliate_id: string | null
+          benefit_label_de: string | null
+          benefit_label_en: string | null
+          benefit_label_es: string | null
           code: string
           created_at: string
           discount_percent: number | null
           duration_months: number | null
           id: string
+          kind: string
           max_redemptions: number | null
           redemptions_count: number | null
           stripe_promo_id: string
@@ -11513,11 +11517,15 @@ export type Database = {
         Insert: {
           active?: boolean | null
           affiliate_id?: string | null
+          benefit_label_de?: string | null
+          benefit_label_en?: string | null
+          benefit_label_es?: string | null
           code: string
           created_at?: string
           discount_percent?: number | null
           duration_months?: number | null
           id?: string
+          kind?: string
           max_redemptions?: number | null
           redemptions_count?: number | null
           stripe_promo_id: string
@@ -11526,11 +11534,15 @@ export type Database = {
         Update: {
           active?: boolean | null
           affiliate_id?: string | null
+          benefit_label_de?: string | null
+          benefit_label_en?: string | null
+          benefit_label_es?: string | null
           code?: string
           created_at?: string
           discount_percent?: number | null
           duration_months?: number | null
           id?: string
+          kind?: string
           max_redemptions?: number | null
           redemptions_count?: number | null
           stripe_promo_id?: string
@@ -11542,6 +11554,47 @@ export type Database = {
             columns: ["affiliate_id"]
             isOneToOne: false
             referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promo_redemptions: {
+        Row: {
+          applied_at: string | null
+          code: string
+          created_at: string
+          id: string
+          promo_code_id: string
+          status: string
+          stripe_session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          applied_at?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          promo_code_id: string
+          status?: string
+          stripe_session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          applied_at?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          promo_code_id?: string
+          status?: string
+          stripe_session_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_redemptions_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
             referencedColumns: ["id"]
           },
         ]
