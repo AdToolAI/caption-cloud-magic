@@ -745,7 +745,7 @@ export default function MediaLibrary() {
       description: t('aipost_media_sent_loading'),
     });
     
-    navigate('/ai-post-generator');
+    navigate('/content-studio?step=layout');
   };
 
   // Send to Composer
@@ -854,7 +854,7 @@ export default function MediaLibrary() {
       description: `Erstes Medium wird im KI-Post-Generator geladen...`,
     });
     
-    navigate('/ai-post-generator');
+    navigate('/content-studio?step=layout');
   };
 
   // Bulk send to Calendar

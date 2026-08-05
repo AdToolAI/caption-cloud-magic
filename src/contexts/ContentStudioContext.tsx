@@ -113,9 +113,39 @@ interface ContentStudioValue {
 
   brandKit: BrandKitLike | null;
   reset: () => void;
+
+  /** Höchster Schritt, der mit dem aktuellen Stand sinnvoll erreichbar ist. */
+  furthestAllowed: StudioStep;
+  canEnter: (step: StudioStep) => boolean;
+  /** True, wenn beim Öffnen ein gespeicherter Entwurf geladen wurde. */
+  restored: boolean;
+  dismissRestored: () => void;
 }
 
+
 const Ctx = createContext<ContentStudioValue | null>(null);
+
+const DRAFT_VERSION = 1;
+const DRAFT_PREFIX = "content-studio:draft:";
+
+interface StudioDraft {
+  v: number;
+  brief: string;
+  platform: string;
+  language: string;
+  tone: string;
+  copy: CopyPayload | null;
+  copyIndex: number;
+  caption: string;
+  image: string | null;
+  imageMode: ImageMode;
+  variants: PostDesign[];
+  moodId: MoodId;
+  design: PostDesign | null;
+  hasDesign: boolean;
+  savedAt: number;
+}
+
 
 export function useContentStudio(): ContentStudioValue {
   const value = useContext(Ctx);
@@ -158,6 +188,70 @@ export function ContentStudioProvider({
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [brandKit, setBrandKit] = useState<BrandKitLike | null>(null);
+
+  const [restored, setRestored] = useState(false);
+  const hydratedRef = useRef(false);
+  const draftKey = user ? `${DRAFT_PREFIX}${user.id}` : null;
+
+  /** Gespeicherten Entwurf laden — genau einmal pro Sitzung. */
+  useEffect(() => {
+    if (!draftKey || hydratedRef.current) return;
+    hydratedRef.current = true;
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as StudioDraft;
+      if (draft?.v !== DRAFT_VERSION) {
+        window.localStorage.removeItem(draftKey);
+        return;
+      }
+      if (!draft.brief && !draft.copy && !draft.hasDesign) return;
+      setBrief(draft.brief ?? "");
+      setPlatform(draft.platform ?? "instagram");
+      setLanguage(draft.language ?? "de");
+      setTone(draft.tone ?? "selbstbewusst, klar");
+      setCopy(draft.copy ?? null);
+      setCopyIndex(draft.copyIndex ?? 0);
+      setCaption(draft.caption ?? "");
+      setImage(draft.image ?? null);
+      setImageMode(draft.imageMode ?? "ai");
+      setVariants(draft.variants ?? []);
+      setMoodId(draft.moodId ?? "brand");
+      if (draft.design) setDesign(draft.design);
+      setHasDesign(!!draft.hasDesign);
+      setRestored(true);
+    } catch {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [draftKey]);
+
+  /** Entwurf entprellt sichern, sobald sich etwas Relevantes ändert. */
+  useEffect(() => {
+    if (!draftKey || !hydratedRef.current) return;
+    const timer = window.setTimeout(() => {
+      const draft: StudioDraft = {
+        v: DRAFT_VERSION,
+        brief, platform, language, tone,
+        copy, copyIndex, caption,
+        image, imageMode,
+        variants, moodId,
+        design: hasDesign ? design : null,
+        hasDesign,
+        savedAt: Date.now(),
+      };
+      try {
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {
+        /* Speicher voll oder blockiert — Entwurf bleibt in-memory. */
+      }
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [
+    draftKey, brief, platform, language, tone, copy, copyIndex, caption,
+    image, imageMode, variants, moodId, design, hasDesign,
+  ]);
+
+
 
   const [reached, setReached] = useState<StudioStep[]>(["brief"]);
   useEffect(() => {
@@ -402,10 +496,28 @@ export function ContentStudioProvider({
     setActiveSlide(0);
     setSelectedId(null);
     setReached(["brief"]);
+    setRestored(false);
     templatesRef.current = [];
     userImageRef.current = false;
+    if (draftKey) {
+      try { window.localStorage.removeItem(draftKey); } catch { /* ignoriert */ }
+    }
     goTo("brief");
-  }, [goTo]);
+  }, [draftKey, goTo]);
+
+  const furthestAllowed: StudioStep = useMemo(() => {
+    if (hasDesign) return "deliver";
+    if (copy) return "layout";
+    return "brief";
+  }, [copy, hasDesign]);
+
+  const canEnter = useCallback(
+    (target: StudioStep) => STUDIO_STEPS.indexOf(target) <= STUDIO_STEPS.indexOf(furthestAllowed),
+    [furthestAllowed],
+  );
+
+  const dismissRestored = useCallback(() => setRestored(false), []);
+
 
   const value: ContentStudioValue = {
     step, goTo, reached,
@@ -416,6 +528,7 @@ export function ContentStudioProvider({
     design, setDesign, openDesign, hasDesign, activeSlide, setActiveSlide,
     selectedId, setSelectedId, updateSlide, changeLayer,
     brandKit, reset,
+    furthestAllowed, canEnter, restored, dismissRestored,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

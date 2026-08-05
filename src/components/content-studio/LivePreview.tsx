@@ -6,7 +6,7 @@ import { useContentStudio } from "@/contexts/ContentStudioContext";
  * Mitlaufende Vorschau des Entwurfs — sichtbar in jedem Schritt,
  * damit sich das Studio wie ein Werkzeug anfühlt und nicht wie ein Formular.
  */
-export function LivePreview() {
+export function LivePreview({ compact = false }: { compact?: boolean }) {
   const s = useContentStudio();
   const slide = s.design.slides[0];
 
@@ -21,7 +21,7 @@ export function LivePreview() {
   );
 
   return (
-    <div className="sticky top-24 space-y-3">
+    <div className={compact ? "space-y-3" : "sticky top-24 space-y-3"}>
       <div className="flex flex-wrap gap-1.5">
         {chips.map((c) => (
           <span key={c} className="rounded-full border border-border/60 bg-card/60 px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -33,7 +33,7 @@ export function LivePreview() {
       <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/40 p-3">
         {showDesign ? (
           <div className="flex justify-center">
-            <SlideRenderer slide={slide} design={s.design} size={300} />
+            <SlideRenderer slide={slide} design={s.design} size={compact ? 240 : 300} />
           </div>
         ) : (
           <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted/40">

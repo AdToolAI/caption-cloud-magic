@@ -130,7 +130,7 @@ export const translations: Record<Language, any> = {
           title: "Open Coach",
           description: "Navigate to AI Coach in the sidebar",
           actionLabel: "Go to Coach",
-          actionLink: "/coach"
+          actionLink: "/content-studio?coach=1"
         },
         step2: {
           title: "Link Brand Kit (Recommended)",
@@ -150,7 +150,7 @@ export const translations: Record<Language, any> = {
         },
         proTip: "Use the Coach before publishing! Paste your draft caption and ask 'Will this perform well?' for predictive insights.",
         quickStartLabel: "Chat with Coach",
-        quickStartLink: "/coach"
+        quickStartLink: "/content-studio?coach=1"
       },
       publishing: {
         icon: "⚡",
@@ -299,7 +299,7 @@ export const translations: Record<Language, any> = {
           title: "Open Campaign Wizard",
           description: "Navigate to Campaign Wizard in the sidebar",
           actionLabel: "Go to Campaigns",
-          actionLink: "/campaigns"
+          actionLink: "/content-studio?step=deliver&mode=series"
         },
         step2: {
           title: "Define Campaign Goal",
@@ -321,7 +321,7 @@ export const translations: Record<Language, any> = {
         },
         proTip: "Save successful campaigns as templates for quick reuse – ideal for recurring themes like product launches or seasonal campaigns!",
         quickStartLabel: "Start Campaign",
-        quickStartLink: "/campaigns"
+        quickStartLink: "/content-studio?step=deliver&mode=series"
       }
     },
     
@@ -5191,7 +5191,7 @@ export const translations: Record<Language, any> = {
           title: "Coach öffnen",
           description: "Navigiere zum AI Coach in der Sidebar",
           actionLabel: "Zum Coach",
-          actionLink: "/coach"
+          actionLink: "/content-studio?coach=1"
         },
         step2: {
           title: "Brand Kit verknüpfen (Empfohlen)",
@@ -5211,7 +5211,7 @@ export const translations: Record<Language, any> = {
         },
         proTip: "Nutze den Coach vor dem Veröffentlichen! Füge deinen Entwurf ein und frage 'Wird das gut performen?' für prädiktive Insights.",
         quickStartLabel: "Mit Coach chatten",
-        quickStartLink: "/coach"
+        quickStartLink: "/content-studio?coach=1"
       },
       publishing: {
         icon: "⚡",
@@ -5360,7 +5360,7 @@ export const translations: Record<Language, any> = {
           title: "Kampagnen-Wizard öffnen",
           description: "Navigiere zum Kampagnen-Wizard in der Sidebar",
           actionLabel: "Zu Kampagnen",
-          actionLink: "/campaigns"
+          actionLink: "/content-studio?step=deliver&mode=series"
         },
         step2: {
           title: "Kampagnenziel definieren",
@@ -5382,7 +5382,7 @@ export const translations: Record<Language, any> = {
         },
         proTip: "Speichere erfolgreiche Kampagnen als Templates für schnelle Wiederverwendung – ideal für wiederkehrende Themen wie Produktlaunches oder Saisonkampagnen!",
         quickStartLabel: "Kampagne starten",
-        quickStartLink: "/campaigns"
+        quickStartLink: "/content-studio?step=deliver&mode=series"
       }
     },
     
@@ -10075,7 +10075,7 @@ export const translations: Record<Language, any> = {
           title: "Abrir Coach",
           description: "Navega al Coach IA en la barra lateral",
           actionLabel: "Ir al Coach",
-          actionLink: "/coach"
+          actionLink: "/content-studio?coach=1"
         },
         step2: {
           title: "Vincular Kit de Marca (Recomendado)",
@@ -10095,7 +10095,7 @@ export const translations: Record<Language, any> = {
         },
         proTip: "¡Usa el Coach antes de publicar! Pega tu borrador de caption y pregunta '¿Funcionará bien esto?' para insights predictivos.",
         quickStartLabel: "Chatear con Coach",
-        quickStartLink: "/coach"
+        quickStartLink: "/content-studio?coach=1"
       },
       publishing: {
         icon: "⚡",
@@ -10244,7 +10244,7 @@ export const translations: Record<Language, any> = {
           title: "Abrir Asistente de Campañas",
           description: "Navega al Asistente de Campañas en la barra lateral",
           actionLabel: "Ir a Campañas",
-          actionLink: "/campaigns"
+          actionLink: "/content-studio?step=deliver&mode=series"
         },
         step2: {
           title: "Definir Objetivo de Campaña",
@@ -10266,7 +10266,7 @@ export const translations: Record<Language, any> = {
         },
         proTip: "¡Guarda campañas exitosas como plantillas para reutilización rápida – ideal para temas recurrentes como lanzamientos de productos o campañas estacionales!",
         quickStartLabel: "Iniciar Campaña",
-        quickStartLink: "/campaigns"
+        quickStartLink: "/content-studio?step=deliver&mode=series"
       }
     },
     

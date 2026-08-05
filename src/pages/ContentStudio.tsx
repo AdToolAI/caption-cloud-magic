@@ -1,10 +1,11 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MessageSquare, RotateCcw, Sparkles, BookTemplate } from "lucide-react";
+import { ChevronDown, MessageSquare, RotateCcw, Sparkles, BookTemplate, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   ContentStudioProvider, STUDIO_STEPS, useContentStudio, type StudioStep,
 } from "@/contexts/ContentStudioContext";
@@ -30,7 +31,13 @@ function StudioBody({
   setTemplatesOpen: (o: boolean) => void;
 }) {
   const s = useContentStudio();
+  const [mobilePreview, setMobilePreview] = useState(false);
   const wide = s.step === "layout" && s.hasDesign;
+
+  // Schritt-Wächter: tiefe Links ohne passenden Stand landen sanft im letzten sinnvollen Schritt.
+  useEffect(() => {
+    if (!s.canEnter(s.step)) s.goTo(s.furthestAllowed);
+  }, [s]);
 
   return (
     <>
@@ -52,8 +59,34 @@ function StudioBody({
             </Button>
           </div>
         </div>
-        <StepRail step={s.step} reached={s.reached} onSelect={s.goTo} />
+        <StepRail step={s.step} reached={s.reached} onSelect={s.goTo} canEnter={s.canEnter} />
       </header>
+
+      {s.restored && (
+        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-2.5 text-sm">
+          <span className="text-foreground/80">Entwurf wiederhergestellt — du kannst dort weitermachen, wo du aufgehört hast.</span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={s.reset}>Verwerfen</Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={s.dismissRestored} aria-label="Hinweis schließen">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!wide && (
+        <Collapsible open={mobilePreview} onOpenChange={setMobilePreview} className="mb-5 lg:hidden">
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full justify-between">
+              Vorschau {mobilePreview ? "ausblenden" : "anzeigen"}
+              <ChevronDown className={`h-4 w-4 transition-transform ${mobilePreview ? "rotate-180" : ""}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-4">
+            <LivePreview compact />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
 
       <motion.div
         key={s.step}
@@ -92,12 +125,17 @@ export default function ContentStudio() {
 
   const setParam = useCallback(
     (key: string, value: string | null, replace = false) => {
-      const params = new URLSearchParams(searchParams);
-      if (value === null) params.delete(key);
-      else params.set(key, value);
-      setSearchParams(params, { replace });
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (value === null) params.delete(key);
+          else params.set(key, value);
+          return params;
+        },
+        { replace },
+      );
     },
-    [searchParams, setSearchParams],
+    [setSearchParams],
   );
 
   const goTo = useCallback((next: StudioStep) => setParam("step", next), [setParam]);

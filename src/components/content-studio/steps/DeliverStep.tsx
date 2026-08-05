@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { CalendarPlus, Download, Layers, Loader2, Save } from "lucide-react";
+import { CalendarPlus, Layers, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,14 +21,29 @@ import { generateSeries, resolveWorkspaceId, seriesToCalendar } from "@/lib/cont
 export function DeliverStep() {
   const s = useContentStudio();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const exportRef = useRef<HTMLDivElement>(null);
   const [exportSlideIndex, setExportSlideIndex] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [series, setSeries] = useState(false);
+  const series = searchParams.get("mode") === "series";
   const [weeks, setWeeks] = useState(4);
   const [perWeek, setPerWeek] = useState(3);
   const [seriesBusy, setSeriesBusy] = useState(false);
+
+  /** Serien-Modus in der URL halten, damit der Zustand teilbar bleibt. */
+  const setSeries = (on: boolean) => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (on) params.set("mode", "series");
+        else params.delete("mode");
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
 
   const renderSlideToBlob = async (index: number): Promise<Blob> => {
     setExportSlideIndex(index);
@@ -153,10 +169,6 @@ export function DeliverStep() {
           <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
             Als Vorlage sichern
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
-            {exporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
-            Herunterladen
           </Button>
           <ExportActionBar size="sm" downloading={exporting} onDownload={handleExport} resolveHandoff={resolvePublishHandoff} />
         </div>
