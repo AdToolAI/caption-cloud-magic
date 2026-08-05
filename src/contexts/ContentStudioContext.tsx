@@ -113,6 +113,8 @@ interface ContentStudioValue {
 
   brandKit: BrandKitLike | null;
   reset: () => void;
+  /** Einen Schritt zurück — nie unter „Briefing“. */
+  back: () => void;
 
   /** Höchster Schritt, der mit dem aktuellen Stand sinnvoll erreichbar ist. */
   furthestAllowed: StudioStep;
@@ -120,7 +122,10 @@ interface ContentStudioValue {
   /** True, wenn beim Öffnen ein gespeicherter Entwurf geladen wurde. */
   restored: boolean;
   dismissRestored: () => void;
+  /** Serien-Modus (Quelle der Wahrheit: URL-Parameter `mode=series`). */
+  series: boolean;
 }
+
 
 
 const Ctx = createContext<ContentStudioValue | null>(null);
