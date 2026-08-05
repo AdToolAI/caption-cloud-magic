@@ -78,6 +78,7 @@ export function ConnectionDiagnostics() {
               return {
                 id: channel.id,
                 ok: data?.ok !== false,
+                env: typeof data?.env === 'string' ? (data.env as string) : undefined,
                 note: Array.isArray(data?.missing) && data.missing.length ? data.missing.join(', ') : data?.message,
               };
             } catch (e: any) {
