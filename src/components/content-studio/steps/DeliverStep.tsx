@@ -138,6 +138,7 @@ export function DeliverStep() {
         const events = await seriesToCalendar(result.campaignId, workspaceId);
         toast.success(`${events} Termine im Kalender eingeplant`);
       }
+      setSeriesDone(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Serie fehlgeschlagen");
     } finally {
@@ -147,40 +148,44 @@ export function DeliverStep() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-      <div className="pointer-events-none fixed left-[-20000px] top-0" aria-hidden>
-        <SlideRenderer
-          ref={exportRef}
-          slide={s.design.slides[Math.min(exportSlideIndex, s.design.slides.length - 1)]}
-          design={s.design}
-          size={CANVAS_SIZE}
-        />
-      </div>
+      {s.hasDesign && (
+        <div className="pointer-events-none fixed left-[-20000px] top-0" aria-hidden>
+          <SlideRenderer
+            ref={exportRef}
+            slide={s.design.slides[Math.min(exportSlideIndex, s.design.slides.length - 1)]}
+            design={s.design}
+            size={CANVAS_SIZE}
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <h2 className="font-display text-3xl tracking-tight">Ausspielen</h2>
         <p className="text-sm text-muted-foreground">Ein Beitrag — oder gleich eine ganze Serie aus demselben Briefing.</p>
       </div>
 
-      <div className="space-y-4 rounded-2xl border border-border/60 bg-card/60 p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            value={s.design.title}
-            onChange={(e) => s.setDesign((p) => ({ ...p, title: e.target.value }))}
-            className="h-9 w-full sm:w-64"
-            placeholder="Titel"
-          />
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-            Als Vorlage sichern
-          </Button>
-          <ExportActionBar size="sm" downloading={exporting} onDownload={handleExport} resolveHandoff={resolvePublishHandoff} />
-        </div>
+      {s.hasDesign && (
+        <div className="space-y-4 rounded-2xl border border-border/60 bg-card/60 p-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              value={s.design.title}
+              onChange={(e) => s.setDesign((p) => ({ ...p, title: e.target.value }))}
+              className="h-9 w-full sm:w-64"
+              placeholder="Titel"
+            />
+            <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+              Als Vorlage sichern
+            </Button>
+            <ExportActionBar size="sm" downloading={exporting} onDownload={handleExport} resolveHandoff={resolvePublishHandoff} />
+          </div>
 
-        <div className="space-y-2">
-          <Label>Caption</Label>
-          <Textarea rows={4} value={s.caption} onChange={(e) => s.setCaption(e.target.value)} />
+          <div className="space-y-2">
+            <Label>Caption</Label>
+            <Textarea rows={4} value={s.caption} onChange={(e) => s.setCaption(e.target.value)} />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="space-y-4 rounded-2xl border border-border/60 bg-card/60 p-5">
         <div className="flex items-center justify-between">
@@ -206,16 +211,27 @@ export function DeliverStep() {
               <Input type="number" min={1} max={7} value={perWeek} onChange={(e) => setPerWeek(Number(e.target.value) || 1)} />
             </div>
             <div className="flex items-end">
-              <Button className="w-full" onClick={handleSeries} disabled={seriesBusy}>
+              <Button className="w-full" onClick={handleSeries} disabled={seriesBusy || !s.brief.trim()}>
                 {seriesBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarPlus className="mr-2 h-4 w-4" />}
                 Serie erzeugen & einplanen
               </Button>
             </div>
           </div>
         )}
+
+        {series && seriesDone && (
+          <Button variant="outline" size="sm" onClick={() => navigate("/command-center?tab=calendar")}>
+            <CalendarPlus className="mr-1.5 h-4 w-4" /> Im Kalender ansehen
+          </Button>
+        )}
       </div>
+
+      <Button variant="ghost" size="sm" onClick={s.back}>
+        <ArrowLeft className="mr-1.5 h-4 w-4" /> Zurück
+      </Button>
     </motion.div>
   );
 }
+
 
 export default DeliverStep;
