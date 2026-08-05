@@ -18,10 +18,13 @@ Neuer Tab **„Gutschein“** in `/account` (neben Abo):
 - Ein Code pro Nutzer, ein Nutzer pro Code — serverseitig erzwungen.
 - Codes können ablaufen (`valid_until`) und ein Kontingent haben (`max_redemptions`).
 - Der Rabatt wird nie im Frontend berechnet, sondern immer von Stripe angewendet.
+- **Kein Founders-Status über Gutscheine.** Ein Checkout mit eingelöstem Code beansprucht keinen der 1.000 Gründer-Plätze und erhält keine Gründer-Vorteile (kein 20 %-Credit-Rabatt, keine Gold-UI). Die Plätze bleiben zahlenden Kunden vorbehalten.
+- Wer nach der Gratiszeit regulär weiterzahlt, wird dadurch **nicht** nachträglich Gründer — der Platz wird beim ersten Checkout entschieden und bei Gutschein-Checkouts übersprungen.
 
 ## Der Launch-Code
 
-`LAUNCHADTOOLAI` — 100 % Rabatt für 3 Monate auf das Beta-Abo (14,99 €), gültig bis 01.09.2026, unbegrenzt einlösbar bis dahin. Wird in Stripe als Coupon + Promotion Code angelegt und in der Datenbank verknüpft. Nach 3 Monaten läuft das Abo regulär weiter (kündbar wie immer).
+`LAUNCHADTOOLAI` — 100 % Rabatt für 3 Monate auf das Beta-Abo (14,99 €), gültig bis 01.09.2026, unbegrenzt einlösbar bis dahin. Wird in Stripe als Coupon + Promotion Code angelegt und in der Datenbank verknüpft. Nach 3 Monaten läuft das Abo regulär weiter (kündbar wie immer). Ohne Gründer-Status.
+
 
 ## Technische Umsetzung
 
