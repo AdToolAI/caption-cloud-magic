@@ -117,6 +117,7 @@ serve(async (req) => {
       quality = 'fast',
       referenceImageUrl,
       editMode = false,
+      textFree = false,
     } = await req.json();
 
     if (!prompt) {
