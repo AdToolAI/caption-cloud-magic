@@ -180,7 +180,16 @@ MANDATORY RULES:
 - Aspect ratio: ${aspectRatio}`;
     } else {
       const stylePrompt = styleModifiers[style] || styleModifiers.realistic;
-      enhancedPrompt = `${prompt}. Style: ${stylePrompt}. Aspect ratio: ${aspectRatio}.`;
+      if (textFree) {
+        // Der Textverbots-Block des Aufrufers muss der letzte Absatz bleiben —
+        // Stil und Seitenverhältnis werden deshalb davor eingefügt.
+        const idx = prompt.indexOf('TEXT-FREE MANDATE');
+        const head = idx > 0 ? prompt.slice(0, idx).trim() : prompt.trim();
+        const tail = idx > 0 ? prompt.slice(idx).trim() : '';
+        enhancedPrompt = `${head}\nStyle: ${stylePrompt}. Aspect ratio: ${aspectRatio}.\n\n${tail}\nDo not render any text of any kind.`.trim();
+      } else {
+        enhancedPrompt = `${prompt}. Style: ${stylePrompt}. Aspect ratio: ${aspectRatio}.`;
+      }
     }
 
     // Build messages
