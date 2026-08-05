@@ -138,7 +138,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
 
   const handleAIGenerate = () => {
     toast.info("Öffne KI Post Generator…");
-    navigate("/ai-post-generator", { state: { prefill: { topic: post.content_idea, platform: post.platform } } });
+    navigate("/content-studio", { state: { prefill: { topic: post.content_idea, platform: post.platform } } });
   };
 
   return (

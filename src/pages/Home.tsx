@@ -507,7 +507,7 @@ const Home = () => {
   const quickActions = [
     { label: t("dashboard.quickActions.quickSchedule"), icon: Plus, to: "/calendar?quickAdd=true", variant: 'default' as const },
     { label: t("dashboard.quickActions.openCalendar"), icon: CalendarIcon, to: "/calendar" },
-    { label: t("dashboard.quickActions.postFromTemplate"), icon: FileText, to: "/ai-post-generator" },
+    { label: t("dashboard.quickActions.postFromTemplate"), icon: FileText, to: "/content-studio" },
     { label: t("dashboard.quickActions.openPerformance"), icon: TrendingUp, to: "/analytics" },
   ];
 

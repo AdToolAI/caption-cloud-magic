@@ -845,7 +845,7 @@ export function ExportRenderStep({
                     </Button>
                     <Button 
                       variant="outline"
-                      onClick={() => navigate(`/ai-post-generator?video_url=${encodeURIComponent(renderedVideoUrl)}`)}
+                      onClick={() => navigate(`/content-studio?step=motif&video_url=${encodeURIComponent(renderedVideoUrl)}`)}
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
                       An KI-Post

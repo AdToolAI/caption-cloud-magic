@@ -88,7 +88,7 @@ export const ExportControls = ({ selectedImages, scenes, onClearSelection }: Exp
     const selectedScenes = Array.from(selectedImages).map(i => scenes[i]);
     sessionStorage.setItem('backgroundScenes', JSON.stringify(selectedScenes));
     
-    navigate('/ai-post-generator');
+    navigate('/content-studio?step=layout');
     toast.success(t('picStudio.scenesToPostGen'));
   };
 

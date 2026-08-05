@@ -780,7 +780,7 @@ export function PreviewExportStep({
                     
                     <div className="grid grid-cols-3 gap-2">
                       <Button
-                        onClick={() => window.location.href = `/ai-post-generator?video_url=${encodeURIComponent(job.downloadUrl!)}`}
+                        onClick={() => window.location.href = `/content-studio?step=motif&video_url=${encodeURIComponent(job.downloadUrl!)}`}
                         variant="secondary"
                         size="sm"
                         className="w-full"
