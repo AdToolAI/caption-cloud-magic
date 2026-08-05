@@ -102,9 +102,17 @@ export function StudioLightbox({ image, open, onOpenChange, onDownload, onSaveTo
               <p className="text-sm text-muted-foreground">{image.prompt}</p>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                <Download className="h-4 w-4 mr-1" /> {t('picStudio.download')}
-              </Button>
+              <ExportActionBar
+                size="sm"
+                onDownload={handleDownload}
+                handoff={{
+                  mediaUrl: image.url,
+                  mediaType: "image",
+                  caption: image.prompt || "",
+                  source: "picture_studio",
+                }}
+              />
+
               {!alreadyUpscaled && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
