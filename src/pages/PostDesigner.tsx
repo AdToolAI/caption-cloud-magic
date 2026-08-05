@@ -278,8 +278,15 @@ export default function PostDesigner() {
       zoneRef.current = built[0] ? negativeZoneForDesign(built[0]) : "bottom";
 
       if (imageMode === "ai") {
+        const base = {
+          imagePrompt: copy.imagePrompt,
+          brief,
+          zone: zoneRef.current,
+          brandName: brandKit?.name ?? "",
+        };
         const url = await generateImage(
-          buildImagePrompt({ imagePrompt: copy.imagePrompt, brief, zone: zoneRef.current }),
+          buildImagePrompt(base),
+          buildImagePrompt({ ...base, strict: true }),
         );
         if (url) applyGeneratedImage(url);
       }
