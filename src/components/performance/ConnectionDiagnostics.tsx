@@ -56,7 +56,7 @@ function StatusPill({ status, label }: { status: Status; label: string }) {
 }
 
 export function ConnectionDiagnostics() {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<ChannelDiagnostic[]>([]);
 
