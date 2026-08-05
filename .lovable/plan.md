@@ -1,65 +1,78 @@
-# Content Studio: fünf Optimieren-Features zu einem Werkzeug
+# Content Studio: ein Ablauf statt fünf Werkzeuge
 
-Der Hub "Optimieren" besteht heute aus sechs einzelnen Seiten, die alle dieselbe Aufgabe umkreisen: aus einer Idee einen fertigen Beitrag machen. Sie sind aber vollständig getrennt — jede Seite hat eigenen Einstieg, eigenen Kontext, kein Ergebnis wandert weiter. Der Kommentar-Manager gehört inhaltlich nicht dazu und existiert bereits in Analytics.
+Heute gibt es im Hub "Optimieren" sechs Seiten, die alle dasselbe Ziel umkreisen: aus einer Idee einen fertigen Beitrag machen. Der Nutzer muss den Weg selbst zusammensetzen. Statt sie unter Tabs zu bündeln, werden sie zu **einem durchgehenden Ablauf** verschmolzen.
 
-## Entscheidung
+Der KI Kommentar-Manager entfällt — er existiert bereits in Analytics.
 
-- **Löschen**: KI Kommentar-Manager (Duplikat zu Analytics/Kommentare).
-- **Zusammenführen** in ein Feature **"Content Studio"** unter `/content-studio`:
-  1. KI Post-Generator
-  2. Bild-Text-Pairing
-  3. Vorlagen-Manager
-  4. Kampagnen-Assistent
-  5. KI-Coach
-
-Der Hub "Optimieren" zeigt danach eine breite Hauptkarte (wie "Planen" → Content Command Center) mit vier Vorschaufeldern.
-
-## Aufbau des Content Studios
-
-Eine Shell mit Tabs, gleiche Bauweise wie das Content Command Center (Tabs, Deep-Links, Ansichten bleiben beim Wechsel erhalten):
+## Der Ablauf
 
 ```text
-Content Studio
-├─ Entwerfen   → Post-Generator + Post Designer (Text, Bild, Layout)
-├─ Paaren      → Bild-Text-Pairing (Motiv ↔ Caption)
-├─ Vorlagen    → Vorlagen-Manager (speichern, wiederverwenden)
-├─ Kampagnen   → Kampagnen-Assistent (Serien statt Einzelposts)
-└─ Coach       → KI-Coach als Seitenpanel, immer erreichbar
+Content Studio  ·  /content-studio
+
+ 1 Briefing        Thema, Ziel, Plattform, Tonalität, Marke
+ 2 Copy            KI-Varianten (Hook, Text, Hashtags) — auswählen, würfeln, feilen
+ 3 Motiv           KI-Bild, Mediathek, Stock oder ohne Bild
+ 4 Layout          Post Designer: Vorlagen-Varianten, Editor, Auto-Fit
+ 5 Ausspielen      Einzelpost oder Serie → Herunterladen · Veröffentlichen · Einplanen
 ```
 
-Der Coach bekommt keinen eigenen Tab, sondern ist ein aufklappbares Panel am rechten Rand, das den aktuellen Entwurf kennt und dazu Feedback gibt. Das ist der eigentliche Mehrwert: Rat genau dort, wo der Text entsteht — nicht auf einer separaten Seite ohne Kontext.
+Ein Fortschrittsband oben führt durch die Schritte, jeder Schritt bleibt jederzeit anklickbar. Rückwärts springen ändert nur den betroffenen Schritt, nicht die ganze Arbeit.
 
-## Der Mehrwert: Dinge wandern weiter
+## Wo die fünf alten Features landen
 
-Heute endet jedes Tool in einer Sackgasse. Neu:
+| Bisher | Neu |
+| --- | --- |
+| KI Post-Generator | Schritt 1–2 (Briefing + Copy) |
+| Bild-Text-Pairing | Schritt 3 — Motiv und Text werden gemeinsam bewertet, kein Extra-Werkzeug |
+| Post Designer | Schritt 4 (Layout & Editor) |
+| Vorlagen-Manager | Schublade "Vorlagen" — im Briefing laden, im Layout speichern |
+| Kampagnen-Assistent | Schritt 5, Schalter **Serie statt Einzelpost**: aus demselben Briefing entstehen 5–10 Beiträge mit Terminvorschlägen |
+| KI-Coach | Panel rechts, kennt den aktuellen Entwurf und kommentiert Schritt für Schritt |
+| KI Kommentar-Manager | entfällt |
 
-- **Entwerfen → Vorlagen**: "Als Vorlage sichern" direkt aus dem Entwurf.
-- **Vorlagen → Entwerfen**: "Vorlage verwenden" öffnet den Entwurf vorbefüllt.
-- **Paaren → Entwerfen**: gewähltes Bild-Text-Paar wird zum Entwurf.
-- **Entwerfen/Kampagnen → Veröffentlichen**: die bestehende Export-Aktionsleiste (Herunterladen · Jetzt veröffentlichen · Einplanen) übernimmt in das Content Command Center.
-- **Kampagnen → Kalender**: eine erzeugte Kampagnenserie landet als Terminvorschläge im Kalender.
+## Der eigentliche Mehrwert
 
-Ein gemeinsamer Studio-Zustand (aktueller Entwurf: Thema, Copy, Bild, Plattformen, Marke) hält die Tabs zusammen, statt jedem Tab eigene Eingaben zu geben.
+- **Ein Briefing trägt bis zum Ende.** Thema, Marke und Zielplattform werden einmal gesetzt und speisen Copy, Bildprompt, Layoutauswahl und Termin.
+- **Serie ist nur ein Schalter.** Dieselbe Maschinerie erzeugt statt einem Post eine Kampagne — kein zweites Werkzeug mit eigener Logik.
+- **Coach wird nützlich.** Feedback zu genau dem Text, der gerade auf dem Schirm ist, statt einer leeren Chatseite.
+- **Vorlagen entstehen nebenbei.** Was gut war, wird an Ort und Stelle gesichert und beim nächsten Briefing angeboten.
+- **Ein Ausgang.** Die vorhandene Aktionsleiste (Herunterladen · Jetzt veröffentlichen · Einplanen) übergibt in das Content Command Center.
 
 ## Visuell
 
-- Kinematischer Kopfbereich im Bond-Gold-Stil: Titel in Playfair Display, darunter eine Statuszeile mit dem aktiven Entwurf (Thema-Chip, Markenfarbe, Zielplattformen).
-- Tabs als goldumrandete Segmentleiste mit ruhigem Glow, wie im Content Command Center.
-- Der Entwurf bleibt als schmale Vorschaukarte oben rechts sichtbar, egal in welchem Tab — dadurch wirkt es wie ein Werkzeug, nicht wie vier Seiten hintereinander.
-- Übergänge zwischen Tabs faden, kein harter Sprung.
-
-## Abgrenzung zu Kampagnen im Command Center
-
-Im Command Center bezeichnet "Kampagnen" die Planungsansicht bestehender Kampagnen (Zeitachse, Status). Der Kampagnen-Assistent hier erzeugt sie. Beide bleiben, werden aber gegenseitig verlinkt: nach dem Erzeugen führt eine Schaltfläche direkt in die Planungsansicht.
+- Bond-Gold, kinematisch: Kopfbereich mit Playfair-Display-Titel, darunter ein schlankes Fortschrittsband mit goldener Fortschrittslinie und Häkchen für erledigte Schritte.
+- Zweispaltiges Arbeitsbild: links der aktive Schritt, rechts eine dauerhaft mitlaufende Live-Vorschau des Beitrags (Format wechselt mit der Plattform).
+- Schrittwechsel als weiches Überblenden, ausgewählte Karten zoomen in die Arbeitsfläche statt hart zu springen.
+- Coach als Panel von rechts, glasig, mit goldenem Rand — überlagert nie die Vorschau.
+- Der Hub "Optimieren" bekommt eine breite Hauptkarte mit vier Vorschaufeldern (wie "Planen" → Content Command Center).
 
 ## Technische Umsetzung
 
-- Neu `src/pages/ContentStudio.tsx`: Shell nach dem Muster von `CommandCenter.tsx` — `VIEWS = ["compose","pair","templates","campaigns"]`, ARIA-Tabs mit Pfeiltasten, `KeepAlive`, `?view=` Deep-Link.
-- Neu `src/contexts/ContentStudioContext.tsx`: gemeinsamer Entwurfszustand (`topic`, `copy`, `hashtags`, `imageUrl`, `platforms`, `templateId`), plus `applyFromTemplate`, `saveAsTemplate`.
-- Bestehende Seiten bekommen wie bei Command Center einen `embedded`-Prop (Kopf/Seiten-Chrome aus): `AIPostGenerator.tsx`, `ImageCaptionPairing.tsx`, `TemplateManager.tsx`, `Campaigns.tsx`. Keine Logik-Umschreibung, nur Chrome und Anbindung an den Kontext.
-- `Coach.tsx` wird zu `ContentCoachPanel` (Sheet rechts) umschlossen; die Seitenlogik bleibt, Eingabe wird mit dem aktuellen Entwurf vorbelegt. Route `/coach` bleibt als Redirect auf `/content-studio?coach=1`.
-- Löschen: `src/pages/CommentManager.tsx`, `src/components/comments/CommentManagerHeroHeader.tsx`, Route in `App.tsx` (zwei Stellen), Eintrag in `src/config/hubConfig.ts`, Eintrag in `src/components/ui/CommandBar.tsx`. Datenbank und Analytics-Kommentaransicht bleiben unangetastet.
-- Redirects wie bei Command Center über eine `ContentStudioRedirect`-Komponente, damit Query-Parameter und State erhalten bleiben (`/ai-post-generator` → `/content-studio?view=compose` usw.).
-- `hubConfig.ts`: "Optimieren" bekommt eine `wide`-Hauptkarte mit `previews` für die vier Ansichten.
-- Übersetzungen: neuer `cs.*`-Namensraum in `src/lib/translations.ts` (EN/DE/ES); `nav.commentManager` und zugehörige Beschreibungen entfernen.
-- Export-Anbindung über die vorhandene `ExportActionBar` / `useQuickPublish`.
+**Neue Dateien**
+- `src/pages/ContentStudio.tsx` — Schritt-Shell, `?step=` Deep-Link, Fortschrittsband, zweispaltiges Layout mit Live-Vorschau.
+- `src/contexts/ContentStudioContext.tsx` — der eine Entwurfszustand: `brief` (Thema, Ziel, Plattformen, Tonalität, Brand-Kit), `copyVariants` + `selectedCopy`, `image` (Quelle, URL, Prompt), `design` (Post-Designer-Slides), `mode: "single" | "series"`, `templateId`. Persistenz in `sessionStorage`, harter Reset bei "Neues Projekt".
+- `src/components/content-studio/steps/BriefStep.tsx`, `CopyStep.tsx`, `MotifStep.tsx`, `LayoutStep.tsx`, `DeliverStep.tsx`.
+- `src/components/content-studio/TemplateDrawer.tsx` — Laden/Speichern gegen die vorhandene Vorlagen-Tabelle aus `TemplateManager.tsx`.
+- `src/components/content-studio/CoachPanel.tsx` — Sheet, füttert die vorhandene Coach-Logik mit `brief` + `selectedCopy`.
+
+**Wiederverwendung statt Neuschreiben**
+- Copy-Erzeugung: bestehende Edge Function aus `AIPostGenerator.tsx` (Aufruf umziehen, Funktion unverändert).
+- Motiv + Layout: Logik aus `PostDesigner.tsx` wird in `src/lib/post-design/` bzw. wiederverwendbare Komponenten ausgelagert (`VariantGallery`, `SlideRenderer`, `imagePrompt.ts`, `detectImageText.ts` bleiben unverändert). `PostDesigner.tsx` wird zur dünnen Hülle um `LayoutStep`.
+- Paarungsbewertung: Score-Logik aus `ImageCaptionPairing.tsx` nach `src/lib/content-studio/pairingScore.ts` heben und im Motiv-Schritt als Passungs-Hinweis anzeigen.
+- Serien: Kampagnen-Erzeugung aus `Campaigns.tsx` in `src/lib/content-studio/series.ts`; erzeugt N Entwürfe aus dem Briefing plus Terminvorschläge über die bestehende Bestzeit-Empfehlung.
+- Ausgabe: vorhandene `ExportActionBar` + `useQuickPublish`, für Serien mit Mehrfach-Einplanung in den Kalender.
+
+**Routen & Aufräumen**
+- Neu: `/content-studio` (+ `?step=`, `?coach=1`).
+- Redirects mit Erhalt von Query/State über eine `ContentStudioRedirect`-Komponente (Muster aus `CommandCenterRedirect.tsx`): `/ai-post-generator` → `?step=brief`, `/image-caption-pairing` → `?step=motif`, `/template-manager` → `?templates=1`, `/campaigns` → `?step=deliver&mode=series`, `/coach` → `?coach=1`, `/post-designer` → `?step=layout`.
+- Löschen: `src/pages/CommentManager.tsx`, `src/components/comments/CommentManagerHeroHeader.tsx`, Route in `App.tsx`, Einträge in `src/config/hubConfig.ts` und `src/components/ui/CommandBar.tsx`. Datenbank und Analytics-Kommentaransicht bleiben unangetastet.
+- Alte Seiten `AIPostGenerator.tsx`, `ImageCaptionPairing.tsx`, `TemplateManager.tsx`, `Campaigns.tsx`, `Coach.tsx` werden nach dem Herauslösen der Logik entfernt.
+- `hubConfig.ts`: "Optimieren" bekommt eine `wide`-Hauptkarte mit `previews`.
+- Übersetzungen: neuer `cs.*`-Namensraum in EN/DE/ES; `nav.commentManager` und Begleittexte entfernen.
+
+**Umsetzungsreihenfolge**
+1. Kontext + Shell + Fortschrittsband (leere Schritte)
+2. Briefing + Copy (Post-Generator abgelöst)
+3. Motiv + Layout (Post Designer eingezogen, Pairing-Score integriert)
+4. Vorlagen-Schublade + Coach-Panel
+5. Ausspielen inkl. Serien-Schalter, danach Routen/Aufräumen
