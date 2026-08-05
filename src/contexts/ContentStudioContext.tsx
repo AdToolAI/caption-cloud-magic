@@ -520,21 +520,30 @@ export function ContentStudioProvider({
     if (draftKey) {
       try { window.localStorage.removeItem(draftKey); } catch { /* ignoriert */ }
     }
+    clearParams?.();
     goTo("brief");
-  }, [draftKey, goTo]);
+  }, [clearParams, draftKey, goTo]);
 
   const furthestAllowed: StudioStep = useMemo(() => {
     if (hasDesign) return "deliver";
+    // Eine Serie braucht nur ein Briefing — kein Layout.
+    if (series && brief.trim()) return "deliver";
     if (copy) return "layout";
     return "brief";
-  }, [copy, hasDesign]);
+  }, [brief, copy, hasDesign, series]);
 
   const canEnter = useCallback(
     (target: StudioStep) => STUDIO_STEPS.indexOf(target) <= STUDIO_STEPS.indexOf(furthestAllowed),
     [furthestAllowed],
   );
 
+  const back = useCallback(() => {
+    const index = STUDIO_STEPS.indexOf(step);
+    if (index > 0) goTo(STUDIO_STEPS[index - 1]);
+  }, [goTo, step]);
+
   const dismissRestored = useCallback(() => setRestored(false), []);
+
 
 
   const value: ContentStudioValue = {
