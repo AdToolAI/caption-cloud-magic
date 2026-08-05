@@ -59,6 +59,12 @@ serve(async (req) => {
     const check = checkPromoRow(row);
     if (!check.ok || !row) return json({ ok: false, reason: check.reason ?? "invalid" });
 
+    // v412: Ohne hinterlegten Stripe-Promotion-Code ist der Rabatt nicht anwendbar.
+    if (!row.stripe_promo_id || !String(row.stripe_promo_id).trim()) {
+      console.warn("[redeem-promo-code] missing stripe_promo_id for", row.code);
+      return json({ ok: false, reason: "invalid" });
+    }
+
     // Nutzer darf nur einen Code einlösen
     const { data: existing } = await admin
       .from("promo_redemptions")
@@ -66,6 +72,18 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     if (existing) return json({ ok: false, reason: "already_redeemed", code: existing.code });
+
+    // v412: Offene Reservierungen zählen mit gegen ein begrenztes Kontingent.
+    if (row.max_redemptions != null) {
+      const { count } = await admin
+        .from("promo_redemptions")
+        .select("id", { count: "exact", head: true })
+        .eq("promo_code_id", row.id)
+        .eq("status", "reserved");
+      if ((row.redemptions_count ?? 0) + (count ?? 0) >= row.max_redemptions) {
+        return json({ ok: false, reason: "exhausted" });
+      }
+    }
 
     // Kein aktives Abo
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");

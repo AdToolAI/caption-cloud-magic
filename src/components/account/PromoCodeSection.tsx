@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Gift, Loader2, Sparkles, Ticket } from "lucide-react";
+import { Gift, Loader2, Sparkles, Ticket, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,7 @@ export const PromoCodeSection = () => {
   const [code, setCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [releasing, setReleasing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [benefit, setBenefit] = useState<string | null>(null);
@@ -85,6 +86,25 @@ export const PromoCodeSection = () => {
       });
     } finally {
       setRedeeming(false);
+    }
+  };
+
+  const handleRelease = async () => {
+    setReleasing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("release-promo-code");
+      if (error || !data?.ok) throw error ?? new Error("release failed");
+      setBenefit(null);
+      toast({ title: t("account.promo.released") });
+      await loadRedemptions();
+    } catch (e) {
+      toast({
+        title: t("account.promo.error.title"),
+        description: t("account.promo.error.internal"),
+        variant: "destructive",
+      });
+    } finally {
+      setReleasing(false);
     }
   };
 
@@ -143,10 +163,21 @@ export const PromoCodeSection = () => {
               <p className="text-sm text-muted-foreground">
                 {benefit ?? t("account.promo.reservedHint")}
               </p>
-              <Button onClick={handleActivate} disabled={activating} className="gap-2">
-                {activating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {t("account.promo.activate")}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleActivate} disabled={activating || releasing} className="gap-2">
+                  {activating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {t("account.promo.activate")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleRelease}
+                  disabled={releasing || activating}
+                  className="gap-2 text-muted-foreground"
+                >
+                  {releasing ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                  {t("account.promo.release")}
+                </Button>
+              </div>
             </div>
           )}
 
