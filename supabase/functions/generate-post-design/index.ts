@@ -24,7 +24,8 @@ Regeln:
 - Liefere 8 Varianten mit unterschiedlicher Tonalität und Blickwinkel (z.B. Bold Statement, Editorial, Split Layout, Minimal Overlay, Angebot, Frage, Beweis, Ankündigung). Jede Variante braucht einen kurzen deutschen Namen.
 - Zusätzlich: intent — genau einer von: offer, product, knowledge, proof, launch, event, engagement, statement. Wähle den, der das Briefing am besten beschreibt.
 - Zusätzlich: imagePrompt — ein englischer Bild-Prompt (max. 60 Wörter) für ein fotorealistisches, werbetaugliches Hintergrundmotiv zum Briefing.
-  imagePrompt ist IMMER auf Englisch, auch wenn die Copy deutsch ist. Beschreibe ausschließlich das Motiv (Subjekt, Umgebung, Licht, Stimmung, Kamera) — KEINE Textinhalte, keine Schilder, keine Logos, keine Slogans, keine Marken- oder Produktnamen als sichtbare Beschriftung. Keine Angaben zu Layout-Zonen (die setzt das System selbst).`;
+  imagePrompt ist IMMER auf Englisch, auch wenn die Copy deutsch ist. Beschreibe ausschließlich Menschen, Hände, Umgebung, Material, Textur, Licht und Kamera.
+  STRIKT VERBOTEN im imagePrompt: Bildschirme oder Displays mit Inhalt, Geräte-Oberflächen (Laptop, Tablet, Smartphone, Monitor, Dashboard, App, UI, Hologramm), Schilder, Plakate, Banner, Verpackungen mit Aufdruck, Bücher, Dokumente, Diagramme, Logos, Slogans, Marken- oder Produktnamen sowie jede Form von sichtbarer Schrift. Keine Angaben zu Layout-Zonen (die setzt das System selbst).`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
