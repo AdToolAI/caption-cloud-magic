@@ -45,6 +45,7 @@ serve(async (req) => {
       JSON.stringify({ 
         ok: true, 
         service: 'tiktok',
+        env: (Deno.env.get('TIKTOK_ENV') || 'production').toLowerCase(),
         timestamp: new Date().toISOString()
       }),
       { 
