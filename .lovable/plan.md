@@ -1,41 +1,41 @@
-# Publish-Cockpit: Hub "Planen" zusammenlegen
+# Text-Overlays im Director's Cut: Rahmen-Treue (v409)
 
-Nur der Bereich "Planen" wird angefasst. Alles andere bleibt unverändert.
+## Was schiefläuft
 
-## Ausgangslage
+Im Screenshot ist das Video ein Hochformat-Clip, der im Player mittig mit schwarzen Balken links/rechts liegt. Die Overlays werden aber über die **gesamte Player-Fläche** gelegt, nicht über das tatsächlich sichtbare Videobild. Ergebnis: Text sitzt im schwarzen Balken bzw. schiebt sich "aus dem Rahmen".
 
-Der Hub zeigt vier Kacheln: Intelligenter Kalender, Content-Planer, Composer, Posting-Zeit-Berater. Das sind vier Seiten für einen einzigen Ablauf: Post schreiben, Zeit wählen, Überblick behalten.
+Bestätigt im Code:
+- `DirectorsCutPreviewPlayer.tsx` (Z. 1801, 1943-1946): Video liegt als `object-contain` im Container, die Overlays sind Geschwister mit `absolute inset-0` auf dem Container.
+- `OverlayCanvasEditor.tsx` (Z. 151-154): Bühne ist fest `aspect-video`, das Video darin `object-contain` — bei Hochformat zeigt der Editor also eine andere Fläche als das Bild.
+- `NativeTextOverlayRenderer.tsx`: Alt-Text-Overlays nutzen feste Pixel-Schriftgrößen (24/36/48/72px) und `maxWidth: 80%` bezogen auf den Container — kein Bezug zur Videobreite, keine Begrenzung nach oben/unten.
 
-## Ziel
+## Was gebaut wird
 
-Eine Seite `/publish` mit vier Ansichten:
+1. **Gemeinsame Bühnen-Berechnung**
+   Eine kleine Hilfsfunktion/Hook, die aus Containergröße + Video-Seitenverhältnis das exakte sichtbare Bildrechteck (Breite, Höhe, Offset links/oben) liefert. Quelle des Seitenverhältnisses: `videoWidth/videoHeight` des Video-Elements, Fallback auf die Szenen-/Projekt-Ratio, Fallback 16:9.
 
-1. **Composer** — schreiben, Medien, Kanäle (Startansicht)
-2. **Kalender** — Monats- und Wochenansicht aller geplanten Posts
-3. **Board** — Drag-and-Drop-Pipeline (Idee, Entwurf, Freigabe, Geplant)
-4. **Beste Zeiten** — Zeitempfehlungen pro Kanal
+2. **Overlay-Bühne statt Vollfläche (Vorschau)**
+   Im Preview-Player bekommen alle Overlays einen eigenen Wrapper, der genau auf diesem Bildrechteck sitzt. Alle relativen Boxen (0..1) und Alt-Positionen beziehen sich dann auf das Videobild — identisch zum Export.
 
-## Verzahnung statt nur Tabs
+3. **Editor-Bühne folgt dem Video**
+   `OverlayCanvasEditor` verliert das feste `aspect-video`: die Ziehfläche, das Raster und die Snap-Guides nutzen dasselbe Bildrechteck. Damit stimmt Ziehen im Editor, Vorschau und Export überein (WYSIWYG-Parität).
 
-- Im Composer steht am Zeitfeld direkt die empfohlene beste Zeit mit "übernehmen".
-- Klick auf einen Kalendereintrag öffnet ihn im Composer, ohne die Seite zu wechseln.
-- Board-Karten lassen sich in den Kalender ziehen und sind damit terminiert.
+4. **Overflow-Schutz für Alt-Text-Overlays**
+   - Schriftgröße wird relativ zur Bühnenbreite skaliert (1080px-Referenz, wie `LEGACY_FONT_SIZE_REL`), statt fixer px-Werte.
+   - Text bleibt in einer Safe-Box (max. 86 % Breite, 80 % Höhe), mit Umbruch und mittiger Ausrichtung.
+   - Animations-Transforms (bounce/scaleUp/glitch) werden gedeckelt, damit die Bewegung nicht über den Bildrand hinausläuft.
 
-## Visuell
+5. **Grafik-Overlays clampen**
+   Beim Verschieben/Skalieren wird `clampBox` konsequent angewendet, damit keine Box (Banner, Lower Third, Badge) teilweise außerhalb des Bildes landen kann.
 
-Kopfbereich mit schmalem Gold-Verlauf, Titel in Playfair Display, rechts Status-Chips (verbundene Kanäle, geplante Posts). Darunter eine goldene Segment-Leiste im Glas-Stil, aktives Segment mit weichem Glow, auf Mobil horizontal scrollbar. Wechsel per kurzem Crossfade, die Kopfzeile bleibt stehen. Im Hub ersetzt eine breite Kachel die vier bisherigen, mit den vier Ansichtsnamen als Mini-Labels darunter.
+## Technische Details
 
-## Technisch
+- Neue Datei `src/lib/directors-cut/videoStageRect.ts` mit `computeStageRect({containerW, containerH, aspect})` plus `useVideoStageRect(videoRef, containerRef)`.
+- `DirectorsCutPreviewPlayer.tsx`: Overlay-Map (Z. 1943-1946) und der Untertitel-Layer in einen `<div style={stageRect}>` mit `pointer-events-none` verlagern.
+- `NativeTextOverlayRenderer.tsx`: `GraphicOverlayPreview` misst weiterhin `clientWidth` — durch die neue Bühne ist das automatisch die Videobreite. `LegacyTextOverlayPreview` erhält `stageWidth` und rechnet Schriftgrad = `overlayFontRel(overlay) * stageWidth`.
+- `OverlayCanvasEditor.tsx`: `aspect-video` durch berechnetes Rechteck ersetzen; Pointer-Mathematik (Z. 80, 97) auf das Bühnenrechteck statt auf `getBoundingClientRect()` des Wrappers beziehen.
+- Keine Änderung an `OverlayGraphic`/`OverlayElementRenderer` (Remotion-Export) nötig — dort ist die Fläche bereits das Videobild. Damit bleibt der Export unverändert und die Vorschau zieht nach.
 
-- Neue Seite `src/pages/PublishCockpit.tsx`, die `Composer`, `Calendar`, `Planner` und `PostingTimes` als Inhalt rendert. Keine Logikänderung in diesen Seiten, nur ein `embedded`-Prop, das die eigene Überschrift ausblendet.
-- Ansicht in der URL: `/publish?view=composer|calendar|board|times`.
-- Alte Routen bleiben und leiten weiter: `/composer`, `/calendar`, `/planner`, `/posting-times`, `/post-time-advisor`.
-- `src/config/hubConfig.ts`: vier Einträge durch einen ersetzen, neues Cover im Bond-Gold-Stil.
-- Sidebar und Command-Palette angleichen, Übersetzungen für DE/EN/ES ergänzen, `src/config/seo.ts` aktualisieren.
+## Nicht Teil dieses Schritts
 
-## Reihenfolge
-
-1. Seite mit Umschalter und den vier eingebetteten Ansichten
-2. Weiterleitungen der alten Routen
-3. Verzahnung (beste Zeit, Kalender zu Composer, Board zu Kalender)
-4. Hub-Kachel, Sidebar, Übersetzungen, SEO
+Keine neuen Overlay-Typen, keine Änderungen an Presets, Brand-Kit-Styling oder Renderpfad im Export.
