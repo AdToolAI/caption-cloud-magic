@@ -635,7 +635,11 @@ export default function Composer({
         setImportedMediaUrl(null);
         setPostData(null);
         localStorage.removeItem(DRAFT_KEY);
-        // Eingebettet im Command Center: Ebene nach vollem Erfolg schließen.
+      }
+
+      // Eingebettet im Command Center: Ebene schließen, sobald mindestens ein
+      // Kanal veröffentlicht hat. Fehlgeschlagene Kanäle nennt der Toast oben.
+      if (successCount > 0) {
         onPublished?.();
       }
     } catch (error: any) {
