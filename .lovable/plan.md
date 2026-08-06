@@ -1,6 +1,6 @@
-# Meta-Setup: Seiten sind sauber — nächster Schritt ist App Review
+# Meta meldet die Root-URL noch als defekt — externe Prüfung ist sauber
 
-## Stand nach dem erneuten Scrape
+## Verifizierter Stand
 
 | URL | Response | Canonical | Bewertung |
 |---|---|---|---|
@@ -9,16 +9,32 @@
 
 Der ursprüngliche Fehler (jede Unterseite wurde als Startseite gewertet) ist damit weg. `fb:app_id` ist gesetzt. Von der Website-Seite ist alles erledigt.
 
-## Nächste Schritte in der Meta-App (keine Code-Änderung nötig)
+Zusätzlich wurde die von Meta jetzt ausdrücklich beanstandete Root-URL `https://useadtool.ai/` live mit vier Kennungen geprüft:
 
-1. **App-Einstellungen → Grunddaten**: als URLs direkt die kanonischen Adressen eintragen und speichern:
+| Abruf | Status | Weiterleitungen |
+|---|---:|---:|
+| `facebookexternalhit/1.1` | 200 | 0 |
+| `Facebot` | 200 | 0 |
+| `meta-externalagent/1.1` | 200 | 0 |
+| normaler Browser | 200 | 0 |
+
+Die Antwort ist `text/html`, HTTPS ist gültig und die Startseite wird ohne Redirect ausgeliefert. Der Screenshot widerspricht damit dem aktuell messbaren Zustand: Metas **Basic-Settings-Validator hält noch einen alten „Broken URL“-Status fest**. Das ist jetzt kein Legal-/Canonical-Fehler mehr.
+
+## Nächster Schritt: Site URL in Meta neu validieren
+
+1. Dialog schließen und unter **App settings → Basic → Website → Site URL** den aktuellen Wert `https://useadtool.ai/` vollständig löschen und **Save changes** klicken.
+2. Danach exakt `https://useadtool.ai/` wieder eintragen und erneut **Save changes** klicken. Dadurch wird nicht nur der Sharing-Cache, sondern Metas separater Basic-Settings-Validator neu angestoßen.
+3. In **Required actions** nachsehen, ob dort noch eine konkrete URL-Prüfung offen ist, und diese erneut ausführen.
+4. Erst danach den Schalter wieder auf **Live** setzen.
+5. Als weitere Grunddaten direkt die kanonischen Adressen verwenden:
    - Datenschutzerklärung: `https://useadtool.ai/legal/privacy`
    - Nutzungsbedingungen: `https://useadtool.ai/legal/terms`
    - Datenlöschung: die vorhandene `/delete-data`-Seite
-   Der Dialog „Invalid Privacy Policy URL" muss jetzt durchgehen.
-2. **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs**: prüfen, dass exakt die Backend-Callback-URL eingetragen ist (steht im Diagnose-Panel unter Verbindungen im Klartext mit Kopier-Button).
-3. **App Review → Permissions and Features → `public_profile` → Request advanced access.** Das ist der letzte echte Blocker: ohne Advanced Access können sich nur App-Rollen (Admin/Tester) einloggen, alle anderen bekommen „Feature nicht verfügbar".
-4. Danach im eingeloggten Zustand unter **Verbindungen → Diagnose** einmal prüfen und den Facebook-Login testen.
+6. Danach **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs** kontrollieren und **App Review → `public_profile` → Request advanced access** ausführen.
+
+## Wenn Meta den Status danach weiterhin festhält
+
+Dann ist der verbleibende Zustand ausschließlich auf Metas Seite: Screenshot des 200-Ergebnisses aus dem Sharing Debugger zusammen mit der App-ID an den Meta Developer Support geben. Weitere Änderungen an Website, Canonical oder Legal-Routen wären dann kontraproduktiv, weil diese aktuell korrekt antworten.
 
 ## Falls Schritt 3 dauert
 
