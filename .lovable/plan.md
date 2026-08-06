@@ -2,6 +2,13 @@
 
 Die Diagnose liefert jetzt Daten. Zwei Befunde, davon einer echt und einer ein Fehlalarm im Prüfcode.
 
+## Zum Screenshot „App settings → Advanced"
+
+Das leere Feld **„Authorize callback URL"** dort ist *nicht* die Ursache. Dieses Feld gilt nur für native/Desktop-Apps (Schalter „Native or desktop app?" ist aus). Die OAuth-Redirect-URI für unseren Web-Flow gehört woanders hin: **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs**.
+
+Was der Screenshot dagegen bestätigt: **App type: None** und **11 offene „Required actions"** (Alerts/Inbox). Genau das ist Befund 1.
+
+
 ## Befund 1 — Meta: fehlende Pflichtangaben (echte Ursache)
 
 Der Meta-Block zeigt:
