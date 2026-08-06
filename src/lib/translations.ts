@@ -19587,6 +19587,8 @@ Object.assign(translations.en, {
     expiresInDays: 'Token expires in {days} days',
     tiktokLive: 'TikTok content posting approved (production).',
     tiktokSandbox: 'TikTok runs in {env} mode — only test accounts can connect.',
+    redirectMismatch: 'Redirect URI does not point at the backend callback — reconnect will fail.',
+    publishPending: 'Connect works, posting permission still pending approval.',
   },
 });
 
@@ -19605,6 +19607,8 @@ Object.assign(translations.de, {
     expiresInDays: 'Token läuft in {days} Tagen ab',
     tiktokLive: 'TikTok Content-Posting genehmigt (Produktion).',
     tiktokSandbox: 'TikTok läuft im {env}-Modus — nur Testkonten können sich verbinden.',
+    redirectMismatch: 'Redirect-URI zeigt nicht auf den Backend-Callback — Verbinden schlägt fehl.',
+    publishPending: 'Verbinden möglich, Posten noch in Prüfung.',
   },
 });
 
@@ -19623,5 +19627,7 @@ Object.assign(translations.es, {
     expiresInDays: 'El token caduca en {days} días',
     tiktokLive: 'Publicación de contenido de TikTok aprobada (producción).',
     tiktokSandbox: 'TikTok está en modo {env} — solo cuentas de prueba pueden conectarse.',
+    redirectMismatch: 'La URI de redirección no apunta al callback del backend — la conexión fallará.',
+    publishPending: 'Conectar funciona, permiso de publicación aún en revisión.',
   },
 });
