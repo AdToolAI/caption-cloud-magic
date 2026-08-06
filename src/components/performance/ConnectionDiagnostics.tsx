@@ -92,6 +92,11 @@ export function ConnectionDiagnostics() {
   const [metaApp, setMetaApp] = useState<MetaAppStatus | null>(null);
   const [backendCallback, setBackendCallback] = useState<string | null>(DEFAULT_BACKEND_CALLBACK);
   const [configError, setConfigError] = useState<string | null>(null);
+  // Statisches fb:app_id aus index.html — Crawler sehen genau diesen Wert.
+  const headAppId =
+    typeof document !== 'undefined'
+      ? document.querySelector('meta[property="fb:app_id"]')?.getAttribute('content') ?? null
+      : null;
 
 
   const run = useCallback(async () => {
@@ -320,6 +325,17 @@ export function ConnectionDiagnostics() {
             <p className="text-xs text-muted-foreground">
               {t('connectionDiagnostics.metaAppUnavailable')}
               {metaApp?.error ? ` (${metaApp.error})` : configError ? ` (${configError})` : ''}
+            </p>
+          )}
+          {/* Abgleich: statisches fb:app_id im Head vs. serverseitig genutzte ID */}
+          {headAppId && (
+            <p className="text-xs text-muted-foreground">
+              {t('connectionDiagnostics.metaAppIdHead')}: {headAppId}
+            </p>
+          )}
+          {headAppId && metaApp?.app_id && headAppId !== metaApp.app_id && (
+            <p className="text-xs text-amber-600">
+              {t('connectionDiagnostics.metaAppIdMismatch')}
             </p>
           )}
         </div>
