@@ -1,43 +1,35 @@
-# Meta-Fix ist live — kein Fehler bei /legal/terms
+# Meta-Setup: Seiten sind sauber — nächster Schritt ist App Review
 
-## Befund (live geprüft, mit Metas Crawler-Kennung)
+## Stand nach dem erneuten Scrape
 
-| URL | Status | `og:url` im statischen Head | `fb:app_id` |
+| URL | Response | Canonical | Bewertung |
 |---|---|---|---|
-| `https://useadtool.ai/privacy` | 200 | entfernt | vorhanden |
-| `https://useadtool.ai/legal/privacy` | 200 | entfernt | vorhanden |
-| `https://useadtool.ai/legal/terms` | 200 | entfernt | vorhanden |
+| `https://useadtool.ai/legal/terms` | 200 | `…/legal/terms` | korrekt, eigenständige Seite |
+| `https://useadtool.ai/privacy` | 200 | `…/legal/privacy` | korrekt, zeigt auf die kanonische Datenschutzseite |
 
-Die Route `/legal/terms` existiert im Router (`/legal/:page`) und liefert live sauber 200 aus.
+Der ursprüngliche Fehler (jede Unterseite wurde als Startseite gewertet) ist damit weg. `fb:app_id` ist gesetzt. Von der Website-Seite ist alles erledigt.
 
-## Warum die Screenshots so aussehen
+## Nächste Schritte in der Meta-App (keine Code-Änderung nötig)
 
-- **`/legal/terms`: „This URL hasn't been shared on Facebook before."** Das ist kein Fehler, sondern schlicht: Meta hat diese Adresse noch nie abgerufen. Ein Klick auf **Fetch new information** legt den ersten Scrape an.
-- **`/privacy`: Canonical zeigt jetzt auf `/legal/privacy`.** Das ist korrekt und gewollt — `/privacy` ist die Kurzform, die kanonische Adresse der Datenschutzerklärung ist `/legal/privacy`. Der frühere Fehlerfall (Canonical = Startseite) ist damit weg.
-- Der ältere `/privacy`-Screenshot mit „42 Minuten" stammt noch aus der Zeit vor dem Deploy.
+1. **App-Einstellungen → Grunddaten**: als URLs direkt die kanonischen Adressen eintragen und speichern:
+   - Datenschutzerklärung: `https://useadtool.ai/legal/privacy`
+   - Nutzungsbedingungen: `https://useadtool.ai/legal/terms`
+   - Datenlöschung: die vorhandene `/delete-data`-Seite
+   Der Dialog „Invalid Privacy Policy URL" muss jetzt durchgehen.
+2. **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs**: prüfen, dass exakt die Backend-Callback-URL eingetragen ist (steht im Diagnose-Panel unter Verbindungen im Klartext mit Kopier-Button).
+3. **App Review → Permissions and Features → `public_profile` → Request advanced access.** Das ist der letzte echte Blocker: ohne Advanced Access können sich nur App-Rollen (Admin/Tester) einloggen, alle anderen bekommen „Feature nicht verfügbar".
+4. Danach im eingeloggten Zustand unter **Verbindungen → Diagnose** einmal prüfen und den Facebook-Login testen.
 
-## Empfehlung für die Meta-App-Einstellungen
+## Falls Schritt 3 dauert
 
-In den App-Grunddaten als **Datenschutz-URL** direkt die kanonische Adresse eintragen:
-`https://useadtool.ai/legal/privacy`
-und als Nutzungsbedingungen:
-`https://useadtool.ai/legal/terms`
-
-So folgt Meta keiner Umleitung mehr und die Validierung greift sofort.
-
-## Schritte
-
-1. Im Sharing Debugger `https://useadtool.ai/legal/terms` → **Fetch new information**.
-2. `https://useadtool.ai/legal/privacy` → **Scrape Again**.
-3. In der Meta-App die beiden kanonischen URLs speichern.
-4. Letzter echter Blocker für den Facebook-Login bleibt: **App Review → Permissions and Features → `public_profile` → Request advanced access**.
+Bis Advanced Access bewilligt ist, kannst du dein eigenes Konto unter **App-Rollen → Tester/Administratoren** hinzufügen und die Verbindung damit vollständig testen. Instagram- und Seiten-Berechtigungen sind bereits genehmigt.
 
 ## Technische Details
 
-Keine Code-Änderung geplant — die relevanten Fixes sind bereits live:
+Keine Code-Änderung geplant. Live und verifiziert:
 
 - `index.html`: statisches `og:url` entfernt, `fb:app_id` = `1769514810345813`
-- `src/config/seo.ts`: `getCanonicalUrl` gibt absolute URLs unverändert zurück
-- `src/components/SEO.tsx`: `canonical`, `og:url`, `twitter:url` aus derselben Quelle
+- `src/config/seo.ts`: `getCanonicalUrl` verhindert Domain-Verdopplung
+- `src/components/SEO.tsx`: `canonical`, `og:url`, `twitter:url` aus einer Quelle
 
-Optional, falls gewünscht: `/privacy` und `/terms` serverseitig auf `/legal/...` umleiten, damit es nur je eine öffentliche Adresse gibt. Das ist Kosmetik, kein Blocker.
+Optional später: `/privacy` und `/terms` dauerhaft auf `/legal/...` umleiten, damit es je nur eine öffentliche Adresse gibt — Kosmetik, kein Blocker.
