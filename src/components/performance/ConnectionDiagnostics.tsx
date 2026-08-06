@@ -92,6 +92,11 @@ export function ConnectionDiagnostics() {
   const [metaApp, setMetaApp] = useState<MetaAppStatus | null>(null);
   const [backendCallback, setBackendCallback] = useState<string | null>(DEFAULT_BACKEND_CALLBACK);
   const [configError, setConfigError] = useState<string | null>(null);
+  // Statisches fb:app_id aus index.html — Crawler sehen genau diesen Wert.
+  const headAppId =
+    typeof document !== 'undefined'
+      ? document.querySelector('meta[property="fb:app_id"]')?.getAttribute('content') ?? null
+      : null;
 
 
   const run = useCallback(async () => {
