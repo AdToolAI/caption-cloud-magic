@@ -19233,6 +19233,16 @@ Object.assign(translations.de, {
     reconnectRequired: 'Instagram bitte neu verbinden',
     reconnectReason: 'Deine Instagram-Verbindung nutzt noch einen geteilten Alt-Token. Verbinde dich jetzt erneut über den offiziellen Instagram-Business-Login, damit Posts mit deinem eigenen Account veröffentlicht werden.',
     reconnectNow: 'Jetzt neu verbinden',
+    instagramSetup: {
+      title: 'Vor dem Verbinden: Instagram-Voraussetzungen',
+      intro: 'Instagram lässt sich nur verbinden, wenn dein Konto ein Profi-Konto (Business oder Creator) ist und mit einer Facebook-Seite verknüpft ist. Sonst zeigt Meta eine leere Kontoliste.',
+      step1Title: 'Auf Profi-Konto umstellen',
+      step1Desc: 'Instagram-App → Einstellungen → Kontotyp und Tools → Zu Profi-Konto wechseln.',
+      step2Title: 'Mit einer Facebook-Seite verknüpfen',
+      step2Desc: 'Instagram-App → Einstellungen → Verknüpfte Konten → Facebook-Seite auswählen (alternativ Meta Business Suite → Einstellungen → Instagram-Konten).',
+      linkBusinessSuite: 'Meta Business Suite öffnen',
+      linkHelp: 'Meta-Hilfe: Instagram mit Seite verknüpfen',
+    },
   },
 });
 
