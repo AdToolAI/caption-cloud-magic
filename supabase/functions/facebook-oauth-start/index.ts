@@ -172,6 +172,9 @@ Deno.serve(async (req) => {
       // Classic Facebook Login — pass scopes inline.
       authUrl.searchParams.set('scope', scopes);
     }
+    // Force the asset picker instead of silently reusing the old grant.
+    authUrl.searchParams.set('auth_type', 'rerequest');
+
 
     const finalAuthUrl = authUrl.toString();
     console.log('[facebook-oauth-start] Authorize URL built', {
