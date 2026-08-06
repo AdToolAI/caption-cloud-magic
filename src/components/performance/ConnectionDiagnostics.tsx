@@ -219,6 +219,82 @@ export function ConnectionDiagnostics() {
         {rows.length === 0 && loading && (
           <p className="text-sm text-muted-foreground">{t('connectionDiagnostics.checking')}</p>
         )}
+
+        {/* Meta App-Grunddaten — die häufigste Ursache für einen blockierten
+            Facebook-Login-Dialog trotz Live-Modus. */}
+        {metaApp && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">
+                {t('connectionDiagnostics.metaAppTitle')}
+                {metaApp.name ? ` — ${metaApp.name}` : ''}
+              </p>
+              <StatusPill
+                status={
+                  !metaApp.available
+                    ? 'unknown'
+                    : (metaApp.missing_fields?.length ?? 0) > 0
+                    ? 'warn'
+                    : 'ok'
+                }
+                label={
+                  !metaApp.available
+                    ? t('connectionDiagnostics.metaAppUnknown')
+                    : (metaApp.missing_fields?.length ?? 0) > 0
+                    ? t('connectionDiagnostics.metaAppIncomplete')
+                    : t('connectionDiagnostics.metaAppComplete')
+                }
+              />
+            </div>
+            {metaApp.available ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  {t('connectionDiagnostics.metaAppId')}: {metaApp.app_id} · {t('connectionDiagnostics.metaAppType')}:{' '}
+                  {metaApp.app_type || '—'} · {t('connectionDiagnostics.metaAppCategory')}: {metaApp.category || '—'}
+                </p>
+                {(metaApp.missing_fields?.length ?? 0) > 0 && (
+                  <p className="text-xs text-amber-600">
+                    {t('connectionDiagnostics.metaAppMissing')}: {metaApp.missing_fields!.join(', ')}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {t('connectionDiagnostics.metaAppUnavailable')}
+                {metaApp.error ? ` (${metaApp.error})` : ''}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Soll-Redirect-URI zum Kopieren */}
+        {backendCallback && (
+          <div className="rounded-lg border border-border/60 p-3 space-y-1">
+            <p className="text-sm font-medium">{t('connectionDiagnostics.redirectTargetTitle')}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="rounded bg-muted px-2 py-1 text-xs break-all">{backendCallback}</code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(backendCallback);
+                    toast({ title: t('connectionDiagnostics.copied') });
+                  } catch {
+                    /* clipboard blocked — Nutzer kann manuell markieren */
+                  }
+                }}
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span className="ml-2">{t('connectionDiagnostics.copy')}</span>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t('connectionDiagnostics.redirectTargetHint')}
+            </p>
+          </div>
+        )}
+
         {rows.map((row) => (
           <div
             key={row.id}
