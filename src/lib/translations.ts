@@ -19603,6 +19603,17 @@ export const detectBrowserLanguage = (): Language => {
 // Connection Diagnostics (Social) — v413
 // ============================================================
 Object.assign(translations.en, {
+  metaProbe: {
+    title: 'Meta page probe',
+    description: 'Shows which pages and Instagram accounts Meta actually bound to your token when the list stays empty.',
+    runInstagram: 'Probe Instagram',
+    runFacebook: 'Probe Facebook',
+    verdict: 'Verdict',
+    businesses: 'Portfolios',
+    grantedPageIds: 'Granted page IDs',
+    grantedIgIds: 'Granted Instagram IDs',
+    rawTitle: 'Raw Meta responses',
+  },
   connectionDiagnostics: {
     title: 'Connection diagnostics',
     description: 'Credentials, token validity and posting readiness per channel.',
