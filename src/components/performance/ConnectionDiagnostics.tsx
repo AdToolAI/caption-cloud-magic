@@ -7,6 +7,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useToast } from '@/hooks/use-toast';
 
+interface MetaPermission {
+  permission: string;
+  status: string;
+}
+
 interface MetaAppStatus {
   available: boolean;
   app_id?: string | null;
@@ -16,8 +21,12 @@ interface MetaAppStatus {
   privacy_policy_url?: string | null;
   terms_of_service_url?: string | null;
   missing_fields?: string[];
+  unreadable_fields?: string[];
+  permissions?: MetaPermission[];
+  permissions_error?: string;
   error?: string;
 }
+
 
 
 type Status = 'ok' | 'warn' | 'error' | 'unknown';
@@ -31,6 +40,8 @@ interface ChannelDiagnostic {
   connectionNote?: string;
   publishing: Status;
   publishingNote?: string;
+  expectedRedirect?: string;
+  redirectOk?: boolean;
 }
 
 const HEALTH_FN: Record<string, string | null> = {
@@ -120,7 +131,7 @@ export function ConnectionDiagnostics() {
         })(),
         (async () => {
           const base = {
-            byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string }>,
+            byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string; expected_redirect?: string }>,
             metaApp: null as MetaAppStatus | null,
             backendCallback: null as string | null,
             error: null as string | null,
@@ -141,7 +152,12 @@ export function ConnectionDiagnostics() {
               }
               return { ...base, error: detail };
             }
-            const list = (data?.checks ?? []) as { provider: string; redirect_ok?: boolean; note?: string }[];
+            const list = (data?.checks ?? []) as {
+              provider: string;
+              redirect_ok?: boolean;
+              note?: string;
+              expected_redirect?: string;
+            }[];
             return {
               byProvider: Object.fromEntries(list.map((c) => [c.provider, c])),
               metaApp: (data?.meta_app_status ?? null) as MetaAppStatus | null,
@@ -164,7 +180,7 @@ export function ConnectionDiagnostics() {
       const next: ChannelDiagnostic[] = CHANNELS.map((channel) => {
         const health = healthResults.find((h) => h.id === channel.id);
         const conn = socialHealth[channel.id];
-        const cfg = (configChecks as Record<string, { redirect_ok?: boolean; note?: string }>)[channel.id];
+        const cfg = (configChecks as Record<string, { redirect_ok?: boolean; note?: string; expected_redirect?: string }>)[channel.id];
 
         let credentials: Status = health?.ok === null ? 'unknown' : health?.ok ? 'ok' : 'error';
         let credentialsNote = health?.note;
@@ -215,6 +231,8 @@ export function ConnectionDiagnostics() {
           connectionNote,
           publishing,
           publishingNote,
+          expectedRedirect: cfg?.expected_redirect,
+          redirectOk: cfg?.redirect_ok,
         };
       });
 
@@ -292,6 +310,11 @@ export function ConnectionDiagnostics() {
                   {t('connectionDiagnostics.metaAppMissing')}: {metaApp.missing_fields!.join(', ')}
                 </p>
               )}
+              {(metaApp.unreadable_fields?.length ?? 0) > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {t('connectionDiagnostics.metaAppUnreadable')}: {metaApp.unreadable_fields!.join(', ')}
+                </p>
+              )}
             </>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -301,6 +324,49 @@ export function ConnectionDiagnostics() {
           )}
         </div>
 
+
+        {/* Meta-Berechtigungen: Facebook Login braucht Advanced Access auf public_profile. */}
+        {metaApp?.available && (
+          <div className="rounded-lg border border-border/60 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium">{t('connectionDiagnostics.metaPermissionsTitle')}</p>
+              {(() => {
+                const pp = metaApp.permissions?.find((x) => x.permission === 'public_profile');
+                const advanced = pp?.status?.toLowerCase() === 'live' || pp?.status?.toLowerCase() === 'advanced';
+                return (
+                  <StatusPill
+                    status={!metaApp.permissions?.length ? 'unknown' : advanced ? 'ok' : 'warn'}
+                    label={
+                      !metaApp.permissions?.length
+                        ? t('connectionDiagnostics.metaAppUnknown')
+                        : advanced
+                        ? t('connectionDiagnostics.metaPermissionsOk')
+                        : t('connectionDiagnostics.metaPermissionsBlocked')
+                    }
+                  />
+                );
+              })()}
+            </div>
+            {metaApp.permissions?.length ? (
+              <ul className="space-y-1">
+                {metaApp.permissions.map((p) => (
+                  <li key={p.permission} className="flex items-center justify-between gap-2 text-xs">
+                    <code className="break-all">{p.permission}</code>
+                    <span className={p.status?.toLowerCase() === 'live' ? 'text-emerald-600' : 'text-amber-600'}>
+                      {p.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {t('connectionDiagnostics.metaPermissionsUnavailable')}
+                {metaApp.permissions_error ? ` (${metaApp.permissions_error})` : ''}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">{t('connectionDiagnostics.metaPermissionsHint')}</p>
+          </div>
+        )}
 
         {/* Soll-Redirect-URI zum Kopieren */}
         {backendCallback && (
@@ -342,6 +408,11 @@ export function ConnectionDiagnostics() {
                   {row.credentials !== 'ok' && row.credentialsNote
                     ? row.credentialsNote
                     : row.connectionNote || row.publishingNote}
+                </p>
+              )}
+              {row.expectedRedirect && row.redirectOk === false && (
+                <p className="text-xs text-amber-600 break-all">
+                  {t('connectionDiagnostics.expectedRedirect')}: {row.expectedRedirect}
                 </p>
               )}
             </div>
