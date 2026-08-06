@@ -19695,6 +19695,17 @@ Object.assign(translations.de, {
 });
 
 Object.assign(translations.es, {
+  metaProbe: {
+    title: 'Sonda de páginas de Meta',
+    description: 'Muestra qué páginas e Instagram ha vinculado Meta realmente a tu token cuando la lista aparece vacía.',
+    runInstagram: 'Comprobar Instagram',
+    runFacebook: 'Comprobar Facebook',
+    verdict: 'Resultado',
+    businesses: 'Portafolios',
+    grantedPageIds: 'IDs de página autorizadas',
+    grantedIgIds: 'IDs de Instagram autorizadas',
+    rawTitle: 'Respuestas sin procesar de Meta',
+  },
   connectionDiagnostics: {
     title: 'Diagnóstico de conexiones',
     description: 'Credenciales, validez del token y disponibilidad de publicación por canal.',
