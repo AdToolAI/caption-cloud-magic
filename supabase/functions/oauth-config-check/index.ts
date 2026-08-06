@@ -12,6 +12,7 @@ type ProviderCheck = {
   credentials: boolean;
   missing: string[];
   redirect_uri: string | null;
+  expected_redirect: string;
   redirect_ok: boolean;
   note?: string;
 };
@@ -45,12 +46,18 @@ serve(async (req) => {
     const pointsAtBackend = (uri: string | null) =>
       !!uri && uri.startsWith(backendCallback);
 
+    // TikTok nutzt eine eigene Callback-Function, nicht den generischen oauth-callback.
+    const tiktokCallback = `${supabaseUrl}/functions/v1/tiktok-oauth-callback`;
+    const pointsAt = (uri: string | null, expected: string) =>
+      !!uri && uri.startsWith(expected);
+
     const checks: ProviderCheck[] = [
       {
         provider: "instagram",
         credentials: missingOf(["META_APP_ID", "META_APP_SECRET"]).length === 0,
         missing: missingOf(["META_APP_ID", "META_APP_SECRET"]),
         redirect_uri: metaRedirect,
+        expected_redirect: backendCallback,
         redirect_ok: pointsAtBackend(metaRedirect),
         note: "Posten benoetigt freigegebene Meta-Berechtigungen (App Review).",
       },
@@ -59,6 +66,7 @@ serve(async (req) => {
         credentials: missingOf(["META_APP_ID", "META_APP_SECRET"]).length === 0,
         missing: missingOf(["META_APP_ID", "META_APP_SECRET"]),
         redirect_uri: metaRedirect,
+        expected_redirect: backendCallback,
         redirect_ok: pointsAtBackend(metaRedirect),
         note: "Posten benoetigt freigegebene Meta-Berechtigungen (App Review).",
       },
@@ -67,7 +75,8 @@ serve(async (req) => {
         credentials: missingOf(["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"]).length === 0,
         missing: missingOf(["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"]),
         redirect_uri: tiktokRedirect,
-        redirect_ok: pointsAtBackend(tiktokRedirect),
+        expected_redirect: tiktokCallback,
+        redirect_ok: pointsAt(tiktokRedirect, tiktokCallback),
         note: `Modus: ${(env("TIKTOK_ENV") || "production").toLowerCase()}; Client-Key-Typ: ${
           (env("TIKTOK_CLIENT_KEY") || "").startsWith("sb") ? "sandbox" : "production"
         }`,
@@ -77,6 +86,7 @@ serve(async (req) => {
         credentials: missingOf(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]).length === 0,
         missing: missingOf(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]),
         redirect_uri: `${backendCallback}?provider=youtube`,
+        expected_redirect: `${backendCallback}?provider=youtube`,
         redirect_ok: true,
         note: "Redirect wird serverseitig gebaut; muss in der Google Cloud Console eingetragen sein.",
       },
@@ -96,10 +106,18 @@ serve(async (req) => {
       terms_of_service_url?: string | null;
       link?: string | null;
       missing_fields: string[];
+      unreadable_fields: string[];
+      permissions: { permission: string; status: string }[];
+      permissions_error?: string;
       error?: string;
     };
 
-    let metaAppStatus: MetaAppStatus = { available: false, missing_fields: [] };
+    let metaAppStatus: MetaAppStatus = {
+      available: false,
+      missing_fields: [],
+      unreadable_fields: [],
+      permissions: [],
+    };
     const metaAppId = env("META_APP_ID");
     const metaAppSecret = env("META_APP_SECRET");
 
@@ -133,15 +151,51 @@ serve(async (req) => {
             available: false,
             app_id: metaAppId,
             missing_fields: [],
+            unreadable_fields: [],
+            permissions: [],
             error: parts.join(" · "),
           };
         } else {
 
+          // Nur echte Blocker als "fehlend" werten. category/app_type sind ueber
+          // App-Token oft nicht lesbar und wurden faelschlich als fehlend gemeldet.
           const required: Record<string, unknown> = {
             privacy_policy_url: body.privacy_policy_url,
             terms_of_service_url: body.terms_of_service_url,
-            category: body.category,
           };
+          const optional: Record<string, unknown> = {
+            category: body.category,
+            app_type: body.app_type,
+          };
+
+          // Berechtigungs-Level lesen: Facebook Login braucht fuer Live-Apps
+          // Advanced Access auf public_profile.
+          let permissions: { permission: string; status: string }[] = [];
+          let permissionsError: string | undefined;
+          try {
+            const pc = new AbortController();
+            const pt = setTimeout(() => pc.abort(), 8000);
+            const pres = await fetch(
+              `https://graph.facebook.com/v24.0/${metaAppId}/permissions` +
+                `?access_token=${encodeURIComponent(`${metaAppId}|${metaAppSecret}`)}`,
+              { signal: pc.signal },
+            );
+            clearTimeout(pt);
+            const pbody = await pres.json().catch(() => ({}));
+            if (!pres.ok) {
+              const g = pbody?.error ?? {};
+              permissionsError = [`HTTP ${pres.status}`, g.code ? `code ${g.code}` : null, g.message ?? null]
+                .filter(Boolean).join(" · ");
+            } else {
+              permissions = (pbody?.data ?? []).map((p: any) => ({
+                permission: String(p.permission ?? ""),
+                status: String(p.status ?? "unknown"),
+              }));
+            }
+          } catch (e: any) {
+            permissionsError = e?.name === "AbortError" ? "timeout" : (e?.message ?? "unknown");
+          }
+
           metaAppStatus = {
             available: true,
             app_id: metaAppId,
@@ -154,17 +208,30 @@ serve(async (req) => {
             missing_fields: Object.entries(required)
               .filter(([, v]) => !v)
               .map(([k]) => k),
+            unreadable_fields: Object.entries(optional)
+              .filter(([, v]) => !v)
+              .map(([k]) => k),
+            permissions,
+            permissions_error: permissionsError,
           };
         }
       } catch (e: any) {
         metaAppStatus = {
           available: false,
           missing_fields: [],
+          unreadable_fields: [],
+          permissions: [],
           error: e?.name === "AbortError" ? "timeout" : (e?.message ?? "unknown"),
         };
       }
     } else {
-      metaAppStatus = { available: false, missing_fields: [], error: "credentials_missing" };
+      metaAppStatus = {
+        available: false,
+        missing_fields: [],
+        unreadable_fields: [],
+        permissions: [],
+        error: "credentials_missing",
+      };
     }
 
     return new Response(
