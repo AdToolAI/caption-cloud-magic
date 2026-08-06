@@ -168,7 +168,7 @@ export async function discoverMetaPagesWithDiagnostics(
   options: { verifyInstagram: boolean }
 ): Promise<DiscoveryResult> {
   const ran_at = new Date().toISOString();
-  const { pages: rawPages, error: listError } = await listMetaPages(userAccessToken);
+  const { pages: rawPages, error: listError } = await collectMetaPagesAllSources(userAccessToken);
 
   const pages_found_count = rawPages.length;
   const pages_with_token_count = rawPages.filter((p) => !!p.access_token).length;
