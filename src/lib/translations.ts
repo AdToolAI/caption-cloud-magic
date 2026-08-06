@@ -19589,8 +19589,22 @@ Object.assign(translations.en, {
     tiktokSandbox: 'TikTok runs in {env} mode — only test accounts can connect.',
     redirectMismatch: 'Redirect URI does not point at the backend callback — reconnect will fail.',
     publishPending: 'Connect works, posting permission still pending approval.',
+    metaAppTitle: 'Meta app basics',
+    metaAppComplete: 'Complete',
+    metaAppIncomplete: 'Fields missing',
+    metaAppUnknown: 'Unknown',
+    metaAppId: 'App ID',
+    metaAppType: 'App type',
+    metaAppCategory: 'Category',
+    metaAppMissing: 'Missing required fields',
+    metaAppUnavailable: 'Meta app status could not be read',
+    redirectTargetTitle: 'Required OAuth redirect URI',
+    redirectTargetHint: 'Add this exact URL under Facebook Login → Settings → Valid OAuth Redirect URIs.',
+    copy: 'Copy',
+    copied: 'Copied',
   },
 });
+
 
 Object.assign(translations.de, {
   connectionDiagnostics: {
