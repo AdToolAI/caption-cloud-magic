@@ -1,39 +1,34 @@
-# Facebook-Login: "Feature nicht verfügbar" einordnen und absichern
+# TikTok-Verbindung: Fehler `non_sandbox_target` lösen
 
-## Was das Bild zeigt
+## Was der Screenshot sagt
 
-Die Fehlerseite kommt von **Facebook**, nicht von TikTok. Die Adresszeile ist exakt die URL, die unsere Facebook-Verbindung baut (`facebook.com/v24.0/dialog/oauth` mit unserer App-ID `1769514810345813` und unserem Callback).
+TikTok bricht den Login mit dem Entwickler-Hinweis **`non_sandbox_target`** ab. Bedeutung: Die TikTok-App läuft noch im **Sandbox-Modus**, und das Konto, mit dem du dich anmelden willst, ist **kein eingetragener Sandbox-Tester**. Im Sandbox-Modus lässt TikTok ausschließlich explizit hinterlegte Testkonten zu — alle anderen werden genau so abgewiesen.
 
-Meta-Text: "Du kannst dich aktuell nicht über Facebook bei dieser App anmelden, da wir zusätzliche Details für diese App aktualisieren."
+Das ist kein Code-Fehler: Die Autorisierungs-URL ist korrekt aufgebaut (Client Key, `response_type=code`, Scopes `user.info.basic`, `video.upload`, `video.publish`, Redirect-URI, State).
 
-Das ist eine **Meta-seitige Sperre**, kein Fehler im Code. Typische Auslöser:
-1. Die App-Konfiguration wurde gerade geändert (Advanced Access, Data Use Checkup) und Meta rollt die Änderung noch aus — dauert meist Minuten bis wenige Stunden.
-2. Es wird eine Berechtigung angefragt, die (noch) nicht freigegeben ist.
-3. Die App wurde auf "Facebook Login for Business" umgestellt — dann lehnt Meta den klassischen Scope-Dialog ab und verlangt eine `config_id`.
+Auffällig ist allerdings die Redirect-URI in der URL:
+`https://api.useadtool.ai/api/oauth/tiktok/callback` — die muss im TikTok-Developer-Portal **zeichengenau** so eingetragen sein und auf unseren Callback zeigen. Das prüfen wir mit.
 
-Wichtig: Der Screenshot ist von **09:19 Uhr heute Morgen** — also **vor** der Freigabe von `public_profile` und den Pages-/Instagram-Scopes. Sehr wahrscheinlich beschreibt er einen bereits behobenen Zustand.
+## Lösungsweg
 
-## Schritt 1 — Aktuellen Stand prüfen (kein Code nötig)
+### Option A — Sofort testen (Sandbox-Tester eintragen)
+Im TikTok Developer Portal → deine App → **Sandbox** → dein TikTok-Konto als Target/Tester hinzufügen und die Einladung im TikTok-Konto bestätigen. Danach funktioniert der Login für dieses Konto sofort. Für echte Kunden reicht das nicht.
 
-Bitte jetzt erneut "Facebook verbinden" klicken. Zwei mögliche Ausgänge:
+### Option B — Produktivbetrieb (nötig für Kunden)
+Im Developer Portal die App zur **Review einreichen** (Produkte „Login Kit" und „Content Posting API" mit den drei Scopes). Voraussetzungen: verifizierte Domain `useadtool.ai`, gültige Datenschutz-/AGB-URLs (`/legal/privacy`, `/legal/terms`) und ein Demo-Video des Post-Flows. Erst nach Freigabe kann sich jedes TikTok-Konto verbinden.
 
-- **Es funktioniert:** Fall erledigt, Screenshot war der alte Stand.
-- **Fehler kommt erneut:** bitte einen frischen Screenshot inkl. vollständiger URL schicken. Dann greift Schritt 2.
+### Redirect-URI gegenprüfen
+Die im Portal hinterlegte Redirect-URI muss exakt dem Wert entsprechen, den unsere Verbindung sendet. Ich prüfe die serverseitig konfigurierte URI und melde, falls sie vom Portal-Eintrag abweicht.
 
-## Schritt 2 — Falls der Fehler bleibt: Business-Login-Konfiguration
+## Was ich im Code ändern würde
 
-Die Verbindungsfunktion unterstützt bereits beide Varianten:
-- klassischer Dialog mit Scope-Liste (Standard heute)
-- Business-Login mit `config_id`, sobald ein Secret hinterlegt ist
+Nur eine Verbesserung der Fehleranzeige — die eigentliche Lösung liegt im TikTok-Portal:
 
-Wenn Meta den klassischen Dialog blockt, holst du im Meta-Dashboard unter **Facebook-Login für Unternehmen → Konfigurationen** die Konfigurations-ID; ich hinterlege sie als Secret, danach nutzt der Flow automatisch die Business-Variante.
-
-## Schritt 3 — TikTok separat betrachten
-
-TikTok läuft über eine eigene Funktion und leitet auf `tiktok.com/v2/auth/authorize/` mit den Scopes `user.info.basic`, `video.upload`, `video.publish`. Der gezeigte Fehler kann also nicht von TikTok stammen. Falls TikTok wirklich klemmt, brauche ich die dort angezeigte Meldung — der TikTok-Zugang steht aktuell noch im Sandbox-Modus, was fremde Konten blockiert.
+1. Im TikTok-Callback die Fehlercodes von TikTok (`non_sandbox_target`, `invalid_redirect_uri` usw.) auslesen und im Verbindungen-Bereich als **klaren deutschen Hinweistext** anzeigen statt eines generischen Fehlers.
+2. Im Diagnose-Panel für TikTok den Sandbox-Status sichtbar machen (`TIKTOK_ENV`) inkl. Hinweis „nur eingetragene Testkonten können sich verbinden" und die aktuell konfigurierte Redirect-URI zum Abgleich anzeigen.
 
 ## Technische Details
 
-- Betroffene Funktion: `supabase/functions/facebook-oauth-start/index.ts` — angefragte Scopes: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`; `config_id` wird über `META_LOGIN_CONFIG_ID` aktiviert.
-- Für Schritt 2 ist nur das Setzen des Secrets nötig, keine Codeänderung.
-- Optional (nur auf Wunsch): Im Diagnose-Panel den Live-Status jeder Berechtigung aus der Graph API anzeigen, damit solche Sperren sofort sichtbar sind.
+- Betroffen: `supabase/functions/_shared/tiktok*.ts` (Auth-URL-Bau, Scopes), `supabase/functions/tiktok-oauth-start/index.ts`, TikTok-Callback-Funktion, `src/components/workspace/social/ConnectionDiagnostics.tsx`.
+- Keine Änderung an der Auth-URL selbst nötig — sie ist korrekt.
+- Facebook/Instagram sind davon nicht betroffen und laufen weiter.
