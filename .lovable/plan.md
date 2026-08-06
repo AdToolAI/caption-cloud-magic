@@ -1,34 +1,39 @@
-# TikTok-Verbindung: Fehler `non_sandbox_target` lösen
+# TikTok-Verbindung: Fehler `non_sandbox_target` trotz genehmigter App
 
-## Was der Screenshot sagt
+## Links zum TikTok Developer Portal
 
-TikTok bricht den Login mit dem Entwickler-Hinweis **`non_sandbox_target`** ab. Bedeutung: Die TikTok-App läuft noch im **Sandbox-Modus**, und das Konto, mit dem du dich anmelden willst, ist **kein eingetragener Sandbox-Tester**. Im Sandbox-Modus lässt TikTok ausschließlich explizit hinterlegte Testkonten zu — alle anderen werden genau so abgewiesen.
+- Portal-Start: https://developers.tiktok.com/
+- Deine Apps (Manage apps): https://developers.tiktok.com/apps/
+- App-Übersicht/Login-Kit-Einstellungen: über „Manage apps" → App auswählen → **Login Kit** / **Content Posting API**
+- Sandbox-Verwaltung: https://developers.tiktok.com/apps/ → App → **Sandbox**
+- Fehlercode-Doku: https://developers.tiktok.com/doc/login-kit-web
 
-Das ist kein Code-Fehler: Die Autorisierungs-URL ist korrekt aufgebaut (Client Key, `response_type=code`, Scopes `user.info.basic`, `video.upload`, `video.publish`, Redirect-URI, State).
+## Warum der Fehler trotz Freigabe kommt
 
-Auffällig ist allerdings die Redirect-URI in der URL:
-`https://api.useadtool.ai/api/oauth/tiktok/callback` — die muss im TikTok-Developer-Portal **zeichengenau** so eingetragen sein und auf unseren Callback zeigen. Das prüfen wir mit.
+Die Meldung `non_sandbox_target` heißt: Die Autorisierungsanfrage wird von TikTok noch einer **Sandbox-App** zugeordnet, das anmeldende Konto ist dort aber kein Tester.
 
-## Lösungsweg
+Wenn die produktive App genehmigt ist, gibt es dafür fast immer eine dieser Ursachen:
 
-### Option A — Sofort testen (Sandbox-Tester eintragen)
-Im TikTok Developer Portal → deine App → **Sandbox** → dein TikTok-Konto als Target/Tester hinzufügen und die Einladung im TikTok-Konto bestätigen. Danach funktioniert der Login für dieses Konto sofort. Für echte Kunden reicht das nicht.
+1. **Falscher Client Key hinterlegt.** Sandbox und Produktion haben je einen eigenen Client Key/Secret. Der bei uns gespeicherte Key stammt vermutlich noch aus der Sandbox (in der URL sichtbar: `sbawkr611uvritkdty` — das Präfix `sb` deutet stark auf „sandbox" hin).
+2. **Redirect-URI gehört zur Sandbox-Konfiguration.** Gesendet wird `https://api.useadtool.ai/api/oauth/tiktok/callback`; diese muss zeichengenau in der **produktiven** App eingetragen sein.
+3. Die Umgebungs-Kennzeichnung auf unserer Seite (`TIKTOK_ENV`) steht noch auf Sandbox.
 
-### Option B — Produktivbetrieb (nötig für Kunden)
-Im Developer Portal die App zur **Review einreichen** (Produkte „Login Kit" und „Content Posting API" mit den drei Scopes). Voraussetzungen: verifizierte Domain `useadtool.ai`, gültige Datenschutz-/AGB-URLs (`/legal/privacy`, `/legal/terms`) und ein Demo-Video des Post-Flows. Erst nach Freigabe kann sich jedes TikTok-Konto verbinden.
+## Vorgehen
 
-### Redirect-URI gegenprüfen
-Die im Portal hinterlegte Redirect-URI muss exakt dem Wert entsprechen, den unsere Verbindung sendet. Ich prüfe die serverseitig konfigurierte URI und melde, falls sie vom Portal-Eintrag abweicht.
+### Schritt 1 — Produktive Zugangsdaten holen
+Im Developer Portal die genehmigte App öffnen und unter **App details / Credentials** den **Client Key** und **Client Secret** der Produktions-App kopieren. Prüfen, ob der Key mit dem in der Fehler-URL (`sbawkr611uvritkdty`) übereinstimmt — wenn nicht, ist genau das die Ursache.
 
-## Was ich im Code ändern würde
+### Schritt 2 — Redirect-URI abgleichen
+In der produktiven App unter **Login Kit → Redirect URI** muss exakt die URI stehen, die wir senden. Ich zeige dir den serverseitig konfigurierten Wert zum 1:1-Abgleich an.
 
-Nur eine Verbesserung der Fehleranzeige — die eigentliche Lösung liegt im TikTok-Portal:
+### Schritt 3 — Zugangsdaten bei uns aktualisieren
+Sobald die produktiven Werte vorliegen, hinterlege ich sie als Secrets (`TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_REDIRECT_URI`) und setze `TIKTOK_ENV` auf `production`. Danach direkt ein Verbindungstest mit deinem Konto.
 
-1. Im TikTok-Callback die Fehlercodes von TikTok (`non_sandbox_target`, `invalid_redirect_uri` usw.) auslesen und im Verbindungen-Bereich als **klaren deutschen Hinweistext** anzeigen statt eines generischen Fehlers.
-2. Im Diagnose-Panel für TikTok den Sandbox-Status sichtbar machen (`TIKTOK_ENV`) inkl. Hinweis „nur eingetragene Testkonten können sich verbinden" und die aktuell konfigurierte Redirect-URI zum Abgleich anzeigen.
+### Schritt 4 — Fehlermeldungen verständlich machen
+Im TikTok-Callback die TikTok-Fehlercodes (`non_sandbox_target`, `invalid_redirect_uri`, …) auslesen und im Verbindungen-Bereich als klaren deutschen Hinweis anzeigen statt eines generischen Fehlers. Im Diagnose-Panel zusätzlich Umgebung (Sandbox/Produktion), Client-Key-Präfix und konfigurierte Redirect-URI sichtbar machen.
 
 ## Technische Details
 
-- Betroffen: `supabase/functions/_shared/tiktok*.ts` (Auth-URL-Bau, Scopes), `supabase/functions/tiktok-oauth-start/index.ts`, TikTok-Callback-Funktion, `src/components/workspace/social/ConnectionDiagnostics.tsx`.
-- Keine Änderung an der Auth-URL selbst nötig — sie ist korrekt.
-- Facebook/Instagram sind davon nicht betroffen und laufen weiter.
+- Betroffen: `supabase/functions/_shared/tiktok*.ts` (baut die Auth-URL aus `TIKTOK_CLIENT_KEY` und `TIKTOK_REDIRECT_URI`), `supabase/functions/tiktok-oauth-start/index.ts` (liest `TIKTOK_ENV`), TikTok-Callback-Funktion, `src/components/workspace/social/ConnectionDiagnostics.tsx`.
+- Die gesendeten Scopes (`user.info.basic`, `video.upload`, `video.publish`) passen bereits zur genehmigten Freigabe — daran ist nichts zu ändern.
+- Facebook und Instagram sind nicht betroffen.
