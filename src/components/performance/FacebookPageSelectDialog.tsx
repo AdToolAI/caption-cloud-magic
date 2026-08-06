@@ -177,13 +177,14 @@ export const FacebookPageSelectDialog = ({
     } else if (pagesHidden) {
       title = 'Meta hat keine Seiten an die App übergeben';
       body =
-        'Deine Berechtigungen sind ok, aber Meta hat für diesen Account keine Seiten an die App ausgeliefert. Das passiert fast immer aus einem dieser vier Gründe:';
+        'Deine Berechtigungen sind erteilt, aber Meta hat deinem Token keine Seiten-Assets zugeordnet (leere Ziel-IDs). Klicke auf „Erneut verbinden" — wir fordern jetzt zusätzlich die Portfolio-Berechtigung an und erzwingen den Asset-Dialog. Prüfe dabei:';
       checklist = [
-        'Dein Instagram-Konto ist ein Business- oder Creator-Konto (nicht „Privat"). Prüfe das in der Instagram-App unter Einstellungen → Konto.',
-        'Dein Instagram-Konto ist in den Einstellungen deiner Facebook-Seite mit dieser Seite verknüpft (Facebook-Seite → Einstellungen → Verknüpfte Konten → Instagram).',
-        'Die Facebook-Seite wird von genau dem Facebook-Account verwaltet, mit dem du dich gerade angemeldet hast.',
-        'Im Meta-Berechtigungsdialog musst du beim Re-Connect mindestens eine Page-Checkbox aktivieren — nicht nur das Instagram-Konto.',
+        'Im Meta-Dialog auf „Alle bearbeiten" gehen und die Seite „AdTool AI" sowie das Instagram-Konto ausdrücklich anhaken.',
+        'Dein Instagram-Konto ist ein Business- oder Creator-Konto (nicht „Privat").',
+        'Das Instagram-Konto ist mit der Facebook-Seite verknüpft (Seite → Einstellungen → Verknüpfte Konten).',
+        'Liegt die Seite in einem Business-Portfolio, muss dein Account dort Vollzugriff auf die Seite haben (Business Suite → Einstellungen → Seiten → Personen).',
       ];
+
     } else if (resultStatus === 'pages_found_but_verification_failed') {
       title = 'Seiten gefunden, aber Verifikation fehlgeschlagen';
       body =
