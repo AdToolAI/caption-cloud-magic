@@ -22,15 +22,16 @@ Die Antwort ist `text/html`, HTTPS ist gültig und die Startseite wird ohne Redi
 
 ## Nächster Schritt: Site URL in Meta neu validieren
 
+Wichtig vorweg: Die App steht laut Screenshot bereits auf **Live** — das war nie das Problem und muss auch nicht umgeschaltet werden. Der Live-Schalter und der „Broken URL"-Validator sind zwei getrennte Dinge.
+
 1. Dialog schließen und unter **App settings → Basic → Website → Site URL** den aktuellen Wert `https://useadtool.ai/` vollständig löschen und **Save changes** klicken.
 2. Danach exakt `https://useadtool.ai/` wieder eintragen und erneut **Save changes** klicken. Dadurch wird nicht nur der Sharing-Cache, sondern Metas separater Basic-Settings-Validator neu angestoßen.
 3. In **Required actions** nachsehen, ob dort noch eine konkrete URL-Prüfung offen ist, und diese erneut ausführen.
-4. Erst danach den Schalter wieder auf **Live** setzen.
-5. Als weitere Grunddaten direkt die kanonischen Adressen verwenden:
+4. Als weitere Grunddaten direkt die kanonischen Adressen verwenden:
    - Datenschutzerklärung: `https://useadtool.ai/legal/privacy`
    - Nutzungsbedingungen: `https://useadtool.ai/legal/terms`
    - Datenlöschung: die vorhandene `/delete-data`-Seite
-6. Danach **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs** kontrollieren und **App Review → `public_profile` → Request advanced access** ausführen.
+5. Danach **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs** kontrollieren und **App Review → `public_profile` → Request advanced access** ausführen.
 
 ## Wenn Meta den Status danach weiterhin festhält
 
