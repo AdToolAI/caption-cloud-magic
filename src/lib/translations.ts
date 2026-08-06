@@ -19602,6 +19602,9 @@ Object.assign(translations.en, {
     redirectTargetHint: 'Add this exact URL under Facebook Login → Settings → Valid OAuth Redirect URIs.',
     copy: 'Copy',
     copied: 'Copied',
+    configErrorTitle: 'Config check failed',
+    configErrorNoSession: 'No active session — sign in and retry.',
+
   },
 });
 
