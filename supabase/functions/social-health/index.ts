@@ -10,7 +10,9 @@ const corsHeaders = {
 interface ProviderHealth {
   connected: boolean;
   expiring_in_days?: number;
+  can_publish?: boolean;
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
