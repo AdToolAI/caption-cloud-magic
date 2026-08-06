@@ -35,8 +35,9 @@ export const SEO = ({
       <meta name="description" content={description} />
       {noindex && <meta name="robots" content="noindex, nofollow" />}
       
-      {/* Canonical URL */}
-      {canonical && <link rel="canonical" href={canonical} />}
+      {/* Canonical URL — gleiche Quelle wie og:url / twitter:url */}
+      {canonical && <link rel="canonical" href={url} />}
+
       
       {/* Open Graph / Facebook */}
       <meta property="og:type" content={ogType} />
