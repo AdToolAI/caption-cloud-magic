@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('[social-health] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isAuth = errorMessage === 'Unauthorized' || errorMessage === 'Missing authorization header';
     return new Response(
       JSON.stringify({
         ok: false,
@@ -116,7 +117,7 @@ Deno.serve(async (req) => {
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
+        status: isAuth ? 401 : 500 
       }
     );
   }
