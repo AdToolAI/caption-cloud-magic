@@ -1155,6 +1155,7 @@ export const ConnectionsTab = () => {
                       </div>
                     ) : (
                       <div className="space-y-2">
+                        {provider.id === 'instagram' && <InstagramSetupChecklist />}
                         <Button onClick={() => handleConnect(provider.id, provider.name)} className="w-full">
                           {t('performance.connections.connect')}
                         </Button>
