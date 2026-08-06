@@ -246,9 +246,20 @@ export function ConnectionDiagnostics() {
           <p className="text-sm text-muted-foreground">{t('connectionDiagnostics.checking')}</p>
         )}
 
+        {configError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm font-medium text-destructive">
+              {t('connectionDiagnostics.configErrorTitle')}
+            </p>
+            <p className="text-xs text-muted-foreground break-all">{configError}</p>
+          </div>
+        )}
+
         {/* Meta App-Grunddaten — die häufigste Ursache für einen blockierten
-            Facebook-Login-Dialog trotz Live-Modus. */}
-        {metaApp && (
+            Facebook-Login-Dialog trotz Live-Modus. Immer sichtbar: fehlende
+            Daten sind selbst ein Befund. */}
+        {(
+
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-medium">
