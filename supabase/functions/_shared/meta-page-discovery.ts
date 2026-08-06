@@ -359,3 +359,144 @@ export function requiredPageScopesFor(provider: 'facebook' | 'instagram'): strin
     ? ['pages_show_list', 'instagram_basic']
     : ['pages_show_list', 'pages_read_engagement'];
 }
+
+// ---------------------------------------------------------------------------
+// Multi-source page collection
+// ---------------------------------------------------------------------------
+// Meta frequently returns an EMPTY /me/accounts even though the user ticked
+// the Page in the consent dialog — typically when the Page lives inside a
+// Business portfolio. The Page is then only visible via
+//   a) the token's granular_scopes[].target_ids (debug_token), or
+//   b) /me/businesses → owned_pages / client_pages (needs business_management).
+// We therefore union all three sources and hydrate each page node with its
+// own page access token.
+
+async function fetchPageNode(
+  pageId: string,
+  userAccessToken: string
+): Promise<RawPage | null> {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${GRAPH_VERSION}/${pageId}?` +
+        `fields=id,name,category,picture{url},access_token,` +
+        `instagram_business_account,connected_instagram_account&` +
+        `access_token=${encodeURIComponent(userAccessToken)}`
+    );
+    if (!res.ok) {
+      console.warn(
+        `[meta-page-discovery] page node hydrate failed for ${pageId}:`,
+        (await res.text()).slice(0, 300)
+      );
+      return null;
+    }
+    const json = await res.json();
+    if (!json?.id) return null;
+    return json as RawPage;
+  } catch (e) {
+    console.warn(`[meta-page-discovery] page node hydrate threw for ${pageId}:`, e);
+    return null;
+  }
+}
+
+/** Page IDs Meta bound to this token, read from debug_token granular scopes. */
+export async function listGranularTargetPageIds(
+  userAccessToken: string
+): Promise<string[]> {
+  const appId = Deno.env.get('META_APP_ID');
+  const appSecret = Deno.env.get('META_APP_SECRET');
+  if (!appId || !appSecret) return [];
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${GRAPH_VERSION}/debug_token?` +
+        `input_token=${encodeURIComponent(userAccessToken)}&` +
+        `access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    const ids = new Set<string>();
+    for (const g of json?.data?.granular_scopes ?? []) {
+      if (
+        g?.scope === 'pages_show_list' ||
+        g?.scope === 'pages_read_engagement' ||
+        g?.scope === 'pages_manage_posts' ||
+        g?.scope === 'instagram_basic' ||
+        g?.scope === 'instagram_content_publish'
+      ) {
+        for (const id of g?.target_ids ?? []) ids.add(String(id));
+      }
+    }
+    return [...ids];
+  } catch (e) {
+    console.warn('[meta-page-discovery] debug_token failed:', e);
+    return [];
+  }
+}
+
+/** Page IDs reachable through the user's Business portfolios. */
+export async function listBusinessPortfolioPageIds(
+  userAccessToken: string
+): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${GRAPH_VERSION}/me/businesses?` +
+        `fields=id,name,owned_pages{id},client_pages{id}&` +
+        `access_token=${encodeURIComponent(userAccessToken)}`
+    );
+    if (!res.ok) {
+      console.warn(
+        '[meta-page-discovery] /me/businesses failed:',
+        (await res.text()).slice(0, 300)
+      );
+      return [];
+    }
+    const json = await res.json();
+    const ids = new Set<string>();
+    for (const biz of json?.data ?? []) {
+      for (const p of biz?.owned_pages?.data ?? []) if (p?.id) ids.add(String(p.id));
+      for (const p of biz?.client_pages?.data ?? []) if (p?.id) ids.add(String(p.id));
+    }
+    return [...ids];
+  } catch (e) {
+    console.warn('[meta-page-discovery] /me/businesses threw:', e);
+    return [];
+  }
+}
+
+/** Union of /me/accounts, token target IDs and business portfolio pages. */
+export async function collectMetaPagesAllSources(userAccessToken: string): Promise<{
+  pages: RawPage[];
+  error: string | null;
+}> {
+  const { pages: accountPages, error } = await listMetaPages(userAccessToken);
+  const byId = new Map<string, RawPage>();
+  for (const p of accountPages) byId.set(String(p.id), p);
+
+  const [targetIds, portfolioIds] = await Promise.all([
+    listGranularTargetPageIds(userAccessToken),
+    listBusinessPortfolioPageIds(userAccessToken),
+  ]);
+
+  const extraIds = [...new Set([...targetIds, ...portfolioIds])].filter(
+    (id) => !byId.has(id)
+  );
+
+  if (extraIds.length > 0) {
+    console.log('[meta-page-discovery] hydrating extra page ids:', extraIds);
+    const hydrated = await Promise.all(
+      extraIds.map((id) => fetchPageNode(id, userAccessToken))
+    );
+    for (const p of hydrated) {
+      if (p?.id && p.access_token) byId.set(String(p.id), p);
+    }
+  }
+
+  const pages = [...byId.values()];
+  console.log('[meta-page-discovery] all-sources result', {
+    from_accounts: accountPages.length,
+    target_ids: targetIds.length,
+    portfolio_ids: portfolioIds.length,
+    total: pages.length,
+  });
+
+  return { pages, error: pages.length > 0 ? null : error };
+}
