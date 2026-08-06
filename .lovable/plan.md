@@ -1,54 +1,43 @@
-# Meta-Diagnose korrigieren: unsere Prüfung liest falsch
+# Gefunden: `public_profile` steht auf Standard-Zugriff
 
-## Was die neuen Screenshots ändern
+## Die Ursache
 
-In den Grunddaten ist alles gesetzt:
-- Kategorie: **Social networks & dating**
-- Datenschutz-URL, Nutzungsbedingungen, Datenlöschungs-URL, App-Symbol, App-Domain `useadtool.ai`, Kontakt-E-Mail
-- Business-Verifizierung: **Verified**, Access-Verifizierung: **Verified**, Data Use Checkup: **complete**
+Screenshot „Facebook Login → Settings" zeigt es wörtlich:
 
-Damit ist meine bisherige Aussage „Kategorie fehlt" **falsch**. Nicht Meta meldet ein fehlendes Feld — **unsere eigene Prüfung** (`oauth-config-check`) liest per App-Token nur einen Teil der Felder und interpretiert leere Rückgaben als „fehlt". `app_type: None` ist bei modernen Meta-Apps zudem normal und kein Fehler.
+> **Facebook Login requires advanced access** — Your app has standard access to `public_profile`. To use Facebook Login, switch `public_profile` to advanced access.
 
-Auch die 11 Alerts sind, wie du sagst, gewöhnliche Nachrichten — kein Blocker.
+Das ist exakt der Grund für „Feature nicht verfügbar. Du kannst dich aktuell nicht über Facebook bei dieser App anmelden". Ohne **Advanced Access auf `public_profile`** funktioniert der Login-Dialog nur für Personen mit einer Rolle in der App — für alle anderen bricht Meta mit dieser generischen Meldung ab.
 
-Kurz: Die Diagnose zeigt derzeit einen Phantom-Fehler, und die echte Ursache ist noch nicht benannt.
+Alles andere ist sauber:
+- Client OAuth login: **Yes**, Web OAuth login: **Yes**, Enforce HTTPS: **Yes**, Strict Mode: **Yes**
+- Gültige OAuth-Redirect-URIs enthalten `https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/oauth-callback` — passt
+- Grunddaten, Kategorie, Business- und Access-Verifizierung: vollständig
 
-## Der verbleibende Hauptverdacht
+Es ist also **kein Code-Fehler** und keine fehlende Grunddaten-Angabe.
 
-Der Login-Dialog wird nicht von den Grunddaten blockiert, sondern von der **Facebook-Login-Produktkonfiguration**:
-- „Gültige OAuth-Redirect-URIs" unter Facebook Login → Einstellungen: fehlt dort unsere Backend-Callback-URL, verweigert Meta den Dialog.
-- „Client-OAuth-Login" / „Web-OAuth-Login" müssen aktiviert sein.
-- Der Use Case „Authentifizierung und Kontoerstellung" bzw. „Facebook Login" muss vollständig konfiguriert sein (das ist auch der Grund für `App type: None`).
+## Was du in Meta machst (2 Minuten)
 
-Diese Werte sind in den Screenshots nicht enthalten — und genau die liest unsere Diagnose bisher nicht aus.
+1. Auf der Seite Facebook Login → Settings den Link **„Get Advanced Access"** klicken (im gelben Kasten).
+2. Alternativ: **App Review → Permissions and Features** → Zeile `public_profile` → **Request Advanced Access**.
+3. `public_profile` ist eine Standardberechtigung; Advanced Access wird nach Business-Verifizierung in der Regel sofort gewährt — bei dir ist die Verifizierung bereits „Verified".
+4. Gleich mitprüfen, dass auch `email` (falls genutzt) auf Advanced Access steht.
 
-## Was ich umsetze
+Danach in der App erneut „Mit Facebook verbinden" — der Dialog sollte durchlaufen.
 
-**1. Phantom-Fehler abschalten**
-`category`/`app_type` werden nicht mehr als Pflichtfelder bewertet. Fehlt ein Feld in der Graph-Antwort, steht künftig „nicht per API lesbar" statt „fehlt" — keine roten Fehlanzeigen mehr für korrekt gepflegte Apps.
+## Was ich am Code nachziehe
 
-**2. Die richtigen Werte auslesen**
-`oauth-config-check` fragt zusätzlich die Login-Konfiguration der App ab und zeigt im Panel:
-- die bei Meta hinterlegten gültigen OAuth-Redirect-URIs (soweit per App-Token lesbar),
-- ob unsere Backend-Callback-URL darunter ist (Abgleich Soll/Ist),
-- ob Client-/Web-OAuth-Login aktiv ist.
-Ist ein Wert per App-Token nicht lesbar, wird das ehrlich als „nicht lesbar — bitte manuell prüfen" ausgewiesen, mit Direktlink zur Facebook-Login-Einstellungsseite.
+**1. Diagnose meldet genau diesen Zustand**
+`oauth-config-check` liest künftig den Zugriffslevel der Meta-Berechtigungen (`public_profile`, `email`, `pages_manage_posts`, `instagram_content_publish`) und zeigt pro Berechtigung „Advanced / Standard / fehlt". Steht eine Login-relevante Berechtigung auf Standard, erscheint im Panel der Klartexthinweis „Facebook-Login blockiert: `public_profile` braucht Advanced Access" mit Direktlink.
 
-**3. Rohantwort sichtbar machen**
-Ein ausklappbarer „Details"-Bereich zeigt die vollständige Graph-Antwort. Damit müssen wir bei der nächsten Runde nicht mehr raten, was Meta wirklich liefert.
+**2. Phantom-Fehler entfernen**
+`category` und `app_type` werden nicht mehr als Pflichtfelder gewertet — die Grunddaten sind gepflegt, unsere Prüfung hat falsch gemeldet. Nicht per API lesbare Felder werden als „nicht lesbar" statt „fehlt" ausgewiesen.
 
-**4. TikTok-Fehlalarm beheben**
-Die Zeile „Redirect-URI zeigt nicht auf den Backend-Callback" bei TikTok ist ebenfalls falsch: TikTok nutzt die eigene Funktion `tiktok-oauth-callback`, die Prüfung akzeptiert aber nur `oauth-callback`. Künftig gilt pro Kanal das jeweils korrekte Soll-Ziel.
-
-## Was du parallel prüfst
-
-Meta App Dashboard → **Facebook Login → Einstellungen**: Steht unter „Gültige OAuth-Redirect-URIs" exakt
-`https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/oauth-callback`?
-Falls nicht: eintragen und speichern. Screenshot dieser Seite hilft mir, den Rest zu bestätigen.
+**3. TikTok-Fehlalarm beheben**
+TikTok nutzt `tiktok-oauth-callback`, nicht `oauth-callback`. Die Prüfung bekommt pro Kanal das korrekte Soll-Ziel, damit die rote Warnung verschwindet.
 
 ## Technische Details
 
-- `supabase/functions/oauth-config-check/index.ts`: Pflichtfeld-Liste auf tatsächlich blockierende Felder reduzieren (`category`, `app_type` raus); zusätzlicher Graph-Call auf die Login-Settings-Felder der App; unlesbare Felder als `unreadable` statt `missing` markieren; komplette Graph-Rohantwort unter `meta_app_status.raw` zurückgeben; `expected_redirect` je Provider (TikTok → `.../functions/v1/tiktok-oauth-callback`).
-- `src/components/performance/ConnectionDiagnostics.tsx`: Meta-Block auf drei Zustände (ok / nicht lesbar / fehlt); Redirect-Ist/Soll-Vergleich; ausklappbarer Rohdaten-Bereich; Soll-Redirect je Kanalzeile.
+- `supabase/functions/oauth-config-check/index.ts`: zusätzlicher Graph-Call auf die Permissions-Übersicht der App (App-Token); Ergebnis als `meta_permissions: [{ permission, status }]`; Pflichtfeld-Liste um `category`/`app_type` bereinigt; unlesbare Felder als `unreadable`; `expected_redirect` je Provider (TikTok → `.../functions/v1/tiktok-oauth-callback`).
+- `src/components/performance/ConnectionDiagnostics.tsx`: neuer Abschnitt „Meta-Berechtigungen" mit Ampel je Permission; Blocker-Hinweis wenn `public_profile !== advanced`; Meta-Block dreistufig (ok / nicht lesbar / fehlt).
 - `src/lib/translations.ts`: neue Texte DE/EN/ES.
 - Keine Änderung an der OAuth-Logik selbst.
