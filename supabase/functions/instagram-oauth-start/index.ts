@@ -165,7 +165,11 @@ Deno.serve(async (req) => {
       'instagram_content_publish',
       'pages_show_list',
       'pages_read_engagement',
+      // Required when the Page lives inside a Business portfolio — without it
+      // Meta binds zero assets to the token and /me/accounts stays empty.
+      'business_management',
     ].join(',');
+
 
     // Optional: Facebook Login for Business configuration ID.
     // If META_LOGIN_CONFIG_ID is set, use the Business Login flow
