@@ -79,7 +79,9 @@ export function ConnectionDiagnostics() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<ChannelDiagnostic[]>([]);
   const [metaApp, setMetaApp] = useState<MetaAppStatus | null>(null);
-  const [backendCallback, setBackendCallback] = useState<string | null>(null);
+  const [backendCallback, setBackendCallback] = useState<string | null>(DEFAULT_BACKEND_CALLBACK);
+  const [configError, setConfigError] = useState<string | null>(null);
+
 
   const run = useCallback(async () => {
     setLoading(true);
