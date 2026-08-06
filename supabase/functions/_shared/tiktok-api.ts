@@ -2,6 +2,41 @@ const TIKTOK_ENV = Deno.env.get('TIKTOK_ENV') || 'production';
 const OAUTH_BASE = 'https://open.tiktokapis.com/v2/oauth';
 const API_BASE = 'https://open.tiktokapis.com/v2';
 
+/**
+ * Single source of truth for TikTok credentials.
+ * Production values (TIKTOK_*_PROD) always win over the legacy sandbox values,
+ * because the legacy TIKTOK_CLIENT_KEY secret is integration-managed and still
+ * holds the sandbox key (`sb...`), which makes TikTok answer `non_sandbox_target`.
+ */
+export function getTikTokClientKey(): string {
+  return (
+    Deno.env.get('TIKTOK_CLIENT_KEY_PROD') ||
+    Deno.env.get('TIKTOK_CLIENT_KEY') ||
+    ''
+  );
+}
+
+export function getTikTokClientSecret(): string {
+  return (
+    Deno.env.get('TIKTOK_CLIENT_SECRET_PROD') ||
+    Deno.env.get('TIKTOK_CLIENT_SECRET') ||
+    ''
+  );
+}
+
+export function getTikTokRedirectUri(): string {
+  return (
+    Deno.env.get('TIKTOK_REDIRECT_URI_PROD') ||
+    Deno.env.get('TIKTOK_REDIRECT_URI') ||
+    ''
+  );
+}
+
+export function isSandboxClientKey(key = getTikTokClientKey()): boolean {
+  return key.toLowerCase().startsWith('sb');
+}
+
+
 export interface TikTokTokenResponse {
   access_token: string;
   refresh_token: string;
@@ -22,9 +57,9 @@ export interface TikTokUserInfo {
 
 // Token Exchange: Authorization Code → Tokens
 export async function exchangeCodeForTokens(code: string): Promise<TikTokTokenResponse> {
-  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
-  const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET')!;
-  const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI')!;
+  const clientKey = getTikTokClientKey();
+  const clientSecret = getTikTokClientSecret();
+  const redirectUri = getTikTokRedirectUri();
 
   console.log('Exchanging code for tokens (client_key hidden for security)');
   console.log('Redirect URI:', redirectUri, 'Environment:', TIKTOK_ENV);
@@ -61,8 +96,8 @@ export async function exchangeCodeForTokens(code: string): Promise<TikTokTokenRe
 
 // Refresh Access Token
 export async function refreshAccessToken(refreshToken: string): Promise<TikTokTokenResponse> {
-  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
-  const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET')!;
+  const clientKey = getTikTokClientKey();
+  const clientSecret = getTikTokClientSecret();
 
   console.log('Refreshing TikTok access token');
 
@@ -138,8 +173,8 @@ export async function getUserInfo(accessToken: string): Promise<TikTokUserInfo> 
 
 // Build Authorization URL
 export function buildAuthUrl(state: string): string {
-  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
-  const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI')!;
+  const clientKey = getTikTokClientKey();
+  const redirectUri = getTikTokRedirectUri();
   
   const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
   authUrl.searchParams.set('client_key', clientKey);
@@ -148,7 +183,7 @@ export function buildAuthUrl(state: string): string {
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('state', state);
   
-  console.log('Built TikTok auth URL:', { clientKey, redirectUri, env: TIKTOK_ENV });
+  console.log('Built TikTok auth URL:', { clientKeyType: isSandboxClientKey(clientKey) ? 'sandbox' : 'production', redirectUri, env: TIKTOK_ENV });
   
   return authUrl.toString();
 }

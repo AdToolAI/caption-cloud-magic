@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { buildAuthUrl } from '../_shared/tiktok-api.ts';
+import { buildAuthUrl, getTikTokRedirectUri } from '../_shared/tiktok-api.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
@@ -85,7 +85,7 @@ serve(async (req) => {
     const authUrl = buildAuthUrl(state);
 
     const tiktokEnv = Deno.env.get('TIKTOK_ENV') || 'production';
-    const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI');
+    const redirectUri = getTikTokRedirectUri();
     console.log(`Redirecting to TikTok OAuth (${tiktokEnv}):`, {
       userId: user.id,
       state,

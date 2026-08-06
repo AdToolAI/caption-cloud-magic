@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { getTikTokClientKey, getTikTokClientSecret, getTikTokRedirectUri, isSandboxClientKey } from '../_shared/tiktok-api.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -28,9 +29,9 @@ serve(async (req) => {
     } catch (_) { /* ignore */ }
   }
 
-  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY');
-  const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET');
-  const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI');
+  const clientKey = getTikTokClientKey();
+  const clientSecret = getTikTokClientSecret();
+  const redirectUri = getTikTokRedirectUri();
   const env = Deno.env.get('TIKTOK_ENV') || 'production';
 
   return new Response(
@@ -41,6 +42,7 @@ serve(async (req) => {
       clientKeyPreview: clientKey ? `${clientKey.substring(0, 4)}***${clientKey.substring(clientKey.length - 4)}` : null,
       redirect_uri: redirectUri || null,
       environment: env,
+      clientKeyType: isSandboxClientKey(clientKey) ? 'sandbox' : 'production',
       configured: !!clientKey && !!clientSecret && !!redirectUri,
       note: 'Compare redirect_uri value byte-for-byte with the URI registered in the TikTok Developer Portal (Login Kit). They must match exactly.'
     }),

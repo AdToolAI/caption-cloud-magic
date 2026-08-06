@@ -46,6 +46,7 @@ const PromptWizard = lazy(() => import("./pages/PromptWizard"));
 const Rewriter = lazy(() => import("./pages/Rewriter"));
 const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
 const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
+const TikTokOAuthCallback = lazy(() => import("./pages/TikTokOAuthCallback"));
 const ReviewLink = lazy(() => import("./pages/ReviewLink"));
 const BioOptimizer = lazy(() => import("./pages/BioOptimizer"));
 const BrandKit = lazy(() => import("./pages/BrandKit"));
@@ -240,6 +241,7 @@ function AppLayout() {
                     <Route path="/posting-times" element={<CommandCenterRedirect view="times" />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/performance" element={<PerformanceTracker />} />
+                    <Route path="/api/oauth/tiktok/callback" element={<TikTokOAuthCallback />} />
                     <Route path="/calendar" element={<CommandCenterRedirect view="calendar" />} />
                     <Route path="/planner" element={<CommandCenterRedirect view="posts" />} />
                     <Route path="/content-studio" element={<ContentStudio />} />

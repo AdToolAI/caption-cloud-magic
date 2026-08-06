@@ -39,7 +39,7 @@ serve(async (req) => {
     const missingOf = (names: string[]) => names.filter((n) => !Deno.env.get(n));
 
     const metaRedirect = env("META_REDIRECT_URI");
-    const tiktokRedirect = env("TIKTOK_REDIRECT_URI");
+    const tiktokRedirect = env("TIKTOK_REDIRECT_URI_PROD") ?? env("TIKTOK_REDIRECT_URI");
 
     // A redirect target is only usable when it points back at the
     // oauth-callback edge function — app URLs are SPA routes and swallow the code.
@@ -47,7 +47,9 @@ serve(async (req) => {
       !!uri && uri.startsWith(backendCallback);
 
     // TikTok nutzt eine eigene Callback-Function, nicht den generischen oauth-callback.
-    const tiktokCallback = `${supabaseUrl}/functions/v1/tiktok-oauth-callback`;
+    // TikTok verlangt eine verifizierte Domain: der Callback laeuft ueber die App-Route
+    // /api/oauth/tiktok/callback, die code+state an die Edge Function weiterleitet.
+    const tiktokCallback = "https://useadtool.ai/api/oauth/tiktok/callback";
     const pointsAt = (uri: string | null, expected: string) =>
       !!uri && uri.startsWith(expected);
 
@@ -72,13 +74,13 @@ serve(async (req) => {
       },
       {
         provider: "tiktok",
-        credentials: missingOf(["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"]).length === 0,
-        missing: missingOf(["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"]),
+        credentials: (!!(env("TIKTOK_CLIENT_KEY_PROD") ?? env("TIKTOK_CLIENT_KEY")) && !!(env("TIKTOK_CLIENT_SECRET_PROD") ?? env("TIKTOK_CLIENT_SECRET"))),
+        missing: missingOf(["TIKTOK_CLIENT_SECRET"]),
         redirect_uri: tiktokRedirect,
         expected_redirect: tiktokCallback,
         redirect_ok: pointsAt(tiktokRedirect, tiktokCallback),
         note: `Modus: ${(env("TIKTOK_ENV") || "production").toLowerCase()}; Client-Key-Typ: ${
-          (env("TIKTOK_CLIENT_KEY") || "").startsWith("sb") ? "sandbox" : "production"
+          ((env("TIKTOK_CLIENT_KEY_PROD") ?? env("TIKTOK_CLIENT_KEY")) || "").startsWith("sb") ? "sandbox" : "production"
         }`,
       },
       {

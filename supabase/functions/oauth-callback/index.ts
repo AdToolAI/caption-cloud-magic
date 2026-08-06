@@ -592,9 +592,9 @@ async function fetchMetaPermissions(
 }
 
 async function exchangeTikTokToken(code: string) {
-  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY');
-  const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET');
-  const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI');
+  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY_PROD') || Deno.env.get('TIKTOK_CLIENT_KEY');
+  const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET_PROD') || Deno.env.get('TIKTOK_CLIENT_SECRET');
+  const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI_PROD') || Deno.env.get('TIKTOK_REDIRECT_URI');
 
   console.log('Exchanging TikTok token...', {
     hasCode: !!code
