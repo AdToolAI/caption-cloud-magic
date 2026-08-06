@@ -183,7 +183,7 @@ export function buildAuthUrl(state: string): string {
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('state', state);
   
-  console.log('Built TikTok auth URL:', { clientKey, redirectUri, env: TIKTOK_ENV });
+  console.log('Built TikTok auth URL:', { clientKeyType: isSandboxClientKey(clientKey) ? 'sandbox' : 'production', redirectUri, env: TIKTOK_ENV });
   
   return authUrl.toString();
 }
