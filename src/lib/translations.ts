@@ -19639,6 +19639,9 @@ Object.assign(translations.de, {
     redirectTargetHint: 'Diese exakte URL unter Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs eintragen.',
     copy: 'Kopieren',
     copied: 'Kopiert',
+    configErrorTitle: 'Konfigurations-Prüfung fehlgeschlagen',
+    configErrorNoSession: 'Keine aktive Sitzung — bitte einloggen und erneut prüfen.',
+
 
   },
 });
