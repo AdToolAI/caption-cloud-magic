@@ -1,3 +1,42 @@
+# Meta-Validator blockiert den Data-Handling-Dialog
+
+## Was der neue Screenshot beweist
+
+Der neue Fehler nennt jetzt ausdrücklich `https://www.useadtool.ai/`. Genau diese Adresse war nur der alternative Versuch, Metas alten Cache zu umgehen. Der Versuch hat **nicht funktioniert** und wird zurückgenommen.
+
+Beide Domains wurden unmittelbar nach dem Screenshot erneut mit Metas echten Crawler-Kennungen geprüft:
+
+| URL | `meta-externalagent` | `facebookexternalhit` |
+|---|---:|---:|
+| `https://www.useadtool.ai/` | 200, HTML | 200, HTML |
+| `https://useadtool.ai/` | 200, HTML | 200, HTML |
+
+Damit ist bestätigt: **Nicht das Formular ist eingefroren und nicht die Website ist kaputt.** Der modale „Broken URL“-Blocker liegt über dem Formular und Meta hält intern einen falschen URL-Prüfstatus. Deshalb reagiert **Submit** dahinter nicht.
+
+## Jetzt exakt so vorgehen — kein weiterer Domain-Wechsel
+
+1. Im Fehlerfenster **Close** klicken.
+2. Im Data-Handling-Dialog **Cancel** klicken. Die Antworten sind laut Screenshot bereits automatisch gespeichert; nicht weiter auf den ausgegrauten Submit-Button klicken.
+3. Unter **App settings → Basic → Website** den `www`-Versuch entfernen und dauerhaft wieder exakt `https://useadtool.ai/` eintragen, dann **Save changes**.
+4. Nicht erneut zwischen `www` und ohne `www` wechseln. Die kanonische Hauptdomain bleibt `https://useadtool.ai/`.
+5. Den Data-Handling-Dialog neu öffnen. Falls Meta denselben Blocker erneut zeigt, direkt unten im Dialog **Direct Support** öffnen und den Fall als fehlerhaften URL-Validator melden.
+
+## Text für den Meta-Support
+
+```text
+Our app is already in Live mode, but the App Review Data Handling submission is blocked by “Broken URL detected” for https://useadtool.ai/.
+
+The URL returns HTTP 200 with text/html and no redirect to both Meta crawler user agents, meta-externalagent/1.1 and facebookexternalhit/1.1. The canonical privacy and terms pages also return HTTP 200 and were successfully refreshed in Meta Sharing Debugger:
+https://useadtool.ai/legal/privacy
+https://useadtool.ai/legal/terms
+
+Please clear or re-run the cached Basic Settings URL validation for app ID 1769514810345813. The blocking modal also prevents submitting the auto-saved Data Handling form.
+```
+
+Beilegen: den aktuellen „Broken URL detected“-Screenshot sowie die beiden erfolgreichen Sharing-Debugger-Screenshots. **Keine weiteren Website- oder DNS-Änderungen** — der Fehler liegt nachweislich hinter Metas Validator-Grenze.
+
+---
+
 # Meta Data Handling Questions — was eintragen
 
 Der „Broken URL"-Block ist überwunden: Meta lässt jetzt den Advanced-Access-Antrag für `public_profile` zu und fragt nur noch die Data-Handling-Fragen ab. Die Einstellungen sind fast vollständig — zwei Punkte würde ich anpassen.
@@ -58,9 +97,7 @@ Danach **Submit**.
 
 ## Falls der Dialog zurückkommt
 
-Statt der Apex-Adresse einmalig `https://www.useadtool.ai/` als Site URL eintragen und speichern — `www` ist live geprüft, liefert ebenfalls 200 und wird von Meta als neuer Host separat validiert. Danach sofort erneut **Request advanced access** klicken.
-
-Wenn auch das abgelehnt wird: keine weiteren Website-Änderungen, sondern mit den Sharing-Debugger-Screenshots an den Meta Developer Support.
+Keine weiteren Domain-Wechsel oder Website-Änderungen. Die Hauptdomain bleibt `https://useadtool.ai/`; der Fall geht mit den erfolgreichen Sharing-Debugger-Nachweisen an **Direct Support**.
 
 ## Technische Details
 
