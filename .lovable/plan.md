@@ -1,58 +1,33 @@
-# Meta meldet die Root-URL noch als defekt — externe Prüfung ist sauber
+# Meta Data Handling Questions — was eintragen
 
-## Verifizierter Stand
+Der „Broken URL"-Block ist überwunden: Meta lässt jetzt den Advanced-Access-Antrag für `public_profile` zu und fragt nur noch die Data-Handling-Fragen ab. Die Einstellungen sind fast vollständig — zwei Punkte würde ich anpassen.
 
-| URL | Response | Canonical | Bewertung |
-|---|---|---|---|
-| `https://useadtool.ai/legal/terms` | 200 | `…/legal/terms` | korrekt, eigenständige Seite |
-| `https://useadtool.ai/privacy` | 200 | `…/legal/privacy` | korrekt, zeigt auf die kanonische Datenschutzseite |
+## Empfohlene Antworten
 
-Der ursprüngliche Fehler (jede Unterseite wurde als Startseite gewertet) ist damit weg. `fb:app_id` ist gesetzt. Von der Website-Seite ist alles erledigt.
+**Datenverarbeiter: Ja** — richtig so. Im Code verifiziert: Der OAuth-Callback speichert Meta-Tokens und Account-Infos in der Datenbank (`social_connections`). Es gibt also echte Auftragsverarbeiter.
 
-Zusätzlich wurde die von Meta jetzt ausdrücklich beanstandete Root-URL `https://useadtool.ai/` live mit vier Kennungen geprüft:
+Einzutragen sind alle, die Meta-Daten (Meta-User-ID, Access-Token, Profilangaben) tatsächlich sehen:
 
-| Abruf | Status | Weiterleitungen |
-|---|---:|---:|
-| `facebookexternalhit/1.1` | 200 | 0 |
-| `Facebot` | 200 | 0 |
-| `meta-externalagent/1.1` | 200 | 0 |
-| normaler Browser | 200 | 0 |
+| Eintrag | Rolle |
+|---|---|
+| `Supabase Inc.` | Datenbank und Backend-Funktionen, speichert Tokens und Account-IDs |
+| `Cloudflare, Inc.` | CDN/Edge vor der Website, verarbeitet den Traffic |
 
-Die Antwort ist `text/html`, HTTPS ist gültig und die Startseite wird ohne Redirect ausgeliefert. Der Screenshot widerspricht damit dem aktuell messbaren Zustand: Metas **Basic-Settings-Validator hält noch einen alten „Broken URL“-Status fest**. Das ist jetzt kein Legal-/Canonical-Fehler mehr.
+**Anpassung 1:** Der bestehende Eintrag lautet „Supabase Inc." — korrekt ist **Supabase Inc.** Bitte über **Edit** die Schreibweise prüfen und korrigieren. Ein falsch geschriebener Verarbeiter ist ein häufiger Ablehnungsgrund.
 
-# Meta „Broken URL detected“ trotz erreichbarer Website
+**Anpassung 2:** `Cloudflare, Inc.` als zweiten Verarbeiter über **Add data processor or service provider** ergänzen.
 
-## Do I know what the issue is?
+Reine Rendering- oder KI-Dienste (AWS Lambda, Replicate, ElevenLabs) gehören **nicht** in die Liste — dort landen keine Meta-Daten, sondern nur eigene Medien.
 
-Ja, bis zur zuständigen Systemgrenze: Der **App-Review-Validator** hält `https://useadtool.ai/` weiterhin als defekt fest. Die Website selbst ist aktuell nicht defekt.
+## Die übrigen Felder
 
-Frisch geprüft:
+- **Verantwortliche Stelle:** „Samuel Dusatko" + „Germany" passt, sofern kein eingetragenes Unternehmen dahintersteht. Gibt es eine Firmierung, muss dort der exakte Firmenname stehen — identisch mit dem Impressum.
+- **Nationale Sicherheitsanfragen:** „No" ist korrekt.
+- **Policies:** Die drei gesetzten Haken passen. Zusätzlich empfehle ich „Provisions for challenging these requests if they are considered unlawful" anzuhaken, sofern rechtswidrige Anfragen tatsächlich angefochten würden — das ist der übliche Standard.
 
-- IPv4: HTTP 200
-- IPv6: HTTP 200
-- `facebookexternalhit`: HTTP 200
-- `meta-externalagent`: HTTP 200
-- keine Weiterleitung, gültiges HTTPS, `text/html`
-- `robots.txt` erlaubt den Zugriff
-- auch `https://www.useadtool.ai/` antwortet direkt mit HTTP 200
+Danach **Submit**.
 
-Damit liegt der Fehler nicht mehr in Canonical, Legal-Routen oder App-Code. Wahrscheinlich hält Metas separater Prüfstatus noch den früher beobachteten 418/Timeout fest; alternativ wird ein einzelner Meta-Prüfabruf am vorgeschalteten Schutz gelegentlich anders behandelt. Welcher dieser beiden externen Fälle zutrifft, lässt sich aus dem Meta-Dialog nicht unterscheiden.
-
-## Erledigt
-
-- App-Modus steht auf **Live** (war nie der Blocker).
-- **Required actions**: einziger Eintrag „Submit Data Use Checkup" ist **Completed** — hier ist nichts mehr offen.
-- Site URL wurde neu gespeichert.
-
-## Nächster Versuch: frischen Host validieren
-
-1. Unter **App settings → Basic → Website → Site URL** statt der gecachten Apex-Adresse exakt `https://www.useadtool.ai/` eintragen und speichern. `www` ist live geprüft und liefert ebenfalls direkt 200, wird von Meta aber als neuer Host separat validiert.
-2. Danach sofort wieder unter **App Review → Permissions and Features → `public_profile` → Request advanced access** klicken.
-3. Wenn der Dialog nicht mehr erscheint, `www` als Site URL belassen. Die eigentliche App und alle Legal-URLs können weiterhin unter `useadtool.ai` laufen.
-
-## Danach: App Review für `public_profile`
-
-Das ist jetzt der einzige echte Blocker für fremde Nutzer. Ohne Advanced Access können sich nur Personen einloggen, die in **App roles → Roles/Test users** eingetragen sind — alle anderen sehen „Feature nicht verfügbar".
+## Danach
 
 1. Bei „Provide testing instructions" eine kurze Anleitung hinterlegen: Testkonto, Weg zu **Verbindungen → Facebook verbinden**, was danach passiert.
 2. **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs** gegenprüfen — der Soll-Wert steht mit Kopier-Button im Diagnose-Panel unter Verbindungen.
@@ -61,20 +36,36 @@ Das ist jetzt der einzige echte Blocker für fremde Nutzer. Ohne Advanced Access
    - Nutzungsbedingungen: `https://useadtool.ai/legal/terms`
    - Datenlöschung: `/delete-data`
 
-## Wenn Meta auch `www` ablehnt
+---
 
-Dann keine weiteren Website-Änderungen vornehmen. Mit den Sharing-Debugger-Screenshots und den aktuellen 200-Prüfungen den Meta Developer Support um Zurücksetzen der gespeicherten URL-Compliance bitten. Parallel Lovable Support den früheren 418-Response nennen und um Prüfung bitten, ob Meta-Crawler am vorgeschalteten Bot-Schutz zeitweise herausgefordert werden. Weitere Änderungen an Canonical oder Legal-Routen wären kontraproduktiv.
+# Vorgeschichte: „Broken URL detected"
 
-## Falls Schritt 3 dauert
+## Verifizierter Stand der Website
 
-Bis Advanced Access bewilligt ist, kannst du dein eigenes Konto unter **App-Rollen → Tester/Administratoren** hinzufügen und die Verbindung damit vollständig testen. Instagram- und Seiten-Berechtigungen sind bereits genehmigt.
+| Abruf | Status | Weiterleitungen |
+|---|---:|---:|
+| `facebookexternalhit/1.1` | 200 | 0 |
+| `meta-externalagent/1.1` | 200 | 0 |
+| IPv4 / IPv6 | 200 | 0 |
+| `www.useadtool.ai` | 200 | 0 |
+
+| URL | Response | Canonical |
+|---|---|---|
+| `https://useadtool.ai/legal/terms` | 200 | `…/legal/terms` |
+| `https://useadtool.ai/privacy` | 200 | `…/legal/privacy` |
+
+`fb:app_id` ist gesetzt, das statische `og:url` entfernt, `robots.txt` erlaubt den Zugriff. Von der Website-Seite ist alles erledigt; der frühere Dialog kam aus Metas eigenem, gecachtem Prüfstatus.
+
+## Falls der Dialog zurückkommt
+
+Statt der Apex-Adresse einmalig `https://www.useadtool.ai/` als Site URL eintragen und speichern — `www` ist live geprüft, liefert ebenfalls 200 und wird von Meta als neuer Host separat validiert. Danach sofort erneut **Request advanced access** klicken.
+
+Wenn auch das abgelehnt wird: keine weiteren Website-Änderungen, sondern mit den Sharing-Debugger-Screenshots an den Meta Developer Support.
 
 ## Technische Details
 
-Keine Code-Änderung geplant. Live und verifiziert:
+Live und verifiziert, keine Code-Änderung geplant:
 
 - `index.html`: statisches `og:url` entfernt, `fb:app_id` = `1769514810345813`
 - `src/config/seo.ts`: `getCanonicalUrl` verhindert Domain-Verdopplung
 - `src/components/SEO.tsx`: `canonical`, `og:url`, `twitter:url` aus einer Quelle
-
-Optional später: `/privacy` und `/terms` dauerhaft auf `/legal/...` umleiten, damit es je nur eine öffentliche Adresse gibt — Kosmetik, kein Blocker.
