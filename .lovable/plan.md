@@ -1,61 +1,50 @@
-# Der eigentliche Blocker: Meta kann die App nicht live schalten
+# Auswertung Sharing Debugger: die Startseite ist sauber
 
-## Was die beiden Screenshots zeigen
+## Was die drei Screenshots sagen
 
-1. **„Broken URL detected"** — Meta blockiert den Wechsel in den Live-Modus, weil es die **Site URL `https://useadtool.ai/`** als nicht erreichbar bewertet.
-2. **„Invalid Privacy Policy URL"** — dieselbe Bewertung für die Datenschutz-URL; deshalb lässt Meta auch kein „Request advanced access" für `public_profile` zu.
+| Prüfpunkt | Ergebnis |
+|---|---|
+| Response Code | **200** |
+| Fetched URL / Canonical | `https://useadtool.ai/` — identisch, keine Weiterleitungskette |
+| Link Preview | wird korrekt mit Bild, Titel und Beschreibung gerendert |
+| Einzige Warnung | **„Missing Properties: fb:app_id"** |
 
-Damit ist die Kette vollständig erklärt:
+Damit ist belegt: `https://useadtool.ai/` ist für Metas Crawler **nicht kaputt**. Der Dialog „Broken URL detected" beruhte auf einem älteren, zwischengespeicherten Scrape-Ergebnis — der neue Scrape von vor 3 Minuten ist 200.
 
-```text
-Site-/Privacy-URL von Metas Crawler als "broken" bewertet
-   -> App kann nicht wirklich Live gehen
-   -> public_profile bleibt auf "Standard access" (Verification required)
-   -> Facebook Login zeigt "Feature nicht verfügbar"
-```
+Zwei Nebenbefunde aus Screenshot 3 (kosmetisch, kein Blocker):
+- Titel, Description, Card und Image tauchen **doppelt** auf (`og:temporal:twitter:*` zeigt jeweils zwei Werte) — es gibt zwei Quellen für dieselben Social-Tags.
+- `og:temporal:twitter:url` steht auf `https://useadtool.ai/https://useadtool.ai/` — eine URL wurde doppelt zusammengesetzt.
 
-## Was ich geprüft habe
+## Was jetzt zu tun ist
 
-Ich habe die drei URLs direkt abgefragt — einmal normal und einmal mit Metas Crawler-Kennung `facebookexternalhit`:
+**Dein Schritt in Meta (der Blocker):**
+1. Sharing Debugger nochmal, diesmal mit der **Datenschutz-URL** (die, die du in App-Grundeinstellungen als Privacy Policy URL eingetragen hast) → „Scrape Again". Nur wenn die auch 200 liefert, ist der „Invalid Privacy Policy URL"-Dialog ebenfalls nur ein alter Cache-Stand.
+2. Danach App Mode erneut auf **Live** stellen. Der Dialog sollte jetzt nicht mehr kommen.
+3. Dann **App Review → Permissions and Features → `public_profile` → Request advanced access**. Das ist der verbliebene echte Grund für „Feature nicht verfügbar".
 
-| URL | normal | als Meta-Crawler |
-|---|---|---|
-| `https://useadtool.ai/` | 200 | 200 |
-| `https://useadtool.ai/privacy` | 200 | 200 |
-| `https://useadtool.ai/legal/terms` | 200 | 200 |
+**Mein Schritt im Code:**
 
-`robots.txt` erlaubt `/` und blockiert keine der drei Seiten.
+**1. `fb:app_id` ergänzen** — die einzige Warnung, die der Debugger meldet. Meta wertet das bei Login-Apps als Signal für die Zuordnung Website ↔ App.
+- Neues Meta-Tag `<meta property="fb:app_id" content="<Meta App-ID>" />` im Head.
 
-Aus unserer Sicht sind die Links also erreichbar. Das heißt: Metas Urteil beruht entweder auf einem **zwischengespeicherten alten Ergebnis** (früherer Ausfall/Redirect) oder darauf, dass der Meta-Crawler von seinen eigenen IP-Bereichen aus geblockt/gedrosselt wird — beides sehen wir von hier aus nicht.
+**2. Doppelte Social-Tags auflösen**
+- Sitewide-Tags bleiben in `index.html`, die zweite Quelle liefert für die Startseite keine abweichenden Werte mehr — der Debugger sieht dann je Property genau einen Wert.
 
-## Was du in Meta machst (Reihenfolge wichtig)
+**3. Kaputte `twitter:url` reparieren**
+- In der Komponente, die pro Route die Social-Tags setzt, wird die URL doppelt mit der Domain verkettet. Künftig genau einmal absolut auflösen (`https://useadtool.ai/…`).
 
-1. **Sharing Debugger** öffnen: `https://developers.facebook.com/tools/debug/`
-   - `https://useadtool.ai/` eingeben → **„Scrape Again"**. Response Code muss 200–299 sein.
-   - Dasselbe für `https://useadtool.ai/privacy` und `https://useadtool.ai/legal/terms`.
-   - Zeigt der Debugger dort einen Fehlercode oder eine Weiterleitung, schick mir bitte einen Screenshot davon — das ist die harte Diagnose.
-2. Danach **App Mode auf Live** schalten. Erst wenn das ohne Dialog durchgeht, ist der Blocker weg.
-3. Dann **App Review → Permissions and Features → `public_profile` → Request advanced access**.
-4. Zum Schluss in der App „Mit Facebook verbinden" testen.
-
-## Was ich am Code nachziehe
-
-**1. Meta-Crawler garantiert bedienen**
-Für `/`, `/privacy` und `/legal/terms` stelle ich sicher, dass ohne JavaScript sofort ein vollständiges HTML-Grundgerüst mit `<title>`, Meta-Description und Open-Graph-Tags ausgeliefert wird. Metas Crawler führt kein JavaScript aus; eine leere Seiten-Hülle kann er als „broken" bewerten, selbst bei HTTP 200.
-
-**2. Keine Weiterleitungen auf diesen drei URLs**
-Prüfen und sicherstellen, dass weder Root noch die Rechtsseiten über eine Zwischenweiterleitung laufen (`useadtool.ai` → `www` → App-Route) — Umleitungsketten sind eine häufige Ursache für Metas Broken-URL-Urteil.
-
-**3. Diagnose ehrlich machen** (aus der vorherigen Runde, weiterhin gültig)
-- Meta-Berechtigungen mit Zugriffslevel (Advanced / Standard) im Diagnose-Panel anzeigen, inklusive Klartext-Blocker „`public_profile` braucht Advanced Access".
-- `category` und `app_type` nicht mehr als Pflichtfelder werten (Grunddaten sind gepflegt, unsere Prüfung meldete falsch).
-- TikTok-Fehlalarm beheben: pro Kanal das korrekte Soll-Callback-Ziel prüfen (`tiktok-oauth-callback` statt `oauth-callback`).
+**4. Diagnose-Panel ehrlich machen** (weiterhin offen aus den letzten Runden)
+- Meta-Berechtigungen mit Zugriffslevel (Advanced/Standard) anzeigen, inkl. Klartext-Blocker „`public_profile` braucht Advanced Access".
+- `category` und `app_type` nicht mehr als fehlende Pflichtfelder werten — deine Grunddaten sind gepflegt, unsere Prüfung meldete falsch.
+- TikTok-Fehlalarm beheben: pro Kanal das korrekte Soll-Callback prüfen (`tiktok-oauth-callback` statt `oauth-callback`).
 
 ## Technische Details
 
-- `index.html`: vollständige statische Head-Metadaten (Title, Description, OG, Canonical) sicherstellen, damit Crawler ohne JS verwertbaren Inhalt bekommen.
-- Routing/Redirects (`public/_headers`, `public/.htaccess`, `vercel.json`) auf Weiterleitungsketten für `/`, `/privacy`, `/legal/terms` prüfen und ggf. auf direkte 200-Auslieferung stellen.
-- `supabase/functions/oauth-config-check/index.ts`: zusätzlicher Graph-Call auf die Permissions-Übersicht (`meta_permissions: [{ permission, status }]`); Pflichtfeld-Liste um `category`/`app_type` bereinigt; nicht lesbare Felder als `unreadable`; `expected_redirect` je Provider.
-- `src/components/performance/ConnectionDiagnostics.tsx`: Abschnitt „Meta-Berechtigungen" mit Ampel je Permission; Blocker-Hinweis bei `public_profile !== advanced`; Soll-Redirect je Kanal.
+- `index.html`: `fb:app_id` ergänzen; Social-Tag-Block als alleinige Quelle für die Startseite belassen.
+- `src/components/SEO.tsx`: `twitter:url` (und analog `og:url`/canonical) über einen einzigen Helper absolut auflösen, damit keine Domain-Verdopplung entsteht; auf der Startseite keine identischen Duplikate mehr emittieren.
+- `supabase/functions/oauth-config-check/index.ts`: Graph-Call auf die Permissions-Übersicht (`meta_permissions: [{ permission, status }]`); Pflichtfeld-Liste um `category`/`app_type` bereinigt; `expected_redirect` je Provider.
+- `src/components/performance/ConnectionDiagnostics.tsx`: Abschnitt „Meta-Berechtigungen" mit Ampel je Permission, Blocker-Hinweis bei `public_profile !== advanced`, Soll-Redirect je Kanal.
 - `src/lib/translations.ts`: neue Texte DE/EN/ES.
 - Keine Änderung an der OAuth-Logik selbst.
+
+Für Punkt 1 brauche ich die **Meta App-ID** (steht in den App-Grundeinstellungen ganz oben) — schick sie mir, dann trage ich sie ein.
