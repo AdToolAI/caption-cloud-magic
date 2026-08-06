@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     // Get all active connections for user
     const { data: connections, error: connError } = await supabase
       .from('social_connections')
-      .select('provider, token_expires_at')
+      .select('provider, token_expires_at, scope')
       .eq('user_id', user.id);
 
     if (connError) {
@@ -59,6 +59,16 @@ Deno.serve(async (req) => {
       youtube: { connected: false },
     };
 
+    // Scopes a connection must carry before the channel can actually publish.
+    const PUBLISH_SCOPES: Record<string, string[]> = {
+      instagram: ['instagram_content_publish'],
+      facebook: ['pages_manage_posts'],
+      tiktok: ['video.publish'],
+      youtube: ['youtube.upload'],
+      linkedin: ['w_member_social'],
+      x: ['tweet.write'],
+    };
+
     const now = new Date();
 
     connections?.forEach((conn) => {
@@ -74,8 +84,15 @@ Deno.serve(async (req) => {
         }
       }
 
+      const required = PUBLISH_SCOPES[conn.provider] ?? [];
+      const granted = (conn.scope ?? '') as string;
+      health.can_publish = required.length === 0
+        ? undefined
+        : required.every((s) => granted.includes(s));
+
       providers[conn.provider] = health;
     });
+
 
     console.log('[social-health] Health check completed', { providers });
 
