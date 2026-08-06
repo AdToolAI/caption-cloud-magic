@@ -1,46 +1,54 @@
-# Diagnose-Auswertung: Meta blockiert wegen fehlender Grunddaten
+# Meta-Diagnose korrigieren: unsere Prüfung liest falsch
 
-Die Diagnose liefert jetzt Daten. Zwei Befunde, davon einer echt und einer ein Fehlalarm im Prüfcode.
+## Was die neuen Screenshots ändern
 
-## Zum Screenshot „App settings → Advanced"
+In den Grunddaten ist alles gesetzt:
+- Kategorie: **Social networks & dating**
+- Datenschutz-URL, Nutzungsbedingungen, Datenlöschungs-URL, App-Symbol, App-Domain `useadtool.ai`, Kontakt-E-Mail
+- Business-Verifizierung: **Verified**, Access-Verifizierung: **Verified**, Data Use Checkup: **complete**
 
-Das leere Feld **„Authorize callback URL"** dort ist *nicht* die Ursache. Dieses Feld gilt nur für native/Desktop-Apps (Schalter „Native or desktop app?" ist aus). Die OAuth-Redirect-URI für unseren Web-Flow gehört woanders hin: **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs**.
+Damit ist meine bisherige Aussage „Kategorie fehlt" **falsch**. Nicht Meta meldet ein fehlendes Feld — **unsere eigene Prüfung** (`oauth-config-check`) liest per App-Token nur einen Teil der Felder und interpretiert leere Rückgaben als „fehlt". `app_type: None` ist bei modernen Meta-Apps zudem normal und kein Fehler.
 
-Was der Screenshot dagegen bestätigt: **App type: None** und **11 offene „Required actions"** (Alerts/Inbox). Genau das ist Befund 1.
+Auch die 11 Alerts sind, wie du sagst, gewöhnliche Nachrichten — kein Blocker.
 
+Kurz: Die Diagnose zeigt derzeit einen Phantom-Fehler, und die echte Ursache ist noch nicht benannt.
 
-## Befund 1 — Meta: fehlende Pflichtangaben (echte Ursache)
+## Der verbleibende Hauptverdacht
 
-Der Meta-Block zeigt:
-- App-ID: 1769514810345813
-- **App-Typ: —** (leer)
-- **Kategorie: —** (leer, als „Fehlende Pflichtfelder: category" markiert)
+Der Login-Dialog wird nicht von den Grunddaten blockiert, sondern von der **Facebook-Login-Produktkonfiguration**:
+- „Gültige OAuth-Redirect-URIs" unter Facebook Login → Einstellungen: fehlt dort unsere Backend-Callback-URL, verweigert Meta den Dialog.
+- „Client-OAuth-Login" / „Web-OAuth-Login" müssen aktiviert sein.
+- Der Use Case „Authentifizierung und Kontoerstellung" bzw. „Facebook Login" muss vollständig konfiguriert sein (das ist auch der Grund für `App type: None`).
 
-Genau das ist das Muster hinter „Feature nicht verfügbar / wir aktualisieren zusätzliche Details für diese App". Meta blockt den Login-Dialog einer Live-App, solange Grunddaten fehlen — unabhängig davon, dass App Review durch ist.
-
-Das ist **nicht am Code reparierbar**. Es muss im Meta App Dashboard erledigt werden:
-
-1. App-Einstellungen → Grunddaten: **Kategorie** setzen (z. B. „Business and Pages"), Datenschutz-URL, Nutzungsbedingungen-URL, Datenlöschungs-Callback, App-Symbol 1024×1024 — speichern.
-2. Falls der App-Typ leer bleibt: unter „Anwendungsfälle" den Use Case „Facebook Login for Business" bzw. „Authentifizierung und Kontoerstellung" vollständig konfigurieren.
-3. „Required actions" in der linken Leiste abarbeiten — offene Pflichtaufgaben blockieren den Dialog ebenfalls.
-
-Nach dem Speichern in der Diagnose „Erneut prüfen" drücken: Kategorie muss dann gefüllt sein und „Felder fehlen" verschwinden.
-
-## Befund 2 — TikTok-Warnung ist ein Fehlalarm
-
-Die Zeile „Redirect-URI zeigt nicht auf den Backend-Callback — Verbinden schlägt fehl" stimmt so nicht. TikTok benutzt bei uns eine **eigene** Callback-Funktion (`tiktok-oauth-callback`), nicht die gemeinsame `oauth-callback`. Die Prüfung akzeptiert aber nur `oauth-callback` als gültiges Ziel und stuft deshalb jede korrekte TikTok-Konfiguration als Fehler ein.
-
-Fix: Die Prüfung bekommt pro Kanal das jeweils erwartete Callback-Ziel, statt für alle dasselbe zu verlangen. TikTok gilt als in Ordnung, wenn die Redirect-URI auf `.../functions/v1/tiktok-oauth-callback` zeigt; passt sie nicht, wird der erwartete Wert im Klartext angezeigt (mit Kopier-Button, wie bei Meta).
+Diese Werte sind in den Screenshots nicht enthalten — und genau die liest unsere Diagnose bisher nicht aus.
 
 ## Was ich umsetze
 
-1. `oauth-config-check`: kanal-spezifische Soll-Callback-URL (`expected_redirect`) je Provider; `redirect_ok` vergleicht gegen diesen Wert statt gegen den Meta-Callback.
-2. Diagnose-Panel: bei nicht passender Redirect-URI wird der Soll-Wert des jeweiligen Kanals angezeigt und kopierbar gemacht — nicht mehr nur die Meta-URL.
-3. Meta-Block: Hinweiszeile ergänzen, dass fehlende Grunddaten den Login-Dialog blockieren, mit Direktlink in die Meta-App-Einstellungen.
+**1. Phantom-Fehler abschalten**
+`category`/`app_type` werden nicht mehr als Pflichtfelder bewertet. Fehlt ein Feld in der Graph-Antwort, steht künftig „nicht per API lesbar" statt „fehlt" — keine roten Fehlanzeigen mehr für korrekt gepflegte Apps.
+
+**2. Die richtigen Werte auslesen**
+`oauth-config-check` fragt zusätzlich die Login-Konfiguration der App ab und zeigt im Panel:
+- die bei Meta hinterlegten gültigen OAuth-Redirect-URIs (soweit per App-Token lesbar),
+- ob unsere Backend-Callback-URL darunter ist (Abgleich Soll/Ist),
+- ob Client-/Web-OAuth-Login aktiv ist.
+Ist ein Wert per App-Token nicht lesbar, wird das ehrlich als „nicht lesbar — bitte manuell prüfen" ausgewiesen, mit Direktlink zur Facebook-Login-Einstellungsseite.
+
+**3. Rohantwort sichtbar machen**
+Ein ausklappbarer „Details"-Bereich zeigt die vollständige Graph-Antwort. Damit müssen wir bei der nächsten Runde nicht mehr raten, was Meta wirklich liefert.
+
+**4. TikTok-Fehlalarm beheben**
+Die Zeile „Redirect-URI zeigt nicht auf den Backend-Callback" bei TikTok ist ebenfalls falsch: TikTok nutzt die eigene Funktion `tiktok-oauth-callback`, die Prüfung akzeptiert aber nur `oauth-callback`. Künftig gilt pro Kanal das jeweils korrekte Soll-Ziel.
+
+## Was du parallel prüfst
+
+Meta App Dashboard → **Facebook Login → Einstellungen**: Steht unter „Gültige OAuth-Redirect-URIs" exakt
+`https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/oauth-callback`?
+Falls nicht: eintragen und speichern. Screenshot dieser Seite hilft mir, den Rest zu bestätigen.
 
 ## Technische Details
 
-- `supabase/functions/oauth-config-check/index.ts`: `ProviderCheck` um `expected_redirect` erweitern; `pointsAtBackend` durch `matchesExpected(uri, expected)` ersetzen; TikTok → `${supabaseUrl}/functions/v1/tiktok-oauth-callback`, Meta → `${supabaseUrl}/functions/v1/oauth-callback`, YouTube unverändert.
-- `src/components/performance/ConnectionDiagnostics.tsx`: pro Kanalzeile den Soll-Redirect rendern, wenn `redirect_ok === false`; Kopier-Button wiederverwenden.
-- `src/lib/translations.ts`: neue Texte DE/EN/ES für Soll-Redirect je Kanal und den Meta-Grunddaten-Hinweis.
+- `supabase/functions/oauth-config-check/index.ts`: Pflichtfeld-Liste auf tatsächlich blockierende Felder reduzieren (`category`, `app_type` raus); zusätzlicher Graph-Call auf die Login-Settings-Felder der App; unlesbare Felder als `unreadable` statt `missing` markieren; komplette Graph-Rohantwort unter `meta_app_status.raw` zurückgeben; `expected_redirect` je Provider (TikTok → `.../functions/v1/tiktok-oauth-callback`).
+- `src/components/performance/ConnectionDiagnostics.tsx`: Meta-Block auf drei Zustände (ok / nicht lesbar / fehlt); Redirect-Ist/Soll-Vergleich; ausklappbarer Rohdaten-Bereich; Soll-Redirect je Kanalzeile.
+- `src/lib/translations.ts`: neue Texte DE/EN/ES.
 - Keine Änderung an der OAuth-Logik selbst.
