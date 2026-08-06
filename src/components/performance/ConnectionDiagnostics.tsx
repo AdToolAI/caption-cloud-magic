@@ -104,6 +104,7 @@ export function ConnectionDiagnostics() {
           }),
         ),
         (async () => {
+          if (!headers) return {} as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean }>;
           try {
             const { data } = await supabase.functions.invoke('social-health', { headers });
             return (data?.providers ?? {}) as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean }>;
@@ -112,6 +113,12 @@ export function ConnectionDiagnostics() {
           }
         })(),
         (async () => {
+          const empty = {
+            byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string }>,
+            metaApp: null as MetaAppStatus | null,
+            backendCallback: null as string | null,
+          };
+          if (!headers) return empty;
           try {
             const { data } = await supabase.functions.invoke('oauth-config-check', { headers });
             const list = (data?.checks ?? []) as { provider: string; redirect_ok?: boolean; note?: string }[];
