@@ -2,9 +2,23 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useToast } from '@/hooks/use-toast';
+
+interface MetaAppStatus {
+  available: boolean;
+  app_id?: string | null;
+  name?: string | null;
+  app_type?: string | null;
+  category?: string | null;
+  privacy_policy_url?: string | null;
+  terms_of_service_url?: string | null;
+  missing_fields?: string[];
+  error?: string;
+}
+
 
 type Status = 'ok' | 'warn' | 'error' | 'unknown';
 
