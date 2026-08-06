@@ -7,6 +7,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useToast } from '@/hooks/use-toast';
 
+interface MetaPermission {
+  permission: string;
+  status: string;
+}
+
 interface MetaAppStatus {
   available: boolean;
   app_id?: string | null;
@@ -16,8 +21,12 @@ interface MetaAppStatus {
   privacy_policy_url?: string | null;
   terms_of_service_url?: string | null;
   missing_fields?: string[];
+  unreadable_fields?: string[];
+  permissions?: MetaPermission[];
+  permissions_error?: string;
   error?: string;
 }
+
 
 
 type Status = 'ok' | 'warn' | 'error' | 'unknown';
