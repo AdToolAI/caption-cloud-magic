@@ -19649,6 +19649,17 @@ Object.assign(translations.en, {
 
 
 Object.assign(translations.de, {
+  metaProbe: {
+    title: 'Meta Seiten-Probe',
+    description: 'Zeigt, welche Seiten und Instagram-Konten Meta wirklich an dein Token gebunden hat, wenn die Auswahl leer bleibt.',
+    runInstagram: 'Instagram prüfen',
+    runFacebook: 'Facebook prüfen',
+    verdict: 'Befund',
+    businesses: 'Portfolios',
+    grantedPageIds: 'Freigegebene Seiten-IDs',
+    grantedIgIds: 'Freigegebene Instagram-IDs',
+    rawTitle: 'Rohantworten von Meta',
+  },
   connectionDiagnostics: {
     title: 'Verbindungs-Diagnose',
     description: 'Zugangsdaten, Token-Gültigkeit und Posting-Bereitschaft je Kanal.',
