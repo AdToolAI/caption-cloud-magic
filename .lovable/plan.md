@@ -12,10 +12,15 @@ Ein Token erzeugen, das **nichts** mit unserer App-Speicherung und unserem OAuth
 
 **Graph API Explorer:** https://developers.facebook.com/tools/explorer/
 
-1. Oben rechts als Meta-App **AdTool AI Integration** wählen.
-2. „User Token" wählen, Berechtigung `pages_show_list` hinzufügen.
-3. **Generate Access Token** — im Dialog mit dem *neuen* Profil zustimmen und die Seite anhaken.
-4. Anfrage `me/accounts` senden.
+1. Den aktuellen Dialog abbrechen. Er zeigt **„Continue as Samuel“** und würde deshalb wieder einen Token für das alte persönliche Facebook-Profil erzeugen.
+2. Ein Inkognito-/Privatfenster öffnen und dort zuerst `https://www.facebook.com/` aufrufen. Mit dem **anderen persönlichen Facebook-Profil** einloggen, das die neue Seite verwaltet. Nicht versuchen, sich als Facebook-Seite einzuloggen — Tokens werden immer für ein persönliches Profil ausgestellt.
+3. Im selben Privatfenster den Graph API Explorer öffnen: `https://developers.facebook.com/tools/explorer/`.
+4. Falls der Explorer dort nicht zugänglich ist, muss das neue persönliche Profil zuerst unter **App roles → Roles** als Administrator oder Tester der App „AdTool AI Integration“ hinzugefügt und die Einladung im neuen Profil angenommen werden. Danach den Explorer im Privatfenster neu öffnen.
+5. Oben rechts als Meta-App **AdTool AI Integration** wählen, „User Token" wählen und nur `pages_show_list` hinzufügen.
+6. **Generate Access Token** — der Dialog muss nun den Namen des neuen persönlichen Profils anzeigen, nicht „Samuel Dusatko“. Erst dann fortfahren und die neue Seite anhaken.
+7. Anfrage `me/accounts?fields=id,name,tasks,instagram_business_account` senden.
+
+Wichtig: Die aktive Facebook-Sitzung ist hier die Identität. Ein anderes Lovable-/AdTool-Konto oder die Auswahl einer anderen Facebook-Seite ändert den User Token nicht. Der Screenshot beweist, dass der bisherige Explorer-Test noch mit dem alten persönlichen Profil gestartet wurde und deshalb den Vergleich nicht leisten konnte.
 
 Zwei mögliche Ergebnisse, und beide sind eindeutig:
 
