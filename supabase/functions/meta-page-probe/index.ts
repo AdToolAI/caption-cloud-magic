@@ -91,7 +91,10 @@ Deno.serve(async (req) => {
     );
 
     const { data: { user }, error: userError } = await anonClient.auth.getUser();
-    if (userError || !user) return jsonRes({ error: 'Unauthorized' }, 401);
+    if (userError || !user) {
+      console.log('[meta-page-probe] getUser failed:', userError?.message);
+      return jsonRes({ error: 'Unauthorized', reason: userError?.message ?? 'no_user' }, 401);
+    }
 
     const { data: connection } = await supabase
       .from('social_connections')
