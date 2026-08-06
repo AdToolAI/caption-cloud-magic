@@ -51,6 +51,10 @@ const CHANNELS: { id: string; name: string }[] = [
   { id: 'x', name: 'X' },
 ];
 
+// Konstante Soll-Callback-URL: immer anzeigbar, auch wenn die Serverabfrage scheitert.
+const DEFAULT_BACKEND_CALLBACK = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/oauth-callback`;
+
+
 function StatusPill({ status, label }: { status: Status; label: string }) {
   const Icon = status === 'ok' ? CheckCircle2 : status === 'warn' ? AlertTriangle : status === 'error' ? XCircle : Loader2;
   const cls =
