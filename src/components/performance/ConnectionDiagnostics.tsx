@@ -51,6 +51,10 @@ const CHANNELS: { id: string; name: string }[] = [
   { id: 'x', name: 'X' },
 ];
 
+// Konstante Soll-Callback-URL: immer anzeigbar, auch wenn die Serverabfrage scheitert.
+const DEFAULT_BACKEND_CALLBACK = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/oauth-callback`;
+
+
 function StatusPill({ status, label }: { status: Status; label: string }) {
   const Icon = status === 'ok' ? CheckCircle2 : status === 'warn' ? AlertTriangle : status === 'error' ? XCircle : Loader2;
   const cls =
@@ -75,7 +79,9 @@ export function ConnectionDiagnostics() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<ChannelDiagnostic[]>([]);
   const [metaApp, setMetaApp] = useState<MetaAppStatus | null>(null);
-  const [backendCallback, setBackendCallback] = useState<string | null>(null);
+  const [backendCallback, setBackendCallback] = useState<string | null>(DEFAULT_BACKEND_CALLBACK);
+  const [configError, setConfigError] = useState<string | null>(null);
+
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -113,33 +119,46 @@ export function ConnectionDiagnostics() {
           }
         })(),
         (async () => {
-          const empty = {
+          const base = {
             byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string }>,
             metaApp: null as MetaAppStatus | null,
             backendCallback: null as string | null,
+            error: null as string | null,
           };
-          if (!headers) return empty;
+          if (!headers) return { ...base, error: t('connectionDiagnostics.configErrorNoSession') };
           try {
-            const { data } = await supabase.functions.invoke('oauth-config-check', { headers });
+            const { data, error } = await supabase.functions.invoke('oauth-config-check', { headers });
+            if (error) {
+              let detail = error.message;
+              try {
+                const ctx = (error as any)?.context;
+                if (ctx && typeof ctx.text === 'function') {
+                  const txt = await ctx.text();
+                  if (txt) detail = `${ctx.status ?? ''} ${txt}`.trim();
+                }
+              } catch {
+                /* Fehlertext nicht lesbar — Basismeldung bleibt */
+              }
+              return { ...base, error: detail };
+            }
             const list = (data?.checks ?? []) as { provider: string; redirect_ok?: boolean; note?: string }[];
             return {
               byProvider: Object.fromEntries(list.map((c) => [c.provider, c])),
               metaApp: (data?.meta_app_status ?? null) as MetaAppStatus | null,
               backendCallback: (data?.backend_callback ?? null) as string | null,
+              error: null as string | null,
             };
-          } catch {
-            return {
-              byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string }>,
-              metaApp: null as MetaAppStatus | null,
-              backendCallback: null as string | null,
-            };
+          } catch (e: any) {
+            return { ...base, error: e?.message ?? 'unknown' };
           }
         })(),
       ]);
 
       const configChecks = config.byProvider;
       setMetaApp(config.metaApp);
-      setBackendCallback(config.backendCallback);
+      setBackendCallback(config.backendCallback ?? DEFAULT_BACKEND_CALLBACK);
+      setConfigError(config.error ?? null);
+
 
 
       const next: ChannelDiagnostic[] = CHANNELS.map((channel) => {
@@ -227,52 +246,61 @@ export function ConnectionDiagnostics() {
           <p className="text-sm text-muted-foreground">{t('connectionDiagnostics.checking')}</p>
         )}
 
-        {/* Meta App-Grunddaten — die häufigste Ursache für einen blockierten
-            Facebook-Login-Dialog trotz Live-Modus. */}
-        {metaApp && (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium">
-                {t('connectionDiagnostics.metaAppTitle')}
-                {metaApp.name ? ` — ${metaApp.name}` : ''}
-              </p>
-              <StatusPill
-                status={
-                  !metaApp.available
-                    ? 'unknown'
-                    : (metaApp.missing_fields?.length ?? 0) > 0
-                    ? 'warn'
-                    : 'ok'
-                }
-                label={
-                  !metaApp.available
-                    ? t('connectionDiagnostics.metaAppUnknown')
-                    : (metaApp.missing_fields?.length ?? 0) > 0
-                    ? t('connectionDiagnostics.metaAppIncomplete')
-                    : t('connectionDiagnostics.metaAppComplete')
-                }
-              />
-            </div>
-            {metaApp.available ? (
-              <>
-                <p className="text-xs text-muted-foreground">
-                  {t('connectionDiagnostics.metaAppId')}: {metaApp.app_id} · {t('connectionDiagnostics.metaAppType')}:{' '}
-                  {metaApp.app_type || '—'} · {t('connectionDiagnostics.metaAppCategory')}: {metaApp.category || '—'}
-                </p>
-                {(metaApp.missing_fields?.length ?? 0) > 0 && (
-                  <p className="text-xs text-amber-600">
-                    {t('connectionDiagnostics.metaAppMissing')}: {metaApp.missing_fields!.join(', ')}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {t('connectionDiagnostics.metaAppUnavailable')}
-                {metaApp.error ? ` (${metaApp.error})` : ''}
-              </p>
-            )}
+        {configError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm font-medium text-destructive">
+              {t('connectionDiagnostics.configErrorTitle')}
+            </p>
+            <p className="text-xs text-muted-foreground break-all">{configError}</p>
           </div>
         )}
+
+        {/* Meta App-Grunddaten — die häufigste Ursache für einen blockierten
+            Facebook-Login-Dialog trotz Live-Modus. Immer sichtbar: fehlende
+            Daten sind selbst ein Befund. */}
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium">
+              {t('connectionDiagnostics.metaAppTitle')}
+              {metaApp?.name ? ` — ${metaApp.name}` : ''}
+            </p>
+            <StatusPill
+              status={
+                !metaApp?.available
+                  ? 'unknown'
+                  : (metaApp.missing_fields?.length ?? 0) > 0
+                  ? 'warn'
+                  : 'ok'
+              }
+              label={
+                !metaApp?.available
+                  ? t('connectionDiagnostics.metaAppUnknown')
+                  : (metaApp.missing_fields?.length ?? 0) > 0
+                  ? t('connectionDiagnostics.metaAppIncomplete')
+                  : t('connectionDiagnostics.metaAppComplete')
+              }
+            />
+          </div>
+          {metaApp?.available ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {t('connectionDiagnostics.metaAppId')}: {metaApp.app_id} · {t('connectionDiagnostics.metaAppType')}:{' '}
+                {metaApp.app_type || '—'} · {t('connectionDiagnostics.metaAppCategory')}: {metaApp.category || '—'}
+              </p>
+              {(metaApp.missing_fields?.length ?? 0) > 0 && (
+                <p className="text-xs text-amber-600">
+                  {t('connectionDiagnostics.metaAppMissing')}: {metaApp.missing_fields!.join(', ')}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {t('connectionDiagnostics.metaAppUnavailable')}
+              {metaApp?.error ? ` (${metaApp.error})` : configError ? ` (${configError})` : ''}
+            </p>
+          )}
+        </div>
+
 
         {/* Soll-Redirect-URI zum Kopieren */}
         {backendCallback && (

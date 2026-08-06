@@ -19602,6 +19602,9 @@ Object.assign(translations.en, {
     redirectTargetHint: 'Add this exact URL under Facebook Login → Settings → Valid OAuth Redirect URIs.',
     copy: 'Copy',
     copied: 'Copied',
+    configErrorTitle: 'Config check failed',
+    configErrorNoSession: 'No active session — sign in and retry.',
+
   },
 });
 
@@ -19636,6 +19639,9 @@ Object.assign(translations.de, {
     redirectTargetHint: 'Diese exakte URL unter Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs eintragen.',
     copy: 'Kopieren',
     copied: 'Kopiert',
+    configErrorTitle: 'Konfigurations-Prüfung fehlgeschlagen',
+    configErrorNoSession: 'Keine aktive Sitzung — bitte einloggen und erneut prüfen.',
+
 
   },
 });
@@ -19670,6 +19676,9 @@ Object.assign(translations.es, {
     redirectTargetHint: 'Añade esta URL exacta en Facebook Login → Configuración → URIs de redirección OAuth válidas.',
     copy: 'Copiar',
     copied: 'Copiado',
+    configErrorTitle: 'Fallo en la comprobación de configuración',
+    configErrorNoSession: 'Sin sesión activa — inicia sesión y vuelve a comprobar.',
+
 
   },
 });
