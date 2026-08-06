@@ -1,43 +1,61 @@
-# Gefunden: `public_profile` steht auf Standard-Zugriff
+# Der eigentliche Blocker: Meta kann die App nicht live schalten
 
-## Die Ursache
+## Was die beiden Screenshots zeigen
 
-Screenshot „Facebook Login → Settings" zeigt es wörtlich:
+1. **„Broken URL detected"** — Meta blockiert den Wechsel in den Live-Modus, weil es die **Site URL `https://useadtool.ai/`** als nicht erreichbar bewertet.
+2. **„Invalid Privacy Policy URL"** — dieselbe Bewertung für die Datenschutz-URL; deshalb lässt Meta auch kein „Request advanced access" für `public_profile` zu.
 
-> **Facebook Login requires advanced access** — Your app has standard access to `public_profile`. To use Facebook Login, switch `public_profile` to advanced access.
+Damit ist die Kette vollständig erklärt:
 
-Das ist exakt der Grund für „Feature nicht verfügbar. Du kannst dich aktuell nicht über Facebook bei dieser App anmelden". Ohne **Advanced Access auf `public_profile`** funktioniert der Login-Dialog nur für Personen mit einer Rolle in der App — für alle anderen bricht Meta mit dieser generischen Meldung ab.
+```text
+Site-/Privacy-URL von Metas Crawler als "broken" bewertet
+   -> App kann nicht wirklich Live gehen
+   -> public_profile bleibt auf "Standard access" (Verification required)
+   -> Facebook Login zeigt "Feature nicht verfügbar"
+```
 
-Alles andere ist sauber:
-- Client OAuth login: **Yes**, Web OAuth login: **Yes**, Enforce HTTPS: **Yes**, Strict Mode: **Yes**
-- Gültige OAuth-Redirect-URIs enthalten `https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/oauth-callback` — passt
-- Grunddaten, Kategorie, Business- und Access-Verifizierung: vollständig
+## Was ich geprüft habe
 
-Es ist also **kein Code-Fehler** und keine fehlende Grunddaten-Angabe.
+Ich habe die drei URLs direkt abgefragt — einmal normal und einmal mit Metas Crawler-Kennung `facebookexternalhit`:
 
-## Was du in Meta machst (2 Minuten)
+| URL | normal | als Meta-Crawler |
+|---|---|---|
+| `https://useadtool.ai/` | 200 | 200 |
+| `https://useadtool.ai/privacy` | 200 | 200 |
+| `https://useadtool.ai/legal/terms` | 200 | 200 |
 
-1. Auf der Seite Facebook Login → Settings den Link **„Get Advanced Access"** klicken (im gelben Kasten).
-2. Alternativ: **App Review → Permissions and Features** → Zeile `public_profile` → **Request Advanced Access**.
-3. `public_profile` ist eine Standardberechtigung; Advanced Access wird nach Business-Verifizierung in der Regel sofort gewährt — bei dir ist die Verifizierung bereits „Verified".
-4. Gleich mitprüfen, dass auch `email` (falls genutzt) auf Advanced Access steht.
+`robots.txt` erlaubt `/` und blockiert keine der drei Seiten.
 
-Danach in der App erneut „Mit Facebook verbinden" — der Dialog sollte durchlaufen.
+Aus unserer Sicht sind die Links also erreichbar. Das heißt: Metas Urteil beruht entweder auf einem **zwischengespeicherten alten Ergebnis** (früherer Ausfall/Redirect) oder darauf, dass der Meta-Crawler von seinen eigenen IP-Bereichen aus geblockt/gedrosselt wird — beides sehen wir von hier aus nicht.
+
+## Was du in Meta machst (Reihenfolge wichtig)
+
+1. **Sharing Debugger** öffnen: `https://developers.facebook.com/tools/debug/`
+   - `https://useadtool.ai/` eingeben → **„Scrape Again"**. Response Code muss 200–299 sein.
+   - Dasselbe für `https://useadtool.ai/privacy` und `https://useadtool.ai/legal/terms`.
+   - Zeigt der Debugger dort einen Fehlercode oder eine Weiterleitung, schick mir bitte einen Screenshot davon — das ist die harte Diagnose.
+2. Danach **App Mode auf Live** schalten. Erst wenn das ohne Dialog durchgeht, ist der Blocker weg.
+3. Dann **App Review → Permissions and Features → `public_profile` → Request advanced access**.
+4. Zum Schluss in der App „Mit Facebook verbinden" testen.
 
 ## Was ich am Code nachziehe
 
-**1. Diagnose meldet genau diesen Zustand**
-`oauth-config-check` liest künftig den Zugriffslevel der Meta-Berechtigungen (`public_profile`, `email`, `pages_manage_posts`, `instagram_content_publish`) und zeigt pro Berechtigung „Advanced / Standard / fehlt". Steht eine Login-relevante Berechtigung auf Standard, erscheint im Panel der Klartexthinweis „Facebook-Login blockiert: `public_profile` braucht Advanced Access" mit Direktlink.
+**1. Meta-Crawler garantiert bedienen**
+Für `/`, `/privacy` und `/legal/terms` stelle ich sicher, dass ohne JavaScript sofort ein vollständiges HTML-Grundgerüst mit `<title>`, Meta-Description und Open-Graph-Tags ausgeliefert wird. Metas Crawler führt kein JavaScript aus; eine leere Seiten-Hülle kann er als „broken" bewerten, selbst bei HTTP 200.
 
-**2. Phantom-Fehler entfernen**
-`category` und `app_type` werden nicht mehr als Pflichtfelder gewertet — die Grunddaten sind gepflegt, unsere Prüfung hat falsch gemeldet. Nicht per API lesbare Felder werden als „nicht lesbar" statt „fehlt" ausgewiesen.
+**2. Keine Weiterleitungen auf diesen drei URLs**
+Prüfen und sicherstellen, dass weder Root noch die Rechtsseiten über eine Zwischenweiterleitung laufen (`useadtool.ai` → `www` → App-Route) — Umleitungsketten sind eine häufige Ursache für Metas Broken-URL-Urteil.
 
-**3. TikTok-Fehlalarm beheben**
-TikTok nutzt `tiktok-oauth-callback`, nicht `oauth-callback`. Die Prüfung bekommt pro Kanal das korrekte Soll-Ziel, damit die rote Warnung verschwindet.
+**3. Diagnose ehrlich machen** (aus der vorherigen Runde, weiterhin gültig)
+- Meta-Berechtigungen mit Zugriffslevel (Advanced / Standard) im Diagnose-Panel anzeigen, inklusive Klartext-Blocker „`public_profile` braucht Advanced Access".
+- `category` und `app_type` nicht mehr als Pflichtfelder werten (Grunddaten sind gepflegt, unsere Prüfung meldete falsch).
+- TikTok-Fehlalarm beheben: pro Kanal das korrekte Soll-Callback-Ziel prüfen (`tiktok-oauth-callback` statt `oauth-callback`).
 
 ## Technische Details
 
-- `supabase/functions/oauth-config-check/index.ts`: zusätzlicher Graph-Call auf die Permissions-Übersicht der App (App-Token); Ergebnis als `meta_permissions: [{ permission, status }]`; Pflichtfeld-Liste um `category`/`app_type` bereinigt; unlesbare Felder als `unreadable`; `expected_redirect` je Provider (TikTok → `.../functions/v1/tiktok-oauth-callback`).
-- `src/components/performance/ConnectionDiagnostics.tsx`: neuer Abschnitt „Meta-Berechtigungen" mit Ampel je Permission; Blocker-Hinweis wenn `public_profile !== advanced`; Meta-Block dreistufig (ok / nicht lesbar / fehlt).
+- `index.html`: vollständige statische Head-Metadaten (Title, Description, OG, Canonical) sicherstellen, damit Crawler ohne JS verwertbaren Inhalt bekommen.
+- Routing/Redirects (`public/_headers`, `public/.htaccess`, `vercel.json`) auf Weiterleitungsketten für `/`, `/privacy`, `/legal/terms` prüfen und ggf. auf direkte 200-Auslieferung stellen.
+- `supabase/functions/oauth-config-check/index.ts`: zusätzlicher Graph-Call auf die Permissions-Übersicht (`meta_permissions: [{ permission, status }]`); Pflichtfeld-Liste um `category`/`app_type` bereinigt; nicht lesbare Felder als `unreadable`; `expected_redirect` je Provider.
+- `src/components/performance/ConnectionDiagnostics.tsx`: Abschnitt „Meta-Berechtigungen" mit Ampel je Permission; Blocker-Hinweis bei `public_profile !== advanced`; Soll-Redirect je Kanal.
 - `src/lib/translations.ts`: neue Texte DE/EN/ES.
 - Keine Änderung an der OAuth-Logik selbst.
