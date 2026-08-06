@@ -322,6 +322,17 @@ export function ConnectionDiagnostics() {
               {metaApp?.error ? ` (${metaApp.error})` : configError ? ` (${configError})` : ''}
             </p>
           )}
+          {/* Abgleich: statisches fb:app_id im Head vs. serverseitig genutzte ID */}
+          {headAppId && (
+            <p className="text-xs text-muted-foreground">
+              {t('connectionDiagnostics.metaAppIdHead')}: {headAppId}
+            </p>
+          )}
+          {headAppId && metaApp?.app_id && headAppId !== metaApp.app_id && (
+            <p className="text-xs text-amber-600">
+              {t('connectionDiagnostics.metaAppIdMismatch')}
+            </p>
+          )}
         </div>
 
 
