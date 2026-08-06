@@ -20,18 +20,23 @@ Zusätzlich wurde die von Meta jetzt ausdrücklich beanstandete Root-URL `https:
 
 Die Antwort ist `text/html`, HTTPS ist gültig und die Startseite wird ohne Redirect ausgeliefert. Der Screenshot widerspricht damit dem aktuell messbaren Zustand: Metas **Basic-Settings-Validator hält noch einen alten „Broken URL“-Status fest**. Das ist jetzt kein Legal-/Canonical-Fehler mehr.
 
-## Nächster Schritt: Site URL in Meta neu validieren
+## Erledigt
 
-Wichtig vorweg: Die App steht laut Screenshot bereits auf **Live** — das war nie das Problem und muss auch nicht umgeschaltet werden. Der Live-Schalter und der „Broken URL"-Validator sind zwei getrennte Dinge.
+- App-Modus steht auf **Live** (war nie der Blocker).
+- **Required actions**: einziger Eintrag „Submit Data Use Checkup" ist **Completed** — hier ist nichts mehr offen.
+- Site URL wurde neu gespeichert.
 
-1. Dialog schließen und unter **App settings → Basic → Website → Site URL** den aktuellen Wert `https://useadtool.ai/` vollständig löschen und **Save changes** klicken.
-2. Danach exakt `https://useadtool.ai/` wieder eintragen und erneut **Save changes** klicken. Dadurch wird nicht nur der Sharing-Cache, sondern Metas separater Basic-Settings-Validator neu angestoßen.
-3. In **Required actions** nachsehen, ob dort noch eine konkrete URL-Prüfung offen ist, und diese erneut ausführen.
-4. Als weitere Grunddaten direkt die kanonischen Adressen verwenden:
-   - Datenschutzerklärung: `https://useadtool.ai/legal/privacy`
+## Nächster Schritt: App Review für `public_profile`
+
+Das ist jetzt der einzige echte Blocker für fremde Nutzer. Ohne Advanced Access können sich nur Personen einloggen, die in **App roles → Roles/Test users** eingetragen sind — alle anderen sehen „Feature nicht verfügbar".
+
+1. **App Review → Permissions and Features** öffnen, nach `public_profile` suchen und **Request advanced access** klicken.
+2. Bei „Provide testing instructions" (im Website-Block) eine kurze Anleitung hinterlegen: Testkonto, Weg zu **Verbindungen → Facebook verbinden**, was danach passiert. Meta lehnt sonst ohne Prüfung ab.
+3. **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs** gegenprüfen — der Soll-Wert steht mit Kopier-Button im Diagnose-Panel unter Verbindungen.
+4. Grunddaten mit den kanonischen Adressen abschließen:
+   - Datenschutz: `https://useadtool.ai/legal/privacy`
    - Nutzungsbedingungen: `https://useadtool.ai/legal/terms`
-   - Datenlöschung: die vorhandene `/delete-data`-Seite
-5. Danach **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs** kontrollieren und **App Review → `public_profile` → Request advanced access** ausführen.
+   - Datenlöschung: `/delete-data`
 
 ## Wenn Meta den Status danach weiterhin festhält
 
