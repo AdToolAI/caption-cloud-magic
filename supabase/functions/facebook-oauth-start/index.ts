@@ -149,7 +149,10 @@ Deno.serve(async (req) => {
       'pages_show_list',
       'pages_read_engagement',
       'pages_manage_posts',
+      // Required when the Page lives inside a Business portfolio.
+      'business_management',
     ].join(',');
+
 
     // Optional: Facebook Login for Business configuration ID.
     // If the Meta App was migrated to "Facebook Login for Business",
@@ -169,6 +172,9 @@ Deno.serve(async (req) => {
       // Classic Facebook Login — pass scopes inline.
       authUrl.searchParams.set('scope', scopes);
     }
+    // Force the asset picker instead of silently reusing the old grant.
+    authUrl.searchParams.set('auth_type', 'rerequest');
+
 
     const finalAuthUrl = authUrl.toString();
     console.log('[facebook-oauth-start] Authorize URL built', {
