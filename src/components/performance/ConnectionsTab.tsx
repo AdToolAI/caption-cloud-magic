@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { CSVUploadDialog } from "./CSVUploadDialog";
 
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
+import { InstagramSetupChecklist } from "./InstagramSetupChecklist";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { XConnectionCard } from "./XConnectionCard";
 import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
@@ -1155,6 +1156,7 @@ export const ConnectionsTab = () => {
                       </div>
                     ) : (
                       <div className="space-y-2">
+                        {provider.id === 'instagram' && <InstagramSetupChecklist />}
                         <Button onClick={() => handleConnect(provider.id, provider.name)} className="w-full">
                           {t('performance.connections.connect')}
                         </Button>
