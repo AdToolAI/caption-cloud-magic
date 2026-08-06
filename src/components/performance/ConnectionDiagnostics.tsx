@@ -71,8 +71,11 @@ function StatusPill({ status, label }: { status: Status; label: string }) {
 
 export function ConnectionDiagnostics() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<ChannelDiagnostic[]>([]);
+  const [metaApp, setMetaApp] = useState<MetaAppStatus | null>(null);
+  const [backendCallback, setBackendCallback] = useState<string | null>(null);
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -81,7 +84,7 @@ export function ConnectionDiagnostics() {
       const accessToken = sessionData.session?.access_token;
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
 
-      const [healthResults, socialHealth, configChecks] = await Promise.all([
+      const [healthResults, socialHealth, config] = await Promise.all([
         Promise.all(
           CHANNELS.map(async (channel) => {
             const fn = HEALTH_FN[channel.id] ?? HEALTH_FN.instagram;
@@ -112,12 +115,25 @@ export function ConnectionDiagnostics() {
           try {
             const { data } = await supabase.functions.invoke('oauth-config-check', { headers });
             const list = (data?.checks ?? []) as { provider: string; redirect_ok?: boolean; note?: string }[];
-            return Object.fromEntries(list.map((c) => [c.provider, c]));
+            return {
+              byProvider: Object.fromEntries(list.map((c) => [c.provider, c])),
+              metaApp: (data?.meta_app_status ?? null) as MetaAppStatus | null,
+              backendCallback: (data?.backend_callback ?? null) as string | null,
+            };
           } catch {
-            return {} as Record<string, { redirect_ok?: boolean; note?: string }>;
+            return {
+              byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string }>,
+              metaApp: null as MetaAppStatus | null,
+              backendCallback: null as string | null,
+            };
           }
         })(),
       ]);
+
+      const configChecks = config.byProvider;
+      setMetaApp(config.metaApp);
+      setBackendCallback(config.backendCallback);
+
 
       const next: ChannelDiagnostic[] = CHANNELS.map((channel) => {
         const health = healthResults.find((h) => h.id === channel.id);
