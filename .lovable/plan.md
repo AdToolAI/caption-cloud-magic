@@ -1,31 +1,43 @@
-# Meta-Fix ist live — nur /privacy ist noch alt gescrapt
+# Meta-Fix ist live — kein Fehler bei /legal/terms
 
-## Befund (live geprüft)
+## Befund (live geprüft, mit Metas Crawler-Kennung)
 
-Abruf von `https://useadtool.ai/privacy` mit Metas Crawler-Kennung zeigt jetzt:
+| URL | Status | `og:url` im statischen Head | `fb:app_id` |
+|---|---|---|---|
+| `https://useadtool.ai/privacy` | 200 | entfernt | vorhanden |
+| `https://useadtool.ai/legal/privacy` | 200 | entfernt | vorhanden |
+| `https://useadtool.ai/legal/terms` | 200 | entfernt | vorhanden |
 
-- `fb:app_id` = `1769514810345813` ist vorhanden
-- **kein** `og:url` mehr im Head
+Die Route `/legal/terms` existiert im Router (`/legal/:page`) und liefert live sauber 200 aus.
 
-Damit sind beide Ursachen behoben. Der Startseiten-Screenshot (12 Sekunden alt) ist sauber: Response 200, Canonical = `https://useadtool.ai/`, keine Weiterleitung.
+## Warum die Screenshots so aussehen
 
-Der `/privacy`-Screenshot ist **42 Minuten alt** — also noch aus der Zeit vor dem Deploy. Deshalb steht dort weiterhin `og:url Meta Tag → https://useadtool.ai/`. Das ist Metas Cache, kein Fehler mehr im Code.
+- **`/legal/terms`: „This URL hasn't been shared on Facebook before."** Das ist kein Fehler, sondern schlicht: Meta hat diese Adresse noch nie abgerufen. Ein Klick auf **Fetch new information** legt den ersten Scrape an.
+- **`/privacy`: Canonical zeigt jetzt auf `/legal/privacy`.** Das ist korrekt und gewollt — `/privacy` ist die Kurzform, die kanonische Adresse der Datenschutzerklärung ist `/legal/privacy`. Der frühere Fehlerfall (Canonical = Startseite) ist damit weg.
+- Der ältere `/privacy`-Screenshot mit „42 Minuten" stammt noch aus der Zeit vor dem Deploy.
 
-## Was noch zu tun ist (keine Code-Änderung nötig)
+## Empfehlung für die Meta-App-Einstellungen
 
-1. Im Sharing Debugger `https://useadtool.ai/privacy` eingeben und **Scrape Again** klicken. Danach muss die Canonical URL `https://useadtool.ai/privacy` lauten und die Zeile „og:url Meta Tag" verschwinden.
-2. Dasselbe für `https://useadtool.ai/legal/terms`.
-3. In den Meta-App-Einstellungen die Datenschutz-URL erneut speichern — der Dialog „Invalid Privacy Policy URL" sollte jetzt durchgehen.
+In den App-Grunddaten als **Datenschutz-URL** direkt die kanonische Adresse eintragen:
+`https://useadtool.ai/legal/privacy`
+und als Nutzungsbedingungen:
+`https://useadtool.ai/legal/terms`
+
+So folgt Meta keiner Umleitung mehr und die Validierung greift sofort.
+
+## Schritte
+
+1. Im Sharing Debugger `https://useadtool.ai/legal/terms` → **Fetch new information**.
+2. `https://useadtool.ai/legal/privacy` → **Scrape Again**.
+3. In der Meta-App die beiden kanonischen URLs speichern.
 4. Letzter echter Blocker für den Facebook-Login bleibt: **App Review → Permissions and Features → `public_profile` → Request advanced access**.
-
-## Hinweis
-
-Falls beim Scrapen einmalig ein 418 oder „Curl Timeout" erscheint: das ist eine kurzzeitige Bot-Prüfung des CDN, kein Serverfehler. Einfach erneut „Scrape Again" klicken.
 
 ## Technische Details
 
-Keine weiteren Änderungen geplant. Die relevanten Änderungen sind bereits live:
+Keine Code-Änderung geplant — die relevanten Fixes sind bereits live:
 
-- `index.html`: statisches `og:url` entfernt, `fb:app_id` ergänzt
-- `src/config/seo.ts`: `getCanonicalUrl` gibt absolute URLs unverändert zurück (keine Domain-Verdopplung)
-- `src/components/SEO.tsx`: `canonical`, `og:url` und `twitter:url` nutzen dieselbe aufgelöste Quelle
+- `index.html`: statisches `og:url` entfernt, `fb:app_id` = `1769514810345813`
+- `src/config/seo.ts`: `getCanonicalUrl` gibt absolute URLs unverändert zurück
+- `src/components/SEO.tsx`: `canonical`, `og:url`, `twitter:url` aus derselben Quelle
+
+Optional, falls gewünscht: `/privacy` und `/terms` serverseitig auf `/legal/...` umleiten, damit es nur je eine öffentliche Adresse gibt. Das ist Kosmetik, kein Blocker.
