@@ -1,52 +1,40 @@
-# Meta: Was nach `public_profile` noch fehlt
+# Meta: Freigaben sind da — jetzt nur noch verifizieren
 
-`public_profile` hat jetzt **Advanced Access**. Damit funktioniert der reine **Login** über Facebook für beliebige Nutzer. Das **Verbinden von Seiten und das Posten** braucht aber weitere Berechtigungen, die im Code angefordert werden und aktuell noch auf Standard Access stehen dürften.
+Der Screenshot zeigt es eindeutig: alle Berechtigungen, die die App tatsächlich anfordert, sind freigegeben.
 
-## Welche Berechtigungen die App tatsächlich anfordert
+| Scope | Status laut Meta | Wird im Code angefordert |
+|---|---|---|
+| `public_profile` | Renewed | Login |
+| `pages_show_list` | Renewed | Facebook + Instagram |
+| `pages_read_engagement` | Renewed | Facebook + Instagram |
+| `pages_manage_posts` | Renewed | Facebook |
+| `instagram_basic` | Approved | Instagram |
+| `instagram_content_publish` | Approved | Instagram |
 
-| Kanal | Angeforderte Scopes (im Code verifiziert) |
-|---|---|
-| Facebook | `pages_show_list`, `pages_read_engagement`, `pages_manage_posts` |
-| Instagram | `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement` |
+Damit deckt sich die Meta-Freigabe **exakt** mit den Scope-Listen in `facebook-oauth-start` und `instagram-oauth-start`. Es fehlt keine Berechtigung. Meine vorherige Einschätzung war überholt — der Punkt ist erledigt.
 
-Solange diese Scopes nur **Standard Access** haben, klappt das Verbinden nur mit Konten, die unter **App roles → Roles / Test users** eingetragen sind. Fremde Kunden bekommen sonst wieder „Feature nicht verfügbar" oder eine leere Seitenliste.
+## Was jetzt noch zu tun ist: ein echter End-to-End-Test
 
-## Schritt 1 — Advanced Access beantragen
+Kein Code-Umbau, nur Verifikation im Live-Betrieb:
 
-In **App Review → Permissions and Features** für jede dieser Berechtigungen **Request advanced access** klicken:
+1. **Facebook verbinden** in AdTool unter Verbindungen. Erwartung: Meta-Dialog erscheint, Seite wird gefunden, Verbindung wird gespeichert.
+2. **Instagram verbinden**. Voraussetzung auf Meta-Seite: Instagram-Konto ist **Business oder Creator** und mit der Facebook-Seite verknüpft. Sonst liefert Meta 0 Seiten — das ist dann kein App-Fehler.
+3. **Testpost** über den Composer auf beiden Kanälen veröffentlichen.
+4. **Redirect-URIs gegenprüfen**: Der Soll-Wert steht mit Kopier-Button im Diagnose-Panel unter Verbindungen; er muss zeichengenau in **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs** stehen. Das ist die häufigste verbleibende Fehlerquelle nach erteilter Freigabe.
 
-- `pages_show_list`
-- `pages_read_engagement`
-- `pages_manage_posts`
-- `instagram_basic`
-- `instagram_content_publish`
+## Falls beim Test etwas hakt
 
-Meta verlangt dafür je Berechtigung:
-- **Screencast** des kompletten Flows: Login → Verbindungen → Facebook/Instagram verbinden → Seite auswählen → Post veröffentlichen.
-- **Testing instructions** mit Testkonto (Login-Daten eines AdTool-Testaccounts) und dem Klickpfad.
-- **Business Verification** des Meta-Business-Kontos (Ausweis/Gewerbenachweis). Ohne verifizierte Firma werden Pages-Scopes regelmäßig abgelehnt.
+Bitte die genaue Fehlermeldung schicken. Typische Fälle und ihre Ursache:
 
-## Schritt 2 — Vorher intern testen (geht sofort, ohne Review)
+- „Feature nicht verfügbar" → Redirect-URI stimmt nicht oder App-Modus/Rollen-Problem.
+- Leere Seitenliste → Instagram nicht auf Business umgestellt oder Seite nicht verknüpft.
+- Fehler beim Posten → Seiten-Token statt Nutzer-Token nötig; das prüft `instagram-token-debug` bereits.
 
-Mit deinem eigenen Konto als App-Admin sind alle Scopes bereits nutzbar. Damit sollten wir vor dem Review einmal komplett durchspielen:
+## Optionaler Ausbau
 
-1. In AdTool → **Verbindungen → Facebook verbinden**: Kommt das Meta-Dialogfenster, wird eine Seite gefunden, wird die Verbindung gespeichert?
-2. Dasselbe für **Instagram** (Instagram muss ein Business-/Creator-Konto sein und mit einer Facebook-Seite verknüpft sein — sonst liefert Meta 0 Seiten).
-3. Einen echten Testpost über den Composer veröffentlichen.
-4. Im **Diagnose-Panel unter Verbindungen** prüfen, ob die gemeldeten Redirect-URIs exakt mit den in **Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs** hinterlegten übereinstimmen.
+Ich kann das Diagnose-Panel so erweitern, dass es **je Scope** Standard vs. Advanced Access live aus der Graph API anzeigt — analog zur bestehenden `public_profile`-Prüfung. Dann siehst du den Freigabestatus direkt in AdTool statt im Meta-Dashboard. Sag Bescheid, ob ich das bauen soll.
 
-Der Screencast für den Review fällt bei diesem Durchlauf direkt mit ab.
+## Noch offen bei den anderen Kanälen
 
-## Schritt 3 — TikTok und YouTube
-
-- **YouTube**: Google-OAuth-Consent-Screen muss von „Testing" auf „In production" stehen, sonst nur 100 Testnutzer. Bei sensiblen Scopes (`youtube.upload`) ist ein Google-Verification-Prozess nötig.
-- **TikTok**: läuft laut Projektnotizen noch im **Sandbox-Modus** — nur eingetragene Testnutzer. Für Kunden muss die App bei TikTok zur Review eingereicht werden.
-
-## Antwort kurz
-
-Der Facebook-**Login** sollte jetzt problemlos gehen. Das **Verbinden und Posten** für fremde Kunden geht erst nach Advanced Access für die Pages-/Instagram-Scopes. Für dein eigenes Konto kannst du sofort alles testen.
-
-## Was ich auf Wunsch übernehme
-
-Kein Code-Umbau nötig. Ich kann aber:
-- den Diagnose-Bereich so erweitern, dass er **je Scope** Standard vs. Advanced Access anzeigt (analog zur bestehenden `public_profile`-Prüfung), damit du den Review-Fortschritt direkt in AdTool siehst.
+- **YouTube**: Google-OAuth-Consent-Screen muss auf „In production" stehen, sonst nur 100 Testnutzer.
+- **TikTok**: läuft laut Projektstand noch im Sandbox-Modus — für echte Kunden ist eine TikTok-App-Review nötig.
