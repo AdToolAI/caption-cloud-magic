@@ -2,6 +2,41 @@ const TIKTOK_ENV = Deno.env.get('TIKTOK_ENV') || 'production';
 const OAUTH_BASE = 'https://open.tiktokapis.com/v2/oauth';
 const API_BASE = 'https://open.tiktokapis.com/v2';
 
+/**
+ * Single source of truth for TikTok credentials.
+ * Production values (TIKTOK_*_PROD) always win over the legacy sandbox values,
+ * because the legacy TIKTOK_CLIENT_KEY secret is integration-managed and still
+ * holds the sandbox key (`sb...`), which makes TikTok answer `non_sandbox_target`.
+ */
+export function getTikTokClientKey(): string {
+  return (
+    Deno.env.get('TIKTOK_CLIENT_KEY_PROD') ||
+    Deno.env.get('TIKTOK_CLIENT_KEY') ||
+    ''
+  );
+}
+
+export function getTikTokClientSecret(): string {
+  return (
+    Deno.env.get('TIKTOK_CLIENT_SECRET_PROD') ||
+    Deno.env.get('TIKTOK_CLIENT_SECRET') ||
+    ''
+  );
+}
+
+export function getTikTokRedirectUri(): string {
+  return (
+    Deno.env.get('TIKTOK_REDIRECT_URI_PROD') ||
+    Deno.env.get('TIKTOK_REDIRECT_URI') ||
+    ''
+  );
+}
+
+export function isSandboxClientKey(key = getTikTokClientKey()): boolean {
+  return key.toLowerCase().startsWith('sb');
+}
+
+
 export interface TikTokTokenResponse {
   access_token: string;
   refresh_token: string;
