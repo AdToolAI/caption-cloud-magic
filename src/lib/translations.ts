@@ -19287,6 +19287,16 @@ Object.assign(translations.es, {
     reconnectRequired: 'Por favor reconecta Instagram',
     reconnectReason: 'Tu conexión de Instagram usa un token compartido antiguo. Reconéctate ahora mediante el login oficial de Instagram Business para habilitar la publicación por usuario.',
     reconnectNow: 'Reconectar ahora',
+    instagramSetup: {
+      title: 'Antes de conectar: requisitos de Instagram',
+      intro: 'Instagram solo se puede conectar si tu cuenta es profesional (Empresa o Creador) y está vinculada a una página de Facebook. De lo contrario, Meta muestra una lista de cuentas vacía.',
+      step1Title: 'Cambiar a cuenta profesional',
+      step1Desc: 'App de Instagram → Configuración → Tipo de cuenta y herramientas → Cambiar a cuenta profesional.',
+      step2Title: 'Vincularla con una página de Facebook',
+      step2Desc: 'App de Instagram → Configuración → Cuentas vinculadas → selecciona tu página de Facebook (o Meta Business Suite → Configuración → Cuentas de Instagram).',
+      linkBusinessSuite: 'Abrir Meta Business Suite',
+      linkHelp: 'Ayuda de Meta: vincular Instagram con una página',
+    },
   },
 });
 
