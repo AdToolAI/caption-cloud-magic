@@ -19676,6 +19676,9 @@ Object.assign(translations.es, {
     redirectTargetHint: 'Añade esta URL exacta en Facebook Login → Configuración → URIs de redirección OAuth válidas.',
     copy: 'Copiar',
     copied: 'Copiado',
+    configErrorTitle: 'Fallo en la comprobación de configuración',
+    configErrorNoSession: 'Sin sesión activa — inicia sesión y vuelve a comprobar.',
+
 
   },
 });
