@@ -113,33 +113,46 @@ export function ConnectionDiagnostics() {
           }
         })(),
         (async () => {
-          const empty = {
+          const base = {
             byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string }>,
             metaApp: null as MetaAppStatus | null,
             backendCallback: null as string | null,
+            error: null as string | null,
           };
-          if (!headers) return empty;
+          if (!headers) return { ...base, error: t('connectionDiagnostics.configErrorNoSession') };
           try {
-            const { data } = await supabase.functions.invoke('oauth-config-check', { headers });
+            const { data, error } = await supabase.functions.invoke('oauth-config-check', { headers });
+            if (error) {
+              let detail = error.message;
+              try {
+                const ctx = (error as any)?.context;
+                if (ctx && typeof ctx.text === 'function') {
+                  const txt = await ctx.text();
+                  if (txt) detail = `${ctx.status ?? ''} ${txt}`.trim();
+                }
+              } catch {
+                /* Fehlertext nicht lesbar — Basismeldung bleibt */
+              }
+              return { ...base, error: detail };
+            }
             const list = (data?.checks ?? []) as { provider: string; redirect_ok?: boolean; note?: string }[];
             return {
               byProvider: Object.fromEntries(list.map((c) => [c.provider, c])),
               metaApp: (data?.meta_app_status ?? null) as MetaAppStatus | null,
               backendCallback: (data?.backend_callback ?? null) as string | null,
+              error: null as string | null,
             };
-          } catch {
-            return {
-              byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string }>,
-              metaApp: null as MetaAppStatus | null,
-              backendCallback: null as string | null,
-            };
+          } catch (e: any) {
+            return { ...base, error: e?.message ?? 'unknown' };
           }
         })(),
       ]);
 
       const configChecks = config.byProvider;
       setMetaApp(config.metaApp);
-      setBackendCallback(config.backendCallback);
+      setBackendCallback(config.backendCallback ?? DEFAULT_BACKEND_CALLBACK);
+      setConfigError(config.error ?? null);
+
 
 
       const next: ChannelDiagnostic[] = CHANNELS.map((channel) => {
