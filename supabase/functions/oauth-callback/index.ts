@@ -25,6 +25,13 @@ serve(async (req) => {
     let provider = url.searchParams.get('provider');
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
+
+    // Provider-Fehler aus dem Zustimmungsdialog (Meta/Google/TikTok senden
+    // hier den echten Grund) — nie verschlucken, sondern im Klartext an die
+    // App durchreichen.
+    const providerError = url.searchParams.get('error');
+    const providerErrorReason = url.searchParams.get('error_reason');
+    const providerErrorDescription = url.searchParams.get('error_description');
     
     // Parse state first to extract provider if not in URL
     let stateData;
@@ -42,6 +49,7 @@ serve(async (req) => {
           provider: provider,
           hasCode: !!code,
           hasState: !!state,
+          providerError,
           referer: req.headers.get('referer'),
           origin: req.headers.get('origin')
         });
@@ -49,25 +57,51 @@ serve(async (req) => {
         console.warn('Could not parse state for provider extraction');
       }
     }
+
+    const appUrlBase = Deno.env.get('APP_URL') || 'https://useadtool.ai';
+
+    const failRedirect = (message: string, reason?: string) => {
+      const params = new URLSearchParams({
+        status: 'error',
+        tab: 'connections',
+        message,
+      });
+      if (provider) params.set('provider', provider);
+      if (reason) params.set('reason', reason);
+      return Response.redirect(`${appUrlBase}/integrations?${params.toString()}`, 302);
+    };
+
+    // Der Nutzer hat abgebrochen oder Meta/Google hat den Dialog blockiert.
+    if (providerError) {
+      const detail = providerErrorDescription || providerErrorReason || providerError;
+      console.warn('OAuth provider returned an error', {
+        provider,
+        providerError,
+        providerErrorReason,
+        providerErrorDescription,
+      });
+      return failRedirect(detail, providerError);
+    }
     
     // Handle Facebook's post-confirmation callback (no code/provider)
     if (!code && !provider) {
-      const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
       console.log('OAuth callback without code/provider - likely Facebook confirmation dialog');
-      return Response.redirect(`${appUrl}/performance`, 302);
+      return Response.redirect(`${appUrlBase}/performance`, 302);
     }
 
     if (!provider) {
       console.warn('Provider missing in OAuth callback', { code: !!code, state: !!state });
-      const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
-      return Response.redirect(`${appUrl}/performance`, 302);
+      return failRedirect('Provider missing in OAuth callback', 'provider_missing');
     }
 
     if (!code) {
       console.warn('Authorization code missing', { provider });
-      const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
-      return Response.redirect(`${appUrl}/performance`, 302);
+      return failRedirect(
+        'Authorization code missing — the provider dialog was cancelled or blocked.',
+        'code_missing',
+      );
     }
+
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
