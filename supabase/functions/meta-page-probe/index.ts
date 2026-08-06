@@ -67,7 +67,8 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return jsonRes({ error: 'Unauthorized' }, 401);
+    console.log('[meta-page-probe] auth header present:', !!authHeader);
+    if (!authHeader) return jsonRes({ error: 'Unauthorized', reason: 'missing_authorization_header' }, 401);
 
     let provider: 'facebook' | 'instagram' = 'instagram';
     let pageIdHint: string | null = null;
