@@ -2,9 +2,23 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useToast } from '@/hooks/use-toast';
+
+interface MetaAppStatus {
+  available: boolean;
+  app_id?: string | null;
+  name?: string | null;
+  app_type?: string | null;
+  category?: string | null;
+  privacy_policy_url?: string | null;
+  terms_of_service_url?: string | null;
+  missing_fields?: string[];
+  error?: string;
+}
+
 
 type Status = 'ok' | 'warn' | 'error' | 'unknown';
 
@@ -57,8 +71,11 @@ function StatusPill({ status, label }: { status: Status; label: string }) {
 
 export function ConnectionDiagnostics() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<ChannelDiagnostic[]>([]);
+  const [metaApp, setMetaApp] = useState<MetaAppStatus | null>(null);
+  const [backendCallback, setBackendCallback] = useState<string | null>(null);
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -67,7 +84,7 @@ export function ConnectionDiagnostics() {
       const accessToken = sessionData.session?.access_token;
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
 
-      const [healthResults, socialHealth, configChecks] = await Promise.all([
+      const [healthResults, socialHealth, config] = await Promise.all([
         Promise.all(
           CHANNELS.map(async (channel) => {
             const fn = HEALTH_FN[channel.id] ?? HEALTH_FN.instagram;
@@ -98,12 +115,25 @@ export function ConnectionDiagnostics() {
           try {
             const { data } = await supabase.functions.invoke('oauth-config-check', { headers });
             const list = (data?.checks ?? []) as { provider: string; redirect_ok?: boolean; note?: string }[];
-            return Object.fromEntries(list.map((c) => [c.provider, c]));
+            return {
+              byProvider: Object.fromEntries(list.map((c) => [c.provider, c])),
+              metaApp: (data?.meta_app_status ?? null) as MetaAppStatus | null,
+              backendCallback: (data?.backend_callback ?? null) as string | null,
+            };
           } catch {
-            return {} as Record<string, { redirect_ok?: boolean; note?: string }>;
+            return {
+              byProvider: {} as Record<string, { redirect_ok?: boolean; note?: string }>,
+              metaApp: null as MetaAppStatus | null,
+              backendCallback: null as string | null,
+            };
           }
         })(),
       ]);
+
+      const configChecks = config.byProvider;
+      setMetaApp(config.metaApp);
+      setBackendCallback(config.backendCallback);
+
 
       const next: ChannelDiagnostic[] = CHANNELS.map((channel) => {
         const health = healthResults.find((h) => h.id === channel.id);
@@ -189,6 +219,82 @@ export function ConnectionDiagnostics() {
         {rows.length === 0 && loading && (
           <p className="text-sm text-muted-foreground">{t('connectionDiagnostics.checking')}</p>
         )}
+
+        {/* Meta App-Grunddaten — die häufigste Ursache für einen blockierten
+            Facebook-Login-Dialog trotz Live-Modus. */}
+        {metaApp && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">
+                {t('connectionDiagnostics.metaAppTitle')}
+                {metaApp.name ? ` — ${metaApp.name}` : ''}
+              </p>
+              <StatusPill
+                status={
+                  !metaApp.available
+                    ? 'unknown'
+                    : (metaApp.missing_fields?.length ?? 0) > 0
+                    ? 'warn'
+                    : 'ok'
+                }
+                label={
+                  !metaApp.available
+                    ? t('connectionDiagnostics.metaAppUnknown')
+                    : (metaApp.missing_fields?.length ?? 0) > 0
+                    ? t('connectionDiagnostics.metaAppIncomplete')
+                    : t('connectionDiagnostics.metaAppComplete')
+                }
+              />
+            </div>
+            {metaApp.available ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  {t('connectionDiagnostics.metaAppId')}: {metaApp.app_id} · {t('connectionDiagnostics.metaAppType')}:{' '}
+                  {metaApp.app_type || '—'} · {t('connectionDiagnostics.metaAppCategory')}: {metaApp.category || '—'}
+                </p>
+                {(metaApp.missing_fields?.length ?? 0) > 0 && (
+                  <p className="text-xs text-amber-600">
+                    {t('connectionDiagnostics.metaAppMissing')}: {metaApp.missing_fields!.join(', ')}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {t('connectionDiagnostics.metaAppUnavailable')}
+                {metaApp.error ? ` (${metaApp.error})` : ''}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Soll-Redirect-URI zum Kopieren */}
+        {backendCallback && (
+          <div className="rounded-lg border border-border/60 p-3 space-y-1">
+            <p className="text-sm font-medium">{t('connectionDiagnostics.redirectTargetTitle')}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="rounded bg-muted px-2 py-1 text-xs break-all">{backendCallback}</code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(backendCallback);
+                    toast({ title: t('connectionDiagnostics.copied') });
+                  } catch {
+                    /* clipboard blocked — Nutzer kann manuell markieren */
+                  }
+                }}
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span className="ml-2">{t('connectionDiagnostics.copy')}</span>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t('connectionDiagnostics.redirectTargetHint')}
+            </p>
+          </div>
+        )}
+
         {rows.map((row) => (
           <div
             key={row.id}

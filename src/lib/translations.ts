@@ -19589,8 +19589,22 @@ Object.assign(translations.en, {
     tiktokSandbox: 'TikTok runs in {env} mode — only test accounts can connect.',
     redirectMismatch: 'Redirect URI does not point at the backend callback — reconnect will fail.',
     publishPending: 'Connect works, posting permission still pending approval.',
+    metaAppTitle: 'Meta app basics',
+    metaAppComplete: 'Complete',
+    metaAppIncomplete: 'Fields missing',
+    metaAppUnknown: 'Unknown',
+    metaAppId: 'App ID',
+    metaAppType: 'App type',
+    metaAppCategory: 'Category',
+    metaAppMissing: 'Missing required fields',
+    metaAppUnavailable: 'Meta app status could not be read',
+    redirectTargetTitle: 'Required OAuth redirect URI',
+    redirectTargetHint: 'Add this exact URL under Facebook Login → Settings → Valid OAuth Redirect URIs.',
+    copy: 'Copy',
+    copied: 'Copied',
   },
 });
+
 
 Object.assign(translations.de, {
   connectionDiagnostics: {
@@ -19609,6 +19623,20 @@ Object.assign(translations.de, {
     tiktokSandbox: 'TikTok läuft im {env}-Modus — nur Testkonten können sich verbinden.',
     redirectMismatch: 'Redirect-URI zeigt nicht auf den Backend-Callback — Verbinden schlägt fehl.',
     publishPending: 'Verbinden möglich, Posten noch in Prüfung.',
+    metaAppTitle: 'Meta App-Grunddaten',
+    metaAppComplete: 'Vollständig',
+    metaAppIncomplete: 'Felder fehlen',
+    metaAppUnknown: 'Unbekannt',
+    metaAppId: 'App-ID',
+    metaAppType: 'App-Typ',
+    metaAppCategory: 'Kategorie',
+    metaAppMissing: 'Fehlende Pflichtfelder',
+    metaAppUnavailable: 'Meta App-Status konnte nicht gelesen werden',
+    redirectTargetTitle: 'Benötigte OAuth-Redirect-URI',
+    redirectTargetHint: 'Diese exakte URL unter Facebook Login → Einstellungen → Gültige OAuth-Redirect-URIs eintragen.',
+    copy: 'Kopieren',
+    copied: 'Kopiert',
+
   },
 });
 
@@ -19629,5 +19657,19 @@ Object.assign(translations.es, {
     tiktokSandbox: 'TikTok está en modo {env} — solo cuentas de prueba pueden conectarse.',
     redirectMismatch: 'La URI de redirección no apunta al callback del backend — la conexión fallará.',
     publishPending: 'Conectar funciona, permiso de publicación aún en revisión.',
+    metaAppTitle: 'Datos básicos de la app de Meta',
+    metaAppComplete: 'Completo',
+    metaAppIncomplete: 'Faltan campos',
+    metaAppUnknown: 'Desconocido',
+    metaAppId: 'ID de la app',
+    metaAppType: 'Tipo de app',
+    metaAppCategory: 'Categoría',
+    metaAppMissing: 'Campos obligatorios que faltan',
+    metaAppUnavailable: 'No se pudo leer el estado de la app de Meta',
+    redirectTargetTitle: 'URI de redirección OAuth requerida',
+    redirectTargetHint: 'Añade esta URL exacta en Facebook Login → Configuración → URIs de redirección OAuth válidas.',
+    copy: 'Copiar',
+    copied: 'Copiado',
+
   },
 });

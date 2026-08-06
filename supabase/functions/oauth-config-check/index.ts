@@ -82,10 +82,92 @@ serve(async (req) => {
       },
     ];
 
+    // ---- Meta App-Status (Graph API, App-Token) --------------------------
+    // Meta blockt den Login-Dialog mit "wir aktualisieren zusätzliche Details
+    // für diese App", wenn Pflicht-Grunddaten fehlen. Das lässt sich nur
+    // serverseitig auslesen — hier ohne Nutzer-Token via App-Token.
+    type MetaAppStatus = {
+      available: boolean;
+      app_id?: string | null;
+      name?: string | null;
+      app_type?: string | null;
+      category?: string | null;
+      privacy_policy_url?: string | null;
+      terms_of_service_url?: string | null;
+      link?: string | null;
+      missing_fields: string[];
+      error?: string;
+    };
+
+    let metaAppStatus: MetaAppStatus = { available: false, missing_fields: [] };
+    const metaAppId = env("META_APP_ID");
+    const metaAppSecret = env("META_APP_SECRET");
+
+    if (metaAppId && metaAppSecret) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const fields = [
+          "name",
+          "link",
+          "privacy_policy_url",
+          "terms_of_service_url",
+          "app_type",
+          "category",
+        ].join(",");
+        const res = await fetch(
+          `https://graph.facebook.com/v24.0/${metaAppId}?fields=${fields}` +
+            `&access_token=${encodeURIComponent(`${metaAppId}|${metaAppSecret}`)}`,
+          { signal: controller.signal },
+        );
+        clearTimeout(timer);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          metaAppStatus = {
+            available: false,
+            missing_fields: [],
+            error: body?.error?.message ?? `HTTP ${res.status}`,
+          };
+        } else {
+          const required: Record<string, unknown> = {
+            privacy_policy_url: body.privacy_policy_url,
+            terms_of_service_url: body.terms_of_service_url,
+            category: body.category,
+          };
+          metaAppStatus = {
+            available: true,
+            app_id: metaAppId,
+            name: body.name ?? null,
+            app_type: body.app_type ?? null,
+            category: body.category ?? null,
+            privacy_policy_url: body.privacy_policy_url ?? null,
+            terms_of_service_url: body.terms_of_service_url ?? null,
+            link: body.link ?? null,
+            missing_fields: Object.entries(required)
+              .filter(([, v]) => !v)
+              .map(([k]) => k),
+          };
+        }
+      } catch (e: any) {
+        metaAppStatus = {
+          available: false,
+          missing_fields: [],
+          error: e?.name === "AbortError" ? "timeout" : (e?.message ?? "unknown"),
+        };
+      }
+    } else {
+      metaAppStatus = { available: false, missing_fields: [], error: "credentials_missing" };
+    }
+
     return new Response(
-      JSON.stringify({ backend_callback: backendCallback, checks }),
+      JSON.stringify({
+        backend_callback: backendCallback,
+        meta_app_status: metaAppStatus,
+        checks,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
+
   } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error?.message ?? "unknown" }),
