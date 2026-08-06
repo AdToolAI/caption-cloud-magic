@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { CSVUploadDialog } from "./CSVUploadDialog";
 
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
+import { InstagramSetupChecklist } from "./InstagramSetupChecklist";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { XConnectionCard } from "./XConnectionCard";
 import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
