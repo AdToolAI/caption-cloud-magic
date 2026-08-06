@@ -1,50 +1,47 @@
-# Meta-Seiten sichtbar machen: Review einreichen und Alternativursachen ausschließen
+# Ein einziger Test entscheidet: Meta oder unser OAuth
 
-## Nicht in den Development-Modus wechseln
+## Deine Analyse ist richtig
 
-Metas eigener Dialog warnt: beim Zurückschalten auf Live kann ein Data-Access-Renewal fällig werden, das bis zu 10 Tage Prüfung kostet. Für einen reinen Beweis ist das zu teuer. Dialog mit **Cancel** schließen.
+Das alte Konto liegt ebenfalls in einem Business-Portfolio, hat Full Access — und liefert Seiten über `/me/accounts`. Damit ist die Portfolio-These als Erklärung für den Unterschied zwischen Alt und Neu widerlegt. `business_management` mag später für Kunden nötig sein, es erklärt diesen Fall aber nicht.
 
-## Befund bisher
+Ausgeschlossen sind damit: falscher Benutzer, fehlender Seitenzugriff, fehlendes Portfolio, fehlender Full Access.
 
-`business_management` steht auf **Standard Access** und wurde nie zur Prüfung eingereicht. Im Live-Modus wirkt Standard Access nicht — das passt zu den Rohdaten: der Scope fehlt in den erteilten Berechtigungen, `/me/businesses` antwortet mit `(#100) Missing Permission`.
+## Der eine Test
 
-Was damit noch **nicht** bewiesen ist: dass `business_management` die einzige Ursache ist. `/me/accounts` war ebenfalls leer, obwohl `pages_show_list` bereits Advanced Access hat. Das wäre bei einer Seite, die dein Profil direkt verwaltet, nicht der Fall — also gibt es mindestens eine zweite mögliche Ursache.
+Ein Token erzeugen, das **nichts** mit unserer App-Speicherung und unserem OAuth-Start zu tun hat, und damit direkt `/me/accounts` abfragen.
 
-## Schritt 1: Review für business_management einreichen (sofort, läuft im Hintergrund)
+**Graph API Explorer:** https://developers.facebook.com/tools/explorer/
 
-App Review → Permissions and Features → `business_management` → *Request advanced access*. Benötigt: Anwendungsfall, Screencast des Verbindungsflusses, aktive Datenschutz-URL. Das ist ohnehin nötig, sobald Kunden Seiten aus einem Business-Portfolio verbinden wollen — unabhängig davon, ob es dein aktuelles Problem löst.
+1. Oben rechts als Meta-App **AdTool AI Integration** wählen.
+2. „User Token" wählen, Berechtigung `pages_show_list` hinzufügen.
+3. **Generate Access Token** — im Dialog mit dem *neuen* Profil zustimmen und die Seite anhaken.
+4. Anfrage `me/accounts` senden.
 
-## Schritt 2: Die Alternativursachen prüfen — jede in 2 Minuten, ohne Wartezeit
+Zwei mögliche Ergebnisse, und beide sind eindeutig:
 
-Wenn nicht `business_management` schuld ist, kommen genau diese vier Ursachen in Frage. Sie erzeugen dasselbe Symptom (leere Seitenliste), lassen sich aber sofort unterscheiden:
+- **`"data": []`** → Meta bindet dem neuen Profil keine Seite an Tokens dieser App. Unser Code ist raus. Der Fix liegt dann bei Meta (Support-Fall / Seiten-Konfiguration), nicht bei uns.
+- **Die Seite erscheint** → Meta ist raus. Dann liegt der Fehler in unserem OAuth-Start oder in der Speicherung, und wir haben eine funktionierende Referenz, gegen die wir unseren Flow Zeile für Zeile vergleichen können.
 
-**A) Dein Facebook-Profil verwaltet die Seite gar nicht.**
-Die wahrscheinlichste Alternative. `pages_show_list` hat Advanced Access und liefert trotzdem null Seiten — das passiert genau dann, wenn das eingeloggte Profil keine Seitenrolle hat. Prüfen: Meta Business Suite → Einstellungen → Seiten → „AdTool AI" → Personen. Steht dein Profil dort mit Vollzugriff? Falls nein: hinzufügen. Das löst das Problem sofort und ohne Review.
+Kontrollversuch, falls Ergebnis 1 eintritt: denselben Explorer-Test mit dem **alten** Profil. Liefert der Explorer dort Seiten, ist der Unterschied profil- bzw. seitengebunden und nicht app-gebunden — das grenzt den Meta-Support-Fall präzise ein.
 
-**B) Du warst mit einem anderen Meta-Profil eingeloggt.**
-Die Probe zeigt Nutzer-ID `122116259151337304`. Der historisch erfolgreiche Instagram-Post im Mai lief über eine andere Identität (`17841477402452109`). Prüfen: im Login-Dialog oben rechts anzeigen lassen, mit welchem Konto du zustimmst.
+## Was ich parallel prüfen will, ohne zu spekulieren
 
-**C) Es gibt keine Facebook-Seite, nur ein persönliches Profil.**
-Instagram-Publishing verlangt zwingend eine echte Seite. Prüfen: Business Suite → Einstellungen → Seiten — ist „AdTool AI" dort als Seite gelistet?
+Ein Unterschied, den wir bisher nie angesehen haben und der zum Zeitpunkt der Seitenerstellung passt: die neue Seite ist zwei Wochen alt und läuft mit hoher Wahrscheinlichkeit im **New Pages Experience**. Ich prüfe das direkt an der API statt es anzunehmen — über die gespeicherten Verbindungsdaten des alten Kontos, das noch funktioniert:
 
-**D) Kein „Facebook Login for Business"-Konfigurations-ID im Einsatz.**
-Ohne `config_id` zeigt Meta bei manchen Apps den Asset-Auswahlschritt nicht an — dann bleiben `granular_scopes` ohne `target_ids`, exakt wie in deiner Probe. Prüfen: App → Facebook Login for Business → Konfigurationen. Gibt es dort eine aktive Konfiguration, hinterlegen wir ihre ID als Secret; der Code unterstützt sie bereits.
+- `/{page_id}?fields=has_transitioned_to_new_page_experience,is_published,verification_status` für beide Seiten im Vergleich.
+- Ob die neue Seite überhaupt **veröffentlicht** ist. Eine unveröffentlichte Seite taucht in `/me/accounts` je nach Zustand nicht auf — das wäre eine Ein-Klick-Lösung und wurde bisher nie geprüft.
 
-Die Reihenfolge ist bewusst: A und C kosten zusammen zwei Minuten und schließen den häufigsten Fall aus, bevor du auf ein Review wartest.
+Diese Abfragen kosten nichts und laufen, während du den Explorer-Test machst.
 
-## Schritt 3: Code an die reale Freigabelage anpassen
+## Erst danach Code
 
-Unabhängig vom Ausgang: aktuell fordern beide Login-Funktionen `business_management` an, obwohl es im Live-Modus wirkungslos ist.
+Ich ändere jetzt bewusst **nichts** am OAuth-Flow. Solange nicht feststeht, auf welcher Seite der Grenze das Problem liegt, wäre jede Änderung geraten. Nach dem Testergebnis greift genau einer dieser beiden Wege:
 
-- Der Scope wird an einen Freigabe-Schalter gekoppelt und erst mitgeschickt, wenn Advanced Access erteilt ist.
-- `META_LOGIN_CONFIG_ID` wird ausgewertet, sobald du eine Business-Login-Konfiguration hast.
-- Der Verbindungsbereich nennt den echten Grund statt einer leeren Liste: fehlende Seitenrolle, fehlende Berechtigung oder fehlende Asset-Zuordnung — jeweils mit passender Handlungsanweisung.
+- **Meta-Seite:** Wir bauen keinen Workaround, sondern zeigen den Zustand ehrlich an und eröffnen den Support-Fall mit den Explorer-Rohdaten als Beweis.
+- **Unsere Seite:** Wir vergleichen den Explorer-Request Parameter für Parameter mit unserem `instagram-oauth-start` / `facebook-oauth-start` — Scopes, `config_id`, `auth_type`, Redirect — und korrigieren die Abweichung, die den Unterschied macht.
 
 ## Technische Details
 
-- `supabase/functions/instagram-oauth-start/index.ts`, `supabase/functions/facebook-oauth-start/index.ts`: Scope-Satz an Freigabe-Schalter koppeln, `config_id` durchreichen, `auth_type=rerequest` beibehalten.
-- `supabase/functions/_shared/meta-page-discovery.ts`: `(#100) Missing Permission` und „null Seiten trotz Advanced Access" als zwei getrennte, benannte Diagnosegründe führen.
-- `supabase/functions/facebook-list-pages/index.ts`: diese Gründe an die UI durchreichen.
-- `src/components/performance/FacebookPageSelectDialog.tsx`, `src/components/performance/MetaPageProbePanel.tsx`: Leer-Zustand und Befund um die vier Ursachen erweitern.
-- `src/lib/translations.ts`: Texte DE/EN/ES.
-- Keine Datenbank-Änderung.
+- Kein Code-Change in diesem Schritt.
+- Vergleichsabfragen laufen lesend über den gespeicherten Token des funktionierenden Kontos.
+- `business_management` bleibt vorerst im Scope-Satz, wird aber nicht mehr als Ursache behandelt. Über den Review entscheiden wir nach dem Testergebnis.
