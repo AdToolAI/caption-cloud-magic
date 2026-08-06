@@ -497,9 +497,11 @@ export const ConnectionsTab = () => {
       // the `instagram-oauth-start` Edge Function (single source of truth).
       // Do not re-add an `instagram:` entry here — it would silently bypass
       // the backend hard-reset + forced re-consent and break Meta App Review.
+      // NOTE: TikTok and LinkedIn are NOT in this map — both are started via
+      // their Edge Functions below. The old `/api/oauth/...` paths do not exist
+      // on this SPA and would land the user on the app shell.
       const oauthUrls: Record<string, string> = {
-        tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
-        linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
+
         x: (() => {
           const fullRedirectUri = `${redirectUri}?provider=x`;
           const scopes = 'tweet.read users.read offline.access';

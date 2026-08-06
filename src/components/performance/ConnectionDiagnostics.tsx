@@ -67,7 +67,7 @@ export function ConnectionDiagnostics() {
       const accessToken = sessionData.session?.access_token;
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
 
-      const [healthResults, socialHealth] = await Promise.all([
+      const [healthResults, socialHealth, configChecks] = await Promise.all([
         Promise.all(
           CHANNELS.map(async (channel) => {
             const fn = HEALTH_FN[channel.id] ?? HEALTH_FN.instagram;
@@ -89,9 +89,18 @@ export function ConnectionDiagnostics() {
         (async () => {
           try {
             const { data } = await supabase.functions.invoke('social-health', { headers });
-            return (data?.providers ?? {}) as Record<string, { connected?: boolean; expiring_in_days?: number }>;
+            return (data?.providers ?? {}) as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean }>;
           } catch {
-            return {} as Record<string, { connected?: boolean; expiring_in_days?: number }>;
+            return {} as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean }>;
+          }
+        })(),
+        (async () => {
+          try {
+            const { data } = await supabase.functions.invoke('oauth-config-check', { headers });
+            const list = (data?.checks ?? []) as { provider: string; redirect_ok?: boolean; note?: string }[];
+            return Object.fromEntries(list.map((c) => [c.provider, c]));
+          } catch {
+            return {} as Record<string, { redirect_ok?: boolean; note?: string }>;
           }
         })(),
       ]);
@@ -99,8 +108,14 @@ export function ConnectionDiagnostics() {
       const next: ChannelDiagnostic[] = CHANNELS.map((channel) => {
         const health = healthResults.find((h) => h.id === channel.id);
         const conn = socialHealth[channel.id];
+        const cfg = (configChecks as Record<string, { redirect_ok?: boolean; note?: string }>)[channel.id];
 
-        const credentials: Status = health?.ok === null ? 'unknown' : health?.ok ? 'ok' : 'error';
+        let credentials: Status = health?.ok === null ? 'unknown' : health?.ok ? 'ok' : 'error';
+        let credentialsNote = health?.note;
+        if (credentials === 'ok' && cfg && cfg.redirect_ok === false) {
+          credentials = 'warn';
+          credentialsNote = t('connectionDiagnostics.redirectMismatch');
+        }
         const connected = !!conn?.connected;
         const expiring = conn?.expiring_in_days;
 
@@ -113,12 +128,15 @@ export function ConnectionDiagnostics() {
 
         let publishing: Status = 'unknown';
         let publishingNote: string | undefined;
-        if (credentials !== 'ok') {
+        if (credentials === 'error') {
           publishing = 'error';
           publishingNote = t('connectionDiagnostics.credentialsMissing');
         } else if (!connected) {
           publishing = 'warn';
           publishingNote = t('connectionDiagnostics.connectFirst');
+        } else if (conn?.can_publish === false) {
+          publishing = 'warn';
+          publishingNote = t('connectionDiagnostics.publishPending');
         } else {
           publishing = 'ok';
           if (channel.id === 'tiktok') {
@@ -136,13 +154,14 @@ export function ConnectionDiagnostics() {
           id: channel.id,
           name: channel.name,
           credentials,
-          credentialsNote: health?.note,
+          credentialsNote,
           connection,
           connectionNote,
           publishing,
           publishingNote,
         };
       });
+
 
       setRows(next);
     } finally {
