@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { ConnectionDiagnostics } from "@/components/performance/ConnectionDiagnostics";
+import { MetaPageProbePanel } from "@/components/performance/MetaPageProbePanel";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1172,6 +1173,8 @@ export const ConnectionsTab = () => {
       </Card>
 
       <ConnectionDiagnostics />
+
+      <MetaPageProbePanel />
 
 
       {/* CSV Upload Section */}
