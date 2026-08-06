@@ -67,7 +67,7 @@ export function ConnectionDiagnostics() {
       const accessToken = sessionData.session?.access_token;
       const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
 
-      const [healthResults, socialHealth] = await Promise.all([
+      const [healthResults, socialHealth, configChecks] = await Promise.all([
         Promise.all(
           CHANNELS.map(async (channel) => {
             const fn = HEALTH_FN[channel.id] ?? HEALTH_FN.instagram;
