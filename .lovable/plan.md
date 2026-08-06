@@ -1,50 +1,58 @@
-# Auswertung Sharing Debugger: die Startseite ist sauber
+# Gefunden: unsere `og:url` schickt Meta von /privacy auf die Startseite
 
-## Was die drei Screenshots sagen
+## Was die neuen Screenshots zeigen
+
+`https://useadtool.ai/privacy`:
 
 | Prüfpunkt | Ergebnis |
 |---|---|
-| Response Code | **200** |
-| Fetched URL / Canonical | `https://useadtool.ai/` — identisch, keine Weiterleitungskette |
-| Link Preview | wird korrekt mit Bild, Titel und Beschreibung gerendert |
-| Einzige Warnung | **„Missing Properties: fb:app_id"** |
+| Response Code | **200** — die Seite ist erreichbar |
+| Fetched URL | `https://useadtool.ai/privacy` |
+| **Canonical URL** | **`https://useadtool.ai/`** ← das ist das Problem |
+| Redirect Path | `Input URL → /privacy`, **`og:url Meta Tag → https://useadtool.ai/`** |
+| Warnung | `Missing Properties: fb:app_id` |
 
-Damit ist belegt: `https://useadtool.ai/` ist für Metas Crawler **nicht kaputt**. Der Dialog „Broken URL detected" beruhte auf einem älteren, zwischengespeicherten Scrape-Ergebnis — der neue Scrape von vor 3 Minuten ist 200.
+Meta folgt dem `og:url`-Tag wie einer Weiterleitung. Für Meta ist `https://useadtool.ai/privacy` deshalb **dieselbe Seite wie die Startseite** — also keine eigenständige Datenschutzerklärung. Genau das quittiert Meta mit „Invalid Privacy Policy URL". Erreichbarkeit war nie das Problem.
 
-Zwei Nebenbefunde aus Screenshot 3 (kosmetisch, kein Blocker):
-- Titel, Description, Card und Image tauchen **doppelt** auf (`og:temporal:twitter:*` zeigt jeweils zwei Werte) — es gibt zwei Quellen für dieselben Social-Tags.
-- `og:temporal:twitter:url` steht auf `https://useadtool.ai/https://useadtool.ai/` — eine URL wurde doppelt zusammengesetzt.
+## Ursache im Code (verifiziert)
 
-## Was jetzt zu tun ist
+- In `index.html` steht fest verdrahtet `<meta property="og:url" content="https://useadtool.ai" />`. Dieses Tag gilt für **jede** URL der Seite.
+- Die routenspezifischen Tags kommen aus `src/components/SEO.tsx` über react-helmet — die werden aber **erst im Browser per JavaScript** gesetzt. Metas Scraper führt kein JavaScript aus und sieht deshalb immer nur den Startseiten-Wert.
+- `fb:app_id` fehlt komplett — kommt in beiden Debugger-Läufen als Warnung.
 
-**Dein Schritt in Meta (der Blocker):**
-1. Sharing Debugger nochmal, diesmal mit der **Datenschutz-URL** (die, die du in App-Grundeinstellungen als Privacy Policy URL eingetragen hast) → „Scrape Again". Nur wenn die auch 200 liefert, ist der „Invalid Privacy Policy URL"-Dialog ebenfalls nur ein alter Cache-Stand.
-2. Danach App Mode erneut auf **Live** stellen. Der Dialog sollte jetzt nicht mehr kommen.
-3. Dann **App Review → Permissions and Features → `public_profile` → Request advanced access**. Das ist der verbliebene echte Grund für „Feature nicht verfügbar".
+## Umsetzung
 
-**Mein Schritt im Code:**
+**1. `og:url` aus `index.html` entfernen**
+Ohne dieses Tag nimmt Meta die tatsächlich abgerufene URL. `/privacy` wird dann als eigene Seite gewertet, `/legal/terms` ebenfalls. Das ist der eigentliche Fix.
 
-**1. `fb:app_id` ergänzen** — die einzige Warnung, die der Debugger meldet. Meta wertet das bei Login-Apps als Signal für die Zuordnung Website ↔ App.
-- Neues Meta-Tag `<meta property="fb:app_id" content="<Meta App-ID>" />` im Head.
+**2. `fb:app_id` ergänzen**
+Statisch in den Head, damit die Warnung verschwindet und Meta Website und App verknüpft. Dafür brauche ich deine **Meta App-ID**.
 
-**2. Doppelte Social-Tags auflösen**
-- Sitewide-Tags bleiben in `index.html`, die zweite Quelle liefert für die Startseite keine abweichenden Werte mehr — der Debugger sieht dann je Property genau einen Wert.
+**3. `twitter:url`-Verdopplung bereinigen**
+Im vorherigen Debug-Lauf stand `https://useadtool.ai/https://useadtool.ai/`. Die URL wird in `SEO.tsx` doppelt mit der Domain verkettet — künftig genau einmal absolut auflösen.
 
-**3. Kaputte `twitter:url` reparieren**
-- In der Komponente, die pro Route die Social-Tags setzt, wird die URL doppelt mit der Domain verkettet. Künftig genau einmal absolut auflösen (`https://useadtool.ai/…`).
+**4. Doppelte Social-Tags reduzieren**
+Titel, Description, Card und Image tauchten je zweimal auf (statisch + Helmet). Auf der Startseite künftig nur eine Quelle, damit der Debugger je Property genau einen Wert sieht.
 
-**4. Diagnose-Panel ehrlich machen** (weiterhin offen aus den letzten Runden)
+**5. Diagnose-Panel ehrlich machen** (weiterhin offen)
 - Meta-Berechtigungen mit Zugriffslevel (Advanced/Standard) anzeigen, inkl. Klartext-Blocker „`public_profile` braucht Advanced Access".
-- `category` und `app_type` nicht mehr als fehlende Pflichtfelder werten — deine Grunddaten sind gepflegt, unsere Prüfung meldete falsch.
-- TikTok-Fehlalarm beheben: pro Kanal das korrekte Soll-Callback prüfen (`tiktok-oauth-callback` statt `oauth-callback`).
+- `category`/`app_type` nicht mehr als fehlende Pflichtfelder werten.
+- TikTok-Fehlalarm beheben (`tiktok-oauth-callback` statt `oauth-callback`).
+
+## Deine Schritte danach
+
+1. Nach dem Deploy im Sharing Debugger `https://useadtool.ai/privacy` → **Scrape Again**. Die Canonical URL muss dann `…/privacy` sein, nicht mehr die Startseite.
+2. Dasselbe für `https://useadtool.ai/legal/terms`.
+3. App Mode auf **Live** stellen — der „Invalid Privacy Policy URL"-Dialog sollte weg sein.
+4. **App Review → Permissions and Features → `public_profile` → Request advanced access**. Das bleibt der letzte echte Blocker für den Facebook-Login.
 
 ## Technische Details
 
-- `index.html`: `fb:app_id` ergänzen; Social-Tag-Block als alleinige Quelle für die Startseite belassen.
-- `src/components/SEO.tsx`: `twitter:url` (und analog `og:url`/canonical) über einen einzigen Helper absolut auflösen, damit keine Domain-Verdopplung entsteht; auf der Startseite keine identischen Duplikate mehr emittieren.
-- `supabase/functions/oauth-config-check/index.ts`: Graph-Call auf die Permissions-Übersicht (`meta_permissions: [{ permission, status }]`); Pflichtfeld-Liste um `category`/`app_type` bereinigt; `expected_redirect` je Provider.
-- `src/components/performance/ConnectionDiagnostics.tsx`: Abschnitt „Meta-Berechtigungen" mit Ampel je Permission, Blocker-Hinweis bei `public_profile !== advanced`, Soll-Redirect je Kanal.
+- `index.html`: Zeile mit `og:url` entfernen; `<meta property="fb:app_id" content="<App-ID>" />` ergänzen; Startseiten-Duplikate der og/twitter-Tags bereinigen.
+- `src/components/SEO.tsx`: `url` über `getCanonicalUrl()` einmalig absolut auflösen und für `og:url`, `twitter:url` und `<link rel="canonical">` dieselbe Quelle nutzen (aktuell nutzt `canonical` den Rohwert, `og:url` den aufgelösten — daher die Domain-Verdopplung).
+- `supabase/functions/oauth-config-check/index.ts`: Permissions-Übersicht via Graph (`meta_permissions: [{ permission, status }]`), bereinigte Pflichtfeldliste, `expected_redirect` je Provider.
+- `src/components/performance/ConnectionDiagnostics.tsx`: Abschnitt „Meta-Berechtigungen" mit Ampel je Permission und Soll-Redirect je Kanal.
 - `src/lib/translations.ts`: neue Texte DE/EN/ES.
 - Keine Änderung an der OAuth-Logik selbst.
 
-Für Punkt 1 brauche ich die **Meta App-ID** (steht in den App-Grundeinstellungen ganz oben) — schick sie mir, dann trage ich sie ein.
+Hinweis: Weil die Seite eine reine Browser-App ohne Server-Rendering ist, sehen Social-Crawler grundsätzlich nur den statischen Head. Deshalb ist der Fix in `index.html` der entscheidende — routenspezifische Vorschauen für Crawler bräuchten Server-Rendering ([was der Umstieg bringt](https://lovable.dev/blog/building-apps-using-tanstack-start)).
