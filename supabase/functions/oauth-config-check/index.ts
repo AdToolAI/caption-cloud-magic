@@ -123,12 +123,20 @@ serve(async (req) => {
         clearTimeout(timer);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
+          const g = body?.error ?? {};
+          const parts = [
+            `HTTP ${res.status}`,
+            g.code ? `code ${g.code}` : null,
+            g.message ?? null,
+          ].filter(Boolean);
           metaAppStatus = {
             available: false,
+            app_id: metaAppId,
             missing_fields: [],
-            error: body?.error?.message ?? `HTTP ${res.status}`,
+            error: parts.join(" · "),
           };
         } else {
+
           const required: Record<string, unknown> = {
             privacy_policy_url: body.privacy_policy_url,
             terms_of_service_url: body.terms_of_service_url,
