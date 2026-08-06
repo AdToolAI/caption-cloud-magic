@@ -186,13 +186,10 @@ Deno.serve(async (req) => {
     } else {
       authUrl.searchParams.set('scope', scopes);
     }
-    // Only use rerequest when the caller explicitly opts in (App Review
-    // recording). Outside of that, leave Meta on its default path —
-    // aggressive extras like `auth_nonce` and `display=page` can themselves
-    // trigger the "Feature unavailable" maintenance screen.
-    if (forReview) {
-      authUrl.searchParams.set('auth_type', 'rerequest');
-    }
+    // Always force re-consent: Meta otherwise silently reuses the previous
+    // (asset-less) grant and never shows the Page/Instagram picker again.
+    authUrl.searchParams.set('auth_type', 'rerequest');
+
 
     const finalAuthUrl = authUrl.toString();
     console.log('[instagram-oauth-start] Authorize URL built', {
