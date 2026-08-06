@@ -19179,6 +19179,16 @@ Object.assign(translations.en, {
     reconnectRequired: 'Please reconnect Instagram',
     reconnectReason: 'Your Instagram connection uses a legacy shared token. Reconnect now using the official Instagram Business login to enable per-user publishing.',
     reconnectNow: 'Reconnect now',
+    instagramSetup: {
+      title: 'Before connecting: Instagram requirements',
+      intro: 'Instagram can only be connected if your account is a professional account (Business or Creator) and is linked to a Facebook Page. Otherwise Meta shows an empty account list.',
+      step1Title: 'Switch to a professional account',
+      step1Desc: 'Instagram app → Settings → Account type and tools → Switch to professional account.',
+      step2Title: 'Link it to a Facebook Page',
+      step2Desc: 'Instagram app → Settings → Linked accounts → select your Facebook Page (or Meta Business Suite → Settings → Instagram accounts).',
+      linkBusinessSuite: 'Open Meta Business Suite',
+      linkHelp: 'Meta help: link Instagram to a Page',
+    },
   },
 });
 
