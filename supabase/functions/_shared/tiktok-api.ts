@@ -57,9 +57,9 @@ export interface TikTokUserInfo {
 
 // Token Exchange: Authorization Code → Tokens
 export async function exchangeCodeForTokens(code: string): Promise<TikTokTokenResponse> {
-  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
-  const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET')!;
-  const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI')!;
+  const clientKey = getTikTokClientKey();
+  const clientSecret = getTikTokClientSecret();
+  const redirectUri = getTikTokRedirectUri();
 
   console.log('Exchanging code for tokens (client_key hidden for security)');
   console.log('Redirect URI:', redirectUri, 'Environment:', TIKTOK_ENV);
@@ -96,8 +96,8 @@ export async function exchangeCodeForTokens(code: string): Promise<TikTokTokenRe
 
 // Refresh Access Token
 export async function refreshAccessToken(refreshToken: string): Promise<TikTokTokenResponse> {
-  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
-  const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET')!;
+  const clientKey = getTikTokClientKey();
+  const clientSecret = getTikTokClientSecret();
 
   console.log('Refreshing TikTok access token');
 
@@ -173,8 +173,8 @@ export async function getUserInfo(accessToken: string): Promise<TikTokUserInfo> 
 
 // Build Authorization URL
 export function buildAuthUrl(state: string): string {
-  const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
-  const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI')!;
+  const clientKey = getTikTokClientKey();
+  const redirectUri = getTikTokRedirectUri();
   
   const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
   authUrl.searchParams.set('client_key', clientKey);
