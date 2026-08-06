@@ -1,30 +1,45 @@
 # Facebook-Verbindung: „Feature nicht verfügbar"
 
-## Was die Meldung bedeutet
+## Was der Screenshot zeigt
 
-Der Aufruf ist technisch korrekt: Die URL enthält die richtige App-ID, die richtige Redirect-URI (Backend-Callback) und einen gültigen State. Der Abbruch kommt **nicht** aus unserem Code, sondern von Meta selbst.
+- App-ID `1769514810345813`, du bist Administrator.
+- **App Review ist durch**: `instagram_content_publish` und `instagram_basic` sind *Approved*, `pages_manage_posts`, `pages_show_list`, `pages_read_engagement` sind *Renewed*.
+- Der Modus-Schalter oben steht auf **Live**.
+- **`App type: None`** — das ist der auffällige Punkt.
 
-„Du kannst dich aktuell nicht über Facebook bei dieser App anmelden, da wir zusätzliche Details für diese App aktualisieren" ist Metas Standardtext, wenn die App **nicht im Live-Modus** ist bzw. das Produkt „Facebook Login" / der Use Case noch nicht vollständig konfiguriert oder in Prüfung ist. In diesem Zustand kann sich niemand anmelden — auch nicht der App-Eigentümer, sofern er nicht als Administrator/Entwickler/Tester der App eingetragen ist.
+Damit fällt meine bisherige Vermutung („App nur im Entwicklungsmodus, Review fehlt") weg. Die Berechtigungen sind da, die App ist live — die Meldung muss eine andere Ursache haben.
 
-Am Code lässt sich das nicht beheben.
+## Die verbleibenden zwei Kandidaten
 
-## Was im Meta-Entwicklerkonto zu prüfen ist
+1. **Unvollständige App-Grunddaten / Use-Case-Konfiguration.** Meta blendet genau den Text „wir aktualisieren zusätzliche Details für diese App" ein, wenn eine live geschaltete App Pflichtangaben vermissen lässt (Datenschutz-URL, Datenlöschungs-Hinweis, Kategorie, App-Symbol) oder der Use Case „Facebook Login" nicht abgeschlossen konfiguriert ist. `App type: None` deutet genau in diese Richtung.
+2. **Redirect-URI nicht in der Erlaubnisliste.** Steht die exakte Backend-Callback-URL nicht unter „Gültige OAuth-Redirect-URIs", blockt Meta den Dialog — teils mit derselben generischen Meldung statt einer präzisen URI-Fehlermeldung.
 
-1. App-Modus oben in der App-Leiste: steht er auf **Entwicklung**, kann nur eingetragenes App-Personal einloggen. `info@useadtool.ai` muss dann als Administrator oder Tester in der App-Rolle hinterlegt sein.
-2. Produkt **Facebook Login für Unternehmen** (bzw. Facebook Login) muss hinzugefügt und konfiguriert sein — inklusive gültiger OAuth-Redirect-URI (der Supabase-Callback, exakt wie in der aufgerufenen URL).
-3. App-Grunddaten vollständig: Datenschutzerklärung-URL, Nutzungsbedingungen, App-Symbol, Kategorie, Datenlöschungs-Hinweis. Fehlt eines davon, blockiert Meta den Login-Dialog mit genau dieser Meldung.
-4. Business-Verifizierung: Für Veröffentlichungsrechte (`pages_manage_posts`, `instagram_content_publish`) verlangt Meta eine verifizierte Unternehmensseite plus App-Review.
-5. Erst wenn 1–4 erfüllt sind, App auf **Live** schalten.
+Beides ist nicht am Code reparierbar, aber beides lässt sich **serverseitig auslesen** statt zu raten.
 
-## Was ich auf unserer Seite ergänze
+## Was ich umsetze: Diagnose statt Raten
 
-- **Diagnose-Panel erweitern**: Über die Graph-API (`/{app-id}?fields=...` mit App-Token) den tatsächlichen App-Status abfragen und im Verbindungsbereich anzeigen: „App im Entwicklungsmodus — nur Testnutzer können sich verbinden" statt eines stillen Fehlschlags.
-- **Klare Fehlerseite**: Wenn Facebook den Nutzer ohne `code` zurückschickt oder der Dialog abbricht, im Verbindungsbereich eine verständliche Meldung mit Hinweis auf den App-Status zeigen, statt nur „Verbindung fehlgeschlagen".
-- **Checkliste in der UI**: Kurzer Hinweistext im Facebook/Instagram-Bereich, welche Meta-seitigen Schritte für Live-Betrieb nötig sind (nur für Admin-Ansicht).
+**Schritt 1 — App-Status hart auslesen**
+`oauth-config-check` bekommt einen Meta-Abschnitt, der mit App-Token (`META_APP_ID|META_APP_SECRET`) die Graph API abfragt:
+- `/{app-id}?fields=name,link,privacy_policy_url,app_type,category` → welche Pflichtfelder leer sind.
+- Ergebnis pro Feld als „gesetzt / fehlt" im Diagnose-Panel.
+
+**Schritt 2 — Redirect-URI gegenprüfen**
+Die im Backend verwendete Callback-URL wird im Panel im Klartext angezeigt, mit Kopier-Button, damit sie 1:1 in die Meta-Login-Einstellungen übernommen werden kann. Zusätzlich Abgleich, ob Start-Funktion und Callback-Funktion dieselbe URL verwenden.
+
+**Schritt 3 — Ehrliche Fehlerseite**
+Kommt der Nutzer ohne `code` aus dem Meta-Dialog zurück, zeigt der Verbindungsbereich künftig Metas `error_reason`/`error_description` im Klartext statt „Verbindung fehlgeschlagen" — damit die nächste Ursache sofort benannt ist.
+
+## Was du parallel in Meta prüfen solltest
+
+- **App-Einstellungen → Grunddaten**: Datenschutzerklärung-URL, Nutzungsbedingungen, App-Symbol (1024×1024), Kategorie, Datenlöschungs-Callback. Alles ausgefüllt und gespeichert?
+- **Facebook Login → Einstellungen**: unter „Gültige OAuth-Redirect-URIs" muss exakt stehen:
+  `https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/oauth-callback`
+- **Required actions** (linke Leiste, dort stehen 11 Alerts): offene Pflichtaufgaben blockieren den Login-Dialog. Der genaue Grund steht meist wörtlich dort.
 
 ## Technische Details
 
-- Betroffene Funktionen: `facebook-oauth-start`, `instagram-oauth-start`, `oauth-callback`, `oauth-config-check`.
-- `oauth-config-check` bekommt einen zusätzlichen Abschnitt „App-Status" (Live/Entwicklung, fehlende Pflichtfelder), abgefragt mit `META_APP_ID` + `META_APP_SECRET` als App-Token.
-- `ConnectionDiagnostics.tsx` rendert den neuen Status als eigene Zeile pro Meta-Kanal.
-- Keine Änderung an der OAuth-Logik selbst — die ist korrekt.
+- `supabase/functions/oauth-config-check/index.ts`: neuer Abschnitt `meta_app_status`, Graph-API-Call `GET /v24.0/{app-id}` mit App-Token, ohne Nutzer-Token; Timeout und Fehlerfall sauber als „unbekannt" melden.
+- `src/components/performance/ConnectionDiagnostics.tsx`: neue Zeilen „App-Grunddaten" und „Redirect-URI (Soll-Wert)" pro Meta-Kanal.
+- `supabase/functions/oauth-callback/index.ts`: `error`, `error_reason`, `error_description` aus der Rückleitung in die App-Redirect-URL durchreichen.
+- `src/lib/translations.ts`: neue Texte DE/EN/ES.
+- Keine Änderung an der OAuth-Logik selbst.
