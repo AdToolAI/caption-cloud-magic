@@ -50,13 +50,18 @@ export const SEO_CONFIG = {
 };
 
 /**
- * Generiert vollständige kanonische URL
+ * Generiert vollständige kanonische URL.
+ * Absolute Eingaben werden unverändert zurückgegeben (verhindert Domain-Verdopplung
+ * wie https://useadtool.ai/https://useadtool.ai/).
  */
 export const getCanonicalUrl = (path: string): string => {
-  // Entfernt führenden Slash wenn vorhanden und fügt ihn dann hinzu
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${SEO_CONFIG.baseUrl}${cleanPath}`;
 };
+
 
 /**
  * Generiert OG-Image URL
