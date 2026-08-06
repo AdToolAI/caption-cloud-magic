@@ -1,30 +1,28 @@
-# Meta App-ID verdeckt eintragen
+# Meta App-ID eintragen (`fb:app_id`)
 
-## Ausgangslage (geprüft)
+Du hast die ID bestätigt: **1769514810345813** — sie stimmt mit dem bereits im Projekt hinterlegten Wert überein. Sie ist eine öffentliche Kennung (steht ohnehin in jedem Facebook-Login-Aufruf im Browser); geheim ist nur das App-Secret. Ein Secret-Formular ist dafür also nicht nötig — und für Meta sogar hinderlich, weil der Crawler kein JavaScript und keine Secrets lesen kann.
 
-Im Projekt liegt bereits `VITE_META_APP_ID="1769514810345813"` in der `.env`. Diese ID ist eine öffentliche Kennung: Sie steht in jedem Facebook-Login-Aufruf im Browser und wäre auch im `fb:app_id`-Tag für jeden sichtbar. Sie ist kein Geheimnis — geheim ist nur das App-Secret.
+## Umsetzung
 
-Trotzdem sollst du sie nicht im Chat tippen müssen. Deshalb zwei Wege:
+**1. `fb:app_id` statisch in den Head**
+In `index.html` bei den Open-Graph-Tags:
+`<meta property="fb:app_id" content="1769514810345813" />`
+Damit verschwindet die Sharing-Debugger-Warnung „Missing Properties: fb:app_id" und Meta verknüpft Website und App.
 
-## Weg A — verdeckte Eingabe (empfohlen, das was du willst)
+**2. Diagnose zeigt die aktive App-ID**
+Im Diagnose-Panel unter „Meta App-Grunddaten" wird die aktuell verwendete App-ID sichtbar gemacht, damit du jederzeit prüfen kannst, ob Head, Backend und Meta-Dashboard dieselbe App meinen.
 
-1. Ich öffne dir ein sicheres Eingabeformular für `META_APP_ID`. Du trägst die ID dort ein, sie erscheint nirgends im Chatverlauf.
-2. Die Diagnose (`oauth-config-check`) liest sie serverseitig und zeigt sie im Panel unter „Meta App-Grunddaten" an — damit siehst du jederzeit, welche ID aktiv ist, ohne sie irgendwo abtippen zu müssen.
-
-## Weg B — `fb:app_id` im Head (nötig für die Meta-Warnung)
-
-Damit die Sharing-Debugger-Warnung „Missing Properties: fb:app_id" verschwindet, muss das Tag **statisch** in `index.html` stehen — Metas Crawler führt kein JavaScript aus, kann also weder Secret noch `import.meta.env` lesen.
-
-Ich trage dafür die bereits im Projekt vorhandene ID `1769514810345813` als `<meta property="fb:app_id" ...>` in den Head ein. Falls das nicht die richtige App ist, sag Bescheid bzw. trag die korrekte über Weg A ein — dann nehme ich diese.
+**3. Abgleich-Warnung**
+Weicht die ID im Head von der ab, die das Backend nutzt, zeigt das Panel eine klare Warnung statt stiller Abweichung.
 
 ## Technische Details
 
-- Neues Secret `META_APP_ID` über das sichere Formular (kein Klartext im Chat).
-- `supabase/functions/oauth-config-check/index.ts`: bevorzugt `META_APP_ID`, fällt auf die bisherige Quelle zurück; gibt die aktive ID im Diagnose-Payload zurück.
-- `src/components/performance/ConnectionDiagnostics.tsx`: zeigt die aktive App-ID an, inkl. Hinweis, woher sie stammt (Secret vs. Fallback).
-- `index.html`: eine Zeile `<meta property="fb:app_id" content="…" />` direkt bei den Open-Graph-Tags.
+- `index.html`: eine Zeile `fb:app_id` direkt unter `og:type`.
+- `supabase/functions/oauth-config-check/index.ts`: liefert die serverseitig genutzte App-ID im Diagnose-Payload zurück (nur die ID, kein Secret).
+- `src/components/performance/ConnectionDiagnostics.tsx`: Anzeige der aktiven App-ID plus Mismatch-Hinweis.
+- `src/lib/translations.ts`: neue Texte DE/EN/ES.
 - Keine Änderung an der OAuth-Logik.
 
 ## Danach
 
-Im Sharing Debugger `https://useadtool.ai/` erneut „Scrape Again" — die `fb:app_id`-Warnung muss dann weg sein.
+Im Sharing Debugger `https://useadtool.ai/` erneut „Scrape Again" — die `fb:app_id`-Warnung muss weg sein. Anschließend bleibt als letzter echter Blocker für den Facebook-Login: **App Review → `public_profile` → Advanced Access beantragen**.
