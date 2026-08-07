@@ -16,7 +16,11 @@
  * HTTP 200 wenn alles grün, sonst 503 — damit ein Deploy-Gate darauf prüfen kann.
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 import {
   LIPSYNC_CONTRACT_VERSION,
   PRECLIP,

@@ -2,7 +2,11 @@
 // Runs via pg_cron at 06:00 UTC (08:00 Europe/Berlin). Sends even at zero,
 // so silence becomes information instead of a gap.
 
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 import { sendAdminEmail } from '../_shared/admin-mail.ts';
 import { ADMIN_ALERT_EMAIL } from '../_shared/admin-config.ts';
