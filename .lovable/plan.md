@@ -10,23 +10,10 @@ Bestätigt aus deinen Screenshots:
 
 ## Deine nächsten Schritte in der ModelArk-Konsole
 
-1. **Guthaben/Resource Pack klären (aktueller Blocker)**
-   Deine Kreditkarte ist hinterlegt, aber die Vorabprüfung meldet `No available resource packs. Please purchase a resource pack first`.
+1. **Erledigt: Seedance 2.5 ist aktiviert** ✔
+   In „Model activation" → Tab **Media** steht *Dreamina-Seedance-2.5 (ByteDance)* auf **Activated**, Region **Asia Pacific (Johor)**. Der Resource-Pack-Fehler ist damit vom Tisch.
+   Hinweis: **„Model usage limit" / Free-Credits-Only-Mode ausgelassen lassen** (Toggle aus), sonst wird der Dienst nach Aufbrauchen des Freikontingents automatisch ausgesetzt.
 
-   **Nicht den Coding Plan kaufen.** „Coding Plan Personal Edition" (Lite 10 $ / Pro 50 $) ist ein Abo für Programmier-LLMs und deckt Video-Generation nicht ab — der Kauf löst den Fehler nicht.
-
-   Richtiger Weg, in dieser Reihenfolge:
-   - Im Fehlerdialog **„I acknowledge"** klicken und den Aktivierungsdialog schließen.
-   - Oben rechts auf das Konto-Symbol → **Billing / Finance / Account Balance** → **Guthaben aufladen** (Prepaid-Balance, kein Abo). ModelArk rechnet Video pay-as-you-go über das Kontoguthaben ab; die Vorabprüfung verlangt ein positives Guthaben in **ap-southeast-1**.
-   - Danach erneut **Model activation** → *Dreamina Seedance 2.5* → **Activate**.
-   - Bleibt der Fehler: **Contact Sales** (oben rechts) oder Chat-Button unten rechts, wörtlich: „Please enable the Dreamina Seedance 2.5 video generation API for my BytePlus ModelArk account in ap-southeast-1 (Johor). Model activation fails with: No available resource packs." Video-Modelle sind bei BytePlus für Neukonten oft erst nach manueller Freigabe nutzbar — das liegt dann bei BytePlus, nicht an unserer Plattform.
-
-
-2. **Seedance 2.5 erneut freischalten**
-   Linke Navigation → **„Model activation"** → nach *Dreamina Seedance 2.5* suchen → **Activate / Enable**.
-   Wichtig: Region muss dabei auf **Asia Pacific (Johor)** stehen. Aktivierung gilt pro Region.
-   Im Dialog nur Seedance 2.5 markieren; **„Enable Free Credits Only Mode" ausgeschaltet lassen**, weil das Modell einen bezahlten Resource Pack verlangt. Dann Bedingungen bestätigen und **„Confirm activation and authorization"** anklicken.
-   Kontrolle: unter **„Model Square"** sollte Seedance 2.5 danach als aktiviert erscheinen.
 
 3. **API-Key erstellen**
    Linke Navigation → **„API keys"** → Button **„+ Create API Key"** → Namen z. B. `adtool-prod` → erstellen und Key kopieren.
