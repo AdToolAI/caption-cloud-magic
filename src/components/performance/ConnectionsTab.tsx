@@ -47,6 +47,13 @@ export const ConnectionsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { emit } = useEventEmitter();
+
+  /** Auth-Lock-Kollisionen nicht als Verbindungsfehler darstellen. */
+  const describeError = (error: any, fallback: string) =>
+    isAuthLockError(error)
+      ? t('socialIntegrations.sessionBusyRetry')
+      : (error?.message || fallback);
+
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
