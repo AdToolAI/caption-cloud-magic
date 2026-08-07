@@ -158,18 +158,29 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
         <div className="space-y-2 min-w-0">
           <Label className="text-sm font-medium">Fläche</Label>
           <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              title="Goldverlauf"
+              onClick={() => onUpdateStyle({ fill: undefined, gradient: ['#F5C76A', '#C79B3F'] })}
+              className={`w-7 h-7 rounded-lg border-2 ${
+                !s.fill && s.gradient ? 'border-white' : 'border-transparent hover:border-white/50'
+              }`}
+              style={{ background: 'linear-gradient(135deg, #F5C76A, #C79B3F)' }}
+            />
             {FILLS.map((c) => (
               <button
                 key={c}
-                onClick={() => onUpdateStyle({ fill: c })}
+                type="button"
+                onClick={() => onUpdateStyle({ fill: c, gradient: undefined })}
                 className={`w-7 h-7 rounded-lg border-2 ${
-                  (s.fill ?? 'transparent') === c ? 'border-white' : 'border-transparent hover:border-white/50'
+                  s.fill === c ? 'border-white' : 'border-transparent hover:border-white/50'
                 } ${c === 'transparent' ? 'bg-[repeating-conic-gradient(#808080_0_90deg,transparent_0_180deg)_0_0/8px_8px]' : ''}`}
                 style={c === 'transparent' ? undefined : { backgroundColor: c }}
               />
             ))}
           </div>
         </div>
+
       </div>
 
       {/* Form */}
