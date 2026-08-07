@@ -161,9 +161,9 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
             <button
               type="button"
               title="Goldverlauf"
-              onClick={() => onUpdateStyle({ fill: undefined, gradient: ['#F5C76A', '#C79B3F'] })}
+              onClick={() => onUpdateStyle({ fill: null, backgroundColor: undefined, gradient: ['#F5C76A', '#C79B3F'] })}
               className={`w-7 h-7 rounded-lg border-2 ${
-                !s.fill && s.gradient ? 'border-white' : 'border-transparent hover:border-white/50'
+                !s.fill && !s.backgroundColor && s.gradient ? 'border-white' : 'border-transparent hover:border-white/50'
               }`}
               style={{ background: 'linear-gradient(135deg, #F5C76A, #C79B3F)' }}
             />
@@ -171,13 +171,14 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
               <button
                 key={c}
                 type="button"
-                onClick={() => onUpdateStyle({ fill: c, gradient: undefined })}
+                onClick={() => onUpdateStyle({ fill: c, backgroundColor: undefined, gradient: null })}
                 className={`w-7 h-7 rounded-lg border-2 ${
-                  s.fill === c ? 'border-white' : 'border-transparent hover:border-white/50'
+                  (s.fill ?? s.backgroundColor) === c ? 'border-white' : 'border-transparent hover:border-white/50'
                 } ${c === 'transparent' ? 'bg-[repeating-conic-gradient(#808080_0_90deg,transparent_0_180deg)_0_0/8px_8px]' : ''}`}
                 style={c === 'transparent' ? undefined : { backgroundColor: c }}
               />
             ))}
+
           </div>
         </div>
 
