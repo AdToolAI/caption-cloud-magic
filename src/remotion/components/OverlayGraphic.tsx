@@ -53,7 +53,12 @@ export const OverlayGraphic: React.FC<OverlayGraphicProps> = ({ overlay, t, dura
   const textShadow = s.shadow !== false ? '0 2px 8px rgba(0,0,0,0.85)' : undefined;
   const weight = s.fontWeight ?? 700;
   const upper = s.uppercase ?? false;
-  const background = s.gradient ? `linear-gradient(135deg, ${s.gradient[0]}, ${s.gradient[1]})` : fill;
+  // Eine explizit gewählte Fläche schlägt den Verlauf der Vorlage.
+  const background = s.fill
+    ? fill
+    : s.gradient
+      ? `linear-gradient(135deg, ${s.gradient[0]}, ${s.gradient[1]})`
+      : fill;
 
   const label = textContent(overlay, vis.visibleChars);
   const title = overlay.slots?.title ?? overlay.text ?? '';
