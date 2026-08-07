@@ -5,7 +5,11 @@
 // This function never calls Meta and never mutates anything.
 
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface AttemptRow {
   id: string;
