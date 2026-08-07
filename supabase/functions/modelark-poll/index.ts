@@ -19,6 +19,8 @@ import {
   storeModelArkVideo,
   extractModelArkTaskId,
   MODELARK_JOB_PREFIX,
+  MODELARK_BASE_URL,
+  modelArkApiKey,
 } from "../_shared/modelark.ts";
 
 const corsHeaders = {
@@ -170,10 +172,31 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   let sceneFilterId: string | null = null;
+  let ping = false;
   try {
     const body = await req.json();
     sceneFilterId = body?.sceneId ?? null;
+    ping = body?.ping === true;
   } catch { /* no body */ }
+
+  // Connectivity check: verifies MODELARK_API_KEY + region without spending credits.
+  if (ping) {
+    try {
+      const res = await fetch(`${MODELARK_BASE_URL}/contents/generations/tasks?page_size=1`, {
+        headers: { Authorization: `Bearer ${modelArkApiKey()}` },
+      });
+      const text = await res.text();
+      return new Response(
+        JSON.stringify({ ok: res.ok, status: res.status, body: text.slice(0, 400) }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    } catch (err: any) {
+      return new Response(
+        JSON.stringify({ ok: false, error: err?.message ?? "ping failed" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+  }
 
   try {
     const summary = await scan(sceneFilterId);
