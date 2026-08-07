@@ -1,37 +1,47 @@
-# Seedance 2.5 direkt über ModelArk anbinden
+# Seedance 2.5 über BytePlus ModelArk anbinden
 
-Seedance 2.5 kommt als **neues, eigenständiges Modell** dazu. Seedance 1 Lite / 2.0 Fast / 2.0 bleiben unverändert über Replicate laufen.
+Bestätigt aus deinem Screenshot (docs.byteplus.com/en/docs/modelark/1520757):
 
-## Links (bitte dort den Key holen)
+- Endpoint: `POST https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks`
+- Auth: `Authorization: Bearer $ARK_API_KEY`
+- Model-ID: `dreamina-seedance-2-5-260628`
+- Seedance 2.5 kommt als **neues Modell neben** 1 Lite / 2.0 Fast / 2.0 dazu.
 
-- ModelArk Konsole (China/Volcengine): https://console.volcengine.com/ark
-- ModelArk Video-Generation Doku: https://www.volcengine.com/docs/82379
-- International (BytePlus ModelArk, EU/SEA-Zugang, meist die praktikablere Variante): https://docs.byteplus.com/en/docs/ModelArk/ — Konsole: https://console.byteplus.com/ark
+## Was du Schritt für Schritt tun musst
 
-Aus der Konsole brauchen wir zwei Dinge: den **API-Key** und die exakte **Model-ID / Endpoint-ID** für Seedance 2.5 (bei ModelArk ist die ID pro Account/Endpoint sichtbar, deshalb kann ich sie nicht raten).
+1. **BytePlus-Konto anlegen/einloggen**
+   Gehe auf https://console.byteplus.com/ark und melde dich an (bzw. registriere dich). ModelArk ist das internationale Pendant zu Volcengine Ark — dieses brauchen wir, weil der Endpoint `ark.ap-southeast.bytepluses.com` genau dazu gehört.
+
+2. **Zahlungsmittel hinterlegen**
+   In der Konsole unter „Billing" / „Payment" eine Kreditkarte hinterlegen. Ohne Guthaben liefert die API sofort einen Quota-Fehler zurück.
+
+3. **Modellzugang für Seedance 2.5 aktivieren**
+   Konsole → „Model Marketplace" bzw. „Models" → *Dreamina Seedance 2.5* suchen → „Activate" / „Enable". Manche Modelle sind erst nach dieser Freischaltung aufrufbar.
+
+4. **API-Key erzeugen**
+   Konsole → „API Key" (linke Navigation) → „Create API Key" → Key kopieren. Der Key wird nur einmal angezeigt.
+
+5. **Preis notieren**
+   Auf der Modell- oder Pricing-Seite den Preis pro Sekunde je Auflösung (480p/720p/1080p) ablesen und mir nennen. Daraus berechne ich unseren Verkaufspreis mit der festen 3,00×-Marge.
+
+6. **Key an mich übergeben**
+   Sag mir Bescheid, sobald der Key bereitliegt — ich öffne dann das sichere Formular für `MODELARK_API_KEY`. **Bitte den Key nicht in den Chat schreiben.**
+
+7. Danach baue ich die Integration (Punkt „Was gebaut wird") und wir testen einen echten 5-Sekunden-Clip.
 
 ## Was gebaut wird
 
-1. **Secrets**: `MODELARK_API_KEY` und `MODELARK_BASE_URL` (Region-abhängig), plus `MODELARK_SEEDANCE_25_MODEL_ID`. So bleibt die Model-ID ohne Deploy änderbar.
-2. **Neue Edge Function `generate-seedance25-video`** nach dem Muster der bestehenden `generate-seedance-video`:
-   - Auth-Check, Kostenberechnung, Wallet-Abzug **vor** dem Call, automatischer Refund bei Provider-Fehler (Pflicht laut Credit-Reliability-Regel).
-   - ModelArk arbeitet asynchron: `POST /contents/generations/tasks` → Task-ID → Polling `GET /contents/generations/tasks/{id}` bis `succeeded/failed`. Kein Replicate-Webhook, deshalb eigener Poll-Loop + Watchdog-Eintrag.
-   - Text-to-Video und Image-to-Video (erstes Frame) werden unterstützt.
-3. **Katalog-Einträge**:
-   - `src/config/seedanceVideoCredits.ts`: neuer Tier `seedance-2-5`.
-   - `supabase/functions/_shared/videoPricingCatalog.ts`: Einkaufspreis + Verkaufspreis mit der bestehenden **3,00×-Marge**.
-   - `src/config/aiVideoModelRegistry.ts`: neues Modell mit `edgeFunction: 'generate-seedance25-video'`, Badge „Neu".
-   - Consistency-Ranking, Prompt-Token-Limit und Provider-Capabilities analog zu Seedance 2.0 ergänzen.
-4. **Composer/Motion Studio**: `seedance-2-5` als eigene ClipSource-Variante nur dort freischalten, wo Seedance 2.0 heute schon erlaubt ist. Die Lip-Sync-Kette bleibt unangetastet (Feature Freeze v400) — Seedance 2.5 gilt wie 2.0 als Plate/B-Roll, nicht als Dialog-Master.
-5. **Preis-Anzeige**: Kostenvorschau vor der Generierung wie bei allen anderen Modellen.
-
-## Offene Punkte vor dem Bau
-
-- Der exakte ModelArk-Preis pro Sekunde/Auflösung muss aus deiner Konsole (Abrechnungsseite) kommen — daraus leiten wir den Verkaufspreis mit 3,00× ab. Ohne die Zahl setze ich vorläufig den 2.0-Pro-Preis und markiere ihn als „zu bestätigen".
-- Falls ModelArk aus der EU nicht erreichbar ist, nutzen wir den BytePlus-Endpoint (`ark.ap-southeast.volces.com`); das ändert nur `MODELARK_BASE_URL`.
+1. **Secrets**: `MODELARK_API_KEY`, dazu `MODELARK_BASE_URL` (`https://ark.ap-southeast.bytepluses.com/api/v3`) und `MODELARK_SEEDANCE_25_MODEL_ID` (`dreamina-seedance-2-5-260628`), damit ein Modell-Update später ohne Deploy möglich ist.
+2. **Neue Edge Function `generate-seedance25-video`** nach dem Muster von `generate-seedance-video`:
+   - Auth-Check, Kostenvorschau, Wallet-Abzug vor dem Call, automatischer Refund bei Provider-Fehler (Pflicht laut Credit-Reliability-Regel).
+   - Asynchroner Ablauf: `POST /contents/generations/tasks` → Task-ID → Polling `GET /contents/generations/tasks/{id}` bis `succeeded`/`failed`, mit Watchdog gegen hängende Tasks.
+   - Unterstützte Task-Typen laut Doku: Text-to-Video, Multimodal-Reference (Bildreferenzen), Edit Video, Extend Video — wir starten mit Text-to-Video und Referenzbild, Edit/Extend als zweiter Schritt.
+3. **Katalog-Einträge**: neuer Tier in `seedanceVideoCredits.ts`, `videoPricingCatalog.ts` (Einkauf + 3,00×-Verkauf), `aiVideoModelRegistry.ts` (`edgeFunction: 'generate-seedance25-video'`, Badge „Neu"), plus Consistency-Ranking und Prompt-Limits.
+4. **Composer/Motion Studio**: Seedance 2.5 dort freischalten, wo 2.0 heute erlaubt ist. Die Lip-Sync-Kette bleibt unangetastet (Feature Freeze v400) — 2.5 gilt wie 2.0 als Plate/B-Roll, nicht als Dialog-Master.
+5. **Kostenvorschau** vor der Generierung wie bei allen anderen Modellen.
 
 ## Technische Details
 
-- Auth: `Authorization: Bearer <MODELARK_API_KEY>`, JSON-Body, OpenAI-ähnliches Schema.
-- Der Poll-Loop läuft innerhalb der Edge Function mit erhöhtem Timeout (300 s) und schreibt Zwischenstände in die bestehende Job-Tabelle, damit die UI den Fortschritt zeigt.
+- Auth: `Authorization: Bearer <MODELARK_API_KEY>`, JSON-Body mit `model` + `content[]` (Text-Part und optionale `image_url`-Parts), Parameter wie Auflösung/Dauer werden laut Doku als Text-Direktiven bzw. Feldern übergeben — ich richte mich beim Bau exakt nach der „Must-read before use"-Seite.
+- Poll-Loop in der Edge Function mit 300 s Timeout, Zwischenstände in die bestehende Job-Tabelle, damit die UI Fortschritt zeigt.
 - Fehlerklassen (Content-Filter, Quota, Timeout) werden auf die vorhandenen Refund-Pfade gemappt.
