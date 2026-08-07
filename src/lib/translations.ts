@@ -19176,6 +19176,8 @@ Object.assign(translations.en, {
     connectDifferentAccount: 'Connect a different Facebook account',
     metaSessionHint: 'Facebook remembers the profile you are logged into in this browser — your AdTool account does not change it. Use this button (or a private window) to pick another Facebook profile.',
     metaAccountId: 'Facebook user ID',
+    metaPagesForToken: '{count} Pages visible to this Meta token',
+    metaConnectedAs: 'Connected as {name} · Meta ID {id} · {count} Pages found',
     syncNow: 'Sync Now',
     followers: 'followers',
     posts: 'posts',
@@ -19233,6 +19235,8 @@ Object.assign(translations.de, {
     connectDifferentAccount: 'Mit anderem Facebook-Konto verbinden',
     metaSessionHint: 'Facebook merkt sich das im Browser angemeldete Profil — dein AdTool-Konto ändert daran nichts. Über diesen Button (oder ein privates Fenster) wählst du ein anderes Facebook-Profil.',
     metaAccountId: 'Facebook-Nutzer-ID',
+    metaPagesForToken: '{count} Seiten für diesen Meta-Token sichtbar',
+    metaConnectedAs: 'Verbunden als {name} · Meta-ID {id} · {count} Seiten gefunden',
     syncNow: 'Jetzt synchronisieren',
     followers: 'Follower',
     posts: 'Posts',
@@ -19290,6 +19294,8 @@ Object.assign(translations.es, {
     connectDifferentAccount: 'Conectar otra cuenta de Facebook',
     metaSessionHint: 'Facebook recuerda el perfil con el que iniciaste sesión en este navegador; tu cuenta de AdTool no lo cambia. Usa este botón (o una ventana privada) para elegir otro perfil de Facebook.',
     metaAccountId: 'ID de usuario de Facebook',
+    metaPagesForToken: '{count} páginas visibles para este token de Meta',
+    metaConnectedAs: 'Conectado como {name} · ID de Meta {id} · {count} páginas encontradas',
     syncNow: 'Sincronizar ahora',
     followers: 'seguidores',
     posts: 'publicaciones',
@@ -19797,6 +19803,7 @@ Object.assign(translations.en, {
     empty: 'No connect attempts recorded yet. Reconnect both accounts once, then load again.',
     noDifference: 'No structural difference between the two attempts.',
     errorTitle: 'Comparison failed',
+    sessionExpired: 'Your session has expired. Please sign in again and reload this page.',
   },
 });
 Object.assign(translations.de, {
@@ -19811,6 +19818,7 @@ Object.assign(translations.de, {
     empty: 'Noch keine Verbindungsversuche aufgezeichnet. Beide Konten einmal neu verbinden, dann erneut laden.',
     noDifference: 'Kein struktureller Unterschied zwischen den beiden Versuchen.',
     errorTitle: 'Vergleich fehlgeschlagen',
+    sessionExpired: 'Deine Sitzung ist abgelaufen. Bitte melde dich neu an und lade diese Seite erneut.',
   },
 });
 Object.assign(translations.es, {
@@ -19825,5 +19833,6 @@ Object.assign(translations.es, {
     empty: 'Todavía no hay intentos registrados. Vuelve a conectar ambas cuentas y carga de nuevo.',
     noDifference: 'No hay diferencia estructural entre los dos intentos.',
     errorTitle: 'Error en la comparación',
+    sessionExpired: 'Tu sesión ha caducado. Inicia sesión de nuevo y recarga esta página.',
   },
 });

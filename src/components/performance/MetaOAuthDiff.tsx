@@ -13,6 +13,7 @@ import { Loader2, RefreshCw, GitCompare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useToast } from '@/hooks/use-toast';
+import { ensureValidSession } from '@/lib/ensureSession';
 
 interface Attempt {
   id: string;
@@ -56,9 +57,16 @@ export function MetaOAuthDiff() {
     async (a?: string, b?: string) => {
       setLoading(true);
       try {
+        const session = await ensureValidSession();
+        if (!session?.access_token) {
+          throw new Error(t('metaDiff.sessionExpired'));
+        }
         const { data: res, error } = await supabase.functions.invoke<DiffResponse>(
           'meta-oauth-diff',
-          { body: { attempt_a: a, attempt_b: b } },
+          {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+            body: { attempt_a: a, attempt_b: b },
+          },
         );
         if (error) throw error;
         setData(res ?? null);
