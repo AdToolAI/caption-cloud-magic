@@ -37,12 +37,10 @@ serve(async (req) => {
       });
     }
 
-    // Verify user
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    // Verify user (validate the JWT directly via the admin client — avoids
+    // depending on SUPABASE_ANON_KEY, which is not reliably present)
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid session' }), {
         status: 401,
