@@ -231,6 +231,7 @@ export const ConnectionsTab = () => {
   const handleConnect = async (
     providerId: string,
     providerName: string,
+    forceAccountChooser = false,
   ) => {
     // Diagnostic instrumentation — makes it possible to see in the browser
     // console exactly which path Instagram OAuth took (frontend builder vs.
@@ -300,6 +301,7 @@ export const ConnectionsTab = () => {
             },
             body: {
               returnTo: window.location.href,
+              forceAccountChooser,
             },
           });
 
@@ -422,7 +424,7 @@ export const ConnectionsTab = () => {
         try {
           const { data: session } = await supabase.auth.getSession();
           const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
-            body: { returnTo: window.location.href },
+            body: { returnTo: window.location.href, forceAccountChooser },
             headers: {
               Authorization: `Bearer ${session.session?.access_token}`,
             },
@@ -953,6 +955,11 @@ export const ConnectionsTab = () => {
                                 : connection.account_name}
                             </p>
                           )}
+                          {connected && connection && (provider.id === 'facebook' || provider.id === 'instagram') && connection.account_id && (
+                            <p className="text-[11px] text-muted-foreground/70">
+                              {t('socialIntegrations.metaAccountId')}: {connection.account_id}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
@@ -1162,6 +1169,20 @@ export const ConnectionsTab = () => {
                         <Button onClick={() => handleConnect(provider.id, provider.name)} className="w-full">
                           {t('performance.connections.connect')}
                         </Button>
+                        {(provider.id === 'facebook' || provider.id === 'instagram') && (
+                          <>
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => handleConnect(provider.id, provider.name, true)}
+                            >
+                              {t('socialIntegrations.connectDifferentAccount')}
+                            </Button>
+                            <p className="text-xs text-muted-foreground">
+                              {t('socialIntegrations.metaSessionHint')}
+                            </p>
+                          </>
+                        )}
                       </div>
                     )}
 
