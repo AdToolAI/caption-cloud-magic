@@ -55,6 +55,12 @@ export interface ToolkitModel {
     /** Max number of reference images supported when multiRef is true. */
     maxReferences?: number;
     /**
+     * True when the model CANNOT generate without at least one reference image
+     * (Vidu Reference2V). Models that also support plain text-to-video leave
+     * this false so references stay optional.
+     */
+    multiRefRequired?: boolean;
+    /**
      * Native dialogue: model generates video + speech + lip-sync in a single
      * pass. Required for the Composer's Dialog/Lip-Sync mode (Artlist-style).
      * Set true only for models that produce in-frame synchronous mouth
