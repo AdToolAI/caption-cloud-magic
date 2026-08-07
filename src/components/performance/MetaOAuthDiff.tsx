@@ -66,7 +66,7 @@ export function MetaOAuthDiff() {
         setAttemptB(res?.attempt_b?.id);
       } catch (e) {
         toast({
-          title: t('diagnostics.metaDiff.errorTitle'),
+          title: t('metaDiff.errorTitle'),
           description: e instanceof Error ? e.message : String(e),
           variant: 'destructive',
         });
@@ -84,19 +84,19 @@ export function MetaOAuthDiff() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <GitCompare className="h-4 w-4" />
-          {t('diagnostics.metaDiff.title')}
+          {t('metaDiff.title')}
         </CardTitle>
-        <CardDescription>{t('diagnostics.metaDiff.description')}</CardDescription>
+        <CardDescription>{t('metaDiff.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => run(attemptA, attemptB)} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            <span className="ml-2">{t('diagnostics.metaDiff.load')}</span>
+            <span className="ml-2">{t('metaDiff.load')}</span>
           </Button>
           {data && (
             <Badge variant="outline" className="font-normal">
-              {t('diagnostics.metaDiff.attemptsFound', { count: attempts.length })}
+              {t('metaDiff.attemptsFound', { count: attempts.length })}
             </Badge>
           )}
         </div>
@@ -104,7 +104,7 @@ export function MetaOAuthDiff() {
         {data && attempts.length > 0 && (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">{t('diagnostics.metaDiff.accountA')}</p>
+              <p className="text-xs text-muted-foreground">{t('metaDiff.accountA')}</p>
               <Select value={attemptA} onValueChange={(v) => { setAttemptA(v); run(v, attemptB); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -115,7 +115,7 @@ export function MetaOAuthDiff() {
               </Select>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">{t('diagnostics.metaDiff.accountB')}</p>
+              <p className="text-xs text-muted-foreground">{t('metaDiff.accountB')}</p>
               <Select value={attemptB} onValueChange={(v) => { setAttemptB(v); run(attemptA, v); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -129,7 +129,7 @@ export function MetaOAuthDiff() {
         )}
 
         {data && attempts.length === 0 && (
-          <p className="text-sm text-muted-foreground">{t('diagnostics.metaDiff.empty')}</p>
+          <p className="text-sm text-muted-foreground">{t('metaDiff.empty')}</p>
         )}
 
         {data && data.diff.length > 0 && (
@@ -137,7 +137,7 @@ export function MetaOAuthDiff() {
             <table className="w-full text-xs">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="p-2 text-left font-medium">{t('diagnostics.metaDiff.field')}</th>
+                  <th className="p-2 text-left font-medium">{t('metaDiff.field')}</th>
                   <th className="p-2 text-left font-medium">A</th>
                   <th className="p-2 text-left font-medium">B</th>
                 </tr>
@@ -161,7 +161,7 @@ export function MetaOAuthDiff() {
         )}
 
         {data && data.attempt_a && data.attempt_b && data.differing_fields.length === 0 && (
-          <p className="text-sm text-muted-foreground">{t('diagnostics.metaDiff.noDifference')}</p>
+          <p className="text-sm text-muted-foreground">{t('metaDiff.noDifference')}</p>
         )}
       </CardContent>
     </Card>
