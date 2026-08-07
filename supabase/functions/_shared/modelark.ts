@@ -26,10 +26,15 @@ export function modelArkApiKey(): string {
   return key;
 }
 
-/** Resource / endpoint id takes precedence over the public model id. */
+/**
+ * Endpoint id takes precedence over the public model id — but only when the
+ * configured resource id actually is an inference endpoint (`ep-…`). Any other
+ * account/resource identifier is ignored so we never send an invalid `model`.
+ */
 export function modelArkModelId(): string {
-  const resource = Deno.env.get("MODELARK_RESOURCE_ID");
-  return resource && resource.trim().length > 0 ? resource.trim() : SEEDANCE_25_MODEL_ID;
+  const resource = (Deno.env.get("MODELARK_RESOURCE_ID") ?? "").trim();
+  if (resource.startsWith("ep-")) return resource;
+  return SEEDANCE_25_MODEL_ID;
 }
 
 export type ModelArkTaskStatus =
