@@ -147,10 +147,10 @@ export function MultiReferenceUploader({
           <ImagePlus className="h-4 w-4 text-primary" />
           <Label className="text-sm font-medium">
             {language === 'de'
-              ? 'Multi-Reference (1–7 Bilder)'
+              ? `Multi-Reference (${rangeLabel} Bilder${required ? '' : ', optional'})`
               : language === 'es'
-              ? 'Multi-Referencia (1–7 imágenes)'
-              : 'Multi-Reference (1–7 images)'}
+              ? `Multi-Referencia (${rangeLabel} imágenes${required ? '' : ', opcional'})`
+              : `Multi-Reference (${rangeLabel} images${required ? '' : ', optional'})`}
           </Label>
           <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">
             {slots.length}/{maxReferences}
