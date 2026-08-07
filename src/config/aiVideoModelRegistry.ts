@@ -523,7 +523,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-seedance25-video',
     group: 'premium',
     icon: Video,
-    capabilities: { t2v: true, i2v: true, audio: false, multiRef: true, maxReferences: 30, endFrame: false },
+    capabilities: { t2v: true, i2v: true, audio: false, multiRef: true, maxReferences: 30, endFrame: true },
     durations: [5, 8, 10, 12, 15, 20, 25, 30],
     resolution: '720p',
     aspectRatios: sharedAspect,

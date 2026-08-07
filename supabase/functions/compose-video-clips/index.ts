@@ -4023,7 +4023,8 @@ serve(async (req) => {
             taskId = await createSeedance25Task({
               prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
               duration: seed25Duration,
-              resolution: quality === "pro" ? "1080p" : "720p",
+              // Seedance 2.5 tops out at 720p output (ModelArk docs).
+              resolution: "720p",
               aspectRatio: "16:9",
               firstFrameUrl: scene.referenceImageUrl ?? undefined,
               lastFrameUrl: scene.endReferenceImageUrl ?? undefined,
