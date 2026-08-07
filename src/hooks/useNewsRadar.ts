@@ -29,16 +29,20 @@ let fetchPromise: Promise<NewsItem[]> | null = null;
 
 async function fetchNewsFromBackend(language: string): Promise<NewsItem[]> {
   try {
+    const session = await ensureValidSession();
+    if (!session) return FALLBACK_NEWS;
+
     const { data, error } = await supabase.functions.invoke('fetch-news-radar', {
       body: { language }
     });
     if (error) throw error;
     return data?.news || FALLBACK_NEWS;
   } catch (e) {
-    console.error('News Radar: failed to fetch', e);
+    console.warn('News Radar: failed to fetch', e);
     return FALLBACK_NEWS;
   }
 }
+
 
 export function useNewsRadar() {
   const { language } = useTranslation();
