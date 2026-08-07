@@ -56,4 +56,4 @@ Im `oauth-callback` läuft für `instagram` die volle Seiten-Erkennung inklusive
 - `src/components/performance/FacebookPageSelectDialog.tsx` + `src/lib/translations.ts`: Leerzustand mit gemessenem Grund.
 - Keine Datenbank-Änderung.
 
-Ohne die Konfigurations-ID aus deiner Meta-App kann ich Punkt 1 nur vorbereiten, nicht scharf schalten — Punkte 2–4 wirken sofort.
+Punkte 2–4 wirken sofort und sind unabhängig von Meta. Für Punkt 1 brauche ich die Konfigurations-ID aus deiner App — die kann nur dort erzeugt werden; ich kann sie weder auslesen noch erfinden.
