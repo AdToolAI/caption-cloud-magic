@@ -303,7 +303,7 @@ export interface OverlayStyle {
   lineHeight?: number;
   align?: 'left' | 'center' | 'right';
   /** Flächenfarbe des Bausteins (Balken, Karte, Badge …). */
-  fill?: string;
+  fill?: string | null;
   /** Optionaler Verlauf für die Fläche. */
   gradient?: [string, string] | null;
   borderColor?: string;

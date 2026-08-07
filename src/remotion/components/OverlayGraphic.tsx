@@ -46,19 +46,28 @@ export const OverlayGraphic: React.FC<OverlayGraphicProps> = ({ overlay, t, dura
   const pad = (s.padding ?? 0.018) * W;
   const radius = (s.radius ?? 0.014) * W;
   const accent = s.accentColor || '#F5C76A';
-  const fill = s.fill ?? (s.backgroundColor && s.backgroundColor !== 'transparent' ? s.backgroundColor : 'rgba(0,0,0,0.72)');
+  // Eine ausdrücklich gewählte Fläche (neues `fill` oder Alt-Feld
+  // `backgroundColor`) gewinnt immer gegen den Verlauf der Vorlage.
+  const explicitFill =
+    s.fill != null && s.fill !== ''
+      ? s.fill
+      : s.backgroundColor != null && s.backgroundColor !== ''
+        ? s.backgroundColor
+        : null;
+  const fill = explicitFill ?? 'rgba(0,0,0,0.72)';
   const color = s.color || '#ffffff';
   const align = s.align ?? 'center';
   const shadow = s.shadow !== false ? '0 2px 12px rgba(0,0,0,0.55)' : undefined;
   const textShadow = s.shadow !== false ? '0 2px 8px rgba(0,0,0,0.85)' : undefined;
   const weight = s.fontWeight ?? 700;
   const upper = s.uppercase ?? false;
-  // Eine explizit gewählte Fläche schlägt den Verlauf der Vorlage.
-  const background = s.fill
-    ? fill
-    : s.gradient
-      ? `linear-gradient(135deg, ${s.gradient[0]}, ${s.gradient[1]})`
-      : fill;
+  const background =
+    explicitFill != null
+      ? explicitFill
+      : s.gradient
+        ? `linear-gradient(135deg, ${s.gradient[0]}, ${s.gradient[1]})`
+        : fill;
+
 
   const label = textContent(overlay, vis.visibleChars);
   const title = overlay.slots?.title ?? overlay.text ?? '';
@@ -194,7 +203,8 @@ export const OverlayGraphic: React.FC<OverlayGraphicProps> = ({ overlay, t, dura
           <div
             style={{
               ...panel,
-              background: s.fill || (s.gradient ? background : accent),
+              background: explicitFill ?? (s.gradient ? background : accent),
+
               borderRadius: '9999px',
               width: '100%',
               height: '100%',
@@ -259,7 +269,7 @@ export const OverlayGraphic: React.FC<OverlayGraphicProps> = ({ overlay, t, dura
           <div
             style={{
               ...panel,
-              background: s.fill || (s.gradient ? background : accent),
+              background: explicitFill ?? (s.gradient ? background : accent),
               borderRadius: '9999px',
               width: '100%',
               height: '100%',

@@ -1711,9 +1711,28 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               })),
             visible: subtitleTrack.visible,
           } : undefined,
+          // Text- und Grafik-Overlays (v407) müssen mit in den Render — ohne
+          // sie kam das Video "roh" (nur Schnitt/Ton) aus Lambda zurück.
+          text_overlays: showTextOverlays
+            ? (textOverlays || []).map((o, i) => ({
+                id: o.id ?? `overlay-${i}`,
+                text: o.text ?? '',
+                kind: o.kind ?? 'text',
+                startTime: Number(o.startTime ?? 0),
+                endTime: o.endTime != null ? Number(o.endTime) : undefined,
+                position: o.position,
+                box: o.box,
+                style: o.style,
+                slots: o.slots,
+                animation: o.animation,
+                enter: o.enter,
+                exit: o.exit,
+              }))
+            : [],
           // Render exactly the edited EDL length. Using the original videoDuration
           // here makes Remotion keep rendering the full source after trims/deletes.
           duration_seconds: actualTotalDuration,
+
         },
       });
 
@@ -1748,7 +1767,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setRenderStatus('failed');
       setRenderError(t('dc.exportCouldNotStart'));
     }
-  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, actualTotalDuration]);
+  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, showTextOverlays, textOverlays, startRenderPolling, actualTotalDuration]);
 
   // W4.2 CI-Preflight wrapper — runs consistency checks before invoking Lambda
   const [preflightOpen, setPreflightOpen] = useState(false);
