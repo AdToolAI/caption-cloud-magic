@@ -70,10 +70,6 @@ export const getPlanDetails = (plan: PlanId | null | undefined) => {
   return planConfig;
 };
 
-/**
- * Check if a plan has access to AI Video Generation
- */
-export const canUseAIVideoGeneration = (plan: PlanId | null | undefined): boolean => {
-  if (!plan) return false;
-  return plan === 'pro' || plan === 'enterprise';
-};
+/* `canUseAIVideoGeneration` entfernt (Beta 2026): die alte pro/enterprise-Regel
+   sperrte Beta-Basic- und Trial-Nutzer aus dem AI Video Studio aus. Zugang läuft
+   jetzt überall über `useTrialAccess()` (aktives Abo oder laufende Testphase). */
