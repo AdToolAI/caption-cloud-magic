@@ -11,7 +11,18 @@ Meta rendert Asset-Zeilen nur für Objekte, die das angemeldete Profil tatsächl
 
 Fazit, gemessen und nicht vermutet: Das ist **kein Fehler in unserer Plattform und keine App-Review-Sache**. Dem Facebook-Profil info@useadtool.ai sind schlicht keine Seiten und kein Business-Portfolio als Person zugeordnet. Die beiden Seiten hängen am Profil bestofproducts4u.
 
+## Betrifft das echte Kunden?
+
+Kurz: Der Normalfall funktioniert, der Sonderfall nicht — und der Sonderfall ist häufiger als er klingt.
+
+- **Kunde ist Seiten-Admin mit dem Profil, mit dem er sich einloggt** → Meta zeigt die Asset-Zeilen, Seitenauswahl klappt. Das ist der überwiegende Fall.
+- **Kunde loggt sich mit einem Profil ohne Seitenrechte ein** (zweites Privatprofil, Agentur-Mitarbeiter, frisch angelegtes Firmenprofil, Seite liegt im Portfolio des Chefs) → exakt dein Bild: drei generische Schalter, 0 Seiten. Bei Agenturen und Teams passiert das regelmäßig.
+- **Kunde hat nur "Redakteur"/"Nur Analyse"** → ebenfalls keine oder unvollständige Auswahl.
+
+Für den Kunden sieht das wie ein Produktfehler aus, weil wir "verbunden" melden und danach nichts passiert. Genau das ist unser Anteil daran — nicht die Meta-Konfiguration. Deshalb bleibt der Fix klein: nicht das OAuth reparieren (da ist nichts kaputt), sondern den Zustand ehrlich benennen und in zwei Sätzen zur Lösung führen.
+
 ## Was du bei Meta tun musst (das löst es)
+
 
 Eine der beiden Varianten:
 
