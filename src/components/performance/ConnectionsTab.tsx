@@ -1019,6 +1019,47 @@ export const ConnectionsTab = () => {
 
                     {connected && connection ? (
                       <div className="space-y-2 text-sm">
+                        {/* Meta returned no usable Page → honest finding instead of a silent "Connected" */}
+                        {provider.id === 'facebook' && (
+                          connection.account_metadata?.meta_pages_found_count === 0 ||
+                          (Array.isArray(connection.account_metadata?.missing_page_scopes) &&
+                            connection.account_metadata.missing_page_scopes.length > 0)
+                        ) && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800 space-y-2 mb-2 dark:bg-amber-950/30 dark:border-amber-800/50 dark:text-amber-200">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                              <div className="space-y-1">
+                                <p className="font-medium">{t('socialIntegrations.metaNoPagesTitle')}</p>
+                                <p>{t('socialIntegrations.metaNoPagesBody')}</p>
+                                {Array.isArray(connection.account_metadata?.missing_page_scopes) &&
+                                  connection.account_metadata.missing_page_scopes.length > 0 && (
+                                  <p className="font-mono">
+                                    {t('socialIntegrations.metaMissingScope', {
+                                      scopes: (connection.account_metadata.missing_page_scopes as string[]).join(', '),
+                                    })}
+                                  </p>
+                                )}
+                                <p>{t('socialIntegrations.metaResetConsentHint')}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open('https://www.facebook.com/settings?tab=applications', '_blank', 'noopener')}
+                              >
+                                {t('socialIntegrations.metaResetConsent')}
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleConnect(provider.id, provider.name, true)}
+                              >
+                                {t('performance.connections.connect')}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Instagram: legacy master-token migration banner */}
                         {provider.id === 'instagram' &&
                          connection.account_name === '@captiongenie_socialmanager' &&
