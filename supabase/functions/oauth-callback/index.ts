@@ -328,7 +328,7 @@ serve(async (req) => {
         auto_sync_enabled: true,
         last_sync_at: null,
         account_metadata: {
-          ...(provider === 'facebook' || provider === 'instagram' ? {
+          ...(provider === 'facebook' ? {
             meta_user_id: (accountInfo as any).meta_user_id || accountInfo.id,
             meta_user_name: (accountInfo as any).meta_user_name || accountInfo.name,
           } : {}),

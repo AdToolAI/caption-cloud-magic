@@ -115,7 +115,7 @@ export const ConnectionsTab = () => {
               const accountMetadata = asAccountMetadata(newConnection.account_metadata);
               const metaUserId = accountMetadata.meta_user_id;
               const pagesFound = accountMetadata.meta_pages_found_count;
-              const successDescription = (connected === 'facebook' || connected === 'instagram')
+              const successDescription = connected === 'facebook'
                 ? t('socialIntegrations.metaConnectedAs', {
                     name: String(accountMetadata.meta_user_name || newConnection.account_name || '—'),
                     id: maskMetaUserId(metaUserId || newConnection.account_id),
@@ -973,7 +973,7 @@ export const ConnectionsTab = () => {
                                 : connection.account_name}
                             </p>
                           )}
-                           {connected && connection && (provider.id === 'facebook' || provider.id === 'instagram') && (connection.account_metadata?.meta_user_id || connection.account_metadata?.selection_required) && (
+                           {connected && connection && provider.id === 'facebook' && (connection.account_metadata?.meta_user_id || connection.account_metadata?.selection_required) && (
                             <p className="text-[11px] text-muted-foreground/70">
                                {t('socialIntegrations.metaAccountId')}: {maskMetaUserId(connection.account_metadata?.meta_user_id || connection.account_id)}
                             </p>
