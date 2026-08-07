@@ -33,11 +33,13 @@ Deno.serve(async (req) => {
     }
 
     let returnTo: string | null = null;
+    let forceAccountChooser = false;
     let forReview = false;
     try {
       const body = await req.json();
       returnTo = body?.returnTo || null;
       forReview = !!body?.forReview;
+      forceAccountChooser = !!body?.forceAccountChooser;
     } catch (_) {
       // body optional
     }
@@ -192,7 +194,12 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set('auth_type', 'rerequest');
 
 
-    const finalAuthUrl = authUrl.toString();
+    const dialogUrl = authUrl.toString();
+    // Facebook remembers the profile in the browser session. Routing the user
+    // through login.php forces Facebook to show its own account chooser first.
+    const finalAuthUrl = forceAccountChooser
+      ? `https://www.facebook.com/login.php?next=${encodeURIComponent(dialogUrl)}`
+      : dialogUrl;
     console.log('[instagram-oauth-start] Authorize URL built', {
       user_id: user.id,
       forReview,
