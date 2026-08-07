@@ -487,7 +487,10 @@ export async function collectMetaPagesAllSources(userAccessToken: string): Promi
       extraIds.map((id) => fetchPageNode(id, userAccessToken))
     );
     for (const p of hydrated) {
-      if (p?.id && p.access_token) byId.set(String(p.id), p);
+      // Keep pages even when Meta withheld a page access token — dropping them
+      // here made "page exists but no token" indistinguishable from "no page".
+      if (p?.id) byId.set(String(p.id), p);
+
     }
   }
 
