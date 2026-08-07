@@ -76,6 +76,8 @@ export function MultiReferenceUploader({
   const [pendingRole, setPendingRole] = useState<ViduReferenceRole>('character');
 
   const isFull = slots.length >= maxReferences;
+  const rangeLabel = `${required ? 1 : 0}–${maxReferences}`;
+  const engine = modelLabel ?? 'Das Modell';
 
   const uploadFile = async (file: File, role: ViduReferenceRole) => {
     if (!user) {
