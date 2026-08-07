@@ -258,7 +258,11 @@ serve(async (req) => {
           const fbPerms = await fetchMetaPermissions(tokenData.access_token);
           (accountInfo as any).granted_scopes = fbPerms.granted;
           (accountInfo as any).declined_scopes = fbPerms.declined;
-          const fbRequired = ['pages_show_list', 'pages_read_engagement'];
+          // business_management is required whenever the Page sits inside a
+          // Business portfolio — without it /me/businesses returns (#100)
+          // and /me/accounts can come back empty.
+          const fbRequired = ['pages_show_list', 'pages_read_engagement', 'business_management'];
+
           (accountInfo as any).missing_page_scopes = fbRequired.filter((s) => !fbPerms.granted.includes(s));
         } catch (e) {
           console.warn('[oauth-callback] FB permission probe failed:', e);
