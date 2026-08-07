@@ -125,6 +125,11 @@ export const ConnectionsTab = () => {
               const accountMetadata = asAccountMetadata(newConnection.account_metadata);
               const metaUserId = accountMetadata.meta_user_id;
               const pagesFound = accountMetadata.meta_pages_found_count;
+              const missingScopes = Array.isArray(accountMetadata.missing_page_scopes)
+                ? (accountMetadata.missing_page_scopes as string[])
+                : [];
+              const metaIncomplete = connected === 'facebook'
+                && (pagesFound === 0 || missingScopes.length > 0);
               const successDescription = connected === 'facebook'
                 ? t('socialIntegrations.metaConnectedAs', {
                     name: String(accountMetadata.meta_user_name || newConnection.account_name || '—'),
@@ -132,10 +137,18 @@ export const ConnectionsTab = () => {
                     count: typeof pagesFound === 'number' ? pagesFound : '—',
                   })
                 : `Successfully connected to ${connected}`;
-              toast({
-                title: t('common.success'),
-                description: successDescription,
-              });
+              if (metaIncomplete) {
+                toast({
+                  title: t('socialIntegrations.metaNoPagesTitle'),
+                  description: `${successDescription} — ${t('socialIntegrations.metaNoPagesBody')}`,
+                  variant: 'destructive',
+                });
+              } else {
+                toast({
+                  title: t('common.success'),
+                  description: successDescription,
+                });
+              }
               await fetchConnections();
               
               // Auto-selected Instagram (single IG-capable page) → skip the
@@ -144,12 +157,16 @@ export const ConnectionsTab = () => {
               if (connected === 'instagram' && autoSelected) {
                 await handleSync(newConnection.id, connected);
               } else if (connected === 'facebook') {
-                // For Facebook AND Instagram (multi-page): show page selection dialog.
-                setPageSelectMode('facebook');
-                setShowPageSelectDialog(true);
+                // Nothing to pick when Meta returned no Page — the card now
+                // shows the honest finding plus the reset-consent action.
+                if (!metaIncomplete) {
+                  setPageSelectMode('facebook');
+                  setShowPageSelectDialog(true);
+                }
               } else if (connected === 'instagram') {
                 setPageSelectMode('instagram');
                 setShowPageSelectDialog(true);
+
               } else {
                 await handleSync(newConnection.id, connected);
               }
