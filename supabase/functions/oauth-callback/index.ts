@@ -6,6 +6,7 @@ import {
   discoverMetaPagesWithDiagnostics,
   type DiscoveryDiagnostics,
 } from '../_shared/meta-page-discovery.ts';
+import { measureMetaToken, recordOAuthCallback } from '../_shared/meta-oauth-diagnostics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
