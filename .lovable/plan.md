@@ -1,55 +1,30 @@
-# Seedance 2.5: Preise verifizieren und auflösungsabhängig abrechnen
+# AI Video Studio: Upgrade-Sperre entfernen
 
-## Was die Recherche ergeben hat
+## Befund
 
-Die offiziellen Preistabellen von BytePlus ModelArk und Volcengine Ark sind nicht öffentlich auslesbar (die Seiten laden ihre Inhalte erst im eingeloggten Browser). Verifizierbar war nur die offizielle Replicate-Listung des Modells `bytedance/seedance-2.5`:
+Die Seite `/n` (AI Video Studio / Toolkit) hat eine eigene, veraltete Plan-Sperre. Sie liest `plan_code` aus der `wallets`-Tabelle und lässt nur `pro` oder `enterprise` durch. Alles andere landet auf der Karte „Dieses Feature ist nur für Pro und Enterprise Nutzer verfügbar."
 
-| Variante | Auflösung | Preis pro Sekunde |
-|---|---|---|
-| ohne Video-Input | 480p | $0,1028 |
-| ohne Video-Input | 720p | $0,2312 |
-| mit Video-Input | 480p | $0,4304 |
-| mit Video-Input | 720p | $0,9676 |
+Das passt nicht mehr zum aktuellen Modell:
 
-Ebenfalls bestätigt: max. **30 Sekunden** pro Clip, Seitenverhältnisse 16:9, 4:3, 1:1, 3:4, 9:16, 21:9, adaptive.
+- Es gibt nur noch **Beta-Basic** (14,99 €) plus Trial. Ein Plan „pro" existiert nicht mehr.
+- In der Datenbank hat aktuell **kein einziges** Wallet den Wert `pro`: 50× `free`, 6× `enterprise`, 1× `basic`. Alle zahlenden Beta-Basic-Nutzer und alle Testnutzer werden also ausgesperrt.
+- Wer gar keine Wallet-Zeile hat, wird ebenfalls ausgesperrt, weil ein fehlender Wert als „kein Zugang" gilt.
+- Der Rest der App macht es längst anders: `useFeatureGate` und `useTrialAccess` sind auf „Zugang über aktives Abo oder laufende Testphase" umgestellt. Nur diese eine Seite hängt noch am alten System.
 
-Zwei Konsequenzen daraus:
+## Fix
 
-1. Unser aktueller Einkaufspreis von 0,18 $/s ist ein Mittelwert, der 480p zu teuer und 720p zu billig rechnet. Bei 720p mit Video-Referenz wären wir sogar deutlich unter Kosten.
-2. **Replicate bietet für Seedance 2.5 gar kein 1080p an** — nur 480p und 720p. Unsere Konfiguration verkauft aber 1080p. Ob ModelArk 1080p unterstützt, muss geprüft werden, bevor Kunden es auswählen können.
+- Die Plan-Sperre auf der AI-Video-Studio-Seite auf denselben Zugangsweg umstellen wie im Rest der App: **aktives Abo oder laufende Testphase = voller Zugang** (`useTrialAccess`). Enterprise-Nutzer behalten selbstverständlich Zugang.
+- Solange der Abo-Status noch geladen wird, keine Upgrade-Karte zeigen — sonst blitzt die Sperre beim Seitenaufruf kurz auf. Stattdessen ein neutraler Ladezustand.
+- Die Upgrade-Karte bleibt erhalten, greift aber nur noch für Nutzer ohne Abo und ohne aktive Testphase. Ihr Text wird auf das aktuelle Angebot angepasst („Beta-Basic" statt „Pro und Enterprise"), und der Button führt auf die Preisübersicht statt auf `/settings/plan`.
+- Die nun überflüssige `wallets`-Abfrage für den Plan-Check entfällt; das AI-Video-Guthaben (`useAIVideoWallet`) bleibt davon unberührt.
 
-## Schritt 1: Fakten aus deiner Konsole (dein Part, 5 Minuten)
+## Prüfung nach dem Fix
 
-In der ModelArk-Konsole (Region Johor):
-
-- **Model Marketplace → Dreamina Seedance 2.5 → Pricing/Billing**: Preis pro Sekunde je Auflösung notieren (bzw. Preis pro 1.000 Tokens, falls ModelArk so abrechnet — dann bitte auch die Token-pro-Sekunde-Angabe).
-- Auf derselben Seite: welche **Auflösungen** offiziell unterstützt werden (steht 1080p in der Liste?) und ob 30 s in jeder Auflösung erlaubt sind.
-
-Wenn dort nichts steht: Schritt 2 klärt es ohnehin empirisch.
-
-## Schritt 2: Zwei Testclips (ich, nach deiner Freigabe)
-
-- Ein 5-Sekunden-Clip in 720p und ein 5-Sekunden-Clip in 1080p über das Studio.
-- Der 1080p-Test zeigt sofort, ob ModelArk die Auflösung akzeptiert oder mit einem Fehler antwortet.
-- Danach in der Konsole unter Billing → Usage die tatsächlich abgerechneten Beträge ablesen. Das ergibt den echten Sekundenpreis, unabhängig von jeder Dokumentation.
-
-## Schritt 3: Preislogik auflösungsabhängig machen
-
-Statt eines Pauschalpreises pro Sekunde bekommt Seedance 2.5 gestaffelte Preise — so, wie es die realen Kosten auch sind:
-
-- Einkaufspreis je Auflösung (480p / 720p / ggf. 1080p) hinterlegen, mit den in Schritt 1–2 bestätigten Werten.
-- Verkaufspreis = Einkaufspreis × 3,00 (unsere übliche Marge).
-- Vorläufige Belegung bis zur Bestätigung, auf Basis der Replicate-Zahlen zzgl. Sicherheitsaufschlag: 480p 0,11 $/s, 720p 0,24 $/s. Damit ist keine Auflösung mehr unter Kosten.
-- Die Kreditanzeige im Studio und im Composer zeigt den Preis der gewählten Auflösung, nicht mehr einen Einheitspreis.
-
-## Schritt 4: 1080p absichern
-
-- Bestätigt ModelArk 1080p: Preis analog hinterlegen, Option bleibt.
-- Lehnt ModelArk 1080p ab: Auswahl auf 480p/720p reduzieren, damit niemand eine Generierung startet, die garantiert fehlschlägt. Bereits gebuchte Credits werden in dem Fall wie gewohnt automatisch erstattet.
+Kontrolle im Preview mit dem laufenden Konto: `/n` öffnet direkt das Studio, keine Upgrade-Karte, Guthabenanzeige und Generierungs-Tab sind erreichbar.
 
 ## Technische Details
 
-- `supabase/functions/_shared/videoPricingCatalog.ts`: Eintrag `seedance-2-5` von einem Skalarwert auf eine Auflösungs-Map umstellen (Fallback = teuerste Stufe, damit ein unbekannter Wert nie unter Kosten verkauft).
-- `src/config/seedanceVideoCredits.ts` und `src/config/aiVideoModelRegistry.ts`: gestaffelte Kreditberechnung, Auflösungsliste aus einer Quelle speisen.
-- `src/lib/video-composer/providerCapabilities.ts`: `ai-seedance25` erlaubt weiterhin 30 s; Auflösungsliste an das Ergebnis aus Schritt 2 angleichen.
-- Der Verifikationslauf nutzt `generate-seedance25-video` und den bereits live getesteten Poller `modelark-poll`; an der Pipeline selbst ändert sich nichts.
+- `src/pages/AIVideoToolkit.tsx`: `useQuery` auf `wallets.plan_code` und `canUseAIVideoGeneration` entfernen, stattdessen `useTrialAccess()` (`hasFullAccess`) plus Ladezustand aus `useAuth().subscribed`.
+- `src/lib/entitlements.ts`: `canUseAIVideoGeneration` hat danach keinen Aufrufer mehr — Funktion entfernen, damit die veraltete `pro`/`enterprise`-Regel nicht erneut irgendwo eingebunden wird.
+- `src/lib/translations.ts`: `aiVid.upgradeMessage` in DE/EN/ES auf das Beta-Basic-Angebot umformulieren.
+- Keine Änderungen an Backend, Credits oder Generierungslogik.
