@@ -1251,9 +1251,16 @@ export const ConnectionsTab = () => {
                     ) : (
                       <div className="space-y-2">
                         {provider.id === 'instagram' && <InstagramSetupChecklist />}
+                        {(provider.id === 'facebook' || provider.id === 'instagram') && (
+                          <div className="bg-muted/50 border border-border rounded-md p-3 text-xs text-muted-foreground flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                            <span>{t('socialIntegrations.metaPageSelectHint')}</span>
+                          </div>
+                        )}
                         <Button onClick={() => handleConnect(provider.id, provider.name)} className="w-full">
                           {t('performance.connections.connect')}
                         </Button>
+
                         {(provider.id === 'facebook' || provider.id === 'instagram') && (
                           <>
                             <Button
