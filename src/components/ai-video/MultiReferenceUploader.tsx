@@ -64,6 +64,8 @@ export function MultiReferenceUploader({
   slots,
   onChange,
   maxReferences = 7,
+  required = true,
+  modelLabel,
   brandCharacterUrl,
   brandCharacterName,
 }: Props) {
