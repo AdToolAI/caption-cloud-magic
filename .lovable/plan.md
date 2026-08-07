@@ -10,7 +10,7 @@ Bestätigt aus deinem Screenshot (docs.byteplus.com/en/docs/modelark/1520757):
 ## Was du Schritt für Schritt tun musst
 
 1. **BytePlus-Konto anlegen/einloggen**
-   Gehe auf https://console.byteplus.com/ark und melde dich an (bzw. registriere dich). ModelArk ist das internationale Pendant zu Volcengine Ark — dieses brauchen wir, weil der Endpoint `ark.ap-southeast.bytepluses.com` genau dazu gehört.
+   Gehe auf https://console.byteplus.com/ark und registriere dich. Bei „Sign up" → Country/Region **Germany** und **Business account** wählen (Personal hat einen eingeschränkten Produktkatalog, und der Kontotyp lässt sich später nicht mehr ändern). Firmenname, Adresse und USt-ID bereithalten. ModelArk ist das internationale Pendant zu Volcengine Ark — genau dazu gehört der Endpoint `ark.ap-southeast.bytepluses.com`.
 
 2. **Zahlungsmittel hinterlegen**
    In der Konsole unter „Billing" / „Payment" eine Kreditkarte hinterlegen. Ohne Guthaben liefert die API sofort einen Quota-Fehler zurück.
