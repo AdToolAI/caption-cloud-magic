@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureValidSession, isAuthLockError } from "@/lib/ensureSession";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Instagram, Facebook, Linkedin, Youtube, Twitter, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,13 @@ export const ConnectionsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { emit } = useEventEmitter();
+
+  /** Auth-Lock-Kollisionen nicht als Verbindungsfehler darstellen. */
+  const describeError = (error: any, fallback: string) =>
+    isAuthLockError(error)
+      ? t('socialIntegrations.sessionBusyRetry')
+      : (error?.message || fallback);
+
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
@@ -93,7 +101,9 @@ export const ConnectionsTab = () => {
         
         setTimeout(async () => {
           try {
-            const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+            const session = await ensureValidSession();
+            const sessionError = session ? null : new Error('no session');
+
             
             if (sessionError || !session) {
               console.error('❌ Session refresh failed:', sessionError);
@@ -299,7 +309,7 @@ export const ConnectionsTab = () => {
       // for Instagram so there is exactly ONE source of truth for IG OAuth.
       if (providerId === 'instagram') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           if (!session.session?.access_token) {
             toast({
               title: t('socialIntegrations.authRequired') || 'Auth required',
@@ -339,7 +349,7 @@ export const ConnectionsTab = () => {
           console.error('[ConnectionsTab] instagram-oauth-start failed:', error);
           toast({
             title: t('common.error'),
-            description: error?.message || 'Failed to start Instagram connection',
+            description: describeError(error, 'Failed to start Instagram connection'),
             variant: 'destructive',
           });
         }
@@ -350,7 +360,7 @@ export const ConnectionsTab = () => {
       // TikTok: Use new backend OAuth flow
       if (providerId === 'tiktok') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           const { data, error } = await supabase.functions.invoke('tiktok-oauth-start', {
             headers: {
               Authorization: `Bearer ${session.session?.access_token}`
@@ -369,7 +379,7 @@ export const ConnectionsTab = () => {
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || 'Failed to start TikTok connection',
+            description: describeError(error, 'Failed to start TikTok connection'),
             variant: 'destructive'
           });
         }
@@ -379,7 +389,7 @@ export const ConnectionsTab = () => {
       // X: Use new backend OAuth flow with PKCE
       if (providerId === 'x') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           const { data, error } = await supabase.functions.invoke('x-oauth-start', {
             headers: {
               Authorization: `Bearer ${session.session?.access_token}`
@@ -397,7 +407,7 @@ export const ConnectionsTab = () => {
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || 'Failed to start X connection',
+            description: describeError(error, 'Failed to start X connection'),
             variant: 'destructive'
           });
         }
@@ -407,7 +417,7 @@ export const ConnectionsTab = () => {
       // YouTube: backend OAuth start (client id from server secrets, offline access)
       if (providerId === 'youtube') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           if (!session.session?.access_token) {
             toast({
               title: t('socialIntegrations.authRequired') || 'Auth required',
@@ -429,7 +439,7 @@ export const ConnectionsTab = () => {
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error?.message || 'Failed to start YouTube connection',
+            description: describeError(error, 'Failed to start YouTube connection'),
             variant: 'destructive',
           });
         }
@@ -440,7 +450,7 @@ export const ConnectionsTab = () => {
       // Facebook: Use backend OAuth flow on Graph API v24 (v18 triggers Meta "Feature unavailable")
       if (providerId === 'facebook') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
             body: { returnTo: window.location.href, forceAccountChooser },
             headers: {
@@ -455,7 +465,7 @@ export const ConnectionsTab = () => {
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || 'Failed to start Facebook connection',
+            description: describeError(error, 'Failed to start Facebook connection'),
             variant: 'destructive',
           });
         }
@@ -539,7 +549,9 @@ export const ConnectionsTab = () => {
       // Special handling for TikTok and LinkedIn (Edge Functions)
       if (providerId === 'tiktok' || providerId === 'linkedin') {
         // Check for valid session before calling Edge Function
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const session = await ensureValidSession();
+        const sessionError = session ? null : new Error('no session');
+
         
         if (!session || sessionError) {
           console.error('No valid session for OAuth:', { sessionError, providerId });
@@ -565,7 +577,7 @@ export const ConnectionsTab = () => {
           
           toast({
             title: t('performance.connections.connectionFailed'),
-            description: error?.message || `Failed to initiate ${providerId} OAuth`,
+            description: describeError(error, `Failed to initiate ${providerId} OAuth`),
             variant: "destructive",
           });
           return;
@@ -587,7 +599,7 @@ export const ConnectionsTab = () => {
     } catch (error: any) {
       toast({
         title: t('common.error'),
-        description: error.message,
+        description: describeError(error, t('common.error')),
         variant: "destructive"
       });
     }
@@ -598,19 +610,11 @@ export const ConnectionsTab = () => {
     setSyncError(prev => ({ ...prev, [connectionId]: false }));
     
     try {
-      // Get session with explicit refresh if needed
-      let { data: { session } } = await supabase.auth.getSession();
-      
-      // If no session or token expired, try to refresh
-      if (!session || !session.access_token) {
-        console.log('⚠️ No valid session, attempting refresh...');
-        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-        
-        if (refreshError || !refreshedSession) {
-          throw new Error(t('socialIntegrations.notAuthenticated'));
-        }
-        
-        session = refreshedSession;
+      // Single-flight session lookup (verhindert Auth-Lock-Kollisionen)
+      const session = await ensureValidSession();
+
+      if (!session?.access_token) {
+        throw new Error(t('socialIntegrations.notAuthenticated'));
       }
 
       console.log('✅ Valid session obtained for sync');
@@ -757,7 +761,7 @@ export const ConnectionsTab = () => {
       } else {
         toast({
           title: t('common.error'),
-          description: error.message || t('socialIntegrations.syncFailed'),
+          description: describeError(error, t('socialIntegrations.syncFailed')),
           variant: "destructive"
         });
       }
@@ -777,7 +781,7 @@ export const ConnectionsTab = () => {
       // ig + fb rows so the next reconnect actually shows Meta's full consent
       // dialog instead of the cached "Continue as ..." short-circuit.
       if (connection?.provider === 'instagram' || connection?.provider === 'facebook') {
-        const { data: session } = await supabase.auth.getSession();
+        const session = { session: await ensureValidSession() };
         const { data: revokeData, error: revokeError } = await supabase.functions.invoke(
           'instagram-oauth-revoke',
           {
