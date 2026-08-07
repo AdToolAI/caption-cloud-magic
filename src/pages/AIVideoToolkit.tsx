@@ -40,22 +40,13 @@ import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
 
 export default function AIVideoToolkit() {
   useTrackPageFeature("ai_video_toolkit");
-  const { user } = useAuth();
+  const { user, subscribed } = useAuth();
+  const { hasFullAccess } = useTrialAccess();
   const { language, t } = useTranslation();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('generate');
   const currency: Currency = getCurrencyForLanguage(language);
-
-  /* Plan gate */
-  const { data: userWallet } = useQuery({
-    queryKey: ['user-wallet', user?.id],
-    queryFn: async () => {
-      const { data } = await supabase.from('wallets').select('plan_code').eq('user_id', user!.id).single();
-      return data;
-    },
-    enabled: !!user,
-  });
 
   /* Stripe purchase confirmation */
   useEffect(() => {
@@ -73,7 +64,23 @@ export default function AIVideoToolkit() {
 
   const handleAfterGenerate = useCallback(() => setActiveTab('history'), []);
 
-  if (!canUseAIVideoGeneration(userWallet?.plan_code as PlanId)) {
+  /* Access gate — Beta 2026: aktives Abo ODER laufende Testphase.
+     Solange der Abo-Status noch lädt (`subscribed === undefined`/`null`),
+     zeigen wir keine Upgrade-Karte, damit sie nicht kurz aufblitzt. */
+  const subscriptionResolved = subscribed !== undefined && subscribed !== null;
+
+  if (user && !subscriptionResolved && !hasFullAccess) {
+    return (
+      <div className="container mx-auto p-8">
+        <Card className="p-12 text-center text-muted-foreground">
+          <Sparkles className="w-10 h-10 mx-auto mb-4 animate-pulse opacity-60" />
+          AI Video Studio…
+        </Card>
+      </div>
+    );
+  }
+
+  if (!hasFullAccess) {
     return (
       <>
         <Helmet><title>AI Video Toolkit | {t('aiVid.upgradeRequired')}</title></Helmet>
@@ -82,12 +89,13 @@ export default function AIVideoToolkit() {
             <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-2xl font-bold mb-2">AI Video Toolkit</h2>
             <p className="text-muted-foreground mb-6">{t('aiVid.upgradeMessage')}</p>
-            <Link to="/settings/plan"><Button>{t('aiVid.upgradeNow')}</Button></Link>
+            <Link to="/#pricing"><Button>{t('aiVid.upgradeNow')}</Button></Link>
           </Card>
         </div>
       </>
     );
   }
+
 
   const subtitle = language === 'de'
     ? 'Ein Prompt. Alle Top-Modelle. Wechsle Anbieter ohne Kontextwechsel.'
