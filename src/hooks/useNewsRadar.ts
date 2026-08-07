@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureValidSession } from "@/lib/ensureSession";
 import { useTranslation } from "@/hooks/useTranslation";
 
 export interface NewsItem {
