@@ -19246,6 +19246,13 @@ Object.assign(translations.de, {
     metaAccountId: 'Facebook-Nutzer-ID',
     metaPagesForToken: '{count} Seiten für diesen Meta-Token sichtbar',
     metaConnectedAs: 'Verbunden als {name} · Meta-ID {id} · {count} Seiten gefunden',
+    metaNoPagesTitle: 'Verbunden, aber Meta hat keine Seite mitgegeben',
+    metaNoPagesBody: 'Meta hat diesem Zugriff keine Seite zugeordnet. Meist wurden im Schritt „Welche Seiten möchtest du verwenden?" keine Seiten angehakt oder die Berechtigung für Business-Portfolios wurde nicht erteilt.',
+    metaMissingScope: 'Fehlende Berechtigung: {scopes}',
+    metaResetConsent: 'Zustimmung zurücksetzen und neu verbinden',
+    metaResetConsentHint: 'Schritt 1: In Facebook unter Einstellungen → Apps und Websites die App „AdTool AI" entfernen. Schritt 2: Zurückkommen und erneut verbinden — Meta zeigt dann den vollständigen Dialog inklusive Seitenauswahl.',
+    metaPageSelectHint: 'Wichtig: Im Meta-Dialog im Schritt „Welche Seiten möchtest du verwenden?" die Seiten anhaken. Ein „Weiter" ohne Auswahl führt zu 0 Seiten.',
+
     syncNow: 'Jetzt synchronisieren',
     followers: 'Follower',
     posts: 'Posts',
