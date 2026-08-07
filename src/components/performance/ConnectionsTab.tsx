@@ -349,7 +349,7 @@ export const ConnectionsTab = () => {
           console.error('[ConnectionsTab] instagram-oauth-start failed:', error);
           toast({
             title: t('common.error'),
-            description: error?.message || 'Failed to start Instagram connection',
+            description: describeError(error, 'Failed to start Instagram connection'),
             variant: 'destructive',
           });
         }
@@ -379,7 +379,7 @@ export const ConnectionsTab = () => {
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || 'Failed to start TikTok connection',
+            description: describeError(error, 'Failed to start TikTok connection'),
             variant: 'destructive'
           });
         }
@@ -407,7 +407,7 @@ export const ConnectionsTab = () => {
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || 'Failed to start X connection',
+            description: describeError(error, 'Failed to start X connection'),
             variant: 'destructive'
           });
         }
@@ -439,7 +439,7 @@ export const ConnectionsTab = () => {
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error?.message || 'Failed to start YouTube connection',
+            description: describeError(error, 'Failed to start YouTube connection'),
             variant: 'destructive',
           });
         }
@@ -465,7 +465,7 @@ export const ConnectionsTab = () => {
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || 'Failed to start Facebook connection',
+            description: describeError(error, 'Failed to start Facebook connection'),
             variant: 'destructive',
           });
         }
@@ -577,7 +577,7 @@ export const ConnectionsTab = () => {
           
           toast({
             title: t('performance.connections.connectionFailed'),
-            description: error?.message || `Failed to initiate ${providerId} OAuth`,
+            description: describeError(error, `Failed to initiate ${providerId} OAuth`),
             variant: "destructive",
           });
           return;
@@ -761,7 +761,7 @@ export const ConnectionsTab = () => {
       } else {
         toast({
           title: t('common.error'),
-          description: error.message || t('socialIntegrations.syncFailed'),
+          description: describeError(error, t('socialIntegrations.syncFailed')),
           variant: "destructive"
         });
       }
