@@ -203,7 +203,8 @@ export const OverlayGraphic: React.FC<OverlayGraphicProps> = ({ overlay, t, dura
           <div
             style={{
               ...panel,
-              background: s.fill || (s.gradient ? background : accent),
+              background: explicitFill ?? (s.gradient ? background : accent),
+
               borderRadius: '9999px',
               width: '100%',
               height: '100%',
