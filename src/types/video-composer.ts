@@ -26,6 +26,8 @@ export type ClipSource =
   | 'ai-sora'
   | 'ai-wan'
   | 'ai-seedance'
+  | 'ai-seedance25'
+
   | 'ai-luma'
   | 'ai-veo'
   | 'ai-runway'
@@ -971,6 +973,7 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
   'ai-sora':     { de: 'KI (Sora)', en: 'AI (Sora)' },
   'ai-wan':      { de: 'KI (Wan 2.5)', en: 'AI (Wan 2.5)' },
   'ai-seedance': { de: 'KI (Seedance)', en: 'AI (Seedance)' },
+  'ai-seedance25': { de: 'KI (Seedance 2.5) ⏱', en: 'AI (Seedance 2.5) ⏱' },
   'ai-luma':     { de: 'KI (Luma Ray 2)', en: 'AI (Luma Ray 2)' },
   'ai-veo':      { de: 'KI (Veo 3.1) 🎵', en: 'AI (Veo 3.1) 🎵' },
   'ai-runway':   { de: 'KI (Runway Gen-4 V2V)', en: 'AI (Runway Gen-4 V2V)' },
@@ -994,6 +997,9 @@ export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> 
   'ai-sora':     { standard: 0.60, pro: 1.35 },
   'ai-wan':      { standard: 0.12, pro: 0.21 },
   'ai-seedance': { standard: 0.09, pro: 0.18 }, // Mini = 0.06 (see registry)
+  // Seedance 2.5 (ModelArk direkt) — 3.00× Marge, bis 30 s pro Szene
+  'ai-seedance25': { standard: 0.54, pro: 0.54 },
+
   'ai-luma':     { standard: 0.21, pro: 0.36 },
   // Veo 3.1: standard = Lite 720p, pro = Pro 1080p
   'ai-veo':      { standard: 0.45, pro: 3.30 },
@@ -1017,6 +1023,7 @@ export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   'ai-sora':     { standard: 'Standard',      pro: 'Pro' },
   'ai-wan':      { standard: 'Standard 720p', pro: 'Pro 1080p' },
   'ai-seedance': { standard: 'Standard 720p', pro: 'Pro 1080p' },
+  'ai-seedance25': { standard: 'Seedance 2.5 720p', pro: 'Seedance 2.5 1080p' },
   'ai-luma':     { standard: 'Ray 2 720p',    pro: 'Ray 2 720p+' },
   'ai-veo':      { standard: 'Lite 720p +Audio', pro: 'Pro 1080p +Audio' },
   'ai-runway':   { standard: 'Aleph 720p',        pro: 'Aleph 720p' },

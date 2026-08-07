@@ -94,6 +94,25 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     enabled: !!user
   });
 
+  /**
+   * Seedance 2.5 runs on ByteDance ModelArk, which has no webhook. If a job is
+   * still "processing", nudge the poller so the row gets finalized even when a
+   * background task on the server was cut short.
+   */
+  useEffect(() => {
+    const pending = (generations ?? []).filter(
+      (g) => (g.status === 'processing' || g.status === 'pending') && g.model === 'seedance-2-5',
+    );
+    if (pending.length === 0) return;
+    const kick = () => {
+      supabase.functions.invoke('modelark-poll', { body: {} }).catch(() => {});
+    };
+    kick();
+    const id = window.setInterval(kick, 20000);
+    return () => window.clearInterval(id);
+  }, [generations]);
+
+
   useEffect(() => {
     if (!user) return;
     const channel = supabase

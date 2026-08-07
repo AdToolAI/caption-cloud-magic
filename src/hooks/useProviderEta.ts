@@ -32,6 +32,7 @@ const PROVIDER_ETA: Record<string, ProviderEtaConfig> = {
   'ai-sora':       { base: 40, perSecond: 8,  proMultiplier: 1.6, tint: '0 0% 95%',    label: 'Sora 2' },
   'ai-wan':        { base: 25, perSecond: 5,  proMultiplier: 1.4, tint: '195 85% 60%', label: 'Wan' },
   'ai-seedance':   { base: 20, perSecond: 4,  proMultiplier: 1.3, tint: '25 90% 60%',  label: 'Seedance' },
+  'ai-seedance25': { base: 35, perSecond: 6,  proMultiplier: 1.0, tint: '25 95% 65%',  label: 'Seedance 2.5' },
   'ai-luma':       { base: 30, perSecond: 6,  proMultiplier: 1.4, tint: '320 80% 65%', label: 'Luma Ray' },
   'ai-veo':        { base: 45, perSecond: 8,  proMultiplier: 1.5, tint: '140 70% 55%', label: 'Veo' },
   'ai-runway':     { base: 50, perSecond: 10, proMultiplier: 1.4, tint: '15 90% 60%',  label: 'Runway' },

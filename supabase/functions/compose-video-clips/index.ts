@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { beginSceneRun } from "../_shared/scene-run-begin.ts";
 import { CLIP_COSTS, type ClipQuality } from "../_shared/clip-costs.ts";
+import { createSeedance25Task, MODELARK_JOB_PREFIX } from "../_shared/modelark.ts";
 import {
   countDialogSpeakers,
   stripSpeakerPrefixes,
@@ -3998,7 +3999,82 @@ serve(async (req) => {
             status: "generating",
             predictionId: prediction.id,
           });
+        } else if (scene.clipSource === "ai-seedance25") {
+          // ─── Seedance 2.5 via BytePlus ModelArk (direct API, no Replicate) ───
+          // Long-form: up to 30 s per scene. ModelArk has no webhook, so the
+          // task id is stored with a `modelark:` prefix and finalized by the
+          // `modelark-poll` edge function (which calls compose-clip-webhook
+          // with a Replicate-shaped payload, reusing all downstream logic).
+          const isI2V = !!scene.referenceImageUrl;
+          const seed25Duration = Math.max(3, Math.min(30, Math.round(scene.durationSeconds)));
+
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update({
+              clip_status: "generating",
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim("ai-seedance", isI2V),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", scene.id);
+
+          let taskId: string;
+          try {
+            taskId = await createSeedance25Task({
+              prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+              duration: seed25Duration,
+              resolution: quality === "pro" ? "1080p" : "720p",
+              aspectRatio: "16:9",
+              firstFrameUrl: scene.referenceImageUrl ?? undefined,
+              lastFrameUrl: scene.endReferenceImageUrl ?? undefined,
+            });
+          } catch (arkErr: any) {
+            console.error(
+              `[compose-video-clips] Seedance 2.5 scene ${scene.id} failed:`,
+              arkErr,
+            );
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({
+                clip_status: "failed",
+                clip_error: String(arkErr?.message ?? "ModelArk error").slice(0, 500),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", scene.id);
+            results.push({
+              sceneId: scene.id,
+              status: "failed",
+              error: String(arkErr?.message ?? "ModelArk error").slice(0, 300),
+            });
+            continue;
+          }
+
+          console.log(
+            `[compose-video-clips] Seedance 2.5 scene ${scene.id}: ModelArk task ${taskId} (${seed25Duration}s)`,
+          );
+
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update({ replicate_prediction_id: `${MODELARK_JOB_PREFIX}${taskId}` })
+            .eq("id", scene.id);
+
+          // Kick the poller so completion does not depend on client polling.
+          void fetch(`${supabaseUrl}/functions/v1/modelark-poll`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
+            },
+            body: JSON.stringify({ sceneId: scene.id }),
+          }).catch(() => {});
+
+          results.push({
+            sceneId: scene.id,
+            status: "generating",
+            predictionId: taskId,
+          });
         } else if (scene.clipSource === "ai-luma") {
+
           // Luma Ray 2 via Replicate — supports start_image
           const isI2V = !!scene.referenceImageUrl;
           await supabaseAdmin

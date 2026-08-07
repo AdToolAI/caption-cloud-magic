@@ -20,6 +20,7 @@ export type ClipSource =
   | 'ai-veo'
   | 'ai-wan'
   | 'ai-seedance'
+  | 'ai-seedance25'
   | 'ai-luma'
   | 'ai-ltx'
   | 'ai-sora'
@@ -96,6 +97,15 @@ export const PROVIDER_CAPS: Record<string, ProviderCapability> = {
     multiSpeaker: false,
     label: 'Seedance',
   },
+  'ai-seedance25': {
+    // ModelArk direct API — long-form scenes up to 30 s.
+    durations: [5, 8, 10, 12, 15, 20, 25, 30],
+    lipsync: false,
+    multiSpeaker: false,
+    startEndFrames: true,
+    label: 'Seedance 2.5',
+  },
+
   'ai-luma': {
     durations: [5, 9],
     lipsync: false,
