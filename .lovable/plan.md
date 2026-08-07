@@ -1,32 +1,32 @@
-# Messdurchgang: zwei Meta-Profile sauber gegeneinander stellen
+# Fehler „Lock … auth-token was released because another request stole it" beim Facebook-Verbinden
 
-## Warum ein erneutes Verbinden nötig ist
+## Was der Fehler bedeutet
 
-Die Diagnose-Zeilen (`meta_oauth_diagnostics`) entstehen ausschließlich beim Start und beim Callback eines Verbindungsversuchs. Bereits gespeicherte Verbindungen liefern die neuen Felder (Meta-Profil-ID, gefundene Seitenzahl, granulare Scopes) nicht nachträglich. Ohne frischen Connect pro Profil gibt es also keine vergleichbare A- und B-Seite.
+Das ist kein Facebook- und kein Berechtigungsfehler. Die Meldung stammt aus der Auth-Bibliothek im Browser: Mehrere Stellen der Seite fragen **gleichzeitig** die Sitzung ab bzw. erneuern sie. Der interne Sperrmechanismus (Web Lock auf den Auth-Token) bricht den langsameren Aufruf ab und wirft genau diesen Text.
 
-Zusätzlich entscheidend: Welches Facebook-Profil verbunden wird, bestimmt die Facebook-Browser-Session, nicht das AdTool-Konto. Die letzten Messungen zeigten deshalb für beide AdTool-Konten dieselbe Meta-User-ID.
+Belegt aus dem Code: Auf der Verbindungsseite gibt es allein in `ConnectionsTab.tsx` neun Stellen mit `getSession()` bzw. `refreshSession()` (Zeilen 96, 302, 353, 382, 410, 443, 542, 602, 780). Parallel dazu ruft das Diff-Panel `ensureValidSession()` auf, das selbst `getSession` + `getUser` + ggf. `refreshSession` ausführt. Beim Klick auf „Verbinden" startet zusätzlich eine Sitzungserneuerung — die Kollision ist damit erwartbar.
 
-## Ablauf (du)
+Nicht belegt: dass dadurch die Verbindung selbst fehlschlägt. In der Regel wird nur der Toast angezeigt, während der eigentliche Ablauf weiterläuft oder abbricht, bevor die Weiterleitung startet.
 
-1. Durchgang A
-   - In AdTool mit Konto A anmelden.
-   - Unter Verbindungen „Mit anderem Facebook-Konto verbinden" nutzen und im Meta-Fenster ausdrücklich Profil A wählen.
-   - Nach dem Rücksprung prüfen: die Karte zeigt Name + maskierte Meta-Profil-ID + Anzahl gefundener Seiten.
-2. Durchgang B
-   - Privates Browserfenster öffnen (zuverlässigster Weg gegen Meta-Cookies).
-   - Mit Konto B in AdTool anmelden, erneut „Mit anderem Facebook-Konto verbinden", diesmal Profil B wählen.
-   - Wieder Meta-Profil-ID und Seitenzahl auf der Karte ablesen.
-3. Abnahme
-   - „Vergleich laden" im Diff-Panel drücken. Erwartung: zwei **unterschiedliche** Meta-User-IDs.
-   - Zeigt die Karte in beiden Durchgängen dieselbe ID, war der Profilwechsel bei Meta nicht wirksam — dann Durchgang B im privaten Fenster wiederholen.
+## Umsetzung
 
-## Auswertung danach
+1. **Sitzungsabfrage bündeln (Single-Flight)**
+   - `src/lib/ensureSession.ts` um eine gemeinsam genutzte, laufende Promise erweitern: parallele Aufrufer bekommen dasselbe Ergebnis, statt jeweils eigene Token-Erneuerungen zu starten.
+   - Lock-Fehler (`Lock ... was released`, `Navigator LockManager`) werden erkannt und als „bitte kurz erneut versuchen" behandelt — mit einem einzigen automatischen Wiederholungsversuch statt einer Fehlermeldung.
 
-- Unterschiedliche Meta-IDs, Profil B mit 0 Seiten und leeren `granular_scopes.target_ids` → Meta bindet diesem Profil keine Seiten-Assets an den Token; die Spur liegt auf Asset-/Portfolio-Ebene, nicht im Code.
-- Profil B mit `target_ids`, aber `/me/accounts` leer → Fehler in unserer Seitenerkennung; Fix: IDs aus dem Token-Debug direkt hydrieren.
-- Beide Profile identisch und funktionierend → der ursprüngliche Fehlerfall war ein Session-Verwechsler, kein Plattformfehler.
+2. **Verbindungsseite auf den gemeinsamen Helfer umstellen**
+   - Alle direkten `getSession()`/`refreshSession()`-Aufrufe in `ConnectionsTab.tsx` durch `ensureValidSession()` ersetzen, damit auf dieser Seite nur noch ein Auth-Zugriff gleichzeitig läuft.
+   - Kein zusätzliches `refreshSession()` unmittelbar vor dem OAuth-Start; der Helfer erneuert nur, wenn wirklich nötig.
+
+3. **Fehler nicht mehr fälschlich als Verbindungsfehler anzeigen**
+   - Im Fehler-Toast der Verbindungsaktionen Lock-Meldungen abfangen und stattdessen einen verständlichen Hinweis zeigen („Sitzung wurde gerade aktualisiert — bitte erneut auf Verbinden klicken"), statt der technischen Bibliotheksmeldung.
+
+4. **Abnahme**
+   - Verbindungsseite öffnen, während das Diff-Panel geladen ist, und „Mit anderem Facebook-Konto verbinden" klicken: es darf kein Lock-Toast mehr erscheinen und die Weiterleitung zu Facebook muss starten.
 
 ## Technische Details
 
-- Keine Code-Änderung in diesem Schritt; die Messung nutzt die bereits deployten Funktionen `facebook-oauth-start`, `oauth-callback` und `meta-oauth-diff`.
-- Der Fix folgt erst nach dem Befund und richtet sich nach genau einem der drei Auswertungsfälle.
+- `src/lib/ensureSession.ts`: modul-globale `inFlight`-Promise, Lock-Fehlererkennung, ein Retry mit kurzem Backoff, Rückgabe wie bisher (`Session | null`).
+- `src/components/performance/ConnectionsTab.tsx`: neun Auth-Aufrufe auf `ensureValidSession()` vereinheitlichen; Fehlerbehandlung in `handleConnect`/`handleSync` um die Lock-Ausnahme ergänzen.
+- `src/lib/translations.ts`: neuer Hinweistext DE/EN/ES.
+- Keine Änderung an Edge Functions, Scopes oder der Datenbank.
