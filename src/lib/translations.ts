@@ -18270,7 +18270,7 @@ Object.assign(translations.es, {
     pageSubtitle: 'Genera videos profesionales con Sora 2',
     metaDesc: 'Genera videos profesionales con IA usando Sora 2. Crea videos de hasta 30 segundos con la más alta calidad.',
     upgradeRequired: 'Actualización necesaria',
-    upgradeMessage: 'Esta función solo está disponible para usuarios Pro y Enterprise.',
+    upgradeMessage: 'Esta función está incluida en el plan Beta-Basic. Inicia la prueba o activa tu suscripción para desbloquearla.',
     upgradeNow: 'Actualizar ahora',
     yourBalance: 'Tu saldo',
     buyCredits: 'Comprar créditos',
