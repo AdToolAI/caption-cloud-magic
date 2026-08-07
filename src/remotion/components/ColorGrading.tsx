@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import type { ColorGradingPreset } from '@/types/video-composer';
+import type { ColorGradingPreset } from '../../types/video-composer';
 
 interface ColorGradingProps {
   preset: ColorGradingPreset;

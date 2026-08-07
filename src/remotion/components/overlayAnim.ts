@@ -4,7 +4,7 @@
  * Wird identisch von der Studio-Vorschau (DOM) und vom Remotion-Export
  * benutzt, damit Vorschau und Render pixelgleich laufen.
  */
-import type { OverlayAnimation } from '@/types/directors-cut';
+import type { OverlayAnimation } from '../../types/directors-cut';
 
 export const OVERLAY_ENTER_SECONDS: Partial<Record<OverlayAnimation, number>> = {
   fadeIn: 0.6,

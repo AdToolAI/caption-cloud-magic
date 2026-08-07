@@ -1,6 +1,6 @@
 import React from 'react';
 import { Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
-import type { TextOverlay } from '@/types/directors-cut';
+import type { TextOverlay } from '../../types/directors-cut';
 import { OverlayGraphic } from './OverlayGraphic';
 
 /**
