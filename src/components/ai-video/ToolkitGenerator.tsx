@@ -679,9 +679,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         body.referenceVideoUrl = referenceVideoUrl;
         body.videoReferenceType = videoReferenceType;
       }
-      // multi-ref: Vidu Q2 Reference2V — 1–7 reference images with roles
+      // multi-ref: reference images with roles.
+      //  - Vidu Reference2V: at least 1 image is mandatory, field `referenceImages`.
+      //  - Seedance 2.5 (ModelArk): optional, field `referenceImageUrls`.
       if (model.capabilities.multiRef) {
-        if (viduReferences.length === 0) {
+        if (model.capabilities.multiRefRequired && viduReferences.length === 0) {
           toast.error(
             language === 'de'
               ? 'Bitte mindestens 1 Referenzbild hinzufügen.'
@@ -690,8 +692,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           setGenerating(false);
           return;
         }
-        body.referenceImages = viduReferences.map((s) => s.url);
-        body.referenceRoles = viduReferences.map((s) => s.role);
+        if (viduReferences.length > 0) {
+          const urls = viduReferences.map((s) => s.url);
+          if (model.capabilities.multiRefRequired) {
+            body.referenceImages = urls;
+            body.referenceRoles = viduReferences.map((s) => s.role);
+          } else {
+            body.referenceImageUrls = urls;
+          }
+        }
       } else if (composedSubjectRefs && composedSubjectRefs.length > 0 && !body.referenceImages) {
         // Subject-reference providers (non-Vidu path is rare, but keep it symmetric).
         // Do not overwrite the composed character anchor if it was already routed above.
@@ -960,12 +969,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Card>
       )}
 
-      {/* ── Multi-Reference (only for capabilities.multiRef → Vidu Q2 Reference2V) ── */}
+      {/* ── Multi-Reference (capabilities.multiRef → Vidu Reference2V, Seedance 2.5) ── */}
       {model.capabilities.multiRef && !omniMediaLock && (
         <MultiReferenceUploader
           slots={viduReferences}
           onChange={setViduReferences}
           maxReferences={model.capabilities.maxReferences ?? 7}
+          required={!!model.capabilities.multiRefRequired}
+          modelLabel={model.name}
           brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
           brandCharacterName={brandCharacter?.name ?? null}
         />

@@ -90,9 +90,20 @@ export async function createSeedance25Task(params: CreateSeedance25Params): Prom
     seed,
   } = params;
 
+  // ── Provider contract (ModelArk docs, verified 07.08.2026) ──
+  // 1. Seedance 2.5 output resolution supports 480p and 720p only —
+  //    1080p / 4K are rejected. Anything higher is clamped to 720p.
+  // 2. Duration range is 4–30 s.
+  // 3. The three input modes — first-frame, first+last-frame and
+  //    multimodal reference — are mutually exclusive and must not be mixed.
+  const safeResolution = resolution === "480p" ? "480p" : "720p";
+  const safeDuration = Math.max(4, Math.min(30, Math.round(duration)));
+  const refs = (referenceImageUrls ?? []).filter(Boolean).slice(0, 30);
+  const useReferenceMode = refs.length > 0;
+
   const directives = [
-    `--resolution ${resolution}`,
-    `--duration ${Math.round(duration)}`,
+    `--resolution ${safeResolution}`,
+    `--duration ${safeDuration}`,
     `--ratio ${aspectRatio}`,
     `--watermark ${noWatermark ? "false" : "true"}`,
   ];
@@ -102,14 +113,17 @@ export async function createSeedance25Task(params: CreateSeedance25Params): Prom
     { type: "text", text: `${prompt.trim()} ${directives.join(" ")}`.trim() },
   ];
 
-  if (firstFrameUrl) {
-    content.push({ type: "image_url", image_url: { url: firstFrameUrl }, role: "first_frame" });
-  }
-  if (lastFrameUrl) {
-    content.push({ type: "image_url", image_url: { url: lastFrameUrl }, role: "last_frame" });
-  }
-  for (const ref of referenceImageUrls ?? []) {
-    if (ref) content.push({ type: "image_url", image_url: { url: ref }, role: "reference_image" });
+  if (useReferenceMode) {
+    for (const ref of refs) {
+      content.push({ type: "image_url", image_url: { url: ref }, role: "reference_image" });
+    }
+  } else {
+    if (firstFrameUrl) {
+      content.push({ type: "image_url", image_url: { url: firstFrameUrl }, role: "first_frame" });
+    }
+    if (firstFrameUrl && lastFrameUrl) {
+      content.push({ type: "image_url", image_url: { url: lastFrameUrl }, role: "last_frame" });
+    }
   }
 
   const res = await fetch(`${MODELARK_BASE_URL}/contents/generations/tasks`, {

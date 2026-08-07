@@ -55,6 +55,12 @@ export interface ToolkitModel {
     /** Max number of reference images supported when multiRef is true. */
     maxReferences?: number;
     /**
+     * True when the model CANNOT generate without at least one reference image
+     * (Vidu Reference2V). Models that also support plain text-to-video leave
+     * this false so references stay optional.
+     */
+    multiRefRequired?: boolean;
+    /**
      * Native dialogue: model generates video + speech + lip-sync in a single
      * pass. Required for the Composer's Dialog/Lip-Sync mode (Artlist-style).
      * Set true only for models that produce in-frame synchronous mouth
@@ -517,13 +523,13 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-seedance25-video',
     group: 'premium',
     icon: Video,
-    capabilities: { t2v: true, i2v: true, audio: false, multiRef: true, maxReferences: 4, endFrame: false },
+    capabilities: { t2v: true, i2v: true, audio: false, multiRef: true, maxReferences: 30, endFrame: true },
     durations: [5, 8, 10, 12, 15, 20, 25, 30],
-    resolution: '1080p',
+    resolution: '720p',
     aspectRatios: sharedAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
     badge: 'Neu',
-    tagline: 'Seedance 2.5 · bis 30 s pro Szene · 1080p',
+    tagline: 'Seedance 2.5 · bis 30 s pro Szene · 720p',
     legacyRoute: '/seedance-video-studio',
   },
 
@@ -597,7 +603,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'recommended',
     icon: Eye,
-    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7, anchorOnly: true },
+    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7, multiRefRequired: true, anchorOnly: true },
     durations: [5],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],

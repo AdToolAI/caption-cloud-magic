@@ -43,6 +43,10 @@ interface Props {
   slots: ViduReferenceSlot[];
   onChange: (slots: ViduReferenceSlot[]) => void;
   maxReferences?: number;
+  /** True when the active model cannot generate without at least one reference. */
+  required?: boolean;
+  /** Model name shown in the helper copy (defaults to a neutral wording). */
+  modelLabel?: string;
   /** Optional: URL of the active Brand Character to offer "Load from Lock". */
   brandCharacterUrl?: string | null;
   brandCharacterName?: string | null;
@@ -60,6 +64,8 @@ export function MultiReferenceUploader({
   slots,
   onChange,
   maxReferences = 7,
+  required = true,
+  modelLabel,
   brandCharacterUrl,
   brandCharacterName,
 }: Props) {
@@ -70,6 +76,8 @@ export function MultiReferenceUploader({
   const [pendingRole, setPendingRole] = useState<ViduReferenceRole>('character');
 
   const isFull = slots.length >= maxReferences;
+  const rangeLabel = `${required ? 1 : 0}–${maxReferences}`;
+  const engine = modelLabel ?? 'Das Modell';
 
   const uploadFile = async (file: File, role: ViduReferenceRole) => {
     if (!user) {
@@ -141,10 +149,10 @@ export function MultiReferenceUploader({
           <ImagePlus className="h-4 w-4 text-primary" />
           <Label className="text-sm font-medium">
             {language === 'de'
-              ? 'Multi-Reference (1–7 Bilder)'
+              ? `Multi-Reference (${rangeLabel} Bilder${required ? '' : ', optional'})`
               : language === 'es'
-              ? 'Multi-Referencia (1–7 imágenes)'
-              : 'Multi-Reference (1–7 images)'}
+              ? `Multi-Referencia (${rangeLabel} imágenes${required ? '' : ', opcional'})`
+              : `Multi-Reference (${rangeLabel} images${required ? '' : ', optional'})`}
           </Label>
           <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">
             {slots.length}/{maxReferences}
@@ -171,10 +179,10 @@ export function MultiReferenceUploader({
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         {language === 'de'
-          ? 'Lade dein Avatar, Produkt, Setting und Style — Vidu kombiniert sie in einer 5s-Szene.'
+          ? `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : ' Ohne Bild wird rein aus dem Text generiert.'}`
           : language === 'es'
-          ? 'Sube tu avatar, producto, ubicación y estilo — Vidu los combina en una escena de 5s.'
-          : 'Upload your character, product, location and style — Vidu blends them into one 5s scene.'}
+          ? `Sube personaje, producto, ubicación y estilo — ${engine} los combina en una escena.${required ? '' : ' Sin imagen se genera solo a partir del texto.'}`
+          : `Upload character, product, location and style — ${engine} blends them into one scene.${required ? '' : ' Without an image it generates from text only.'}`}
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
@@ -261,12 +269,18 @@ export function MultiReferenceUploader({
       />
 
       {slots.length === 0 && (
-        <p className="text-[10px] text-amber-500/80">
-          {language === 'de'
-            ? '⚠️ Mindestens 1 Bild erforderlich für Reference2V.'
-            : language === 'es'
-            ? '⚠️ Se requiere al menos 1 imagen para Reference2V.'
-            : '⚠️ At least 1 image required for Reference2V.'}
+        <p className={`text-[10px] ${required ? 'text-amber-500/80' : 'text-muted-foreground'}`}>
+          {required
+            ? language === 'de'
+              ? '⚠️ Mindestens 1 Bild erforderlich.'
+              : language === 'es'
+              ? '⚠️ Se requiere al menos 1 imagen.'
+              : '⚠️ At least 1 image required.'
+            : language === 'de'
+              ? 'Optional — ohne Bild entsteht ein reines Text-to-Video.'
+              : language === 'es'
+              ? 'Opcional — sin imagen se genera un vídeo solo de texto.'
+              : 'Optional — without an image this is a pure text-to-video.'}
         </p>
       )}
     </Card>
