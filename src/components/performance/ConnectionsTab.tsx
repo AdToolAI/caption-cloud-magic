@@ -37,6 +37,11 @@ const maskMetaUserId = (value: unknown) => {
   return `${id.slice(0, 4)}••••${id.slice(-4)}`;
 };
 
+const asAccountMetadata = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
 export const ConnectionsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -107,11 +112,12 @@ export const ConnectionsTab = () => {
             
             if (newConnection) {
               console.log(`✅ Connection verified, starting auto-sync...`);
-              const metaUserId = newConnection.account_metadata?.meta_user_id;
-              const pagesFound = newConnection.account_metadata?.meta_pages_found_count;
+              const accountMetadata = asAccountMetadata(newConnection.account_metadata);
+              const metaUserId = accountMetadata.meta_user_id;
+              const pagesFound = accountMetadata.meta_pages_found_count;
               const successDescription = (connected === 'facebook' || connected === 'instagram')
                 ? t('socialIntegrations.metaConnectedAs', {
-                    name: newConnection.account_metadata?.meta_user_name || newConnection.account_name || '—',
+                    name: accountMetadata.meta_user_name || newConnection.account_name || '—',
                     id: maskMetaUserId(metaUserId || newConnection.account_id),
                     count: typeof pagesFound === 'number' ? pagesFound : '—',
                   })
