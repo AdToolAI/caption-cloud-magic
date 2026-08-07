@@ -29,7 +29,7 @@ import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSou
 
 // 🎬 Phase 5: Import RiveCharacter for advanced lip-sync
 import { RiveCharacter, type PhonemeTimestamp } from '../components/RiveCharacter';
-import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMapping';
+import { getGestureForSceneType, detectEmotionFromText } from '../../utils/phonemeMapping';
 
 // ✅ r23: Professional fallback backgrounds with scene-type-aware patterns
 const DEFAULT_FALLBACK_GRADIENT = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)';

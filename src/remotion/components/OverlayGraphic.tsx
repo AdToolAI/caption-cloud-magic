@@ -7,8 +7,8 @@
  * Canvas-Breite, die Aufrufer als `canvasWidth` (px) hereinreichen.
  */
 import React from 'react';
-import type { TextOverlay } from '@/types/directors-cut';
-import { DEFAULT_OVERLAY_BOX, overlayFontRel } from '@/lib/directors-cut/overlayModel';
+import type { TextOverlay } from '../../types/directors-cut';
+import { DEFAULT_OVERLAY_BOX, overlayFontRel } from '../../lib/directors-cut/overlayModel';
 import { computeOverlayVisual } from './overlayAnim';
 
 interface OverlayGraphicProps {

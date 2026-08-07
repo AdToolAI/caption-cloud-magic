@@ -8,7 +8,7 @@ import type {
   OverlayKind,
   OverlayStyle,
   TextOverlay,
-} from '@/types/directors-cut';
+} from '../../types/directors-cut';
 
 /** Relative Schriftgrade der Alt-Stufen (bezogen auf Canvas-Breite, 1080px-Referenz). */
 export const LEGACY_FONT_SIZE_REL: Record<string, number> = {

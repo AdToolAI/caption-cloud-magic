@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence } from 'remotion';
-import type { TextAnimation, TextPosition } from '@/types/video-composer';
+import type { TextAnimation, TextPosition } from '../../types/video-composer';
 
 interface KineticTextProps {
   text: string;

@@ -1,8 +1,8 @@
 import React from 'react';
 import { useCurrentFrame, useVideoConfig, Easing } from 'remotion';
 import { safeInterpolate, safeSpring as spring } from '../utils/safeInterpolate';
-import type { TextOverlay } from '@/types/directors-cut';
-import { isGraphicOverlay } from '@/lib/directors-cut/overlayModel';
+import type { TextOverlay } from '../../types/directors-cut';
+import { isGraphicOverlay } from '../../lib/directors-cut/overlayModel';
 import { OverlayElementRenderer } from './OverlayElementRenderer';
 
 /**
