@@ -94,7 +94,9 @@ export const ConnectionsTab = () => {
         
         setTimeout(async () => {
           try {
-            const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+            const session = await ensureValidSession();
+            const sessionError = session ? null : new Error('no session');
+
             
             if (sessionError || !session) {
               console.error('❌ Session refresh failed:', sessionError);
@@ -300,7 +302,7 @@ export const ConnectionsTab = () => {
       // for Instagram so there is exactly ONE source of truth for IG OAuth.
       if (providerId === 'instagram') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           if (!session.session?.access_token) {
             toast({
               title: t('socialIntegrations.authRequired') || 'Auth required',
@@ -351,7 +353,7 @@ export const ConnectionsTab = () => {
       // TikTok: Use new backend OAuth flow
       if (providerId === 'tiktok') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           const { data, error } = await supabase.functions.invoke('tiktok-oauth-start', {
             headers: {
               Authorization: `Bearer ${session.session?.access_token}`
@@ -380,7 +382,7 @@ export const ConnectionsTab = () => {
       // X: Use new backend OAuth flow with PKCE
       if (providerId === 'x') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           const { data, error } = await supabase.functions.invoke('x-oauth-start', {
             headers: {
               Authorization: `Bearer ${session.session?.access_token}`
@@ -408,7 +410,7 @@ export const ConnectionsTab = () => {
       // YouTube: backend OAuth start (client id from server secrets, offline access)
       if (providerId === 'youtube') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           if (!session.session?.access_token) {
             toast({
               title: t('socialIntegrations.authRequired') || 'Auth required',
@@ -441,7 +443,7 @@ export const ConnectionsTab = () => {
       // Facebook: Use backend OAuth flow on Graph API v24 (v18 triggers Meta "Feature unavailable")
       if (providerId === 'facebook') {
         try {
-          const { data: session } = await supabase.auth.getSession();
+          const session = { session: await ensureValidSession() };
           const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
             body: { returnTo: window.location.href, forceAccountChooser },
             headers: {
@@ -540,7 +542,9 @@ export const ConnectionsTab = () => {
       // Special handling for TikTok and LinkedIn (Edge Functions)
       if (providerId === 'tiktok' || providerId === 'linkedin') {
         // Check for valid session before calling Edge Function
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const session = await ensureValidSession();
+        const sessionError = session ? null : new Error('no session');
+
         
         if (!session || sessionError) {
           console.error('No valid session for OAuth:', { sessionError, providerId });
@@ -778,7 +782,7 @@ export const ConnectionsTab = () => {
       // ig + fb rows so the next reconnect actually shows Meta's full consent
       // dialog instead of the cached "Continue as ..." short-circuit.
       if (connection?.provider === 'instagram' || connection?.provider === 'facebook') {
-        const { data: session } = await supabase.auth.getSession();
+        const session = { session: await ensureValidSession() };
         const { data: revokeData, error: revokeError } = await supabase.functions.invoke(
           'instagram-oauth-revoke',
           {
