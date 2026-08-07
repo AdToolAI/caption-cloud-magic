@@ -31,6 +31,12 @@ const PROVIDERS = [
   { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'bg-red-600' }
 ];
 
+const maskMetaUserId = (value: unknown) => {
+  const id = typeof value === 'string' ? value : String(value ?? '');
+  if (id.length <= 8) return id;
+  return `${id.slice(0, 4)}••••${id.slice(-4)}`;
+};
+
 export const ConnectionsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -101,8 +107,14 @@ export const ConnectionsTab = () => {
             
             if (newConnection) {
               console.log(`✅ Connection verified, starting auto-sync...`);
-              const successDescription = connected === 'instagram' && autoSelected && newConnection.account_name
-                ? `Instagram verbunden: ${newConnection.account_name}`
+              const metaUserId = newConnection.account_metadata?.meta_user_id;
+              const pagesFound = newConnection.account_metadata?.meta_pages_found_count;
+              const successDescription = (connected === 'facebook' || connected === 'instagram')
+                ? t('socialIntegrations.metaConnectedAs', {
+                    name: newConnection.account_metadata?.meta_user_name || newConnection.account_name || '—',
+                    id: maskMetaUserId(metaUserId || newConnection.account_id),
+                    count: typeof pagesFound === 'number' ? pagesFound : '—',
+                  })
                 : `Successfully connected to ${connected}`;
               toast({
                 title: t('common.success'),
@@ -955,11 +967,16 @@ export const ConnectionsTab = () => {
                                 : connection.account_name}
                             </p>
                           )}
-                          {connected && connection && (provider.id === 'facebook' || provider.id === 'instagram') && connection.account_id && (
+                           {connected && connection && (provider.id === 'facebook' || provider.id === 'instagram') && (connection.account_metadata?.meta_user_id || connection.account_metadata?.selection_required) && (
                             <p className="text-[11px] text-muted-foreground/70">
-                              {t('socialIntegrations.metaAccountId')}: {connection.account_id}
+                               {t('socialIntegrations.metaAccountId')}: {maskMetaUserId(connection.account_metadata?.meta_user_id || connection.account_id)}
                             </p>
                           )}
+                           {connected && connection && (provider.id === 'facebook' || provider.id === 'instagram') && typeof connection.account_metadata?.meta_pages_found_count === 'number' && (
+                             <p className="text-[11px] text-muted-foreground/70">
+                               {t('socialIntegrations.metaPagesForToken', { count: connection.account_metadata.meta_pages_found_count })}
+                             </p>
+                           )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">

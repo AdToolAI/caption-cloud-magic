@@ -242,6 +242,19 @@ serve(async (req) => {
         }
         accountInfo = await getMetaAccountInfo(tokenData.access_token, provider);
         try {
+          const fbDiscovery = await discoverMetaPagesWithDiagnostics(tokenData.access_token, {
+            verifyInstagram: false,
+          });
+          (accountInfo as any).meta_pages_found_count = fbDiscovery.diagnostics.pages_found_count;
+          (accountInfo as any).meta_page_discovery_status = fbDiscovery.diagnostics.pages_found_count > 0
+            ? 'pages_found'
+            : 'meta_pages_hidden_or_unavailable';
+          (accountInfo as any).meta_list_error = fbDiscovery.diagnostics.list_error;
+          (accountInfo as any).meta_last_discovery_at = fbDiscovery.diagnostics.ran_at;
+        } catch (e) {
+          console.warn('[oauth-callback] FB page discovery failed:', e);
+        }
+        try {
           const fbPerms = await fetchMetaPermissions(tokenData.access_token);
           (accountInfo as any).granted_scopes = fbPerms.granted;
           (accountInfo as any).declined_scopes = fbPerms.declined;
@@ -315,6 +328,10 @@ serve(async (req) => {
         auto_sync_enabled: true,
         last_sync_at: null,
         account_metadata: {
+          ...(provider === 'facebook' || provider === 'instagram' ? {
+            meta_user_id: (accountInfo as any).meta_user_id || accountInfo.id,
+            meta_user_name: (accountInfo as any).meta_user_name || accountInfo.name,
+          } : {}),
           ...(accountInfo as any).account_type ? { account_type: (accountInfo as any).account_type } : {},
           ...(accountInfo as any).selection_required ? { selection_required: true } : {},
           ...(accountInfo as any).profile_picture_url ? { profile_picture_url: (accountInfo as any).profile_picture_url } : {},
