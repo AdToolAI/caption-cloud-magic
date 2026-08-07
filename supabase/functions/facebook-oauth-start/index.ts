@@ -185,6 +185,18 @@ Deno.serve(async (req) => {
       url_preview: finalAuthUrl.slice(0, 200) + '…',
     });
 
+    // Pure measurement: record what we asked Meta for, before consent.
+    await recordOAuthStart(supabase, {
+      userId: user.id,
+      provider: 'facebook',
+      stateKey: csrf,
+      requestedScopes: configId ? [] : scopes.split(','),
+      dialogUrl: finalAuthUrl,
+      usesConfigId: !!configId,
+      authType: 'rerequest',
+    });
+
+
     return new Response(
       JSON.stringify({ authUrl: finalAuthUrl, url: finalAuthUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
