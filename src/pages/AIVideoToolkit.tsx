@@ -13,10 +13,10 @@ import {
 
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { useAuth } from '@/hooks/useAuth';
+import { useTrialAccess } from '@/hooks/useTrialAccess';
 import { useTranslation } from '@/hooks/useTranslation';
 import { supabase } from '@/integrations/supabase/client';
-import { canUseAIVideoGeneration } from '@/lib/entitlements';
-import { PlanId, Currency } from '@/config/pricing';
+import { Currency } from '@/config/pricing';
 import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 import { toast } from 'sonner';
 
