@@ -177,10 +177,10 @@ export function MultiReferenceUploader({
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         {language === 'de'
-          ? 'Lade dein Avatar, Produkt, Setting und Style — Vidu kombiniert sie in einer 5s-Szene.'
+          ? `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : ' Ohne Bild wird rein aus dem Text generiert.'}`
           : language === 'es'
-          ? 'Sube tu avatar, producto, ubicación y estilo — Vidu los combina en una escena de 5s.'
-          : 'Upload your character, product, location and style — Vidu blends them into one 5s scene.'}
+          ? `Sube personaje, producto, ubicación y estilo — ${engine} los combina en una escena.${required ? '' : ' Sin imagen se genera solo a partir del texto.'}`
+          : `Upload character, product, location and style — ${engine} blends them into one scene.${required ? '' : ' Without an image it generates from text only.'}`}
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
