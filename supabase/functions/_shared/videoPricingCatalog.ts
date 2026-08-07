@@ -45,6 +45,11 @@ export const VIDEO_PRICING_CATALOG: Record<string, CatalogEntry> = {
   'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 1 Lite (Draft)', unit: 'per-second', sellEUR: 0.06, sellUSD: 0.06, costEUR: 0.02,  minDuration: 3,  maxDuration: 15 },
   'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.45, sellUSD: 0.45, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
   'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.54, sellUSD: 0.54, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
+  // Seedance 2.5 via BytePlus ModelArk (direct API, not Replicate) —
+  // long-form scenes up to 30 s, 1080p. Cost estimate 0.18 $/s → 3.00× margin.
+  'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.54, sellUSD: 0.54, costEUR: 0.18,  minDuration: 3,  maxDuration: 30 },
+
+
 
 
   // Kling

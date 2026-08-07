@@ -1,0 +1,300 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
+import {
+  createSeedance25Task,
+  getModelArkTask,
+  storeModelArkVideo,
+  MODELARK_JOB_PREFIX,
+} from "../_shared/modelark.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
+};
+
+const MODEL_ID = "seedance-2-5";
+const MIN_DURATION = 3;
+const MAX_DURATION = 30;
+
+interface GenerateRequest {
+  prompt: string;
+  model?: string;
+  duration: number;
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  resolution?: "480p" | "720p" | "1080p";
+  startImageUrl?: string;
+  endImageUrl?: string;
+  referenceImageUrls?: string[];
+  seed?: number;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  if (isQaMockRequest(req)) {
+    return qaMockResponse({ corsHeaders, kind: "video" });
+  }
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    );
+
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    if (authError || !user) throw new Error("Unauthorized");
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
+    const body = await req.json() as GenerateRequest;
+    const {
+      prompt,
+      duration,
+      aspectRatio = "16:9",
+      resolution = "720p",
+      startImageUrl,
+      endImageUrl,
+      referenceImageUrls,
+      seed,
+    } = body;
+
+    if (!prompt || !prompt.trim()) {
+      return new Response(JSON.stringify({ error: "Prompt is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!Number.isFinite(duration) || duration < MIN_DURATION || duration > MAX_DURATION) {
+      return new Response(
+        JSON.stringify({
+          error: `Duration must be between ${MIN_DURATION} and ${MAX_DURATION} seconds for Seedance 2.5`,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: walletPreview } = await supabaseClient
+      .from("ai_video_wallets")
+      .select("currency")
+      .eq("user_id", user.id)
+      .single();
+
+    const currency = (walletPreview?.currency || "EUR") as "EUR" | "USD";
+    const costPerSecond = resolveCostPerSecond(MODEL_ID, currency) ?? 0.54;
+    const totalCost = +(duration * costPerSecond).toFixed(4);
+
+    const { data: wallet, error: walletError } = await supabaseAdmin
+      .from("ai_video_wallets")
+      .select("balance_euros, currency")
+      .eq("user_id", user.id)
+      .single();
+
+    if (walletError || !wallet) {
+      return new Response(
+        JSON.stringify({
+          error: "No AI Video wallet found. Please purchase credits first.",
+          code: "NO_WALLET",
+          needsPurchase: true,
+        }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const currencySymbol = wallet.currency === "USD" ? "$" : "€";
+    if (wallet.balance_euros < totalCost) {
+      await trackBusinessEvent("credit_insufficient", user.id, {
+        provider: "seedance25",
+        model: MODEL_ID,
+        required: totalCost,
+        available: wallet.balance_euros,
+        currency: wallet.currency,
+      }).catch(() => {});
+      return new Response(
+        JSON.stringify({
+          error: `Insufficient credits. Need ${currencySymbol}${totalCost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
+          code: "INSUFFICIENT_CREDITS",
+          needsPurchase: true,
+          required: totalCost,
+          available: wallet.balance_euros,
+          currency: wallet.currency,
+        }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: generation, error: genError } = await supabaseAdmin
+      .from("ai_video_generations")
+      .insert({
+        user_id: user.id,
+        prompt,
+        model: MODEL_ID,
+        duration_seconds: duration,
+        aspect_ratio: aspectRatio,
+        resolution,
+        cost_per_second: costPerSecond,
+        total_cost_euros: totalCost,
+        status: "pending",
+        source_image_url: startImageUrl || null,
+      })
+      .select()
+      .single();
+
+    if (genError) throw genError;
+
+    const { data: newBalance, error: deductError } = await supabaseAdmin.rpc(
+      "deduct_ai_video_credits",
+      { p_user_id: user.id, p_amount: totalCost, p_generation_id: generation.id },
+    );
+
+    if (deductError || newBalance === null || newBalance === undefined) {
+      console.error("[generate-seedance25-video] Deduct credits error:", deductError);
+      await supabaseAdmin
+        .from("ai_video_generations")
+        .update({ status: "failed", error_message: "Failed to deduct credits" })
+        .eq("id", generation.id);
+      throw new Error("Failed to deduct credits");
+    }
+
+    const refund = async (reason: string) => {
+      await supabaseAdmin
+        .from("ai_video_generations")
+        .update({
+          status: "failed",
+          failed_at: new Date().toISOString(),
+          error_message: reason.slice(0, 500),
+        })
+        .eq("id", generation.id);
+      const { error: refundError } = await supabaseAdmin.rpc("refund_ai_video_credits", {
+        p_user_id: user.id,
+        p_amount_euros: totalCost,
+        p_generation_id: generation.id,
+      });
+      if (refundError) console.error("[generate-seedance25-video] Refund failed:", refundError);
+    };
+
+    let taskId: string;
+    try {
+      taskId = await createSeedance25Task({
+        prompt,
+        duration,
+        resolution,
+        aspectRatio,
+        firstFrameUrl: startImageUrl,
+        lastFrameUrl: endImageUrl,
+        referenceImageUrls,
+        seed,
+      });
+    } catch (providerError: any) {
+      console.error("[generate-seedance25-video] ModelArk error:", providerError);
+      await refund(`ModelArk Error: ${providerError?.message ?? "Unknown error"}`);
+      return new Response(
+        JSON.stringify({
+          error: "Video generation failed. Credits refunded.",
+          code: "MODELARK_ERROR",
+          detail: String(providerError?.message ?? "").slice(0, 300),
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    await supabaseAdmin
+      .from("ai_video_generations")
+      .update({
+        status: "processing",
+        started_at: new Date().toISOString(),
+        artlist_job_id: `${MODELARK_JOB_PREFIX}${taskId}`,
+      })
+      .eq("id", generation.id);
+
+    await trackAIGeneration("started", user.id, {
+      provider: "modelark",
+      model: MODEL_ID,
+      duration_s: duration,
+      cost_eur: totalCost,
+      aspect_ratio: aspectRatio,
+      resolution,
+      generation_id: generation.id,
+    }).catch(() => {});
+
+    // Background poll — ModelArk has no webhook. `modelark-poll` acts as the
+    // safety net when this background task is cut short.
+    const pollInBackground = async () => {
+      const deadline = Date.now() + 12 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 8000));
+        try {
+          const task = await getModelArkTask(taskId);
+          if (task.status === "succeeded" && task.videoUrl) {
+            const permanentUrl = await storeModelArkVideo(
+              supabaseAdmin,
+              "ai-videos",
+              `${user.id}/${generation.id}.mp4`,
+              task.videoUrl,
+            );
+            await supabaseAdmin
+              .from("ai_video_generations")
+              .update({
+                status: "completed",
+                video_url: permanentUrl,
+                completed_at: new Date().toISOString(),
+                error_message: null,
+              })
+              .eq("id", generation.id);
+            await trackAIGeneration("completed", user.id, {
+              provider: "modelark",
+              model: MODEL_ID,
+              cost_eur: totalCost,
+              generation_id: generation.id,
+            }).catch(() => {});
+            return;
+          }
+          if (task.status === "failed" || task.status === "cancelled") {
+            await refund(task.error ?? "ModelArk task failed");
+            return;
+          }
+        } catch (err) {
+          console.error("[generate-seedance25-video] poll error:", err);
+        }
+      }
+      console.warn(`[generate-seedance25-video] Poll deadline hit for task ${taskId}`);
+    };
+
+    // @ts-ignore EdgeRuntime is provided by the Supabase runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(pollInBackground());
+    } else {
+      void pollInBackground();
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        generationId: generation.id,
+        taskId,
+        cost: totalCost,
+        currency: wallet.currency,
+        newBalance,
+        status: "processing",
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+    );
+  } catch (error: any) {
+    console.error("[generate-seedance25-video] Error:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
+    );
+  }
+});

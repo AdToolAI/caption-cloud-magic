@@ -19,7 +19,7 @@ export function toolkitModelToClipSource(model: ToolkitModel): ClipSource | null
     case 'wan':        return 'ai-wan';
     case 'hailuo':     return 'ai-hailuo';
     case 'luma':       return 'ai-luma';
-    case 'seedance':   return 'ai-seedance';
+    case 'seedance':   return model.id === 'seedance-2-5' ? 'ai-seedance25' : 'ai-seedance';
     case 'sora':       return 'ai-sora';
     case 'runway':     return 'ai-runway';
     case 'pika':       return 'ai-pika';

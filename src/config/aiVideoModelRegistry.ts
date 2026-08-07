@@ -509,6 +509,25 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     tagline: 'Seedance 2.0 Flagship · beste Motion-Kohärenz',
     legacyRoute: '/seedance-video-studio',
   },
+  {
+    id: 'seedance-2-5',
+    name: SEEDANCE_VIDEO_MODELS['seedance-2-5'].name,
+    provider: 'ByteDance',
+    family: 'seedance',
+    edgeFunction: 'generate-seedance25-video',
+    group: 'premium',
+    icon: Video,
+    capabilities: { t2v: true, i2v: true, audio: false, multiRef: true, maxReferences: 4, endFrame: false },
+    durations: [5, 8, 10, 12, 15, 20, 25, 30],
+    resolution: '1080p',
+    aspectRatios: sharedAspect,
+    costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
+    badge: 'Neu',
+    tagline: 'Seedance 2.5 · bis 30 s pro Szene · 1080p',
+    legacyRoute: '/seedance-video-studio',
+  },
+
+
 
   /* ─────────── V2V Specialist (Runway) ─────────── */
   {

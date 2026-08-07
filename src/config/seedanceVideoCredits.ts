@@ -54,7 +54,26 @@ export const SEEDANCE_VIDEO_MODELS = {
     },
     badge: 'Premium',
   },
+  // Seedance 2.5 — direkte ByteDance ModelArk API (nicht Replicate).
+  // Long-Form: bis 30 s pro Szene, 1080p, First/Last-Frame + Multi-Reference.
+  'seedance-2-5': {
+    name: 'Seedance 2.5',
+    provider: 'ByteDance (ModelArk)',
+    quality: '1080p',
+    costPerSecond: {
+      EUR: 0.54,
+      USD: 0.54,
+    },
+    minDuration: 3,
+    maxDuration: 30,
+    description: {
+      EUR: 'Seedance 2.5 · 1080p · bis 30 s pro Szene — ab 2,70€ pro 5 Sekunden',
+      USD: 'Seedance 2.5 · 1080p · up to 30 s per scene — from $2.70 per 5 seconds',
+    },
+    badge: 'Neu',
+  },
 } as const;
+
 
 export type SeedanceVideoModel = keyof typeof SEEDANCE_VIDEO_MODELS;
 

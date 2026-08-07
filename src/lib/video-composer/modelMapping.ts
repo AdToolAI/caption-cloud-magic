@@ -80,7 +80,8 @@ const LIPSYNC_FAMILIES = new Set(['happyhorse', 'hailuo', 'kling', 'wan', 'seeda
  * provider first so the ModelSelector pre-selects HappyHorse.
  */
 export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS
-  .filter((m) => LIPSYNC_FAMILIES.has(m.family))
+  // Seedance 2.5 (ModelArk) is not certified for the Sync.so lip-sync path.
+  .filter((m) => LIPSYNC_FAMILIES.has(m.family) && m.id !== 'seedance-2-5')
   .sort((a, b) => {
     // HappyHorse (primary) before Hailuo (fallback); standard before pro.
     const fam = (x: ToolkitModel) => (x.family === 'happyhorse' ? 0 : 1);
@@ -122,7 +123,7 @@ export function modelIdToSource(modelId: string): { clipSource: ClipSource; clip
       case 'veo':      return 'ai-veo';
       case 'wan':      return 'ai-wan';
       case 'luma':     return 'ai-luma';
-      case 'seedance': return 'ai-seedance';
+      case 'seedance': return modelId === 'seedance-2-5' ? 'ai-seedance25' : 'ai-seedance';
       case 'sora':     return 'ai-veo'; // Sora 2 Sunset → Veo 3.1 fallback
       case 'runway':   return 'ai-runway';
       case 'pika':     return 'ai-pika';
@@ -138,6 +139,8 @@ export function modelIdToSource(modelId: string): { clipSource: ClipSource; clip
 /** Map a composer (clipSource, clipQuality) → toolkit modelId for the dropdown. */
 export function sourceToModelId(clipSource: ClipSource, clipQuality: ClipQuality = 'standard'): string {
   if (clipSource === 'ai-image') return IMAGE_TOOLKIT_MODEL.id;
+  // Seedance 2.5 runs on its own ModelArk path — no quality tiers.
+  if (clipSource === 'ai-seedance25') return 'seedance-2-5';
 
   const familyMap: Partial<Record<ClipSource, ToolkitModel['family']>> = {
     'ai-hailuo':   'hailuo',
