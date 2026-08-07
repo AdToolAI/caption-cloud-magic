@@ -1174,7 +1174,10 @@ export const ConnectionsTab = () => {
 
       <ConnectionDiagnostics />
 
+      <MetaOAuthDiff />
+
       <MetaPageProbePanel />
+
 
 
       {/* CSV Upload Section */}
