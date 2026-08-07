@@ -1767,7 +1767,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setRenderStatus('failed');
       setRenderError(t('dc.exportCouldNotStart'));
     }
-  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, startRenderPolling, actualTotalDuration]);
+  }, [projectId, onSaveProject, scenes, appliedEffects, colorGrading, styleTransfer, transitions, exportSettings, cleanedVideoUrl, videoUrl, voiceOverUrl, audioTracks, showSubtitles, subtitleTrack, showTextOverlays, textOverlays, startRenderPolling, actualTotalDuration]);
 
   // W4.2 CI-Preflight wrapper — runs consistency checks before invoking Lambda
   const [preflightOpen, setPreflightOpen] = useState(false);
