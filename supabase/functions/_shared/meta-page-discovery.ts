@@ -83,7 +83,8 @@ export async function listMetaPages(userAccessToken: string): Promise<{
     `https://graph.facebook.com/${GRAPH_VERSION}/me/accounts?` +
     `fields=id,name,category,picture{url},access_token,` +
     `instagram_business_account,connected_instagram_account&` +
-    `access_token=${userAccessToken}`;
+    `access_token=${encodeURIComponent(userAccessToken)}`;
+
 
   try {
     const res = await fetch(url);
