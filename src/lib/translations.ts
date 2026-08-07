@@ -18024,7 +18024,7 @@ Object.assign(translations.en, {
     pageSubtitle: 'Generate professional videos with Sora 2',
     metaDesc: 'Generate professional AI videos with Sora 2. Create videos up to 30 seconds in the highest quality.',
     upgradeRequired: 'Upgrade Required',
-    upgradeMessage: 'This feature is only available for Pro and Enterprise users.',
+    upgradeMessage: 'This feature is included in the Beta-Basic plan. Start your free trial or subscribe to unlock it.',
     upgradeNow: 'Upgrade Now',
     yourBalance: 'Your Balance',
     buyCredits: 'Buy Credits',
