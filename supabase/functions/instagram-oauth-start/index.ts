@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { decryptToken } from '../_shared/crypto.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { recordOAuthStart } from '../_shared/meta-oauth-diagnostics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
