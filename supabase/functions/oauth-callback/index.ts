@@ -271,6 +271,24 @@ serve(async (req) => {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
+    // Structural proof record for Meta connects: what did Meta actually bind
+    // to this token? Pure measurement, never alters the flow.
+    if ((provider === 'facebook' || provider === 'instagram') && tokenData?.access_token) {
+      try {
+        const measurement = await measureMetaToken(tokenData.access_token);
+        await recordOAuthCallback(supabase, {
+          userId,
+          provider,
+          stateKey: csrf,
+          measurement,
+        });
+      } catch (e) {
+        console.warn('[oauth-callback] meta diagnostics record failed:', e);
+      }
+    }
+
+
+
     // Encrypt tokens with AES-GCM for secure storage
     const accessTokenHash = tokenData.access_token 
       ? await encryptToken(tokenData.access_token)
