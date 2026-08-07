@@ -603,7 +603,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'recommended',
     icon: Eye,
-    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7, anchorOnly: true },
+    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7, multiRefRequired: true, anchorOnly: true },
     durations: [5],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],
