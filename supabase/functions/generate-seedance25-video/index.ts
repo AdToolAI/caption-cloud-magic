@@ -16,7 +16,7 @@ const corsHeaders = {
 };
 
 const MODEL_ID = "seedance-2-5";
-const MIN_DURATION = 3;
+const MIN_DURATION = 4;
 const MAX_DURATION = 30;
 
 interface GenerateRequest {
@@ -24,7 +24,8 @@ interface GenerateRequest {
   model?: string;
   duration: number;
   aspectRatio?: "16:9" | "9:16" | "1:1";
-  resolution?: "480p" | "720p" | "1080p";
+  /** ModelArk supports 480p and 720p output for Seedance 2.5 — 1080p is rejected. */
+  resolution?: "480p" | "720p";
   startImageUrl?: string;
   endImageUrl?: string;
   referenceImageUrls?: string[];
