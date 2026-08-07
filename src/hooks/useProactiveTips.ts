@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { ensureValidSession } from '@/lib/ensureSession';
 import { useAuth } from '@/hooks/useAuth';
 
 interface DiagnosticResult {
@@ -51,7 +52,7 @@ export function useProactiveTips() {
   const fetchDiagnostics = useCallback(async () => {
     try {
       setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await ensureValidSession();
       if (!session) {
         setDiagnostics([]);
         return;
@@ -60,6 +61,7 @@ export function useProactiveTips() {
       const { data, error } = await supabase.functions.invoke('companion-diagnose', {
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
+
 
       if (error) {
         console.warn('Diagnostics fetch failed:', error.message);
