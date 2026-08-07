@@ -18149,7 +18149,7 @@ Object.assign(translations.de, {
     pageSubtitle: 'Generiere professionelle Videos mit Sora 2',
     metaDesc: 'Generiere professionelle KI-Videos mit Sora 2. Erstelle Videos bis zu 30 Sekunden mit höchster Qualität.',
     upgradeRequired: 'Upgrade erforderlich',
-    upgradeMessage: 'Dieses Feature ist nur für Pro und Enterprise Nutzer verfügbar.',
+    upgradeMessage: 'Dieses Feature ist im Beta-Basic-Abo enthalten. Starte die Testphase oder aktiviere dein Abo, um es freizuschalten.',
     upgradeNow: 'Jetzt upgraden',
     yourBalance: 'Dein Guthaben',
     buyCredits: 'Credits kaufen',
