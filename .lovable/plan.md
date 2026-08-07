@@ -10,12 +10,19 @@ Bestätigt aus deinen Screenshots:
 
 ## Deine nächsten Schritte in der ModelArk-Konsole
 
-1. **Zahlungsmittel hinterlegen**
-   Oben rechts auf dein Konto-Kürzel → „Billing" / „Finance" → Kreditkarte hinterlegen bzw. Guthaben aufladen. Ohne Zahlungsmittel liefert die API sofort einen Quota-/Insufficient-Balance-Fehler.
+1. **Resource Pack/Coding Plan erwerben (aktueller Blocker)**
+   Deine Kreditkarte ist bereits hinterlegt. Die Fehlermeldung lautet jedoch `No available resource packs. Please purchase a resource pack first` — ModelArk verlangt für die Vorabprüfung zusätzlich einen aktiven Resource Pack in **Asia Pacific (Johor)**.
+   - Im Fehler rechts zuerst **„I acknowledge"** anklicken und den Aktivierungsdialog schließen.
+   - Oben auf **„Subscription"** oder **„Coding Plan"** gehen.
+   - Einen für **Media / Video Generation / Dreamina-Seedance** gültigen Resource Pack auswählen; kein reines LLM-/Token-Paket kaufen.
+   - Beim Kauf kontrollieren, dass die Region **Asia Pacific (Johor / ap-southeast-1)** ist.
+   - Pack bezahlen/aktivieren und warten, bis er unter Subscription als **Active** erscheint.
+   - Falls dort kein Video-Pack angeboten wird: **Contact Sales** öffnen und ausdrücklich „Dreamina Seedance 2.5 API resource pack for ap-southeast-1 (Johor)" anfordern. Das ist dann eine Freischaltung durch BytePlus und kein Fehler in unserer Plattform.
 
-2. **Seedance 2.5 freischalten**
+2. **Seedance 2.5 erneut freischalten**
    Linke Navigation → **„Model activation"** → nach *Dreamina Seedance 2.5* suchen → **Activate / Enable**.
    Wichtig: Region muss dabei auf **Asia Pacific (Johor)** stehen. Aktivierung gilt pro Region.
+   Im Dialog nur Seedance 2.5 markieren; **„Enable Free Credits Only Mode" ausgeschaltet lassen**, weil das Modell einen bezahlten Resource Pack verlangt. Dann Bedingungen bestätigen und **„Confirm activation and authorization"** anklicken.
    Kontrolle: unter **„Model Square"** sollte Seedance 2.5 danach als aktiviert erscheinen.
 
 3. **API-Key erstellen**
