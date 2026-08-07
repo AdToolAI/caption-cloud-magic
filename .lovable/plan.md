@@ -1,52 +1,32 @@
-# Ein einziger Test entscheidet: Meta oder unser OAuth
+# Banner: gewählte Flächenfarbe wird vom Gold-Verlauf überstimmt
 
-## Deine Analyse ist richtig
+## Befund
 
-Das alte Konto liegt ebenfalls in einem Business-Portfolio, hat Full Access — und liefert Seiten über `/me/accounts`. Damit ist die Portfolio-These als Erklärung für den Unterschied zwischen Alt und Neu widerlegt. `business_management` mag später für Kunden nötig sein, es erklärt diesen Fall aber nicht.
+Du hast die Vorlage „Banner oben — Gold" benutzt. Diese Vorlage bringt einen fest hinterlegten Goldverlauf mit (`gradient: [GOLD, '#C79B3F']` in `src/lib/directors-cut/overlayPresets.ts`, Zeile 118).
 
-Ausgeschlossen sind damit: falscher Benutzer, fehlender Seitenzugriff, fehlendes Portfolio, fehlender Full Access.
+Im gemeinsamen Renderer `src/remotion/components/OverlayGraphic.tsx` (Zeile 56) gewinnt dieser Verlauf bedingungslos gegen die Flächenfarbe:
 
-## Der eine Test
+```text
+background = s.gradient ? "linear-gradient(...)" : fill
+```
 
-Ein Token erzeugen, das **nichts** mit unserer App-Speicherung und unserem OAuth-Start zu tun hat, und damit direkt `/me/accounts` abfragen.
+Dein Klick auf Schwarz setzt zwar `style.fill`, der Verlauf bleibt aber gesetzt und überdeckt ihn. Deshalb ändert sich die Textfarbe (die kennt keinen Verlauf) und die Fläche nicht. Dieselbe Reihenfolge steckt auch in `badge` (Zeile 192) und `cta` (Zeile 257) — dort tritt der Fehler mit denselben Vorlagen genauso auf.
 
-**Graph API Explorer:** https://developers.facebook.com/tools/explorer/
+## Fix
 
-1. Den aktuellen Dialog abbrechen. Er zeigt **„Continue as Samuel“** und würde deshalb wieder einen Token für das alte persönliche Facebook-Profil erzeugen.
-2. Ein Inkognito-/Privatfenster öffnen und dort zuerst `https://www.facebook.com/` aufrufen. Mit dem **anderen persönlichen Facebook-Profil** einloggen, das die neue Seite verwaltet. Nicht versuchen, sich als Facebook-Seite einzuloggen — Tokens werden immer für ein persönliches Profil ausgestellt.
-3. Im selben Privatfenster den Graph API Explorer öffnen: `https://developers.facebook.com/tools/explorer/`.
-4. Falls der Explorer dort nicht zugänglich ist, muss das neue persönliche Profil zuerst unter **App roles → Roles** als Administrator oder Tester der App „AdTool AI Integration“ hinzugefügt und die Einladung im neuen Profil angenommen werden. Danach den Explorer im Privatfenster neu öffnen.
-5. Oben rechts als Meta-App **AdTool AI Integration** wählen, „User Token" wählen und nur `pages_show_list` hinzufügen.
-6. **Generate Access Token** — der Dialog muss nun den Namen des neuen persönlichen Profils anzeigen, nicht „Samuel Dusatko“. Erst dann fortfahren und die neue Seite anhaken.
-7. Anfrage `me/accounts?fields=id,name,tasks,instagram_business_account` senden.
+**1. Klick auf eine Flächenfarbe ist eine klare Entscheidung.**
+Im `OverlayInspector` setzt die Farbauswahl künftig `fill` *und* entfernt den Verlauf. Wer Schwarz wählt, bekommt Schwarz — auch bei einer Verlauf-Vorlage.
 
-Wichtig: Die aktive Facebook-Sitzung ist hier die Identität. Ein anderes Lovable-/AdTool-Konto oder die Auswahl einer anderen Facebook-Seite ändert den User Token nicht. Der Screenshot beweist, dass der bisherige Explorer-Test noch mit dem alten persönlichen Profil gestartet wurde und deshalb den Vergleich nicht leisten konnte.
+**2. Der Renderer respektiert eine explizit gesetzte Fläche.**
+Die Reihenfolge wird zu: explizite Fläche schlägt Verlauf, Verlauf schlägt Standard. Das repariert auch bereits gespeicherte Projekte, in denen beides gesetzt ist, und gilt einheitlich für Banner, Badge und CTA.
 
-Zwei mögliche Ergebnisse, und beide sind eindeutig:
+**3. Verlauf bleibt erreichbar.**
+Damit der Goldverlauf nicht verloren geht, bekommt die Farbreihe „Fläche" ein zusätzliches Verlauf-Feld als erste Option. Es stellt den Verlauf der Vorlage wieder her. Ohne das wäre die Entscheidung für eine Vollfläche eine Einbahnstraße.
 
-- **`"data": []`** → Meta bindet dem neuen Profil keine Seite an Tokens dieser App. Unser Code ist raus. Der Fix liegt dann bei Meta (Support-Fall / Seiten-Konfiguration), nicht bei uns.
-- **Die Seite erscheint** → Meta ist raus. Dann liegt der Fehler in unserem OAuth-Start oder in der Speicherung, und wir haben eine funktionierende Referenz, gegen die wir unseren Flow Zeile für Zeile vergleichen können.
-
-Kontrollversuch, falls Ergebnis 1 eintritt: denselben Explorer-Test mit dem **alten** Profil. Liefert der Explorer dort Seiten, ist der Unterschied profil- bzw. seitengebunden und nicht app-gebunden — das grenzt den Meta-Support-Fall präzise ein.
-
-## Was ich parallel prüfen will, ohne zu spekulieren
-
-Ein Unterschied, den wir bisher nie angesehen haben und der zum Zeitpunkt der Seitenerstellung passt: die neue Seite ist zwei Wochen alt und läuft mit hoher Wahrscheinlichkeit im **New Pages Experience**. Ich prüfe das direkt an der API statt es anzunehmen — über die gespeicherten Verbindungsdaten des alten Kontos, das noch funktioniert:
-
-- `/{page_id}?fields=has_transitioned_to_new_page_experience,is_published,verification_status` für beide Seiten im Vergleich.
-- Ob die neue Seite überhaupt **veröffentlicht** ist. Eine unveröffentlichte Seite taucht in `/me/accounts` je nach Zustand nicht auf — das wäre eine Ein-Klick-Lösung und wurde bisher nie geprüft.
-
-Diese Abfragen kosten nichts und laufen, während du den Explorer-Test machst.
-
-## Erst danach Code
-
-Ich ändere jetzt bewusst **nichts** am OAuth-Flow. Solange nicht feststeht, auf welcher Seite der Grenze das Problem liegt, wäre jede Änderung geraten. Nach dem Testergebnis greift genau einer dieser beiden Wege:
-
-- **Meta-Seite:** Wir bauen keinen Workaround, sondern zeigen den Zustand ehrlich an und eröffnen den Support-Fall mit den Explorer-Rohdaten als Beweis.
-- **Unsere Seite:** Wir vergleichen den Explorer-Request Parameter für Parameter mit unserem `instagram-oauth-start` / `facebook-oauth-start` — Scopes, `config_id`, `auth_type`, Redirect — und korrigieren die Abweichung, die den Unterschied macht.
+Weil Vorschau und Export denselben Renderer benutzen, gilt die Korrektur automatisch auch im gerenderten Video — die WYSIWYG-Parität bleibt erhalten.
 
 ## Technische Details
 
-- Kein Code-Change in diesem Schritt.
-- Vergleichsabfragen laufen lesend über den gespeicherten Token des funktionierenden Kontos.
-- `business_management` bleibt vorerst im Scope-Satz, wird aber nicht mehr als Ursache behandelt. Über den Review entscheiden wir nach dem Testergebnis.
+- `src/remotion/components/OverlayGraphic.tsx`: `background` so berechnen, dass ein gesetztes `s.fill` Vorrang vor `s.gradient` hat; die Zweige in `banner`, `badge` und `cta` auf dieselbe Logik ziehen.
+- `src/components/directors-cut/features/overlays/OverlayInspector.tsx`: Farbauswahl der Fläche ruft `onUpdateStyle({ fill: c, gradient: undefined })`; zusätzliche Verlauf-Kachel setzt `gradient` zurück und leert `fill`.
+- Kein Eingriff in Presets, Timeline, Export-Payload oder Datenbank.
