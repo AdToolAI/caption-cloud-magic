@@ -960,12 +960,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Card>
       )}
 
-      {/* ── Multi-Reference (only for capabilities.multiRef → Vidu Q2 Reference2V) ── */}
+      {/* ── Multi-Reference (capabilities.multiRef → Vidu Reference2V, Seedance 2.5) ── */}
       {model.capabilities.multiRef && !omniMediaLock && (
         <MultiReferenceUploader
           slots={viduReferences}
           onChange={setViduReferences}
           maxReferences={model.capabilities.maxReferences ?? 7}
+          required={!!model.capabilities.multiRefRequired}
+          modelLabel={model.name}
           brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
           brandCharacterName={brandCharacter?.name ?? null}
         />
