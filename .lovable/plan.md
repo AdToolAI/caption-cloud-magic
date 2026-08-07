@@ -21,7 +21,16 @@ Zusätzlich gefunden: Selbst wenn du Bilder hochlädst, kommen sie **nicht** bei
 - `src/components/ai-video/MultiReferenceUploader.tsx`: Überschrift/Beschreibung/Fußnote aus Props statt hartkodierter Vidu-Texte (DE/EN/ES), Warnung nur wenn Bilder Pflicht sind.
 - Keine Änderung an Credits, Poller oder `_shared/modelark.ts` (dort ist die Referenz-Rolle `reference_image` bereits korrekt implementiert).
 
+## Reihenfolge (sauber, ohne Rateanteil)
+
+1. ModelArk-Doku zu Seedance 2.5 prüfen: erlaubte Bildrollen, maximale Anzahl Referenzbilder, Kombinierbarkeit mit First-/Last-Frame. Erst danach werden Zahlen und Texte gesetzt — keine geschätzten Limits in der Oberfläche.
+2. Feldnamen-Fehler beheben (Referenzbilder erreichen ModelArk).
+3. Pflicht-Flag einführen, Seedance 2.5 auf „Bilder optional" stellen.
+4. Texte modellabhängig machen, keine Vidu-Formulierungen mehr in fremden Modellen.
+5. Ein Testlauf je Modus (ohne Bild / mit Bildern) im Preview, inklusive Kontrolle des tatsächlich gesendeten Payloads und des Job-Logs.
+
 ## Prüfung danach
 
 - Seedance 2.5 ohne Bild: „Generieren" ist klickbar, Job startet als Text-to-Video.
 - Seedance 2.5 mit 2 Bildern: Payload enthält die Referenz-URLs, Ergebnis übernimmt die Motive.
+- Vidu Q2 unverändert: Bildpflicht, Rollen-Tagging und Texte wie bisher.
