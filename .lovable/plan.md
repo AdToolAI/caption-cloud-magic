@@ -1,41 +1,63 @@
-# Diff-Panel wählt die falschen Datensätze aus — Befund und Fix
+# Meta-Diff: AdTool-Konto und Facebook-Profil eindeutig trennen
 
-## Befund (aus der Diagnose-Tabelle, nicht vermutet)
+## Sicher gemessener Befund
 
-Die Zuordnung im Callback ist **korrekt**. Die letzten Einträge:
+Die drei aktuellen, abgeschlossenen OAuth-Callbacks waren:
 
-| Zeit (Berlin) | Diagnostic-ID (kurz) | meta_user_id | granted | Seiten |
-|---|---|---|---|---|
-| 8.8. 00:01 | 45159e4a | 1221 1625 9151 337304 (neu) | ohne `business_management` | 0 |
-| 7.8. 23:57 | 835e7fbd | 1223 3704 2788 329815 (alt) | **mit `business_management`** | **2** |
-| 7.8. 23:56 | 229a2768 | 1221 1625 9151 337304 (neu) | ohne `business_management` | 0 |
-| 7.8. 23:36 | 46df1c4d | — | — (abgebrochen, kein Callback) | — |
+| Zeit (Berlin) | AdTool-Konto | Meta-User-ID | Ergebnis |
+|---|---|---|---|
+| 7.8. 23:56 | `ab6b…` | `122116259151337304` (neu) | 0 Seiten, `business_management` fehlt |
+| 7.8. 23:57 | `8948…` | `122337042788329815` (alt) | 2 Seiten, `business_management` erteilt |
+| 8.8. 00:01 | `ab6b…` | `122116259151337304` (neu) | 0 Seiten, `business_management` fehlt |
 
-Beide Meta-Profile werden also sauber getrennt gespeichert, mit den genau erwarteten Werten. Der historisch funktionierende Account liefert auch **jetzt** wieder `business_management` + 2 Seiten (Eintrag 835e7fbd, 23:57).
+Jeder Versuch hat eine eigene Diagnostic-ID und einen eigenen State. Callback und Datenbankzuordnung sind korrekt; es werden keine Zeilen überschrieben oder vermischt.
 
-**Ursache deines Screenshots:** Im Panel stand als A der Versuch von 23:56:35 (das ist das **neue** Profil, 0 Seiten) und als B der abgebrochene Versuch von 23:36:25 (gar keine Daten). Der gute Datensatz von 23:57 lag genau dazwischen und war nicht ausgewählt. Es wurden also zwei falsche Zeilen verglichen — kein Datenfehler, ein Auswahlfehler im Panel.
+## Warum das Panel trotzdem irreführend wirkt
 
-## Fix (nur Anzeige/Auswahl, keine OAuth-Änderung)
+`meta-oauth-diff` lädt aus Sicherheitsgründen nur Diagnosen des **aktuell angemeldeten AdTool-Kontos** (`user_id = aktueller Nutzer`). Der funktionierende Versuch um 23:57 gehört zum anderen AdTool-Konto und kann deshalb im Panel des neuen AdTool-Kontos nicht erscheinen.
 
-1. **Identität prominent zeigen**
-   - Über der Tabelle je Spalte eine Kopfzeile mit: Meta-Profil-Name, **vollständige `meta_user_id`**, Zeitstempel und kurze Diagnostic-ID.
-   - Sind beide Spalten dieselbe `meta_user_id`, erscheint ein deutlicher Warnhinweis: „Beide Spalten stammen vom selben Meta-Profil — der Vergleich ist nicht aussagekräftig."
+Im Screenshot wurde daher verglichen:
 
-2. **Abgebrochene Versuche nicht mehr vergleichbar machen**
-   - Einträge ohne `callback_completed_at` werden in den Auswahllisten in einen eigenen, ausgegrauten Abschnitt „abgebrochen (keine Messdaten)" verschoben und sind nicht mehr vorauswählbar.
+- A: neuer Meta-User um 23:56 (0 Seiten)
+- B: abgebrochener Versuch um 23:36 (keine Callback-Daten)
 
-3. **Sinnvolle Vorauswahl**
-   - Beim Laden wählt das Panel automatisch die **zwei jüngsten abgeschlossenen Versuche mit unterschiedlicher `meta_user_id`**.
-   - Zusätzlich ein Umschalter „nur abgeschlossene Versuche zeigen" (Standard: an).
+Der Name „Samuel Dusatko“ ist bei beiden Facebook-Profilen gleich und verdeckt zusätzlich, welches Profil wirklich gemeint ist. Das Panel zeigt also nicht Daten des alten Accounts; seine Beschriftung macht nur die Identität und den Abbruchstatus zu unklar.
 
-4. **Aussagekräftige Beschriftung in den Listen**
-   - Format: `Meta-ID …337304 · 2 Seiten · 8.8. 00:01` statt nur Name und Zeit — der Name ist bei beiden Profilen identisch („Samuel Dusatko") und taugt nicht zur Unterscheidung.
+## Umsetzung
 
-Nach dem Fix zeigt der Standardvergleich direkt 835e7fbd (alt, 2 Seiten) gegen 45159e4a (neu, 0 Seiten) — genau die Gegenüberstellung, die du auswerten wolltest.
+1. **Identität je Spalte unübersehbar anzeigen**
+   - Vollständige `meta_user_id`
+   - Meta-Profilname
+   - lokaler Zeitstempel
+   - kurze Diagnostic-ID
+   - Status „abgeschlossen“ oder „abgebrochen“
+
+2. **Auswahllabels eindeutig machen**
+   - Format: `Meta-ID …337304 · 0 Seiten · 8.8. 00:01 · Diagnostic 45159e4a`
+   - Nicht mehr primär über den identischen Namen „Samuel Dusatko“ beschriften.
+
+3. **Abgebrochene Versuche aus dem normalen Vergleich entfernen**
+   - Standardmäßig nur abgeschlossene Callbacks anbieten.
+   - Abgebrochene Starts separat und ausgegraut anzeigen; sie dürfen nicht automatisch als A oder B gewählt werden.
+
+4. **Falsche Vergleiche verhindern**
+   - Bei gleicher `meta_user_id` Warnung anzeigen: „Beide Spalten gehören zum selben Facebook-Profil.“
+   - Bei fehlender zweiter unterschiedlicher Meta-ID klar erklären: „Für dieses AdTool-Konto liegt nur ein Facebook-Profil vor.“
+   - Automatisch die zwei jüngsten abgeschlossenen Datensätze mit unterschiedlichen Meta-IDs wählen, sofern beide im aktuellen AdTool-Konto vorhanden sind.
+
+5. **Kontogrenze ehrlich erklären statt aufzuweichen**
+   - Das Panel bleibt strikt auf das aktuelle AdTool-Konto begrenzt; Diagnosen eines anderen Kundenkontos dürfen nicht sichtbar werden.
+   - Für den kontrollierten internen A/B-Test wird im Diagnose-Panel eine kompakte, tokenfreie Vergleichszusammenfassung exportierbar gemacht (Meta-ID, Scopes, Counts, Status, Diagnostic-ID). Die Zusammenfassungen beider Testkonten können anschließend ohne Tokens nebeneinander geprüft werden.
 
 ## Technische Details
 
-- `src/components/performance/MetaOAuthDiff.tsx`: Auswahl-Logik (Filter auf `callback_completed_at`, Auto-Pick unterschiedlicher `fb_user_id`), Kopfzeile mit Identität, Warnhinweis bei gleicher ID, neue Options-Labels.
-- `supabase/functions/meta-oauth-diff/index.ts`: `fb_user_id`, `fb_user_name`, `callback_completed_at` und `id` in der Attempt-Liste mitliefern, falls noch nicht enthalten.
-- `src/lib/translations.ts`: neue Texte DE/EN/ES.
-- Keine Änderung an Scopes, OAuth-Start, Callback-Logik oder Meta-Einstellungen.
+- `src/components/performance/MetaOAuthDiff.tsx`: eindeutige Labels, Identitätskopf, Completed-Filter, Warnzustände und sichere Zusammenfassungs-Kopie.
+- `supabase/functions/meta-oauth-diff/index.ts`: `callback_completed_at` explizit im Summary zurückgeben; bestehende `user_id`-Filterung unverändert beibehalten.
+- `src/lib/translations.ts`: Texte in DE/EN/ES.
+- Keine Änderung an OAuth-Scopes, Callback-Zuordnung, Meta-Konfiguration oder Zugriffsgrenzen.
+
+## Abnahme
+
+- Im neuen AdTool-Konto erscheinen die beiden abgeschlossenen neuen Meta-Versuche, eindeutig als Meta-ID `…337304` und 0 Seiten markiert; abgebrochene Einträge werden nicht vorausgewählt.
+- Im alten AdTool-Konto erscheint der funktionierende Meta-Versuch eindeutig als Meta-ID `…329815`, 2 Seiten und `business_management` erteilt.
+- Kein AdTool-Konto kann die Rohdiagnosen eines anderen Kontos laden.
