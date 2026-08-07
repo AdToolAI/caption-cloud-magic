@@ -6,6 +6,7 @@ import {
   discoverMetaPagesWithDiagnostics,
   type DiscoveryDiagnostics,
 } from '../_shared/meta-page-discovery.ts';
+import { measureMetaToken, recordOAuthCallback } from '../_shared/meta-oauth-diagnostics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -230,8 +231,27 @@ serve(async (req) => {
         break;
       case 'facebook':
         tokenData = await exchangeMetaToken(code);
+        // Same long-lived upgrade as the Instagram branch so both flows are
+        // structurally comparable (and the token survives page selection).
+        try {
+          const longLived = await exchangeForLongLivedToken(tokenData.access_token);
+          tokenData.access_token = longLived.access_token;
+          tokenData.expires_at = longLived.expires_at;
+        } catch (e) {
+          console.warn('[oauth-callback] FB long-lived token exchange failed, keeping short-lived:', e);
+        }
         accountInfo = await getMetaAccountInfo(tokenData.access_token, provider);
+        try {
+          const fbPerms = await fetchMetaPermissions(tokenData.access_token);
+          (accountInfo as any).granted_scopes = fbPerms.granted;
+          (accountInfo as any).declined_scopes = fbPerms.declined;
+          const fbRequired = ['pages_show_list', 'pages_read_engagement'];
+          (accountInfo as any).missing_page_scopes = fbRequired.filter((s) => !fbPerms.granted.includes(s));
+        } catch (e) {
+          console.warn('[oauth-callback] FB permission probe failed:', e);
+        }
         break;
+
       case 'tiktok':
         tokenData = await exchangeTikTokToken(code);
         accountInfo = await getTikTokAccountInfo(tokenData.access_token);
@@ -251,6 +271,24 @@ serve(async (req) => {
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
+
+    // Structural proof record for Meta connects: what did Meta actually bind
+    // to this token? Pure measurement, never alters the flow.
+    if ((provider === 'facebook' || provider === 'instagram') && tokenData?.access_token) {
+      try {
+        const measurement = await measureMetaToken(tokenData.access_token);
+        await recordOAuthCallback(supabase, {
+          userId,
+          provider,
+          stateKey: csrf,
+          measurement,
+        });
+      } catch (e) {
+        console.warn('[oauth-callback] meta diagnostics record failed:', e);
+      }
+    }
+
+
 
     // Encrypt tokens with AES-GCM for secure storage
     const accessTokenHash = tokenData.access_token 

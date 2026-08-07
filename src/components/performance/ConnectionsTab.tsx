@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { ConnectionDiagnostics } from "@/components/performance/ConnectionDiagnostics";
+import { MetaOAuthDiff } from "@/components/performance/MetaOAuthDiff";
 import { MetaPageProbePanel } from "@/components/performance/MetaPageProbePanel";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 
@@ -1174,7 +1175,10 @@ export const ConnectionsTab = () => {
 
       <ConnectionDiagnostics />
 
+      <MetaOAuthDiff />
+
       <MetaPageProbePanel />
+
 
 
       {/* CSV Upload Section */}

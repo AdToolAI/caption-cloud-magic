@@ -83,7 +83,8 @@ export async function listMetaPages(userAccessToken: string): Promise<{
     `https://graph.facebook.com/${GRAPH_VERSION}/me/accounts?` +
     `fields=id,name,category,picture{url},access_token,` +
     `instagram_business_account,connected_instagram_account&` +
-    `access_token=${userAccessToken}`;
+    `access_token=${encodeURIComponent(userAccessToken)}`;
+
 
   try {
     const res = await fetch(url);
@@ -486,7 +487,10 @@ export async function collectMetaPagesAllSources(userAccessToken: string): Promi
       extraIds.map((id) => fetchPageNode(id, userAccessToken))
     );
     for (const p of hydrated) {
-      if (p?.id && p.access_token) byId.set(String(p.id), p);
+      // Keep pages even when Meta withheld a page access token — dropping them
+      // here made "page exists but no token" indistinguishable from "no page".
+      if (p?.id) byId.set(String(p.id), p);
+
     }
   }
 

@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { decryptToken } from '../_shared/crypto.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { recordOAuthStart } from '../_shared/meta-oauth-diagnostics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -184,6 +185,18 @@ Deno.serve(async (req) => {
       scopes: configId ? null : scopes,
       url_preview: finalAuthUrl.slice(0, 200) + '…',
     });
+
+    // Pure measurement: record what we asked Meta for, before consent.
+    await recordOAuthStart(supabase, {
+      userId: user.id,
+      provider: 'facebook',
+      stateKey: csrf,
+      requestedScopes: configId ? [] : scopes.split(','),
+      dialogUrl: finalAuthUrl,
+      usesConfigId: !!configId,
+      authType: 'rerequest',
+    });
+
 
     return new Response(
       JSON.stringify({ authUrl: finalAuthUrl, url: finalAuthUrl }),

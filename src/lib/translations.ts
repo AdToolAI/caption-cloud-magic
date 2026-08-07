@@ -19772,3 +19772,49 @@ Object.assign(translations.es, {
 
   },
 });
+
+// ============================================================
+// Meta OAuth structural diff (proof before fix) — v414
+// ============================================================
+Object.assign(translations.en, {
+  metaDiff: {
+    title: 'Meta connect diff (account A vs B)',
+    description: 'Compares two Meta connect attempts field by field: requested vs granted scopes, token target IDs, /me/accounts and /me/businesses. Measurement only — nothing is changed.',
+    load: 'Load comparison',
+    attemptsFound: '{count} recorded attempts',
+    accountA: 'Attempt A',
+    accountB: 'Attempt B',
+    field: 'Field',
+    empty: 'No connect attempts recorded yet. Reconnect both accounts once, then load again.',
+    noDifference: 'No structural difference between the two attempts.',
+    errorTitle: 'Comparison failed',
+  },
+});
+Object.assign(translations.de, {
+  metaDiff: {
+    title: 'Meta-Verbindungs-Diff (Konto A vs. B)',
+    description: 'Vergleicht zwei Meta-Verbindungsversuche Feld für Feld: angeforderte vs. erteilte Berechtigungen, Token-Target-IDs, /me/accounts und /me/businesses. Reine Messung — es wird nichts verändert.',
+    load: 'Vergleich laden',
+    attemptsFound: '{count} aufgezeichnete Versuche',
+    accountA: 'Versuch A',
+    accountB: 'Versuch B',
+    field: 'Feld',
+    empty: 'Noch keine Verbindungsversuche aufgezeichnet. Beide Konten einmal neu verbinden, dann erneut laden.',
+    noDifference: 'Kein struktureller Unterschied zwischen den beiden Versuchen.',
+    errorTitle: 'Vergleich fehlgeschlagen',
+  },
+});
+Object.assign(translations.es, {
+  metaDiff: {
+    title: 'Comparación de conexión Meta (cuenta A vs. B)',
+    description: 'Compara dos intentos de conexión de Meta campo por campo: permisos solicitados y concedidos, IDs del token, /me/accounts y /me/businesses. Solo medición — no se cambia nada.',
+    load: 'Cargar comparación',
+    attemptsFound: '{count} intentos registrados',
+    accountA: 'Intento A',
+    accountB: 'Intento B',
+    field: 'Campo',
+    empty: 'Todavía no hay intentos registrados. Vuelve a conectar ambas cuentas y carga de nuevo.',
+    noDifference: 'No hay diferencia estructural entre los dos intentos.',
+    errorTitle: 'Error en la comparación',
+  },
+});

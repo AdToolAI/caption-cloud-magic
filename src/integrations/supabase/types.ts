@@ -9496,6 +9496,72 @@ export type Database = {
           },
         ]
       }
+      meta_oauth_diagnostics: {
+        Row: {
+          auth_type: string | null
+          callback_completed_at: string | null
+          created_at: string
+          debug_token_raw: Json | null
+          declined_scopes: string[] | null
+          dialog_url: string | null
+          fb_user_id: string | null
+          fb_user_name: string | null
+          granted_scopes: string[] | null
+          granular_scopes: Json | null
+          id: string
+          me_accounts_raw: Json | null
+          me_businesses_raw: Json | null
+          pages_found_count: number | null
+          provider: string
+          requested_scopes: string[] | null
+          state_key: string | null
+          user_id: string
+          uses_config_id: boolean | null
+        }
+        Insert: {
+          auth_type?: string | null
+          callback_completed_at?: string | null
+          created_at?: string
+          debug_token_raw?: Json | null
+          declined_scopes?: string[] | null
+          dialog_url?: string | null
+          fb_user_id?: string | null
+          fb_user_name?: string | null
+          granted_scopes?: string[] | null
+          granular_scopes?: Json | null
+          id?: string
+          me_accounts_raw?: Json | null
+          me_businesses_raw?: Json | null
+          pages_found_count?: number | null
+          provider: string
+          requested_scopes?: string[] | null
+          state_key?: string | null
+          user_id: string
+          uses_config_id?: boolean | null
+        }
+        Update: {
+          auth_type?: string | null
+          callback_completed_at?: string | null
+          created_at?: string
+          debug_token_raw?: Json | null
+          declined_scopes?: string[] | null
+          dialog_url?: string | null
+          fb_user_id?: string | null
+          fb_user_name?: string | null
+          granted_scopes?: string[] | null
+          granular_scopes?: Json | null
+          id?: string
+          me_accounts_raw?: Json | null
+          me_businesses_raw?: Json | null
+          pages_found_count?: number | null
+          provider?: string
+          requested_scopes?: string[] | null
+          state_key?: string | null
+          user_id?: string
+          uses_config_id?: boolean | null
+        }
+        Relationships: []
+      }
       motion_studio_character_variants: {
         Row: {
           character_id: string

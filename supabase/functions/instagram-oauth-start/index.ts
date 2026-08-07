@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { decryptToken } from '../_shared/crypto.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { recordOAuthStart } from '../_shared/meta-oauth-diagnostics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -201,6 +202,19 @@ Deno.serve(async (req) => {
       auth_type: authUrl.searchParams.get('auth_type'),
       url_preview: finalAuthUrl.slice(0, 200) + '…',
     });
+
+    // Pure measurement: record what we asked Meta for, before consent.
+    await recordOAuthStart(supabase, {
+      userId: user.id,
+      provider: 'instagram',
+      stateKey: csrf,
+      requestedScopes: configId ? [] : String(scopes).split(','),
+      dialogUrl: finalAuthUrl,
+      usesConfigId: !!configId,
+      authType: authUrl.searchParams.get('auth_type'),
+    });
+
+
 
     return new Response(
       JSON.stringify({ authUrl: finalAuthUrl }),
