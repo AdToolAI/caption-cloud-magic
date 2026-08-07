@@ -230,8 +230,27 @@ serve(async (req) => {
         break;
       case 'facebook':
         tokenData = await exchangeMetaToken(code);
+        // Same long-lived upgrade as the Instagram branch so both flows are
+        // structurally comparable (and the token survives page selection).
+        try {
+          const longLived = await exchangeForLongLivedToken(tokenData.access_token);
+          tokenData.access_token = longLived.access_token;
+          tokenData.expires_at = longLived.expires_at;
+        } catch (e) {
+          console.warn('[oauth-callback] FB long-lived token exchange failed, keeping short-lived:', e);
+        }
         accountInfo = await getMetaAccountInfo(tokenData.access_token, provider);
+        try {
+          const fbPerms = await fetchMetaPermissions(tokenData.access_token);
+          (accountInfo as any).granted_scopes = fbPerms.granted;
+          (accountInfo as any).declined_scopes = fbPerms.declined;
+          const fbRequired = ['pages_show_list', 'pages_read_engagement'];
+          (accountInfo as any).missing_page_scopes = fbRequired.filter((s) => !fbPerms.granted.includes(s));
+        } catch (e) {
+          console.warn('[oauth-callback] FB permission probe failed:', e);
+        }
         break;
+
       case 'tiktok':
         tokenData = await exchangeTikTokToken(code);
         accountInfo = await getTikTokAccountInfo(tokenData.access_token);
