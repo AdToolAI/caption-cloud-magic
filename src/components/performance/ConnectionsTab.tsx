@@ -117,7 +117,7 @@ export const ConnectionsTab = () => {
               const pagesFound = accountMetadata.meta_pages_found_count;
               const successDescription = (connected === 'facebook' || connected === 'instagram')
                 ? t('socialIntegrations.metaConnectedAs', {
-                    name: accountMetadata.meta_user_name || newConnection.account_name || '—',
+                    name: String(accountMetadata.meta_user_name || newConnection.account_name || '—'),
                     id: maskMetaUserId(metaUserId || newConnection.account_id),
                     count: typeof pagesFound === 'number' ? pagesFound : '—',
                   })
