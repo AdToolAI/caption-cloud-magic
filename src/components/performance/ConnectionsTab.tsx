@@ -603,19 +603,11 @@ export const ConnectionsTab = () => {
     setSyncError(prev => ({ ...prev, [connectionId]: false }));
     
     try {
-      // Get session with explicit refresh if needed
-      let { data: { session } } = await supabase.auth.getSession();
-      
-      // If no session or token expired, try to refresh
-      if (!session || !session.access_token) {
-        console.log('⚠️ No valid session, attempting refresh...');
-        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-        
-        if (refreshError || !refreshedSession) {
-          throw new Error(t('socialIntegrations.notAuthenticated'));
-        }
-        
-        session = refreshedSession;
+      // Single-flight session lookup (verhindert Auth-Lock-Kollisionen)
+      const session = await ensureValidSession();
+
+      if (!session?.access_token) {
+        throw new Error(t('socialIntegrations.notAuthenticated'));
       }
 
       console.log('✅ Valid session obtained for sync');
