@@ -599,7 +599,7 @@ export const ConnectionsTab = () => {
     } catch (error: any) {
       toast({
         title: t('common.error'),
-        description: error.message,
+        description: describeError(error, t('common.error')),
         variant: "destructive"
       });
     }
