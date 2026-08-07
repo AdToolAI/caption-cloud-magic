@@ -1,51 +1,41 @@
-# A/B-Vergleich Alt vs. Neu — Ergebnis liegt bereits vor
+# Diff-Panel wählt die falschen Datensätze aus — Befund und Fix
 
-Der von dir beschriebene Diagnoseblock läuft seit gestern automatisch bei jedem Callback (Tabelle `meta_oauth_diagnostics`). Beide Durchgänge sind erfasst — es braucht keinen neuen Test, nur die Auswertung.
+## Befund (aus der Diagnose-Tabelle, nicht vermutet)
 
-## Vergleichstabelle (Rohdaten aus dem Callback, keine Tokens)
+Die Zuordnung im Callback ist **korrekt**. Die letzten Einträge:
 
-| Feld | Account A (alt, funktioniert) | Account B (neu, AdTool AI) |
-|---|---|---|
-| Zeitpunkt | 07.08. 20:18 | 07.08. 20:53 |
-| Meta-User-ID | 122337042788329815 | 122116259151337304 |
-| angeforderte Scopes (unsere URL) | pages_show_list, pages_read_engagement, pages_manage_posts, **business_management** | identisch |
-| `uses_config_id` | false | false |
-| gewährte Scopes (`/me/permissions`) | pages_show_list, **business_management**, pages_read_engagement, pages_manage_posts, public_profile | pages_show_list, pages_read_engagement, pages_manage_posts, public_profile |
-| abgelehnt (declined) | keine | keine |
-| `granular_scopes` | 4 Scopes, **kein** `target_ids` | 3 Scopes, **kein** `target_ids` |
-| `/me/accounts` | 2 Seiten (Mystische…, Bestofproducts4u) | `data: []` (HTTP 200) |
-| `/me/businesses` | 3 Portfolios inkl. `owned_pages` | HTTP 400 `(#100) Missing Permission` |
-| Token gültig | ja | ja |
+| Zeit (Berlin) | Diagnostic-ID (kurz) | meta_user_id | granted | Seiten |
+|---|---|---|---|---|
+| 8.8. 00:01 | 45159e4a | 1221 1625 9151 337304 (neu) | ohne `business_management` | 0 |
+| 7.8. 23:57 | 835e7fbd | 1223 3704 2788 329815 (alt) | **mit `business_management`** | **2** |
+| 7.8. 23:56 | 229a2768 | 1221 1625 9151 337304 (neu) | ohne `business_management` | 0 |
+| 7.8. 23:36 | 46df1c4d | — | — (abgebrochen, kein Callback) | — |
 
-## Was das beweist
+Beide Meta-Profile werden also sauber getrennt gespeichert, mit den genau erwarteten Werten. Der historisch funktionierende Account liefert auch **jetzt** wieder `business_management` + 2 Seiten (Eintrag 835e7fbd, 23:57).
 
-1. **Der Unterschied ist auf Token-Ebene bestätigt.** Identische Anfrage, unterschiedliches Ergebnis: bei B fehlt `business_management` in den gewährten Scopes — und zwar **nicht als „declined"**, sondern es taucht gar nicht erst auf. Meta hat die Berechtigung bei B nicht angeboten. Genau das entspricht dem verkürzten 3-Schalter-Dialog.
-2. **`/me/businesses` scheitert bei B nur als Folge davon** (`Missing Permission` = fehlendes `business_management`). Das ist Symptom, nicht Ursache.
-3. **`target_ids` fehlt in beiden Fällen** — auch beim funktionierenden Account A. Die Asset-Zuordnung läuft hier also nicht über granulare Scopes; A bekommt seine Seiten schlicht über `/me/accounts`. Diese Spur ist damit erledigt.
-4. **Unsere Plattform ist entlastet:** angeforderte Scopes, Dialog-URL und Callback sind bei A und B byte-gleich. Der Unterschied entsteht ausschließlich bei Meta.
+**Ursache deines Screenshots:** Im Panel stand als A der Versuch von 23:56:35 (das ist das **neue** Profil, 0 Seiten) und als B der abgebrochene Versuch von 23:36:25 (gar keine Daten). Der gute Datensatz von 23:57 lag genau dazwischen und war nicht ausgewählt. Es wurden also zwei falsche Zeilen verglichen — kein Datenfehler, ein Auswahlfehler im Panel.
 
-Zwei spätere Einträge (20:55 und 21:36) haben keine Callback-Daten — diese Verbindungsversuche wurden abgebrochen, bevor Meta zurückkam.
+## Fix (nur Anzeige/Auswahl, keine OAuth-Änderung)
 
-## Schritt 2: warum Meta `business_management` bei B nicht anbietet
+1. **Identität prominent zeigen**
+   - Über der Tabelle je Spalte eine Kopfzeile mit: Meta-Profil-Name, **vollständige `meta_user_id`**, Zeitstempel und kurze Diagnostic-ID.
+   - Sind beide Spalten dieselbe `meta_user_id`, erscheint ein deutlicher Warnhinweis: „Beide Spalten stammen vom selben Meta-Profil — der Vergleich ist nicht aussagekräftig."
 
-Eine Sache ist bisher **nicht** gemessen und entscheidet alles Weitere: ob Meta die Berechtigung bei B aktiv verweigert oder sie beim Dialogaufbau gar nicht in Betracht zieht.
+2. **Abgebrochene Versuche nicht mehr vergleichbar machen**
+   - Einträge ohne `callback_completed_at` werden in den Auswahllisten in einen eigenen, ausgegrauten Abschnitt „abgebrochen (keine Messdaten)" verschoben und sind nicht mehr vorauswählbar.
 
-Dafür eine temporäre Diagnose-Route (ändert den normalen Verbindungsweg nicht):
+3. **Sinnvolle Vorauswahl**
+   - Beim Laden wählt das Panel automatisch die **zwei jüngsten abgeschlossenen Versuche mit unterschiedlicher `meta_user_id`**.
+   - Zusätzlich ein Umschalter „nur abgeschlossene Versuche zeigen" (Standard: an).
 
-- Neue Funktion `meta-scope-probe-start`: baut denselben Dialog, aber mit **nur** `business_management` als Scope und `auth_type=rerequest`.
-- Ergebnis wird in dieselbe Diagnose-Tabelle geschrieben, markiert als `probe`.
-- Auswertung:
-  - Meta zeigt bei B den Dialog und erteilt die Berechtigung → dann blockiert die Kombination der Scopes im normalen Dialog; wir splitten den Consent.
-  - Meta zeigt den Dialog und die Berechtigung bleibt trotz Zustimmung ungewährt → Asset-/Rollen-Ebene bei Meta; App-Review-relevant.
-  - Meta bricht mit Fehlercode ab → der Fehlercode benennt die Ursache direkt.
-- Die Probe-Route ist über das Diagnose-Panel erreichbar und wird nach der Klärung wieder entfernt.
+4. **Aussagekräftige Beschriftung in den Listen**
+   - Format: `Meta-ID …337304 · 2 Seiten · 8.8. 00:01` statt nur Name und Zeit — der Name ist bei beiden Profilen identisch („Samuel Dusatko") und taugt nicht zur Unterscheidung.
 
-**Erst nach diesem Befund** planen wir den eigentlichen Fix. Keine weitere Einstellung auf Verdacht.
+Nach dem Fix zeigt der Standardvergleich direkt 835e7fbd (alt, 2 Seiten) gegen 45159e4a (neu, 0 Seiten) — genau die Gegenüberstellung, die du auswerten wolltest.
 
 ## Technische Details
 
-- Neu: `supabase/functions/meta-scope-probe-start/index.ts` (JWT-verifiziert, `oauth_states`-Eintrag mit `provider = 'facebook_probe'`, Scope-Liste ausschließlich `business_management`).
-- `supabase/functions/oauth-callback/index.ts`: `facebook_probe` behandeln — Messblock ausführen, Ergebnis in `meta_oauth_diagnostics` schreiben, **keine** `social_connections`-Zeile anlegen.
-- `src/components/performance/MetaOAuthDiff.tsx`: Button „Scope-Probe starten" plus Anzeige der Probe-Zeilen.
-- `src/lib/translations.ts`: DE/EN/ES.
-- Keine Änderung an den bestehenden Facebook-/Instagram-Scopes, an der Meta-App oder an der Datenbankstruktur (die Tabelle existiert bereits).
+- `src/components/performance/MetaOAuthDiff.tsx`: Auswahl-Logik (Filter auf `callback_completed_at`, Auto-Pick unterschiedlicher `fb_user_id`), Kopfzeile mit Identität, Warnhinweis bei gleicher ID, neue Options-Labels.
+- `supabase/functions/meta-oauth-diff/index.ts`: `fb_user_id`, `fb_user_name`, `callback_completed_at` und `id` in der Attempt-Liste mitliefern, falls noch nicht enthalten.
+- `src/lib/translations.ts`: neue Texte DE/EN/ES.
+- Keine Änderung an Scopes, OAuth-Start, Callback-Logik oder Meta-Einstellungen.
