@@ -269,12 +269,18 @@ export function MultiReferenceUploader({
       />
 
       {slots.length === 0 && (
-        <p className="text-[10px] text-amber-500/80">
-          {language === 'de'
-            ? '⚠️ Mindestens 1 Bild erforderlich für Reference2V.'
-            : language === 'es'
-            ? '⚠️ Se requiere al menos 1 imagen para Reference2V.'
-            : '⚠️ At least 1 image required for Reference2V.'}
+        <p className={`text-[10px] ${required ? 'text-amber-500/80' : 'text-muted-foreground'}`}>
+          {required
+            ? language === 'de'
+              ? '⚠️ Mindestens 1 Bild erforderlich.'
+              : language === 'es'
+              ? '⚠️ Se requiere al menos 1 imagen.'
+              : '⚠️ At least 1 image required.'
+            : language === 'de'
+              ? 'Optional — ohne Bild entsteht ein reines Text-to-Video.'
+              : language === 'es'
+              ? 'Opcional — sin imagen se genera un vídeo solo de texto.'
+              : 'Optional — without an image this is a pure text-to-video.'}
         </p>
       )}
     </Card>
