@@ -2,16 +2,18 @@
 
 Du hast recht: wenn Meta die Seite im Dialog anzeigt und du bestätigst, liegt der Rest bei uns. Ich habe den Code gelesen — es gibt zwei konkrete Stellen auf unserer Seite, die genau dieses Verhalten erzeugen.
 
-## Befund 1: Wir starten den falschen Login-Typ für Business-Portfolios
+## Zu deiner Frage: nein, die Konfigurations-ID kann ich nicht haben
 
-`facebook-oauth-start` baut die Dialog-URL so:
+Die Konfigurations-ID entsteht nicht bei uns, sondern wird einmalig **in deiner Meta-App** angelegt (Facebook Login for Business → Configurations). Sie steht in unseren Secrets nicht (Secret-Liste geprüft: `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`, `FB_APP_ID`, `FB_APP_SECRET` — kein `META_LOGIN_CONFIG_ID`).
 
-- Wenn das Secret `META_LOGIN_CONFIG_ID` gesetzt ist → „Facebook Login for Business" (Asset-Auswahl, Seiten werden dem Token fest zugeordnet).
-- Wenn es fehlt → klassischer Login mit `scope=...`.
+Dass die Seiten trotzdem im Dialog auftauchen, ist kein Widerspruch: Der **klassische** Login-Dialog (`scope=...`, ohne `config_id`) zeigt sehr wohl eine Seitenliste zum Ankreuzen — er nutzt dafür deine Anmeldung im Browser, nicht die App-Konfiguration. Nur bindet er die Auswahl bei Seiten in einem Business-Portfolio nicht zuverlässig als Asset an das ausgestellte Token. Genau dieses Bild haben wir: Anzeige im Dialog ja, danach `/me/accounts` leer.
 
-**`META_LOGIN_CONFIG_ID` ist in unseren Secrets nicht vorhanden** (Secret-Liste geprüft). Wir laufen also im klassischen Modus. Genau der zeigt bei Seiten, die in einem Business-Portfolio liegen, die Seite im Dialog an — bindet sie aber nicht als Asset an das Token. Ergebnis: Zustimmung „erfolgreich", danach `/me/accounts` leer.
+## Befund 1: Wir laufen im klassischen Login-Modus
 
-Dazu passt exakt, was in deiner gespeicherten Verbindung steht: `meta_pages_found_count: 0`, `meta_page_discovery_status: "meta_pages_hidden_or_unavailable"`, und `granted_scopes` enthält **kein** `business_management` — obwohl wir es anfordern. Meta lässt es im klassischen Dialog still weg.
+`facebook-oauth-start` und `instagram-oauth-start` prüfen `META_LOGIN_CONFIG_ID`; ist die Variable leer, fallen beide still auf den klassischen Dialog zurück. Da sie leer ist, läuft jeder Connect im Fallback.
+
+Passend dazu steht in deiner gespeicherten Verbindung: `meta_pages_found_count: 0`, `meta_page_discovery_status: "meta_pages_hidden_or_unavailable"`, und `granted_scopes` enthält **kein** `business_management` — obwohl `facebook-oauth-start` es anfordert. Meta lässt es im klassischen Dialog still weg.
+
 
 ## Befund 2: Wir werfen gefundene Seiten wieder weg
 
@@ -54,4 +56,4 @@ Im `oauth-callback` läuft für `instagram` die volle Seiten-Erkennung inklusive
 - `src/components/performance/FacebookPageSelectDialog.tsx` + `src/lib/translations.ts`: Leerzustand mit gemessenem Grund.
 - Keine Datenbank-Änderung.
 
-Ohne die Konfigurations-ID aus deiner Meta-App kann ich Punkt 1 nur vorbereiten, nicht scharf schalten — Punkte 2–4 wirken sofort.
+Punkte 2–4 wirken sofort und sind unabhängig von Meta. Für Punkt 1 brauche ich die Konfigurations-ID aus deiner App — die kann nur dort erzeugt werden; ich kann sie weder auslesen noch erfinden.
