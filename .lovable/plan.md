@@ -10,14 +10,17 @@ Bestätigt aus deinen Screenshots:
 
 ## Deine nächsten Schritte in der ModelArk-Konsole
 
-1. **Resource Pack/Coding Plan erwerben (aktueller Blocker)**
-   Deine Kreditkarte ist bereits hinterlegt. Die Fehlermeldung lautet jedoch `No available resource packs. Please purchase a resource pack first` — ModelArk verlangt für die Vorabprüfung zusätzlich einen aktiven Resource Pack in **Asia Pacific (Johor)**.
-   - Im Fehler rechts zuerst **„I acknowledge"** anklicken und den Aktivierungsdialog schließen.
-   - Oben auf **„Subscription"** oder **„Coding Plan"** gehen.
-   - Einen für **Media / Video Generation / Dreamina-Seedance** gültigen Resource Pack auswählen; kein reines LLM-/Token-Paket kaufen.
-   - Beim Kauf kontrollieren, dass die Region **Asia Pacific (Johor / ap-southeast-1)** ist.
-   - Pack bezahlen/aktivieren und warten, bis er unter Subscription als **Active** erscheint.
-   - Falls dort kein Video-Pack angeboten wird: **Contact Sales** öffnen und ausdrücklich „Dreamina Seedance 2.5 API resource pack for ap-southeast-1 (Johor)" anfordern. Das ist dann eine Freischaltung durch BytePlus und kein Fehler in unserer Plattform.
+1. **Guthaben/Resource Pack klären (aktueller Blocker)**
+   Deine Kreditkarte ist hinterlegt, aber die Vorabprüfung meldet `No available resource packs. Please purchase a resource pack first`.
+
+   **Nicht den Coding Plan kaufen.** „Coding Plan Personal Edition" (Lite 10 $ / Pro 50 $) ist ein Abo für Programmier-LLMs und deckt Video-Generation nicht ab — der Kauf löst den Fehler nicht.
+
+   Richtiger Weg, in dieser Reihenfolge:
+   - Im Fehlerdialog **„I acknowledge"** klicken und den Aktivierungsdialog schließen.
+   - Oben rechts auf das Konto-Symbol → **Billing / Finance / Account Balance** → **Guthaben aufladen** (Prepaid-Balance, kein Abo). ModelArk rechnet Video pay-as-you-go über das Kontoguthaben ab; die Vorabprüfung verlangt ein positives Guthaben in **ap-southeast-1**.
+   - Danach erneut **Model activation** → *Dreamina Seedance 2.5* → **Activate**.
+   - Bleibt der Fehler: **Contact Sales** (oben rechts) oder Chat-Button unten rechts, wörtlich: „Please enable the Dreamina Seedance 2.5 video generation API for my BytePlus ModelArk account in ap-southeast-1 (Johor). Model activation fails with: No available resource packs." Video-Modelle sind bei BytePlus für Neukonten oft erst nach manueller Freigabe nutzbar — das liegt dann bei BytePlus, nicht an unserer Plattform.
+
 
 2. **Seedance 2.5 erneut freischalten**
    Linke Navigation → **„Model activation"** → nach *Dreamina Seedance 2.5* suchen → **Activate / Enable**.
