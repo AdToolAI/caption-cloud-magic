@@ -202,6 +202,19 @@ Deno.serve(async (req) => {
       url_preview: finalAuthUrl.slice(0, 200) + '…',
     });
 
+    // Pure measurement: record what we asked Meta for, before consent.
+    await recordOAuthStart(supabase, {
+      userId: user.id,
+      provider: 'instagram',
+      stateKey: csrf,
+      requestedScopes: configId ? [] : String(scopes).split(','),
+      dialogUrl: finalAuthUrl,
+      usesConfigId: !!configId,
+      authType: authUrl.searchParams.get('auth_type'),
+    });
+
+
+
     return new Response(
       JSON.stringify({ authUrl: finalAuthUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
