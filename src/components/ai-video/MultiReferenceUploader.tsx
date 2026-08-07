@@ -43,6 +43,10 @@ interface Props {
   slots: ViduReferenceSlot[];
   onChange: (slots: ViduReferenceSlot[]) => void;
   maxReferences?: number;
+  /** True when the active model cannot generate without at least one reference. */
+  required?: boolean;
+  /** Model name shown in the helper copy (defaults to a neutral wording). */
+  modelLabel?: string;
   /** Optional: URL of the active Brand Character to offer "Load from Lock". */
   brandCharacterUrl?: string | null;
   brandCharacterName?: string | null;
