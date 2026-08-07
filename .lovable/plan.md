@@ -1,47 +1,51 @@
-# Neuer Account: Was jetzt noch fehlt (Portfolio-Zugriff ist schon da)
+# A/B-Vergleich Alt vs. Neu — Ergebnis liegt bereits vor
 
-## Befund aus deinem Screenshot
+Der von dir beschriebene Diagnoseblock läuft seit gestern automatisch bei jedem Callback (Tabelle `meta_oauth_diagnostics`). Beide Durchgänge sind erfasst — es braucht keinen neuen Test, nur die Auswertung.
 
-Unter Nutzer → Personen steht dein Profil mit **„Uneingeschränkter Zugriff / Alles"**. Die Portfolio-Rolle ist also nicht das Problem — der Punkt „Vollzugriff geben" entfällt.
+## Vergleichstabelle (Rohdaten aus dem Callback, keine Tokens)
 
-Damit bleiben genau zwei Stellen übrig, die Meta braucht, damit im Login-Dialog Asset-Zeilen erscheinen:
-1. Die Seite muss unter **Konten → Seiten** in diesem Portfolio liegen (im Besitz, nicht nur verbunden).
-2. Die App **AdTool AI** muss unter **Konten → Apps** im Portfolio eingetragen sein. Fehlt der App-Eintrag, liefert Meta bei `business_management` schlicht nichts — genau das haben wir gemessen (0 Seiten, Berechtigung nicht erteilt).
+| Feld | Account A (alt, funktioniert) | Account B (neu, AdTool AI) |
+|---|---|---|
+| Zeitpunkt | 07.08. 20:18 | 07.08. 20:53 |
+| Meta-User-ID | 122337042788329815 | 122116259151337304 |
+| angeforderte Scopes (unsere URL) | pages_show_list, pages_read_engagement, pages_manage_posts, **business_management** | identisch |
+| `uses_config_id` | false | false |
+| gewährte Scopes (`/me/permissions`) | pages_show_list, **business_management**, pages_read_engagement, pages_manage_posts, public_profile | pages_show_list, pages_read_engagement, pages_manage_posts, public_profile |
+| abgelehnt (declined) | keine | keine |
+| `granular_scopes` | 4 Scopes, **kein** `target_ids` | 3 Scopes, **kein** `target_ids` |
+| `/me/accounts` | 2 Seiten (Mystische…, Bestofproducts4u) | `data: []` (HTTP 200) |
+| `/me/businesses` | 3 Portfolios inkl. `owned_pages` | HTTP 400 `(#100) Missing Permission` |
+| Token gültig | ja | ja |
 
-Dazu kommt die alte, leere App-Zustimmung, die Meta sonst stillschweigend wiederverwendet.
+## Was das beweist
 
-## Schritt für Schritt
+1. **Der Unterschied ist auf Token-Ebene bestätigt.** Identische Anfrage, unterschiedliches Ergebnis: bei B fehlt `business_management` in den gewährten Scopes — und zwar **nicht als „declined"**, sondern es taucht gar nicht erst auf. Meta hat die Berechtigung bei B nicht angeboten. Genau das entspricht dem verkürzten 3-Schalter-Dialog.
+2. **`/me/businesses` scheitert bei B nur als Folge davon** (`Missing Permission` = fehlendes `business_management`). Das ist Symptom, nicht Ursache.
+3. **`target_ids` fehlt in beiden Fällen** — auch beim funktionierenden Account A. Die Asset-Zuordnung läuft hier also nicht über granulare Scopes; A bekommt seine Seiten schlicht über `/me/accounts`. Diese Spur ist damit erledigt.
+4. **Unsere Plattform ist entlastet:** angeforderte Scopes, Dialog-URL und Callback sind bei A und B byte-gleich. Der Unterschied entsteht ausschließlich bei Meta.
 
-**1. Seiten prüfen**
-Einstellungen → Konten → **Seiten**. Steht „AdTool AI" dort? Wenn nein: „Hinzufügen" → **Seite beanspruchen** (nicht „Zugriff anfordern") → Seite auswählen → bestätigen.
-Wenn ja: Seite anklicken → rechts unter **Personen** muss dein Profil mit aktivierten Aufgaben (Inhalte, Insights, Nachrichten) stehen. Sonst dort hinzufügen.
+Zwei spätere Einträge (20:55 und 21:36) haben keine Callback-Daten — diese Verbindungsversuche wurden abgebrochen, bevor Meta zurückkam.
 
-**2. App im Portfolio eintragen — das ist der wahrscheinlich fehlende Punkt**
-Einstellungen → Konten → **Apps** → „Hinzufügen" → **App-ID unserer Meta-App** eintragen (die ID aus dem Secret `META_APP_ID`; ich nenne sie dir im nächsten Schritt, sobald der Plan freigegeben ist). Danach der App die Seite „AdTool AI" als Asset zuweisen.
+## Schritt 2: warum Meta `business_management` bei B nicht anbietet
 
-**3. Alte Zustimmung löschen**
-facebook.com mit demselben Profil → Einstellungen und Privatsphäre → Einstellungen → **Apps und Websites** → „AdTool AI" → **Entfernen**. Ohne das zeigt Meta wieder den verkürzten 3-Schalter-Dialog.
+Eine Sache ist bisher **nicht** gemessen und entscheidet alles Weitere: ob Meta die Berechtigung bei B aktiv verweigert oder sie beim Dialogaufbau gar nicht in Betracht zieht.
 
-**4. Neu verbinden und prüfen**
-AdTool AI → /integrations → Facebook „Verbinden". Der Dialog muss jetzt zeigen:
-- „Manage your business" mit dem Portfolio **AdTool AI**
-- „Create and manage content on your Page" mit der Seite **AdTool AI**
-Beides anhaken → Fertig. Die Karte muss danach „1 Seite gefunden" melden und den Auswahldialog öffnen.
+Dafür eine temporäre Diagnose-Route (ändert den normalen Verbindungsweg nicht):
 
-**5. Falls weiterhin 0 Seiten**
-Im Diff-Panel „Vergleich laden" — dort steht dann schwarz auf weiß, welche Berechtigung Meta verweigert hat. Erst danach folgt ein weiterer Fix, nicht auf Verdacht.
+- Neue Funktion `meta-scope-probe-start`: baut denselben Dialog, aber mit **nur** `business_management` als Scope und `auth_type=rerequest`.
+- Ergebnis wird in dieselbe Diagnose-Tabelle geschrieben, markiert als `probe`.
+- Auswertung:
+  - Meta zeigt bei B den Dialog und erteilt die Berechtigung → dann blockiert die Kombination der Scopes im normalen Dialog; wir splitten den Consent.
+  - Meta zeigt den Dialog und die Berechtigung bleibt trotz Zustimmung ungewährt → Asset-/Rollen-Ebene bei Meta; App-Review-relevant.
+  - Meta bricht mit Fehlercode ab → der Fehlercode benennt die Ursache direkt.
+- Die Probe-Route ist über das Diagnose-Panel erreichbar und wird nach der Klärung wieder entfernt.
 
-## Was ich in der App ändere
-
-Kein Eingriff in OAuth, Scopes oder Datenbank — nur der 0-Seiten-Zustand wird handlungsleitend:
-
-- Der Warnblock auf der Facebook-Karte ersetzt die pauschale Meldung durch diese Prüfliste: Seite im Portfolio beansprucht · App im Portfolio eingetragen · alte App-Zustimmung entfernt — jeweils mit Direktlink (Business-Suite-Einstellungen, Facebook „Apps und Websites").
-- Die Meta-App-ID wird in dem Block angezeigt, damit man sie beim Schritt „App hinzufügen" direkt kopieren kann (die App-ID ist öffentlich, kein Secret).
-- Aktionsreihenfolge: „Zustimmung zurücksetzen und neu verbinden" zuerst, „Mit anderem Facebook-Konto verbinden" als Zweitoption.
+**Erst nach diesem Befund** planen wir den eigentlichen Fix. Keine weitere Einstellung auf Verdacht.
 
 ## Technische Details
 
-- `src/components/performance/ConnectionsTab.tsx`: Inhalt des `metaIncomplete`-Blocks auf die 3-Punkte-Checkliste + Links + App-ID-Anzeige umstellen, Buttonreihenfolge anpassen.
-- Meta-App-ID im Frontend über eine bestehende Health-/Config-Antwort beziehen (kein neues Secret im Client).
-- `src/lib/translations.ts`: `metaNoPagesBody` präzisieren, neue Checklisten-Schlüssel in DE/EN/ES.
-- Keine Änderung an `oauth-callback`, Scopes, Datenbank oder Meta-App-Konfiguration.
+- Neu: `supabase/functions/meta-scope-probe-start/index.ts` (JWT-verifiziert, `oauth_states`-Eintrag mit `provider = 'facebook_probe'`, Scope-Liste ausschließlich `business_management`).
+- `supabase/functions/oauth-callback/index.ts`: `facebook_probe` behandeln — Messblock ausführen, Ergebnis in `meta_oauth_diagnostics` schreiben, **keine** `social_connections`-Zeile anlegen.
+- `src/components/performance/MetaOAuthDiff.tsx`: Button „Scope-Probe starten" plus Anzeige der Probe-Zeilen.
+- `src/lib/translations.ts`: DE/EN/ES.
+- Keine Änderung an den bestehenden Facebook-/Instagram-Scopes, an der Meta-App oder an der Datenbankstruktur (die Tabelle existiert bereits).
