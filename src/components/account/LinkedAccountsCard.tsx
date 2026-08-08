@@ -111,10 +111,10 @@ export const LinkedAccountsCard = () => {
             `${PLATFORMS[platform].name} ${t("accountLinked.disconnected")} — Meta permissions revoked, local cleanup partial.`
           );
         } else {
-          // No actual Meta-side revoke happened. Warn the user instead of
-          // pretending the next reconnect will be clean.
+          // No actual Meta-side revoke happened. Tell the user what to do,
+          // without dumping raw Graph API JSON into the toast.
           toast.warning(
-            `${PLATFORMS[platform].name} ${t("accountLinked.disconnected")} locally, but Meta still remembers this app${data?.revokeError ? ` (${data.revokeError})` : ''}. The next connect may skip the consent dialog.`
+            `${PLATFORMS[platform].name}: ${t("common.metaDisconnected")} ${t("common.metaGrantRemains")}`
           );
         }
         return;
