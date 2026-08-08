@@ -86,6 +86,9 @@ Deno.serve(async (req) => {
     let revoked = false;
     let revokeError: string | null = null;
     let metaUserResolved = false;
+    // Kept for the post-revoke debug_token verification (App Review recording prep)
+    let lastUserToken: string | null = null;
+    let resolvedMetaUserId: string | null = null;
 
     /** Turn a Graph API error body into one short readable line. */
     const shortGraphError = (status: number, body: string): string => {
