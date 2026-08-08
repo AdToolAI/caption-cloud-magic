@@ -160,6 +160,8 @@ Deno.serve(async (req) => {
           continue;
         }
         metaUserResolved = true;
+        lastUserToken = userToken;
+        resolvedMetaUserId = metaUserId;
         console.log('[instagram-oauth-revoke] Resolved Meta user id:', metaUserId, 'via', connection.provider);
 
         const revokeRes = await fetch(
