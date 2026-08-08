@@ -1,0 +1,1 @@
+UPDATE public.ai_video_wallets SET balance_euros = 500, updated_at = now() WHERE user_id = 'ab6bf0d1-fe33-4cdd-b2cc-4a4ce727b4f4';
