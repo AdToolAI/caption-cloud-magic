@@ -1,5 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
-import { decryptToken } from '../_shared/crypto.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { recordOAuthStart } from '../_shared/meta-oauth-diagnostics.ts';
 
@@ -12,8 +11,8 @@ const corsHeaders = {
 /**
  * Starts the real Meta OAuth flow for Facebook Pages.
  * Mirrors instagram-oauth-start: uses Graph API v24.0 (v18 is deprecated and
- * triggers Meta's "Feature nicht verfügbar" maintenance screen), performs a
- * best-effort grant reset, then redirects the user to facebook.com/v24.0/dialog/oauth.
+ * triggers Meta's "Feature nicht verfügbar" maintenance screen), then
+ * redirects the user to facebook.com/v24.0/dialog/oauth.
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,10 +32,12 @@ Deno.serve(async (req) => {
 
     let returnTo: string | null = null;
     let forceAccountChooser = false;
+    let mode: 'connect' | 'review_reset' = 'connect';
     try {
       const body = await req.json();
       returnTo = body?.returnTo || null;
       forceAccountChooser = !!body?.forceAccountChooser;
+      if (body?.mode === 'review_reset') mode = 'review_reset';
     } catch (_) {
       // body optional
     }
@@ -62,49 +63,14 @@ Deno.serve(async (req) => {
       throw new Error('META_APP_ID not configured');
     }
 
-    console.log('[facebook-oauth-start] invoked', { user_id: user.id, hasReturnTo: !!returnTo });
-
-    // ----- Best-effort BACKEND hard-reset of the Meta app grant -----
-    try {
-      const { data: metaConnections } = await supabase
-        .from('social_connections')
-        .select('id, provider, access_token_hash')
-        .eq('user_id', user.id)
-        .in('provider', ['instagram', 'facebook']);
-
-      for (const conn of metaConnections ?? []) {
-        if (!conn.access_token_hash) continue;
-        try {
-          const userToken = await decryptToken(conn.access_token_hash);
-          const meRes = await fetch(
-            `https://graph.facebook.com/v24.0/me?fields=id&access_token=${encodeURIComponent(userToken)}`
-          );
-          if (!meRes.ok) continue;
-          const me = await meRes.json();
-          const metaUserId = me?.id;
-          if (!metaUserId) continue;
-          const revokeRes = await fetch(
-            `https://graph.facebook.com/v24.0/${metaUserId}/permissions?access_token=${encodeURIComponent(userToken)}`,
-            { method: 'DELETE' }
-          );
-          if (revokeRes.ok) {
-            console.log('[facebook-oauth-start] backend revoke OK via', conn.provider);
-            break;
-          }
-        } catch (e) {
-          console.warn('[facebook-oauth-start] backend revoke skip', conn.provider, e);
-        }
-      }
-
-      // Purge stale fb rows so the new connection starts clean.
-      await supabase
-        .from('social_connections')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('provider', 'facebook');
-    } catch (resetErr) {
-      console.warn('[facebook-oauth-start] backend hard-reset failed (continuing):', resetErr);
-    }
+    const oauthProvider = mode === 'review_reset' ? 'facebook_review_reset' : 'facebook';
+    if (mode === 'review_reset') forceAccountChooser = true;
+    console.log('[facebook-oauth-start] invoked', {
+      user_id: user.id,
+      hasReturnTo: !!returnTo,
+      mode,
+      force_account_chooser: forceAccountChooser,
+    });
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
@@ -113,7 +79,7 @@ Deno.serve(async (req) => {
     const timestamp = Date.now();
     const state = btoa(JSON.stringify({
       user_id: user.id,
-      provider: 'facebook',
+      provider: oauthProvider,
       csrf,
       timestamp,
     }));
@@ -134,7 +100,7 @@ Deno.serve(async (req) => {
       .from('oauth_states')
       .insert({
         user_id: user.id,
-        provider: 'facebook',
+        provider: oauthProvider,
         csrf_token: csrf,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
         redirect_url: safeReturnTo,
@@ -168,12 +134,12 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('state', state);
-    if (configId) {
+    if (configId && mode === 'connect') {
       // Business Login flow — scopes are defined inside the configuration.
       authUrl.searchParams.set('config_id', configId);
     } else {
       // Classic Facebook Login — pass scopes inline.
-      authUrl.searchParams.set('scope', scopes);
+      authUrl.searchParams.set('scope', mode === 'review_reset' ? 'public_profile' : scopes);
     }
     // Force the asset picker instead of silently reusing the old grant.
     authUrl.searchParams.set('auth_type', 'rerequest');
@@ -187,19 +153,22 @@ Deno.serve(async (req) => {
       : dialogUrl;
     console.log('[facebook-oauth-start] Authorize URL built', {
       force_account_chooser: forceAccountChooser,
+      mode,
       user_id: user.id,
       redirect_uri: redirectUri,
       uses_config_id: !!configId,
-      scopes: configId ? null : scopes,
+      scopes: configId && mode === 'connect' ? null : (mode === 'review_reset' ? 'public_profile' : scopes),
       url_preview: finalAuthUrl.slice(0, 200) + '…',
     });
 
     // Pure measurement: record what we asked Meta for, before consent.
     await recordOAuthStart(supabase, {
       userId: user.id,
-      provider: 'facebook',
+      provider: oauthProvider,
       stateKey: csrf,
-      requestedScopes: configId ? [] : scopes.split(','),
+      requestedScopes: configId && mode === 'connect'
+        ? []
+        : (mode === 'review_reset' ? ['public_profile'] : scopes.split(',')),
       dialogUrl: finalAuthUrl,
       usesConfigId: !!configId,
       authType: 'rerequest',
@@ -207,7 +176,7 @@ Deno.serve(async (req) => {
 
 
     return new Response(
-      JSON.stringify({ authUrl: finalAuthUrl, url: finalAuthUrl }),
+      JSON.stringify({ authUrl: finalAuthUrl, url: finalAuthUrl, mode, forceAccountChooser }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

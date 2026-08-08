@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/integrations/supabase/client";
 import { ensureValidSession, isAuthLockError } from "@/lib/ensureSession";
@@ -29,6 +29,21 @@ export const MetaOAuthResetPanel = ({ onReset }: { onReset?: () => void }) => {
   const [connecting, setConnecting] = useState(false);
   const [result, setResult] = useState<ResetResult | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const resetStatus = params.get('meta_reset');
+    if (!resetStatus) return;
+    const cleared = resetStatus === 'cleared';
+    setResult({
+      at: params.get('reset_at') || new Date().toISOString(),
+      revoked: params.get('revoked') === 'true',
+      revokeError: cleared ? null : params.get('message'),
+      deletedProviders: cleared ? ['facebook', 'instagram'] : [],
+      authorizationCleared: cleared,
+      remainingScopes: [],
+    });
+  }, []);
+
   const describeError = (error: any, fallback: string) =>
     isAuthLockError(error)
       ? t('socialIntegrations.sessionBusyRetry')
@@ -40,32 +55,18 @@ export const MetaOAuthResetPanel = ({ onReset }: { onReset?: () => void }) => {
       const session = await ensureValidSession();
       if (!session?.access_token) throw new Error(t('socialIntegrations.pleaseReLogin'));
 
-      const { data, error } = await supabase.functions.invoke('instagram-oauth-revoke', {
-        body: {},
+      const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
+        body: {
+          returnTo: window.location.href,
+          forceAccountChooser: true,
+          mode: 'review_reset',
+        },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (error) throw error;
-
-      const next: ResetResult = {
-        at: new Date().toISOString(),
-        revoked: !!data?.revoked,
-        revokeError: data?.revokeError ?? null,
-        deletedProviders: data?.deletedProviders ?? [],
-        authorizationCleared: data?.authorization_cleared ?? null,
-        remainingScopes: data?.remaining_scopes ?? [],
-      };
-      setResult(next);
-      onReset?.();
-
-      toast({
-        title: next.authorizationCleared
-          ? t('socialIntegrations.metaReset.doneTitle')
-          : t('socialIntegrations.metaReset.partialTitle'),
-        description: next.authorizationCleared
-          ? t('socialIntegrations.metaReset.doneDesc')
-          : t('socialIntegrations.metaReset.partialDesc'),
-        variant: next.authorizationCleared ? undefined : 'destructive',
-      });
+      const url = data?.authUrl || data?.url;
+      if (!url) throw new Error('No reset authorization URL received');
+      window.location.href = url;
     } catch (error: any) {
       toast({
         title: t('common.error'),
@@ -82,7 +83,7 @@ export const MetaOAuthResetPanel = ({ onReset }: { onReset?: () => void }) => {
     try {
       const session = await ensureValidSession();
       const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
-        body: { returnTo: window.location.href, forceAccountChooser: true },
+        body: { returnTo: window.location.href, forceAccountChooser: true, mode: 'connect' },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
       if (error) throw error;
@@ -114,7 +115,7 @@ export const MetaOAuthResetPanel = ({ onReset }: { onReset?: () => void }) => {
         <div className="flex flex-col sm:flex-row gap-2">
           <Button onClick={handleReset} disabled={loading} variant="outline" className="gap-2">
             <RotateCcw className="h-4 w-4" />
-            {loading ? t('common.loading') : t('socialIntegrations.metaReset.action')}
+            {loading ? t('common.loading') : t('socialIntegrations.metaReset.step1Action')}
           </Button>
           <Button
             onClick={handleConnectWithChooser}
@@ -122,7 +123,7 @@ export const MetaOAuthResetPanel = ({ onReset }: { onReset?: () => void }) => {
             className="gap-2"
           >
             <Facebook className="h-4 w-4" />
-            {t('socialIntegrations.connectDifferentAccount')}
+            {t('socialIntegrations.metaReset.step2Action')}
           </Button>
         </div>
 
