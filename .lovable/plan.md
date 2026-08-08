@@ -1,50 +1,48 @@
-# Befund des neuen Scope-Tests — jetzt eindeutig
+# OAuth-Flow zurücksetzen für das Review-Screenrecording
 
-## Die Messung (11:18 Uhr, Diagnostic-ID 54c3821d)
+Ziel: Der Meta-Dialog muss im Video wieder **vollständig** erscheinen — inklusive „Dein Unternehmen verwalten" (`business_management`) und der Seitenauswahl. Aktuell überspringt Meta den Dialog und zeigt nur „Du hast dich zuvor bereits angemeldet — Als Samuel fortfahren", weil die App-Zustimmung noch gespeichert ist.
 
-| Feld | Wert |
+## Wichtig vorab: mit welchem Facebook-Profil aufgenommen wird
+
+Gemessen und belegt:
+
+- Profil `…329815` (bestofproducts4u@gmail.com): erhält `business_management`, liefert 2 Seiten — **Mystische aber wahre Geschichten** und **Bestofproducts4u**.
+- Profil `…337304` (info@useadtool.ai): Meta bietet `business_management` gar nicht erst an, 0 Seiten. Der frische Test von 11:18 (nach entzogener Zustimmung) gab nur noch `public_profile` zurück.
+
+Das Video muss deshalb zwingend mit **`…329815`** aufgenommen werden. Mit dem neuen Profil ist die geforderte Szene technisch nicht darstellbar.
+
+## Was ich baue: sauberer Reset-Weg in der App
+
+1. **Aktion „OAuth-Zustimmung zurücksetzen"** in den Verbindungen (Meta-Bereich, als Diagnose-/Review-Aktion gekennzeichnet):
+   - ruft die bestehende Revoke-Funktion auf: `DELETE /{meta-user-id}/permissions` mit dem **User**-Token (nicht dem Page-Token) → Meta entzieht der App die komplette Autorisierung,
+   - löscht die gespeicherten Facebook-/Instagram-Verbindungen des Kontos,
+   - prüft anschließend per `debug_token`, dass keine Zustimmung mehr existiert, und zeigt „Zustimmung entfernt — der nächste Verbindungsversuch zeigt den vollständigen Dialog".
+2. **Zustands-Anzeige vor der Aufnahme**: eine kleine Statuszeile „Nächster Connect zeigt vollständigen Dialog: ja/nein", abgeleitet aus den aktuell erteilten Scopes. Damit siehst du **vor** dem Start der Aufnahme, ob der Reset gegriffen hat, statt es erst im Video zu merken.
+3. **Verbinden-Button mit Kontowahl** für die Aufnahme: der bestehende Weg „Mit anderem Facebook-Konto verbinden" wird im Reset-Bereich direkt angeboten, damit im Video sicher `…329815` verwendet wird.
+4. **Seitenauswahl garantiert sichtbar**: die automatische Ein-Seiten-Auflösung wird für Facebook nicht angewandt (bei 2 Seiten erscheint der Dialog ohnehin) — ich prüfe zusätzlich, dass der Auswahl-Dialog auch dann angezeigt wird, wenn nur eine Seite zurückkommt, damit die Bestätigungs-Szene im Video nicht wegfällt.
+
+Falls Meta trotz Revoke weiter den Kurz-Dialog zeigt, gibt es einen zweiten, manuellen Weg, den ich als Hinweis direkt in der Karte einblende: auf facebook.com mit diesem Profil → Einstellungen → Apps und Websites → „AdTool AI Integration" entfernen. Damit ist die Zustimmung garantiert weg.
+
+## Ablauf der Aufnahme (60–90 s)
+
+| Zeit | Szene |
 | --- | --- |
-| Facebook-Profil | 122116259151337304 (Samuel Dusatko, das neue) |
-| Angefragt | nur `business_management`, `auth_type=rerequest` |
-| Erteilt | **nur `public_profile`** |
-| Abgelehnt (`declined_scopes`) | leer |
-| `/me/accounts` | 200, 0 Seiten |
-| `/me/businesses` | 400 · „(#100) Missing Permission" |
+| 0–8 s | AdTool AI, angemeldet, Bereich Social-Media-Integrationen — URL und Oberfläche klar erkennbar |
+| 8–14 s | Bei Facebook auf „Verbinden" klicken |
+| 14–25 s | Meta-Login/Authentifizierung |
+| 25–35 s | **Berechtigungsbildschirm mit „Dein Unternehmen verwalten" — 3 Sekunden ruhig stehen lassen** |
+| 35–48 s | Seiten-Berechtigungen: beide Seiten anhaken und bestätigen |
+| 48–55 s | Rückleitung zu AdTool AI |
+| 55–68 s | Seitenauswahl in AdTool AI mit „Mystische aber wahre Geschichten" und „Bestofproducts4u"; eine Seite wählen und bestätigen |
+| 68–78 s | Verbindungskarte: Facebook → Verbunden, gewählte Seite sichtbar |
+| 78–90 s | Kurz in den Publishing-Bereich: die verbundene Seite ist als Ziel auswählbar (ohne zu posten) |
 
-Entscheidend ist der Vergleich zu den Tests von 11:01: dort standen im Token noch die alten Berechtigungen (`pages_show_list`, `pages_read_engagement`, `pages_manage_posts`). Jetzt steht dort nur noch `public_profile`. Die alte Zustimmung ist also tatsächlich weg — Meta hat frisch entschieden. Und in dieser frischen Entscheidung erteilt Meta `business_management` nicht, listet es aber auch nicht als „abgelehnt". Das heißt: Meta hat die Berechtigung diesem Profil gar nicht erst zur Auswahl gestellt.
-
-## Was das konkret heißt
-
-Damit ist die Frage aus dem letzten Test beantwortet und die Unsicherheit („vielleicht nur recycelte Zustimmung") ausgeräumt:
-
-- Es liegt **nicht** an unserem Code, nicht an den angefragten Scopes, nicht an der App-Konfiguration — dieselbe App, dieselbe `client_id`, derselbe Request erteilt dem alten Profil `business_management` und 2 Seiten.
-- Es liegt auch nicht an „Admin ja/nein" im Business-Portfolio; die Rolle ist uneingeschränkt.
-- Es liegt daran, dass dieses Facebook-Profil **keine Assets hat, auf die sich die Berechtigung beziehen könnte**: keine Seiten-Rolle, keine dem Profil zugewiesene App/Seite im Portfolio. Meta blendet die Berechtigung deshalb aus, statt sie zur Ablehnung anzubieten.
-
-Kurz: Das neue Profil ist bei Meta schlicht kein Verwalter der Seiten. Kein Code-Fix kann das ändern.
-
-## Nächste Schritte
-
-1. **Meta-seitig lösen** (einmalig, in der Business-Suite mit dem alten, funktionierenden Profil als Portfolio-Admin):
-   - Das neue Profil als Person zum Portfolio hinzufügen (falls nicht vorhanden).
-   - Unter *Konten → Seiten* beiden Seiten das neue Profil als **Seiten-Admin** zuweisen.
-   - Unter *Konten → Apps* der App „AdTool AI Integration" das neue Profil zuweisen.
-   - Danach Scope-Test wiederholen — dann muss `business_management` im Dialog erscheinen.
-2. **Kein Warten darauf für den Produktivbetrieb**: das alte Profil funktioniert nachweislich. Der Launch hängt nicht an diesem Punkt.
-3. **Für Kunden absichern** (Code): Genau dieser Fall wird jeden Kunden treffen, der ohne Seiten-Rolle verbindet. Statt „verbunden, aber 0 Seiten" muss die App den Befund im Klartext zeigen und sagen, was beim eigenen Facebook-Konto fehlt.
-
-## Was ich am Code baue
-
-1. **Dauerhafte Ergebnis-Karte im Diff-Panel**: letzte Scope-Tests mit Zeitpunkt, Facebook-Profil-ID, Diagnostic-ID und Klartext-Urteil („erteilt" / „nicht angeboten" / „abgelehnt" — unterschieden über `declined_scopes`). Kein flüchtiger Toast mehr.
-2. **Klartext-Diagnose in der Verbindungskarte**: bei fehlendem `business_management` + 0 Seiten der konkrete Satz „Dein Facebook-Profil verwaltet keine Seite bzw. ist der App im Business-Portfolio nicht zugewiesen" statt Roh-JSON, plus Kurzanleitung.
-3. **Scope-Tests in der Vergleichsliste kennzeichnen**, damit sie nicht wie normale Connects mit „0 Seiten" wirken.
-4. **Rücksprung auf die Startseite des Tests** mit markierter neuester Messung.
+Aufnahme in einem privaten Fenster, deutsche oder englische UI durchgehend gleich, keine Sprünge/Schnitte innerhalb des OAuth-Teils.
 
 ## Technische Details
 
-- `supabase/functions/meta-oauth-diff/index.ts`: zusätzliche Rückgabe `scope_probes` (Zeilen mit `provider = 'facebook_scope_probe'` inkl. `requested_scopes`, `granted_scopes`, `declined_scopes`, `fb_user_id`, `created_at`).
-- `src/components/performance/MetaOAuthDiff.tsx`: Ergebnis-Liste im Scope-Test-Block, Badge für Probe-Einträge, Auto-Refresh nach Rückkehr mit `status=probe_done`.
-- `supabase/functions/meta-scope-probe-start/index.ts` / `oauth-callback`: Rücksprungziel aus dem Startaufruf übernehmen statt fest `/integrations`.
-- `src/components/performance/ConnectionsTab.tsx`: Klartext-Befund bei fehlendem Scope / 0 Seiten.
-- `src/lib/translations.ts`: neue Schlüssel `metaDiff.probeResults*` in DE/EN/ES.
-- Keine Datenbank-Migration, keine Änderung an Scopes oder gespeicherten Verbindungen.
+- `supabase/functions/instagram-oauth-revoke/index.ts`: bleibt die Revoke-Grundlage; Rückgabe um ein `authorization_cleared`-Flag aus einer `debug_token`-Nachprüfung erweitern.
+- `src/components/performance/ConnectionsTab.tsx`: Abschnitt „OAuth-Zustimmung zurücksetzen (für Review-Aufnahme)" mit Aktion, Ergebnis-Status und Hinweis auf den manuellen Weg; Statuszeile „Nächster Connect zeigt vollständigen Dialog".
+- `supabase/functions/oauth-callback/index.ts`: Facebook-Zweig zeigt den Seitenauswahl-Dialog auch bei genau einer Seite.
+- `src/lib/translations.ts`: neue Schlüssel in DE/EN/ES.
+- Keine Änderung an den angefragten Scopes, keine Datenbank-Migration.
