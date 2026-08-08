@@ -86,9 +86,27 @@ Deno.serve(async (req) => {
     let revoked = false;
     let revokeError: string | null = null;
     let metaUserResolved = false;
-    // Kept for the post-revoke debug_token verification (App Review recording prep)
     let lastUserToken: string | null = null;
     let resolvedMetaUserId: string | null = null;
+
+    const appId = Deno.env.get('META_APP_ID');
+    const appSecret = Deno.env.get('META_APP_SECRET');
+    if (!appId || !appSecret) {
+      throw new Error('Meta app credentials are not configured');
+    }
+    const appAccessToken = `${appId}|${appSecret}`;
+
+    const debugToken = async (inputToken: string) => {
+      const response = await fetch(
+        `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(inputToken)}&access_token=${encodeURIComponent(appAccessToken)}`
+      );
+      const body = await response.json().catch(() => null);
+      if (!response.ok || body?.error) {
+        const message = body?.error?.message || `Meta ${response.status}`;
+        throw new Error(message);
+      }
+      return body?.data ?? null;
+    };
 
     /** Turn a Graph API error body into one short readable line. */
     const shortGraphError = (status: number, body: string): string => {
@@ -105,10 +123,8 @@ Deno.serve(async (req) => {
       return `Meta ${status}`;
     };
 
-    // Facebook rows hold the USER access token; Instagram rows hold a PAGE
-    // access token. DELETE /{id}/permissions only works with a user token —
-    // with a page token Meta answers "Unsupported delete request" (#100).
-    // So: facebook first, and skip anything that is not a user token.
+    // Facebook rows should hold the USER access token; Instagram rows normally
+    // hold a PAGE token. Prove the token type with debug_token before revoking.
     const ordered = [...(metaConnections ?? [])].sort((a, b) =>
       a.provider === 'facebook' ? -1 : b.provider === 'facebook' ? 1 : 0
     );
@@ -123,67 +139,55 @@ Deno.serve(async (req) => {
           'token (len:', userToken.length, ')'
         );
 
-        // metadata=1 makes Graph report whether this is a user or page token.
-        const meRes = await fetch(
-          `https://graph.facebook.com/v24.0/me?fields=id&metadata=1&access_token=${encodeURIComponent(userToken)}`
-        );
+        const tokenInfo = await debugToken(userToken);
+        const tokenType = String(tokenInfo?.type ?? '').toUpperCase();
+        const tokenUserId = tokenInfo?.user_id ? String(tokenInfo.user_id) : null;
+        console.log('[instagram-oauth-revoke] Token inspected', {
+          provider: connection.provider,
+          type: tokenType || 'unknown',
+          is_valid: tokenInfo?.is_valid === true,
+          has_user_id: !!tokenUserId,
+        });
 
-        if (!meRes.ok) {
-          const meBody = await meRes.text();
-          revokeError = shortGraphError(meRes.status, meBody);
-          console.warn('[instagram-oauth-revoke] /me failed for', connection.provider, ':', meBody);
+        if (tokenInfo?.is_valid !== true || tokenType !== 'USER' || !tokenUserId) {
+          console.log('[instagram-oauth-revoke] Skipping non-user or invalid token', connection.provider);
           continue;
         }
-
-        const me = await meRes.json();
-        const tokenType = me?.metadata?.type as string | undefined;
         const storedMetaUserId =
           (connection.account_metadata as Record<string, unknown> | null)?.meta_user_id as
             | string
             | undefined;
-
-        if (tokenType && tokenType !== 'user') {
-          console.log(
-            '[instagram-oauth-revoke] Skipping',
-            connection.provider,
-            '— token type is',
-            tokenType,
-            '(page tokens cannot revoke app permissions)'
-          );
-          continue;
-        }
-
-        const metaUserId = storedMetaUserId || me?.id;
-        if (!metaUserId) {
-          revokeError = 'Meta /me returned no id';
-          console.warn('[instagram-oauth-revoke]', revokeError);
-          continue;
-        }
         metaUserResolved = true;
         lastUserToken = userToken;
-        resolvedMetaUserId = metaUserId;
-        console.log('[instagram-oauth-revoke] Resolved Meta user id:', metaUserId, 'via', connection.provider);
+        resolvedMetaUserId = tokenUserId;
+        console.log('[instagram-oauth-revoke] Resolved Meta user token', {
+          provider: connection.provider,
+          stored_id_matches: !storedMetaUserId || storedMetaUserId === tokenUserId,
+        });
 
+        // /me is bound to the confirmed user token and avoids accidentally
+        // targeting a Page ID from stale connection metadata.
         const revokeRes = await fetch(
-          `https://graph.facebook.com/v24.0/${metaUserId}/permissions?access_token=${encodeURIComponent(userToken)}`,
+          `https://graph.facebook.com/v24.0/me/permissions?access_token=${encodeURIComponent(userToken)}`,
           { method: 'DELETE' }
         );
         const revokeBody = await revokeRes.text();
+        let revokePayload: { success?: boolean } | null = null;
+        try {
+          revokePayload = revokeBody ? JSON.parse(revokeBody) : null;
+        } catch (_) {
+          revokePayload = null;
+        }
 
-        if (revokeRes.ok) {
+        if (revokeRes.ok && revokePayload?.success === true) {
           revoked = true;
           revokeError = null;
-          console.log(
-            '[instagram-oauth-revoke] ✅ Permissions revoked for Meta user',
-            metaUserId,
-            'via',
-            connection.provider,
-            'response:',
-            revokeBody
-          );
+          console.log('[instagram-oauth-revoke] Permissions revoked via', connection.provider);
           break; // one successful revoke is enough — Meta drops the whole app grant
         } else {
-          revokeError = shortGraphError(revokeRes.status, revokeBody);
+          revokeError = revokeRes.ok
+            ? 'Meta did not confirm the permission reset'
+            : shortGraphError(revokeRes.status, revokeBody);
           console.warn(
             '[instagram-oauth-revoke] ❌ Revoke call failed via',
             connection.provider,
@@ -204,30 +208,6 @@ Deno.serve(async (req) => {
     }
 
 
-    // Always delete BOTH instagram and facebook rows for this user.
-    // Meta sees them as a shared app grant; keeping fb around is what causes
-    // the "Continue as ..." short-circuit on Instagram reconnect.
-    const deletedProviders: string[] = [];
-    for (const provider of ['instagram', 'facebook'] as const) {
-      const { data: deleted, error: deleteErr } = await supabase
-        .from('social_connections')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('provider', provider)
-        .select('id');
-
-      if (deleteErr) {
-        console.error('[instagram-oauth-revoke] DB delete failed for', provider, ':', deleteErr);
-        // Don't throw — keep going so we delete what we can.
-        continue;
-      }
-      if (deleted && deleted.length > 0) {
-        deletedProviders.push(provider);
-      }
-    }
-
-    const hardResetComplete = revoked && deletedProviders.length > 0;
-
     // Verify with Meta that the app grant is really gone. If the token still
     // debugs as valid with scopes, Meta will short-circuit the next consent
     // dialog ("Continue as ...") — which breaks the App Review recording.
@@ -235,26 +215,36 @@ Deno.serve(async (req) => {
     let authorizationCleared: boolean | null = null;
     let remainingScopes: string[] = [];
     try {
-      const appId = Deno.env.get('META_APP_ID');
-      const appSecret = Deno.env.get('META_APP_SECRET');
-      if (appId && appSecret && lastUserToken) {
-        const dbgRes = await fetch(
-          `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(lastUserToken)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`
-        );
-        const dbg = await dbgRes.json().catch(() => null);
-        const info = dbg?.data;
-        if (info) {
-          remainingScopes = Array.isArray(info.scopes) ? info.scopes : [];
-          // Cleared when the token is no longer valid or carries no scopes.
-          authorizationCleared = info.is_valid === false || remainingScopes.length === 0;
-        } else if (dbg?.error) {
-          // A hard error on debug_token usually means the grant is gone.
-          authorizationCleared = true;
-        }
+      if (lastUserToken) {
+        const info = await debugToken(lastUserToken);
+        remainingScopes = Array.isArray(info?.scopes) ? info.scopes : [];
+        authorizationCleared = info?.is_valid === false || remainingScopes.length === 0;
       }
     } catch (verifyErr) {
       console.warn('[instagram-oauth-revoke] debug_token verification failed:', verifyErr);
     }
+
+    // Preserve the local token if Meta did not confirm that the grant is gone.
+    // It is needed for a retry and prevents the UI from claiming a clean reset.
+    const deletedProviders: string[] = [];
+    if (revoked && authorizationCleared === true) {
+      for (const provider of ['instagram', 'facebook'] as const) {
+        const { data: deleted, error: deleteErr } = await supabase
+          .from('social_connections')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('provider', provider)
+          .select('id');
+
+        if (deleteErr) {
+          console.error('[instagram-oauth-revoke] DB delete failed for', provider, ':', deleteErr);
+          continue;
+        }
+        if (deleted && deleted.length > 0) deletedProviders.push(provider);
+      }
+    }
+
+    const hardResetComplete = revoked && authorizationCleared === true;
 
     console.log('[instagram-oauth-revoke] Hard reset summary:', {
       user_id: user.id,
