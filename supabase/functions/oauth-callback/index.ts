@@ -181,6 +181,77 @@ serve(async (req) => {
       return Response.redirect(`${appUrlBase}/integrations?${params.toString()}`, 302);
     }
 
+    // Review-only reset: obtain a fresh Meta USER token, immediately revoke
+    // the app grant with it, and never persist it as a product connection.
+    if (provider === 'facebook_review_reset') {
+      const resetReturnUrl = storedState.redirect_url || `${appUrlBase}/integrations`;
+      const resetBaseUrl = resetReturnUrl.replace(/\/integrations.*$/, '').replace(/\/performance.*$/, '');
+      try {
+        const resetToken = await exchangeMetaToken(code);
+        const revokeRes = await fetch(
+          `https://graph.facebook.com/v24.0/me/permissions?access_token=${encodeURIComponent(resetToken.access_token)}`,
+          { method: 'DELETE' },
+        );
+        const revokeText = await revokeRes.text();
+        let revokeConfirmed = false;
+        try {
+          revokeConfirmed = revokeRes.ok && JSON.parse(revokeText)?.success === true;
+        } catch (_) {
+          revokeConfirmed = false;
+        }
+
+        const appId = Deno.env.get('META_APP_ID');
+        const appSecret = Deno.env.get('META_APP_SECRET');
+        if (!appId || !appSecret) throw new Error('Meta app credentials are not configured');
+        const verifyRes = await fetch(
+          `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(resetToken.access_token)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`,
+        );
+        const verifyJson = await verifyRes.json().catch(() => null);
+        const remainingScopes = Array.isArray(verifyJson?.data?.scopes) ? verifyJson.data.scopes : [];
+        const authorizationCleared = revokeConfirmed
+          && (verifyJson?.data?.is_valid === false || remainingScopes.length === 0);
+
+        if (authorizationCleared) {
+          await supabase
+            .from('social_connections')
+            .delete()
+            .eq('user_id', userId)
+            .in('provider', ['facebook', 'instagram']);
+        }
+
+        console.log('[oauth-callback] review reset result', {
+          user_id: userId,
+          revoked: revokeConfirmed,
+          authorization_cleared: authorizationCleared,
+          remaining_scope_count: remainingScopes.length,
+          at: new Date().toISOString(),
+        });
+
+        const params = new URLSearchParams({
+          tab: 'connections',
+          meta_reset: authorizationCleared ? 'cleared' : 'failed',
+          revoked: revokeConfirmed ? 'true' : 'false',
+          remaining_scope_count: String(remainingScopes.length),
+          reset_at: new Date().toISOString(),
+        });
+        if (!authorizationCleared) {
+          params.set('message', revokeConfirmed
+            ? 'Meta did not confirm that all permissions were removed.'
+            : `Meta did not confirm the revoke (${revokeRes.status}).`);
+        }
+        return Response.redirect(`${resetBaseUrl}/integrations?${params.toString()}`, 302);
+      } catch (e) {
+        console.error('[oauth-callback] review reset failed:', e);
+        const params = new URLSearchParams({
+          tab: 'connections',
+          meta_reset: 'failed',
+          message: e instanceof Error ? e.message : 'Meta reset failed',
+          reset_at: new Date().toISOString(),
+        });
+        return Response.redirect(`${resetBaseUrl}/integrations?${params.toString()}`, 302);
+      }
+    }
+
     let tokenData;
     let accountInfo;
     // Tracks whether we successfully auto-resolved a single IG-capable Page
