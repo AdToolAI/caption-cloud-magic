@@ -147,12 +147,47 @@ serve(async (req) => {
       .delete()
       .eq('id', storedState.id);
 
+    // ---- Diagnostic scope probe -------------------------------------------
+    // Isolated measurement flow (provider `facebook_scope_probe`): it only
+    // measures whether Meta grants business_management for this profile.
+    // It never stores a token and never touches social_connections.
+    if (provider === 'facebook_scope_probe') {
+      let probeMeasurement: any = null;
+      try {
+        const probeToken = await exchangeMetaToken(code);
+        probeMeasurement = await measureMetaToken(probeToken.access_token);
+        await recordOAuthCallback(supabase, {
+          userId,
+          provider,
+          stateKey: csrf,
+          measurement: probeMeasurement,
+        });
+      } catch (e) {
+        console.error('[oauth-callback] scope probe failed:', e);
+        return failRedirect(
+          e instanceof Error ? e.message : 'Scope probe failed',
+          'scope_probe_failed',
+        );
+      }
+
+      const granted = probeMeasurement?.granted_scopes?.includes('business_management');
+      const params = new URLSearchParams({
+        status: 'probe_done',
+        tab: 'connections',
+        provider,
+        probe_scope: 'business_management',
+        probe_granted: granted ? 'true' : 'false',
+      });
+      return Response.redirect(`${appUrlBase}/integrations?${params.toString()}`, 302);
+    }
+
     let tokenData;
     let accountInfo;
     // Tracks whether we successfully auto-resolved a single IG-capable Page
     // during the Instagram OAuth flow. When true, we redirect with
     // auto_selected=true so the UI skips the Page Select Dialog.
     let igAutoSelected = false;
+
 
     switch (provider) {
       case 'instagram':

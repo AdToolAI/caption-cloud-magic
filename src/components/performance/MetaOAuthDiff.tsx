@@ -2,6 +2,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -11,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, RefreshCw, GitCompare, AlertTriangle, Copy } from 'lucide-react';
+import { Loader2, RefreshCw, GitCompare, AlertTriangle, Copy, ShieldQuestion } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +29,9 @@ interface Attempt {
   fb_user_id: string | null;
   fb_user_name: string | null;
   pages_found_count?: number | null;
+  account_ref?: string | null;
+  is_own_account?: boolean;
+  is_latest_for_profile?: boolean;
 }
 
 interface DiffRow {
@@ -36,6 +42,8 @@ interface DiffRow {
 }
 
 interface DiffResponse {
+  is_admin?: boolean;
+  all_accounts?: boolean;
   attempts: Attempt[];
   attempt_a: Attempt | null;
   attempt_b: Attempt | null;
@@ -52,6 +60,10 @@ export function MetaOAuthDiff() {
   const [data, setData] = useState<DiffResponse | null>(null);
   const [attemptA, setAttemptA] = useState<string | undefined>();
   const [attemptB, setAttemptB] = useState<string | undefined>();
+  const [allAccounts, setAllAccounts] = useState(false);
+  const [pastedId, setPastedId] = useState('');
+  const [extraIds, setExtraIds] = useState<string[]>([]);
+  const [probeLoading, setProbeLoading] = useState(false);
 
   const run = useCallback(
     async (a?: string, b?: string) => {
@@ -65,7 +77,12 @@ export function MetaOAuthDiff() {
           'meta-oauth-diff',
           {
             headers: { Authorization: `Bearer ${session.access_token}` },
-            body: { attempt_a: a, attempt_b: b },
+            body: {
+              attempt_a: a,
+              attempt_b: b,
+              include_all_accounts: allAccounts,
+              attempt_ids: extraIds,
+            },
           },
         );
         if (error) throw error;
@@ -82,8 +99,35 @@ export function MetaOAuthDiff() {
         setLoading(false);
       }
     },
-    [t, toast],
+    [t, toast, allAccounts, extraIds],
   );
+
+  // Isolated scope test: asks Meta for business_management only.
+  const startProbe = useCallback(async () => {
+    setProbeLoading(true);
+    try {
+      const session = await ensureValidSession();
+      if (!session?.access_token) throw new Error(t('metaDiff.sessionExpired'));
+      const { data: res, error } = await supabase.functions.invoke<{ authUrl?: string }>(
+        'meta-scope-probe-start',
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          body: { forceAccountChooser: true },
+        },
+      );
+      if (error) throw error;
+      if (!res?.authUrl) throw new Error('Missing authUrl');
+      window.location.href = res.authUrl;
+    } catch (e) {
+      toast({
+        title: t('metaDiff.errorTitle'),
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setProbeLoading(false);
+    }
+  }, [t, toast]);
 
   const attempts = data?.attempts ?? [];
   const completedAttempts = useMemo(() => attempts.filter((a) => a.completed), [attempts]);
@@ -100,7 +144,10 @@ export function MetaOAuthDiff() {
       const metaId = a.fb_user_id ? `${t('metaDiff.metaUserId')} …${a.fb_user_id.slice(-6)}` : '—';
       if (!a.completed) return `${metaId} · ${when} · ${t('metaDiff.aborted')}`;
       const pages = t('metaDiff.pagesCount', { count: a.pages_found_count ?? 0 });
-      return `${metaId} · ${pages} · ${when} · ${t('metaDiff.diagnosticId')} ${shortId(a.id)}`;
+      const acc = a.account_ref
+        ? ` · ${t('metaDiff.accountRef')} ${a.account_ref}${a.is_own_account === false ? ` (${t('metaDiff.otherAccount')})` : ''}`
+        : '';
+      return `${metaId} · ${pages} · ${when} · ${t('metaDiff.diagnosticId')} ${shortId(a.id)}${acc}`;
     },
     [t],
   );
@@ -116,11 +163,22 @@ export function MetaOAuthDiff() {
           {attempt.fb_user_name ?? '—'} · {new Date(attempt.created_at).toLocaleString()}
         </p>
         <p className="text-muted-foreground font-mono">
-          {t('metaDiff.diagnosticId')} {shortId(attempt.id)} ·{' '}
+          {t('metaDiff.diagnosticId')} {attempt.id}
+        </p>
+        <p className="text-muted-foreground">
           {attempt.completed
             ? t('metaDiff.pagesCount', { count: attempt.pages_found_count ?? 0 })
             : t('metaDiff.aborted')}
+          {attempt.account_ref ? ` · ${t('metaDiff.accountRef')} ${attempt.account_ref}` : ''}
+          {attempt.is_own_account === false ? ` (${t('metaDiff.otherAccount')})` : ''}
         </p>
+        {attempt.completed && (
+          <p className={attempt.is_latest_for_profile ? 'text-muted-foreground' : 'text-amber-600'}>
+            {attempt.is_latest_for_profile
+              ? t('metaDiff.latestForProfile')
+              : t('metaDiff.staleAttempt')}
+          </p>
+        )}
       </div>
     );
   };
@@ -198,6 +256,60 @@ export function MetaOAuthDiff() {
         </div>
 
         <p className="text-xs text-muted-foreground">{t('metaDiff.scopeAccountNote')}</p>
+
+        {data?.is_admin !== undefined && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="meta-diff-all-accounts"
+              checked={allAccounts}
+              onCheckedChange={(v) => {
+                setAllAccounts(v);
+                setTimeout(() => run(attemptA, attemptB), 0);
+              }}
+              disabled={!data?.is_admin}
+            />
+            <Label htmlFor="meta-diff-all-accounts" className="text-xs font-normal">
+              {t('metaDiff.allAccounts')}
+            </Label>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <Label className="text-xs font-normal text-muted-foreground">{t('metaDiff.pasteId')}</Label>
+          <div className="flex gap-2">
+            <Input
+              value={pastedId}
+              onChange={(e) => setPastedId(e.target.value)}
+              placeholder={t('metaDiff.pasteIdPlaceholder')}
+              className="h-8 font-mono text-xs"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!pastedId.trim() || loading}
+              onClick={() => {
+                const id = pastedId.trim();
+                setExtraIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                setPastedId('');
+                setTimeout(() => run(attemptA, id), 0);
+              }}
+            >
+              {t('metaDiff.pasteIdAdd')}
+            </Button>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-border p-3 space-y-2">
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <ShieldQuestion className="h-4 w-4" />
+            {t('metaDiff.probeTitle')}
+          </p>
+          <p className="text-xs text-muted-foreground">{t('metaDiff.probeDescription')}</p>
+          <Button size="sm" variant="outline" onClick={startProbe} disabled={probeLoading}>
+            {probeLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {t('metaDiff.probeStart')}
+          </Button>
+        </div>
 
         {data && attempts.length > 0 && (
           <div className="grid gap-3 sm:grid-cols-2">

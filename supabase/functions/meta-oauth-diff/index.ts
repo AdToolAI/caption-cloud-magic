@@ -13,6 +13,7 @@ const corsHeaders = {
 
 interface AttemptRow {
   id: string;
+  user_id: string;
   provider: string;
   created_at: string;
   callback_completed_at: string | null;
@@ -30,7 +31,7 @@ interface AttemptRow {
   pages_found_count: number | null;
 }
 
-function summarize(row: AttemptRow) {
+function summarize(row: AttemptRow, currentUserId: string) {
   const granular = Array.isArray(row.granular_scopes) ? row.granular_scopes : [];
   const targetIds = new Set<string>();
   for (const g of granular as any[]) {
@@ -48,6 +49,10 @@ function summarize(row: AttemptRow) {
   return {
     id: row.id,
     provider: row.provider,
+    // Short, non-identifying reference of the AdTool account the attempt
+    // belongs to — makes cross-account confusion visible in the UI.
+    account_ref: row.user_id ? row.user_id.slice(0, 8) : '',
+    is_own_account: row.user_id === currentUserId,
     created_at: row.created_at,
     callback_completed_at: row.callback_completed_at,
     completed: !!row.callback_completed_at,
@@ -135,23 +140,68 @@ Deno.serve(async (req) => {
       });
     }
 
-    let body: { attempt_a?: string; attempt_b?: string; provider?: string } = {};
+    let body: {
+      attempt_a?: string;
+      attempt_b?: string;
+      provider?: string;
+      attempt_ids?: string[];
+      include_all_accounts?: boolean;
+    } = {};
     if (req.method === 'POST') {
       body = await req.json().catch(() => ({}));
     }
 
+    // Cross-account view is admin-only: regular users never see attempts of
+    // other AdTool accounts.
+    let isAdmin = false;
+    if (body.include_all_accounts) {
+      const { data: adminCheck } = await supabase.rpc('has_role', {
+        _user_id: userData.user.id,
+        _role: 'admin',
+      });
+      isAdmin = adminCheck === true;
+    }
+    const allAccounts = !!body.include_all_accounts && isAdmin;
+
     let query = supabase
       .from('meta_oauth_diagnostics')
       .select('*')
-      .eq('user_id', userData.user.id)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(allAccounts ? 60 : 20);
+    if (!allAccounts) query = query.eq('user_id', userData.user.id);
     if (body.provider) query = query.eq('provider', body.provider);
 
     const { data: rows, error } = await query;
     if (error) throw error;
 
-    const attempts = ((rows ?? []) as AttemptRow[]).map(summarize);
+    let rowList = (rows ?? []) as AttemptRow[];
+
+    // Explicitly requested diagnostic IDs (e.g. pasted from another account's
+    // panel) are fetched on top — but only when the caller is allowed to see
+    // them (own account, or admin in cross-account mode).
+    const wantedIds = [body.attempt_a, body.attempt_b, ...(body.attempt_ids ?? [])]
+      .filter((id): id is string => !!id && !rowList.some((r) => r.id === id));
+    if (wantedIds.length > 0) {
+      let extraQuery = supabase
+        .from('meta_oauth_diagnostics')
+        .select('*')
+        .in('id', [...new Set(wantedIds)]);
+      if (!allAccounts) extraQuery = extraQuery.eq('user_id', userData.user.id);
+      const { data: extra } = await extraQuery;
+      rowList = [...rowList, ...((extra ?? []) as AttemptRow[])];
+    }
+
+    const attempts = rowList.map((r) => summarize(r, userData.user.id));
+
+    // Flag the newest completed attempt per Facebook profile so a stale row
+    // can never be mistaken for the latest connect.
+    const seenProfiles = new Set<string>();
+    for (const attempt of attempts) {
+      const key = attempt.fb_user_id ?? '';
+      const latest = !!attempt.completed && !!key && !seenProfiles.has(key);
+      if (latest) seenProfiles.add(key);
+      (attempt as any).is_latest_for_profile = latest;
+    }
 
     // Default comparison: newest completed attempt per distinct Meta user.
     const pickById = (id?: string) => attempts.find((a) => a.id === id);
@@ -181,6 +231,8 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        is_admin: isAdmin,
+        all_accounts: allAccounts,
         attempts,
         attempt_a: a ?? null,
         attempt_b: b ?? null,
