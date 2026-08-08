@@ -1300,6 +1300,8 @@ export const ConnectionsTab = () => {
 
       <ConnectionDiagnostics />
 
+      <MetaOAuthResetPanel onReset={fetchConnections} />
+
       <MetaOAuthDiff />
 
       <MetaPageProbePanel />
