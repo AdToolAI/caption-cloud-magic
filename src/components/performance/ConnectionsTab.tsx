@@ -78,6 +78,18 @@ export const ConnectionsTab = () => {
       const error = params.get('error');
       const autoSelected = params.get('auto_selected') === 'true';
 
+      // Isolated scope probe result (diagnostics only, no connection stored).
+      if (status === 'probe_done') {
+        const granted = params.get('probe_granted') === 'true';
+        toast({
+          title: t('metaDiff.probeTitle'),
+          description: granted ? t('metaDiff.probeGranted') : t('metaDiff.probeDenied'),
+          variant: granted ? 'default' : 'destructive',
+        });
+        window.history.replaceState({}, '', window.location.pathname + '?tab=connections');
+        return;
+      }
+
       if (connected && status === 'error') {
         // OAuth callback returned an error
         const errorMessage = params.get('message') || t('socialIntegrations.connectionFailed');
