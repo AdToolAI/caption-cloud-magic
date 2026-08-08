@@ -227,6 +227,35 @@ Deno.serve(async (req) => {
     }
 
     const hardResetComplete = revoked && deletedProviders.length > 0;
+
+    // Verify with Meta that the app grant is really gone. If the token still
+    // debugs as valid with scopes, Meta will short-circuit the next consent
+    // dialog ("Continue as ...") — which breaks the App Review recording.
+    // authorization_cleared === true  → next connect shows the FULL dialog.
+    let authorizationCleared: boolean | null = null;
+    let remainingScopes: string[] = [];
+    try {
+      const appId = Deno.env.get('META_APP_ID');
+      const appSecret = Deno.env.get('META_APP_SECRET');
+      if (appId && appSecret && lastUserToken) {
+        const dbgRes = await fetch(
+          `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(lastUserToken)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`
+        );
+        const dbg = await dbgRes.json().catch(() => null);
+        const info = dbg?.data;
+        if (info) {
+          remainingScopes = Array.isArray(info.scopes) ? info.scopes : [];
+          // Cleared when the token is no longer valid or carries no scopes.
+          authorizationCleared = info.is_valid === false || remainingScopes.length === 0;
+        } else if (dbg?.error) {
+          // A hard error on debug_token usually means the grant is gone.
+          authorizationCleared = true;
+        }
+      }
+    } catch (verifyErr) {
+      console.warn('[instagram-oauth-revoke] debug_token verification failed:', verifyErr);
+    }
+
     console.log('[instagram-oauth-revoke] Hard reset summary:', {
       user_id: user.id,
       revoked,
@@ -234,6 +263,8 @@ Deno.serve(async (req) => {
       deletedProviders,
       hardResetComplete,
       metaUserResolved,
+      authorizationCleared,
+      remainingScopeCount: remainingScopes.length,
     });
 
     return new Response(
@@ -244,6 +275,9 @@ Deno.serve(async (req) => {
         deletedProviders,
         hardResetComplete,
         metaUserResolved,
+        meta_user_id: resolvedMetaUserId,
+        authorization_cleared: authorizationCleared,
+        remaining_scopes: remainingScopes,
         // backwards-compat for older frontend code
         connectionDeleted: deletedProviders.length > 0,
       }),
