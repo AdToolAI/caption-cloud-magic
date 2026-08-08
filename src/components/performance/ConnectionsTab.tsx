@@ -837,9 +837,8 @@ export const ConnectionsTab = () => {
             });
           } else {
             toast({
-              title: t('common.warning') || 'Warning',
-              description: `Disconnected locally, but Meta still remembers this app${revokeData?.revokeError ? ` (${revokeData.revokeError})` : ''}. The next connect may skip the consent dialog.`,
-              variant: 'destructive',
+              title: t('common.warning'),
+              description: `${t('common.metaDisconnected')} ${t('common.metaGrantRemains')}`,
             });
           }
           fetchConnections();
