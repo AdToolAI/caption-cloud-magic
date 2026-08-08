@@ -116,7 +116,11 @@ export const MetaOAuthResetPanel = ({ onReset }: { onReset?: () => void }) => {
             <RotateCcw className="h-4 w-4" />
             {loading ? t('common.loading') : t('socialIntegrations.metaReset.action')}
           </Button>
-          <Button onClick={handleConnectWithChooser} disabled={connecting} className="gap-2">
+          <Button
+            onClick={handleConnectWithChooser}
+            disabled={connecting || result?.authorizationCleared !== true}
+            className="gap-2"
+          >
             <Facebook className="h-4 w-4" />
             {t('socialIntegrations.connectDifferentAccount')}
           </Button>
@@ -134,7 +138,7 @@ export const MetaOAuthResetPanel = ({ onReset }: { onReset?: () => void }) => {
                 {t('socialIntegrations.metaReset.statusLabel')}:{' '}
                 {cleared
                   ? t('socialIntegrations.metaReset.statusYes')
-                  : t('socialIntegrations.metaReset.statusNo')}
+                  : t('socialIntegrations.metaReset.notReady')}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -156,9 +160,14 @@ export const MetaOAuthResetPanel = ({ onReset }: { onReset?: () => void }) => {
               </div>
             )}
             {!cleared && (
-              <p className="text-xs text-muted-foreground">
-                {t('socialIntegrations.metaReset.manualHint')}
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-destructive">
+                  {t('socialIntegrations.metaReset.connectBlocked')}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t('socialIntegrations.metaReset.manualHint')}
+                </p>
+              </div>
             )}
           </div>
         )}
