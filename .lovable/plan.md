@@ -1,44 +1,50 @@
-# Was der Scope-Test bedeutet und was jetzt zu tun ist
+# Befund des neuen Scope-Tests — jetzt eindeutig
 
-## Die Messung (aus der Datenbank gelesen)
+## Die Messung (11:18 Uhr, Diagnostic-ID 54c3821d)
 
-Deine beiden Scope-Tests von heute sind protokolliert:
+| Feld | Wert |
+| --- | --- |
+| Facebook-Profil | 122116259151337304 (Samuel Dusatko, das neue) |
+| Angefragt | nur `business_management`, `auth_type=rerequest` |
+| Erteilt | **nur `public_profile`** |
+| Abgelehnt (`declined_scopes`) | leer |
+| `/me/accounts` | 200, 0 Seiten |
+| `/me/businesses` | 400 · „(#100) Missing Permission" |
 
-| Zeit (Berlin) | Angefragt | Von Meta erteilt |
-| --- | --- | --- |
-| 11:01:04 | nur `business_management` | pages_show_list, pages_read_engagement, pages_manage_posts, public_profile — **kein business_management** |
-| 11:01:44 | nur `business_management` | dieselbe Liste — **kein business_management** |
+Entscheidend ist der Vergleich zu den Tests von 11:01: dort standen im Token noch die alten Berechtigungen (`pages_show_list`, `pages_read_engagement`, `pages_manage_posts`). Jetzt steht dort nur noch `public_profile`. Die alte Zustimmung ist also tatsächlich weg — Meta hat frisch entschieden. Und in dieser frischen Entscheidung erteilt Meta `business_management` nicht, listet es aber auch nicht als „abgelehnt". Das heißt: Meta hat die Berechtigung diesem Profil gar nicht erst zur Auswahl gestellt.
 
-Zum Vergleich: der Connect des alten Profils (…329815) um 10:33 hat `business_management` erhalten und 2 Seiten geliefert. Das neue Profil (…337304) bekommt bei jedem Versuch 0 Seiten.
+## Was das konkret heißt
 
-## Warum läuft es beim alten Konto und beim neuen nicht?
+Damit ist die Frage aus dem letzten Test beantwortet und die Unsicherheit („vielleicht nur recycelte Zustimmung") ausgeräumt:
 
-Nicht wegen „Admin ja/nein" im Business-Portfolio — deine Portfolio-Rolle ist laut Screenshot bereits uneingeschränkt. Der Unterschied liegt eine Ebene tiefer: **Meta erteilt eine Berechtigung nur, wenn es dem Profil dafür überhaupt Assets anbieten kann.**
+- Es liegt **nicht** an unserem Code, nicht an den angefragten Scopes, nicht an der App-Konfiguration — dieselbe App, dieselbe `client_id`, derselbe Request erteilt dem alten Profil `business_management` und 2 Seiten.
+- Es liegt auch nicht an „Admin ja/nein" im Business-Portfolio; die Rolle ist uneingeschränkt.
+- Es liegt daran, dass dieses Facebook-Profil **keine Assets hat, auf die sich die Berechtigung beziehen könnte**: keine Seiten-Rolle, keine dem Profil zugewiesene App/Seite im Portfolio. Meta blendet die Berechtigung deshalb aus, statt sie zur Ablehnung anzubieten.
 
-- Altes Profil: ist Seiten-Admin der 2 Seiten und diese Seiten liegen im Portfolio, das auch die App kennt → Meta zeigt die Seiten-Auswahl und erteilt `business_management`.
-- Neues Profil: hat keine eigene Seiten-Rolle und keine Asset-Zuweisung → Meta zeigt nur 3 Toggles und lässt `business_management` weg. Ohne diesen Scope liefert `me/accounts` 0 Seiten und `me/businesses` „Missing Permission".
-
-Wichtige Einschränkung, die ich nicht verschweigen will: dein Screenshot vom Test zeigt den Bildschirm „Du hast dich zuvor bereits angemeldet — Als Samuel fortfahren". Meta hat dort **gar keinen Berechtigungsdialog** mehr angezeigt, sondern still die bereits gespeicherte Zustimmung wiederverwendet. `auth_type=rerequest` wird zwar mitgeschickt, greift aber nicht, wenn Meta die bestehende App-Zustimmung recycelt. Die Messung „Scope nicht erteilt" steht, aber sie beweist noch nicht endgültig, dass Meta ihn *verweigern würde*, wenn es neu fragen müsste.
+Kurz: Das neue Profil ist bei Meta schlicht kein Verwalter der Seiten. Kein Code-Fix kann das ändern.
 
 ## Nächste Schritte
 
-1. **Ein sauberer Test ohne Alt-Zustimmung** — auf facebook.com mit dem neuen Profil: Einstellungen → Apps und Websites → „AdTool AI Integration" **entfernen**. Danach im AdTool den Scope-Test erneut starten. Jetzt muss Meta den Dialog frisch zeigen. Erscheint `business_management` dann immer noch nicht als Option, ist der Befund endgültig.
-2. **Ergebnis wird sichtbar gemacht** (Code, siehe unten) — heute verschwindet das Ergebnis in einem kurzen Toast; künftig steht es dauerhaft im Diff-Panel.
-3. **Je nach Ergebnis:**
-   - Scope taucht auf und wird erteilt → Ursache war die Alt-Zustimmung; normal neu verbinden, Thema erledigt.
-   - Scope taucht gar nicht auf → dem neuen Profil fehlen im Business-Portfolio die Asset-Zuweisungen (Seite *und* App dem Profil zuweisen). Das ist eine Meta-Einstellung, keine App-Änderung.
+1. **Meta-seitig lösen** (einmalig, in der Business-Suite mit dem alten, funktionierenden Profil als Portfolio-Admin):
+   - Das neue Profil als Person zum Portfolio hinzufügen (falls nicht vorhanden).
+   - Unter *Konten → Seiten* beiden Seiten das neue Profil als **Seiten-Admin** zuweisen.
+   - Unter *Konten → Apps* der App „AdTool AI Integration" das neue Profil zuweisen.
+   - Danach Scope-Test wiederholen — dann muss `business_management` im Dialog erscheinen.
+2. **Kein Warten darauf für den Produktivbetrieb**: das alte Profil funktioniert nachweislich. Der Launch hängt nicht an diesem Punkt.
+3. **Für Kunden absichern** (Code): Genau dieser Fall wird jeden Kunden treffen, der ohne Seiten-Rolle verbindet. Statt „verbunden, aber 0 Seiten" muss die App den Befund im Klartext zeigen und sagen, was beim eigenen Facebook-Konto fehlt.
 
 ## Was ich am Code baue
 
-1. **Dauerhafte Ergebnis-Karte im Diff-Panel**: die letzten Scope-Tests mit Zeitpunkt, Facebook-Profil-ID, Diagnostic-ID und Klartext-Urteil („erteilt" / „nicht erteilt"). Kein Toast mehr nötig.
-2. **Klartext-Auswertung** direkt darunter, inklusive des Hinweises, wenn Meta den Dialog übersprungen hat (erkennbar daran, dass die erteilten Scopes exakt der vorherigen Zustimmung entsprechen) — dann steht dort die Anleitung „App im Facebook-Profil entfernen und Test wiederholen".
-3. **Scope-Tests in der Vergleichsliste kennzeichnen**, damit sie nicht wie normale Connects mit „0 Seiten" aussehen.
-4. **Rücksprung auf die Seite, von der der Test gestartet wurde**, mit markierter neuester Messung.
+1. **Dauerhafte Ergebnis-Karte im Diff-Panel**: letzte Scope-Tests mit Zeitpunkt, Facebook-Profil-ID, Diagnostic-ID und Klartext-Urteil („erteilt" / „nicht angeboten" / „abgelehnt" — unterschieden über `declined_scopes`). Kein flüchtiger Toast mehr.
+2. **Klartext-Diagnose in der Verbindungskarte**: bei fehlendem `business_management` + 0 Seiten der konkrete Satz „Dein Facebook-Profil verwaltet keine Seite bzw. ist der App im Business-Portfolio nicht zugewiesen" statt Roh-JSON, plus Kurzanleitung.
+3. **Scope-Tests in der Vergleichsliste kennzeichnen**, damit sie nicht wie normale Connects mit „0 Seiten" wirken.
+4. **Rücksprung auf die Startseite des Tests** mit markierter neuester Messung.
 
 ## Technische Details
 
-- `supabase/functions/meta-oauth-diff/index.ts`: zusätzliche Rückgabe `scope_probes` (Zeilen mit `provider = 'facebook_scope_probe'`, inkl. `requested_scopes`, `granted_scopes`, `fb_user_id`, `created_at`).
+- `supabase/functions/meta-oauth-diff/index.ts`: zusätzliche Rückgabe `scope_probes` (Zeilen mit `provider = 'facebook_scope_probe'` inkl. `requested_scopes`, `granted_scopes`, `declined_scopes`, `fb_user_id`, `created_at`).
 - `src/components/performance/MetaOAuthDiff.tsx`: Ergebnis-Liste im Scope-Test-Block, Badge für Probe-Einträge, Auto-Refresh nach Rückkehr mit `status=probe_done`.
 - `supabase/functions/meta-scope-probe-start/index.ts` / `oauth-callback`: Rücksprungziel aus dem Startaufruf übernehmen statt fest `/integrations`.
+- `src/components/performance/ConnectionsTab.tsx`: Klartext-Befund bei fehlendem Scope / 0 Seiten.
 - `src/lib/translations.ts`: neue Schlüssel `metaDiff.probeResults*` in DE/EN/ES.
 - Keine Datenbank-Migration, keine Änderung an Scopes oder gespeicherten Verbindungen.
