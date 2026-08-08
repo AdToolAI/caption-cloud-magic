@@ -88,6 +88,7 @@ Deno.serve(async (req) => {
     let metaUserResolved = false;
     let lastUserToken: string | null = null;
     let resolvedMetaUserId: string | null = null;
+    let grantAlreadyCleared = false;
 
     const appId = Deno.env.get('META_APP_ID');
     const appSecret = Deno.env.get('META_APP_SECRET');
@@ -148,6 +149,14 @@ Deno.serve(async (req) => {
           is_valid: tokenInfo?.is_valid === true,
           has_user_id: !!tokenUserId,
         });
+
+        if (tokenInfo?.is_valid === false && connection.provider === 'facebook') {
+          lastUserToken = userToken;
+          resolvedMetaUserId = tokenUserId;
+          grantAlreadyCleared = true;
+          console.log('[instagram-oauth-revoke] Stored Facebook user token is already invalid; grant is cleared');
+          break;
+        }
 
         if (tokenInfo?.is_valid !== true || tokenType !== 'USER' || !tokenUserId) {
           console.log('[instagram-oauth-revoke] Skipping non-user or invalid token', connection.provider);
@@ -227,7 +236,7 @@ Deno.serve(async (req) => {
     // Preserve the local token if Meta did not confirm that the grant is gone.
     // It is needed for a retry and prevents the UI from claiming a clean reset.
     const deletedProviders: string[] = [];
-    if (revoked && authorizationCleared === true) {
+    if ((revoked || grantAlreadyCleared) && authorizationCleared === true) {
       for (const provider of ['instagram', 'facebook'] as const) {
         const { data: deleted, error: deleteErr } = await supabase
           .from('social_connections')
@@ -244,7 +253,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const hardResetComplete = revoked && authorizationCleared === true;
+    const hardResetComplete = (revoked || grantAlreadyCleared) && authorizationCleared === true;
 
     console.log('[instagram-oauth-revoke] Hard reset summary:', {
       user_id: user.id,
