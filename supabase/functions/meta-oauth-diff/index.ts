@@ -231,6 +231,8 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        is_admin: isAdmin,
+        all_accounts: allAccounts,
         attempts,
         attempt_a: a ?? null,
         attempt_b: b ?? null,
