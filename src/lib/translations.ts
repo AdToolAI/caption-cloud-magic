@@ -12482,6 +12482,9 @@ export const translations: Record<Language, any> = {
     common: {
       error: "Error",
       success: "Éxito",
+      warning: "Aviso",
+      metaDisconnected: "Conexión eliminada.",
+      metaGrantRemains: "Meta sigue mostrando esta app en tu perfil de Facebook. Abre Facebook → Configuración → Apps y sitios web y elimina «AdTool AI» para que la próxima conexión muestre el diálogo de permisos completo.",
       cancel: "Cancelar",
       generating: "Generando...",
       uploading: "Subiendo...",
