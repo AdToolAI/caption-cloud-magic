@@ -3,6 +3,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { ConnectionDiagnostics } from "@/components/performance/ConnectionDiagnostics";
 import { MetaOAuthDiff } from "@/components/performance/MetaOAuthDiff";
 import { MetaPageProbePanel } from "@/components/performance/MetaPageProbePanel";
+import { MetaOAuthResetPanel } from "@/components/performance/MetaOAuthResetPanel";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1298,6 +1299,8 @@ export const ConnectionsTab = () => {
       </Card>
 
       <ConnectionDiagnostics />
+
+      <MetaOAuthResetPanel onReset={fetchConnections} />
 
       <MetaOAuthDiff />
 
