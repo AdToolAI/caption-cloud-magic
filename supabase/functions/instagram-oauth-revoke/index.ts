@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     // Pull EVERY Meta-related connection (ig + fb) for this user
     const { data: metaConnections, error: fetchErr } = await supabase
       .from('social_connections')
-      .select('id, provider, access_token_hash, account_id')
+      .select('id, provider, access_token_hash, account_id, account_metadata')
       .eq('user_id', user.id)
       .in('provider', ['instagram', 'facebook']);
 
@@ -87,8 +87,30 @@ Deno.serve(async (req) => {
     let revokeError: string | null = null;
     let metaUserResolved = false;
 
-    // Try to revoke via Meta using whichever token still works
-    for (const connection of metaConnections ?? []) {
+    /** Turn a Graph API error body into one short readable line. */
+    const shortGraphError = (status: number, body: string): string => {
+      try {
+        const parsed = JSON.parse(body);
+        const err = parsed?.error;
+        if (err?.message) {
+          const code = err.code ? ` (#${err.code})` : '';
+          return `Meta ${status}${code}: ${String(err.message).split('.')[0]}`;
+        }
+      } catch (_) {
+        // not JSON — fall through
+      }
+      return `Meta ${status}`;
+    };
+
+    // Facebook rows hold the USER access token; Instagram rows hold a PAGE
+    // access token. DELETE /{id}/permissions only works with a user token —
+    // with a page token Meta answers "Unsupported delete request" (#100).
+    // So: facebook first, and skip anything that is not a user token.
+    const ordered = [...(metaConnections ?? [])].sort((a, b) =>
+      a.provider === 'facebook' ? -1 : b.provider === 'facebook' ? 1 : 0
+    );
+
+    for (const connection of ordered) {
       if (!connection.access_token_hash) continue;
       try {
         const userToken = await decryptToken(connection.access_token_hash);
@@ -98,19 +120,37 @@ Deno.serve(async (req) => {
           'token (len:', userToken.length, ')'
         );
 
+        // metadata=1 makes Graph report whether this is a user or page token.
         const meRes = await fetch(
-          `https://graph.facebook.com/v24.0/me?fields=id&access_token=${encodeURIComponent(userToken)}`
+          `https://graph.facebook.com/v24.0/me?fields=id&metadata=1&access_token=${encodeURIComponent(userToken)}`
         );
 
         if (!meRes.ok) {
           const meBody = await meRes.text();
-          revokeError = `/me ${meRes.status}: ${meBody}`;
-          console.warn('[instagram-oauth-revoke] /me failed for', connection.provider, ':', revokeError);
+          revokeError = shortGraphError(meRes.status, meBody);
+          console.warn('[instagram-oauth-revoke] /me failed for', connection.provider, ':', meBody);
           continue;
         }
 
         const me = await meRes.json();
-        const metaUserId = me?.id;
+        const tokenType = me?.metadata?.type as string | undefined;
+        const storedMetaUserId =
+          (connection.account_metadata as Record<string, unknown> | null)?.meta_user_id as
+            | string
+            | undefined;
+
+        if (tokenType && tokenType !== 'user') {
+          console.log(
+            '[instagram-oauth-revoke] Skipping',
+            connection.provider,
+            '— token type is',
+            tokenType,
+            '(page tokens cannot revoke app permissions)'
+          );
+          continue;
+        }
+
+        const metaUserId = storedMetaUserId || me?.id;
         if (!metaUserId) {
           revokeError = 'Meta /me returned no id';
           console.warn('[instagram-oauth-revoke]', revokeError);
@@ -138,12 +178,12 @@ Deno.serve(async (req) => {
           );
           break; // one successful revoke is enough — Meta drops the whole app grant
         } else {
-          revokeError = `Revoke ${revokeRes.status}: ${revokeBody}`;
+          revokeError = shortGraphError(revokeRes.status, revokeBody);
           console.warn(
             '[instagram-oauth-revoke] ❌ Revoke call failed via',
             connection.provider,
             ':',
-            revokeError
+            revokeBody
           );
         }
       } catch (decryptErr) {
@@ -157,6 +197,7 @@ Deno.serve(async (req) => {
         );
       }
     }
+
 
     // Always delete BOTH instagram and facebook rows for this user.
     // Meta sees them as a shared app grant; keeping fb around is what causes
