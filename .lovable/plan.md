@@ -1,36 +1,30 @@
-# Warum das Diff-Panel den Versuch von gestern 21:08 zeigt
+# Sind wir dem Fehler näher? Ja — der Befund steht jetzt fest
 
-## Befund (aus der Datenbank gelesen, nicht vermutet)
+## Was die Datenbank für deine heutigen Connects sagt
 
-Deine beiden Connects von heute sind **beide** korrekt protokolliert:
+| Zeit (Berlin) | Facebook-Profil | Seiten | AdTool-Konto | business_management |
+| --- | --- | --- | --- | --- |
+| 10:33:15 | …329815 | 2 | Konto B | erteilt |
+| 10:34:25 | …337304 | 0 | Konto A | **nicht erteilt** |
 
-| Zeit (Berlin) | Facebook-Profil | Seiten | AdTool-Konto |
-| --- | --- | --- | --- |
-| 10:33:15 | …329815 | 2 | Konto **B** (8948d3d9…) |
-| 10:34:25 | …337304 | 0 | Konto **A** (ab6bf0d1…) |
+Beide Versuche von heute sind sauber protokolliert. Das Diff-Panel zeigte trotzdem 21:08 von gestern, weil es nur Versuche des **angemeldeten** AdTool-Kontos liest (`user_id = auth.uid()`). Du warst in Konto A angemeldet; der 2-Seiten-Connect von heute gehört zu Konto B. Der jüngste 2-Seiten-Versuch von Konto A war der von gestern 21:08. Also kein Cache, kein Zuordnungsfehler — eine Anzeige-Einschränkung.
 
-Das Diff-Panel liest aber ausschließlich Versuche des **gerade angemeldeten** AdTool-Kontos (`meta-oauth-diff` filtert auf `user_id = auth.uid()`). Du warst dabei in Konto A angemeldet. Der 2-Seiten-Connect von heute 10:33 gehört zu Konto B und ist deshalb dort unsichtbar.
+## Der eigentliche Fehler ist damit eingekreist
 
-Der neueste 2-Seiten-Versuch, der zu Konto A gehört, stammt vom 7.8. um 19:08 UTC = **21:08 Berlin** — genau der Eintrag im Screenshot. Es ist also kein alter Cache und kein Zuordnungsfehler, sondern die Konto-Trennung des Panels.
+Gleiche App, gleiche `client_id`, identische angefragte Scopes, gleicher Browser, gleicher Mensch — der einzige Unterschied ist das Facebook-Profil. Bei …337304 erteilt Meta `business_management` gar nicht erst und liefert deshalb `me/accounts = 0` und `me/businesses = (#100) Missing Permission`. Das ist kein Code-Fehler der App: Meta zeigt diesem Profil im Dialog nur 3 Toggles, weil ihm keine App-/Seiten-Assets im Business-Portfolio zugewiesen sind.
 
-## Was ich ändere
+Offen ist genau eine Frage: Fehlt bei …337304 die **Asset-Zuweisung** (Seite und App im Portfolio), oder blockiert Meta den Scope für dieses Profil grundsätzlich. Das lässt sich messen, ohne in der Business Suite zu raten.
 
-Damit ein kontoübergreifender Vergleich möglich ist, ohne die Privatsphäre anderer Nutzer aufzugeben:
+## Was ich baue
 
-1. **Admin-Modus im Diff-Panel**: Für Nutzer mit Admin-Rolle (`has_role(auth.uid(),'admin')`, serverseitig geprüft) gibt es einen Schalter „Alle Konten einbeziehen". Damit erscheinen beide Versuche von heute nebeneinander, jeweils mit AdTool-Konto-Kennung.
-2. **Ohne Admin-Rolle**: Vergleich per **Diagnostic-ID**. Im anderen Konto die ID kopieren, hier einfügen — der Server gibt nur die tokenfreie Zusammenfassung dieser einen ID heraus.
-3. **Klarer Zeitstempel-Hinweis**: Über der Tabelle steht sichtbar, aus welchem AdTool-Konto und von welchem Zeitpunkt jede Spalte stammt, plus Hinweis „ältere Messung — heutiger Versuch liegt in einem anderen Konto", wenn der gewählte Versuch nicht der neueste des Profils ist.
-
-Am OAuth-Flow, an Scopes oder an gespeicherten Verbindungen ändert sich nichts — reine Diagnose-Anzeige.
+1. **Isolierter Scope-Test** (`meta-scope-probe`): ein Connect, der ausschließlich `business_management` mit `auth_type=rerequest` anfragt. Erteilt Meta ihn allein → das Problem ist die Kombination/Asset-Zuweisung. Verweigert Meta ihn auch allein → der Scope ist für dieses Profil gesperrt, und keine App-Änderung hilft. Ergebnis landet als eigener Eintrag im Diagnose-Protokoll.
+2. **Kontoübergreifender Vergleich im Diff-Panel**: Schalter „Alle Konten einbeziehen" für Admins (serverseitig gegen `user_roles` geprüft) plus Vergleich per eingefügter Diagnostic-ID für alle anderen. Über jeder Spalte steht künftig, aus welchem AdTool-Konto und von wann die Messung stammt, inklusive Hinweis „nicht der neueste Versuch dieses Profils".
+3. **Ehrliche Fehlermeldung in der Verbindungskarte**: bei fehlendem `business_management` kein technisches Roh-JSON, sondern der konkrete Satz, was bei Meta fehlt und dass es kein App-Fehler ist.
 
 ## Technische Details
 
-- `supabase/functions/meta-oauth-diff/index.ts`: optionale Parameter `include_all_accounts` (nur wirksam bei Admin-Rolle, per Service-Client gegen `user_roles` geprüft) und `attempt_ids` (direkte Auswahl per Diagnostic-ID, unabhängig vom `user_id`-Filter). Standardverhalten bleibt unverändert.
-- Rückgabe je Versuch zusätzlich `account_ref` (gekürzte AdTool-User-ID) und `is_latest_for_profile`.
-- `src/components/performance/MetaOAuthDiff.tsx`: Schalter „Alle Konten einbeziehen" (nur sichtbar bei Admin), Eingabefeld für Diagnostic-ID, Konto- und Aktualitäts-Hinweis über der Tabelle.
-- `src/lib/translations.ts`: neue Schlüssel DE/EN/ES unter `metaDiff.*`.
-- Keine Datenbank-Migration nötig.
-
-## Der eigentliche Meta-Befund bleibt
-
-Unabhängig davon: Profil …337304 bekommt von Meta weiterhin `business_management` nicht erteilt und liefert 0 Seiten — das ist ein Meta-/Business-Portfolio-Thema, kein Fehler der App.
+- Neue Edge Function `meta-scope-probe-start` + Auswertung im bestehenden Callback; schreibt nach `meta_oauth_diagnostics` mit `provider = 'facebook_scope_probe'`, ändert keine gespeicherte Verbindung und keinen Token.
+- `supabase/functions/meta-oauth-diff/index.ts`: optionale Parameter `include_all_accounts` (nur mit Admin-Rolle) und `attempt_ids`; Rückgabe zusätzlich `account_ref` und `is_latest_for_profile`.
+- `src/components/performance/MetaOAuthDiff.tsx`: Admin-Schalter, Eingabefeld für Diagnostic-ID, Konto- und Aktualitätshinweis, Button „Scope-Test starten".
+- `src/lib/translations.ts`: neue Schlüssel DE/EN/ES unter `metaDiff.*` und `metaProbe.*`.
+- Keine Datenbank-Migration, keine Änderung an Scopes des normalen Connect-Flows.
