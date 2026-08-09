@@ -8,6 +8,7 @@ import { Upload, X } from 'lucide-react';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { tx } from '@/lib/i18nText';
 
 interface VoiceCloneDialogProps {
   open: boolean;
@@ -34,8 +35,8 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
   const handleSubmit = async () => {
     if (!name || audioFiles.length < 1) {
       toast({
-        title: 'Fehler',
-        description: 'Mindestens 1 Audio-Sample erforderlich',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: tx({ de: 'Mindestens 1 Audio-Sample erforderlich', en: 'At least 1 audio sample required', es: 'Se requiere al menos 1 muestra de audio' }),
         variant: 'destructive',
       });
       return;
@@ -73,8 +74,8 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
     } catch (error) {
       console.error('Error uploading samples:', error);
       toast({
-        title: 'Fehler',
-        description: 'Upload fehlgeschlagen',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Carga fallida' }),
         variant: 'destructive',
       });
     } finally {
@@ -147,7 +148,7 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {audioFiles.length}/5 Samples ({audioFiles.length < 1 ? 'mindestens 1 erforderlich' : 'bereit zum Klonen'})
+              {audioFiles.length}/5 Samples ({audioFiles.length < 1 ? tx({ de: 'mindestens 1 erforderlich', en: 'at least 1 required', es: 'se requiere al menos 1' }) : tx({ de: 'bereit zum Klonen', en: 'ready to clone', es: 'listo para clonar' })})
             </p>
           </div>
 
