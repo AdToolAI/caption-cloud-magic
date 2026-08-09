@@ -64,6 +64,40 @@ const STYLE_MODIFIERS: Record<string, string> = {
   editorial: 'editorial fashion photography, high-end magazine style, bold composition',
 };
 
+/**
+ * Allowed `aspect_ratio` values per Replicate model. Sending anything outside
+ * this list makes the model reject the whole request ("input validation"),
+ * which surfaced as a silent "Bildgenerierung fehlgeschlagen" in the UI.
+ */
+const ASPECT_SUPPORT: Record<string, string[]> = {
+  fast: ['1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
+  pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+  ultra: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
+};
+
+/** Maps an unsupported ratio to the closest supported one for that model. */
+function mapAspectRatio(tier: string, requested: string): string {
+  const allowed = ASPECT_SUPPORT[tier] ?? ASPECT_SUPPORT.fast;
+  if (allowed.includes(requested)) return requested;
+
+  const parse = (r: string) => {
+    const [w, h] = r.split(':').map(Number);
+    return w > 0 && h > 0 ? w / h : 1;
+  };
+  const target = parse(requested);
+  let best = allowed[0];
+  let bestDelta = Infinity;
+  for (const cand of allowed) {
+    const delta = Math.abs(parse(cand) - target);
+    if (delta < bestDelta) {
+      best = cand;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
