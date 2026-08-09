@@ -220,7 +220,7 @@ export const VideoPreviewComparison = ({
             rel="noreferrer"
             className="mt-2 text-xs text-primary underline hover:no-underline"
           >
-            Video im neuen Tab öffnen
+            {tx({ de: "Video im neuen Tab öffnen", en: "Open video in new tab", es: "Abrir video en nueva pestaña" })}
           </a>
         </div>
       );
@@ -239,7 +239,7 @@ export const VideoPreviewComparison = ({
         >
           <img 
             src={thumbnailUrl} 
-            alt="Video Vorschau"
+            alt={tx({ de: "Video Vorschau", en: "Video preview", es: "Vista previa del video" })}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
@@ -304,7 +304,7 @@ export const VideoPreviewComparison = ({
               {renderVideoOrError('original', originalUrl, originalVideoError, originalVideoLoading, showOriginalPlayer, setShowOriginalPlayer, originalVideoRef)}
             </div>
             <div className="absolute top-2 left-2 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-medium">
-              Original
+              {tx({ de: "Original", en: "Original", es: "Original" })}
             </div>
           </div>
 
@@ -321,7 +321,7 @@ export const VideoPreviewComparison = ({
               )}
             </div>
             <div className="absolute top-2 right-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-medium text-primary-foreground">
-              Bearbeitet
+              {tx({ de: "Bearbeitet", en: "Edited", es: "Editado" })}
             </div>
           </div>
         </div>

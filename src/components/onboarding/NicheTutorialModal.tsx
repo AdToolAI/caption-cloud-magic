@@ -153,14 +153,14 @@ export function NicheTutorialModal({ onComplete }: NicheTutorialModalProps) {
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <DialogTitle className="sr-only">Personalisiere dein Dashboard</DialogTitle>
+        <DialogTitle className="sr-only">{tx({ de: "Personalisiere dein Dashboard", en: "Personalize your dashboard", es: "Personaliza tu panel" })}</DialogTitle>
         <DialogDescription className="sr-only">
-          Drei kurze Schritte, um deinen personalisierten Wochenplan zu erstellen.
+          {tx({ de: "Drei kurze Schritte, um deinen personalisierten Wochenplan zu erstellen.", en: "Three quick steps to create your personalized weekly plan.", es: "Tres pasos rápidos para crear tu plan semanal personalizado." })}
         </DialogDescription>
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-center justify-center">
             <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-bold">Personalisiere dein Dashboard</h2>
+            <h2 className="text-lg font-bold">{tx({ de: "Personalisiere dein Dashboard", en: "Personalize your dashboard", es: "Personaliza tu panel" })}</h2>
           </div>
 
           {step < 3 && (

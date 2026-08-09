@@ -21,30 +21,29 @@ export default function AutopilotAUP() {
       <div className="min-h-screen bg-background">
         <div className="max-w-3xl mx-auto px-6 py-10">
           <Link to="/autopilot" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-            <ArrowLeft className="h-4 w-4" /> Zurück zum Cockpit
+            <ArrowLeft className="h-4 w-4" /> {tx({ de: "Zurück zum Cockpit", en: "Back to cockpit", es: "Volver al cockpit" })}
           </Link>
 
           <div className="flex items-center gap-3 mb-2">
             <ShieldCheck className="h-7 w-7 text-primary" />
             <h1 className="font-serif text-3xl">Autopilot — Acceptable Use Policy</h1>
           </div>
-          <p className="text-sm text-muted-foreground mb-8">Version {AUTOPILOT_AUP_VERSION} · gültig ab Aktivierung</p>
+          <p className="text-sm text-muted-foreground mb-8">{tx({ de: `Version ${AUTOPILOT_AUP_VERSION} · gültig ab Aktivierung`, en: `Version ${AUTOPILOT_AUP_VERSION} · valid from activation`, es: `Versión ${AUTOPILOT_AUP_VERSION} · válida desde la activación` })}</p>
 
           <Card className="bg-destructive/10 border-destructive/40 p-5 mb-8">
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="text-sm">
-                <p className="font-semibold text-destructive mb-1">Wichtig — bitte vollständig lesen</p>
+                <p className="font-semibold text-destructive mb-1">{tx({ de: "Wichtig — bitte vollständig lesen", en: "Important — please read in full", es: "Importante — por favor lee todo" })}</p>
                 <p className="text-foreground/90">
-                  Die Aktivierung des Autopilot-Modus bedeutet, dass eine KI in deinem Namen Inhalte generiert und (bei aktiviertem Auto-Publish) auf deinen verbundenen Plattformen veröffentlicht.
-                  Du bleibst rechtlich verantwortlich für jeden veröffentlichten Inhalt. Diese Policy regelt verbindlich, was zulässig ist und welche Konsequenzen Verstöße haben.
+                  {tx({ de: "Die Aktivierung des Autopilot-Modus bedeutet, dass eine KI in deinem Namen Inhalte generiert und (bei aktiviertem Auto-Publish) auf deinen verbundenen Plattformen veröffentlicht. Du bleibst rechtlich verantwortlich für jeden veröffentlichten Inhalt. Diese Policy regelt verbindlich, was zulässig ist und welche Konsequenzen Verstöße haben.", en: "Activating Autopilot mode means an AI generates content on your behalf and (with Auto-Publish enabled) publishes it on your connected platforms. You remain legally responsible for every published piece of content. This policy binds what is permitted and the consequences of violations.", es: "Activar el modo Autopilot significa que una IA genera contenido en tu nombre y (con Auto-Publish activado) lo publica en tus plataformas conectadas. Sigues siendo legalmente responsable de todo el contenido publicado. Esta política regula de forma vinculante lo que está permitido y las consecuencias de las infracciones." })}
                 </p>
               </div>
             </div>
           </Card>
 
-          <Section title="§1 Geltungsbereich">
-            Diese Acceptable Use Policy (AUP) gilt für alle Funktionen unter <code>/autopilot</code> sowie für sämtliche durch den Autopilot generierten und veröffentlichten Inhalte. Sie ist Bestandteil unserer AGB. Im Konflikt gelten die strengeren Regeln dieser AUP.
+          <Section title={tx({ de: "§1 Geltungsbereich", en: "§1 Scope", es: "§1 Ámbito de aplicación" })}>
+            {tx({ de: "Diese Acceptable Use Policy (AUP) gilt für alle Funktionen unter", en: "This Acceptable Use Policy (AUP) applies to all features under", es: "Esta Política de Uso Aceptable (AUP) se aplica a todas las funciones bajo" })} <code>/autopilot</code> {tx({ de: "sowie für sämtliche durch den Autopilot generierten und veröffentlichten Inhalte. Sie ist Bestandteil unserer AGB. Im Konflikt gelten die strengeren Regeln dieser AUP.", en: "as well as all content generated and published by Autopilot. It is part of our Terms & Conditions. In case of conflict, the stricter rules of this AUP apply.", es: "así como para todo el contenido generado y publicado por Autopilot. Forma parte de nuestros Términos y Condiciones. En caso de conflicto, se aplican las reglas más estrictas de esta AUP." })}
           </Section>
 
           <Section title="§2 Striktes Deepfake-Verbot">

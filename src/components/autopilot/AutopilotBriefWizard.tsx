@@ -235,7 +235,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               </p>
             )}
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
               <Button disabled={!briefValid || !goalValid || upsert.isPending} onClick={handleSaveBrief} className="gap-1.5">
                 Weiter <ChevronRight className="h-4 w-4" />
               </Button>
@@ -264,7 +264,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             <div className="space-y-2.5">
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox checked={aupAccepted} onCheckedChange={(v) => setAupAccepted(v === true)} disabled={!scrolled} />
-                <span>Ich habe die <strong>vollständige AUP</strong> gelesen und akzeptiere sie als verbindlich.</span>
+                <span>{tx({ de: "Ich habe die ", en: "I have read the ", es: "He leído la " })}<strong>{tx({ de: "vollständige AUP", en: "full AUP", es: "AUP completa" })}</strong>{tx({ de: " gelesen und akzeptiere sie als verbindlich.", en: " and accept it as binding.", es: " y la acepto como vinculante." })}</span>
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox checked={noDeepfake} onCheckedChange={(v) => setNoDeepfake(v === true)} disabled={!scrolled} />
@@ -272,7 +272,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox checked={noCopyright} onCheckedChange={(v) => setNoCopyright(v === true)} disabled={!scrolled} />
-                <span>Ich werde keine <strong>urheberrechtlich geschützten</strong> Marken, Logos, Songs oder Charaktere verwenden.</span>
+                <span>{tx({ de: "Ich werde keine ", en: "I will not use any ", es: "No usaré " })}<strong>{tx({ de: "urheberrechtlich geschützten", en: "copyrighted", es: "protegidas por derechos de autor" })}</strong>{tx({ de: " Marken, Logos, Songs oder Charaktere verwenden.", en: " brands, logos, songs, or characters.", es: " marcas, logotipos, canciones o personajes." })}</span>
               </label>
               <label className="flex items-start gap-2 text-sm border-l-2 border-destructive pl-2">
                 <Checkbox checked={acceptTermination} onCheckedChange={(v) => setAcceptTermination(v === true)} disabled={!scrolled} />

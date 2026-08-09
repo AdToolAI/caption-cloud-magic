@@ -94,7 +94,7 @@ export default function SceneRenderConfirmDialog({
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Szene {scn.sceneIndex}
+                  {tx({ de: `Szene ${scn.sceneIndex}`, en: `Scene ${scn.sceneIndex}`, es: `Escena ${scn.sceneIndex}` })}
                 </span>
                 <Badge variant="outline" className="text-[10px] tabular-nums">
                   {formatCredits(scn.totalCredits)} · {formatEur(scn.totalEur)}
@@ -118,7 +118,7 @@ export default function SceneRenderConfirmDialog({
                 ))}
                 {scn.lines.length === 0 && (
                   <li className="text-[11px] text-muted-foreground italic">
-                    Keine kostenpflichtigen Komponenten (Stock/Upload).
+                    {tx({ de: "Keine kostenpflichtigen Komponenten (Stock/Upload).", en: "No billable components (stock/upload).", es: "Sin componentes con costo (stock/carga)." })}
                   </li>
                 )}
               </ul>
@@ -126,7 +126,7 @@ export default function SceneRenderConfirmDialog({
                 <div className="mt-2 pt-2 border-t border-border/30 flex items-center justify-between text-[10px] text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    Renderzeit
+                    {tx({ de: "Renderzeit", en: "Render time", es: "Tiempo de renderizado" })}
                   </span>
                   <span className="tabular-nums">{formatEtaRange(scn.etaSeconds)}</span>
                 </div>
@@ -138,7 +138,7 @@ export default function SceneRenderConfirmDialog({
             <div className="flex items-center justify-between">
               <span className="text-sm flex items-center gap-1.5">
                 <Wallet className="h-4 w-4 text-primary" />
-                Gesamt
+                {tx({ de: "Gesamt", en: "Total", es: "Total" })}
               </span>
               <span className="font-semibold tabular-nums">
                 {formatCredits(cost.totalCredits)} · {formatEur(cost.totalEur)}
@@ -148,7 +148,7 @@ export default function SceneRenderConfirmDialog({
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5" />
-                  Geschätzte Renderzeit
+                  {tx({ de: "Geschätzte Renderzeit", en: "Estimated render time", es: "Tiempo estimado de renderizado" })}
                 </span>
                 <span className="tabular-nums">{formatEtaRange(cost.etaSeconds)}</span>
               </div>
@@ -182,7 +182,7 @@ export default function SceneRenderConfirmDialog({
           {cost.totalCredits === 0 && (
             <div className="rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-[11px] text-amber-300 flex items-start gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-              Keine kostenpflichtigen API-Calls — du kannst sicher fortfahren.
+              {tx({ de: "Keine kostenpflichtigen API-Calls — du kannst sicher fortfahren.", en: "No billable API calls — you can safely continue.", es: "Sin llamadas a la API con costo — puedes continuar con seguridad." })}
             </div>
           )}
 
@@ -191,15 +191,15 @@ export default function SceneRenderConfirmDialog({
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4 text-red-400 shrink-0" />
                 <span className="text-sm font-semibold text-red-200">
-                  Hinweis zu Lip-Sync mit {providerLabel}
+                  {tx({ de: `Hinweis zu Lip-Sync mit ${providerLabel}`, en: `Note on lip-sync with ${providerLabel}`, es: `Nota sobre lip-sync con ${providerLabel}` })}
                 </span>
               </div>
               <p className="text-[11.5px] leading-relaxed text-red-100/90">
-                <strong>{providerLabel}</strong> liefert bei Lip-Sync-Szenen
-                {anyMultiSpeaker ? tx({ de: ' mit mehreren Sprechern', en: 'with multiple speakers', es: 'con múltiples parlantes' }) : ''} keine
-                zuverlässigen Ergebnisse. Es kann zu Ghost-Mouthing (Nicht-
-                Sprecher bewegen den Mund), verzerrten Gesichtern und
-                falschen Mundbewegungen kommen.
+                {tx({
+                  de: <>Liefert bei Lip-Sync-Szenen{anyMultiSpeaker ? ' mit mehreren Sprechern' : ''} keine zuverlässigen Ergebnisse. Es kann zu Ghost-Mouthing (Nicht-Sprecher bewegen den Mund), verzerrten Gesichtern und falschen Mundbewegungen kommen.</>,
+                  en: <>Does not deliver reliable results for lip-sync scenes{anyMultiSpeaker ? ' with multiple speakers' : ''}. This can lead to ghost-mouthing (non-speakers moving their mouth), distorted faces and incorrect mouth movements.</>,
+                  es: <>No ofrece resultados fiables en escenas de lip-sync{anyMultiSpeaker ? ' con múltiples parlantes' : ''}. Puede provocar ghost-mouthing (personas que no hablan mueven la boca), rostros distorsionados y movimientos de boca incorrectos.</>,
+                })}
               </p>
               <p className="text-[11.5px] leading-relaxed text-red-100/90">
                 Für stabile Lip-Sync-Renderings empfehlen wir{' '}

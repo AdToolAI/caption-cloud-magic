@@ -508,12 +508,12 @@ const Carousel = () => {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Vorschau</CardTitle>
+                    <CardTitle>{tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}</CardTitle>
                     {carouselOutline && (
                       <div className="flex gap-2">
                         <Button onClick={handleCopyCaption} variant="outline" size="sm">
                           <Copy className="h-4 w-4 mr-2" />
-                          Caption kopieren
+                          {tx({ de: "Caption kopieren", en: "Copy caption", es: "Copiar título" })}
                         </Button>
                       </div>
                     )}
@@ -523,7 +523,7 @@ const Carousel = () => {
                   {!carouselOutline ? (
                     <div className="flex flex-col items-center justify-center h-[400px] text-center space-y-4">
                       <FileText className="h-16 w-16 text-muted-foreground opacity-50" />
-                      <p className="text-muted-foreground">Erstelle Folien um die Vorschau zu sehen</p>
+                      <p className="text-muted-foreground">{tx({ de: "Erstelle Folien um die Vorschau zu sehen", en: "Create slides to see the preview", es: "Crea diapositivas para ver la vista previa" })}</p>
                     </div>
                   ) : (
                     <div className="space-y-4">

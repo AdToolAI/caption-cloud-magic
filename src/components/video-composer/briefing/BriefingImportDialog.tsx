@@ -259,7 +259,7 @@ export default function BriefingImportDialog({
                   title="Captions / Subtitles"
                 >
                   <Row label="Font" value={manifest.captions.font} />
-                  <Row label="Größe" value={manifest.captions.sizePx ? `${manifest.captions.sizePx}px` : undefined} />
+                  <Row label={tx({ de: "Größe", en: "Size", es: "Tamaño" })} value={manifest.captions.sizePx ? `${manifest.captions.sizePx}px` : undefined} />
                   <Row label="Farbe" value={manifest.captions.color} />
                   <Row label="Highlight" value={manifest.captions.highlightColor} />
                   <Row label="Max Wörter/Cue" value={manifest.captions.maxWordsPerCue?.toString()} />
@@ -333,7 +333,7 @@ export default function BriefingImportDialog({
         <DialogFooter className="gap-2">
           {step === 'paste' && (
             <>
-              <Button variant="ghost" onClick={() => handleClose(false)}>Abbrechen</Button>
+              <Button variant="ghost" onClick={() => handleClose(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
               <Button onClick={handleParse} disabled={parsing || text.trim().length < 40 || text.length > 120_000}>
                 {parsing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Parse…</> : <><Sparkles className="h-4 w-4 mr-2" />Briefing analysieren</>}
               </Button>

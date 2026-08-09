@@ -1,6 +1,7 @@
 import { Clock, TrendingUp, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -90,9 +91,9 @@ export const RecommendationsEmptyState = () => {
             <Sparkles className="h-6 w-6 text-primary" />
           </motion.div>
           <div className="text-center space-y-1">
-            <h3 className="font-semibold text-base text-foreground">Noch keine Empfehlungen</h3>
+            <h3 className="font-semibold text-base text-foreground">{tx({ de: "Noch keine Empfehlungen", en: "No recommendations yet", es: "Aún no hay recomendaciones" })}</h3>
             <p className="text-sm text-muted-foreground max-w-sm">
-              Sobald du mehr Content erstellst, generiert die KI personalisierte Tipps für dich.
+              {tx({ de: "Sobald du mehr Content erstellst, generiert die KI personalisierte Tipps für dich.", en: "Once you create more content, the AI will generate personalized tips for you.", es: "En cuanto crees más contenido, la IA generará consejos personalizados para ti." })}
             </p>
           </div>
         </CardContent>

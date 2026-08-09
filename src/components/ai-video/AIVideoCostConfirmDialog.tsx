@@ -96,7 +96,7 @@ export default function AIVideoCostConfirmDialog({
         <div className="space-y-3 my-2 max-h-[55vh] overflow-y-auto pr-1">
           <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground">Modell</span>
+              <span className="text-xs font-medium text-muted-foreground">{tx({ de: "Modell", en: "Model", es: "Modelo" })}</span>
               <Badge variant="outline" className="text-[10px]">
                 {modelBadge ?? modelName}
               </Badge>
@@ -136,7 +136,7 @@ export default function AIVideoCostConfirmDialog({
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5" />
-                  Geschätzte Dauer
+                  {tx({ de: "Geschätzte Dauer", en: "Estimated duration", es: "Duración estimada" })}
                 </span>
                 <span className="tabular-nums">{formatEta(etaSeconds)}</span>
               </div>
@@ -148,7 +148,7 @@ export default function AIVideoCostConfirmDialog({
               <div className="flex items-center justify-between text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <Coins className="h-3.5 w-3.5" />
-                  Aktuelles AI-Guthaben
+                  {tx({ de: "Aktuelles AI-Guthaben", en: "Current AI balance", es: "Saldo de IA actual" })}
                 </span>
                 <span className="tabular-nums">
                   {currencySymbol}
@@ -157,7 +157,7 @@ export default function AIVideoCostConfirmDialog({
               </div>
               {remaining !== null && !insufficient && (
                 <div className="flex items-center justify-between text-muted-foreground/80">
-                  <span>Restsaldo nach Generierung</span>
+                  <span>{tx({ de: "Restsaldo nach Generierung", en: "Remaining balance after generation", es: "Saldo restante después de la generación" })}</span>
                   <span className="tabular-nums">
                     {currencySymbol}
                     {remaining.toFixed(2)}
@@ -170,7 +170,7 @@ export default function AIVideoCostConfirmDialog({
           {isUnlimited && (
             <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-[11px] text-emerald-300 flex items-start gap-1.5">
               <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-              Unlimited-Plan aktiv — keine Guthaben-Belastung.
+              {tx({ de: "Unlimited-Plan aktiv — keine Guthaben-Belastung.", en: "Unlimited plan active — no credit charged.", es: "Plan ilimitado activo — sin cargo de saldo." })}
             </div>
           )}
 
@@ -179,7 +179,7 @@ export default function AIVideoCostConfirmDialog({
               <div className="flex items-start gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <span className="leading-tight">
-                  Dein Guthaben reicht nicht aus. Bitte lade AI-Credits nach, um fortzufahren.
+                  {tx({ de: "Dein Guthaben reicht nicht aus. Bitte lade AI-Credits nach, um fortzufahren.", en: "Your balance is not sufficient. Please top up AI credits to continue.", es: "Tu saldo no es suficiente. Recarga créditos de IA para continuar." })}
                 </span>
               </div>
               {onTopUp && (
@@ -187,7 +187,7 @@ export default function AIVideoCostConfirmDialog({
                   onClick={onTopUp}
                   className="w-full rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-2.5 py-1.5 text-[11px] font-medium text-amber-100 transition"
                 >
-                  AI-Credits nachkaufen
+                  {tx({ de: "AI-Credits nachkaufen", en: "Buy more AI credits", es: "Comprar más créditos de IA" })}
                 </button>
               )}
             </div>
@@ -203,19 +203,19 @@ export default function AIVideoCostConfirmDialog({
               htmlFor="ai-video-suppress-confirm"
               className="text-[11px] cursor-pointer text-muted-foreground"
             >
-              24 Stunden lang nicht mehr fragen
+              {tx({ de: "24 Stunden lang nicht mehr fragen", en: "Don't ask again for 24 hours", es: "No preguntar de nuevo durante 24 horas" })}
             </Label>
           </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Abbrechen</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             disabled={insufficient}
             className="bg-gradient-to-r from-primary to-accent disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Für {totalValue} generieren
+            {tx({ de: `Für ${totalValue} generieren`, en: `Generate for ${totalValue}`, es: `Generar por ${totalValue}` })}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

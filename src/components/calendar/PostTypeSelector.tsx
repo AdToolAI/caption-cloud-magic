@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { FileText, Image, Video, Images } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -10,10 +11,10 @@ interface PostTypeSelectorProps {
 }
 
 const postTypes = [
-  { value: "text" as const, label: "Text", icon: FileText },
-  { value: "image" as const, label: "Bild", icon: Image },
-  { value: "video" as const, label: "Video", icon: Video },
-  { value: "carousel" as const, label: "Carousel", icon: Images },
+  { value: "text" as const, label: tx({ de: "Text", en: "Text", es: "Texto" }), icon: FileText },
+  { value: "image" as const, label: tx({ de: "Bild", en: "Image", es: "Imagen" }), icon: Image },
+  { value: "video" as const, label: tx({ de: "Video", en: "Video", es: "Video" }), icon: Video },
+  { value: "carousel" as const, label: tx({ de: "Karussell", en: "Carousel", es: "Carrusel" }), icon: Images },
 ];
 
 export function PostTypeSelector({ value, onChange, className }: PostTypeSelectorProps) {

@@ -499,9 +499,9 @@ export const VideoQuickPreview = ({
         <div className="text-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
           <div className="text-sm text-muted-foreground">
-            Generiere Vorschau...
+            {tx({ de: 'Generiere Vorschau...', en: 'Generating preview...', es: 'Generando vista previa...' })}
             <br />
-            <span className="text-xs">Audio wird für {segments.length || '...'} Segmente erstellt</span>
+            <span className="text-xs">{tx({ de: `Audio wird für ${segments.length || '...'} Segmente erstellt`, en: `Generating audio for ${segments.length || '...'} segments`, es: `Generando audio para ${segments.length || '...'} segmentos` })}</span>
           </div>
         </div>
       </div>
@@ -512,7 +512,7 @@ export const VideoQuickPreview = ({
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Fehler</AlertTitle>
+        <AlertTitle>{tx({ de: "Fehler", en: "Error", es: "Error" })}</AlertTitle>
         <AlertDescription>{error}</AlertDescription>
       </Alert>
     );
@@ -524,9 +524,9 @@ export const VideoQuickPreview = ({
       {mediaUrls.length === 0 && (
         <Alert className="border-yellow-500/50 bg-yellow-500/10">
           <Info className="h-4 w-4 text-yellow-600" />
-          <AlertTitle className="text-yellow-600">Text-only Vorschau</AlertTitle>
+          <AlertTitle className="text-yellow-600">{tx({ de: "Text-only Vorschau", en: "Text-only preview", es: "Vista previa solo de texto" })}</AlertTitle>
           <AlertDescription className="text-yellow-600/90">
-            Keine Medien vorhanden - Diese Vorschau zeigt nur Text, Audio und Untertitel. Füge Bilder oder Videos hinzu für eine vollständige Vorschau.
+            {tx({ de: "Keine Medien vorhanden - Diese Vorschau zeigt nur Text, Audio und Untertitel. Füge Bilder oder Videos hinzu für eine vollständige Vorschau.", en: "No media available - This preview only shows text, audio and subtitles. Add images or videos for a full preview.", es: "No hay medios disponibles - Esta vista previa solo muestra texto, audio y subtítulos. Añade imágenes o videos para una vista previa completa." })}
           </AlertDescription>
         </Alert>
       )}
@@ -534,9 +534,9 @@ export const VideoQuickPreview = ({
       {segments.length > 0 && segmentAudios.length > 0 && (
         <Alert className="border-primary/50 bg-primary/5">
           <Info className="h-4 w-4 text-primary" />
-          <AlertTitle className="text-primary">Segment-basierte Vorschau</AlertTitle>
+          <AlertTitle className="text-primary">{tx({ de: "Segment-basierte Vorschau", en: "Segment-based preview", es: "Vista previa basada en segmentos" })}</AlertTitle>
           <AlertDescription className="text-primary/90">
-            {segmentAudios.length} Audio-Segmente • {currentSegment?.subtitleSettings?.wordTiming?.length || 0} Wörter mit präzisem Timing
+            {tx({ de: `${segmentAudios.length} Audio-Segmente • ${currentSegment?.subtitleSettings?.wordTiming?.length || 0} Wörter mit präzisem Timing`, en: `${segmentAudios.length} audio segments • ${currentSegment?.subtitleSettings?.wordTiming?.length || 0} words with precise timing`, es: `${segmentAudios.length} segmentos de audio • ${currentSegment?.subtitleSettings?.wordTiming?.length || 0} palabras con temporización precisa` })}
           </AlertDescription>
         </Alert>
       )}
@@ -576,7 +576,7 @@ export const VideoQuickPreview = ({
                 {subtitleText || currentSegment?.text || tx({ de: 'Text wird geladen...', en: 'Loading text...', es: 'Cargando texto...' })}
               </div>
               <div className="text-sm text-white/50">
-                📸 Füge Medien hinzu für vollständige Vorschau
+                {tx({ de: "📸 Füge Medien hinzu für vollständige Vorschau", en: "📸 Add media for a full preview", es: "📸 Añade medios para una vista previa completa" })}
               </div>
             </div>
           </div>

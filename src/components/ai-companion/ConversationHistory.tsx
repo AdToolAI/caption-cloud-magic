@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { tx } from '@/lib/i18nText';
 
 interface Conversation {
   id: string;
@@ -96,7 +97,7 @@ export function ConversationHistory({
         </Button>
         <div className="flex items-center gap-2">
           <History className="w-4 h-4 text-primary" />
-          <span className="font-medium">Gesprächsverlauf</span>
+          <span className="font-medium">{tx({ de: 'Gesprächsverlauf', en: 'Conversation history', es: 'Historial de conversaciones' })}</span>
         </div>
       </div>
 
@@ -111,7 +112,7 @@ export function ConversationHistory({
           size="sm"
         >
           <MessageCircle className="w-4 h-4 mr-2" />
-          Neues Gespräch
+          {tx({ de: 'Neues Gespräch', en: 'New conversation', es: 'Nueva conversación' })}
         </Button>
       </div>
 
@@ -124,7 +125,7 @@ export function ConversationHistory({
         ) : conversations.length === 0 ? (
           <div className="text-center py-8 px-4">
             <MessageCircle className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-            <p className="text-sm text-muted-foreground">Noch keine Gespräche</p>
+            <p className="text-sm text-muted-foreground">{tx({ de: "Noch keine Gespräche", en: "No conversations yet", es: "Aún no hay conversaciones" })}</p>
           </div>
         ) : (
           <div className="p-2 space-y-1">

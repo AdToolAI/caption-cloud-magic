@@ -306,7 +306,7 @@ export function TimelineStudio({
                 <Scissors className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Schneiden</TooltipContent>
+            <TooltipContent>{tx({ de: "Schneiden", en: "Cut", es: "Cortar" })}</TooltipContent>
           </Tooltip>
           
           <Tooltip>
@@ -315,7 +315,7 @@ export function TimelineStudio({
                 <Copy className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Duplizieren (Ctrl+D)</TooltipContent>
+            <TooltipContent>{tx({ de: "Duplizieren (Ctrl+D)", en: "Duplicate (Ctrl+D)", es: "Duplicar (Ctrl+D)" })}</TooltipContent>
           </Tooltip>
           
           <Tooltip>
@@ -329,7 +329,7 @@ export function TimelineStudio({
                 <Trash2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Löschen (Entf)</TooltipContent>
+            <TooltipContent>{tx({ de: "Löschen (Entf)", en: "Delete (Del)", es: "Eliminar (Supr)" })}</TooltipContent>
           </Tooltip>
         </div>
         

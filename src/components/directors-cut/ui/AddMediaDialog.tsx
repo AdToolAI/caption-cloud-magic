@@ -160,7 +160,7 @@ export function AddMediaDialog({
         return {
           id: row.id,
           url: publicUrl,
-          name: meta.original_name || 'Bild',
+          name: meta.original_name || tx({ de: 'Bild', en: 'Image', es: 'Imagen' }),
           thumbnail_url: publicUrl,
         };
       });
@@ -183,7 +183,7 @@ export function AddMediaDialog({
       type: 'image',
       url: image.url,
       duration: imageDuration,
-      name: image.name || 'Bild',
+      name: image.name || tx({ de: 'Bild', en: 'Image', es: 'Imagen' }),
       thumbnail: image.thumbnail_url || image.url,
     });
   }, [imageDuration]);
@@ -398,7 +398,7 @@ export function AddMediaDialog({
                 <div>
                   <p className="font-medium">{tx({ de: "Video oder Bild hochladen", en: "Upload video or image", es: "Subir video o imagen" })}</p>
                   <p className="text-sm text-muted-foreground">
-                    Klicken oder Datei hierher ziehen
+                    {tx({ de: "Klicken oder Datei hierher ziehen", en: "Click or drag file here", es: "Haz clic o arrastra el archivo aquí" })}
                   </p>
                 </div>
               </label>
@@ -407,7 +407,9 @@ export function AddMediaDialog({
                 <div className="mt-4 p-3 bg-muted rounded-lg">
                   <p className="text-sm font-medium">{selectedMedia.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {selectedMedia.type === 'video' ? 'Video' : 'Bild'} ausgewählt
+                    {selectedMedia.type === 'video'
+                      ? tx({ de: 'Video ausgewählt', en: 'Video selected', es: 'Video seleccionado' })
+                      : tx({ de: 'Bild ausgewählt', en: 'Image selected', es: 'Imagen seleccionada' })}
                   </p>
                 </div>
               )}

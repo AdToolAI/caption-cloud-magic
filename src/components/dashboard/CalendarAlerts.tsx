@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { tx } from "@/lib/i18nText";
 import { AlertTriangle, AlertCircle, Info } from "lucide-react";
 
 interface Alert {
@@ -97,7 +98,7 @@ export function CalendarAlerts({
           <div className="text-center py-8 text-muted-foreground">
             <Info className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p className="font-medium">Alles im grünen Bereich! ✅</p>
-            <p className="text-sm mt-1">Keine Warnungen oder offenen Aufgaben.</p>
+            <p className="text-sm mt-1">{tx({ de: "Keine Warnungen oder offenen Aufgaben.", en: "No warnings or open tasks.", es: "No hay advertencias ni tareas pendientes." })}</p>
           </div>
         </CardContent>
       </Card>

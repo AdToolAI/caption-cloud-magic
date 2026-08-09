@@ -118,7 +118,7 @@ export function SuppressionManager() {
     const result = await callManage({ action: 'bulk_remove_test' });
     if (result) {
       const removed = (result as any)?.removed ?? 0;
-      toast.success(`${removed} Test-Adressen entfernt`);
+      toast.success(tx({ de: `${removed} Test-Adressen entfernt`, en: `${removed} test addresses removed`, es: `${removed} direcciones de prueba eliminadas` }));
       setBulkConfirm(false);
       load();
     }
@@ -151,7 +151,7 @@ export function SuppressionManager() {
       <div className="flex flex-col md:flex-row gap-3 mb-4 md:items-center md:justify-between">
         <div className="flex flex-1 gap-2 flex-col sm:flex-row">
           <Input
-            placeholder="Email suchen…"
+            placeholder={tx({ de: "Email suchen…", en: "Search email…", es: "Buscar email…" })}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="md:max-w-xs"
@@ -176,14 +176,14 @@ export function SuppressionManager() {
               onClick={() => setBulkConfirm(true)}
               className="gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
             >
-              <Sparkles className="h-4 w-4" /> {testCount} Test-Adressen entfernen
+              <Sparkles className="h-4 w-4" /> {tx({ de: `${testCount} Test-Adressen entfernen`, en: `Remove ${testCount} test addresses`, es: `Eliminar ${testCount} direcciones de prueba` })}
             </Button>
           )}
           <Button variant="outline" onClick={handleExportCsv} className="gap-2" disabled={!rows.length}>
             <Download className="h-4 w-4" /> CSV
           </Button>
           <Button onClick={() => setAdding(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Adresse hinzufügen
+            <Plus className="h-4 w-4" /> {tx({ de: "Adresse hinzufügen", en: "Add address", es: "Añadir dirección" })}
           </Button>
         </div>
       </div>
@@ -194,7 +194,7 @@ export function SuppressionManager() {
         </div>
       ) : rows.length === 0 ? (
         <div className="text-muted-foreground text-center py-12 text-sm">
-          Keine Einträge in der Suppression-Liste.
+          {tx({ de: "Keine Einträge in der Suppression-Liste.", en: "No entries in the suppression list.", es: "No hay entradas en la lista de supresión." })}
         </div>
       ) : (
         <>
@@ -202,11 +202,11 @@ export function SuppressionManager() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="w-[140px]">Grund</TableHead>
-                  <TableHead className="w-[180px]">Hinzugefügt</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead className="w-[110px] text-right">Aktion</TableHead>
+                  <TableHead>{tx({ de: "Email", en: "Email", es: "Email" })}</TableHead>
+                  <TableHead className="w-[140px]">{tx({ de: "Grund", en: "Reason", es: "Motivo" })}</TableHead>
+                  <TableHead className="w-[180px]">{tx({ de: "Hinzugefügt", en: "Added", es: "Añadido" })}</TableHead>
+                  <TableHead>{tx({ de: "Details", en: "Details", es: "Detalles" })}</TableHead>
+                  <TableHead className="w-[110px] text-right">{tx({ de: "Aktion", en: "Action", es: "Acción" })}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -246,7 +246,7 @@ export function SuppressionManager() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
               <span>
-                Seite {page + 1} von {totalPages} · {rows.length} Einträge gesamt
+                {tx({ de: `Seite ${page + 1} von ${totalPages} · ${rows.length} Einträge gesamt`, en: `Page ${page + 1} of ${totalPages} · ${rows.length} total entries`, es: `Página ${page + 1} de ${totalPages} · ${rows.length} entradas en total` })}
               </span>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
@@ -267,7 +267,7 @@ export function SuppressionManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>{tx({ de: "Adresse zur Suppression-Liste hinzufügen", en: "Add address to suppression list", es: "Añadir dirección a la lista de supresión" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Diese Adresse erhält keine Mails mehr — auch keine transaktionalen.
+              {tx({ de: "Diese Adresse erhält keine Mails mehr — auch keine transaktionalen.", en: "This address will no longer receive any mail — including transactional ones.", es: "Esta dirección ya no recibirá correos — incluidos los transaccionales." })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-2">
@@ -287,15 +287,15 @@ export function SuppressionManager() {
               </SelectContent>
             </Select>
             <Input
-              placeholder="Notiz (optional)"
+              placeholder={tx({ de: "Notiz (optional)", en: "Note (optional)", es: "Nota (opcional)" })}
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
             <AlertDialogAction onClick={handleAdd} disabled={busy || !newEmail.trim()}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Hinzufügen
+              {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />} {tx({ de: "Hinzufügen", en: "Add", es: "Añadir" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -305,16 +305,15 @@ export function SuppressionManager() {
       <AlertDialog open={!!removeTarget} onOpenChange={(o) => !o && setRemoveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Adresse entfernen?</AlertDialogTitle>
+            <AlertDialogTitle>{tx({ de: "Adresse entfernen?", en: "Remove address?", es: "¿Eliminar dirección?" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              <span className="font-mono">{removeTarget}</span> wird aus der Suppression-Liste entfernt
-              und kann zukünftig wieder Mails empfangen.
+              {tx({ de: <><span className="font-mono">{removeTarget}</span> wird aus der Suppression-Liste entfernt und kann zukünftig wieder Mails empfangen.</>, en: <><span className="font-mono">{removeTarget}</span> will be removed from the suppression list and can receive mail again in the future.</>, es: <><span className="font-mono">{removeTarget}</span> será eliminado de la lista de supresión y podrá volver a recibir correos en el futuro.</> })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
             <AlertDialogAction onClick={handleRemove} disabled={busy} className="bg-rose-500 hover:bg-rose-600">
-              {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Entfernen
+              {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />} {tx({ de: "Entfernen", en: "Remove", es: "Eliminar" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -326,14 +325,13 @@ export function SuppressionManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>{tx({ de: "Alle Test-Adressen entfernen?", en: "Remove all test addresses?", es: "¿Eliminar todas las direcciones de prueba?" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Es werden alle Resend-Test-Adressen (<span className="font-mono">*@resend.dev</span>) aus der
-              Suppression-Liste gelöscht. Echte Bounces bleiben erhalten.
+              {tx({ de: <>Es werden alle Resend-Test-Adressen (<span className="font-mono">*@resend.dev</span>) aus der Suppression-Liste gelöscht. Echte Bounces bleiben erhalten.</>, en: <>All Resend test addresses (<span className="font-mono">*@resend.dev</span>) will be deleted from the suppression list. Real bounces remain.</>, es: <>Se eliminarán todas las direcciones de prueba de Resend (<span className="font-mono">*@resend.dev</span>) de la lista de supresión. Los rebotes reales se conservan.</> })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
             <AlertDialogAction onClick={handleBulkRemoveTest} disabled={busy} className="bg-amber-500 hover:bg-amber-600 text-amber-950">
-              {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Alle entfernen
+              {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />} {tx({ de: "Alle entfernen", en: "Remove all", es: "Eliminar todas" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

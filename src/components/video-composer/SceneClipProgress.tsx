@@ -382,7 +382,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         {hasPreview && (
           <div className="absolute top-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 flex items-center gap-1 shadow">
             <Zap className="h-2.5 w-2.5" />
-            <span className="text-[8px] font-bold uppercase tracking-wide">Vorschau</span>
+            <span className="text-[8px] font-bold uppercase tracking-wide">{tx({ de: 'Vorschau', en: 'Preview', es: 'Vista previa' })}</span>
           </div>
         )}
         {/* Cinematic-Sync — explicit phase 1 banner so user knows the OLD HeyGen avatar is being replaced */}
@@ -420,7 +420,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         />
         <div className="absolute top-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 flex items-center gap-1 shadow">
           <Zap className="h-2.5 w-2.5" />
-          <span className="text-[8px] font-bold uppercase tracking-wide">Schnell-Vorschau</span>
+          <span className="text-[8px] font-bold uppercase tracking-wide">{tx({ de: 'Schnell-Vorschau', en: 'Quick preview', es: 'Vista previa rápida' })}</span>
         </div>
         {isAi && hasPrompt && (
           <button
@@ -428,7 +428,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             onClick={triggerFastPreview}
             disabled={busy}
             className="absolute bottom-1 right-1 bg-black/70 hover:bg-black/90 text-white rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 transition"
-            title="Schnell-Vorschau neu generieren"
+            title={tx({ de: 'Schnell-Vorschau neu generieren', en: 'Regenerate quick preview', es: 'Regenerar vista previa rápida' })}
           >
             {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5" />}
             Reroll
@@ -443,7 +443,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     return (
       <div className="relative w-full h-full bg-destructive/10 border border-destructive/30 flex flex-col items-center justify-center gap-1">
         <XCircle className="h-5 w-5 text-destructive" />
-        <span className="text-[9px] text-destructive font-medium">Fehlgeschlagen</span>
+        <span className="text-[9px] text-destructive font-medium">{tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' })}</span>
         {isAi && hasPrompt && (
           <button
             type="button"
@@ -454,7 +454,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             {busy || previewStatus === 'generating'
               ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
               : <Zap className="h-2.5 w-2.5" />}
-            Vorschau
+            {tx({ de: 'Vorschau', en: 'Preview', es: 'Vista previa' })}
           </button>
         )}
       </div>
@@ -467,7 +467,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       <div className="relative w-full h-full bg-amber-500/10 border border-amber-500/40 flex flex-col items-center justify-center gap-1 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/30 to-amber-500/0 animate-pulse" />
         <Zap className="h-4 w-4 text-amber-400 relative z-10" />
-        <span className="text-[9px] text-amber-300 font-medium relative z-10">Schnell-Vorschau läuft…</span>
+        <span className="text-[9px] text-amber-300 font-medium relative z-10">{tx({ de: 'Schnell-Vorschau läuft…', en: 'Quick preview running…', es: 'Vista previa rápida en curso…' })}</span>
         <span className="text-[8px] text-amber-300/70 relative z-10">~10 Sek.</span>
       </div>
     );
@@ -479,9 +479,9 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     <>
       <div className="relative w-full h-full bg-muted/20 border border-dashed border-border/40 flex flex-col items-center justify-center gap-1">
         <Icon className="h-4 w-4 text-muted-foreground/50" />
-        <span className="text-[9px] text-muted-foreground/60">Szene {index + 1}</span>
+        <span className="text-[9px] text-muted-foreground/60">{tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` })}</span>
         <span className="text-[8px] text-muted-foreground/40 flex items-center gap-0.5">
-          <Clock className="h-2 w-2" /> bereit zum Generieren
+          <Clock className="h-2 w-2" /> {tx({ de: 'bereit zum Generieren', en: 'ready to generate', es: 'listo para generar' })}
         </span>
         {isAi && hasPrompt && (
           <div className="absolute bottom-1 right-1 flex gap-1">
@@ -514,7 +514,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               title={tx({ de: "3-Sekunden-Vorschau in ca. 10 Sek. (LTX, ~0.005 €)", en: "3 second preview in approx. 10 seconds (LTX, ~0.005 €)", es: "Vista previa de 3 segundos en aprox. 10 segundos (LTX, ~0,005 €)" })}
             >
               {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5" />}
-              Schnell-Vorschau
+              {tx({ de: 'Schnell-Vorschau', en: 'Quick preview', es: 'Vista previa rápida' })}
             </button>
           </div>
         )}

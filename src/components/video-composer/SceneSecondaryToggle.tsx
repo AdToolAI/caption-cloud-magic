@@ -44,7 +44,7 @@ export default function SceneSecondaryToggle({
   if (summary.anchorLabel) pills.push(summary.anchorLabel);
   if (summary.faceLock) pills.push('Face-Lock');
   if (summary.lipSyncOn) pills.push('Lip-Sync');
-  if (summary.hasReferenceImage) pills.push(language === 'de' ? 'Ref-Bild' : language === 'es' ? 'Ref-img' : 'Ref-img');
+  if (summary.hasReferenceImage) pills.push(language === 'de' ? 'Ref-Bild' : 'Ref-img');
 
   return (
     <button
