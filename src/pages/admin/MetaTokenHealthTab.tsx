@@ -157,8 +157,11 @@ export function MetaTokenHealthTab() {
 
           <div className="mt-4 text-xs text-zinc-500 border-t border-[#F5C76A]/10 pt-3">
             {tx({ de: <>Cron läuft täglich um 03:00 UTC. Refresh wird ausgelöst, sobald Restlaufzeit &lt; {s?.threshold_days ?? 14} Tage.</>, en: <>Cron runs daily at 03:00 UTC. Refresh is triggered once remaining time is &lt; {s?.threshold_days ?? 14} days.</>, es: <>El cron se ejecuta diariamente a las 03:00 UTC. La renovación se activa cuando el tiempo restante es &lt; {s?.threshold_days ?? 14} días.</> })}
-            Bei <code>token_invalid</code> muss manuell ein neuer Short-Token im{" "}
-            {tx({ de: <><code>InstagramTokenDialog</code> eingefügt werden.</>, en: <>inserted into <code>InstagramTokenDialog</code>.</>, es: <>insertado en <code>InstagramTokenDialog</code>.</> })}
+            {tx({
+              de: <> Bei <code>token_invalid</code> muss manuell ein neuer Short-Token im <code>InstagramTokenDialog</code> eingefügt werden.</>,
+              en: <> On <code>token_invalid</code>, a new short-lived token must be inserted manually in the <code>InstagramTokenDialog</code>.</>,
+              es: <> En caso de <code>token_invalid</code>, se debe insertar manualmente un nuevo token de corta duración en el <code>InstagramTokenDialog</code>.</>,
+            })}
           </div>
         </CardContent>
       </Card>
