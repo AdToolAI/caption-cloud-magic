@@ -260,7 +260,7 @@ export const FacebookPageSelectDialog = ({
           <DialogDescription>
             {isInstagram
               ? "Wähle die Facebook-Seite, deren verknüpftes Instagram Business-Konto verbunden werden soll."
-              : "Wähle die Facebook-Seite, die du mit CaptionGenie verbinden möchtest."}
+              : "Wähle die Facebook-Seite, die du mit AdTool AI verbinden möchtest."}
           </DialogDescription>
           {isInstagram && (
             <div className="text-[11px] text-muted-foreground/80 mt-2 leading-relaxed space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-2.5">

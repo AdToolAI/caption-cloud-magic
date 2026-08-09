@@ -86,7 +86,7 @@ export default function Integrations() {
   return (
     <PageWrapper>
       <SEO
-        title={`${t('socialIntegrations.title')} | CaptionGenie`}
+        title={t('socialIntegrations.title')}
         description={t('socialIntegrations.seoDescription')}
       />
       
