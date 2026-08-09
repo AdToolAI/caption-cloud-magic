@@ -81,7 +81,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
           await insertCharacterVariant(character.id, v.vibe, persisted, v.seed ?? null, false);
         }),
       );
-      toast.success(`${incoming.length} tx({ de: 'Casting-Varianten generiert ✨', en: 'Casting variants generated ✨', es: 'Variantes de casting generadas ✨' })`);
+      toast.success(tx({ de: `${incoming.length} Casting-Varianten generiert ✨`, en: `${incoming.length} casting variants generated ✨`, es: `${incoming.length} variantes de casting generadas ✨` }));
       await reload();
     } catch (err) {
       const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });

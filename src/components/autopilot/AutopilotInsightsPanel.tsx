@@ -29,13 +29,12 @@ export function AutopilotInsightsPanel() {
     return (
       <Card className="p-8 text-center border-dashed bg-muted/20">
         <BarChart3 className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-        <h3 className="font-serif text-lg mb-1">Noch in der Lernphase</h3>
+        <h3 className="font-serif text-lg mb-1">{tx({ de: 'Noch in der Lernphase', en: 'Still in the learning phase', es: 'Todavía en fase de aprendizaje' })}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Der Autopilot wertet erst aus, sobald mindestens <strong>10 Posts</strong> live waren.
-          Aktuell analysiert: {insights?.total_posts_analyzed ?? 0} Posts.
+          {tx({ de: <>Der Autopilot wertet erst aus, sobald mindestens <strong>10 Posts</strong> live waren. Aktuell analysiert: {insights?.total_posts_analyzed ?? 0} Posts.</>, en: <>The autopilot only analyzes once at least <strong>10 posts</strong> have gone live. Currently analyzed: {insights?.total_posts_analyzed ?? 0} posts.</>, es: <>El piloto automático solo analiza una vez que al menos <strong>10 publicaciones</strong> están activas. Analizado actualmente: {insights?.total_posts_analyzed ?? 0} publicaciones.</> })}
         </p>
         <p className="text-xs text-muted-foreground mt-2">
-          Die Analyse läuft automatisch nightly um 03:00 UTC.
+          {tx({ de: 'Die Analyse läuft automatisch nightly um 03:00 UTC.', en: 'The analysis runs automatically nightly at 03:00 UTC.', es: 'El análisis se ejecuta automáticamente todas las noches a las 03:00 UTC.' })}
         </p>
         <Button
           variant="outline"
@@ -45,7 +44,7 @@ export function AutopilotInsightsPanel() {
           disabled={trigger.isPending}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${trigger.isPending ? 'animate-spin' : ''}`} />
-          Trotzdem jetzt analysieren
+          {tx({ de: 'Trotzdem jetzt analysieren', en: 'Analyze now anyway', es: 'Analizar ahora de todos modos' })}
         </Button>
       </Card>
     );
@@ -62,15 +61,14 @@ export function AutopilotInsightsPanel() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-xs uppercase tracking-widest text-primary/80">Self-Tuning aktiv</span>
+              <span className="text-xs uppercase tracking-widest text-primary/80">{tx({ de: 'Self-Tuning aktiv', en: 'Self-tuning active', es: 'Autoajuste activo' })}</span>
             </div>
-            <h2 className="font-serif text-2xl">Performance-Erkenntnisse</h2>
+            <h2 className="font-serif text-2xl">{tx({ de: 'Performance-Erkenntnisse', en: 'Performance insights', es: 'Perspectivas de rendimiento' })}</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Analyse von <strong>{insights.total_posts_analyzed}</strong> echten Posts ·
-              ⌀ Engagement <strong>{((insights.avg_engagement_rate ?? 0) * 100).toFixed(1)}%</strong>
+              {tx({ de: <>Analyse von <strong>{insights.total_posts_analyzed}</strong> echten Posts · ⌀ Engagement <strong>{((insights.avg_engagement_rate ?? 0) * 100).toFixed(1)}%</strong></>, en: <>Analysis of <strong>{insights.total_posts_analyzed}</strong> real posts · avg engagement <strong>{((insights.avg_engagement_rate ?? 0) * 100).toFixed(1)}%</strong></>, es: <>Análisis de <strong>{insights.total_posts_analyzed}</strong> publicaciones reales · engagement promedio <strong>{((insights.avg_engagement_rate ?? 0) * 100).toFixed(1)}%</strong></> })}
             </p>
             <p className="text-[11px] text-muted-foreground mt-1">
-              Letzte Analyse: vor {hoursAgo}h · Nächste automatisch um 03:00 UTC
+              {tx({ de: `Letzte Analyse: vor ${hoursAgo}h · Nächste automatisch um 03:00 UTC`, en: `Last analysis: ${hoursAgo}h ago · Next automatically at 03:00 UTC`, es: `Último análisis: hace ${hoursAgo}h · Próximo automático a las 03:00 UTC` })}
             </p>
           </div>
           <Button
@@ -81,7 +79,7 @@ export function AutopilotInsightsPanel() {
             className="gap-1.5"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${trigger.isPending ? 'animate-spin' : ''}`} />
-            Neu analysieren
+            {tx({ de: 'Neu analysieren', en: 'Re-analyze', es: 'Reanalizar' })}
           </Button>
         </div>
 
@@ -97,7 +95,7 @@ export function AutopilotInsightsPanel() {
         <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="h-4 w-4 text-emerald-600" />
-            <h3 className="font-semibold text-sm">Top-Themen</h3>
+            <h3 className="font-semibold text-sm">{tx({ de: 'Top-Themen', en: 'Top topics', es: 'Temas principales' })}</h3>
           </div>
           {insights.top_pillars.length > 0 ? (
             <ol className="space-y-2">
@@ -137,7 +135,7 @@ export function AutopilotInsightsPanel() {
       <Card className="p-5">
         <div className="flex items-center gap-2 mb-3">
           <BarChart3 className="h-4 w-4 text-primary" />
-          <h3 className="font-semibold text-sm">Plattform-Ranking</h3>
+          <h3 className="font-semibold text-sm">{tx({ de: 'Plattform-Ranking', en: 'Platform ranking', es: 'Ranking de plataformas' })}</h3>
         </div>
         <div className="space-y-2">
           {insights.top_platforms.map((p) => {
@@ -167,7 +165,7 @@ export function AutopilotInsightsPanel() {
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Clock className="h-4 w-4 text-primary" />
-            <h3 className="font-semibold text-sm">Beste Posting-Zeiten (UTC)</h3>
+            <h3 className="font-semibold text-sm">{tx({ de: 'Beste Posting-Zeiten (UTC)', en: 'Best posting times (UTC)', es: 'Mejores horarios de publicación (UTC)' })}</h3>
           </div>
           <div className="space-y-3">
             {Object.entries(insights.top_post_hours).map(([platform, hours]) => (
@@ -201,14 +199,14 @@ export function AutopilotInsightsPanel() {
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Layers className="h-4 w-4 text-primary" />
-            <h3 className="font-semibold text-sm">Format-Ranking</h3>
+            <h3 className="font-semibold text-sm">{tx({ de: 'Format-Ranking', en: 'Format ranking', es: 'Ranking de formatos' })}</h3>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {insights.top_formats.map((f) => (
               <div key={f.format} className="p-3 rounded-md bg-muted/40 border">
                 <div className="text-sm font-medium capitalize mb-0.5">{f.format.replace(/_/g, ' ')}</div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{f.posts_count} Posts</span>
+                  <span className="text-muted-foreground">{tx({ de: `${f.posts_count} Posts`, en: `${f.posts_count} posts`, es: `${f.posts_count} publicaciones` })}</span>
                   <span className="font-mono text-primary">{(f.avg_engagement * 100).toFixed(1)}%</span>
                 </div>
               </div>
@@ -218,9 +216,7 @@ export function AutopilotInsightsPanel() {
       )}
 
       <Card className="p-3 bg-muted/30 text-[11px] text-muted-foreground leading-relaxed">
-        ℹ️ Median-basiert (robust gegen Ausreißer). Zeitraum: letzte 30 Tage. Die Daten fließen
-        automatisch in die nächste Wochenplanung — die KI verstärkt Top-Themen und reduziert
-        Schwächere ohne dein Zutun.
+        {tx({ de: 'ℹ️ Median-basiert (robust gegen Ausreißer). Zeitraum: letzte 30 Tage. Die Daten fließen automatisch in die nächste Wochenplanung — die KI verstärkt Top-Themen und reduziert Schwächere ohne dein Zutun.', en: 'ℹ️ Median-based (robust against outliers). Period: last 30 days. The data automatically flows into the next weekly planning — the AI boosts top topics and reduces weaker ones without your intervention.', es: 'ℹ️ Basado en la mediana (robusto frente a valores atípicos). Período: últimos 30 días. Los datos fluyen automáticamente hacia la próxima planificación semanal — la IA refuerza los temas principales y reduce los más débiles sin tu intervención.' })}
       </Card>
     </div>
   );

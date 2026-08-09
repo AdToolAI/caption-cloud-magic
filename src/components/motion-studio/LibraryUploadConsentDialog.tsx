@@ -80,13 +80,11 @@ export default function LibraryUploadConsentDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            Rechtliche Bestätigung erforderlich
+            {tx({ de: "Rechtliche Bestätigung erforderlich", en: "Legal confirmation required", es: "Confirmación legal requerida" })}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-left space-y-2">
             <span className="block">
-              Bevor du eigene Bilder in die Library hochladen kannst, müssen wir aus rechtlichen
-              Gründen (DSGVO, Persönlichkeitsrechte, Urheberrecht) folgende Punkte mit dir klären.
-              Diese Einwilligung wird einmalig dokumentiert und gilt für künftige Uploads.
+              {tx({ de: "Bevor du eigene Bilder in die Library hochladen kannst, müssen wir aus rechtlichen Gründen (DSGVO, Persönlichkeitsrechte, Urheberrecht) folgende Punkte mit dir klären. Diese Einwilligung wird einmalig dokumentiert und gilt für künftige Uploads.", en: "Before you can upload your own images to the library, we need to clarify the following points with you for legal reasons (GDPR, personal rights, copyright). This consent is documented once and applies to future uploads.", es: "Antes de que puedas subir tus propias imágenes a la biblioteca, debemos aclarar contigo los siguientes puntos por motivos legales (RGPD, derechos de la personalidad, derechos de autor). Este consentimiento se documenta una sola vez y se aplica a futuras subidas." })}
             </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -100,10 +98,9 @@ export default function LibraryUploadConsentDialog({
               className="mt-0.5"
             />
             <div className="space-y-0.5">
-              <p className="text-sm font-medium">Ich besitze die Bildrechte.</p>
+              <p className="text-sm font-medium">{tx({ de: "Ich besitze die Bildrechte.", en: "I own the image rights.", es: "Soy propietario de los derechos de la imagen." })}</p>
               <p className="text-[11px] text-muted-foreground leading-snug">
-                Ich bin Urheber des Bildes oder besitze eine gültige Lizenz, die die Nutzung in
-                AI-generierten Videos erlaubt.
+                {tx({ de: "Ich bin Urheber des Bildes oder besitze eine gültige Lizenz, die die Nutzung in AI-generierten Videos erlaubt.", en: "I am the creator of the image or hold a valid license that permits its use in AI-generated videos.", es: "Soy el creador de la imagen o poseo una licencia válida que permite su uso en videos generados por IA." })}
               </p>
             </div>
           </label>
@@ -118,11 +115,10 @@ export default function LibraryUploadConsentDialog({
               />
               <div className="space-y-0.5">
                 <p className="text-sm font-medium">
-                  Abgebildete Personen haben eingewilligt.
+                  {tx({ de: "Abgebildete Personen haben eingewilligt.", en: "Depicted persons have given their consent.", es: "Las personas representadas han dado su consentimiento." })}
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Falls eine reale Person erkennbar ist, liegt mir deren ausdrückliche Einwilligung
-                  zur Nutzung als KI-Video-Referenz vor (Art. 6 DSGVO, § 22 KUG).
+                  {tx({ de: "Falls eine reale Person erkennbar ist, liegt mir deren ausdrückliche Einwilligung zur Nutzung als KI-Video-Referenz vor (Art. 6 DSGVO, § 22 KUG).", en: "If a real person is recognizable, I have their express consent to use it as an AI video reference (Art. 6 GDPR, § 22 KUG).", es: "Si una persona real es reconocible, cuento con su consentimiento expreso para usarla como referencia de video de IA (Art. 6 RGPD, § 22 KUG)." })}
                 </p>
               </div>
             </label>
@@ -137,11 +133,10 @@ export default function LibraryUploadConsentDialog({
             />
             <div className="space-y-0.5">
               <p className="text-sm font-medium">
-                Keine Marken oder prominenten Personen.
+                {tx({ de: "Keine Marken oder prominenten Personen.", en: "No brands or public figures.", es: "Sin marcas ni personas públicas." })}
               </p>
               <p className="text-[11px] text-muted-foreground leading-snug">
-                Das Bild zeigt keine geschützten Marken, Logos oder Prominente, und die generierten
-                Videos werden nicht zur Täuschung oder Rufschädigung verwendet.
+                {tx({ de: "Das Bild zeigt keine geschützten Marken, Logos oder Prominente, und die generierten Videos werden nicht zur Täuschung oder Rufschädigung verwendet.", en: "The image does not show any protected brands, logos, or public figures, and the generated videos will not be used for deception or defamation.", es: "La imagen no muestra marcas protegidas, logotipos ni personas públicas, y los videos generados no se utilizarán para engaño o difamación." })}
               </p>
             </div>
           </label>
@@ -149,8 +144,7 @@ export default function LibraryUploadConsentDialog({
           <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
             <p className="text-[11px] text-muted-foreground leading-snug">
-              Bei Verstößen liegt die volle rechtliche Verantwortung beim hochladenden Nutzer. Wir
-              dokumentieren diese Bestätigung mit Zeitstempel (Version {version}).
+              {tx({ de: "Bei Verstößen liegt die volle rechtliche Verantwortung beim hochladenden Nutzer. Wir dokumentieren diese Bestätigung mit Zeitstempel", en: "In case of violations, full legal responsibility lies with the uploading user. We document this confirmation with a timestamp", es: "En caso de infracciones, la responsabilidad legal total recae en el usuario que realiza la carga. Documentamos esta confirmación con marca de tiempo" })} (Version {version}).
             </p>
           </div>
         </div>

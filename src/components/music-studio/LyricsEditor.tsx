@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 interface LyricsEditorProps {
   value: string;
@@ -53,7 +54,7 @@ export function LyricsEditor({ value, onChange, onAutoGenerate, generating, disa
           className="h-7 text-xs gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
         >
           {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          AI Lyrics generieren
+          {tx({ de: 'AI Lyrics generieren', en: 'Generate AI lyrics', es: 'Generar letras con IA' })}
         </Button>
       </div>
 
@@ -84,7 +85,7 @@ export function LyricsEditor({ value, onChange, onAutoGenerate, generating, disa
         className="min-h-[200px] font-mono text-sm bg-background/40 border-primary/20 focus:border-primary/60"
       />
       <p className="text-[11px] text-muted-foreground">
-        Verwende <code className="text-primary/80">[Verse]</code>, <code className="text-primary/80">[Chorus]</code>, <code className="text-primary/80">[Bridge]</code> Marker für klare Songstruktur. Max. 60s Output.
+        {tx({ de: 'Verwende', en: 'Use', es: 'Usa' })} <code className="text-primary/80">[Verse]</code>, <code className="text-primary/80">[Chorus]</code>, <code className="text-primary/80">[Bridge]</code> {tx({ de: 'Marker für klare Songstruktur. Max. 60s Output.', en: 'markers for a clear song structure. Max. 60s output.', es: 'marcadores para una estructura de canción clara. Salida máx. 60s.' })}
       </p>
     </div>
   );

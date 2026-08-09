@@ -380,10 +380,10 @@ export const VoiceCloneVisual = () => (
   <Frame label="Voice · Script Panel">
     <div className="w-full max-w-md space-y-2 text-[11px] text-primary/70 leading-relaxed">
       {[
-        "Sprecher 1: Willkommen bei AdTool AI.",
+        tx({ de: "Sprecher 1: Willkommen bei AdTool AI.", en: "Speaker 1: Welcome to AdTool AI.", es: "Orador 1: Bienvenido a AdTool AI." }),
         tx({ de: "Sprecher 2: Vier Stimmen, eine Szene.", en: "Speaker 2: Four voices, one scene.", es: "Orador 2: Cuatro voces, una escena." }),
         tx({ de: "Sprecher 3: Kein Lip-Sync verrutscht.", en: "Speaker 3: No lip sync slips.", es: "Orador 3: Sin errores de sincronización de labios." }),
-        "Sprecher 4: Willkommen in der Beta.",
+        tx({ de: "Sprecher 4: Willkommen in der Beta.", en: "Speaker 4: Welcome to the beta.", es: "Orador 4: Bienvenido a la beta." }),
       ].map((line, i) => (
         <motion.div
           key={i}

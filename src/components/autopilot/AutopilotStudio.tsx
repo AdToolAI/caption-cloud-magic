@@ -66,10 +66,10 @@ function briefFromIdea(round: Round, idea: AutopilotIdea): string {
     tx({ de: `Kaufhemmnis, das entkräftet wird: ${round.strategy.objection}`, en: `Purchase barrier that is being refuted: ${round.strategy.objection}`, es: `Barrera de compra que se está refutando: ${round.strategy.objection}` }),
     `Tonalität: ${round.strategy.tone}`,
     round.options.lipSync
-      ? `Bis zu ${round.options.lipSyncSpeakers} Person(en) sprechen sichtbar in die Kamera.`
-      : 'Niemand spricht sichtbar in die Kamera.',
+      ? tx({ de: `Bis zu ${round.options.lipSyncSpeakers} Person(en) sprechen sichtbar in die Kamera.`, en: `Up to ${round.options.lipSyncSpeakers} person(s) speak visibly into the camera.`, es: `Hasta ${round.options.lipSyncSpeakers} persona(s) hablan visiblemente a la cámara.` })
+      : tx({ de: 'Niemand spricht sichtbar in die Kamera.', en: 'Nobody speaks visibly into the camera.', es: 'Nadie habla visiblemente a la cámara.' }),
     assetLines.length ? '' : '',
-    assetLines.length ? 'Kundenbilder, die vorkommen:' : '',
+    assetLines.length ? tx({ de: 'Kundenbilder, die vorkommen:', en: 'Customer images that appear:', es: 'Imágenes del cliente que aparecen:' }) : '',
     ...assetLines,
   ]
     .filter((line) => line !== undefined)
@@ -90,7 +90,7 @@ export function AutopilotStudio() {
           onClick={() => setBriefing(null)}
           className="text-sm text-muted-foreground underline-offset-4 hover:underline"
         >
-          ← Andere Idee wählen
+          {tx({ de: "← Andere Idee wählen", en: "← Choose another idea", es: "← Elegir otra idea" })}
         </button>
         <DirectorsTable briefing={briefing} />
       </div>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,15 +82,15 @@ export function E2EResultsTab() {
   }, [rows]);
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Lade E2E-Resultate…</p>;
+    return <p className="text-sm text-muted-foreground">{tx({ de: "Lade E2E-Resultate…", en: "Loading E2E results…", es: "Cargando resultados E2E…" })}</p>;
   }
 
   if (runs.length === 0) {
     return (
       <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10">
         <CardContent className="pt-6 text-center text-sm text-muted-foreground">
-          Noch keine Playwright-Resultate. Der CI-Workflow{" "}
-          <code className="font-mono text-[#F5C76A]">e2e-critical.yml</code> postet automatisch nach jedem Run.
+          {tx({ de: "Noch keine Playwright-Resultate. Der CI-Workflow", en: "No Playwright results yet. The CI workflow", es: "Aún no hay resultados de Playwright. El flujo de trabajo de CI" })}{" "}
+          <code className="font-mono text-[#F5C76A]">e2e-critical.yml</code> {tx({ de: "postet automatisch nach jedem Run.", en: "posts automatically after every run.", es: "publica automáticamente después de cada ejecución." })}
         </CardContent>
       </Card>
     );
@@ -154,7 +155,7 @@ export function E2EResultsTab() {
 
             {run.meta?.base_url && (
               <p className="text-[10px] text-muted-foreground/70 font-mono pt-1 border-t border-[#F5C76A]/5">
-                Ziel: {run.meta.base_url}
+                {tx({ de: "Ziel:", en: "Target:", es: "Objetivo:" })} {run.meta.base_url}
               </p>
             )}
           </CardContent>

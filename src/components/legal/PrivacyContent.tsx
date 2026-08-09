@@ -137,7 +137,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
             </div>
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Widerspruchsrecht (Art. 21)</h4>
-              <p className="text-sm">Jederzeit Widerspruch gegen die Verarbeitung</p>
+              <p className="text-sm">{tx({ de: "Jederzeit Widerspruch gegen die Verarbeitung", en: "Object to processing at any time", es: "Oponerse al tratamiento en cualquier momento" })}</p>
             </div>
           </div>
         </LegalSection>

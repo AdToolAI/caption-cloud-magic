@@ -54,7 +54,7 @@ export function SentryDashboard() {
     try {
       const { data, error } = await supabase.functions.invoke('sentry-issues');
       if (error) throw error;
-      toast.success(`${data?.count ?? 0} Issues von Sentry synchronisiert`);
+      toast.success(tx({ de: `${data?.count ?? 0} Issues von Sentry synchronisiert`, en: `${data?.count ?? 0} issues synced from Sentry`, es: `${data?.count ?? 0} incidencias sincronizadas desde Sentry` }));
       await loadCached();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : tx({ de: 'Fehler', en: 'Mistake', es: 'Error' });
@@ -89,26 +89,26 @@ export function SentryDashboard() {
           <div>
             <CardTitle className="text-2xl flex items-center gap-2">
               <Bug className="h-6 w-6 text-destructive" />
-              Sentry Errors
+              {tx({ de: "Sentry Errors", en: "Sentry Errors", es: "Errores de Sentry" })}
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Live Production Errors aus deiner Sentry-Integration
+              {tx({ de: "Live Production Errors aus deiner Sentry-Integration", en: "Live production errors from your Sentry integration", es: "Errores de producción en vivo de tu integración con Sentry" })}
             </p>
           </div>
           <Button onClick={syncFromSentry} disabled={syncing} variant="outline">
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            Sync von Sentry
+            {tx({ de: "Sync von Sentry", en: "Sync from Sentry", es: "Sincronizar desde Sentry" })}
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">Lade Errors...</div>
+          <div className="text-center py-8 text-muted-foreground">{tx({ de: "Lade Errors...", en: "Loading errors...", es: "Cargando errores..." })}</div>
         ) : issues.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-green-500" />
             <p className="font-medium">{tx({ de: "Keine Errors gecacht", en: "No errors cached", es: "No hay errores en caché" })}</p>
-            <p className="text-sm mt-1">Klicke „Sync von Sentry" um die neuesten Errors zu laden.</p>
+            <p className="text-sm mt-1">{tx({ de: 'Klicke „Sync von Sentry" um die neuesten Errors zu laden.', en: 'Click "Sync from Sentry" to load the latest errors.', es: 'Haz clic en "Sincronizar desde Sentry" para cargar los últimos errores.' })}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -139,7 +139,7 @@ export function SentryDashboard() {
                       )}
                       {iss.last_seen && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Zuletzt:{' '}
+                          {tx({ de: "Zuletzt:", en: "Last seen:", es: "Última vez:" })}{' '}
                           {formatDistanceToNow(new Date(iss.last_seen), {
                             addSuffix: true,
                             locale: de,

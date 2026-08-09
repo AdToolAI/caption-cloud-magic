@@ -21,6 +21,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Music, Scissors, AlertTriangle } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 export interface MusicClip {
   trimStart: number;
@@ -214,7 +215,7 @@ export function MusicClipPanel({
     <Card className="p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Scissors className="h-4 w-4 text-primary" />
-        <h4 className="text-sm font-semibold">Musik-Ausschnitt & Position</h4>
+        <h4 className="text-sm font-semibold">{tx({ de: "Musik-Ausschnitt & Position", en: "Music clip & position", es: "Fragmento de música y posición" })}</h4>
       </div>
 
       {/* Waveform + region */}
@@ -223,7 +224,7 @@ export function MusicClipPanel({
         {!isReady && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
             <Music className="h-3 w-3" />
-            Waveform wird geladen…
+            {tx({ de: "Waveform wird geladen…", en: "Waveform is loading…", es: "Cargando forma de onda…" })}
           </div>
         )}
       </div>
@@ -231,7 +232,7 @@ export function MusicClipPanel({
       {/* Trim inputs */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Von (im Track)</Label>
+          <Label className="text-xs">{tx({ de: "Von (im Track)", en: "From (in track)", es: "Desde (en la pista)" })}</Label>
           <Input
             value={startInput}
             onChange={(e) => setStartInput(e.target.value)}
@@ -242,7 +243,7 @@ export function MusicClipPanel({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Bis (im Track)</Label>
+          <Label className="text-xs">{tx({ de: "Bis (im Track)", en: "To (in track)", es: "Hasta (en la pista)" })}</Label>
           <Input
             value={endInput}
             onChange={(e) => setEndInput(e.target.value)}
@@ -254,14 +255,14 @@ export function MusicClipPanel({
         </div>
       </div>
       <div className="text-xs text-muted-foreground">
-        Ausschnitt: <span className="font-medium text-foreground">{clipLen.toFixed(2)}s</span>
-        {trackDuration > 0 && <> · Track gesamt {trackDuration.toFixed(2)}s</>}
+        {tx({ de: "Ausschnitt:", en: "Clip:", es: "Fragmento:" })} <span className="font-medium text-foreground">{clipLen.toFixed(2)}s</span>
+        {trackDuration > 0 && <> · {tx({ de: "Track gesamt", en: "Track total", es: "Pista total" })} {trackDuration.toFixed(2)}s</>}
       </div>
 
       {/* Video offset */}
       <div className="space-y-2 pt-2 border-t border-border/60">
         <div className="flex items-center justify-between">
-          <Label className="text-xs">Start im Video</Label>
+          <Label className="text-xs">{tx({ de: "Start im Video", en: "Start in video", es: "Inicio en el video" })}</Label>
           <span className="text-xs font-mono text-muted-foreground">
             {formatTimecode(clip.startTime)}
           </span>
@@ -274,18 +275,18 @@ export function MusicClipPanel({
           onValueChange={([v]) => onChange({ ...clip, startTime: Math.max(0, Math.min(v, maxOffset)) })}
         />
         <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => setPreset('start')}>Anfang</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => setPreset('middle')}>Mitte</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => setPreset('end')}>Ende</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setPreset('start')}>{tx({ de: "Anfang", en: "Start", es: "Inicio" })}</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setPreset('middle')}>{tx({ de: "Mitte", en: "Middle", es: "Medio" })}</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setPreset('end')}>{tx({ de: "Ende", en: "End", es: "Fin" })}</Button>
         </div>
       </div>
 
       {/* Loop toggle */}
       <div className="flex items-center justify-between pt-2 border-t border-border/60">
         <div>
-          <Label className="text-sm">Bis Video-Ende loopen</Label>
+          <Label className="text-sm">{tx({ de: "Bis Video-Ende loopen", en: "Loop until video end", es: "Repetir hasta el final del video" })}</Label>
           <p className="text-xs text-muted-foreground">
-            Wiederholt den Ausschnitt nahtlos bis das Video endet.
+            {tx({ de: "Wiederholt den Ausschnitt nahtlos bis das Video endet.", en: "Repeats the clip seamlessly until the video ends.", es: "Repite el fragmento sin interrupciones hasta que termine el video." })}
           </p>
         </div>
         <Switch
@@ -298,7 +299,7 @@ export function MusicClipPanel({
         <div className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/40 p-2 text-xs text-amber-700 dark:text-amber-300">
           <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
           <span>
-            Ausschnitt endet vor Video-Ende ({videoDuration.toFixed(1)}s). Aktiviere „Loopen" oder verschiebe den Startpunkt.
+            {tx({ de: `Ausschnitt endet vor Video-Ende (${videoDuration.toFixed(1)}s). Aktiviere „Loopen" oder verschiebe den Startpunkt.`, en: `Clip ends before the video ends (${videoDuration.toFixed(1)}s). Enable "Loop" or move the start point.`, es: `El fragmento termina antes de que acabe el video (${videoDuration.toFixed(1)}s). Activa "Repetir" o mueve el punto de inicio.` })}
           </span>
         </div>
       )}

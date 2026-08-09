@@ -89,7 +89,7 @@ export function CrossPostMagicPanel({
   if (activeChannels.length === 0) {
     return (
       <Card className="p-6 bg-black/40 border-white/10 text-center text-sm text-muted-foreground">
-        Wähle oben mindestens einen Kanal, um Cross-Post Magic zu starten.
+        {tx({ de: 'Wähle oben mindestens einen Kanal, um Cross-Post Magic zu starten.', en: 'Select at least one channel above to start Cross-Post Magic.', es: 'Selecciona al menos un canal arriba para iniciar Cross-Post Magic.' })}
       </Card>
     );
   }
@@ -106,7 +106,7 @@ export function CrossPostMagicPanel({
           </div>
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-[#F5C76A]/80">Cross-Post Magic</div>
-            <div className="text-sm text-white/90">Plattform-optimierte Captions in einem Klick</div>
+            <div className="text-sm text-white/90">{tx({ de: 'Plattform-optimierte Captions in einem Klick', en: 'Platform-optimized captions in one click', es: 'Subtítulos optimizados por plataforma en un clic' })}</div>
           </div>
         </div>
 
@@ -153,10 +153,10 @@ export function CrossPostMagicPanel({
           <div className="rounded-lg border border-dashed border-white/10 bg-black/20 p-8 text-center">
             <Sparkles className="mx-auto h-8 w-8 text-[#F5C76A]/70" />
             <p className="mt-3 text-sm text-white/80">
-              Klicke <span className="font-semibold text-[#F5C76A]">Generate</span>, um für jede Plattform eine optimierte Caption zu erstellen.
+              {tx({ de: <>Klicke <span className="font-semibold text-[#F5C76A]">Generate</span>, um für jede Plattform eine optimierte Caption zu erstellen.</>, en: <>Click <span className="font-semibold text-[#F5C76A]">Generate</span> to create an optimized caption for every platform.</>, es: <>Haz clic en <span className="font-semibold text-[#F5C76A]">Generate</span> para crear un subtítulo optimizado para cada plataforma.</> })}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {activeChannels.length} Kanäle ausgewählt · Sprache: {(language ?? "en").toUpperCase()}
+              {tx({ de: `${activeChannels.length} Kanäle ausgewählt · Sprache: ${(language ?? "en").toUpperCase()}`, en: `${activeChannels.length} channels selected · language: ${(language ?? "en").toUpperCase()}`, es: `${activeChannels.length} canales seleccionados · idioma: ${(language ?? "en").toUpperCase()}` })}
             </p>
           </div>
         ) : (
@@ -184,7 +184,7 @@ export function CrossPostMagicPanel({
               if (!d) {
                 return (
                   <TabsContent key={c} value={c}>
-                    <p className="text-sm text-muted-foreground">Noch kein Draft.</p>
+                    <p className="text-sm text-muted-foreground">{tx({ de: 'Noch kein Draft.', en: 'No draft yet.', es: 'Aún no hay borrador.' })}</p>
                   </TabsContent>
                 );
               }
@@ -228,7 +228,7 @@ export function CrossPostMagicPanel({
                     />
                     {over && (
                       <div className="mt-1 flex items-center gap-1 text-[11px] text-red-400">
-                        <AlertTriangle className="h-3 w-3" /> Zu lang für {CHANNEL_META[c].name} (max {rule.captionMax}).
+                        <AlertTriangle className="h-3 w-3" /> {tx({ de: `Zu lang für ${CHANNEL_META[c].name} (max ${rule.captionMax}).`, en: `Too long for ${CHANNEL_META[c].name} (max ${rule.captionMax}).`, es: `Demasiado largo para ${CHANNEL_META[c].name} (máx ${rule.captionMax}).` })}
                       </div>
                     )}
                   </div>

@@ -372,7 +372,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
 
               {asset.analyzing ? (
                 <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Bild wird gelesen…
+                  <Loader2 className="h-3 w-3 animate-spin" /> {tx({ de: "Bild wird gelesen…", en: "Reading image…", es: "Leyendo imagen…" })}
                 </p>
               ) : asset.warning ? (
                 <p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber-500">
@@ -380,7 +380,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
                 </p>
               ) : asset.description ? (
                 <p className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-500">
-                  <CheckCircle2 className="h-3 w-3" /> Erkannt und einsatzbereit
+                  <CheckCircle2 className="h-3 w-3" /> {tx({ de: "Erkannt und einsatzbereit", en: "Recognized and ready to use", es: "Reconocido y listo para usar" })}
                 </p>
               ) : null}
             </div>
@@ -394,7 +394,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
               className="flex min-h-[110px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 bg-background/20 p-4 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
             >
               {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-              Logo, Produkt oder Ort hochladen
+              {tx({ de: "Logo, Produkt oder Ort hochladen", en: "Upload logo, product or location", es: "Subir logo, producto o ubicación" })}
             </button>
           )}
         </div>
@@ -526,11 +526,11 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       <Button onClick={handleGenerate} disabled={loading} size="lg" className="mt-6 w-full">
         {loading ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Strategie und Ideen entstehen…
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {tx({ de: "Strategie und Ideen entstehen…", en: "Strategy and ideas are being created…", es: "Creando estrategia e ideas…" })}
           </>
         ) : (
           <>
-            <Sparkles className="mr-2 h-4 w-4" /> Fünf Ideen entwickeln
+            <Sparkles className="mr-2 h-4 w-4" /> {tx({ de: "Fünf Ideen entwickeln", en: "Develop five ideas", es: "Desarrollar cinco ideas" })}
           </>
         )}
       </Button>

@@ -65,7 +65,7 @@ export function ComingSoonScreen({
             onClick={() => setPreviewMode(false)}
             className="h-7 text-xs"
           >
-            <ArrowLeft className="h-3 w-3 mr-1" /> Zurück zur Coming-Soon-Ansicht
+            <ArrowLeft className="h-3 w-3 mr-1" /> {tx({ de: "Zurück zur Coming-Soon-Ansicht", en: "Back to Coming Soon view", es: "Volver a la vista de Próximamente" })}
           </Button>
         </div>
         {adminPreview}
@@ -91,7 +91,7 @@ export function ComingSoonScreen({
           to={backHref}
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition mb-8"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Zurück
+          <ArrowLeft className="h-3.5 w-3.5" /> {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
         </Link>
 
         <motion.div

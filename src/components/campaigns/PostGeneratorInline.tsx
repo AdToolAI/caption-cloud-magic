@@ -98,7 +98,7 @@ export const PostGeneratorInline = ({
       };
 
       setGeneratedContent(content);
-      toast.success("✨ Post-Content generiert!");
+      toast.success(tx({ de: "✨ Post-Content generiert!", en: "✨ Post content generated!", es: "✨ ¡Contenido generado!" }));
     } catch (error: any) {
       console.error("Error generating content:", error);
       if (error.message?.includes("429")) {
@@ -128,7 +128,7 @@ export const PostGeneratorInline = ({
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    toast.success("In Zwischenablage kopiert");
+    toast.success(tx({ de: "In Zwischenablage kopiert", en: "Copied to clipboard", es: "Copiado al portapapeles" }));
   };
 
   return (
@@ -137,10 +137,10 @@ export const PostGeneratorInline = ({
         <SheetHeader className="mb-6">
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            KI-Post Generator
+            {tx({ de: "KI-Post Generator", en: "AI Post Generator", es: "Generador de publicaciones IA" })}
           </SheetTitle>
           <p className="text-sm text-muted-foreground">
-            Generiere Hook, Caption & Hashtags für "{post.title}"
+            {tx({ de: `Generiere Hook, Caption & Hashtags für "${post.title}"`, en: `Generate hook, caption & hashtags for "${post.title}"`, es: `Genera hook, caption y hashtags para "${post.title}"` })}
           </p>
         </SheetHeader>
 
@@ -176,11 +176,11 @@ export const PostGeneratorInline = ({
 
           {/* Brief Input */}
           <div>
-            <Label>Kurzbeschreibung / Briefing</Label>
+            <Label>{tx({ de: "Kurzbeschreibung / Briefing", en: "Short description / brief", es: "Descripción breve / brief" })}</Label>
             <Textarea
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
-              placeholder="Worum geht es in diesem Post? 2-3 Stichpunkte..."
+              placeholder={tx({ de: "Worum geht es in diesem Post? 2-3 Stichpunkte...", en: "What is this post about? 2-3 bullet points...", es: "¿De qué trata esta publicación? 2-3 puntos clave..." })}
               rows={4}
               className="mt-2"
             />
@@ -188,39 +188,39 @@ export const PostGeneratorInline = ({
 
           {/* Tone Select */}
           <div>
-            <Label>Tonfall</Label>
+            <Label>{tx({ de: "Tonfall", en: "Tone", es: "Tono" })}</Label>
             <Select value={tone} onValueChange={setTone}>
               <SelectTrigger className="mt-2">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="friendly">Freundlich</SelectItem>
-                <SelectItem value="professional">Professionell</SelectItem>
-                <SelectItem value="casual">Locker</SelectItem>
-                <SelectItem value="inspirational">Inspirierend</SelectItem>
-                <SelectItem value="humorous">Humorvoll</SelectItem>
+                <SelectItem value="friendly">{tx({ de: "Freundlich", en: "Friendly", es: "Amistoso" })}</SelectItem>
+                <SelectItem value="professional">{tx({ de: "Professionell", en: "Professional", es: "Profesional" })}</SelectItem>
+                <SelectItem value="casual">{tx({ de: "Locker", en: "Casual", es: "Informal" })}</SelectItem>
+                <SelectItem value="inspirational">{tx({ de: "Inspirierend", en: "Inspirational", es: "Inspirador" })}</SelectItem>
+                <SelectItem value="humorous">{tx({ de: "Humorvoll", en: "Humorous", es: "Humorístico" })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Content Length */}
           <div>
-            <Label>Content-Länge</Label>
+            <Label>{tx({ de: "Content-Länge", en: "Content length", es: "Longitud del contenido" })}</Label>
             <Select value={contentLength} onValueChange={(v) => setContentLength(v as 'short' | 'medium' | 'long')}>
               <SelectTrigger className="mt-2">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="short">Kurz (~120 Zeichen)</SelectItem>
-                <SelectItem value="medium">Mittel (~250 Zeichen)</SelectItem>
-                <SelectItem value="long">Lang (~400 Zeichen)</SelectItem>
+                <SelectItem value="short">{tx({ de: "Kurz (~120 Zeichen)", en: "Short (~120 characters)", es: "Corto (~120 caracteres)" })}</SelectItem>
+                <SelectItem value="medium">{tx({ de: "Mittel (~250 Zeichen)", en: "Medium (~250 characters)", es: "Medio (~250 caracteres)" })}</SelectItem>
+                <SelectItem value="long">{tx({ de: "Lang (~400 Zeichen)", en: "Long (~400 characters)", es: "Largo (~400 caracteres)" })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Hashtag Count */}
           <div>
-            <Label>Anzahl Hashtags: {hashtagCount}</Label>
+            <Label>{tx({ de: "Anzahl Hashtags", en: "Number of hashtags", es: "Número de hashtags" })}: {hashtagCount}</Label>
             <Slider
               value={[hashtagCount]}
               onValueChange={(v) => setHashtagCount(v[0])}
@@ -241,12 +241,12 @@ export const PostGeneratorInline = ({
             {isGenerating ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Generiere...
+                {tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Content generieren
+                {tx({ de: "Content generieren", en: "Generate content", es: "Generar contenido" })}
               </>
             )}
           </Button>
@@ -261,7 +261,7 @@ export const PostGeneratorInline = ({
                 className="space-y-4 p-4 rounded-xl bg-muted/30 border border-white/10"
               >
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-sm">Generierter Content</h4>
+                  <h4 className="font-semibold text-sm">{tx({ de: "Generierter Content", en: "Generated content", es: "Contenido generado" })}</h4>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -273,14 +273,14 @@ export const PostGeneratorInline = ({
                     ) : (
                       <Copy className="h-3 w-3" />
                     )}
-                    {copied ? tx({ de: "Kopiert", en: "Copied", es: "Copiado" }) : "Kopieren"}
+                    {copied ? tx({ de: "Kopiert", en: "Copied", es: "Copiado" }) : tx({ de: "Kopieren", en: "Copy", es: "Copiar" })}
                   </Button>
                 </div>
 
                 {/* Hook */}
                 {generatedContent.hook && (
                   <div>
-                    <Label className="text-xs text-muted-foreground">Hook</Label>
+                    <Label className="text-xs text-muted-foreground">{tx({ de: "Hook", en: "Hook", es: "Gancho" })}</Label>
                     <p className="text-sm font-medium mt-1 p-2 rounded bg-primary/10 border border-primary/20">
                       {generatedContent.hook}
                     </p>
@@ -289,7 +289,7 @@ export const PostGeneratorInline = ({
 
                 {/* Caption */}
                 <div>
-                  <Label className="text-xs text-muted-foreground">Caption</Label>
+                  <Label className="text-xs text-muted-foreground">{tx({ de: "Caption", en: "Caption", es: "Título" })}</Label>
                   <p className="text-sm mt-1 whitespace-pre-wrap">
                     {generatedContent.caption}
                   </p>
@@ -298,7 +298,7 @@ export const PostGeneratorInline = ({
                 {/* Hashtags */}
                 {generatedContent.hashtags.length > 0 && (
                   <div>
-                    <Label className="text-xs text-muted-foreground">Hashtags</Label>
+                    <Label className="text-xs text-muted-foreground">{tx({ de: "Hashtags", en: "Hashtags", es: "Hashtags" })}</Label>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {generatedContent.hashtags.map((tag, i) => (
                         <Badge key={i} variant="secondary" className="text-xs">
@@ -312,7 +312,7 @@ export const PostGeneratorInline = ({
                 {/* CTA */}
                 {generatedContent.cta && (
                   <div>
-                    <Label className="text-xs text-muted-foreground">Call-to-Action</Label>
+                    <Label className="text-xs text-muted-foreground">{tx({ de: "Call-to-Action", en: "Call to action", es: "Llamada a la acción" })}</Label>
                     <p className="text-sm font-medium mt-1 text-primary">
                       🎯 {generatedContent.cta}
                     </p>
@@ -322,7 +322,7 @@ export const PostGeneratorInline = ({
                 {/* Apply Button */}
                 <Button onClick={handleApply} className="w-full gap-2">
                   <Check className="h-4 w-4" />
-                  Auf Post anwenden
+                  {tx({ de: "Auf Post anwenden", en: "Apply to post", es: "Aplicar a la publicación" })}
                 </Button>
               </motion.div>
             )}

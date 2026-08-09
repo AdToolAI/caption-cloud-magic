@@ -75,7 +75,7 @@ export const TRANSITION_TYPES = [
   { 
     id: 'morph', 
     name: 'AI Morph', 
-    description: 'KI-generierter fließender Übergang',
+    description: tx({ de: 'KI-generierter fließender Übergang', en: 'AI-generated fluid transition', es: 'Transición fluida generada por IA' }),
     icon: '∞',
     gradient: 'from-violet-500 via-purple-500 to-fuchsia-500',
     aiScore: 0.95,
@@ -175,7 +175,7 @@ export function AITransitions({
         
         toast({
           title: tx({ de: 'AI Übergänge generiert', en: 'AI transitions generated', es: 'Transiciones de IA generadas' }),
-          description: tx({ de: `${generated.length} ${tx({ de: 'szenenspezifische Übergänge mit Confidence Scores.', en: 'scene-specific transitions with confidence scores.', es: 'transiciones específicas de escena con puntuaciones de confianza.' })}`, en: `${generated.length} ${tx({ de: 'scene-specific transitions with confidence scores.', en: 'scene-specific transitions with confidence scores.', es: 'transiciones específicas de escena con puntuaciones de confianza.' })}`, es: `${generated.length} ${tx({ de: 'transiciones específicas de escena con puntuaciones de confianza.', en: 'transiciones específicas de escena con puntuaciones de confianza.', es: 'transiciones específicas de escena con supervisión de confianza.' })}` }),
+          description: tx({ de: `${generated.length} szenenspezifische Übergänge mit Confidence Scores.`, en: `${generated.length} scene-specific transitions with confidence scores.`, es: `${generated.length} transiciones específicas de escena con puntuaciones de confianza.` }),
         });
       } else {
         throw new Error(tx({ de: 'Ungültige Antwort vom Server', en: 'Invalid response from server', es: 'Respuesta no válida del servidor' }));
@@ -292,7 +292,7 @@ export function AITransitions({
               ) : (
                 <>
                   <Wand2 className="h-5 w-5" />
-                  <span>AI Übergänge generieren</span>
+                  <span>{tx({ de: "AI Übergänge generieren", en: "Generate AI transitions", es: "Generar transiciones de IA" })}</span>
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </>
               )}
@@ -303,7 +303,7 @@ export function AITransitions({
         {sceneCount < 2 && (
           <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
             <Info className="h-3 w-3" />
-            Mindestens 2 Szenen für Übergänge benötigt
+            {tx({ de: "Mindestens 2 Szenen für Übergänge benötigt", en: "At least 2 scenes required for transitions", es: "Se requieren al menos 2 escenas para las transiciones" })}
           </p>
         )}
 
@@ -311,7 +311,7 @@ export function AITransitions({
         <div className="space-y-2 p-3 rounded-xl bg-muted/30 backdrop-blur-sm">
           <div className="flex justify-between items-center">
             <span className="text-xs font-medium flex items-center gap-1.5">
-              Standard-Dauer
+              {tx({ de: "Standard-Dauer", en: "Default duration", es: "Duración predeterminada" })}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger>
@@ -453,7 +453,7 @@ export function AITransitions({
           <div className="space-y-2 pt-2 border-t border-border/50">
             <div className="flex justify-between items-center">
               <label className="text-xs font-medium">
-                Zugewiesene Übergänge ({transitions.length})
+                {tx({ de: "Zugewiesene Übergänge", en: "Assigned transitions", es: "Transiciones asignadas" })} ({transitions.length})
               </label>
               <Button
                 variant="ghost"
@@ -495,7 +495,7 @@ export function AITransitions({
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-medium">
-                            Szene {index + 1} → {index + 2}
+                            {tx({ de: "Szene", en: "Scene", es: "Escena" })} {index + 1} → {index + 2}
                           </span>
                           {t.aiSuggested && (
                             <Badge variant="secondary" className="h-4 text-[8px] px-1 bg-primary/10 text-primary border-0">

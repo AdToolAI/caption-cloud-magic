@@ -22,6 +22,7 @@ import {
   type AnchorDrift,
 } from '@/lib/directors-cut/anchorRefresh';
 import { extractVideoFrame } from '@/lib/directors-cut/videoFrameExtractor';
+import { tx } from '@/lib/i18nText';
 import { trackUDC } from '@/lib/analytics';
 
 interface Props {
@@ -41,7 +42,7 @@ const SEVERITY_STYLES: Record<AnchorDrift['severity'], string> = {
 
 const SEVERITY_LABEL: Record<AnchorDrift['severity'], string> = {
   ok: 'OK',
-  warn: 'Warnung',
+  warn: tx({ de: 'Warnung', en: 'Warning', es: 'Advertencia' }),
   drift: 'Drift',
 };
 
@@ -129,33 +130,32 @@ export function AnchorRefreshDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-[#F5C76A]">
             <Anchor className="h-5 w-5" />
-            Anchor-Refresh — Character Consistency
+            {tx({ de: 'Anchor-Refresh — Character Consistency', en: 'Anchor Refresh — Character Consistency', es: 'Actualización de anclaje — Consistencia de personajes' })}
           </DialogTitle>
           <DialogDescription className="text-white/60">
-            Vergleicht den aktuellen Kopf-Frame jeder Szene mit dem gespeicherten Identity-Anchor.
-            „Snap" setzt den Source-In zurück auf den Anchor und stellt den Charakter-Look wieder her.
+            {tx({ de: '„Vergleicht den aktuellen Kopf-Frame jeder Szene mit dem gespeicherten Identity-Anchor. „Snap" setzt den Source-In zurück auf den Anchor und stellt den Charakter-Look wieder her.', en: 'Compares the current head frame of each scene with the stored identity anchor. "Snap" resets the source-in to the anchor and restores the character look.', es: 'Compara el fotograma inicial actual de cada escena con el ancla de identidad guardada. "Snap" restablece el source-in al ancla y restaura el aspecto del personaje.' })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-wrap items-center justify-between gap-3 py-2">
           <div className="flex items-center gap-2 text-sm">
             <Badge variant="outline" className="border-white/15 text-white/80">
-              {scenes.length} Szenen
+              {tx({ de: `${scenes.length} Szenen`, en: `${scenes.length} scenes`, es: `${scenes.length} escenas` })}
             </Badge>
             {driftingCount > 0 ? (
               <Badge className="bg-rose-500/15 text-rose-300 border-rose-500/30 border">
-                {driftingCount} betroffen
+                {tx({ de: `${driftingCount} betroffen`, en: `${driftingCount} affected`, es: `${driftingCount} afectadas` })}
               </Badge>
             ) : (
               <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 border">
-                Alle Anchors intakt
+                {tx({ de: 'Alle Anchors intakt', en: 'All anchors intact', es: 'Todos los anclajes intactos' })}
               </Badge>
             )}
           </div>
 
           <div className="flex items-center gap-3 min-w-[280px]">
             <span className="text-xs text-white/50 whitespace-nowrap">
-              Drift-Schwelle
+              {tx({ de: 'Drift-Schwelle', en: 'Drift threshold', es: 'Umbral de deriva' })}
             </span>
             <Slider
               min={0.05}
@@ -177,7 +177,7 @@ export function AnchorRefreshDialog({
             className="gap-2 bg-gradient-to-r from-[#F5C76A] to-[#d4a843] text-black hover:from-[#FFE4A0] hover:to-[#F5C76A] disabled:opacity-40"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Alle{snappableCount > 0 ? ` (${snappableCount})` : ''} refreshen
+            {tx({ de: `Alle${snappableCount > 0 ? ` (${snappableCount})` : ''} refreshen`, en: `Refresh all${snappableCount > 0 ? ` (${snappableCount})` : ''}`, es: `Actualizar todo${snappableCount > 0 ? ` (${snappableCount})` : ''}` })}
           </Button>
         </div>
 
@@ -208,15 +208,15 @@ export function AnchorRefreshDialog({
                           ) : frame?.current ? (
                             <img
                               src={frame.current}
-                              alt="Aktueller Frame"
+                              alt={tx({ de: 'Aktueller Frame', en: 'Current frame', es: 'Fotograma actual' })}
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <span className="text-[9px] text-white/30 px-1 text-center">Kein Preview</span>
+                            <span className="text-[9px] text-white/30 px-1 text-center">{tx({ de: 'Kein Preview', en: 'No preview', es: 'Sin vista previa' })}</span>
                           )}
                         </div>
                         <span className="absolute -top-1.5 left-1 text-[9px] font-semibold text-rose-300 bg-[#0A0A12] px-1 rounded">
-                          Jetzt
+                          {tx({ de: 'Jetzt', en: 'Now', es: 'Ahora' })}
                         </span>
                       </div>
                       <ArrowRight className="h-3 w-3 text-white/40 flex-shrink-0" />
@@ -226,7 +226,7 @@ export function AnchorRefreshDialog({
                           {d.thumbnail ? (
                             <img src={d.thumbnail} alt="Anchor" className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-[9px] text-white/30 px-1 text-center">Kein Anchor</span>
+                            <span className="text-[9px] text-white/30 px-1 text-center">{tx({ de: 'Kein Anchor', en: 'No anchor', es: 'Sin ancla' })}</span>
                           )}
                         </div>
                         <span className="absolute -top-1.5 left-1 text-[9px] font-semibold text-emerald-300 bg-[#0A0A12] px-1 rounded">
@@ -240,7 +240,7 @@ export function AnchorRefreshDialog({
                         <img src={d.thumbnail} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-white/30 text-xs">
-                          Frame
+                          {tx({ de: 'Frame', en: 'Frame', es: 'Fotograma' })}
                         </div>
                       )}
                     </div>
@@ -248,7 +248,7 @@ export function AnchorRefreshDialog({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-white">Szene {d.index + 1}</span>
+                      <span className="text-sm font-medium text-white">{tx({ de: `Szene ${d.index + 1}`, en: `Scene ${d.index + 1}`, es: `Escena ${d.index + 1}` })}</span>
                       <Badge className={cn('border text-[10px]', SEVERITY_STYLES[d.severity])}>
                         {d.severity === 'ok' ? (
                           <Check className="h-2.5 w-2.5 mr-0.5" />
@@ -258,7 +258,7 @@ export function AnchorRefreshDialog({
                         {SEVERITY_LABEL[d.severity]}
                       </Badge>
                       <span className="text-[11px] text-white/50">
-                        Head-Trim {d.headTrim.toFixed(2)}s
+                        {tx({ de: `Head-Trim ${d.headTrim.toFixed(2)}s`, en: `Head trim ${d.headTrim.toFixed(2)}s`, es: `Recorte inicial ${d.headTrim.toFixed(2)}s` })}
                       </span>
                     </div>
                     <p className="text-xs text-white/60 mt-0.5 truncate">{d.reason}</p>
@@ -272,7 +272,7 @@ export function AnchorRefreshDialog({
                     className="h-8 gap-1.5 border-[#F5C76A]/30 text-[#F5C76A] hover:bg-[#F5C76A]/10 disabled:opacity-30"
                   >
                     <RefreshCw className="h-3 w-3" />
-                    Snap
+                    {tx({ de: 'Snap', en: 'Snap', es: 'Snap' })}
                   </Button>
                 </div>
               );
@@ -282,7 +282,7 @@ export function AnchorRefreshDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-white/70">
-            Schließen
+            {tx({ de: 'Schließen', en: 'Close', es: 'Cerrar' })}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -140,7 +140,7 @@ export function TextOverlayEditor({
 
           <TabsContent value="templates" className="space-y-3 mt-3">
             <p className="text-sm text-muted-foreground">
-              Schnell-{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })} mit einem Klick hinzufügen
+              {tx({ de: "Schnell-Vorlagen mit einem Klick hinzufügen", en: "Add quick templates with one click", es: "Añade plantillas rápidas con un clic" })}
             </p>
             <div className="grid grid-cols-2 gap-2">
               {TEXT_OVERLAY_TEMPLATES.map((template) => (

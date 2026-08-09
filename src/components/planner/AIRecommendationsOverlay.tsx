@@ -102,7 +102,7 @@ export function AIRecommendationsOverlay({
         className="fixed bottom-4 right-4 z-30 gap-2 shadow-lg"
       >
         <Sparkles className="h-4 w-4" />
-        AI-Empfehlungen
+        {tx({ de: "AI-Empfehlungen", en: "AI recommendations", es: "Recomendaciones de IA" })}
       </Button>
     );
   }
@@ -140,11 +140,11 @@ export function AIRecommendationsOverlay({
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="text-xs">
-                        <div className="font-semibold">Optimale Zeit für {platform}</div>
+                        <div className="font-semibold">{tx({ de: "Optimale Zeit für", en: "Optimal time for", es: "Hora óptima para" })} {platform}</div>
                         <div className="text-muted-foreground">
                           {format(slotStart, "HH:mm")} - {format(slotEnd, "HH:mm")}
                         </div>
-                        <div className="mt-1">Score: {slot.score}/100</div>
+                        <div className="mt-1">{tx({ de: "Score", en: "Score", es: "Puntuación" })}: {slot.score}/100</div>
                         <div className="text-muted-foreground">{slot.reason}</div>
                       </div>
                     </TooltipContent>
@@ -160,7 +160,7 @@ export function AIRecommendationsOverlay({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-green-500" />
-            <span className="font-semibold">AI-Empfehlungen</span>
+            <span className="font-semibold">{tx({ de: "AI-Empfehlungen", en: "AI recommendations", es: "Recomendaciones de IA" })}</span>
           </div>
           <Button size="sm" variant="ghost" onClick={onToggle}>
             <X className="h-4 w-4" />
@@ -175,16 +175,16 @@ export function AIRecommendationsOverlay({
           <>
             <div className="text-sm text-muted-foreground mb-3">
               {timeline.flatMap((d) => d.slots.filter((s) => !s.blocked && s.score >= 60)).length}{" "}
-              optimale Zeitslots für <Badge variant="secondary" className="ml-1">{platform}</Badge>
+              {tx({ de: "optimale Zeitslots für", en: "optimal time slots for", es: "franjas horarias óptimas para" })} <Badge variant="secondary" className="ml-1">{platform}</Badge>
             </div>
 
             <Button onClick={handleApply} className="w-full gap-2">
               <Sparkles className="h-4 w-4" />
-              Slots übernehmen
+              {tx({ de: "Slots übernehmen", en: "Apply slots", es: "Aplicar franjas" })}
             </Button>
 
             <p className="text-xs text-muted-foreground mt-2">
-              Grüne Bänder zeigen die besten Posting-Zeiten. Drag & Drop Posts dorthin für optimale Reichweite.
+              {tx({ de: "Grüne Bänder zeigen die besten Posting-Zeiten. Drag & Drop Posts dorthin für optimale Reichweite.", en: "Green bands show the best posting times. Drag & drop posts there for optimal reach.", es: "Las bandas verdes muestran los mejores horarios de publicación. Arrastra y suelta publicaciones ahí para un alcance óptimo." })}
             </p>
           </>
         )}

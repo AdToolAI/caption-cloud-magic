@@ -25,7 +25,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['←'], label: tx({ de: '1 Frame zurück', en: '1 frame back', es: '1 fotograma atrás' }), category: 'Playback' },
   { keys: ['→'], label: tx({ de: '1 Frame vor', en: '1 frame forward', es: '1 fotograma adelante' }), category: 'Playback' },
   { keys: ['⇧', '←'], label: tx({ de: '1 Sekunde zurück', en: '1 second back', es: '1 segundo atrás' }), category: 'Playback' },
-  { keys: ['⇧', '→'], label: '1 Sekunde vor', category: 'Playback' },
+  { keys: ['⇧', '→'], label: tx({ de: '1 Sekunde vor', en: '1 second forward', es: '1 segundo adelante' }), category: 'Playback' },
   { keys: ['Home'], label: tx({ de: 'Zum Anfang', en: 'To beginning', es: 'Al principio' }), category: 'Playback' },
   { keys: ['End'], label: tx({ de: 'Zum Ende', en: 'To end', es: 'Al final' }), category: 'Playback' },
 
@@ -78,7 +78,7 @@ export const ShortcutOverlay: React.FC<Props> = ({ open, onOpenChange }) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-[#F5C76A]">
             <Keyboard className="h-5 w-5" />
-            Tastatur-Shortcuts
+            {tx({ de: 'Tastatur-Shortcuts', en: 'Keyboard shortcuts', es: 'Atajos de teclado' })}
           </DialogTitle>
           <DialogDescription className="text-white/50">
             Pro-Editing Shortcuts für den Universal Cut. Drücke <kbd className="px-1 border border-white/20 rounded text-[10px]">?</kbd> {tx({ de: "jederzeit, um diese Übersicht zu öffnen.", en: "anytime to open this overview.", es: "en cualquier momento para abrir este resumen." })}

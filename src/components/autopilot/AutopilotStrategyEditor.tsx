@@ -152,7 +152,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       <Card className="p-8 text-center border-dashed">
         <SettingsIcon className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">
-          Noch kein Brief erstellt — bitte zuerst beim ersten Aktivieren den Onboarding-Wizard durchlaufen.
+          tx({ de: "Noch kein Brief erstellt — bitte zuerst beim ersten Aktivieren den Onboarding-Wizard durchlaufen.", en: "No brief created yet — please complete the onboarding wizard the first time you activate.", es: "Aún no se ha creado ningún briefing — completa primero el asistente de incorporación al activar por primera vez." })
         </p>
       </Card>
     );
@@ -164,7 +164,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       <Card className="p-5 space-y-3 border-primary/30 bg-primary/5">
         <div className="flex items-center gap-2">
           <Target className="h-4 w-4 text-primary" />
-          <Label className="text-xs uppercase tracking-widest text-primary">Channel-Ziel & Budget</Label>
+          <Label className="text-xs uppercase tracking-widest text-primary">{tx({ de: "Channel-Ziel & Budget", en: "Channel goal & budget", es: "Objetivo del canal y presupuesto" })}</Label>
         </div>
         <AutopilotGoalBriefingStep value={goal} onChange={setGoal} />
       </Card>
@@ -191,7 +191,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
             value={pillarInput}
             onChange={(e) => setPillarInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPillar())}
-            placeholder="z. B. Productivity, AI Tools, Brand Building"
+            placeholder={tx({ de: "z. B. Productivity, AI Tools, Brand Building", en: "e.g. Productivity, AI Tools, Brand Building", es: "p. ej. Productividad, herramientas de IA, branding" })}
             className="text-sm"
           />
           <Button onClick={addPillar} size="sm" variant="outline" className="gap-1.5">
@@ -224,11 +224,11 @@ export function AutopilotStrategyEditor({ brief }: Props) {
             value={forbiddenInput}
             onChange={(e) => setForbiddenInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addForbidden())}
-            placeholder="z. B. Politik, Glücksspiel, Wettbewerber-Namen"
+            placeholder={tx({ de: "z. B. Politik, Glücksspiel, Wettbewerber-Namen", en: "e.g. politics, gambling, competitor names", es: "p. ej. política, apuestas, nombres de la competencia" })}
             className="text-sm"
           />
           <Button onClick={addForbidden} size="sm" variant="outline" className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Sperren
+            <Plus className="h-3.5 w-3.5" /> {tx({ de: "Sperren", en: "Block", es: "Bloquear" })}
           </Button>
         </div>
       </Card>
@@ -236,7 +236,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       {/* Tonality + Platforms + Languages */}
       <div className="grid md:grid-cols-3 gap-4">
         <Card className="p-5 space-y-3">
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Tonalität</Label>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">{tx({ de: "Tonalität", en: "Tone", es: "Tonalidad" })}</Label>
           <div className="flex flex-wrap gap-1.5">
             {TONALITIES.map((t) => (
               <Button
@@ -253,7 +253,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
         </Card>
 
         <Card className="p-5 space-y-3">
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Plattformen</Label>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">{tx({ de: "Plattformen", en: "Platforms", es: "Plataformas" })}</Label>
           <div className="flex flex-wrap gap-1.5">
             {ALL_PLATFORMS.map((p) => (
               <Button
@@ -270,7 +270,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
         </Card>
 
         <Card className="p-5 space-y-3">
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Sprachen</Label>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">{tx({ de: "Sprachen", en: "Languages", es: "Idiomas" })}</Label>
           <div className="flex flex-wrap gap-1.5">
             {ALL_LANGS.map((l) => (
               <Button
@@ -291,7 +291,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-5 space-y-3">
           <Label htmlFor="budget" className="text-xs uppercase tracking-widest text-muted-foreground">
-            Wöchentliches Credit-Budget
+            {tx({ de: "Wöchentliches Credit-Budget", en: "Weekly credit budget", es: "Presupuesto semanal de créditos" })}
           </Label>
           <Input
             id="budget"
@@ -303,7 +303,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
             onChange={(e) => setBudget(Number(e.target.value))}
           />
           <p className="text-[11px] text-muted-foreground">
-            Diese Woche verbraucht: {brief.weekly_credits_spent} cr · Reset {new Date(brief.budget_resets_at).toLocaleDateString()}
+            {tx({ de: "Diese Woche verbraucht:", en: "Consumed this week:", es: "Consumido esta semana:" })} {brief.weekly_credits_spent} cr · {tx({ de: "Reset", en: "Reset", es: "Restablecer" })} {new Date(brief.budget_resets_at).toLocaleDateString()}
           </p>
         </Card>
 
@@ -324,9 +324,9 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       <Card className="p-5 space-y-4 border-fuchsia-500/30 bg-gradient-to-br from-fuchsia-500/5 to-transparent">
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-xs uppercase tracking-widest text-fuchsia-600">🎬 Video-Pipeline</Label>
+            <Label className="text-xs uppercase tracking-widest text-fuchsia-600">🎬 {tx({ de: "Video-Pipeline", en: "Video pipeline", es: "Pipeline de video" })}</Label>
             <p className="text-[11px] text-muted-foreground mt-1">
-              Wenn aktiv und Slot-Format „video / reel / short / tiktok / story" enthält, rendert der Autopilot ein echtes Video statt eines Bildes.
+              tx({ de: 'Wenn aktiv und Slot-Format „video / reel / short / tiktok / story" enthält, rendert der Autopilot ein echtes Video statt eines Bildes.', en: 'If active and the slot format contains "video / reel / short / tiktok / story", the autopilot renders a real video instead of an image.', es: 'Si está activo y el formato de la franja contiene "video / reel / short / tiktok / story", el autopilot renderiza un video real en lugar de una imagen.' })
             </p>
           </div>
           <Switch checked={videoEnabled} onCheckedChange={setVideoEnabled} />
@@ -335,7 +335,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
         {videoEnabled && (
           <>
             <div>
-              <Label className="text-xs uppercase tracking-widest text-muted-foreground">Provider</Label>
+              <Label className="text-xs uppercase tracking-widest text-muted-foreground">{tx({ de: "Provider", en: "Provider", es: "Proveedor" })}</Label>
               <div className="grid sm:grid-cols-3 gap-2 mt-2">
                 {VIDEO_PROVIDERS.map((p) => {
                   const cost = p.perSecCredits * videoDuration;
@@ -361,7 +361,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground">Dauer</Label>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground">{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</Label>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {VIDEO_DURATIONS.map((d) => (
                     <Button
@@ -378,7 +378,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
               </div>
 
               <div>
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground">Seitenverhältnis</Label>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground">{tx({ de: "Seitenverhältnis", en: "Aspect ratio", es: "Relación de aspecto" })}</Label>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {VIDEO_RATIOS.map((r) => (
                     <Button
@@ -396,8 +396,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
             </div>
 
             <div className="text-[11px] text-muted-foreground bg-muted/40 rounded p-2 leading-relaxed">
-              ⚠️ Video-Renders dauern typischerweise 1–5 Min. Status sichtbar im Slot-Drawer.
-              Bei Render-Fehler werden Credits automatisch zurückerstattet.
+              ⚠️ {tx({ de: "Video-Renders dauern typischerweise 1–5 Min. Status sichtbar im Slot-Drawer. Bei Render-Fehler werden Credits automatisch zurückerstattet.", en: "Video renders typically take 1-5 min. Status is visible in the slot drawer. On render failure, credits are automatically refunded.", es: "Los renderizados de video suelen tardar de 1 a 5 min. El estado es visible en el panel de la franja. Si falla el renderizado, los créditos se reembolsan automáticamente." })}
             </div>
           </>
         )}
@@ -413,7 +412,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
           </span>
           <Button onClick={save} disabled={!dirty || upsert.isPending} size="sm" className="gap-1.5">
             <Save className="h-3.5 w-3.5" />
-            {upsert.isPending ? 'Speichere…' : tx({ de: 'Strategie speichern', en: 'Save strategy', es: 'Guardar estrategia' })}
+            {upsert.isPending ? tx({ de: 'Speichere…', en: 'Saving…', es: 'Guardando…' }) : tx({ de: 'Strategie speichern', en: 'Save strategy', es: 'Guardar estrategia' })}
           </Button>
         </Card>
       </div>

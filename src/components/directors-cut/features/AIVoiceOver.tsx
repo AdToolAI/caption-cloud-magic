@@ -37,10 +37,10 @@ interface AIVoiceOverProps {
 
 const EMOTIONAL_TONES = [
   { id: 'neutral', name: 'Neutral' },
-  { id: 'enthusiastic', name: 'Enthusiastisch' },
-  { id: 'calm', name: 'Ruhig' },
-  { id: 'serious', name: 'Seriös' },
-  { id: 'friendly', name: 'Freundlich' },
+  { id: 'enthusiastic', name: tx({ de: 'Enthusiastisch', en: 'Enthusiastic', es: 'Entusiasta' }) },
+  { id: 'calm', name: tx({ de: 'Ruhig', en: 'Calm', es: 'Tranquilo' }) },
+  { id: 'serious', name: tx({ de: 'Seriös', en: 'Serious', es: 'Serio' }) },
+  { id: 'friendly', name: tx({ de: 'Freundlich', en: 'Friendly', es: 'Amistoso' }) },
 ];
 
 const TIPS: Record<string, string> = {
@@ -139,7 +139,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
     if (lockedVoiceId) {
       localStorage.removeItem(lockStorageKey);
       setLockedVoiceId(null);
-      toast.success('Voice-Lock entfernt');
+      toast.success(tx({ de: 'Voice-Lock entfernt', en: 'Voice lock removed', es: 'Bloqueo de voz eliminado' }));
     } else {
       const payload = {
         voiceId: settings.voiceId,
@@ -149,7 +149,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       localStorage.setItem(lockStorageKey, JSON.stringify(payload));
       setLockedVoiceId(settings.voiceId);
       const voice = voices.find((v) => v.id === settings.voiceId);
-      toast.success(`Voice-Lock aktiv: ${voice?.name ?? settings.voiceId}`);
+      toast.success(tx({ de: `Voice-Lock aktiv: ${voice?.name ?? settings.voiceId}`, en: `Voice lock active: ${voice?.name ?? settings.voiceId}`, es: `Bloqueo de voz activo: ${voice?.name ?? settings.voiceId}` }));
     }
   };
 
@@ -198,7 +198,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
   const handleVoiceSelect = (voiceId: string) => {
     if (lockedVoiceId && voiceId !== lockedVoiceId) {
-      toast.warning('Voice-Lock aktiv – entsperre zuerst, um die Stimme zu wechseln', { id: 'udc-voice-lock-warn' });
+      toast.warning(tx({ de: 'Voice-Lock aktiv – entsperre zuerst, um die Stimme zu wechseln', en: 'Voice lock active – unlock first to change the voice', es: 'Bloqueo de voz activo – desbloquea primero para cambiar la voz' }), { id: 'udc-voice-lock-warn' });
       return;
     }
     const voice = voices.find((v) => v.id === voiceId);
@@ -216,7 +216,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Mic className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold">AI Voice-Over</h3>
+          <h3 className="font-semibold">{tx({ de: "AI Voice-Over", en: "AI Voice-Over", es: "Voz en off IA" })}</h3>
           {lockedVoiceName && (
             <Badge variant="secondary" className="text-[10px] h-5 px-1.5 gap-1 bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
               <Lock className="h-2.5 w-2.5" /> {lockedVoiceName}
@@ -230,10 +230,10 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             size="sm"
             onClick={toggleVoiceLock}
             className="h-7 px-2 text-xs gap-1"
-            title={lockedVoiceId ? 'Voice-Lock entfernen' : tx({ de: 'Aktuelle Stimme für dieses Projekt sperren', en: 'Lock current voice for this project', es: 'Bloquear voz actual para este proyecto' })}
+            title={lockedVoiceId ? tx({ de: "Voice-Lock entfernen", en: "Remove voice lock", es: "Eliminar bloqueo de voz" }) : tx({ de: 'Aktuelle Stimme für dieses Projekt sperren', en: 'Lock current voice for this project', es: 'Bloquear voz actual para este proyecto' })}
           >
             {lockedVoiceId ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-            {lockedVoiceId ? 'Entsperren' : 'Sperren'}
+            {lockedVoiceId ? tx({ de: 'Entsperren', en: 'Unlock', es: 'Desbloquear' }) : tx({ de: 'Sperren', en: 'Lock', es: 'Bloquear' })}
           </Button>
           <Switch
             checked={settings.enabled}
@@ -245,7 +245,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       {settings.enabled && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Skript / Text</Label>
+            <Label>{tx({ de: "Skript / Text", en: "Script / Text", es: "Guion / Texto" })}</Label>
             <Textarea
               value={settings.scriptText}
               onChange={(e) => { onSettingsChange({ ...settings, scriptText: e.target.value }); setGeneratedUrl(null); }}
@@ -253,7 +253,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
               rows={4}
             />
             <p className="text-xs text-muted-foreground text-right">
-              {settings.scriptText.length} Zeichen • ~{estimatedDuration} Sekunden
+              {settings.scriptText.length} {tx({ de: "Zeichen", en: "characters", es: "caracteres" })} • ~{estimatedDuration} {tx({ de: "Sekunden", en: "seconds", es: "segundos" })}
             </p>
           </div>
 
@@ -273,10 +273,10 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                   size="sm"
                   onClick={() => setLibraryOpen(true)}
                   className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
-                  title="Vollständige Voice-Bibliothek (Suche, Filter, Native-Only)"
+                  title={tx({ de: "Vollständige Voice-Bibliothek (Suche, Filter, Native-Only)", en: "Full voice library (search, filter, native-only)", es: "Biblioteca de voces completa (búsqueda, filtro, solo nativas)" })}
                 >
                   <Library className="h-3 w-3" />
-                  Bibliothek
+                  {tx({ de: "Bibliothek", en: "Library", es: "Biblioteca" })}
                 </Button>
                 <Button
                   type="button"
@@ -284,10 +284,10 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                   size="sm"
                   onClick={() => setCloneDialogOpen(true)}
                   className="h-7 px-2 text-xs gap-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
-                  title="Eigene Stimme klonen (3+ Audio-Samples)"
+                  title={tx({ de: "Eigene Stimme klonen (3+ Audio-Samples)", en: "Clone your own voice (3+ audio samples)", es: "Clonar tu propia voz (3+ muestras de audio)" })}
                 >
                   <Plus className="h-3 w-3" />
-                  Klonen
+                  {tx({ de: "Klonen", en: "Clone", es: "Clonar" })}
                 </Button>
               </div>
             </div>
@@ -350,7 +350,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                   <TabsContent key={lang} value={lang} className="mt-3">
                     {loadingVoices ? (
                       <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lade Stimmen…
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" /> {tx({ de: "Lade Stimmen…", en: "Loading voices…", es: "Cargando voces…" })}
                       </div>
                     ) : langVoices.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-6">{tx({ de: "Keine Stimmen verfügbar", en: "No voices available", es: "No hay voces disponibles" })}</p>
@@ -360,7 +360,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-1.5 px-1">
                               <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                                Meine Stimmen
+                                {tx({ de: "Meine Stimmen", en: "My voices", es: "Mis voces" })}
                               </span>
                               <div className="h-px flex-1 bg-gradient-to-r from-amber-500/30 to-transparent" />
                             </div>
@@ -383,7 +383,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
           </div>
 
           <div className="space-y-2">
-            <Label>Emotionaler Ton</Label>
+            <Label>{tx({ de: "Emotionaler Ton", en: "Emotional tone", es: "Tono emocional" })}</Label>
             <Select
               value={settings.emotionalTone}
               onValueChange={(emotionalTone: typeof settings.emotionalTone) => {
@@ -402,7 +402,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Geschwindigkeit</Label>
+              <Label>{tx({ de: "Geschwindigkeit", en: "Speed", es: "Velocidad" })}</Label>
               <span className="text-sm text-muted-foreground">{settings.speed}x</span>
             </div>
             <Slider
@@ -416,7 +416,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 <Volume2 className="h-3 w-3" />
-                <Label>Lautstärke</Label>
+                <Label>{tx({ de: "Lautstärke", en: "Volume", es: "Volumen" })}</Label>
               </div>
               <span className="text-sm text-muted-foreground">{settings.volume}%</span>
             </div>
@@ -429,7 +429,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
           {generatedUrl && (
             <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
-              <p className="text-sm text-success mb-2 font-medium">✓ Voice-Over generiert</p>
+              <p className="text-sm text-success mb-2 font-medium">{tx({ de: "✓ Voice-Over generiert", en: "✓ Voice-over generated", es: "✓ Voz en off generada" })}</p>
               <audio ref={audioRef} src={generatedUrl} onEnded={() => setIsPlaying(false)} className="hidden" />
             </div>
           )}
@@ -442,14 +442,14 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
               className="flex-1 gap-2"
             >
               {generatedUrl ? (
-                <>{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}{isPlaying ? 'Pause' : 'Abspielen'}</>
+                <>{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}{isPlaying ? tx({ de: 'Pause', en: 'Pause', es: 'Pausa' }) : tx({ de: 'Abspielen', en: 'Play', es: 'Reproducir' })}</>
               ) : (
                 <><Play className="h-4 w-4" />{tx({ de: 'Vorschau', en: 'Preview', es: 'Vista previa' })}</>
               )}
             </Button>
             <Button onClick={handleGenerate} disabled={isGenerating || !settings.scriptText} className="flex-1 gap-2">
               {isGenerating ? (
-                <><Loader2 className="h-4 w-4 animate-spin" />Generiert...</>
+                <><Loader2 className="h-4 w-4 animate-spin" />{tx({ de: 'Generiert...', en: 'Generating...', es: 'Generando...' })}</>
               ) : (
                 <><Sparkles className="h-4 w-4" />{generatedUrl ? tx({ de: 'Neu generieren', en: 'Regenerate', es: 'Regenerar' }) : tx({ de: 'Voice-Over erstellen', en: 'Create voice-over', es: 'Crear voz en off' })}</>
               )}
