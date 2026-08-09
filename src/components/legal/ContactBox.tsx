@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { Mail, MapPin, Shield } from "lucide-react";
 
@@ -8,18 +9,18 @@ interface ContactBoxProps {
 export const ContactBox = ({ lang }: ContactBoxProps) => {
   const content = {
     de: {
-      title: "Kontakt für Datenschutzanfragen",
+      title: tx({ de: "Kontakt für Datenschutzanfragen", en: "Contact for privacy inquiries", es: "Contacto para consultas de privacidad" }),
       email: "privacy@useadtool.ai",
       address: "Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau, Germany",
       authority: "Zuständige Aufsichtsbehörde",
-      authorityName: "Bayerisches Landesamt für Datenschutzaufsicht (BayLDA)"
+      authorityName: tx({ de: "Bayerisches Landesamt für Datenschutzaufsicht (BayLDA)", en: "Bavarian State Office for Data Protection Supervision (BayLDA)", es: "Oficina Estatal de Baviera para la Supervisión de la Protección de Datos (BayLDA)" })
     },
     en: {
       title: "Contact for Privacy Inquiries",
       email: "privacy@useadtool.ai",
       address: "Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau, Germany",
       authority: "Supervisory Authority",
-      authorityName: "Bayerisches Landesamt für Datenschutzaufsicht (BayLDA)"
+      authorityName: tx({ de: "Bayerisches Landesamt für Datenschutzaufsicht (BayLDA)", en: "Bavarian State Office for Data Protection Supervision (BayLDA)", es: "Oficina Estatal de Baviera para la Supervisión de la Protección de Datos (BayLDA)" })
     }
   };
 

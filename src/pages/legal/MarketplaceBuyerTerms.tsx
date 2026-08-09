@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
@@ -9,7 +10,7 @@ export default function MarketplaceBuyerTerms() {
     <>
       <Helmet>
         <title>Marketplace Buyer License | AdTool</title>
-        <meta name="description" content="Lizenzbedingungen für den Erwerb von Brand Characters im AdTool Marketplace." />
+        <meta name="description" content={tx({ de: "Lizenzbedingungen für den Erwerb von Brand Characters im AdTool Marketplace.", en: "License conditions for purchasing brand characters in the AdTool Marketplace.", es: "Condiciones de licencia para la compra de personajes de marca en AdTool Marketplace." })} />
       </Helmet>
       <div className="container mx-auto max-w-3xl py-10 px-4">
         <Link to="/marketplace" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
