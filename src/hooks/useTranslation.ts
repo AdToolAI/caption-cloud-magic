@@ -38,16 +38,29 @@ export const useTranslationState = () => {
 
   const t = (key: string, params?: Record<string, string | number>): any => {
     const keys = key.split('.') as any;
-    let value: any = translations[language];
-    
-    for (const k of keys) {
-      value = value?.[k];
+    const lookup = (dict: any) => {
+      let v: any = dict;
+      for (const k of keys) v = v?.[k];
+      return v;
+    };
+
+    // Preferred language -> generated fill -> English -> German -> key
+    let value: any = lookup(translations[language]);
+    if (value === undefined || value === null) {
+      value = lookup((translationsFill as any)[language]);
+    }
+    if (value === undefined || value === null) {
+      value = lookup(translations.en);
+    }
+    if (value === undefined || value === null) {
+      value = lookup(translations.de);
     }
 
-    // Return key if value is undefined or null
+    // Return key if nothing was found at all
     if (value === undefined || value === null) {
       return key;
     }
+
 
     // Return objects directly (for featureGuides, etc.)
     if (typeof value === 'object') {
