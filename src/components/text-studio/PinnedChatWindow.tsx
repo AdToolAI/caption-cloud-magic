@@ -386,7 +386,7 @@ export default function PinnedChatWindow() {
           background:
             "linear-gradient(135deg, transparent 50%, rgba(245,199,106,0.5) 50%, rgba(245,199,106,0.5) 100%)",
         }}
-        title="Größe ändern"
+        title={tx({ de: "Größe ändern", en: "Resize", es: "Cambiar tamaño" })}
       />
     </div>
   );

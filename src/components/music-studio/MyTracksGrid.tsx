@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { tx } from "@/lib/i18nText";
 import { Play, Pause, Download, Loader2, Music2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -87,7 +88,7 @@ export function MyTracksGrid() {
     return (
       <Card className="p-12 text-center border-dashed border-primary/20 bg-background/40">
         <Music2 className="h-10 w-10 text-primary/40 mx-auto mb-3" />
-        <p className="text-foreground font-medium">Noch keine generierten Tracks</p>
+        <p className="text-foreground font-medium">{tx({ de: "Noch keine generierten Tracks", en: "No generated tracks yet", es: "Aún no hay pistas generadas" })}</p>
         <p className="text-sm text-muted-foreground mt-1">
           Wechsel zum Generate-Tab und erschaffe deinen ersten Track.
         </p>

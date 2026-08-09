@@ -530,8 +530,10 @@ export function useAcceptWeeklyReview() {
       qc.invalidateQueries({ queryKey: ['autopilot-weekly-review'] });
       qc.invalidateQueries({ queryKey: ['autopilot-brief'] });
       toast({
-        title: vars.applySuggestion ? 'Vorschlag übernommen' : 'Briefing bestätigt',
-        description: 'Autopilot läuft normal weiter.',
+        title: vars.applySuggestion
+          ? tx({ de: 'Vorschlag übernommen', en: 'Suggestion applied', es: 'Sugerencia aplicada' })
+          : tx({ de: 'Briefing bestätigt', en: 'Briefing confirmed', es: 'Briefing confirmado' }),
+        description: tx({ de: 'Autopilot läuft normal weiter.', en: 'Autopilot continues running normally.', es: 'El piloto automático continúa funcionando normalmente.' }),
       });
     },
     onError: (e: unknown) => toast({
@@ -553,7 +555,10 @@ export function useTriggerWeeklyReview() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['autopilot-weekly-review'] });
-      toast({ title: 'Review erstellt', description: 'Strategie-Vorschlag bereit.' });
+      toast({
+        title: tx({ de: 'Review erstellt', en: 'Review created', es: 'Revisión creada' }),
+        description: tx({ de: 'Strategie-Vorschlag bereit.', en: 'Strategy suggestion ready.', es: 'Sugerencia de estrategia lista.' }),
+      });
     },
     onError: (e: unknown) => toast({
       title: tx({ de: "Review fehlgeschlagen", en: "Review failed", es: "Revisión fallida" }),

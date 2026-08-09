@@ -286,12 +286,12 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               {isProcessing ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Optimiere Audio...
+                  {tx({ de: "Optimiere Audio...", en: "Optimizing audio...", es: "Optimizando audio..." })}
                 </>
               ) : processedUrl && activeMode === 'enhance' ? (
                 <>
                   <Check className="w-5 h-5 mr-2" />
-                  Erneut optimieren
+                  {tx({ de: "Erneut optimieren", en: "Optimize again", es: "Optimizar de nuevo" })}
                 </>
               ) : (
                 <>
@@ -361,17 +361,17 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               {isProcessing ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Isoliere Stimme...
+                  {tx({ de: "Isoliere Stimme...", en: "Isolating voice...", es: "Aislando voz..." })}
                 </>
               ) : processedUrl && activeMode === 'isolate' ? (
                 <>
                   <Check className="w-5 h-5 mr-2" />
-                  Erneut isolieren
+                  {tx({ de: "Erneut isolieren", en: "Isolate again", es: "Aislar de nuevo" })}
                 </>
               ) : (
                 <>
                   <Mic className="w-5 h-5 mr-2" />
-                  Stimme isolieren
+                  {tx({ de: "Stimme isolieren", en: "Isolate voice", es: "Aislar voz" })}
                 </>
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />

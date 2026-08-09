@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { ShieldAlert, ShieldCheck, RefreshCw, Check, FileWarning } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,20 +27,20 @@ export function BrandDriftDossier({ brandKitId }: Props) {
             <ShieldAlert className="h-4 w-4 text-amber-400" />
             Drift Dossier
           </CardTitle>
-          <CardDescription>Aktive Verstöße gegen dein Marken-Set.</CardDescription>
+          <CardDescription>{tx({ de: 'Aktive Verstöße gegen dein Marken-Set.', en: 'Active violations against your brand kit.', es: 'Infracciones activas contra tu kit de marca.' })}</CardDescription>
         </div>
         <Button size="sm" variant="outline" onClick={() => scan.mutate()} disabled={scan.isPending}>
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${scan.isPending ? "animate-spin" : ""}`} />
-          Scan starten
+          {tx({ de: 'Scan starten', en: 'Start scan', es: 'Iniciar escaneo' })}
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (
-          <p className="text-sm text-muted-foreground">Lade Dossier…</p>
+          <p className="text-sm text-muted-foreground">{tx({ de: 'Lade Dossier…', en: 'Loading dossier…', es: 'Cargando expediente…' })}</p>
         ) : drifts.length === 0 ? (
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-300">
             <ShieldCheck className="h-4 w-4" />
-            Keine offenen Drifts. Deine Marke ist konsistent.
+            {tx({ de: 'Keine offenen Drifts. Deine Marke ist konsistent.', en: 'No open drifts. Your brand is consistent.', es: 'Sin desviaciones abiertas. Tu marca es consistente.' })}
           </div>
         ) : (
           drifts.map((d, i) => (
@@ -58,10 +59,10 @@ export function BrandDriftDossier({ brandKitId }: Props) {
                     <Badge variant="outline" className="text-[10px] uppercase">{d.severity}</Badge>
                   </div>
                   <p className="text-sm font-medium">
-                    {d.source_table === "posts" ? "Voice-Drift" : "Color-Drift"} · Score {Math.round(d.score)}
+                    {d.source_table === "posts" ? "Voice-Drift" : "Color-Drift"} · {tx({ de: 'Score', en: 'Score', es: 'Puntuación' })} {Math.round(d.score)}
                   </p>
                   <p className="text-xs opacity-70 mt-1 truncate">
-                    Suggested: {d.suggested_fix?.kind ?? "review"} {d.suggested_fix?.hex ? `→ ${d.suggested_fix.hex}` : ""}
+                    {tx({ de: 'Vorschlag', en: 'Suggested', es: 'Sugerido' })}: {d.suggested_fix?.kind ?? "review"} {d.suggested_fix?.hex ? `→ ${d.suggested_fix.hex}` : ""}
                   </p>
                 </div>
                 {d.preview_url && (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -132,7 +133,7 @@ export default function VideoPerformanceDashboard() {
     <div className="container py-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">Video Performance Dashboard</h1>
-        <p className="text-muted-foreground">Rendering-Statistiken und Systemauslastung</p>
+        <p className="text-muted-foreground">{tx({ de: "Rendering-Statistiken und Systemauslastung", en: "Rendering statistics and system load", es: "Estadísticas de renderizado y carga del sistema" })}</p>
       </div>
 
       {/* Period Selector */}

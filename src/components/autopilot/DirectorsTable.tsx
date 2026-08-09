@@ -569,7 +569,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             </div>
 
             <div className="space-y-2">
-              <Label>Sprache</Label>
+              <Label>{tx({ de: "Sprache", en: "Language", es: "Idioma" })}</Label>
               <Select value={language} onValueChange={setLanguage}>
                 <SelectTrigger>
                   <SelectValue />

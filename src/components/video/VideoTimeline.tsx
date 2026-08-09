@@ -8,6 +8,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Plus, Trash2 } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface TimelineClip {
   id: string;
@@ -56,7 +57,7 @@ function SortableClip({ clip, onUpdate, onDelete }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-xs">Dauer (Sekunden)</Label>
+              <Label className="text-xs">{tx({ de: 'Dauer (Sekunden)', en: 'Duration (seconds)', es: 'Duración (segundos)' })}</Label>
               <Slider
                 value={[clip.duration]}
                 onValueChange={([value]) => onUpdate(clip.id, { duration: value })}

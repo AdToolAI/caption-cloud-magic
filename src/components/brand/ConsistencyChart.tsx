@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import { tx } from "@/lib/i18nText";
 
 interface ConsistencyChartProps {
   brandKitId: string;
@@ -41,17 +42,17 @@ export function ConsistencyChart({ brandKitId }: ConsistencyChartProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5" />
-          Konsistenz-Verlauf
+          {tx({ de: 'Konsistenz-Verlauf', en: 'Consistency History', es: 'Historial de consistencia' })}
         </CardTitle>
         <CardDescription>
-          Entwicklung deiner Marken-Konsistenz über die Zeit
+          {tx({ de: 'Entwicklung deiner Marken-Konsistenz über die Zeit', en: 'Evolution of your brand consistency over time', es: 'Evolución de la consistencia de tu marca a lo largo del tiempo' })}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {historyData.length > 0 ? (
           <>
             <div className="mb-4">
-              <p className="text-sm text-muted-foreground">Durchschnittlicher Score</p>
+              <p className="text-sm text-muted-foreground">{tx({ de: 'Durchschnittlicher Score', en: 'Average score', es: 'Puntuación media' })}</p>
               <p className="text-3xl font-bold text-primary">{avgScore}%</p>
             </div>
             <ResponsiveContainer width="100%" height={200}>
@@ -87,8 +88,8 @@ export function ConsistencyChart({ brandKitId }: ConsistencyChartProps) {
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <TrendingUp className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>Noch keine Konsistenz-Daten vorhanden</p>
-            <p className="text-sm mt-1">Erstelle Inhalte, um deinen Score zu tracken</p>
+            <p>{tx({ de: 'Noch keine Konsistenz-Daten vorhanden', en: 'No consistency data yet', es: 'Aún no hay datos de consistencia' })}</p>
+            <p className="text-sm mt-1">{tx({ de: 'Erstelle Inhalte, um deinen Score zu tracken', en: 'Create content to track your score', es: 'Crea contenido para seguir tu puntuación' })}</p>
           </div>
         )}
       </CardContent>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import {
   ENGINE_CATALOG,
@@ -270,7 +271,11 @@ export default function MusicStudio() {
                 <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 mt-1">
                   <Info className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/70" />
                   <span>
-                    <strong>Suno</strong> und <strong>Udio</strong> bieten aktuell keinen offiziellen API-Zugang. Für Full-Song-Qualität setzen wir auf <strong>ElevenLabs Music v2</strong> (beste Gesamtlösung) und <strong>Google Lyria 3 Pro</strong> (Preview) — <strong>Stable Audio 3.0 Large</strong> deckt den Instrumental-Bereich ab.
+{tx({
+                      de: <><strong>Suno</strong> und <strong>Udio</strong> bieten aktuell keinen offiziellen API-Zugang. Für Full-Song-Qualität setzen wir auf <strong>ElevenLabs Music v2</strong> (beste Gesamtlösung) und <strong>Google Lyria 3 Pro</strong> (Preview) — <strong>Stable Audio 3.0 Large</strong> deckt den Instrumental-Bereich ab.</>,
+                      en: <><strong>Suno</strong> and <strong>Udio</strong> currently offer no official API access. For full-song quality we rely on <strong>ElevenLabs Music v2</strong> (best overall solution) and <strong>Google Lyria 3 Pro</strong> (preview) — <strong>Stable Audio 3.0 Large</strong> covers the instrumental range.</>,
+                      es: <><strong>Suno</strong> y <strong>Udio</strong> actualmente no ofrecen acceso oficial a la API. Para la calidad de canción completa confiamos en <strong>ElevenLabs Music v2</strong> (mejor solución general) y <strong>Google Lyria 3 Pro</strong> (vista previa) — <strong>Stable Audio 3.0 Large</strong> cubre el área instrumental.</>,
+                    })}
                   </span>
                 </p>
 

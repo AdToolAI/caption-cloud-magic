@@ -13,7 +13,7 @@ export interface FirstVideoPrompt {
 const FALLBACK: Record<string, FirstVideoPrompt[]> = {
   de: [
     { prompt: tx({ de: "Cinematische Drohnenaufnahme über einer modernen Skyline bei Sonnenuntergang", en: "Cinematic drone shot over a modern skyline at sunset", es: "Toma cinematográfica de dron sobre un horizonte moderno al atardecer" }), prompt_en: "Cinematic drone shot over a modern skyline at sunset", style_hint: "cinematic" },
-    { prompt: "Eleganter Produkt-Shot eines Parfüm-Flakons mit weichem Goldlicht", prompt_en: "Elegant product shot of a perfume bottle with soft gold light", style_hint: "product" },
+    { prompt: tx({ de: "Eleganter Produkt-Shot eines Parfüm-Flakons mit weichem Goldlicht", en: "Elegant product shot of a perfume bottle with soft gold light", es: "Toma elegante de un frasco de perfume con luz dorada suave" }), prompt_en: "Elegant product shot of a perfume bottle with soft gold light", style_hint: "product" },
     { prompt: tx({ de: "Eine entspannte Person auf einer Couch, die in die Kamera lächelt", en: "A relaxed person on a couch smiling at the camera", es: "Una persona relajada en un sofá sonriendo a la cámara" }), prompt_en: "A relaxed person on a couch smiling at the camera", style_hint: "lifestyle" },
   ],
   en: [

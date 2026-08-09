@@ -313,7 +313,7 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
                   value={assignments[sp.idx] === null || assignments[sp.idx] === undefined ? "" : String(assignments[sp.idx])}
                   onChange={(e) => setSlot(sp.idx, e.target.value === "" ? null : Number(e.target.value))}
                 >
-                  <option value="">— Slot wählen —</option>
+                  <option value="">{tx({ de: '— Slot wählen —', en: '— Select slot —', es: '— Seleccionar espacio —' })}</option>
                   {faces.map((f) => (
                     <option key={f.slot} value={f.slot}>Slot {f.slot + 1}</option>
                   ))}
@@ -324,10 +324,10 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Abbrechen</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>{tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}</Button>
           <Button onClick={handleSave} disabled={saving || unresolvedCount > 0}>
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            Zuordnung speichern & rendern
+            {tx({ de: 'Zuordnung speichern & rendern', en: 'Save assignment & render', es: 'Guardar asignación y renderizar' })}
           </Button>
         </DialogFooter>
       </DialogContent>
