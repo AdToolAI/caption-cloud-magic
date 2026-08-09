@@ -323,7 +323,7 @@ CRITICAL RULES:
 - sceneActionEn MUST describe the GROUP situation including ALL character names (e.g. "Sarah, Matthew and Kailee discuss the launch around the desk"), never just one character.
 - Do NOT use "the two of them" or pronouns — always restate names.
 - Never put the same identical pair in two consecutive scenes with the same shotTypes — vary framing.`;
-})(req)))()}
+})()}
 
 Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.${styleDirective}`;
 
@@ -1036,4 +1036,4 @@ Generate the storyboard using the create_storyboard function.`;
       }
     );
   }
-});
+})(req)));
