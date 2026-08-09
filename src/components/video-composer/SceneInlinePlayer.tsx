@@ -25,7 +25,6 @@ import type { ComposerScene } from '@/types/video-composer';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 import { isInFlightState, sceneState } from '@/lib/composer/sceneState';
-import { tx } from "@/lib/i18nText";
 
 interface Props {
   scene: ComposerScene;
@@ -379,7 +378,7 @@ export default function SceneInlinePlayer({
 
         {/* v124 — Failure overlay: shows the actual backend error (e.g.
             anchor_identity_failed) plus a Re-Render button, instead of an
-            endless tx({ de: "Szene wird gebaut…", en: "Scene is building…", es: "La escena se está construyendo…" }) spinner. */}
+            endless "Szene wird gebaut…" spinner. */}
         {isFailed && (() => {
           const rawErr = String(
             (scene as any).clipError ?? (scene as any).clip_error ?? '',
