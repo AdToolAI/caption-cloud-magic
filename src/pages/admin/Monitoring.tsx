@@ -13,7 +13,7 @@ export default function Monitoring() {
   return (
     <>
       <Helmet>
-        <title>Performance Monitoring - CaptionGenie</title>
+        <title>Performance Monitoring - AdTool AI</title>
         <meta name="description" content="Real-time performance monitoring dashboard with cache metrics, query performance, and system health" />
       </Helmet>
       

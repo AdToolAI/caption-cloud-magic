@@ -263,7 +263,7 @@ export function YouTubeLiveTab() {
             </div>
             {!activeStream && (
               <Button size="sm" variant="outline" className="border-[#FF0000]/30 text-[#FF0000]"
-                onClick={() => yt.createStream("CaptionGenie Stream")}>
+                onClick={() => yt.createStream("AdTool AI Stream")}>
                 <Plus className="w-3 h-3 mr-1" /> {t('gaming.createStreamKey')}
               </Button>
             )}

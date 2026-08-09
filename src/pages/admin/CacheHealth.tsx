@@ -269,7 +269,7 @@ export function CacheHealth() {
             </p>
             <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
               <li>Create a free account at <a href="https://cloudflare.com" target="_blank" rel="noopener" className="text-primary underline">cloudflare.com</a></li>
-              <li>Add your custom domain (e.g. captiongenie.app, useadtool.ai)</li>
+              <li>Add your custom domain (e.g. useadtool.ai)</li>
               <li>Update your DNS to point to Cloudflare's nameservers</li>
               <li>Enable "Auto Minify" + "Brotli" + "Polish (WebP)" in Speed → Optimization</li>
               <li>Set Cache → Configuration → Browser Cache TTL: 4 hours</li>

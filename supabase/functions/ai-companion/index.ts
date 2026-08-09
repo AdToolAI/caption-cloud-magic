@@ -162,7 +162,7 @@ A: Nein, niemals ohne deine Zustimmung.
 ### 📱 PUSH-BENACHRICHTIGUNGEN EINRICHTEN:
 
 **Android (Chrome):**
-1. Öffne https://caption-cloud-magic.lovable.app in Chrome
+1. Öffne https://useadtool.ai in Chrome
 2. Tippe auf die drei Punkte (⋮) oben rechts
 3. Wähle "Zum Startbildschirm hinzufügen" oder "App installieren"
 4. Öffne die App über das neue Icon auf dem Startbildschirm (NICHT über Chrome!)
@@ -173,7 +173,7 @@ A: Nein, niemals ohne deine Zustimmung.
 [Benachrichtigungen öffnen](/account?tab=notifications)
 
 **iPhone / iOS (Safari):**
-1. Öffne https://caption-cloud-magic.lovable.app in Safari (NICHT Chrome!)
+1. Öffne https://useadtool.ai in Safari (NICHT Chrome!)
 2. Tippe auf das Teilen-Symbol (□↑) unten in der Mitte
 3. Scrolle runter und wähle "Zum Home-Bildschirm"
 4. Tippe "Hinzufügen"

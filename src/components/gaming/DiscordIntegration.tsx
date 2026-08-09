@@ -355,7 +355,7 @@ export function DiscordIntegration() {
                         <p className="text-[10px] text-white/40">{t('gaming.streamThumbnail')}</p>
                       </div>
                     )}
-                    <p className="text-[10px]" style={{ color: "#72767d" }}>CaptionGenie Gaming Hub • {t('gaming.today')}</p>
+                    <p className="text-[10px]" style={{ color: "#72767d" }}>AdTool AI Gaming Hub • {t('gaming.today')}</p>
                   </div>
                 </div>
               </div>
