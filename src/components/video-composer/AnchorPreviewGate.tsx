@@ -211,7 +211,7 @@ export function AnchorPreviewGate({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Anchor-Vorschau bestätigen</DialogTitle>
+          <DialogTitle>{tx({ de: "Anchor-Vorschau bestätigen", en: "Confirm anchor preview", es: "Confirmar vista previa del ancla" })}</DialogTitle>
           <DialogDescription>
             Sieh dir das komponierte Anchor-Bild an, bevor Video + Lip-Sync
             gerendert werden. So sparst du dir teure Re-Rolls, wenn Identitäten

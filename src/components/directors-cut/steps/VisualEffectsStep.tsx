@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -183,7 +184,7 @@ export function VisualEffectsStep({
         {/* Video Preview */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Live-Vorschau</CardTitle>
+            <CardTitle className="text-sm">{tx({ de: "Live-Vorschau", en: "Live preview", es: "Vista previa en vivo" })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="aspect-video bg-black rounded-lg overflow-hidden">
