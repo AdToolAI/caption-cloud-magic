@@ -11,7 +11,7 @@ const ALLOWED = [
   // Rückwärtskompatible Erkennung alter Demo-Verbindungen
   'src/components/performance/ConnectionsTab.tsx',
   // Dieser Test selbst
-  'tests/brand-consistency.spec.ts',
+  'src/test/brand-consistency.test.ts',
 ];
 
 function grep(pattern: string): string[] {
