@@ -76,15 +76,15 @@ const ENGINES: HybridEngine[] = ['ai-kling', 'ai-luma', 'ai-hailuo', 'ai-wan', '
 const T = {
   de: {
     title: 'Director Mode',
-    titleScene: 'Szene #{n} regieren',
-    desc: 'In drei Schritten: caste deine Engine, scoute den Blickwinkel, gib die Regie-Anweisung.',
-    tagline: 'Du bist der Regisseur. Wir sind die Crew.',
+    titleScene: tx({ de: 'Szene #{n} regieren', en: 'Scene #{n} rule', es: 'Regla de escena #{n}' }),
+    desc: tx({ de: 'In drei Schritten: caste deine Engine, scoute den Blickwinkel, gib die Regie-Anweisung.', en: 'In three steps: cast your engine, scout the angle, give the direction.', es: 'En tres pasos: lanza tu motor, explora el ángulo, da la dirección.' }),
+    tagline: tx({ de: 'Du bist der Regisseur. Wir sind die Crew.', en: 'You are the director. We are the crew.', es: 'Eres el director. Somos la tripulación.' }),
     step1: 'Cast',
     step2: 'Scout',
     step3: 'Direct',
     // Scout (Mode-Tabs)
     sequel: 'Sequel',
-    sequelHint: 'Wie geht die Szene weiter?',
+    sequelHint: tx({ de: 'Wie geht die Szene weiter?', en: 'How does the scene continue?', es: '¿Cómo continúa la escena?' }),
     prequel: 'Prequel',
     prequelHint: 'Was passierte davor?',
     crossfade: 'Crossfade',
@@ -114,7 +114,7 @@ const T = {
     promptPh: tx({ de: 'Action! In dieser Szene …', en: 'Action! In this scene...', es: '¡Acción! En esta escena...' }),
     cost: 'Drehbudget',
     cancel: 'Abbrechen',
-    action: 'Action! — Szene drehen',
+    action: tx({ de: 'Action! — Szene drehen', en: 'Action! — Shooting a scene', es: '¡Acción! — Filmar una escena' }),
     rolling: 'Kamera läuft …',
   },
   en: {

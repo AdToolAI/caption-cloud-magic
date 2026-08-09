@@ -201,7 +201,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
               <Slider id="duration" min={8} max={180} step={1} value={[targetDuration]} onValueChange={(value) => setTargetDuration(value[0])} className="mt-2" disabled={hasScenes} />
               {hasScenes && (
                 <p className="text-[10px] text-muted-foreground">
-                  {language === 'en' ? 'Locked to scene total.' : language === 'es' ? 'Bloqueado al total de escenas.' : 'An Szenen-Gesamtdauer gekoppelt.'}
+                  {language === 'en' ? 'Locked to scene total.' : language === 'es' ? 'Bloqueado al total de escenas.' : tx({ de: 'An Szenen-Gesamtdauer gekoppelt.', en: 'Linked to total scene duration.', es: 'Vinculado a la duración total de la escena.' })}
                 </p>
               )}
             </div>
@@ -214,7 +214,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
             {hasScenes && (
               <Button onClick={handleGenerateFromScenes} disabled={isGenerating} className="w-full">
                 {isGenerating ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /></>) : (<><Wand2 className="w-4 h-4 mr-2" />
-                  {language === 'en' ? 'Generate from scenes' : language === 'es' ? 'Generar desde escenas' : 'Aus Szenen generieren'}
+                  {language === 'en' ? 'Generate from scenes' : language === 'es' ? 'Generar desde escenas' : tx({ de: 'Aus Szenen generieren', en: 'Generate from scenes', es: 'Generar a partir de escenas' })}
                 </>)}
               </Button>
             )}
@@ -258,7 +258,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Film className="w-4 h-4 text-primary" />
                     <span>
-                      {language === 'en' ? 'Per scene' : language === 'es' ? 'Por escena' : 'Pro Szene'}
+                      {language === 'en' ? 'Per scene' : language === 'es' ? 'Por escena' : tx({ de: 'Pro Szene', en: 'Per scene', es: 'Por escena' })}
                     </span>
                   </div>
                   <ul className="space-y-1.5 text-xs">

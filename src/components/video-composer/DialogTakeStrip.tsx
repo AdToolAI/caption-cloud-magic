@@ -56,8 +56,8 @@ const T = {
     setActive: 'Als aktiv markieren',
     delete: 'Löschen',
     noVoice: tx({ de: 'Stimme wählen, dann Take aufnehmen.', en: 'Select voice, then record take.', es: 'Selecciona la voz, luego graba la toma.' }),
-    failed: 'Take fehlgeschlagen',
-    full: `Max ${MAX_TAKES_PER_LINE} Takes — lösche einen, um neu aufzunehmen.`,
+    failed: tx({ de: 'Take fehlgeschlagen', en: 'Take failed', es: 'Tomar falló' }),
+    full: tx({ de: `Max ${MAX_TAKES_PER_LINE} Takes — lösche einen, um neu aufzunehmen.`, en: `Max ${MAX_TAKES_PER_LINE} takes — delete one to re-record.`, es: `Tomas máximas de ${MAX_TAKES_PER_LINE}: elimina una para volver a grabar.` }),
   },
   en: {
     takes: 'Takes',

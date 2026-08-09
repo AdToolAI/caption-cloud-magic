@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { Component, ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -82,7 +83,7 @@ export class TemplateErrorBoundary extends Component<Props, State> {
               <div className="flex-1 space-y-4">
                 <div>
                   <h2 className="text-2xl font-bold mb-2">
-                    {isTemplateError ? 'Template-Fehler' : 'Etwas ist schief gelaufen'}
+                    {isTemplateError ? 'Template-Fehler' : tx({ de: 'Etwas ist schief gelaufen', en: 'Something went wrong', es: 'algo salió mal' })}
                   </h2>
                   <p className="text-muted-foreground">
                     {errorDetails.message}

@@ -84,7 +84,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
       toast.success(`${incoming.length} Casting-Varianten generiert ✨`);
       await reload();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Generierung fehlgeschlagen';
+      const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });
       toast.error(msg);
     } finally {
       setGenerating(false);

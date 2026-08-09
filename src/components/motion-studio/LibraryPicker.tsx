@@ -36,7 +36,7 @@ export default function LibraryPicker({
   selectedCharacterIds = [],
   selectedLocationIds = [],
   onSelect,
-  title = 'Aus Library hinzufügen',
+  title = tx({ de: 'Aus Library hinzufügen', en: 'Add from Library', es: 'Agregar desde la biblioteca' }),
 }: LibraryPickerProps) {
   const { characters, locations, loading, trackUsage } = useMotionStudioLibrary();
   const [search, setSearch] = useState('');
@@ -81,7 +81,7 @@ export default function LibraryPicker({
             {title}
           </DialogTitle>
           <DialogDescription>
-            Wähle gespeicherte {modes.includes('character') && modes.includes('location') ? 'Charaktere und Locations' : modes[0] === 'character' ? 'Charaktere' : 'Locations'} oder lege neue in der Library an.
+            Wähle gespeicherte {modes.includes('character') && modes.includes('location') ? tx({ de: 'Charaktere und Locations', en: 'Characters and locations', es: 'Personajes y ubicaciones' }) : modes[0] === 'character' ? 'Charaktere' : 'Locations'} oder lege neue in der Library an.
           </DialogDescription>
         </DialogHeader>
 

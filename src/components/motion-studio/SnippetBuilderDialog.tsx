@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
@@ -120,7 +121,7 @@ export default function SnippetBuilderDialog({
   const handleUpload = useCallback(
     async (file: File) => {
       if (!user) {
-        toast.error('Bitte einloggen');
+        toast.error(tx({ de: 'Bitte einloggen', en: 'Please log in', es: 'Por favor inicia sesión' }));
         return;
       }
       if (!file.type.startsWith('image/')) {
@@ -143,7 +144,7 @@ export default function SnippetBuilderDialog({
           toast.success('Vorschau gesetzt');
         }
       } catch (e: any) {
-        toast.error(`Upload fehlgeschlagen: ${e.message ?? e}`);
+        toast.error(tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }));
       } finally {
         setUploading(false);
       }
@@ -317,7 +318,7 @@ export default function SnippetBuilderDialog({
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Kurzbeschreibung für die Library-Karte"
+              placeholder={tx({ de: "Kurzbeschreibung für die Library-Karte", en: "Short description for the library card", es: "Breve descripción de la tarjeta de la biblioteca" })}
               className="bg-background/60 mt-1"
             />
           </div>
@@ -337,7 +338,7 @@ export default function SnippetBuilderDialog({
 
           {/* Duration */}
           <div>
-            <Label className="text-xs">Dauer (Sekunden, optional)</Label>
+            <Label className="text-xs">{tx({ de: "Dauer (Sekunden, optional)", en: "Duration (seconds, optional)", es: "Duración (segundos, opcional)" })}</Label>
             <Input
               type="number"
               min={1}

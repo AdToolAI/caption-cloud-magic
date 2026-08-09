@@ -294,7 +294,7 @@ export function ImageGenerator() {
     }
 
     if (hasInsufficientCredits) {
-      toast.error(`Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`);
+      toast.error(tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
       navigate('/ai-video-purchase-credits');
       return;
     }
@@ -329,7 +329,7 @@ export function ImageGenerator() {
         if (safetyFilteredMsg) {
           const canRetryFast = tier !== 'fast';
           toast.warning('Sicherheitsfilter ausgelöst', {
-            description: safetyFilteredMsg + (canRetryFast ? ' Tipp: „Fast" (Seedream 4) hat tolerantere Filter.' : ''),
+            description: safetyFilteredMsg + (canRetryFast ? tx({ de: ' Tipp: „Fast" (Seedream 4) hat tolerantere Filter.', en: 'Tip: “Fast” (Seedream 4) has more tolerant filters.', es: 'Consejo: "Rápido" (Seedream 4) tiene filtros más tolerantes.' }) : ''),
             duration: 14000,
             action: canRetryFast ? {
               label: 'Mit Fast erneut',
@@ -340,7 +340,7 @@ export function ImageGenerator() {
             } : undefined,
           });
         } else {
-          toast.error('Bildgenerierung fehlgeschlagen');
+          toast.error(tx({ de: 'Bildgenerierung fehlgeschlagen', en: 'Image generation failed', es: 'Error al generar la imagen' }));
         }
       } else if (variantsCount > 1) {
         toast.success(`${successCount} von ${variantsCount} Varianten generiert`);
@@ -363,7 +363,7 @@ export function ImageGenerator() {
     // Free tier (Gemini/Standard "Gratis im Abo") skips confirm.
     if (cost <= 0) { void runGenerate(); return; }
     if (hasInsufficientCredits) {
-      toast.error(`Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`);
+      toast.error(tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
       navigate('/ai-video-purchase-credits');
       return;
     }

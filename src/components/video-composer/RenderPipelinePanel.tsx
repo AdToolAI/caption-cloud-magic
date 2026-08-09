@@ -31,7 +31,7 @@ interface RenderPipelinePanelProps {
 
 const statusLabel: Record<PipelineStatus, string> = {
   idle: 'Bereit',
-  queueing: 'Warteschlange wird vorbereitet …',
+  queueing: tx({ de: 'Warteschlange wird vorbereitet …', en: 'Queue is being prepared...', es: 'Se está preparando la cola...' }),
   generating: tx({ de: 'Szenen werden generiert …', en: 'Scenes are being generated...', es: 'Se están generando las escenas...' }),
   stitching: 'Wird zusammengeschnitten …',
   ready: 'Fertig 🎬',

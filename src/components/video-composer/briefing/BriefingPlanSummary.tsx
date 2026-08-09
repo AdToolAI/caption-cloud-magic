@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * BriefingPlanSummary — sticky "Pre-Apply Summary" footer for the
  * ProductionPlanSheet review step. Surfaces three things at a glance:
@@ -140,8 +141,8 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardContent side="top" className="w-[320px] text-[11px]">
                 <div className="font-medium mb-1">Briefing-Treue (LITERAL)</div>
                 <div className="text-muted-foreground space-y-0.5">
-                  <div>Szenen im Skript: <span className="text-foreground">{fidelity.scenesInScript ?? 0}</span></div>
-                  <div>Szenen gematcht: <span className="text-foreground">{fidelity.scenesMatched ?? 0}</span></div>
+                  <div>{tx({ de: "Szenen im Skript:", en: "Scenes in the script:", es: "Escenas del guión:" })} <span className="text-foreground">{fidelity.scenesInScript ?? 0}</span></div>
+                  <div>{tx({ de: "Szenen gematcht:", en: "Scenes matched:", es: "Escenas coincidentes:" })} <span className="text-foreground">{fidelity.scenesMatched ?? 0}</span></div>
                   <div>Dialog-Texte repariert: <span className="text-foreground">{fidelity.repairedTexts ?? 0}</span></div>
                   <div>Sprecher neu zugeordnet: <span className="text-foreground">{fidelity.repairedSpeakers ?? 0}</span></div>
                 </div>
@@ -184,7 +185,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <div className="font-medium mb-1">Briefing-Dauer gewinnt</div>
                 <div className="text-muted-foreground">
                   Die Gesamtdauer wurde direkt aus dem Briefing gelesen und vor dem Board-Wert angewendet.
-                  {canonicalTiming?.sceneCount ? ` Erkannte Struktur: ${canonicalTiming.sceneCount} Szenen.` : ''}
+                  {canonicalTiming?.sceneCount ? tx({ de: ` Erkannte Struktur: ${canonicalTiming.sceneCount} Szenen.`, en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }) : ''}
                 </div>
               </HoverCardContent>
             </HoverCard>
@@ -243,7 +244,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[320px] text-[11px]">
-                <div className="font-medium mb-1">Was hat die KI ergänzt?</div>
+                <div className="font-medium mb-1">{tx({ de: "Was hat die KI ergänzt?", en: "What did the AI ​​add?", es: "¿Qué añadió la IA?" })}</div>
                 <div className="text-muted-foreground space-y-1">
                   {meta?.aiFilled?.length ? (
                     <div>

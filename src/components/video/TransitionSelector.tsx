@@ -1,15 +1,16 @@
+import { tx } from "@/lib/i18nText";
 import { Label } from '@/components/ui/label';
 import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
 
 const TRANSITIONS = [
   { id: 'none', name: 'Cut', description: 'Harter Schnitt — Artlist-Standard' },
-  { id: 'crossfade', name: 'Crossfade', description: 'Sanftes Morphing zwischen Szenen' },
+  { id: 'crossfade', name: 'Crossfade', description: tx({ de: 'Sanftes Morphing zwischen Szenen', en: 'Smooth morphing between scenes', es: 'Transformación suave entre escenas' }) },
   { id: 'fade', name: 'Fade', description: 'Sanftes Ein-/Ausblenden' },
   { id: 'slide', name: 'Slide', description: 'Seitliches Gleiten' },
   { id: 'zoom', name: 'Zoom', description: 'Hinein-/Herauszoomen' },
   { id: 'wipe', name: 'Wipe', description: 'Wischbewegung' },
   { id: 'blur', name: 'Blur', description: 'Weichzeichner-Übergang' },
-  { id: 'push', name: 'Push', description: 'Szene schiebt Szene' },
+  { id: 'push', name: 'Push', description: tx({ de: 'Szene schiebt Szene', en: 'Scene pushes scene', es: 'La escena empuja la escena' }) },
 ] as const;
 
 interface TransitionSelectorProps {

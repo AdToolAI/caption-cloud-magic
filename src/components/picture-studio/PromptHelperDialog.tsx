@@ -152,7 +152,7 @@ export function PromptHelperDialog({
             )}
 
             <div className="space-y-2">
-              <Label className="text-xs">Was willst du? (beliebige Sprache)</Label>
+              <Label className="text-xs">{tx({ de: "Was willst du? (beliebige Sprache)", en: "What do you want? (any language)", es: "¿Qué deseas? (cualquier idioma)" })}</Label>
               <Textarea
                 value={userText}
                 onChange={(e) => setUserText(e.target.value)}

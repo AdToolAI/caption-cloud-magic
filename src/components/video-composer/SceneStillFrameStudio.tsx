@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Stage 2 — Frame-First UI for Composer SceneCard
 //
 // Renders a "Generate still frames" button below the scene's prompt area.
@@ -56,7 +57,7 @@ export default function SceneStillFrameStudio({
     if (!prompt?.trim()) {
       toast.error(
         language === 'de'
-          ? 'Erst einen Prompt schreiben.'
+          ? tx({ de: 'Erst einen Prompt schreiben.', en: 'Write a prompt first.', es: 'Primero escriba un mensaje.' })
           : language === 'es'
           ? 'Escribe primero un prompt.'
           : 'Write a prompt first.',
@@ -98,7 +99,7 @@ export default function SceneStillFrameStudio({
       toast.error(
         e?.message?.includes('402')
           ? language === 'de' ? 'AI-Credits aufgebraucht' : 'AI credits exhausted'
-          : e?.message ?? (language === 'de' ? 'Generierung fehlgeschlagen' : 'Generation failed'),
+          : e?.message ?? (language === 'de' ? tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }) : 'Generation failed'),
       );
     } finally {
       setLoading(false);
@@ -130,7 +131,7 @@ export default function SceneStillFrameStudio({
           </span>
           <span className="text-[9px] text-muted-foreground">
             {language === 'de'
-              ? '— erst stillen Frame prüfen, dann Video rendern'
+              ? tx({ de: '— erst stillen Frame prüfen, dann Video rendern', en: '— first check the still frame, then render the video', es: '— primero verifique la imagen fija y luego renderice el video' })
               : language === 'es'
               ? '— revisa el fotograma antes de renderizar'
               : '— inspect a still before burning video credits'}

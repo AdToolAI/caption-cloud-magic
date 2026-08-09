@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -41,7 +42,7 @@ const SHORTCUTS: Shortcut[] = [
   // Selection
   { keys: ['⌘', 'A'], label: 'Alles auswählen', category: 'Selection' },
   { keys: ['⇧', 'Klick'], label: 'Range-Select', category: 'Selection' },
-  { keys: ['⌘', 'Klick'], label: 'Zur Auswahl hinzufügen', category: 'Selection' },
+  { keys: ['⌘', 'Klick'], label: tx({ de: 'Zur Auswahl hinzufügen', en: 'Add to selection', es: 'Añadir a la selección' }), category: 'Selection' },
   { keys: ['Esc'], label: 'Auswahl aufheben', category: 'Selection' },
 
   // Navigation

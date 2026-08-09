@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -81,7 +82,7 @@ export default function LocationLightingGrid({
         toast.success(`„${preset.label}" generiert ✨`);
         await reload();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Generierung fehlgeschlagen';
+        const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });
         toast.error(msg);
       } finally {
         setGeneratingVibe(null);

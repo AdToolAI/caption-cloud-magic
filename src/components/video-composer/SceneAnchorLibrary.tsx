@@ -24,7 +24,7 @@ interface Props {
 }
 
 const TXT = {
-  de: { title: 'Quick-Anker', last: 'Letzter Frame Szene', char: 'Brand-Char', loc: 'Location', clear: 'Leeren' },
+  de: { title: 'Quick-Anker', last: tx({ de: 'Letzter Frame Szene', en: 'Last frame scene', es: 'Escena del último fotograma' }), char: 'Brand-Char', loc: 'Location', clear: 'Leeren' },
   en: { title: 'Quick anchors', last: 'Last frame Scene', char: 'Brand char', loc: 'Location', clear: 'Clear' },
   es: { title: 'Anclas rápidas', last: 'Último fotograma Escena', char: 'Personaje', loc: 'Lugar', clear: 'Borrar' },
 };

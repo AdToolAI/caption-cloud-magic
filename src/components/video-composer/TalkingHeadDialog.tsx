@@ -160,7 +160,7 @@ export default function TalkingHeadDialog({
     } catch (err) {
       toast({
         title: 'Upload-Fehler',
-        description: err instanceof Error ? err.message : 'Unbekannter Fehler',
+        description: err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: 'destructive',
       });
     } finally {
@@ -174,7 +174,7 @@ export default function TalkingHeadDialog({
       return;
     }
     if (!newPhotoUrl) {
-      toast({ title: 'Foto fehlt', description: 'Bitte lade ein Foto hoch.', variant: 'destructive' });
+      toast({ title: 'Foto fehlt', description: tx({ de: 'Bitte lade ein Foto hoch.', en: 'Please upload a photo.', es: 'Por favor sube una foto.' }), variant: 'destructive' });
       return;
     }
     if (!canAddToBriefing) return;
@@ -507,7 +507,7 @@ export default function TalkingHeadDialog({
                 id="script"
                 value={script}
                 onChange={(e) => setScript(e.target.value)}
-                placeholder="Hi, ich bin dein neuer KI-Avatar. Hier kommt mein Text..."
+                placeholder={tx({ de: "Hi, ich bin dein neuer KI-Avatar. Hier kommt mein Text...", en: "Hi, I am your new AI avatar. Here comes my text...", es: "Hola, soy tu nuevo avatar de IA. Aquí viene mi texto..." })}
                 rows={5}
                 className="mt-1"
               />
@@ -562,7 +562,7 @@ export default function TalkingHeadDialog({
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Nur in Media Library</SelectItem>
-                    <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">An Szene anhängen</div>
+                    <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">{tx({ de: "An Szene anhängen", en: "Attach to scene", es: "Adjuntar a la escena" })}</div>
                     {availableScenes.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
                     ))}
@@ -789,14 +789,14 @@ function DialogModeTab({
       }
       toast({
         title: 'Dialog gestartet',
-        description: `${results.length}/${blocks.length} Talking-Heads werden generiert (1–3 Min pro Clip).`,
+        description: tx({ de: `${results.length}/${blocks.length} Talking-Heads werden generiert (1–3 Min pro Clip).`, en: `${results.length}/${blocks.length} Talking heads are generated (1-3 min per clip).`, es: `${results.length}/${blocks.length} Se generan cabezas parlantes (1-3 minutos por clip).` }),
       });
       onSuccess(results);
     } catch (e) {
       console.error('[DialogMode] error', e);
       toast({
         title: 'Fehler',
-        description: e instanceof Error ? e.message : 'Generierung fehlgeschlagen',
+        description: e instanceof Error ? e.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }),
         variant: 'destructive',
       });
     } finally {

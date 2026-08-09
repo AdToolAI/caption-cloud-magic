@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Unified per-scene asset picker for the Composer storyboard.
 //
 // Visually a continuation of the existing CharacterCastPicker — same chip-row
@@ -311,7 +312,7 @@ export function UnifiedAssetPicker({
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     {lang === 'de'
-                      ? 'Aus Foto erstellen (KI)…'
+                      ? tx({ de: 'Aus Foto erstellen (KI)…', en: 'Create from Photo (AI)…', es: 'Crear a partir de una foto (AI)…' })
                       : lang === 'es'
                       ? 'Crear desde foto (IA)…'
                       : 'Create from photo (AI)…'}

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useTemplateCollaboration } from '@/hooks/useTemplateCollaboration';
 import { Card } from '@/components/ui/card';
@@ -39,7 +40,7 @@ export const TemplateComments = ({ templateId }: TemplateCommentsProps) => {
           <Textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Kommentar hinzufügen..."
+            placeholder={tx({ de: "Kommentar hinzufügen...", en: "Add comment...", es: "Añadir comentario..." })}
             className="flex-1 min-h-[80px]"
           />
           <Button

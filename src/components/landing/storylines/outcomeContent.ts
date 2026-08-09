@@ -66,7 +66,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
         durationMs: 4800,
         copy: S(
           ["Schritt 02 · Slot-Auto-Pick", "Step 02 · Slot Auto-Pick", "Paso 02 · Auto-Slot"],
-          ["Die besten Slots werden vorgeschlagen.", "The strongest slots get pre-picked.", "Los mejores slots se preseleccionan."],
+          [tx({ de: "Die besten Slots werden vorgeschlagen.", en: "The best slots are suggested.", es: "Se sugieren las mejores tragamonedas." }), "The strongest slots get pre-picked.", "Los mejores slots se preseleccionan."],
           [
             tx({ de: "AdTool AI rankt jeden Zeitslot nach Reach-Potenzial und pickt die stärksten automatisch — du bestätigst mit einem Klick.", en: "AdTool AI ranks each time slot by reach potential and automatically picks the strongest ones — you confirm with a click.", es: "AdTool AI clasifica cada franja horaria por potencial de alcance y selecciona automáticamente las más fuertes; tú confirmas con un clic." }),
             "AdTool AI ranks every time-slot by reach potential and auto-picks the strongest — you confirm with one click.",
@@ -79,9 +79,9 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
         durationMs: 5000,
         copy: S(
           ["Schritt 03 · Kanal-Matrix", "Step 03 · Channel matrix", "Paso 03 · Matriz de canal"],
-          ["Ein Post, alle Formate.", "One post, every format.", "Un post, todos los formatos."],
+          [tx({ de: "Ein Post, alle Formate.", en: "One post, all formats.", es: "Una publicación, todos los formatos." }), "One post, every format.", "Un post, todos los formatos."],
           [
-            "9:16, 1:1, 16:9, Stories — die Matrix zeigt sofort, welches Format auf welchem Kanal live geht. Kein Copy-Paste-Chaos.",
+            tx({ de: "9:16, 1:1, 16:9, Stories — die Matrix zeigt sofort, welches Format auf welchem Kanal live geht. Kein Copy-Paste-Chaos.", en: "9:16, 1:1, 16:9, Stories — the matrix immediately shows which format goes live on which channel. No copy-paste chaos.", es: "9:16, 1:1, 16:9, Historias: la matriz muestra inmediatamente qué formato se publica en qué canal. No hay caos de copiar y pegar." }),
             "9:16, 1:1, 16:9, Stories — the matrix shows exactly which format goes live on which channel. No copy-paste chaos.",
             "9:16, 1:1, 16:9, Stories — la matriz muestra qué formato va a cada canal. Sin caos de copy-paste.",
           ],
@@ -92,7 +92,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
         durationMs: 5200,
         copy: S(
           ["Schritt 04 · Wiederholung", "Step 04 · Recurrence", "Paso 04 · Recurrencia"],
-          ["Serien laufen wie ein Uhrwerk.", "Series run like clockwork.", "Series como reloj suizo."],
+          [tx({ de: "Serien laufen wie ein Uhrwerk.", en: "Series run like clockwork.", es: "Las series funcionan como un reloj." }), "Series run like clockwork.", "Series como reloj suizo."],
           [
             tx({ de: "Wöchentlich, zweiwöchentlich, saisonal — Serien laufen automatisch weiter. Ein neues Skript reicht, der Slot ist schon reserviert.", en: "Weekly, bi-weekly, seasonally — series continue automatically. A new script is enough, the slot is already reserved.", es: "Semanal, quincenal, estacional: las series continúan automáticamente. Basta con un nuevo guion, la franja ya está reservada." }),
             "Weekly, bi-weekly, seasonal — series just keep running. Drop a new script, the slot is already booked.",
@@ -139,7 +139,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 02 · CTR Δ", "Step 02 · CTR Δ", "Paso 02 · CTR Δ"],
           ["Varianten kämpfen um jeden Klick.", "Variants fight for every click.", "Las variantes luchan por cada clic."],
           [
-            "Jede Variante wird gegen die anderen gemessen. Du siehst sofort, welche Version das Momentum hat.",
+            tx({ de: "Jede Variante wird gegen die anderen gemessen. Du siehst sofort, welche Version das Momentum hat.", en: "Each variant is measured against the others. You can immediately see which version has the momentum.", es: "Cada variante se compara con las demás. Puedes ver inmediatamente qué versión tiene el impulso." }),
             "Every variant is benchmarked against the others. You see instantly which one has momentum.",
             "Cada variante se compara con las otras. Ves al instante cuál tiene momentum.",
           ],
@@ -152,7 +152,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 03 · Watch-Time", "Step 03 · Watch-time", "Paso 03 · Watch-time"],
           ["Kurven verraten Hooks & Drop-offs.", "Curves reveal hooks & drop-offs.", "Las curvas revelan hooks y drop-offs."],
           [
-            "Die Watch-Time-Kurve markiert genau, wo Zuschauer bleiben und wo sie abspringen — perfekt, um Hooks und Cuts zu tunen.",
+            tx({ de: "Die Watch-Time-Kurve markiert genau, wo Zuschauer bleiben und wo sie abspringen — perfekt, um Hooks und Cuts zu tunen.", en: "The watch time curve marks exactly where viewers stay and where they drop out - perfect for tuning hooks and cuts.", es: "La curva de tiempo de visualización marca exactamente dónde permanecen los espectadores y dónde abandonan, perfecto para afinar ganchos y cortes." }),
             "The watch-time curve pinpoints exactly where viewers stay and drop — perfect for tuning hooks and cuts.",
             "La curva de watch-time marca dónde se quedan y dónde saltan — ideal para afinar hooks y cortes.",
           ],
@@ -163,7 +163,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
         durationMs: 4500,
         copy: S(
           ["Schritt 04 · A/B Duel", "Step 04 · A/B duel", "Paso 04 · Duelo A/B"],
-          ["A gegen B — ohne Ratespiel.", "A vs. B — no guesswork.", "A contra B — sin adivinar."],
+          [tx({ de: "A gegen B — ohne Ratespiel.", en: "A versus B — no guessing game.", es: "A versus B: no hay juego de adivinanzas." }), "A vs. B — no guesswork.", "A contra B — sin adivinar."],
           [
             tx({ de: "Zwei Cuts starten parallel, das schwächere Video wird automatisch stumm geschaltet. Nur der Gewinner bekommt Budget.", en: "Two cuts start in parallel, the weaker video is automatically muted. Only the winner gets the budget.", es: "Dos cortes se inician en paralelo, el vídeo más débil se silencia automáticamente. Solo el ganador recibe el presupuesto." }),
             "Two cuts launch in parallel, the weaker one is auto-muted. Only the winner gets more budget.",
@@ -176,7 +176,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
         durationMs: 5000,
         copy: S(
           ["Schritt 05 · Insight-Cards", "Step 05 · Insight cards", "Paso 05 · Insight cards"],
-          ["Konkrete Anweisungen, keine Charts.", "Concrete actions, not just charts.", "Instrucciones concretas, no solo gráficos."],
+          [tx({ de: "Konkrete Anweisungen, keine Charts.", en: "Concrete instructions, no charts.", es: "Instrucciones concretas, sin gráficos." }), "Concrete actions, not just charts.", "Instrucciones concretas, no solo gráficos."],
           [
             "Statt Charts liefert AdTool AI klare Anweisungen: Hook @0,8s stärker, CTA @6,2s, Cut @12s. Umsetzen, veröffentlichen, weiter.",
             "Instead of charts, AdTool AI gives concrete calls: sharper hook @0.8s, CTA @6.2s, cut @12s. Apply, publish, move on.",
@@ -208,9 +208,9 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
         durationMs: 4800,
         copy: S(
           ["Schritt 02 · Auto-Publish", "Step 02 · Auto-publish", "Paso 02 · Auto-publish"],
-          ["Ein Video, alle Kanäle live.", "One video, all channels live.", "Un video, todos los canales en vivo."],
+          [tx({ de: "Ein Video, alle Kanäle live.", en: "One video, all channels live.", es: "Un video, todos los canales en vivo." }), "One video, all channels live.", "Un video, todos los canales en vivo."],
           [
-            "Rendern, formatieren, watermarken, publishen — alles läuft automatisch. Du bestätigst nur einmal.",
+            tx({ de: "Rendern, formatieren, watermarken, publishen — alles läuft automatisch. Du bestätigst nur einmal.", en: "Rendering, formatting, watermarking, publishing — everything happens automatically. You only confirm once.", es: "Renderizado, formateo, marcas de agua, publicación: todo sucede automáticamente. Sólo confirmas una vez." }),
             "Render, format, watermark, publish — all automated. You confirm once.",
             "Renderizar, formatear, watermark, publicar — todo automático. Confirmas una vez.",
           ],

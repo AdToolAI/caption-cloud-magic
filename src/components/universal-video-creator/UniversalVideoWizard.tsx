@@ -71,7 +71,7 @@ export function UniversalVideoWizard() {
   // Steps for manual mode
   const STEPS_MANUAL = [
     { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
-    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
+    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || tx({ de: 'Lade mindestens 4 Produktbilder hoch', en: 'Upload at least 4 product images', es: 'Sube al menos 4 imágenes de productos' }) }] : []),
     { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
     { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
     { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') },
@@ -88,7 +88,7 @@ export function UniversalVideoWizard() {
   // Steps for full-service mode  
   const STEPS_FULL_SERVICE = [
     { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
-    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
+    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || tx({ de: 'Lade mindestens 4 Produktbilder hoch', en: 'Upload at least 4 product images', es: 'Sube al menos 4 imágenes de productos' }) }] : []),
     { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
     { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
     { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') },
@@ -281,7 +281,7 @@ export function UniversalVideoWizard() {
                 generationMode === 'manual' ? STEPS_MANUAL :
                 [
                   { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
-                  ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
+                  ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || tx({ de: 'Lade mindestens 4 Produktbilder hoch', en: 'Upload at least 4 product images', es: 'Sube al menos 4 imágenes de productos' }) }] : []),
                   { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
                   { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
                   { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') }

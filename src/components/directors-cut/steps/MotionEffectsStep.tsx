@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Play } from 'lucide-react';
 import { KenBurnsEffect, KenBurnsKeyframe } from '../features/KenBurnsEffect';
@@ -77,7 +78,7 @@ export function MotionEffectsStep({
       transitions={transitions}
       audio={audio}
       title="Motion & Kamera"
-      description="Ken Burns Effekt und dynamische Geschwindigkeitseffekte"
+      description={tx({ de: "Ken Burns Effekt und dynamische Geschwindigkeitseffekte", en: "Ken Burns effect and dynamic speed effects", es: "Efecto Ken Burns y efectos de velocidad dinámicos." })}
       icon={Play}
       speedKeyframes={speedKeyframes.map(k => ({ time: k.time, speed: k.speed, sceneId: k.sceneId }))}
       kenBurns={kenBurnsKeyframes}

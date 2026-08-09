@@ -79,7 +79,7 @@ const t = {
     resetAll: 'Alles zurücksetzen',
     done: 'Fertig',
     preview: 'Vorschau',
-    previewEmpty: 'Noch keine Cinematography gesetzt.',
+    previewEmpty: tx({ de: 'Noch keine Cinematography gesetzt.', en: 'No cinematography set yet.', es: 'Aún no se ha establecido ninguna cinematografía.' }),
     axisFraming: 'Bildausschnitt',
     axisAngle: 'Winkel',
     axisMovement: 'Bewegung',

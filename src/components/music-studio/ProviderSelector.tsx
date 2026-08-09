@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Activity, Wand2, Music2, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -49,7 +50,7 @@ export function ProviderSelector({ value, onChange, currencySymbol = '€', disa
               type="button"
               disabled={isDisabled}
               onClick={() => onChange(id as MusicEngineId)}
-              title={engine.comingSoon ? 'Preview-Access wird in Kürze freigeschaltet' : undefined}
+              title={engine.comingSoon ? tx({ de: 'Preview-Access wird in Kürze freigeschaltet', en: 'Preview access will be activated shortly', es: 'El acceso a la vista previa se activará en breve' }) : undefined}
               className={cn(
                 'group relative text-left rounded-lg overflow-hidden transition-all',
                 'border backdrop-blur-sm',

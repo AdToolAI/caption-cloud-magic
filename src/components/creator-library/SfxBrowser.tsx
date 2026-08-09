@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SfxBrowser — Sound-Effects tab. Uses existing `search-sfx-library`
  * edge function and persists favorites in `user_audio_library` with
@@ -73,7 +74,7 @@ export default function SfxBrowser() {
       setResults(list);
     } catch (err) {
       toast({
-        title: 'SFX-Suche fehlgeschlagen',
+        title: tx({ de: 'SFX-Suche fehlgeschlagen', en: 'SFX search failed', es: 'La búsqueda de SFX falló' }),
         description: err instanceof Error ? err.message : '',
         variant: 'destructive',
       });
@@ -93,7 +94,7 @@ export default function SfxBrowser() {
     const a = new Audio(t.preview_url);
     a.volume = 0.8;
     a.onended = () => setPlayingId(null);
-    a.play().catch(() => toast({ title: 'Preview nicht abspielbar', variant: 'destructive' }));
+    a.play().catch(() => toast({ title: tx({ de: 'Preview nicht abspielbar', en: 'Preview cannot be played', es: 'No se puede reproducir la vista previa' }), variant: 'destructive' }));
     audioRef.current = a;
     setPlayingId(t.id);
   }
@@ -122,7 +123,7 @@ export default function SfxBrowser() {
     if (quota.exceeded) {
       toast({
         title: 'Monatslimit erreicht',
-        description: 'Upgrade für unbegrenzte Downloads.',
+        description: tx({ de: 'Upgrade für unbegrenzte Downloads.', en: 'Upgrade for unlimited downloads.', es: 'Actualice para descargas ilimitadas.' }),
         variant: 'destructive',
       });
       return;
@@ -140,12 +141,12 @@ export default function SfxBrowser() {
       tags: t.tags ?? [],
     });
     if (error) {
-      toast({ title: 'Speichern fehlgeschlagen', description: error.message, variant: 'destructive' });
+      toast({ title: tx({ de: 'Speichern fehlgeschlagen', en: 'Save failed', es: 'Error al guardar' }), description: error.message, variant: 'destructive' });
       return;
     }
     setFavorites(new Set([...favorites, key]));
     quota.refresh();
-    toast({ title: 'SFX gespeichert' });
+    toast({ title: tx({ de: 'SFX gespeichert', en: 'SFX saved', es: 'SFX guardado' }) });
   }
 
   return (

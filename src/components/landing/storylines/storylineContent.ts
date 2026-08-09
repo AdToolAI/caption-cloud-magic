@@ -209,7 +209,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       UIComponent: MotionTimelineVisual,
       copy: S(
         ["Speaker-Timeline", "Speaker timeline", "Timeline de voces"],
-        ["Wer spricht wann — auf einen Blick.", "Who speaks when — at a glance.", "Quién habla cuándo — de un vistazo."],
+        [tx({ de: "Wer spricht wann — auf einen Blick.", en: "Who speaks when – at a glance.", es: "Quién habla y cuándo: de un vistazo." }), "Who speaks when — at a glance.", "Quién habla cuándo — de un vistazo."],
         [
           tx({ de: "Weise Zeilen per Klick einem Sprecher zu. Emotionen, Pausen und Überlappungen wandern in eine Timeline, die Motion Studio direkt in eine Regieanweisung übersetzt.", en: "Assign lines to a speaker with a click. Emotions, pauses, and overlaps are transferred to a timeline that Motion Studio directly translates into a directorial instruction.", es: "Asigna líneas a un orador con un clic. Las emociones, pausas y superposiciones se transfieren a una línea de tiempo que Motion Studio traduce directamente en una instrucción de dirección." }),
           "Assign lines to a speaker with one click. Emotions, pauses and overlaps land on a timeline that Motion Studio translates straight into direction.",
@@ -304,7 +304,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Format-Flex", "Format flex", "Formato flexible"],
         ["Vertikal, Quadrat, Landscape.", "Vertical, square, landscape.", "Vertical, cuadrado, landscape."],
         [
-          "9:16 für Reels, 1:1 für Feed, 16:9 für YouTube — dieselbe Idee, drei Formate, ein Render-Job. Kein Neu-Framing per Hand.",
+          tx({ de: "9:16 für Reels, 1:1 für Feed, 16:9 für YouTube — dieselbe Idee, drei Formate, ein Render-Job. Kein Neu-Framing per Hand.", en: "9:16 for Reels, 1:1 for Feed, 16:9 for YouTube — same idea, three formats, one render job. No re-framing by hand.", es: "9:16 para Reels, 1:1 para Feed, 16:9 para YouTube: la misma idea, tres formatos, un trabajo de renderizado. No es necesario volver a enmarcar a mano." }),
           "9:16 for reels, 1:1 for feed, 16:9 for YouTube — same idea, three formats, one render job. No manual re-framing.",
           "9:16 para reels, 1:1 para feed, 16:9 para YouTube — misma idea, tres formatos, un solo render. Sin reencuadre manual.",
         ],
@@ -341,7 +341,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       imageSrc: videoS6,
       copy: S(
         ["Hero-Shot", "Hero shot", "Plano héroe"],
-        ["Vom Prompt zum Werbespot.", "From prompt to ad spot.", "Del prompt al spot."],
+        [tx({ de: "Vom Prompt zum Werbespot.", en: "From prompt to commercial.", es: "De rápido a comercial." }), "From prompt to ad spot.", "Del prompt al spot."],
         [
           tx({ de: "Was früher einen Dreh brauchte, entsteht in Minuten: Ein Hero-Shot mit Cast, Musik, VO und Format — bereit für Meta, TikTok, YouTube.", en: "What used to take a shoot, now takes minutes: A hero shot with cast, music, VO, and format — ready for Meta, TikTok, YouTube.", es: "Lo que antes requería una sesión de fotos, ahora se crea en minutos: Un hero shot con elenco, música, voz en off y formato — listo para Meta, TikTok, YouTube." }),
           "What used to need a shoot now takes minutes: a hero shot with cast, music, VO and format — ready for Meta, TikTok, YouTube.",
@@ -369,7 +369,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       UIComponent: PictureAnchorVisual,
       copy: S(
         ["Brand-Anchor", "Brand anchor", "Ancla de marca"],
-        ["Farben, Font-Gefühl, Bildlogik gespeichert.", "Colors, typographic feel, visual logic saved.", "Colores, tipografía, lógica visual guardadas."],
+        [tx({ de: "Farben, Font-Gefühl, Bildlogik gespeichert.", en: "Colors, font feel, image logic saved.", es: "Colores, sensación de fuente y lógica de imagen guardada." }), "Colors, typographic feel, visual logic saved.", "Colores, tipografía, lógica visual guardadas."],
         [
           tx({ de: "Definiere Anchor-Frames für deine Marke. Jedes neue Bild bleibt in derselben Palette, Kontrastkurve und Bildsprache — Konsistenz statt Zufall.", en: "Define anchor frames for your brand. Every new image stays within the same palette, contrast curve, and visual language — consistency instead of randomness.", es: "Define fotogramas ancla para tu marca. Cada nueva imagen se mantiene en la misma paleta, curva de contraste y lenguaje visual — consistencia en lugar de aleatoriedad." }),
           "Define anchor frames for your brand. Every new image stays in the same palette, contrast and visual language — consistency, not luck.",
@@ -462,7 +462,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       imageSrc: musicS3,
       copy: S(
         ["Podcast-Intro", "Podcast intro", "Intro de podcast"],
-        ["Studio-Sound ohne Studio-Buchung.", "Studio sound, no studio booking.", "Sonido de estudio, sin reservar estudio."],
+        [tx({ de: "Studio-Sound ohne Studio-Buchung.", en: "Studio sound without studio booking.", es: "Sonido de estudio sin reserva de estudio." }), "Studio sound, no studio booking.", "Sonido de estudio, sin reservar estudio."],
         [
           tx({ de: "Intro, Outro, Bumper, Transition — jeder Baustein deines Podcasts entsteht in Minuten mit klarer Klangfarbe und dauerhafter Wiedererkennbarkeit.", en: "Intro, outro, bumper, transition — every building block of your podcast is created in minutes with clear timbre and lasting recognizability.", es: "Intro, outro, bumper, transición — cada componente de tu podcast se crea en minutos con un timbre claro y una reconocibilidad duradera." }),
           "Intro, outro, bumper, transition — every podcast building block in minutes, with a clean tone and lasting recognition.",
@@ -611,7 +611,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Multi-Provider · 02", "Multi-provider · 02", "Multi-provider · 02"],
-        ["Wir routen zum besten Modell.", "We route to the best model.", "Enrutamos al mejor modelo."],
+        [tx({ de: "Wir routen zum besten Modell.", en: "We route to the best model.", es: "Nos encaminamos hacia el mejor modelo." }), "We route to the best model.", "Enrutamos al mejor modelo."],
         [
           tx({ de: "Für jeden Job scoren wir Provider live nach Qualität, Preis und Latenz. Der Gewinner rendert — vollautomatisch.", en: "For every job, we score providers live based on quality, price, and latency. The winner renders — fully automatically.", es: "Para cada trabajo, puntuamos a los proveedores en vivo según calidad, precio y latencia. El ganador renderiza — de forma totalmente automática." }),
           "For every job we score providers live by quality, price and latency. The winner renders — fully automatic.",
@@ -639,7 +639,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 4800,
       copy: S(
         ["Multi-Provider · 04", "Multi-provider · 04", "Multi-provider · 04"],
-        ["Cost-Guard schützt dein Budget.", "Cost-Guard protects your budget.", "Cost-Guard protege tu presupuesto."],
+        [tx({ de: "Cost-Guard schützt dein Budget.", en: "Cost Guard protects your budget.", es: "Cost Guard protege su presupuesto." }), "Cost-Guard protects your budget.", "Cost-Guard protege tu presupuesto."],
         [
           tx({ de: "Jeder Render bekommt eine harte Budget-Kappe. Sobald die Prognose kippt, routen wir zum günstigeren Provider oder pausieren die Queue.", en: "Every render gets a hard budget cap. As soon as the forecast shifts, we route to the cheaper provider or pause the queue.", es: "Cada render tiene un límite de presupuesto estricto. Tan pronto como la previsión cambie, redirigimos al proveedor más barato o pausamos la cola." }),
           "Every render has a hard budget cap. The moment the forecast tips, we route to a cheaper provider or pause the queue.",
@@ -653,7 +653,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 4800,
       copy: S(
         ["Multi-Provider · 05", "Multi-provider · 05", "Multi-provider · 05"],
-        ["Sekunden schlagen Minuten.", "Seconds beat minutes.", "Segundos vencen minutos."],
+        [tx({ de: "Sekunden schlagen Minuten.", en: "Seconds beat minutes.", es: "Los segundos ganan a los minutos." }), "Seconds beat minutes.", "Segundos vencen minutos."],
         [
           tx({ de: "Bei Deadline-Jobs zählt Latenz mehr als Preis. Der Router priorisiert automatisch die schnellste Route — perfekt für Reactive-Content.", en: "For deadline jobs, latency matters more than price. The router automatically prioritizes the fastest route — perfect for reactive content.", es: "Para trabajos con fecha límite, la latencia importa más que el precio. El enrutador prioriza automáticamente la ruta más rápida — perfecto para contenido reactivo." }),
           "For deadline jobs, latency beats price. The router automatically picks the fastest route — perfect for reactive content.",
@@ -669,7 +669,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
         ["Multi-Provider · 06", "Multi-provider · 06", "Multi-provider · 06"],
         ["Ein Output-Format. Immer.", "One output format. Always.", "Un formato de salida. Siempre."],
         [
-          "Egal welcher Provider — du bekommst dieselbe Qualität, denselben Codec, denselben Farbraum. Deine Timeline bleibt konsistent.",
+          tx({ de: "Egal welcher Provider — du bekommst dieselbe Qualität, denselben Codec, denselben Farbraum. Deine Timeline bleibt konsistent.", en: "No matter which provider, you get the same quality, the same codec, the same color space. Your timeline stays consistent.", es: "No importa qué proveedor, obtendrás la misma calidad, el mismo códec y el mismo espacio de color. Su línea de tiempo se mantiene constante." }),
           "Whichever provider — you get the same quality, codec and colour space. Your timeline stays consistent.",
           "Sea cual sea el proveedor — misma calidad, mismo códec, mismo color. Tu timeline se mantiene consistente.",
         ],
@@ -697,7 +697,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Founders · 02", "Founders · 02", "Founders · 02"],
-        ["20 % auf KI-Credits — 24 Monate.", "20% off AI credits — for 24 months.", "20 % en créditos IA — 24 meses."],
+        [tx({ de: "20 % auf KI-Credits — 24 Monate.", en: "20% on AI credits — 24 months.", es: "20 % en créditos de IA: 24 meses." }), "20% off AI credits — for 24 months.", "20 % en créditos IA — 24 meses."],
         [
           tx({ de: "Das Abo kostet 14,99 € — für alle gleich. Als Founder bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits.", en: "The subscription costs €14.99 — the same for everyone. As a Founder, you get a 20% discount on every AI credit purchase for 24 months.", es: "La suscripción cuesta 14,99 € — igual para todos. Como Founder, obtienes un 20% de descuento en cada compra de créditos de IA durante 24 meses." }),
           "The subscription is €14.99 for everyone. As a founder you get 20% off every AI credit purchase for 24 months.",
@@ -739,7 +739,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Founders · 05", "Founders · 05", "Founders · 05"],
-        ["Jeder Sitz ist sichtbar.", "Every seat is visible.", "Cada plaza es visible."],
+        [tx({ de: "Jeder Sitz ist sichtbar.", en: "Every seat is visible.", es: "Cada asiento es visible." }), "Every seat is visible.", "Cada plaza es visible."],
         [
           tx({ de: "Wir zeigen die Founder-Map live: wie viele Plätze bereits vergeben sind und wie viele noch frei. Kein Fake-Countdown, echte Zahlen.", en: "We show the Founder map live: how many spots are already taken and how many are still free. No fake countdown, real numbers.", es: "Mostramos el mapa de Founders en vivo: cuántas plazas ya están ocupadas y cuántas quedan libres. Sin cuenta atrás falsa, números reales." }),
           "We show the founder map live: how many seats are taken and how many are still open. No fake countdown, real numbers.",
@@ -753,7 +753,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5000,
       copy: S(
         ["Founders · 06", "Founders · 06", "Founders · 06"],
-        ["− 90,96 € über 24 Monate.", "− €90.96 across 24 months.", "− 90,96 € en 24 meses."],
+        [tx({ de: "− 90,96 € über 24 Monate.", en: "− €90.96 over 24 months.", es: "− 90,96 € durante 24 meses." }), "− €90.96 across 24 months.", "− 90,96 € en 24 meses."],
         [
           tx({ de: "Rechnet man Beta-Preis plus 20 % Founder-Rabatt gegen den regulären Tarif, sparst du über 24 Monate 90,96 €. Bei Kündigung ist der Vorteil weg.", en: "If you compare the beta price plus 20% Founder discount against the regular rate, you save €90.96 over 24 months. If you cancel, the benefit is gone.", es: "Si comparas el precio beta más el 20% de descuento de Founder con la tarifa regular, ahorras 90,96 € en 24 meses. Si cancelas, el beneficio desaparece." }),
           "Beta price plus 20 % founder discount vs. the regular tariff: you save €90.96 across 24 months. Cancel and the perk is gone.",

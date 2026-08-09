@@ -116,7 +116,7 @@ export function SpeakerMappingBar({
       const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
       await audio.play();
     } catch (e: any) {
-      toast({ title: 'Preview fehlgeschlagen', description: e?.message ?? String(e), variant: 'destructive' });
+      toast({ title: tx({ de: 'Preview fehlgeschlagen', en: 'Preview failed', es: 'Error en la vista previa' }), description: e?.message ?? String(e), variant: 'destructive' });
     } finally {
       setPreviewing(null);
     }

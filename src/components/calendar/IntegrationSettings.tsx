@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -104,7 +105,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
         .eq("workspace_id", workspaceId);
     } catch (error: any) {
       console.error("Sync failed:", error);
-      toast.error("❌ Sync fehlgeschlagen");
+      toast.error(tx({ de: "❌ Sync fehlgeschlagen", en: "❌ Sync failed", es: "❌ Falló la sincronización" }));
     } finally {
       setSyncing(false);
     }

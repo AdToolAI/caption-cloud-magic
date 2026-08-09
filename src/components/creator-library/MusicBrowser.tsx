@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * MusicBrowser — curated royalty-free music search (Jamendo via
  * `search-stock-music`). This is the library counterpart to AI-Music-
@@ -74,7 +75,7 @@ export default function MusicBrowser() {
     const audio = new Audio(track.preview_url);
     audio.volume = 0.7;
     audio.onended = () => setPlayingId(null);
-    audio.play().catch(() => toast({ title: 'Preview nicht abspielbar', variant: 'destructive' }));
+    audio.play().catch(() => toast({ title: tx({ de: 'Preview nicht abspielbar', en: 'Preview cannot be played', es: 'No se puede reproducir la vista previa' }), variant: 'destructive' }));
     audioRef.current = audio;
     setPlayingId(track.id);
   }
@@ -98,7 +99,7 @@ export default function MusicBrowser() {
     if (quota.exceeded) {
       toast({
         title: 'Monatslimit erreicht',
-        description: 'Upgrade für unbegrenzte Downloads.',
+        description: tx({ de: 'Upgrade für unbegrenzte Downloads.', en: 'Upgrade for unlimited downloads.', es: 'Actualice para descargas ilimitadas.' }),
         variant: 'destructive',
       });
       return;
@@ -120,7 +121,7 @@ export default function MusicBrowser() {
       tags: track.tags,
     });
     if (error) {
-      toast({ title: 'Speichern fehlgeschlagen', description: error.message, variant: 'destructive' });
+      toast({ title: tx({ de: 'Speichern fehlgeschlagen', en: 'Save failed', es: 'Error al guardar' }), description: error.message, variant: 'destructive' });
       return;
     }
     setFavorites(new Set([...favorites, track.id]));

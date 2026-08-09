@@ -27,7 +27,7 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
 
 const CONTENT_TYPE_PLACEHOLDERS: Record<string, string> = {
   ad: tx({ de: 'Beschreibe dein Produkt und Zielgruppe... z.B. "Innovative Fitness-App für vielbeschäftigte Berufstätige"', en: 'Describe your product and target audience... e.g. "Innovative fitness app for busy professionals"', es: 'Describe tu producto y público objetivo... p. ej. "Aplicación de fitness innovadora para profesionales ocupados"' }),
-  story: 'Welche Story möchtest du erzählen? z.B. "Meine Morgenroutine als Entrepreneur"',
+  story: tx({ de: 'Welche Story möchtest du erzählen? z.B. "Meine Morgenroutine als Entrepreneur"', en: 'What story do you want to tell? e.g. “My morning routine as an entrepreneur”', es: '¿Qué historia quieres contar? p.ej. “Mi rutina matutina como emprendedora”' }),
   reel: tx({ de: 'Was ist deine Hook-Idee? z.B. "3 Fehler, die jeder beim Kochen macht"', en: 'What\'s your hook idea? e.g. "3 mistakes everyone makes when cooking"', es: '¿Cuál es tu idea de gancho? p. ej. "3 errores que todo el mundo comete al cocinar"' }),
   tutorial: 'Was soll das Tutorial zeigen? z.B. "Wie man in 5 Minuten professionelle Fotos macht"',
   testimonial: 'Beschreibe die Erfolgsgeschichte... z.B. "Wie ich 10kg in 3 Monaten abgenommen habe"',
@@ -64,7 +64,7 @@ export const AIScriptGenerator = ({ onGenerate, fieldLabel = 'Text', contentType
     if (!prompt.trim()) {
       toast({
         title: 'Fehler',
-        description: 'Bitte beschreibe, worum es in deinem Video gehen soll',
+        description: tx({ de: 'Bitte beschreibe, worum es in deinem Video gehen soll', en: 'Please describe what your video should be about', es: 'Por favor describe de qué debería tratar tu vídeo.' }),
         variant: 'destructive'
       });
       return;
@@ -179,7 +179,7 @@ ${script.cta}`;
           </div>
 
           <div className="space-y-2">
-            <Label>Dauer (Sekunden)</Label>
+            <Label>{tx({ de: "Dauer (Sekunden)", en: "Duration (seconds)", es: "Duración (segundos)" })}</Label>
             <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))} disabled={loading}>
               <SelectTrigger>
                 <SelectValue />

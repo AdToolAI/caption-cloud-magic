@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -92,7 +93,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
         <div className="space-y-6 py-4">
           {/* Platform Selection */}
           <div className="space-y-3">
-            <Label>Plattformen auswählen</Label>
+            <Label>{tx({ de: "Plattformen auswählen", en: "Select platforms", es: "Seleccionar plataformas" })}</Label>
             <div className="grid grid-cols-2 gap-3">
               {platforms.map(platform => (
                 <div
@@ -159,7 +160,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
               <Label htmlFor="description">Erweiterte Beschreibung (YouTube)</Label>
               <Textarea
                 id="description"
-                placeholder="Detaillierte Beschreibung für YouTube..."
+                placeholder={tx({ de: "Detaillierte Beschreibung für YouTube...", en: "Detailed description for YouTube...", es: "Descripción detallada de YouTube..." })}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}

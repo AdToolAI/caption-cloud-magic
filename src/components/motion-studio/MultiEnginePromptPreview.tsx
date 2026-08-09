@@ -139,7 +139,7 @@ export default function MultiEnginePromptPreview({
       });
     } catch {
       toast({
-        title: t(language, 'Kopieren fehlgeschlagen', 'Copy failed', 'Falló la copia'),
+        title: t(language, tx({ de: 'Kopieren fehlgeschlagen', en: 'Copy failed', es: 'Copia fallida' }), 'Copy failed', 'Falló la copia'),
         variant: 'destructive',
       });
     }
@@ -178,7 +178,7 @@ export default function MultiEnginePromptPreview({
               {r.state === 'loading' && (
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground py-3 justify-center">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {t(language, 'Komponiere für', 'Composing for', 'Componiendo para')} {limit.label}…
+                  {t(language, tx({ de: 'Komponiere für', en: 'Compose for', es: 'Componer para' }), 'Composing for', 'Componiendo para')} {limit.label}…
                 </div>
               )}
 

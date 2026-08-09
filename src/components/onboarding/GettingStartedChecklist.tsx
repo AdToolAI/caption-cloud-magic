@@ -31,7 +31,7 @@ const stepLabels: Record<string, Record<ChecklistStep["key"], string>> = {
   de: {
     onboarding: "Studio einrichten",
     first_video: "Erstes Video produzieren",
-    social_connected: "Kanal für die Veröffentlichung verbinden",
+    social_connected: tx({ de: "Kanal für die Veröffentlichung verbinden", en: "Connect channel for publishing", es: "Conectar canal para publicar" }),
     post_planned: "Ersten Release planen",
     brand_kit: "Cast & Markenlook anlegen",
   },

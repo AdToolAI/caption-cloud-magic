@@ -341,11 +341,11 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['background-assets'] });
       onSelectAsset(assetData as BackgroundAsset);
-      toast.success(t('uc.videoImportedFromLibrary') || 'Video aus Mediathek übernommen');
+      toast.success(t('uc.videoImportedFromLibrary') || tx({ de: 'Video aus Mediathek übernommen', en: 'Video taken from media library', es: 'Vídeo tomado de la biblioteca multimedia.' }));
       setLibraryPickerOpen(false);
     } catch (err: any) {
       console.error('Library import error:', err);
-      toast.error(err.message || 'Import fehlgeschlagen');
+      toast.error(err.message || tx({ de: 'Import fehlgeschlagen', en: 'Import failed', es: 'Importación fallida' }));
     }
   };
 

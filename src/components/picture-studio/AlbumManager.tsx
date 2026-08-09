@@ -324,7 +324,7 @@ export function AlbumManager() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Neues Album erstellen</DialogTitle>
+            <DialogTitle>{tx({ de: "Neues Album erstellen", en: "Create new album", es: "Crear nuevo álbum" })}</DialogTitle>
           </DialogHeader>
           <Input
             placeholder="Album Name..."

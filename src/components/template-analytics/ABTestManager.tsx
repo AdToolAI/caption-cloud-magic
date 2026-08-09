@@ -129,7 +129,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Neuen A/B Test erstellen</DialogTitle>
+                  <DialogTitle>{tx({ de: "Neuen A/B Test erstellen", en: "Create a new A/B test", es: "Crear una nueva prueba A/B" })}</DialogTitle>
                   <DialogDescription>
                     Erstelle einen neuen Test um verschiedene Varianten zu vergleichen
                   </DialogDescription>

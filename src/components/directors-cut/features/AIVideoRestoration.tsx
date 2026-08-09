@@ -88,9 +88,9 @@ export function AIVideoRestoration({
       }
     } catch (err) {
       console.error('Restoration error:', err);
-      setError(err instanceof Error ? err.message : 'Restaurierung fehlgeschlagen');
+      setError(err instanceof Error ? err.message : tx({ de: 'Restaurierung fehlgeschlagen', en: 'Restoration failed', es: 'La restauración falló' }));
       toast({
-        title: 'Fehler bei Restaurierung',
+        title: tx({ de: 'Fehler bei Restaurierung', en: 'Restoration error', es: 'Error de restauración' }),
         description: tx({ de: 'Bitte versuche es später erneut.', en: 'Please try again later.', es: 'Por favor, inténtalo de nuevo más tarde.' }),
         variant: 'destructive'
       });
@@ -269,7 +269,7 @@ export function AIVideoRestoration({
 
           <div className="p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
-              <strong>Perfekt für:</strong> Alte Familienvideos, VHS-Aufnahmen, 
+              <strong>{tx({ de: "Perfekt für:", en: "Perfect for:", es: "Perfecto para:" })}</strong> Alte Familienvideos, VHS-Aufnahmen, 
               historisches Filmmaterial und beschädigte Aufnahmen.
             </p>
           </div>

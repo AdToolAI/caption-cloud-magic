@@ -42,7 +42,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
   const remove = async (id: string) => {
     const { error } = await supabase.from("post_designs").delete().eq("id", id);
     if (error) {
-      toast.error("Löschen fehlgeschlagen");
+      toast.error(tx({ de: "Löschen fehlgeschlagen", en: "Delete failed", es: "Error al eliminar" }));
       return;
     }
     setItems((prev) => prev.filter((i) => i.id !== id));
@@ -84,7 +84,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
                 >
                   Verwenden
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => remove(item.id)} aria-label="Vorlage löschen">
+                <Button size="icon" variant="ghost" onClick={() => remove(item.id)} aria-label={tx({ de: "Vorlage löschen", en: "Delete template", es: "Eliminar plantilla" })}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>

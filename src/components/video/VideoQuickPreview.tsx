@@ -191,7 +191,7 @@ export const VideoQuickPreview = ({
             }
           });
           
-          if (analyzeError) throw new Error('Script-Analyse fehlgeschlagen');
+          if (analyzeError) throw new Error(tx({ de: 'Script-Analyse fehlgeschlagen', en: 'Script parsing failed', es: 'Falló el análisis del script' }));
           finalSegments = data.segments || [];
         }
         
@@ -209,7 +209,7 @@ export const VideoQuickPreview = ({
             }
           });
           
-          if (voiceError) throw new Error(`Audio-Generierung fehlgeschlagen: ${segment.id}`);
+          if (voiceError) throw new Error(tx({ de: `Audio-Generierung fehlgeschlagen: ${segment.id}`, en: `Audio generation failed: ${segment.id}`, es: `Error al generar audio: ${segment.id}` }));
           
           const audioBlob = base64ToBlob(data.audioContent, 'audio/mpeg');
           const audioUrl = URL.createObjectURL(audioBlob);
@@ -573,7 +573,7 @@ export const VideoQuickPreview = ({
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
             <div className="text-center space-y-4 p-8 max-w-2xl">
               <div className="text-2xl font-bold text-white animate-fade-in">
-                {subtitleText || currentSegment?.text || 'Text wird geladen...'}
+                {subtitleText || currentSegment?.text || tx({ de: 'Text wird geladen...', en: 'Loading text...', es: 'Cargando texto...' })}
               </div>
               <div className="text-sm text-white/50">
                 📸 Füge Medien hinzu für vollständige Vorschau

@@ -84,7 +84,7 @@ export const InstantAvatarDemo = () => {
     const file = accepted[0];
     if (!file) return;
     if (file.size > 8 * 1024 * 1024) {
-      toast.error("Foto ist zu groß (max. 8 MB).");
+      toast.error(tx({ de: "Foto ist zu groß (max. 8 MB).", en: "Photo is too large (max. 8 MB).", es: "La foto es demasiado grande (máx. 8 MB)." }));
       return;
     }
     const dataUrl = await fileToDataUrl(file);
@@ -114,7 +114,7 @@ export const InstantAvatarDemo = () => {
       });
       if (error) throw error;
       if (data?.error) {
-        toast.error(data.message ?? "Generierung fehlgeschlagen.");
+        toast.error(data.message ?? tx({ de: "Generierung fehlgeschlagen.", en: "Generation failed.", es: "La generación fracasó." }));
         return;
       }
       const received: Frame[] = data?.frames ?? [];
@@ -128,9 +128,9 @@ export const InstantAvatarDemo = () => {
       window.setTimeout(() => setSweep(false), 1300);
       toast.success(tx({ de: "Dein Avatar ist bereit — dreh ihn mit dem Scrubber.", en: "Your avatar is ready — rotate it with the scrubber.", es: "Tu avatar está listo, gíralo con el control deslizante." }));
     } catch (err) {
-      const msg = (err as Error)?.message ?? "Unbekannter Fehler.";
+      const msg = (err as Error)?.message ?? tx({ de: "Unbekannter Fehler.", en: "Unknown error.", es: "Error desconocido." });
       if (msg.includes("429") || msg.toLowerCase().includes("rate")) {
-        toast.error("Demo-Kontingent erreicht. Starte kostenlos für unbegrenzte Avatare.");
+        toast.error(tx({ de: "Demo-Kontingent erreicht. Starte kostenlos für unbegrenzte Avatare.", en: "Demo quota reached. Start free for unlimited avatars.", es: "Cuota de demostración alcanzada. Comience gratis para obtener avatares ilimitados." }));
       } else {
         toast.error(msg);
       }
@@ -270,7 +270,7 @@ export const InstantAvatarDemo = () => {
                 <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center mb-3">
                   <Upload className="w-5 h-5 text-primary" />
                 </div>
-                <p className="font-medium text-sm mb-1">Foto hierher ziehen oder klicken</p>
+                <p className="font-medium text-sm mb-1">{tx({ de: "Foto hierher ziehen oder klicken", en: "Drag or click photo here", es: "Arrastra o haz clic en la foto aquí." })}</p>
                 <p className="text-xs text-muted-foreground">
                   JPG · PNG · WEBP · max. 8 MB
                 </p>
@@ -372,7 +372,7 @@ export const InstantAvatarDemo = () => {
                     <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">5 Winkel werden parallel gerendert...</p>
+                    <p className="font-medium text-sm">{tx({ de: "5 Winkel werden parallel gerendert...", en: "5 angles are rendered in parallel...", es: "5 ángulos se representan en paralelo..." })}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Identity-Lock · Bond-Gold Cinematic
                     </p>

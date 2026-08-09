@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SceneStripTile — compact 16:9 thumbnail tile for the cinematic filmstrip.
  *
@@ -94,7 +95,7 @@ function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: Sc
   const titleText =
     (scene as any).title ||
     scene.aiPrompt?.slice(0, 64) ||
-    `Szene ${index + 1}`;
+    tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${índice + 1}` });
 
   return (
     <button

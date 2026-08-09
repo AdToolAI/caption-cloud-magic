@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -106,7 +107,7 @@ export const CreditHistory = () => {
         <CardContent className="p-6">
           <div className="flex items-center gap-3">
             <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="text-muted-foreground">Transaktionen werden geladen...</span>
+            <span className="text-muted-foreground">{tx({ de: "Transaktionen werden geladen...", en: "Loading transactions...", es: "Cargando transacciones..." })}</span>
           </div>
         </CardContent>
       </Card>
@@ -150,7 +151,7 @@ export const CreditHistory = () => {
               >
                 <Sparkles className="h-12 w-12 text-primary/50" />
               </motion.div>
-              <p className="text-muted-foreground">Noch keine Transaktionen vorhanden</p>
+              <p className="text-muted-foreground">{tx({ de: "Noch keine Transaktionen vorhanden", en: "No transactions yet", es: "Aún no hay transacciones" })}</p>
             </motion.div>
           ) : (
             <div className="overflow-x-auto">

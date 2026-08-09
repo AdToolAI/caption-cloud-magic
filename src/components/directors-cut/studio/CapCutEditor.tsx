@@ -501,7 +501,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 // they need to click play to grant audio permission.
                 if (!(window as any).__dcAudioToastShown) {
                   (window as any).__dcAudioToastShown = true;
-                  toast.warning('Klicke erneut auf Play, um Audio zu aktivieren.');
+                  toast.warning(tx({ de: 'Klicke erneut auf Play, um Audio zu aktivieren.', en: 'Click Play again to activate audio.', es: 'Haga clic en Reproducir nuevamente para activar el audio.' }));
                   setTimeout(() => { (window as any).__dcAudioToastShown = false; }, 5000);
                 }
               } else {
@@ -1449,7 +1449,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         isBlackscreen: true,
         sourceMode: 'blackscreen',
       }]);
-      toast.success('Szene am Playhead eingefügt');
+      toast.success(tx({ de: 'Szene am Playhead eingefügt', en: 'Scene added to the playhead', es: 'Escena agregada al cabezal de reproducción.' }));
       return;
     }
 
@@ -1516,7 +1516,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       return updated;
     });
     onScenesUpdate(recalculated);
-    toast.success('Szene am Playhead eingefügt');
+    toast.success(tx({ de: 'Szene am Playhead eingefügt', en: 'Scene added to the playhead', es: 'Escena agregada al cabezal de reproducción.' }));
   }, [scenes, currentTime, onScenesUpdate, t, commitHistory]);
 
   // Duplicate scene

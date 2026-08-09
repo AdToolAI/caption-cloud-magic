@@ -82,7 +82,7 @@ export const TemplateRating = ({
           </div>
 
           <Textarea
-            placeholder="Optional: Schreiben Sie eine Rezension..."
+            placeholder={tx({ de: "Optional: Schreiben Sie eine Rezension...", en: "Optional: Write a review...", es: "Opcional: Escribe una reseña..." })}
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
             rows={3}

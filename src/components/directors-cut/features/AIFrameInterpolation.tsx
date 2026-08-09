@@ -77,9 +77,9 @@ export function AIFrameInterpolation({
       }
     } catch (err) {
       console.error('Interpolation error:', err);
-      setError(err instanceof Error ? err.message : 'Interpolation fehlgeschlagen');
+      setError(err instanceof Error ? err.message : tx({ de: 'Interpolation fehlgeschlagen', en: 'Interpolation failed', es: 'La interpolación falló' }));
       toast({
-        title: 'Fehler bei Frame Interpolation',
+        title: tx({ de: 'Fehler bei Frame Interpolation', en: 'Frame interpolation error', es: 'Error de interpolación de trama' }),
         description: tx({ de: 'Bitte versuche es später erneut.', en: 'Please try again later.', es: 'Por favor, inténtalo de nuevo más tarde.' }),
         variant: 'destructive'
       });

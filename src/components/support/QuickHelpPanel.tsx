@@ -20,7 +20,7 @@ const TEXT = {
   },
   de: {
     title: "Schnelle Hilfe",
-    sub: "Häufige Lösungen, bevor du ein Ticket öffnest.",
+    sub: tx({ de: "Häufige Lösungen, bevor du ein Ticket öffnest.", en: "Common solutions before opening a ticket.", es: "Soluciones habituales antes de abrir un ticket." }),
     items: [
       { q: "Mein Render hängt oder schlägt fehl", a: tx({ de: "Renders sind meist innerhalb von 10 Min. fertig. Prüfe die Status-Seite auf aktive Provider-Probleme.", en: "Renders are usually ready within 10 min. Check the status page for active provider issues.", es: "Los renders suelen estar listos en 10 minutos. Consulta la página de estado para ver si hay problemas activos con el proveedor." }) },
       { q: tx({ de: "Credits wurden nach einem Fehler nicht erstattet", en: "Credits were not refunded after an error", es: "Los créditos no fueron reembolsados después de un error" }), a: tx({ de: "Erstattungen sind automatisch und idempotent — meist innerhalb von 60 Sek. sichtbar. Falls nicht, öffne ein Ticket mit der Render-ID.", en: "Refunds are automatic and idempotent — usually visible within 60 seconds. If not, open a ticket with the render ID.", es: "Los reembolsos son automáticos e idempotentes — normalmente visibles en 60 segundos. Si no, abre un ticket con el ID del render." }) },
@@ -30,7 +30,7 @@ const TEXT = {
     ],
     statusBtn: "Live-Systemstatus ansehen",
     faqBtn: "Vollständige FAQ durchsuchen",
-    whatsapp: "Dringend? Schreib uns auf WhatsApp",
+    whatsapp: tx({ de: "Dringend? Schreib uns auf WhatsApp", en: "Urgent? Write to us on WhatsApp", es: "¿Urgente? Escríbenos por WhatsApp" }),
   },
   es: {
     title: "Ayuda rápida",

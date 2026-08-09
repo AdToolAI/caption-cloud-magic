@@ -57,7 +57,7 @@ export const ScriptEditor = ({
         onChange(data.optimizedText);
         toast({
           title: "✨ Optimiert!",
-          description: `Skript wurde ${label}.`,
+          description: tx({ de: `Skript wurde ${label}.`, en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }),
         });
       }
     } catch (error) {
@@ -137,7 +137,7 @@ export const ScriptEditor = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleOptimize('cta', 'mit CTA versehen')}
+              onClick={() => handleOptimize('cta', tx({ de: 'mit CTA versehen', en: 'provided with CTA', es: 'provisto de CTA' }))}
               disabled={isOptimizing || !value.trim()}
               className="justify-start"
             >

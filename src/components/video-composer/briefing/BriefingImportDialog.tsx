@@ -146,7 +146,7 @@ export default function BriefingImportDialog({
     });
     toast({
       title: 'Briefing übernommen',
-      description: `${result.scenesApplied} Szenen · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`,
+      description: tx({ de: `${result.scenesApplied} Szenen · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`, en: `${result.scenesApplied} Scenes · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`, es: `${result.scenesApplied} Escenas · ${result.voiceApplied? 'Voz ✓ · ' : ''}${result.captionsApplied ? 'Subtítulos ✓' : ''}` }),
     });
     handleClose(false);
   };
@@ -202,7 +202,7 @@ export default function BriefingImportDialog({
               <SectionCard
                 checked={accept.scenes}
                 onToggle={(v) => setAccept((a) => ({ ...a, scenes: v }))}
-                title={`Szenen (${manifest.scenes.length})`}
+                title={tx({ de: `Szenen (${manifest.scenes.length})`, en: `Scenes (${manifest.scenes.length})`, es: `Escenas (${manifest.scenes.length})` })}
               >
                 <div className="space-y-2">
                   {manifest.scenes.map((s) => (

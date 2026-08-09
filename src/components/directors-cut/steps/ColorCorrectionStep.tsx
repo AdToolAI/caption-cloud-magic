@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -190,7 +191,7 @@ export function ColorCorrectionStep({
       transitions={transitions}
       audio={audio}
       title="Farbkorrektur"
-      description="Passe Helligkeit, Kontrast und Farben an"
+      description={tx({ de: "Passe Helligkeit, Kontrast und Farben an", en: "Adjust brightness, contrast and colors", es: "Ajustar brillo, contraste y colores." })}
       icon={Palette}
       colorGrading={{ enabled: !!selectedGrade, grade: selectedGrade, intensity: gradeIntensity }}
       sceneColorGrading={sceneColorGrading}
@@ -204,7 +205,7 @@ export function ColorCorrectionStep({
           className="backdrop-blur-sm bg-white/5 border-white/10 hover:bg-white/10"
         >
           <RotateCcw className="h-4 w-4 mr-2" />
-          {selectedSceneId ? 'Szene zurücksetzen' : 'Alle zurücksetzen'}
+          {selectedSceneId ? tx({ de: 'Szene zurücksetzen', en: 'Reset scene', es: 'Restablecer escena' }) : tx({ de: 'Alle zurücksetzen', en: 'Reset all', es: 'Restablecer todo' })}
         </Button>
         <Button 
           size="sm" 

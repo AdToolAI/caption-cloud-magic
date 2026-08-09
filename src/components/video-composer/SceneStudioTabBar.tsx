@@ -134,12 +134,12 @@ const SECTION_TITLES = {
     advanced: { title: 'Advanced', sub: 'Final prompt, negative prompt and engine compare' },
   },
   de: {
-    story: { title: 'Story & Engine', sub: 'Skript, Dauer und welches KI-Modell den Clip rendert' },
+    story: { title: 'Story & Engine', sub: tx({ de: 'Skript, Dauer und welches KI-Modell den Clip rendert', en: 'Script, duration and which AI model renders the clip', es: 'Guión, duración y qué modelo de IA representa el clip' }) },
     cast: { title: 'Cast', sub: tx({ de: 'Charaktere in dieser Szene + Face-Lock-Anker', en: 'Characters in this scene + face-lock anchor', es: 'Personajes en esta escena + anclaje de bloqueo facial' }) },
     performance: { title: 'Performance', sub: tx({ de: 'Mimik, Gestik, Blick und Energy pro Charakter', en: 'Facial expressions, gestures, gaze and energy per character', es: 'Expresiones faciales, gestos, mirada y energía por personaje' }) },
-    audio: { title: 'Audio & Voiceover', sub: 'Skript-Studio, Lip-Sync und Director Score' },
+    audio: { title: 'Audio & Voiceover', sub: tx({ de: 'Skript-Studio, Lip-Sync und Director Score', en: 'Script Studio, Lip Sync and Director Score', es: 'Estudio de guión, sincronización labial y música del director' }) },
     look: { title: 'Look & Bildsprache', sub: 'One-Click Cinematic Styles + Referenzbild' },
-    advanced: { title: 'Erweitert', sub: 'Final-Prompt, Negative-Prompt und Engine-Vergleich' },
+    advanced: { title: 'Erweitert', sub: tx({ de: 'Final-Prompt, Negative-Prompt und Engine-Vergleich', en: 'Final prompt, negative prompt and engine comparison', es: 'Aviso final, aviso negativo y comparación de motores.' }) },
   },
   es: {
     story: { title: 'Historia y Motor', sub: 'Guion, duración y qué modelo IA renderiza el clip' },

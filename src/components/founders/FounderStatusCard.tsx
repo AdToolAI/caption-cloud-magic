@@ -17,9 +17,9 @@ import {
 const copy = {
   de: {
     eyebrow: "Founders Circle",
-    title: "Du gehörst zum Founders Circle.",
+    title: tx({ de: "Du gehörst zum Founders Circle.", en: "You belong to the Founders Circle.", es: "Perteneces al Círculo de Fundadores." }),
     sub: tx({ de: "Ein Kreis, der nur einmal geöffnet wird. Dein Vorteil läuft still im Hintergrund mit.", en: "A circle that only opens once. Your benefit runs silently in the background.", es: "Un círculo que solo se abre una vez. Tu beneficio funciona silenciosamente en segundo plano." }),
-    discount: `${FOUNDERS_CREDIT_DISCOUNT_PERCENT} % auf jeden Credit-Kauf`,
+    discount: tx({ de: `${FOUNDERS_CREDIT_DISCOUNT_PERCENT} % auf jeden Credit-Kauf`, en: `${FOUNDERS_CREDIT_DISCOUNT_PERCENT} % on every credit purchase`, es: `${FOUNDERS_CREDIT_DISCOUNT_PERCENT} % en cada compra de crédito` }),
     discountSub: "Automatisch im Checkout abgezogen",
     priority: "Priority-Rendering",
     prioritySub: "Dein Slot geht bei Systemlast zuerst",

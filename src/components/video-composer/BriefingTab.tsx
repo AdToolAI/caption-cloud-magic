@@ -453,7 +453,7 @@ export default function BriefingTab({
       const isRetryable = err?.retryable === true;
       toast({
         title: isRetryable
-          ? (language === 'de' ? 'KI-Dienst ist gerade überlastet'
+          ? (language === 'de' ? tx({ de: 'KI-Dienst ist gerade überlastet', en: 'AI service is currently overloaded', es: 'El servicio de IA está actualmente sobrecargado' })
             : language === 'es' ? 'El servicio de IA está temporalmente saturado'
             : 'AI service is temporarily overloaded')
           : t('videoComposer.storyboardError'),

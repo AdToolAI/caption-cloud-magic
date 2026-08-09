@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * DriftReportPanel — collapsible card that compares the latest saved
  * ProductionPlan (from `composer_production_plans`) against the current
@@ -129,14 +130,14 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
       }
       await persist({ autoFixApplied: true, fixedFields: allFixed });
       toast.success('Storyboard angeglichen', {
-        description: `${autoFix.fixableCount} Feld(er) in ${autoFix.patches.length} Szene(n) aktualisiert.`,
+        description: tx({ de: `${autoFix.fixableCount} Feld(er) in ${autoFix.patches.length} Szene(n) aktualisiert.`, en: `Updated ${autoFix.fixableCount} field(s) in ${autoFix.patches.length} scene(s).`, es: `Se actualizaron los campos ${autoFix.fixableCount} en las escenas ${autoFix.patches.length}.` }),
       });
       setPreviewOpen(false);
       // Re-load plan after a beat so the next drift-check sees fresh state.
       setTimeout(() => void loadPlan(), 300);
     } catch (e) {
       console.error('[DriftReportPanel] auto-fix failed', e);
-      toast.error('Auto-Fix fehlgeschlagen', { description: (e as Error)?.message ?? 'unknown' });
+      toast.error(tx({ de: 'Auto-Fix fehlgeschlagen', en: 'Auto fix failed', es: 'Error en la reparación automática' }), { description: (e as Error)?.message ?? 'unknown' });
     } finally {
       setApplying(false);
     }
@@ -260,7 +261,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
           {autoFix && (
             <div className="space-y-3 max-h-[50vh] overflow-y-auto">
               {autoFix.patches.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">Keine sicheren Auto-Fixes verfügbar.</p>
+                <p className="text-sm text-muted-foreground italic">{tx({ de: "Keine sicheren Auto-Fixes verfügbar.", en: "No secure auto-fixes available.", es: "No hay correcciones automáticas seguras disponibles." })}</p>
               ) : (
                 autoFix.patches.map((p) => (
                   <div key={p.sceneId} className="rounded border border-border/50 bg-background/40 p-2.5">

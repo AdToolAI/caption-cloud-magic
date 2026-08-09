@@ -6,7 +6,7 @@ import { Check, TrendingUp, ShoppingCart, Palette } from "lucide-react";
 import { useTx } from "@/lib/i18nText";
 
 const goals = [
-  { id: "grow_audience", label: "Reichweite aufbauen", icon: TrendingUp, desc: "Videos, die neue Zuschauer erreichen" },
+  { id: "grow_audience", label: "Reichweite aufbauen", icon: TrendingUp, desc: tx({ de: "Videos, die neue Zuschauer erreichen", en: "Videos that reach new viewers", es: "Vídeos que llegan a nuevos espectadores" }) },
   { id: "sell_products", label: "Werbevideos produzieren", icon: ShoppingCart, desc: "Ads, die Produkte verkaufen" },
   { id: "build_brand", label: "Marke inszenieren", icon: Palette, desc: "Wiedererkennbarer Cast & Look in jedem Video" },
 ];

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -65,7 +66,7 @@ export const PanelDivider: React.FC<PanelDividerProps> = ({
         'group relative w-1 flex-shrink-0 cursor-col-resize',
         'bg-transparent hover:bg-[#F5C76A]/20 transition-colors'
       )}
-      title="Ziehen zum Anpassen · Doppelklick zurücksetzen"
+      title={tx({ de: "Ziehen zum Anpassen · Doppelklick zurücksetzen", en: "Drag to adjust · Double click to reset", es: "Arrastre para ajustar · Haga doble clic para restablecer" })}
     >
       <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-[#F5C76A]/10 group-hover:bg-[#F5C76A]/40" />
     </div>

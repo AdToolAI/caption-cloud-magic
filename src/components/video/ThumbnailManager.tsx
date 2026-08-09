@@ -127,7 +127,7 @@ export const ThumbnailManager = ({
 
         {/* Regenerate Thumbnail */}
         <div className="space-y-2">
-          <Label htmlFor="timestamp">Zeitstempel (Sekunden)</Label>
+          <Label htmlFor="timestamp">{tx({ de: "Zeitstempel (Sekunden)", en: "Timestamp (seconds)", es: "Marca de tiempo (segundos)" })}</Label>
           <div className="flex gap-2">
             <Input
               id="timestamp"

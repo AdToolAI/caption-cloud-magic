@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -48,7 +49,7 @@ export const AdvancedVoiceSettings = ({ onSettingsChange }: AdvancedVoiceSetting
           className="gap-2"
         >
           <Settings className="h-4 w-4" />
-          {showAdvanced ? 'Erweiterte Einstellungen ausblenden' : 'Erweiterte Einstellungen'}
+          {showAdvanced ? tx({ de: 'Erweiterte Einstellungen ausblenden', en: 'Hide advanced settings', es: 'Ocultar configuración avanzada' }) : tx({ de: 'Erweiterte Einstellungen', en: 'Advanced Settings', es: 'Configuración avanzada' })}
         </Button>
         {showAdvanced && (
           <Button variant="ghost" size="sm" onClick={resetToDefaults}>

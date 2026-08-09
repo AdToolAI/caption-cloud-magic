@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,7 +53,7 @@ export function GreenScreenChromaKey({
     if (!videoUrl) {
       toast({
         title: 'Fehler',
-        description: 'Kein Video zum Analysieren vorhanden',
+        description: tx({ de: 'Kein Video zum Analysieren vorhanden', en: 'No video available to analyze', es: 'No hay vídeo disponible para analizar' }),
         variant: 'destructive',
       });
       return;
@@ -68,7 +69,7 @@ export function GreenScreenChromaKey({
       });
 
       if (error) {
-        throw new Error(error.message || 'AI Chroma-Key-Analyse fehlgeschlagen');
+        throw new Error(error.message || tx({ de: 'AI Chroma-Key-Analyse fehlgeschlagen', en: 'AI chroma key analysis failed', es: 'El análisis de clave de croma de IA falló' }));
       }
 
       if (data?.analysis) {
@@ -87,16 +88,16 @@ export function GreenScreenChromaKey({
         
         toast({
           title: 'AI Erkennung abgeschlossen',
-          description: `${analysis.color_name || 'Farbe'} erkannt mit ${Math.round((analysis.confidence || 0.85) * 100)}% Konfidenz. (${data.credits_used || 3} Credits)`,
+          description: tx({ de: `${analysis.color_name || 'Farbe'} erkannt mit ${Math.round((analysis.confidence || 0.85) * 100)}% Konfidenz. (${data.credits_used || 3} Credits)`, en: `${analysis.color_name || 'Color'} detected with ${Math.round((analysis.confidence || 0.85) * 100)}% confidence. (${data.credits_used || 3} credits)`, es: `${análisis.color_name || 'Color'} detectado con ${Math.round((analysis.confidence || 0.85) * 100)}% de confianza. (${data.credits_used || 3} créditos)` }),
         });
       } else {
-        throw new Error('Ungültige Antwort vom Server');
+        throw new Error(tx({ de: 'Ungültige Antwort vom Server', en: 'Invalid response from server', es: 'Respuesta no válida del servidor' }));
       }
     } catch (err: any) {
       console.error('Chroma Key detection error:', err);
       toast({
         title: 'Fehler',
-        description: err.message || 'AI Chroma-Key-Analyse fehlgeschlagen',
+        description: err.message || tx({ de: 'AI Chroma-Key-Analyse fehlgeschlagen', en: 'AI chroma key analysis failed', es: 'El análisis de clave de croma de IA falló' }),
         variant: 'destructive',
       });
       
@@ -153,7 +154,7 @@ export function GreenScreenChromaKey({
 
         {/* Color Selection */}
         <div className="space-y-2">
-          <label className="text-xs font-medium">Key-Farbe auswählen</label>
+          <label className="text-xs font-medium">{tx({ de: "Key-Farbe auswählen", en: "Select key color", es: "Seleccionar color clave" })}</label>
           <div className="flex gap-2">
             {PRESET_COLORS.map((preset) => (
               <button
@@ -176,7 +177,7 @@ export function GreenScreenChromaKey({
                 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all
                 ${isPicking ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}
               `}
-              title="Farbe aus Video"
+              title={tx({ de: "Farbe aus Video", en: "Color from video", es: "Color del vídeo" })}
             >
               <Pipette className="h-4 w-4" />
             </button>

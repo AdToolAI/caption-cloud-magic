@@ -70,7 +70,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
       return;
     }
     if (!scenes.length) {
-      toast({ title: 'Keine Szenen', description: 'Erstelle zuerst Szenen im Storyboard.', variant: 'destructive' });
+      toast({ title: tx({ de: 'Keine Szenen', en: 'No scenes', es: 'Sin escenas' }), description: tx({ de: 'Erstelle zuerst Szenen im Storyboard.', en: 'First, create scenes in the storyboard.', es: 'Primero, crea escenas en el guión gráfico.' }), variant: 'destructive' });
       return;
     }
     setGenerating(true);
@@ -159,7 +159,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
 
         {!loading && clips.length === 0 && (
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            Noch kein AI Sound Design generiert. Klick "Mix erstellen" um Atmo + SFX vorschlagen und generieren zu lassen.
+            Noch kein AI Sound Design generiert. Klick tx({ de: "Mix erstellen", en: "Create mix", es: "crear mezcla" }) um Atmo + SFX vorschlagen und generieren zu lassen.
           </div>
         )}
 

@@ -60,8 +60,8 @@ export function CIPreflightDialog({
             {allClean
               ? tx({ de: 'Alle Consistency-Checks bestanden — bereit für den Render.', en: 'All consistency checks passed — ready for render.', es: 'Todas las comprobaciones de consistencia pasaron — listo para renderizar.' })
               : hasBlockers
-              ? 'Blocker gefunden — bitte behebe die kritischen Punkte vor dem Render.'
-              : 'Nicht-blockierende Hinweise — du kannst trotzdem rendern.'}
+              ? tx({ de: 'Blocker gefunden — bitte behebe die kritischen Punkte vor dem Render.', en: 'Blockers found — please fix the critical points before rendering.', es: 'Se encontraron bloqueadores: solucione los puntos críticos antes de renderizar.' })
+              : tx({ de: 'Nicht-blockierende Hinweise — du kannst trotzdem rendern.', en: 'Non-blocking hints — you can still render.', es: 'Sugerencias sin bloqueo: aún puedes renderizar.' })}
           </DialogDescription>
         </DialogHeader>
 

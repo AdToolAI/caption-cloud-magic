@@ -255,7 +255,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
   };
 
   const handleClose = () => {
-    if (hasChanges && !window.confirm(`${changeCount} ungespeicherte Änderung(en). Schließen?`)) return;
+    if (hasChanges && !window.confirm(tx({ de: `${changeCount} ungespeicherte Änderung(en). Schließen?`, en: `${changeCount} unsaved change(s). Close?`, es: `${changeCount} cambios no guardados. ¿Cerca?` }))) return;
     onOpenChange(false);
   };
 

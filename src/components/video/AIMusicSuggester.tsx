@@ -85,7 +85,7 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="any">Alle Genres</SelectItem>
+              <SelectItem value="any">{tx({ de: "Alle Genres", en: "All genres", es: "Todos los géneros" })}</SelectItem>
               <SelectItem value="electronic">Elektronisch</SelectItem>
               <SelectItem value="acoustic">Akustisch</SelectItem>
               <SelectItem value="cinematic">Cinematic</SelectItem>

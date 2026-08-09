@@ -76,7 +76,7 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
       }
     } catch (err) {
       console.error("Optimize error:", err);
-      toast.error("Optimierung fehlgeschlagen");
+      toast.error(tx({ de: "Optimierung fehlgeschlagen", en: "Optimization failed", es: "Error de optimización" }));
     } finally {
       setOptimizing(false);
     }
@@ -104,7 +104,7 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
       toast.success("Caption & Hashtags per KI generiert!");
     } catch (err) {
       console.error("Auto-fill error:", err);
-      toast.error("KI-Generierung fehlgeschlagen");
+      toast.error(tx({ de: "KI-Generierung fehlgeschlagen", en: "AI generation failed", es: "La generación de IA falló" }));
     } finally {
       setAutoFilling(false);
     }
@@ -156,7 +156,7 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
       onOpenChange(false);
     } catch (err) {
       console.error("Save error:", err);
-      toast.error("Speichern fehlgeschlagen");
+      toast.error(tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Error al guardar" }));
     } finally {
       setSaving(false);
     }
@@ -237,7 +237,7 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
             <Textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder="Was möchtest du posten?"
+              placeholder={tx({ de: "Was möchtest du posten?", en: "What would you like to post?", es: "¿Qué te gustaría publicar?" })}
               rows={4}
               className="resize-none"
             />

@@ -53,7 +53,7 @@ export function DeliverStep() {
     setExportSlideIndex(index);
     await new Promise((r) => setTimeout(r, 120));
     const node = exportRef.current;
-    if (!node) throw new Error("Export-Renderer nicht bereit");
+    if (!node) throw new Error(tx({ de: "Export-Renderer nicht bereit", en: "Export renderer not ready", es: "El renderizador de exportación no está listo" }));
     return elementToPngBlob(node);
   };
 

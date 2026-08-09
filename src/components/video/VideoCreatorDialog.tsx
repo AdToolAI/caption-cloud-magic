@@ -405,7 +405,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             }`}>
               {String(customizations[field.key] || '').length}/{field.maxLength}
               {String(customizations[field.key] || '').length > field.maxLength && (
-                <span className="ml-1">⚠️ Text ist zu lang!</span>
+                <span className="ml-1">{tx({ de: "⚠️ Text ist zu lang!", en: "⚠️ Text is too long!", es: "⚠️ ¡El texto es demasiado largo!" })}</span>
               )}
             </p>
           </div>
@@ -474,7 +474,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             )}
             <Video className="h-5 w-5" />
             {step === 'gallery' && tx({ de: "Template auswählen", en: "Select template", es: "Seleccionar plantilla" })}
-            {step === 'customize' && `Video erstellen: ${selectedTemplate?.name}`}
+            {step === 'customize' && tx({ de: `Video erstellen: ${selectedTemplate?.name}`, en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` })}
             {step === 'rendering' && tx({ de: 'Video wird erstellt...', en: 'Video is being created...', es: 'El video se está creando...' })}
           </DialogTitle>
         </DialogHeader>
@@ -620,7 +620,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                         onChange={(e) => setScriptText(e.target.value)}
                         rows={10}
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
-                        placeholder="Dein AI-generiertes Script erscheint hier..."
+                        placeholder={tx({ de: "Dein AI-generiertes Script erscheint hier...", en: "Your AI-generated script appears here...", es: "Su secuencia de comandos generada por IA aparece aquí..." })}
                       />
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">

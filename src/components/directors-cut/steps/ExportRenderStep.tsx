@@ -874,7 +874,7 @@ export function ExportRenderStep({
                   <div className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      {slotWaiting ? 'Warte auf Slot…' : 'Rendering...'}
+                      {slotWaiting ? tx({ de: 'Warte auf Slot…', en: 'Waiting for slot…', es: 'Esperando cupo...' }) : 'Rendering...'}
                     </span>
                     <span>{Math.round(renderProgress)}%</span>
                   </div>
