@@ -639,11 +639,11 @@ const BrandKit = () => {
                     animate="visible"
                   >
                     {[
-                      { emoji: "✨", title: "KI-Markenanalyse", desc: "Automatische Erkennung von Farben, Stilrichtung und Emotionen aus deinem Logo" },
-                      { emoji: "🎨", title: "Visuelles Brandboard", desc: "Sofortige Live-Vorschau mit Farbpalette, Schriften und Beispiel-Posts" },
-                      { emoji: "🔗", title: "Auto-Integration", desc: "Alle Tools nutzen automatisch deine Markenfarben und Tonalität" },
-                      { emoji: "📊", title: "Consistency Score", desc: "Regelmäßige Analyse deiner Content-Konsistenz mit Verbesserungstipps" },
-                      { emoji: "🚀", title: "Multi-Brand-Management", desc: "Verwalte mehrere Marken und wechsle mit einem Klick" },
+                      { emoji: "✨", title: "KI-Markenanalyse", desc: tx({ de: "Automatische Erkennung von Farben, Stilrichtung und Emotionen aus deinem Logo", en: "Automatic recognition of colors, style and emotions from your logo", es: "Reconocimiento automático de colores, estilo y emociones de tu logo." }) },
+                      { emoji: "🎨", title: "Visuelles Brandboard", desc: tx({ de: "Sofortige Live-Vorschau mit Farbpalette, Schriften und Beispiel-Posts", en: "Instant live preview with color palette, fonts and sample posts", es: "Vista previa instantánea en vivo con paleta de colores, fuentes y publicaciones de muestra" }) },
+                      { emoji: "🔗", title: "Auto-Integration", desc: tx({ de: "Alle Tools nutzen automatisch deine Markenfarben und Tonalität", en: "All tools automatically use your brand colors and tonality", es: "Todas las herramientas utilizan automáticamente los colores y la tonalidad de su marca." }) },
+                      { emoji: "📊", title: "Consistency Score", desc: tx({ de: "Regelmäßige Analyse deiner Content-Konsistenz mit Verbesserungstipps", en: "Regular analysis of your content consistency with improvement tips", es: "Análisis periódico de la coherencia de su contenido con consejos de mejora." }) },
+                      { emoji: "🚀", title: "Multi-Brand-Management", desc: tx({ de: "Verwalte mehrere Marken und wechsle mit einem Klick", en: "Manage multiple brands and switch with one click", es: "Administre múltiples marcas y cambie con un solo clic" }) },
                     ].map((feature, idx) => (
                       <motion.div 
                         key={idx}

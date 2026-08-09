@@ -24,8 +24,8 @@ interface ExportOptionsEditorProps {
 const aspectRatioInfo = {
   '16:9': { icon: Monitor, label: 'YouTube, Desktop', description: tx({ de: 'Standard für YouTube und Desktop', en: 'Standard for YouTube and desktop', es: 'Estándar para YouTube y escritorio' }) },
   '9:16': { icon: Smartphone, label: 'TikTok, Stories', description: tx({ de: 'Vertikal für Mobile', en: 'Vertical for mobile', es: 'verticales para móviles' }) },
-  '1:1': { icon: Instagram, label: 'Instagram Feed', description: 'Quadratisch für Instagram' },
-  '4:5': { icon: Film, label: 'Instagram Portrait', description: 'Portrait für Instagram Feed' },
+  '1:1': { icon: Instagram, label: 'Instagram Feed', description: tx({ de: 'Quadratisch für Instagram', en: 'Square for Instagram', es: 'Cuadrado para Instagram' }) },
+  '4:5': { icon: Film, label: 'Instagram Portrait', description: tx({ de: 'Portrait für Instagram Feed', en: 'Portrait for Instagram feed', es: 'Retrato para feed de Instagram' }) },
 };
 
 export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorProps) => {

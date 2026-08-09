@@ -67,7 +67,7 @@ const EFFECT_GROUPS: EffectGroup[] = [
     effects: [
       { key: 'boxinessCut', label: 'Box-Cut', shortLabel: '-2.5dB 250Hz', description: 'Boxy Sound entfernen' },
       { key: 'mudCut', label: 'Mud-Cut', shortLabel: '-2dB 500Hz', description: 'Schlammigkeit' },
-      { key: 'airBoost', label: 'Air', shortLabel: '+1.5dB 10kHz+', description: 'Brillanz hinzufügen' },
+      { key: 'airBoost', label: 'Air', shortLabel: '+1.5dB 10kHz+', description: tx({ de: 'Brillanz hinzufügen', en: 'Add brilliance', es: 'Añade brillo' }) },
       { key: 'compression', label: 'Komp.', shortLabel: '4:1 -24dB', description: 'Dynamik komprimieren' },
       { key: 'limiter', label: 'Limiter', shortLabel: '-1dB 20:1', description: 'Clipping verhindern' },
     ]
