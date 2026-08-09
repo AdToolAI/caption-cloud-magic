@@ -721,13 +721,18 @@ export function ImageGenerator() {
                 <button
                   type="button"
                   onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
-                  className="relative block w-full h-24 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
+                  className="relative block w-full rounded-md overflow-hidden border border-border bg-muted/30 hover:border-primary transition-colors"
                 >
                   <img
                     src={mode === 'transform' ? referenceImage! : styleReference!}
-                    className="h-full w-full object-cover"
+                    className="mx-auto max-h-56 w-auto max-w-full object-contain"
                     alt="Reference"
                   />
+                  {refUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-background/70 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Upload className="h-4 w-4" />
                   </div>
