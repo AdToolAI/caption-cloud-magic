@@ -19859,6 +19859,8 @@ Object.assign(translations.es, {
     tiktokSandbox: 'TikTok está en modo {env} — solo cuentas de prueba pueden conectarse.',
     redirectMismatch: 'La URI de redirección no apunta al callback del backend — la conexión fallará.',
     publishPending: 'Conectar funciona, permiso de publicación aún en revisión.',
+    ytChannel: 'Canal: {name}',
+    ytNoRefreshToken: 'No hay token de actualización — vuelve a conectar YouTube o la subida fallará tras 1 hora.',
     metaAppTitle: 'Datos básicos de la app de Meta',
     metaAppComplete: 'Completo',
     metaAppIncomplete: 'Faltan campos',
