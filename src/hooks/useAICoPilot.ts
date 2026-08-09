@@ -248,22 +248,22 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
         onCommand?.(localCommand.command, localCommand.params);
         
         const commandResponses: Record<string, string> = {
-          analyze_scenes: '🎬 Starte Szenenanalyse...',
-          generate_transitions: '✨ Generiere KI-Übergänge...',
-          auto_cut: '✂️ Aktiviere Auto-Cut...',
-          split_scene: '✂️ Teile Szene...',
-          duplicate_scene: '📋 Dupliziere Szene...',
-          delete_scene: '🗑️ Lösche Szene...',
-          apply_style: `🎨 Wende ${localCommand.params.style || 'Style'} an...`,
-          open_styles: '🎨 Öffne Style-Auswahl...',
-          apply_color: `🌈 Wende ${localCommand.params.preset || 'Farbkorrektur'} an...`,
-          open_color: '🌈 Öffne Farbkorrektur...',
-          adjust_volume: localCommand.params.change > 0 ? '🔊 Erhöhe Lautstärke...' : '🔉 Reduziere Lautstärke...',
-          noise_reduction: '🎙️ Aktiviere Rauschunterdrückung...',
-          export: `📤 Starte ${localCommand.params.quality || 'HD'} Export...`,
-          open_export: '📤 Öffne Export-Einstellungen...',
-          next_step: '➡️ Nächster Schritt...',
-          prev_step: '⬅️ Vorheriger Schritt...',
+          analyze_scenes: tx({ de: '🎬 Starte Szenenanalyse...', en: '🎬 Starting scene analysis...', es: '🎬 Iniciando análisis de escenas...' }),
+          generate_transitions: tx({ de: '✨ Generiere KI-Übergänge...', en: '✨ Generating AI transitions...', es: '✨ Generando transiciones de IA...' }),
+          auto_cut: tx({ de: '✂️ Aktiviere Auto-Cut...', en: '✂️ Activating auto-cut...', es: '✂️ Activando corte automático...' }),
+          split_scene: tx({ de: '✂️ Teile Szene...', en: '✂️ Splitting scene...', es: '✂️ Dividiendo escena...' }),
+          duplicate_scene: tx({ de: '📋 Dupliziere Szene...', en: '📋 Duplicating scene...', es: '📋 Duplicando escena...' }),
+          delete_scene: tx({ de: '🗑️ Lösche Szene...', en: '🗑️ Deleting scene...', es: '🗑️ Eliminando escena...' }),
+          apply_style: `🎨 ${tx({ de: 'Wende', en: 'Applying', es: 'Aplicando' })} ${localCommand.params.style || tx({ de: 'Style', en: 'style', es: 'estilo' })}...`,
+          open_styles: tx({ de: '🎨 Öffne Style-Auswahl...', en: '🎨 Opening style selection...', es: '🎨 Abriendo selección de estilo...' }),
+          apply_color: `🌈 ${tx({ de: 'Wende', en: 'Applying', es: 'Aplicando' })} ${localCommand.params.preset || tx({ de: 'Farbkorrektur', en: 'color correction', es: 'corrección de color' })}...`,
+          open_color: tx({ de: '🌈 Öffne Farbkorrektur...', en: '🌈 Opening color correction...', es: '🌈 Abriendo corrección de color...' }),
+          adjust_volume: localCommand.params.change > 0 ? tx({ de: '🔊 Erhöhe Lautstärke...', en: '🔊 Increasing volume...', es: '🔊 Aumentando volumen...' }) : tx({ de: '🔉 Reduziere Lautstärke...', en: '🔉 Decreasing volume...', es: '🔉 Reduciendo volumen...' }),
+          noise_reduction: tx({ de: '🎙️ Aktiviere Rauschunterdrückung...', en: '🎙️ Activating noise reduction...', es: '🎙️ Activando reducción de ruido...' }),
+          export: `📤 ${tx({ de: 'Starte', en: 'Starting', es: 'Iniciando' })} ${localCommand.params.quality || 'HD'} ${tx({ de: 'Export', en: 'export', es: 'exportación' })}...`,
+          open_export: tx({ de: '📤 Öffne Export-Einstellungen...', en: '📤 Opening export settings...', es: '📤 Abriendo ajustes de exportación...' }),
+          next_step: tx({ de: '➡️ Nächster Schritt...', en: '➡️ Next step...', es: '➡️ Siguiente paso...' }),
+          prev_step: tx({ de: '⬅️ Vorheriger Schritt...', en: '⬅️ Previous step...', es: '⬅️ Paso anterior...' }),
         };
 
         const assistantMessage: CoPilotMessage = {
@@ -334,7 +334,7 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
     if (suggestion.action) {
       onCommand?.(suggestion.action.command);
       dismissSuggestion(suggestion.id);
-      toast.success(`${suggestion.action.label} ausgeführt`);
+      toast.success(`${suggestion.action.label} ${tx({ de: 'ausgeführt', en: 'executed', es: 'ejecutado' })}`);
     }
   }, [onCommand, dismissSuggestion]);
 

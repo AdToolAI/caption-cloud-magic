@@ -7,6 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { Upload, Search, Image as ImageIcon, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTx } from '@/lib/i18nText';
 import ReactCrop, { Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -102,8 +103,8 @@ export const MediaEditor = ({
 
     if (!file.type.startsWith('image/')) {
       toast({
-        title: "Ungültiger Dateityp",
-        description: "Bitte wähle eine Bilddatei aus.",
+        title: tx({ de: "Ungültiger Dateityp", en: "Invalid file type", es: "Tipo de archivo no válido" }),
+        description: tx({ de: "Bitte wähle eine Bilddatei aus.", en: "Please select an image file.", es: "Selecciona un archivo de imagen." }),
         variant: "destructive",
       });
       return;
@@ -121,8 +122,8 @@ export const MediaEditor = ({
   const handleUnsplashSearch = async () => {
     if (!searchQuery.trim()) {
       toast({
-        title: "Suchbegriff fehlt",
-        description: "Bitte gib einen Suchbegriff ein.",
+        title: tx({ de: "Suchbegriff fehlt", en: "Search term missing", es: "Falta el término de búsqueda" }),
+        description: tx({ de: "Bitte gib einen Suchbegriff ein.", en: "Please enter a search term.", es: "Introduce un término de búsqueda." }),
         variant: "destructive",
       });
       return;

@@ -14,6 +14,7 @@ import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUpload
 import { VoicePicker } from '@/components/motion-studio/VoicePicker';
 import CastingVibeGrid from '@/components/motion-studio/CastingVibeGrid';
 import {
+import { tx } from "@/lib/i18nText";
   EMPTY_CHARACTER_DRAFT,
   type CharacterDraft,
   type MotionStudioCharacter,
@@ -94,7 +95,7 @@ export default function CharacterEditor({
     async (file: File | null) => {
       if (!file) return;
       if (!ACCEPTED.includes(file.type)) {
-        toast.error('Bitte JPG, PNG oder WEBP wählen.');
+        toast.error(tx({ de: 'Bitte JPG, PNG oder WEBP wählen.', en: 'Please select a JPG, PNG or WEBP file.', es: 'Selecciona un archivo JPG, PNG o WEBP.' }));
         return;
       }
       if (file.size > MAX_BYTES) {
@@ -123,7 +124,7 @@ export default function CharacterEditor({
   /** Generate a 4-view photorealistic character sheet via edge function. */
   const handleGenerateSheet = useCallback(async () => {
     if (!draft.description.trim()) {
-      toast.error('Bitte zuerst eine Beschreibung („Aussehen") eingeben');
+      toast.error(tx({ de: 'Bitte zuerst eine Beschreibung („Aussehen") eingeben', en: 'Please enter a description ("Appearance") first', es: 'Introduce primero una descripción ("Aspecto")' }));
       return;
     }
     setGeneratingSheet(true);
@@ -420,11 +421,11 @@ export default function CharacterEditor({
 
         <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Abbrechen
+            {tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {character ? 'Änderungen speichern' : 'Charakter anlegen'}
+            {character ? tx({ de: 'Änderungen speichern', en: 'Save changes', es: 'Guardar cambios' }) : tx({ de: 'Charakter anlegen', en: 'Create character', es: 'Crear personaje' })}
           </Button>
         </div>
       </DialogContent>
