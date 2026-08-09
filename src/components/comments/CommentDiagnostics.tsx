@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { tx } from "@/lib/i18nText";
 import { 
   TrendingUp, 
   AlertTriangle, 
@@ -61,7 +62,7 @@ export const CommentDiagnostics = ({ data, loading }: CommentDiagnosticsProps) =
           >
             <Lightbulb className="h-8 w-8 text-primary/60" />
           </motion.div>
-          <p className="text-muted-foreground">Noch keine Diagnose verfügbar.</p>
+          <p className="text-muted-foreground">{tx({ de: "Noch keine Diagnose verfügbar.", en: "No diagnosis available yet.", es: "Aún no hay diagnóstico disponible." })}</p>
           <p className="text-sm mt-2 text-muted-foreground/70">Importiere Kommentare und analysiere sie.</p>
         </div>
       </motion.div>

@@ -22,6 +22,7 @@ import { IncidentManager } from "@/components/admin/qa-cockpit/IncidentManager";
 import { FunctionMatrixTab } from "@/components/admin/qa-cockpit/FunctionMatrixTab";
 import { SupportInboxTab } from "@/components/admin/qa-cockpit/SupportInboxTab";
 import { EmailHealthTab } from "@/components/admin/qa-cockpit/EmailHealthTab";
+import { tx } from "@/lib/i18nText";
 
 
 
@@ -265,7 +266,7 @@ export default function QACockpit() {
             <Button
               variant="outline"
               onClick={() => {
-                if (confirm("Wirklich neues Passwort erzeugen? Das alte wird sofort ungültig.")) {
+                if (confirm(tx({ de: "Wirklich neues Passwort erzeugen? Das alte wird sofort ungültig.", en: "Really generate a new password? The old one will be invalidated immediately.", es: "¿Generar realmente una nueva contraseña? La anterior quedará invalidada de inmediato." }))) {
                   setupTestUser.mutate(true);
                 }
               }}

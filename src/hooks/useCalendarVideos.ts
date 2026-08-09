@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { tx } from "@/lib/i18nText";
 
 export function useCalendarVideos() {
   const [loading, setLoading] = useState(false);
@@ -37,8 +38,8 @@ export function useCalendarVideos() {
       if (error) throw error;
 
       toast({
-        title: '✅ Video verknüpft',
-        description: 'Video wurde mit Event verbunden',
+        title: tx({ de: '✅ Video verknüpft', en: '✅ Video linked', es: '✅ Video vinculado' }),
+        description: tx({ de: 'Video wurde mit Event verbunden', en: 'Video was linked to the event', es: 'El video se vinculó al evento' }),
       });
 
       return true;

@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Loader2, Upload, Sparkles, Library, Images } from "lucide-react";
+import { tx } from "@/lib/i18nText";
 
 interface ImageSourceDialogProps {
   open: boolean;
@@ -49,7 +50,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
     const file = event.target.files?.[0];
     if (!file || !user) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Bitte eine Bilddatei wählen");
+      toast.error(tx({ de: "Bitte eine Bilddatei wählen", en: "Please select an image file", es: "Selecciona un archivo de imagen" }));
       return;
     }
     setUploading(true);
@@ -61,7 +62,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
       onPick(data.publicUrl);
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Upload fehlgeschlagen");
+      toast.error(error instanceof Error ? error.message : tx({ de: "Upload fehlgeschlagen", en: "Upload failed", es: "Error al subir" }));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -70,7 +71,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error("Bitte kurz beschreiben, was zu sehen sein soll");
+      toast.error(tx({ de: "Bitte kurz beschreiben, was zu sehen sein soll", en: "Please briefly describe what should be shown", es: "Describe brevemente lo que debe mostrarse" }));
       return;
     }
     setGenerating(true);
@@ -79,13 +80,13 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
         body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast" },
       });
       if (error) throw error;
-      if (data?.ok === false || data?.error) throw new Error(data.error || "Generierung fehlgeschlagen");
+      if (data?.ok === false || data?.error) throw new Error(data.error || tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error en la generación" }));
       const url = data?.image?.url ?? data?.image;
-      if (!url) throw new Error("Kein Bild erhalten");
+      if (!url) throw new Error(tx({ de: "Kein Bild erhalten", en: "No image received", es: "No se recibió ninguna imagen" }));
       onPick(url);
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Generierung fehlgeschlagen");
+      toast.error(error instanceof Error ? error.message : tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error en la generación" }));
     } finally {
       setGenerating(false);
     }
@@ -114,14 +115,14 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Bildquelle wählen</DialogTitle>
+          <DialogTitle>{tx({ de: "Bildquelle wählen", en: "Choose image source", es: "Elegir fuente de imagen" })}</DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="upload">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="upload"><Upload className="mr-1.5 h-3.5 w-3.5" />Upload</TabsTrigger>
-            <TabsTrigger value="ai"><Sparkles className="mr-1.5 h-3.5 w-3.5" />KI-Bild</TabsTrigger>
-            <TabsTrigger value="library"><Library className="mr-1.5 h-3.5 w-3.5" />Mediathek</TabsTrigger>
+            <TabsTrigger value="ai"><Sparkles className="mr-1.5 h-3.5 w-3.5" />{tx({ de: "KI-Bild", en: "AI image", es: "Imagen IA" })}</TabsTrigger>
+            <TabsTrigger value="library"><Library className="mr-1.5 h-3.5 w-3.5" />{tx({ de: "Mediathek", en: "Media library", es: "Biblioteca" })}</TabsTrigger>
             <TabsTrigger value="stock"><Images className="mr-1.5 h-3.5 w-3.5" />Stock</TabsTrigger>
           </TabsList>
 
@@ -132,7 +133,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
               className="flex h-52 w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-primary/40 transition-colors hover:bg-primary/5"
             >
               {uploading ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : <Upload className="h-6 w-6 text-primary" />}
-              <span className="text-sm">Bild hierher klicken und auswählen</span>
+              <span className="text-sm">{tx({ de: "Bild hierher klicken und auswählen", en: "Click here to select an image", es: "Haz clic aquí para seleccionar una imagen" })}</span>
               <span className="text-xs text-muted-foreground">JPG, PNG oder WEBP bis 10 MB</span>
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />

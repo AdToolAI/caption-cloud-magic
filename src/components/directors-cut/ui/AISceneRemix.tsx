@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 interface AISceneRemixProps {
   open: boolean;
@@ -49,7 +50,7 @@ const remixOptions: RemixOption[] = [
   {
     id: 'hook-first',
     name: 'Hook First',
-    description: 'Spannendste Szene zuerst für maximale Aufmerksamkeit',
+    description: tx({ de: 'Spannendste Szene zuerst für maximale Aufmerksamkeit', en: 'Most exciting scene first for maximum attention', es: 'La escena más emocionante primero para máxima atención' }),
     icon: <Zap className="w-5 h-5" />,
     color: 'from-amber-500 to-orange-500',
     badge: 'Empfohlen',
@@ -89,7 +90,7 @@ const platformOptions: RemixOption[] = [
   {
     id: 'youtube',
     name: 'YouTube Story',
-    description: 'Klassischer Story-Arc mit Intro und Outro',
+    description: tx({ de: 'Klassischer Story-Arc mit Intro und Outro', en: 'Classic story arc with intro and outro', es: 'Arco narrativo clásico con introducción y cierre' }),
     icon: <Film className="w-5 h-5" />,
     color: 'from-red-500 to-red-600',
   },
