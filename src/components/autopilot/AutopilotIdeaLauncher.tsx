@@ -424,7 +424,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm">Sprache</Label>
+          <Label className="text-sm">{tx({ de: "Sprache", en: "Language", es: "Idioma" })}</Label>
           <Select value={options.language} onValueChange={(v) => set('language', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>

@@ -576,7 +576,7 @@ export function EventCreateDialog({
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2">
-                <Label className="text-sm text-muted-foreground">Sprache:</Label>
+                <Label className="text-sm text-muted-foreground">{tx({ de: "Sprache:", en: "Language:", es: "Idioma:" })}</Label>
                 <Select
                   value={selectedLanguage}
                   onValueChange={(value: 'de' | 'en' | 'es') => setSelectedLanguage(value)}
