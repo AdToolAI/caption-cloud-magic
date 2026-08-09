@@ -330,7 +330,7 @@ import { sortVoicesPremiumFirst, DEFAULT_VOICE_SETTINGS, DEFAULT_MODEL, type Voi
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import { Badge } from '@/components/ui/badge';
-import { useTx } from '@/lib/i18nText';
+import { useTx, tx } from '@/lib/i18nText';
 
 const VOICE_LANG_TABS: Array<{ code: 'de' | 'en' | 'es'; flag: string; label: string }> = [
   { code: 'de', flag: '🇩🇪', label: 'DE' },
@@ -371,7 +371,7 @@ const SubtitleVoiceoverSection: React.FC<{
         setLibraryVoices(sortVoicesPremiumFirst(voices));
       } catch (err) {
         console.error('[SubtitleVoiceover] list-voices failed:', err);
-        toast.error(t('dc.voiceoverGenerationFailed') || tr({ de: 'Stimmen konnten nicht geladen werden', en: 'Could not load voices', es: 'No se pudieron cargar las voces' }));
+        toast.error(t('dc.voiceoverGenerationFailed') || tx({ de: 'Stimmen konnten nicht geladen werden', en: 'Could not load voices', es: 'No se pudieron cargar las voces' }));
       } finally {
         if (!cancelled) setLoadingVoices(false);
       }
