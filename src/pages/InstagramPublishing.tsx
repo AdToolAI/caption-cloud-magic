@@ -1028,7 +1028,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
                       <div>
                         <p className="font-medium">{tx({ de: "Klicke auf \"Generate Access Token\"", en: "Click on “Generate Access Token”", es: "Haga clic en \"Generar token de acceso\"" })}</p>
-                        <p className="text-muted-foreground">Neben dem Token-Feld</p>
+                        <p className="text-muted-foreground">{tx({ de: 'Neben dem Token-Feld', en: 'Next to the token field', es: 'Junto al campo de token' })}</p>
                       </div>
                     </li>
                     <li className="flex gap-3">
@@ -1049,7 +1049,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
                       <div>
                         <p className="font-medium">Bestätige im Popup</p>
-                        <p className="text-muted-foreground">Klicke auf "Als {'{'}Dein Name{'}'} fortfahren"</p>
+                        <p className="text-muted-foreground">{tx({ de: "Klicke auf \"Als {'{'}Dein Name{'}'} fortfahren\"", en: "Click on \"Continue as {'{'}Your Name{'}'}\"", es: "Haz clic en \"Continuar como {'{'}Tu Nombre{'}'}\"" })}</p>
                       </div>
                     </li>
                     <li className="flex gap-3">

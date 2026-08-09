@@ -36,12 +36,12 @@ export default function Alerts() {
             <div>
               <CardTitle className="text-2xl">🚨 Alerts &amp; Health Monitoring</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Automatische Überwachung mit Email-Benachrichtigung an den Admin
+                {tx({ de: "Automatische Überwachung mit Email-Benachrichtigung an den Admin", en: "Automatic monitoring with email notification to the admin", es: "Monitoreo automático con notificación por correo al administrador" })}
               </p>
             </div>
             <Button onClick={runHealthCheck} disabled={running} variant="outline">
               {running ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-              Test Run
+              {tx({ de: "Testlauf", en: "Test run", es: "Ejecución de prueba" })}
             </Button>
           </div>
         </CardHeader>
@@ -56,23 +56,21 @@ export default function Alerts() {
         <AlertConfigCard />
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">ℹ️ So funktioniert's</CardTitle>
+            <CardTitle className="text-lg">{tx({ de: "ℹ️ So funktioniert's", en: "ℹ️ How it works", es: "ℹ️ Cómo funciona" })}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              <b className="text-foreground">Health-Alerter</b> {tx({ de: "läuft alle", en: "runs all", es: "ejecuta todo" })} <b>10 Minuten</b> und prüft 5 Schwellen.
-              Ist eine überschritten und die Cooldown abgelaufen, geht eine Email raus.
+              <b className="text-foreground">Health-Alerter</b> {tx({ de: "läuft alle", en: "runs every", es: "se ejecuta cada" })} <b>10 {tx({ de: "Minuten", en: "minutes", es: "minutos" })}</b> {tx({ de: "und prüft 5 Schwellen.", en: "and checks 5 thresholds.", es: "y comprueba 5 umbrales." })}
+              {tx({ de: "Ist eine überschritten und die Cooldown abgelaufen, geht eine Email raus.", en: "If one is exceeded and the cooldown has expired, an email is sent.", es: "Si se supera uno y el cooldown ha expirado, se envía un correo." })}
             </p>
             <p>
-              <b className="text-foreground">Auto-Resolve:</b> Sobald der Wert beim nächsten Check
-              wieder unter der Schwelle liegt, wird der Alert automatisch geschlossen.
+              {tx({ de: <><b className="text-foreground">Auto-Resolve:</b> Sobald der Wert beim nächsten Check wieder unter der Schwelle liegt, wird der Alert automatisch geschlossen.</>, en: <><b className="text-foreground">Auto-resolve:</b> As soon as the value is back below the threshold at the next check, the alert is closed automatically.</>, es: <><b className="text-foreground">Resolución automática:</b> En cuanto el valor vuelva a estar por debajo del umbral en la siguiente comprobación, la alerta se cierra automáticamente.</> })}
             </p>
             <p>
-              <b className="text-foreground">Wöchentlicher Report:</b> Jeden Sonntag um 08:00 Uhr
-              kommt eine HTML-Übersicht mit allen wichtigen KPIs der letzten 7 Tage.
+              {tx({ de: <><b className="text-foreground">Wöchentlicher Report:</b> Jeden Sonntag um 08:00 Uhr kommt eine HTML-Übersicht mit allen wichtigen KPIs der letzten 7 Tage.</>, en: <><b className="text-foreground">Weekly report:</b> Every Sunday at 08:00, an HTML overview with all important KPIs of the last 7 days is sent.</>, es: <><b className="text-foreground">Informe semanal:</b> Cada domingo a las 08:00 se envía un resumen HTML con todos los KPI importantes de los últimos 7 días.</> })}
             </p>
             <p>
-              <b className="text-foreground">Cleanup:</b> Alerts älter als 30 Tage werden automatisch entfernt.
+              {tx({ de: <><b className="text-foreground">Cleanup:</b> Alerts älter als 30 Tage werden automatisch entfernt.</>, en: <><b className="text-foreground">Cleanup:</b> Alerts older than 30 days are automatically removed.</>, es: <><b className="text-foreground">Limpieza:</b> Las alertas de más de 30 días se eliminan automáticamente.</> })}
             </p>
           </CardContent>
         </Card>

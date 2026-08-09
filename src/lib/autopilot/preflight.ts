@@ -182,7 +182,7 @@ export function preflightTreatment(treatment: AutopilotTreatment): PreflightResu
     findings.push(
       block(
         'duration_drift',
-        `Szenensumme (${sum.toFixed(1)}s) weicht von der Zielzeit (${treatment.totalDurationSeconds}s) ab.`,
+        tx({ de: `Szenensumme (${sum.toFixed(1)}s) weicht von der Zielzeit (${treatment.totalDurationSeconds}s) ab.`, en: `Scene total (${sum.toFixed(1)}s) deviates from the target duration (${treatment.totalDurationSeconds}s).`, es: `La suma de escenas (${sum.toFixed(1)}s) se desvía de la duración objetivo (${treatment.totalDurationSeconds}s).` }),
       ),
     );
   }
