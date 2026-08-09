@@ -7,6 +7,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,7 +36,7 @@ Arbeitsregeln:
    später den Modellprompt.
 2. subject, action, environment und mood sind IMMER auf Englisch — das ist die Sprache der
    Bildmodelle. Titel, Logline und gesprochene Dialoge sind in der Sprache des Nutzers.
-3. Eine Szene = eine sichtbare Handlung. Keine Aufzählungen, keine "und dann"-Ketten.
+3. Eine Szene = eine sichtbare Handlung. Keine Aufzählungen, keine tl({ de: "und dann", en: "and then", es: "y luego" })-Ketten.
 4. Kein Text im Bild. Beschreibe niemals Schrift, Logos, Untertitel oder Schilder.
 5. Verwende ausschließlich die übergebenen Charaktere. Erfinde keine Personen dazu.
    Wenn keine Charaktere übergeben wurden, beschreibe Menschen generisch oder verzichte
@@ -94,7 +95,7 @@ const SCENE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "autopilot-treatment", ok: true });
 
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
 
     const body = (await req.json()) as Body;
     const brief = (body?.brief ?? "").trim();
-    if (brief.length < 8) return json({ error: "Bitte beschreibe dein Video etwas genauer." }, 400);
+    if (brief.length < 8) return json({ error: tl({ de: "Bitte beschreibe dein Video etwas genauer.", en: "Please describe your video in more detail.", es: "Por favor, describe tu video con más detalle." }) }, 400);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY missing" }, 500);
@@ -145,7 +146,7 @@ Deno.serve(async (req) => {
       `Zielsprache für Dialoge/Texte: ${language}`,
       body.target_duration_seconds
         ? `Gesamtlänge: ca. ${body.target_duration_seconds} Sekunden`
-        : "Gesamtlänge: passend zum Genre wählen",
+        : tl({ de: "Gesamtlänge: passend zum Genre wählen", en: "Total length: choose according to genre", es: "Duración total: elegir según el género" }),
       characters.length
         ? `Verfügbare Charaktere (nur diese verwenden, characterIds exakt übernehmen):\n${characters
             .map((c) => `- ${c.id} — ${c.name}${c.description ? `: ${c.description}` : ""}`)
@@ -338,7 +339,7 @@ Deno.serve(async (req) => {
       user_id: user.id,
       stage: "treatment",
       role: "writer",
-      message: `Treatment "${treatment.title}" mit ${scenes.length} Szenen entwickelt.`,
+      message: tl({ de: `Treatment "${treatment.title}" mit ${scenes.length} Szenen entwickelt.`, en: `Treatment "${treatment.title}" developed with ${scenes.length} scenes.`, es: `Tratamiento "${treatment.title}" desarrollado con ${scenes.length} escenas.` }),
       meta: { logline: treatment.logline },
     });
 
@@ -347,7 +348,7 @@ Deno.serve(async (req) => {
     console.error("[autopilot-treatment] fatal", err);
     return json({ error: err instanceof Error ? err.message : "unknown" }, 500);
   }
-});
+})(req)));
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {

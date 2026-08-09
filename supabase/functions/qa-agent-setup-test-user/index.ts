@@ -5,6 +5,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +13,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "qa-agent-setup-test-user" });
@@ -115,7 +116,7 @@ Deno.serve(async (req) => {
         created,
         password_changed: passwordChanged,
         instructions: passwordReturned
-          ? "Speichere das Passwort SOFORT als Secret QA_TEST_USER_PASSWORD — es wird nur dieses eine Mal angezeigt."
+          ? tl({ de: "Speichere das Passwort SOFORT als Secret QA_TEST_USER_PASSWORD — es wird nur dieses eine Mal angezeigt.", en: "Save the password IMMEDIATELY as Secret QA_TEST_USER_PASSWORD — it will only be shown this one time.", es: "Guarda la contraseña INMEDIATAMENTE como Secreto QA_TEST_USER_PASSWORD — solo se mostrará esta vez." })
           : "User existierte bereits; Passwort unverändert. Sende { reset_password: true } um es neu zu setzen.",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -127,4 +128,4 @@ Deno.serve(async (req) => {
       status: 500,
     });
   }
-});
+})(req)));

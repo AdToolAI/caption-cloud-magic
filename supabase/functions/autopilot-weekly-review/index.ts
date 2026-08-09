@@ -4,13 +4,14 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -88,7 +89,7 @@ Deno.serve(async (req) => {
 
       // AI strategy suggestion
       let aiRecommendation: Record<string, unknown> = {
-        strategy_text: "Nicht genug Daten für eine Empfehlung — weiter sammeln.",
+        strategy_text: tl({ de: "Nicht genug Daten für eine Empfehlung — weiter sammeln.", en: "Not enough data for a recommendation — keep collecting.", es: "No hay suficientes datos para una recomendación — sigue recopilando." }),
         suggested_budget_eur: brief.weekly_budget_eur,
         suggested_mix: brief.content_mix,
       };
@@ -104,7 +105,7 @@ Deno.serve(async (req) => {
               messages: [
                 {
                   role: "system",
-                  content: "Du bist ein Senior Social Media Strategist. Analysiere die Wochendaten und schlage konkret eine Strategie + Budget für nächste Woche vor. Sei präzise und actionable.",
+                  content: tl({ de: "Du bist ein Senior Social Media Strategist. Analysiere die Wochendaten und schlage konkret eine Strategie + Budget für nächste Woche vor. Sei präzise und actionable.", en: "You are a Senior Social Media Strategist. Analyze the weekly data and propose a concrete strategy + budget for next week. Be precise and actionable.", es: "Eres un estratega senior de redes sociales. Analiza los datos semanales y propón una estrategia + presupuesto concretos para la próxima semana. Sé preciso y accionable." }),
                 },
                 {
                   role: "user",
@@ -129,7 +130,7 @@ Deno.serve(async (req) => {
                 type: "function",
                 function: {
                   name: "weekly_strategy",
-                  description: "Liefere eine kurze Strategie und einen Budget-Vorschlag.",
+                  description: tl({ de: "Liefere eine kurze Strategie und einen Budget-Vorschlag.", en: "Provide a brief strategy and budget proposal.", es: "Proporciona una breve estrategia y propuesta de presupuesto." }),
                   parameters: {
                     type: "object",
                     properties: {
@@ -217,7 +218,7 @@ Deno.serve(async (req) => {
             user_id: userId,
             kind: "autopilot_weekly_review_ready",
             title: "Wochen-Review bereit",
-            body: `Deine Strategie für die kommende Woche wartet. Bitte bis Sonntag 18:00 UTC bestätigen.`,
+            body: tl({ de: `Deine Strategie für die kommende Woche wartet. Bitte bis Sonntag 18:00 UTC bestätigen.`, en: `Your strategy for the coming week is ready. Please confirm by Sunday 6 PM UTC.`, es: `Tu estrategia para la próxima semana está lista. Por favor, confirma antes del domingo a las 18:00 UTC.` }),
             payload: { review_id: review!.id, deadline: deadline.toISOString() },
           },
         });
@@ -231,7 +232,7 @@ Deno.serve(async (req) => {
     console.error("weekly-review error", e);
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
-});
+})(req)));
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {

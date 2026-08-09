@@ -6,6 +6,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -39,7 +40,7 @@ interface PostingSlot {
   score: number;
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -143,7 +144,7 @@ CONTENT-MIX (Soll-Verteilung): ${contentMix.ai_video}% KI-Video / ${contentMix.s
 ZIELGRUPPE: ${brief.target_audience || "(nicht definiert)"}
 USP: ${brief.usp || "(nicht definiert)"}
 ERLAUBTE FORMATE: ${allowedFormats}
-${isLowBudget ? "⚠️ Bei niedrigem Budget MAXIMAL Static-Posts und Image-Carousels einsetzen — keine ai-video!" : ""}`;
+${isLowBudget ? tl({ de: "⚠️ Bei niedrigem Budget MAXIMAL Static-Posts und Image-Carousels einsetzen — keine ai-video!", en: "⚠️ With a low budget, use MAXIMALLY static posts and image carousels — no AI video!", es: "⚠️ Con un presupuesto bajo, utiliza MÁXIMAMENTE publicaciones estáticas y carruseles de imágenes — ¡nada de video con IA!" }) : ""}`;
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -189,7 +190,7 @@ Strikte Regeln:
           type: "function",
           function: {
             name: "create_plan",
-            description: "Liefere einen Content-Plan mit konkreten Topic-Ideen pro Plattform, jeweils mit Trend-Bezug und Format.",
+            description: tl({ de: "Liefere einen Content-Plan mit konkreten Topic-Ideen pro Plattform, jeweils mit Trend-Bezug und Format.", en: "Provide a content plan with concrete topic ideas per platform, each with trend relevance and format.", es: "Proporciona un plan de contenido con ideas de temas concretas por plataforma, cada una con relevancia de tendencia y formato." }),
             parameters: {
               type: "object",
               properties: {
@@ -202,7 +203,7 @@ Strikte Regeln:
                       language: { type: "string" },
                       topic_hint: { type: "string", description: "Konkrete Content-Idee (max 120 Zeichen)." },
                       format_hint: { type: "string", enum: ["short_video", "image_carousel", "single_image", "talking_head"] },
-                      trend_anchor: { type: "string", description: "Optional: Bezug zu einem live_trend oder live_news Headline." },
+                      trend_anchor: { type: "string", description: tl({ de: "Optional: Bezug zu einem live_trend oder live_news Headline.", en: "Optional: Reference to a live_trend or live_news headline.", es: "Opcional: Referencia a una tendencia en vivo o titular de noticias en vivo." }) },
                     },
                     required: ["platform", "language", "topic_hint", "format_hint"],
                     additionalProperties: false,
@@ -308,7 +309,7 @@ Strikte Regeln:
     console.error("plan-week error", e);
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
-});
+})(req)));
 
 /* ===================== Helpers ===================== */
 

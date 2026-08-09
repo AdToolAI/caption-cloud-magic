@@ -8,6 +8,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { generateUnsubscribeToken, suppressEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,7 +46,7 @@ function page(title: string, message: string, status = 200): Response {
   });
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "email-unsubscribe" });
@@ -64,7 +65,7 @@ serve(async (req) => {
   const expected = await generateUnsubscribeToken(email);
   if (token !== expected) {
     console.warn(`[email-unsubscribe] invalid token for ${email}`);
-    return page("Ungültiger Link", "Dieser Abmelde-Link ist nicht mehr gültig.", 400);
+    return page("Ungültiger Link", tl({ de: "Dieser Abmelde-Link ist nicht mehr gültig.", en: "This unsubscribe link is no longer valid.", es: "Este enlace para cancelar la suscripción ya no es válido." }), 400);
   }
 
   try {
@@ -75,7 +76,7 @@ serve(async (req) => {
     console.log(`[email-unsubscribe] unsubscribed: ${email}`);
   } catch (e) {
     console.error("[email-unsubscribe] error:", e);
-    return page("Fehler", "Beim Abmelden ist ein Fehler aufgetreten. Bitte versuche es später erneut.", 500);
+    return page("Fehler", tl({ de: "Beim Abmelden ist ein Fehler aufgetreten. Bitte versuche es später erneut.", en: "An error occurred during unsubscription. Please try again later.", es: "Ocurrió un error al cancelar la suscripción. Por favor, inténtalo de nuevo más tarde." }), 500);
   }
 
   // For one-click POST, RFC 8058 expects 200 with no body required
@@ -88,6 +89,6 @@ serve(async (req) => {
 
   return page(
     "Du wurdest abgemeldet",
-    `Die Adresse <strong>${email}</strong> erhält keine Marketing-Mails mehr von uns. Transaktions-Mails (z. B. Passwort-Reset) bekommst du weiterhin.`,
+    tl({ de: `Die Adresse <strong>${email}</strong> erhält keine Marketing-Mails mehr von uns. Transaktions-Mails (z. B. Passwort-Reset) bekommst du weiterhin.`, en: `The address <strong>${email}</strong> will no longer receive marketing emails from us. You will continue to receive transactional emails (e.g., password reset).`, es: `La dirección <strong>${email}</strong> ya no recibirá correos electrónicos de marketing de nuestra parte. Seguirás recibiendo correos electrónicos transaccionales (por ejemplo, restablecimiento de contraseña).` }),
   );
-});
+})(req)));

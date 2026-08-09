@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -20,7 +21,7 @@ interface SceneInput {
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -123,7 +124,7 @@ serve(async (req) => {
         ? 'Storyboard scenes (the script MUST follow this order, hook in scene 1, CTA / resolution in the last scene):'
         : lang === 'es'
         ? 'Escenas del guion gráfico (el guion DEBE seguir este orden, gancho en la escena 1, CTA / resolución en la última):'
-        : 'Storyboard-Szenen (das Skript MUSS diese Reihenfolge einhalten, Hook in Szene 1, CTA / Auflösung in der letzten Szene):';
+        : tl({ de: 'Storyboard-Szenen (das Skript MUSS diese Reihenfolge einhalten, Hook in Szene 1, CTA / Auflösung in der letzten Szene):', en: 'Storyboard scenes (the script MUST follow this order, hook in scene 1, CTA / resolution in the last scene):', es: 'Escenas del guion gráfico (el guion DEBE seguir este orden, gancho en la escena 1, CTA / resolución en la última escena):' });
       const rows = sceneBudgets.map((s, i) => {
         const num = i + 1;
         const desc = s.description ? ` — ${s.description.slice(0, 140)}` : '';
@@ -241,10 +242,10 @@ Gib deine Antwort über das bereitgestellte Tool zurück.`;
           ? 'Tell a coherent story that matches the storyboard scenes.'
           : language === 'es'
           ? 'Cuenta una historia coherente que coincida con las escenas del guion gráfico.'
-          : 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.');
+          : tl({ de: 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.', en: 'Tell a coherent story that matches the storyboard scenes.', es: 'Cuenta una historia coherente que coincida con las escenas del storyboard.' }));
 
     const userPrompts: Record<string, string> = {
-      de: `Erstelle einen Voice-over-Text für: "${effectiveIdea}". Wortanzahl-Vorgabe: ${minWords}–${maxWords} Wörter (Ziel ${idealWords}).${hasScenes ? ' Halte dich strikt an die Szenen-Tabelle und füge die [[scene:N]] Marker ein.' : ''}`,
+      de: tl({ de: `Erstelle einen Voice-over-Text für: "${effectiveIdea}". Wortanzahl-Vorgabe: ${minWords}–${maxWords} Wörter (Ziel ${idealWords}).${hasScenes ? tl({ de: ' Halte dich strikt an die Szenen-Tabelle und füge die [[scene:N]] Marker ein.', en: ' Adhere strictly to the scene table and insert the [[scene:N]] markers.', es: ' Adhiérete estrictamente a la tabla de escenas e inserta los marcadores [[scene:N]].' }) : ''}`, en: `Create a voice-over text for: "${effectiveIdea}". Word count target: ${minWords}–${maxWords} words (ideal ${idealWords}).${hasScenes ? ' Adhere strictly to the scene table and insert the [[scene:N]] markers.' : ''}`, es: `Crea un texto de voz en off para: "${effectiveIdea}". Objetivo de recuento de palabras: ${minWords}–${maxWords} palabras (ideal ${idealWords}).${hasScenes ? ' Adhiérete estrictamente a la tabla de escenas e inserta los marcadores [[scene:N]].' : ''}` }),
       en: `Create a voice-over script for: "${effectiveIdea}". Required word count: ${minWords}–${maxWords} words (target ${idealWords}).${hasScenes ? ' Strictly follow the scene table and insert [[scene:N]] markers.' : ''}`,
       es: `Crea un guión de voice-over para: "${effectiveIdea}". Recuento requerido: ${minWords}–${maxWords} palabras (objetivo ${idealWords}).${hasScenes ? ' Sigue estrictamente la tabla de escenas e inserta los marcadores [[scene:N]].' : ''}`,
     };
@@ -348,7 +349,7 @@ Gib deine Antwort über das bereitgestellte Tool zurück.`;
               ? `Your script had only ${wordCount} words. It must be between ${minWords} and ${maxWords} words. Rewrite longer with more detail. Keep the [[scene:N]] structure.`
               : language === 'es'
               ? `Tu guión tuvo solo ${wordCount} palabras. Debe tener entre ${minWords} y ${maxWords}. Reescríbelo más largo. Mantén la estructura [[scene:N]].`
-              : `Dein Skript hatte nur ${wordCount} Wörter. Es muss zwischen ${minWords} und ${maxWords} Wörter haben. Schreibe es länger. Behalte die [[scene:N]]-Struktur.`,
+              : tl({ de: `Dein Skript hatte nur ${wordCount} Wörter. Es muss zwischen ${minWords} und ${maxWords} Wörter haben. Schreibe es länger. Behalte die [[scene:N]]-Struktur.`, en: `Your script only had ${wordCount} words. It must be between ${minWords} and ${maxWords} words. Make it longer. Keep the [[scene:N]] structure.`, es: `Tu guion solo tenía ${wordCount} palabras. Debe tener entre ${minWords} y ${maxWords} palabras. Hazlo más largo. Mantén la estructura [[scene:N]].` }),
         },
       ];
       try {
@@ -423,4 +424,4 @@ Gib deine Antwort über das bereitgestellte Tool zurück.`;
       { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

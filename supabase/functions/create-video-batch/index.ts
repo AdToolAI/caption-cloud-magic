@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,7 @@ interface BatchVideoRequest {
   batch_data: Array<Record<string, string | number>>;
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -67,7 +68,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: false,
           error: 'INSUFFICIENT_CREDITS',
-          message: `Batch benötigt ${totalCost} Credits, verfügbar: ${wallet?.balance || 0}`
+          message: tl({ de: `Batch benötigt ${totalCost} Credits, verfügbar: ${wallet?.balance || 0}`, en: `Batch requires ${totalCost} credits, available: ${wallet?.balance || 0}`, es: `El lote requiere ${totalCost} créditos, disponibles: ${wallet?.balance || 0}` })
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
@@ -130,4 +131,4 @@ Deno.serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

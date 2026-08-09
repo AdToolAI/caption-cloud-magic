@@ -7,6 +7,7 @@ import { recordHeartbeat } from "../_shared/heartbeat.ts";
 import { withSentryCron } from "../_shared/sentryCron.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -16,7 +17,7 @@ const corsHeaders = {
 // Hard timeout: predictions older than 15min are considered failed
 const TIMEOUT_MIN = 15;
 
-Deno.serve(withSentryCron("autopilot-video-poll", { schedule: "* * * * *", maxRuntime: 5 }, async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (withSentryCron("autopilot-video-poll", { schedule: "* * * * *", maxRuntime: 5 }, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -171,7 +172,7 @@ Deno.serve(withSentryCron("autopilot-video-poll", { schedule: "* * * * *", maxRu
     expectedIntervalSeconds: 60,
   });
   return json({ ok: true, polled: list.length, completed, failed, still_processing: stillProcessing });
-}));
+}))(req)));
 
 async function markFailed(
   admin: ReturnType<typeof createClient>,
@@ -222,7 +223,7 @@ async function markFailed(
       user_id: slot.user_id,
       type: "autopilot_blocked",
       title: "Video-Render fehlgeschlagen",
-      message: `Slot konnte nicht gerendert werden (${reason}). ${refund} Credits zurückerstattet.`,
+      message: tl({ de: `Slot konnte nicht gerendert werden (${reason}). ${refund} Credits zurückerstattet.`, en: `Slot could not be rendered (${reason}). ${refund} credits refunded.`, es: `No se pudo renderizar el slot (${reason}). ${refund} créditos reembolsados.` }),
       metadata: { slot_id: slot.id, reason, refund },
       push_url: "/autopilot",
     },

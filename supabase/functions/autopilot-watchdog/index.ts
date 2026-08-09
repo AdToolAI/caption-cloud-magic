@@ -19,6 +19,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +35,7 @@ const FINAL_STAGES = new Set(["audio", "voice", "music", "sfx", "finalizing"]);
 const MAX_RESUMES = 2;
 
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "autopilot-watchdog", ok: true });
 
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
           .from("autopilot_productions")
           .update({ resume_attempts: attempts + 1, heartbeat_at: new Date().toISOString() })
           .eq("id", row.id);
-        await note(admin, row, "Endschnitt wurde neu angestoßen — die Szenen waren bereits fertig.");
+        await note(admin, row, tl({ de: "Endschnitt wurde neu angestoßen — die Szenen waren bereits fertig.", en: "Final cut was restarted — scenes were already finished.", es: "El corte final se reinició — las escenas ya estaban terminadas." }));
         await invoke("autopilot-finalize", { production_id: row.id, user_id: row.user_id });
         result.finalized++;
         continue;
@@ -118,13 +119,13 @@ Deno.serve(async (req) => {
             heartbeat_at: new Date().toISOString(),
             completed_at: new Date().toISOString(),
             error_message:
-              `Der Endschnitt konnte trotz ${MAX_RESUMES} Versuchen nicht abgeschlossen werden — ${usable.length} fertige Szene(n) bleiben gesichert.`,
+              tl({ de: `Der Endschnitt konnte trotz ${MAX_RESUMES} Versuchen nicht abgeschlossen werden — ${usable.length} fertige Szene(n) bleiben gesichert.`, en: `The final cut could not be completed despite ${MAX_RESUMES} attempts — ${usable.length} finished scene(s) remain saved.`, es: `El corte final no pudo completarse a pesar de ${MAX_RESUMES} intentos — ${usable.length} escena(s) terminada(s) permanecen guardadas.` }),
           })
           .eq("id", row.id);
         await note(
           admin,
           row,
-          `Nach ${MAX_RESUMES} Versuchen aufgegeben — ${usable.length} fertige Szene(n) bleiben erhalten, keine weiteren Kosten.`,
+          tl({ de: `Nach ${MAX_RESUMES} Versuchen aufgegeben — ${usable.length} fertige Szene(n) bleiben erhalten, keine weiteren Kosten.`, en: `Given up after ${MAX_RESUMES} attempts — ${usable.length} finished scene(s) remain, no further costs.`, es: `Se rindió después de ${MAX_RESUMES} intentos — ${usable.length} escena(s) terminada(s) permanecen, sin costos adicionales.` }),
           "error",
         );
         result.failed++;
@@ -138,7 +139,7 @@ Deno.serve(async (req) => {
           status: "failed",
           stage: "failed",
           progress: 100,
-          error_message: "Produktion blieb mehrfach stehen und konnte nicht fortgesetzt werden.",
+          error_message: tl({ de: "Produktion blieb mehrfach stehen und konnte nicht fortgesetzt werden.", en: "Production stopped multiple times and could not be continued.", es: "La producción se detuvo varias veces y no pudo continuar." }),
           completed_at: new Date().toISOString(),
         })
         .eq("id", row.id);
@@ -151,7 +152,7 @@ Deno.serve(async (req) => {
   }
 
   return json({ ok: true, ...result });
-});
+})(req)));
 
 async function invoke(fn: string, payload: Record<string, unknown>) {
   try {

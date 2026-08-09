@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,7 +21,7 @@ const ASPECT_RATIOS = {
   '21:9': { width: 2560, height: 1080, name: 'Cinematic Ultrawide' },
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -128,7 +129,7 @@ Berücksichtige:
 - Tracking-Modus: ${tracking_mode}
 
 Szenen:
-${scenesDescription || 'Keine Szenen-Details verfügbar'}
+${scenesDescription || tl({ de: 'Keine Szenen-Details verfügbar', en: 'No scene details available', es: 'No hay detalles de la escena disponibles' })}
 
 Generiere Crop-Analyse im Format:
 {
@@ -254,4 +255,4 @@ Generiere Crop-Analyse im Format:
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

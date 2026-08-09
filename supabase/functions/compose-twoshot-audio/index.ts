@@ -23,6 +23,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import {
+import { tl, withLang } from "../_shared/i18n.ts";
   ensureDialogTurnsForScene,
   normalizeTurns,
   readIdOnlyEnabled,
@@ -527,7 +528,7 @@ async function humePcm(
 }
 
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -857,7 +858,7 @@ serve(async (req) => {
         return json({
           error: "missing_voice",
           speaker: block.rawSpeaker,
-          message: `Sprecher "${block.rawSpeaker}" hat keine Stimme zugeordnet.`,
+          message: tl({ de: `Sprecher "${block.rawSpeaker}" hat keine Stimme zugeordnet.`, en: `Speaker "${block.rawSpeaker}" has no voice assigned.`, es: `El orador "${block.rawSpeaker}" no tiene una voz asignada.` }),
         }, 400);
       }
       resolved.push({ voice, block });
@@ -906,7 +907,7 @@ serve(async (req) => {
               speaker: block.rawSpeaker,
               voice: voice.voiceId,
               engine: voice.engine,
-              message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
+              message: tl({ de: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`, en: `Voice "${voice.voiceId}" (${voice.engine}) could not be generated: ${errMsg}`, es: `La voz "${voice.voiceId}" (${voice.engine}) no pudo ser generada: ${errMsg}` }),
             }, 400),
           };
           return;
@@ -933,7 +934,7 @@ serve(async (req) => {
               speaker: block.rawSpeaker,
               voice: voice.voiceId,
               engine: voice.engine,
-              message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
+              message: tl({ de: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`, en: `Voice "${voice.voiceId}" (${voice.engine}) could not be generated: ${errMsg}`, es: `La voz "${voice.voiceId}" (${voice.engine}) no pudo ser generada: ${errMsg}` }),
               fallback_error: fbErr instanceof Error ? fbErr.message : String(fbErr),
             }, 400),
           };
@@ -1001,7 +1002,7 @@ serve(async (req) => {
           return json({
             error: "ambiguous_speaker_name",
             speaker: block.rawSpeaker,
-            message: `Sprecher "${block.rawSpeaker}" ist mehrdeutig — mehrere Cast-Mitglieder teilen diesen Namen. Bitte verwende den vollen Namen (z. B. "Vorname Nachname:") oder weise dem Skript-Block eine eindeutige Character-ID zu.`,
+            message: tl({ de: `Sprecher "${block.rawSpeaker}" ist mehrdeutig — mehrere Cast-Mitglieder teilen diesen Namen. Bitte verwende den vollen Namen (z. B. "Vorname Nachname:") oder weise dem Skript-Block eine eindeutige Character-ID zu.`, en: `Speaker "${block.rawSpeaker}" is ambiguous — multiple cast members share this name. Please use the full name (e.g., "Firstname Lastname:") or assign a unique character ID to the script block.`, es: `El orador "${block.rawSpeaker}" es ambiguo — varios miembros del elenco comparten este nombre. Por favor, usa el nombre completo (por ejemplo, "Nombre Apellido:") o asigna un ID de personaje único al bloque del guion.` }),
           }, 400);
         }
         const charEntry = fullSlugHit ?? charByName.get(firstName);
@@ -1075,8 +1076,8 @@ serve(async (req) => {
         return json({
           error: "dialog_too_long_for_plate",
           message:
-            `Das Skript dauert ${spokenSec.toFixed(2)} s, aber die Szene ist nur ${sceneDur.toFixed(2)} s lang. ` +
-            `Bitte Text kürzen oder die Szene auf mindestens ${Math.ceil(spokenSec + 0.3)} s verlängern.`,
+            tl({ de: `Das Skript dauert ${spokenSec.toFixed(2)} s, aber die Szene ist nur ${sceneDur.toFixed(2)} s lang. `, en: `The script is ${spokenSec.toFixed(2)}s long, but the scene is only ${sceneDur.toFixed(2)}s long.`, es: `El guion dura ${spokenSec.toFixed(2)}s, pero la escena solo dura ${sceneDur.toFixed(2)}s.` }) +
+            tl({ de: `Bitte Text kürzen oder die Szene auf mindestens ${Math.ceil(spokenSec + 0.3)} s verlängern.`, en: `Please shorten text or extend the scene to at least ${Math.ceil(spokenSec + 0.3)}s.`, es: `Por favor, acorta el texto o extiende la escena a al menos ${Math.ceil(spokenSec + 0.3)}s.` }),
           spoken_sec: Math.round(spokenSec * 1000) / 1000,
           scene_dur_sec: sceneDur,
           overflow_sec: Math.round(overflow * 1000) / 1000,
@@ -1192,9 +1193,9 @@ serve(async (req) => {
       return json({
         error: "speaker_dedup_collision",
         message:
-          `${distinctRawSpeakers.size} unterschiedliche Sprecher im Skript, aber nur ${speakerTracks.length} eindeutige Audio-Spuren. ` +
+          tl({ de: `${distinctRawSpeakers.size} unterschiedliche Sprecher im Skript, aber nur ${speakerTracks.length} eindeutige Audio-Spuren. `, en: `${distinctRawSpeakers.size} distinct speakers in the script, but only ${speakerTracks.length} unique audio tracks.`, es: `${distinctRawSpeakers.size} oradores distintos en el guion, pero solo ${speakerTracks.length} pistas de audio únicas.` }) +
           `Kollision: ${[...new Set(collidingPairs)].join(", ") || "(unbekannt)"}. ` +
-          `Bitte vollen Namen verwenden oder jedem Skript-Block einen eindeutigen Charakter zuweisen.`,
+          tl({ de: `Bitte vollen Namen verwenden oder jedem Skript-Block einen eindeutigen Charakter zuweisen.`, en: `Please use full names or assign a unique character to each script block.`, es: `Por favor, usa nombres completos o asigna un personaje único a cada bloque del guion.` }),
         distinct_speakers: distinctRawSpeakers.size,
         speaker_tracks: speakerTracks.length,
         colliding_pairs: [...new Set(collidingPairs)],
@@ -1397,4 +1398,4 @@ serve(async (req) => {
     console.error("[compose-twoshot-audio] error", e);
     return json({ error: e instanceof Error ? e.message : "unknown error" }, 500);
   }
-});
+})(req)));

@@ -12,10 +12,11 @@ const corsHeaders = {
 };
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 import { sendRadarAlert, claimMilestone } from '../_shared/launch-radar.ts';
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const MILESTONE_COUNTS = [1, 10, 50, 100, 250, 500, 1000];
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
       await sendRadarAlert({
         kind: 'milestone',
         highlight: true,
-        title: 'Das erste Video wurde fertig gerendert',
+        title: tl({ de: 'Das erste Video wurde fertig gerendert', en: 'The first video has finished rendering', es: 'El primer video ha terminado de renderizarse' }),
         dedupeKey: 'milestone:first_render',
         lines: [
           ['Nutzer', String(owner?.email ?? userId)],
@@ -131,4 +132,4 @@ Deno.serve(async (req) => {
     console.error('[LAUNCH-RADAR-NOTIFY] error:', msg);
     return json({ error: msg }, 500);
   }
-});
+})(req)));

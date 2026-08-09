@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,7 +16,7 @@ const RENDER_TIMEOUT_SECONDS = 720; // 12 min
 const UNIVERSAL_CREATOR_TIMEOUT_SECONDS = 600; // 10 min — accommodates AWS throttle backoff retries
 const MAX_RECONCILIATION_PAGES = 20; // max 20 pages × 200 keys = 4000 keys
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -114,7 +115,7 @@ serve(async (req) => {
       const timeoutCategory = !realRenderId && !sawProgressArtifact ? 'start_failed' : 'timeout';
       const timeoutStage = !realRenderId && !sawProgressArtifact ? 'lambda_start' : 'lambda-runtime';
       const timeoutMessage = timeoutCategory === 'start_failed'
-        ? 'Render konnte nicht gestartet werden: Es kam keine echte Remotion-Render-ID und kein Lambda-Fortschritt zurück.'
+        ? tl({ de: 'Render konnte nicht gestartet werden: Es kam keine echte Remotion-Render-ID und kein Lambda-Fortschritt zurück.', en: 'Render could not be started: No real Remotion render ID and no Lambda progress were returned.', es: 'No se pudo iniciar el renderizado: No se devolvió una ID de renderizado de Remotion real ni progreso de Lambda.' })
         : `Render-Timeout nach ${Math.round(effectiveTimeoutSeconds / 60)} Min.`;
       await supabaseAdmin.from(tableName).update({
         status: 'failed',
@@ -259,7 +260,7 @@ serve(async (req) => {
 
     if (!isDirectorsCut && elapsedSeconds > effectiveTimeoutSeconds && !realRenderId && !sawProgressArtifact) {
       const existingCfg = (renderData?.[configColumn] as any) || {};
-      const message = 'Render konnte nicht gestartet werden: Es kam kein Lambda-Status und kein Webhook zurück.';
+      const message = tl({ de: 'Render konnte nicht gestartet werden: Es kam kein Lambda-Status und kein Webhook zurück.', en: 'Render could not be started: No Lambda status and no webhook were returned.', es: 'No se pudo iniciar el renderizado: No se devolvió el estado de Lambda ni el webhook.' });
       await supabaseAdmin.from(tableName).update({
         status: 'failed',
         error_message: message,
@@ -301,7 +302,7 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));
 
 // ============================================
 // HELPER: Build JSON response

@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,7 +11,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-qa-mock',
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -101,7 +102,7 @@ serve(async (req) => {
       ok: true,
       status: 'processing',
       prediction_id: prediction.id,
-      message: 'Verarbeitung gestartet (3 Durchläufe). Dies kann 3–8 Minuten dauern.',
+      message: tl({ de: 'Verarbeitung gestartet (3 Durchläufe). Dies kann 3–8 Minuten dauern.', en: 'Processing started (3 passes). This may take 3–8 minutes.', es: 'Procesamiento iniciado (3 pasadas). Esto puede tardar de 3 a 8 minutos.' }),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -118,4 +119,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));

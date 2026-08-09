@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,7 +65,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number
   return results;
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
     if (balance < cost) {
       return new Response(JSON.stringify({
         error: 'insufficient_credits',
-        message: `Nicht genug Guthaben: ${cost.toFixed(2)} € benötigt, ${balance.toFixed(2)} € verfügbar.`,
+        message: tl({ de: `Nicht genug Guthaben: ${cost.toFixed(2)} € benötigt, ${balance.toFixed(2)} € verfügbar.`, en: `Not enough credit: ${cost.toFixed(2)} € needed, ${balance.toFixed(2)} € available.`, es: `Crédito insuficiente: se necesitan ${cost.toFixed(2)} €, disponibles ${balance.toFixed(2)} €.` }),
         cost, balance,
       }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -207,4 +208,4 @@ Deno.serve(async (req) => {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));

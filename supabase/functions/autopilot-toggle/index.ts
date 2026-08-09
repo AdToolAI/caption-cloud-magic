@@ -2,6 +2,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -14,7 +15,7 @@ interface Body {
   consentTextVersion?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -61,7 +62,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!brief) {
-      return json({ ok: false, error: "Bitte zuerst Brand-Brief speichern." }, 400);
+      return json({ ok: false, error: tl({ de: "Bitte zuerst Brand-Brief speichern.", en: "Please save Brand Brief first.", es: "Por favor, guarda primero el Brand Brief." }) }, 400);
     }
 
     if (brief.locked_until && new Date(brief.locked_until) > new Date()) {
@@ -138,7 +139,7 @@ Deno.serve(async (req) => {
     console.error("autopilot-toggle error", e);
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
-});
+})(req)));
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {

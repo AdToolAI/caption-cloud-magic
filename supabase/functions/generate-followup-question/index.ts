@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,7 +48,7 @@ REGELN:
 Beispiele guter Anschlussfragen:
 - "Welche Posting-Zeiten funktionieren am besten?"
 - "Wie oft sollte ich Stories posten?"
-- "Was macht einen guten Hook aus?"`
+- tl({ de: "Was macht einen guten Hook aus?", en: "What makes a good hook?", es: "¿Qué hace un buen gancho?" })`
       : `You are a content strategy expert. Generate ONE short follow-up question (max 60 chars) that relates to the previous Q&A.
 
 RULES:

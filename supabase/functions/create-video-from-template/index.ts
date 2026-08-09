@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -113,7 +114,7 @@ function cleanInvalidAssets(config: any, customizations: any, template: any): an
   return config;
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -260,7 +261,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: false,
           error: 'INSUFFICIENT_CREDITS',
-          message: `Nicht genügend Credits. ${creditsRequired} Credits benötigt für Video-Generierung.`
+          message: tl({ de: `Nicht genügend Credits. ${creditsRequired} Credits benötigt für Video-Generierung.`, en: `Not enough credits. ${creditsRequired} credits needed for video generation.`, es: `Créditos insuficientes. Se requieren ${creditsRequired} créditos para generar el video.` })
         }),
         { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -347,7 +348,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: false,
           error: 'TEMPLATE_PARSE_ERROR',
-          message: 'Das Template konnte nicht verarbeitet werden. Bitte versuche es erneut.',
+          message: tl({ de: 'Das Template konnte nicht verarbeitet werden. Bitte versuche es erneut.', en: 'Could not process the template. Please try again.', es: 'No se pudo procesar la plantilla. Por favor, inténtalo de nuevo.' }),
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -803,7 +804,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: false,
           error: 'NO_VALID_CONTENT',
-          message: 'Keine gültigen Medien für Video-Erstellung vorhanden. Bitte lade mindestens ein Bild oder Video hoch.'
+          message: tl({ de: 'Keine gültigen Medien für Video-Erstellung vorhanden. Bitte lade mindestens ein Bild oder Video hoch.', en: 'No valid media for video creation. Please upload at least one image or video.', es: 'No hay medios válidos para la creación de videos. Por favor, sube al menos una imagen o un video.' })
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -993,4 +994,4 @@ Deno.serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

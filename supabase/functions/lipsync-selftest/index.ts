@@ -22,6 +22,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 import {
+import { tl, withLang } from "../_shared/i18n.ts";
   LIPSYNC_CONTRACT_VERSION,
   PRECLIP,
   PROVIDER,
@@ -38,7 +39,7 @@ const json = (body: unknown, status: number) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const checks: Check[] = [];
@@ -136,7 +137,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (error) throw error;
     if (!data) {
-      push("golden_run_present", false, "Referenzszene nicht mehr vorhanden");
+      push("golden_run_present", false, tl({ de: "Referenzszene nicht mehr vorhanden", en: "Reference scene no longer exists", es: "La escena de referencia ya no existe" }));
     } else {
       const shots = (data.dialog_shots ?? {}) as Record<string, unknown>;
       const passes = Array.isArray(shots.passes) ? shots.passes : [];
@@ -166,4 +167,4 @@ Deno.serve(async (req) => {
     `[lipsync-selftest] ok=${ok} ${checks.map((c) => `${c.id}=${c.ok ? "ok" : "FAIL"}`).join(" ")}`,
   );
   return json({ ok, version: LIPSYNC_CONTRACT_VERSION, checks }, ok ? 200 : 503);
-});
+})(req)));

@@ -1,3 +1,4 @@
+import { tl, withLang } from "./i18n.ts";
 /**
  * Sync.so Preflight Guard (Stufe B + C of the input-hardening plan).
  *
@@ -1117,8 +1118,8 @@ export function explainSyncErrorCode(code?: string | null): string | null {
     generation_video_missing: "Source video missing — regenerate the scene clip",
     generation_input_validation_failed: "Sync.so rejected the input — check audio/video format",
     generation_internal_auth: "Sync.so authentication failed — contact support",
-    generation_input_video_inaccessible: "Plate-URL war beim Dispatch nicht mehr abrufbar (Quelle abgelaufen) — Szene bitte neu rendern",
-    generation_input_audio_inaccessible: "Audio-URL war beim Dispatch nicht mehr abrufbar (Quelle abgelaufen) — Szene bitte neu rendern",
+    generation_input_video_inaccessible: tl({ de: "Plate-URL war beim Dispatch nicht mehr abrufbar (Quelle abgelaufen) — Szene bitte neu rendern", en: "Plate URL was no longer available at dispatch (source expired) — please re-render scene", es: "La URL de la placa ya no estaba disponible en el envío (fuente caducada) — por favor, vuelve a renderizar la escena" }),
+    generation_input_audio_inaccessible: tl({ de: "Audio-URL war beim Dispatch nicht mehr abrufbar (Quelle abgelaufen) — Szene bitte neu rendern", en: "Audio URL was no longer available at dispatch (source expired) — please re-render scene", es: "La URL de audio ya no estaba disponible en el envío (fuente caducada) — por favor, vuelve a renderizar la escena" }),
   };
   return map[String(code).toLowerCase()] ?? null;
 }

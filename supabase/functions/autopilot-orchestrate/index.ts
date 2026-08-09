@@ -26,6 +26,7 @@ import {
   upsertBridgeScene,
 } from "../_shared/autopilotComposerBridge.ts";
 import {
+import { tl, withLang } from "../_shared/i18n.ts";
   FALLBACK_STILL,
   isFramingFailure,
   MAX_SCENE_ATTEMPTS,
@@ -88,7 +89,7 @@ const MOTION_MODEL = "minimax/hailuo-2.3";
 const ANCHOR_DEADLINE_MS = 6 * 60 * 1000;
 
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "autopilot-orchestrate", ok: true });
 
@@ -249,8 +250,8 @@ Deno.serve(async (req) => {
       stage: "anchors",
       role: "director",
       message: resume
-        ? `Produktion wieder aufgenommen — offene Szenen werden zu Ende gebracht.`
-        : `Freigabe erteilt — Produktion mit ${scenes.length} Szenen gestartet.`,
+        ? tl({ de: `Produktion wieder aufgenommen — offene Szenen werden zu Ende gebracht.`, en: `Production resumed — open scenes are being completed.`, es: `Producción reanudada — las escenas abiertas se están completando.` })
+        : tl({ de: `Freigabe erteilt — Produktion mit ${scenes.length} Szenen gestartet.`, en: `Approved — production started with ${scenes.length} scenes.`, es: `Aprobado — producción iniciada con ${scenes.length} escenas.` }),
     });
 
     // Hand the long work to the background; the client polls from here on.
@@ -266,7 +267,7 @@ Deno.serve(async (req) => {
     console.error("[autopilot-orchestrate] fatal", err);
     return json({ error: err instanceof Error ? err.message : "unknown" }, 500);
   }
-});
+})(req)));
 
 // ------------------------------------------------------------------ the loop
 
@@ -400,8 +401,8 @@ async function runProduction(
             severity: attempt < MAX_SCENE_ATTEMPTS ? "warn" : "error",
             scene_index: scene.orderIndex,
             message: attempt < MAX_SCENE_ATTEMPTS
-              ? `Szene ${scene.orderIndex + 1}: Bildfreigabe gescheitert — zweiter Anlauf mit vereinfachter Bildidee.`
-              : `Szene ${scene.orderIndex + 1}: Bildfreigabe endgültig gescheitert — keine Motion-Credits ausgegeben.`,
+              ? tl({ de: `Szene ${scene.orderIndex + 1}: Bildfreigabe gescheitert — zweiter Anlauf mit vereinfachter Bildidee.`, en: `Scene ${scene.orderIndex + 1}: Image approval failed — second attempt with a simpler image idea.`, es: `Escena ${scene.orderIndex + 1}: Aprobación de imagen fallida — segundo intento con una idea de imagen más simple.` })
+              : tl({ de: `Szene ${scene.orderIndex + 1}: Bildfreigabe endgültig gescheitert — keine Motion-Credits ausgegeben.`, en: `Scene ${scene.orderIndex + 1}: Image approval definitively failed — no motion credits issued.`, es: `Escena ${scene.orderIndex + 1}: Aprobación de imagen fallida definitivamente — no se emitieron créditos de movimiento.` }),
           });
           continue;
         }
@@ -461,7 +462,7 @@ async function runProduction(
           counters.failed++;
           await setSceneStatus(admin, productionId, scene.orderIndex, {
             status: "failed",
-            error_message: "Guthaben reicht für diese Szene nicht aus.",
+            error_message: tl({ de: "Guthaben reicht für diese Szene nicht aus.", en: "Insufficient credits for this scene.", es: "Créditos insuficientes para esta escena." }),
           });
           await log(admin, productionId, userId, {
             stage: "motion",
@@ -496,7 +497,7 @@ async function runProduction(
             stage: "motion",
             sceneIndex: scene.orderIndex,
             euros: motionEuros,
-            label: `Bewegtbild Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+            label: tl({ de: `Bewegtbild Szene ${scene.orderIndex + 1} fehlgeschlagen`, en: `Motion scene ${scene.orderIndex + 1} failed`, es: `Escena de movimiento ${scene.orderIndex + 1} fallida` }),
           });
           await log(admin, productionId, userId, {
             stage: "motion",
@@ -504,8 +505,8 @@ async function runProduction(
             severity: attempt < MAX_SCENE_ATTEMPTS ? "warn" : "error",
             scene_index: scene.orderIndex,
             message: attempt < MAX_SCENE_ATTEMPTS
-              ? `Szene ${scene.orderIndex + 1}: Animation fehlgeschlagen — zweiter Anlauf mit ruhigerem Framing.`
-              : `Szene ${scene.orderIndex + 1}: Animation endgültig fehlgeschlagen.`,
+              ? tl({ de: `Szene ${scene.orderIndex + 1}: Animation fehlgeschlagen — zweiter Anlauf mit ruhigerem Framing.`, en: `Scene ${scene.orderIndex + 1}: Animation failed — second attempt with calmer framing.`, es: `Escena ${scene.orderIndex + 1}: Animación fallida — segundo intento con un encuadre más tranquilo.` })
+              : tl({ de: `Szene ${scene.orderIndex + 1}: Animation endgültig fehlgeschlagen.`, en: `Scene ${scene.orderIndex + 1}: Animation definitively failed.`, es: `Escena ${scene.orderIndex + 1}: Animación fallida definitivamente.` }),
           });
           continue;
         }
@@ -570,7 +571,7 @@ async function runProduction(
         severity: "warn",
         scene_index: scene.orderIndex,
         message:
-          `Szene ${scene.orderIndex + 1}: Bewegtbild nicht zustande gekommen (${lastError}) — als Standbild in den Schnitt genommen, keine Motion-Credits berechnet.`,
+          tl({ de: `Szene ${scene.orderIndex + 1}: Bewegtbild nicht zustande gekommen (${lastError}) — als Standbild in den Schnitt genommen, keine Motion-Credits berechnet.`, en: `Scene ${scene.orderIndex + 1}: Motion picture not created (${lastError}) — taken into edit as still image, no motion credits charged.`, es: `Escena ${scene.orderIndex + 1}: Imagen en movimiento no creada (${lastError}) — incluida en la edición como imagen fija, no se cobraron créditos de movimiento.` }),
       });
       return;
     }
@@ -614,7 +615,7 @@ async function runProduction(
       stage: allFailed ? "failed" : "scenes_ready",
       status: allFailed ? "failed" : "running",
       progress: allFailed ? 100 : 78,
-      error_message: allFailed ? "Keine Szene konnte produziert werden." : null,
+      error_message: allFailed ? tl({ de: "Keine Szene konnte produziert werden.", en: "No scene could be produced.", es: "No se pudo producir ninguna escena." }) : null,
       heartbeat_at: new Date().toISOString(),
       // v298: `completed_at` gehört zum echten Abschluss — hier steht erst der Schnitt an.
       ...(allFailed ? { completed_at: new Date().toISOString() } : {}),
@@ -627,7 +628,7 @@ async function runProduction(
     role: "director",
     severity: allFailed ? "error" : "info",
     message: allFailed
-      ? "Produktion abgebrochen — keine Szene bestand die Prüfung."
+      ? tl({ de: "Produktion abgebrochen — keine Szene bestand die Prüfung.", en: "Production aborted — no scene passed the review.", es: "Producción abortada — ninguna escena pasó la revisión." })
       : `Szenen im Kasten: ${done} von ${total}${
         stills ? `, davon ${stills} als Standbild gerettet` : ""
       }${failed ? `, ${failed} übersprungen` : ""}. Endschnitt startet.`,
@@ -657,7 +658,7 @@ async function runProduction(
         stage: "scenes_ready",
         status: "completed",
         progress: 95,
-        error_message: "Endschnitt konnte nicht gestartet werden — die Szenen sind gesichert.",
+        error_message: tl({ de: "Endschnitt konnte nicht gestartet werden — die Szenen sind gesichert.", en: "Final cut could not be started — scenes are secured.", es: "No se pudo iniciar el corte final — las escenas están aseguradas." }),
       })
       .eq("id", productionId);
   }
@@ -745,7 +746,7 @@ async function speakAndSync(
         stage: "voice",
         sceneIndex: scene.orderIndex,
         euros: voiceEuros,
-        label: `Sprachaufnahme Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+        label: tl({ de: `Sprachaufnahme Szene ${scene.orderIndex + 1} fehlgeschlagen`, en: `Voice recording scene ${scene.orderIndex + 1} failed`, es: `Grabación de voz de la escena ${scene.orderIndex + 1} fallida` }),
       });
     }
     await log(admin, productionId, userId, {
@@ -776,7 +777,7 @@ async function speakAndSync(
     });
     if (!gate.ok) {
       await voiceOnly(
-        `Szene ${scene.orderIndex + 1}: Gesichts-Check nicht bestanden (${gate.reason}) — Lip-Sync übersprungen, Ton bleibt erhalten.`,
+        tl({ de: `Szene ${scene.orderIndex + 1}: Gesichts-Check nicht bestanden (${gate.reason}) — Lip-Sync übersprungen, Ton bleibt erhalten.`, en: `Scene ${scene.orderIndex + 1}: Face check failed (${gate.reason}) — Lip-sync skipped, audio retained.`, es: `Escena ${scene.orderIndex + 1}: Verificación facial fallida (${gate.reason}) — Sincronización labial omitida, audio conservado.` }),
       );
       return;
     }
@@ -795,7 +796,7 @@ async function speakAndSync(
   });
   if (!syncCharge.charged && syncCharge.reason === "insufficient") {
     await voiceOnly(
-      `Szene ${scene.orderIndex + 1}: Guthaben reicht nicht für Lip-Sync — Sprachspur bleibt, Clip bleibt stumm gelippt.`,
+      tl({ de: `Szene ${scene.orderIndex + 1}: Guthaben reicht nicht für Lip-Sync — Sprachspur bleibt, Clip bleibt stumm gelippt.`, en: `Scene ${scene.orderIndex + 1}: Insufficient credits for lip-sync — audio track remains, clip remains silently lip-synced.`, es: `Escena ${scene.orderIndex + 1}: Créditos insuficientes para la sincronización labial — la pista de audio permanece, el clip permanece sincronizado labialmente en silencio.` }),
     );
     return;
   }
@@ -827,10 +828,10 @@ async function speakAndSync(
       stage: "lipsync",
       sceneIndex: scene.orderIndex,
       euros: lipsyncEuros,
-      label: `Lip-Sync Szene ${scene.orderIndex + 1} nicht gestartet`,
+      label: tl({ de: `Lip-Sync Szene ${scene.orderIndex + 1} nicht gestartet`, en: `Lip-sync scene ${scene.orderIndex + 1} not started`, es: `Sincronización labial de la escena ${scene.orderIndex + 1} no iniciada` }),
     });
     await voiceOnly(
-      `Szene ${scene.orderIndex + 1}: Lip-Sync-Strecke nicht erreichbar — Sprachspur bleibt erhalten.`,
+      tl({ de: `Szene ${scene.orderIndex + 1}: Lip-Sync-Strecke nicht erreichbar — Sprachspur bleibt erhalten.`, en: `Scene ${scene.orderIndex + 1}: Lip-sync track unreachable — audio track retained.`, es: `Escena ${scene.orderIndex + 1}: Pista de sincronización labial inalcanzable — pista de audio conservada.` }),
     );
     return;
   }
@@ -874,13 +875,13 @@ async function speakAndSync(
       stage: "lipsync",
       sceneIndex: scene.orderIndex,
       euros: lipsyncEuros,
-      label: `Lip-Sync Szene ${scene.orderIndex + 1} fehlgeschlagen`,
+      label: tl({ de: `Lip-Sync Szene ${scene.orderIndex + 1} fehlgeschlagen`, en: `Lip-sync for scene ${scene.orderIndex + 1} failed`, es: `Sincronización labial para la escena ${scene.orderIndex + 1} falló` }),
     });
   }
 
   if (!result.masterAudioUrl) {
     await voiceOnly(
-      `Szene ${scene.orderIndex + 1}: Lip-Sync fehlgeschlagen (${result.reason ?? "unbekannt"}).`,
+      tl({ de: `Szene ${scene.orderIndex + 1}: Lip-Sync fehlgeschlagen (${result.reason ?? "unbekannt"}).`, en: `Scene ${scene.orderIndex + 1}: Lip-sync failed (${result.reason ?? "unknown"}).`, es: `Escena ${scene.orderIndex + 1}: Sincronización labial fallida (${result.reason ?? "desconocido"}).` }),
     );
     return;
   }

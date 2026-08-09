@@ -56,6 +56,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
+import { tl, withLang } from "../_shared/i18n.ts";
   classifySyncError,
   detectVoicedFrames,
   detectVoicedRange,
@@ -650,7 +651,7 @@ function frameCandidatesForTurn(turn: SegmentItem, totalSec: number, fps: number
 }
 
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -2828,7 +2829,7 @@ serve(async (req) => {
         `Lip-Sync wurde nicht gestartet: Die Charaktere auf dem gerenderten Scene-Clip ` +
         `sind nicht eindeutig voneinander unterscheidbar (Identitäts-Confidence ${(minConf * 100).toFixed(0)}%, Margin ${(minMar * 100).toFixed(0)}%). ` +
         `Eine automatische Zuweisung birgt das Risiko, dass Stimmen vertauscht werden. ` +
-        `Bitte die Szene neu rendern — mit deutlich unterschiedlichen Posen, Kleidung oder Kamera-Winkeln pro Charakter, sodass jede Person klar identifizierbar ist. ` +
+        tl({ de: `Bitte die Szene neu rendern — mit deutlich unterschiedlichen Posen, Kleidung oder Kamera-Winkeln pro Charakter, sodass jede Person klar identifizierbar ist. `, en: `Please re-render the scene — with distinctly different poses, clothing, or camera angles per character, so that each person is clearly identifiable.`, es: `Por favor, vuelve a renderizar la escena — con poses, ropa o ángulos de cámara claramente diferentes por personaje, para que cada persona sea claramente identificable.` }) +
         `Credits wurden vollständig zurückerstattet.`;
       try {
         await supabase
@@ -3015,8 +3016,8 @@ serve(async (req) => {
             clip_url: null,
             lip_sync_source_clip_url: null,
             clip_error: splitScreenReason
-              ? `Plate-Quality-Gate (v9): Der gerenderte Scene-Clip ist ein Split-Screen/Panel-Layout (${speakers.length} isolierte Einzel-Panels statt einer gemeinsamen Group-Composition). Sync.so kann Einzel-Panels nicht lipsyncen. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen im selben Raum stehen, in einem durchgehenden Kamera-Frame. Credits wurden zurückerstattet.`
-              : `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`,
+              ? tl({ de: `Plate-Quality-Gate (v9): Der gerenderte Scene-Clip ist ein Split-Screen/Panel-Layout (${speakers.length} isolierte Einzel-Panels statt einer gemeinsamen Group-Composition). Sync.so kann Einzel-Panels nicht lipsyncen. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen im selben Raum stehen, in einem durchgehenden Kamera-Frame. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v9): The rendered scene clip is a split-screen/panel layout (${speakers.length} isolated individual panels instead of a common group composition). Sync.so cannot lipsync individual panels. Please re-render the scene — all ${speakers.length} people must be in the same room, in a continuous camera frame. Credits have been refunded.`, es: `Plate-Quality-Gate (v9): El clip de escena renderizado es un diseño de pantalla dividida/panel (${speakers.length} paneles individuales aislados en lugar de una composición de grupo común). Sync.so no puede sincronizar los labios de paneles individuales. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar en la misma habitación, en un encuadre de cámara continuo. Los créditos han sido reembolsados.` })
+              : tl({ de: `Plate-Quality-Gate (v117): Auf dem aktuellen Scene-Clip sind nicht alle ${speakers.length} Charaktere als Gesichter erkennbar (erkannt: ${detectedFaces} von ${speakers.length}). Sync.so kann fehlende Personen nicht animieren. Bitte die Szene neu rendern — alle ${speakers.length} Personen müssen frontal sichtbar im Bild sein, keine angeschnittenen Köpfe. Credits wurden zurückerstattet.`, en: `Plate-Quality-Gate (v117): Not all ${speakers.length} characters are recognizable as faces in the current scene clip (recognized: ${detectedFaces} of ${speakers.length}). Sync.so cannot animate missing people. Please re-render the scene — all ${speakers.length} people must be visibly frontal in the image, no cropped heads. Credits have been refunded.`, es: `Plate-Quality-Gate (v117): No todos los ${speakers.length} personajes son reconocibles como caras en el clip de escena actual (reconocidos: ${detectedFaces} de ${speakers.length}). Sync.so no puede animar a personas que faltan. Por favor, vuelve a renderizar la escena — las ${speakers.length} personas deben estar frontalmente visibles en la imagen, sin cabezas cortadas. Los créditos han sido reembolsados.` }),
             updated_at: new Date().toISOString(),
           })
           .eq("id", sceneId);
@@ -3039,7 +3040,7 @@ serve(async (req) => {
         return json(
           {
             error: "v117_plate_quality_gate",
-            message: `Plate enthält ${detectedFaces} Gesichter, erwartet ${speakers.length}. Bitte Szene neu rendern.`,
+            message: tl({ de: `Plate enthält ${detectedFaces} Gesichter, erwartet ${speakers.length}. Bitte Szene neu rendern.`, en: `Plate contains ${detectedFaces} faces, expected ${speakers.length}. Please re-render scene.`, es: `La placa contiene ${detectedFaces} caras, se esperaban ${speakers.length}. Por favor, vuelve a renderizar la escena.` }),
             detected_faces: detectedFaces,
             resolved_faces: resolvedFaces,
             expected: speakers.length,
@@ -3232,12 +3233,12 @@ serve(async (req) => {
         }
         const speakerList =
           failures.length === 1
-            ? `Sprecher „${failures[0].speaker}" ist bei Sekunde ${failures[0].turn_sec} (Dialog-Turn) nicht im Bild`
+            ? tl({ de: `Sprecher „${failures[0].speaker}" ist bei Sekunde ${failures[0].turn_sec} (Dialog-Turn) nicht im Bild`, en: `Speaker "${failures[0].speaker}" is not in the picture at second ${failures[0].turn_sec} (dialog turn)`, es: `El orador "${failures[0].speaker}" no está en la imagen en el segundo ${failures[0].turn_sec} (turno de diálogo)` })
             : `${failures.length} Sprecher sind während ihres Dialog-Turns nicht im Bild: ${failures.map((f) => `${f.speaker} @ ${f.turn_sec}s`).join(", ")}`;
         const userMsg =
-          `Lip-Sync wurde nicht gestartet: ${speakerList}. ` +
-          `Sync.so kann ein Gesicht nur animieren, wenn es in genau diesem Moment sichtbar ist. ` +
-          `Bitte die Szene neu rendern — alle Sprecher müssen während ihres Dialog-Turns frontal und unverdeckt im Bild sein (keine Kameraschwenks weg, keine Cuts, keine angeschnittenen Köpfe). ` +
+          tl({ de: `Lip-Sync wurde nicht gestartet: ${speakerList}. `, en: `Lip-sync did not start: ${speakerList}.`, es: `La sincronización labial no se inició: ${speakerList}.` }) +
+          tl({ de: `Sync.so kann ein Gesicht nur animieren, wenn es in genau diesem Moment sichtbar ist. `, en: `Sync.so can only animate a face if it is visible at that exact moment.`, es: `Sync.so solo puede animar una cara si es visible en ese preciso momento.` }) +
+          tl({ de: `Bitte die Szene neu rendern — alle Sprecher müssen während ihres Dialog-Turns frontal und unverdeckt im Bild sein (keine Kameraschwenks weg, keine Cuts, keine angeschnittenen Köpfe). `, en: `Please re-render the scene — all speakers must be frontal and uncovered in the picture during their dialog turn (no camera pans away, no cuts, no cropped heads).`, es: `Por favor, vuelve a renderizar la escena — todos los oradores deben estar frontales y descubiertos en la imagen durante su turno de diálogo (sin movimientos de cámara, sin cortes, sin cabezas cortadas).` }) +
           `Credits wurden vollständig zurückerstattet.`;
         await supabase
           .from("composer_scenes")
@@ -3377,7 +3378,7 @@ serve(async (req) => {
                 lip_sync_status: "failed",
                 twoshot_stage: "failed",
                 clip_error:
-                  "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.",
+                  tl({ de: "no_face_map_after_3_retries: Gesichts­erkennung für die Plate lieferte keine Treffer. Bitte Plate (Hailuo-Clip) neu rendern oder eine andere Szene wählen.", en: "no_face_map_after_3_retries: Face detection for the plate yielded no results. Please re-render plate (Hailuo clip) or choose a different scene.", es: "no_face_map_after_3_retries: La detección de rostros para la placa no arrojó resultados. Por favor, vuelve a renderizar la placa (clip de Hailuo) o elige una escena diferente." }),
                 dialog_shots: mergeDialogShots(existingDs, { face_detect_retry_count: 0 }),
               }
             : {
@@ -3528,13 +3529,13 @@ serve(async (req) => {
         .update({
           lip_sync_status: "failed",
           twoshot_stage: "failed",
-          clip_error: "speaker_count_mismatch: Zwei Cast-Mitglieder teilen denselben Character-Slot. Bitte vollen Namen verwenden oder eindeutige Cast-IDs zuweisen, dann 'Sauber neu starten'.",
+          clip_error: tl({ de: "speaker_count_mismatch: Zwei Cast-Mitglieder teilen denselben Character-Slot. Bitte vollen Namen verwenden oder eindeutige Cast-IDs zuweisen, dann 'Sauber neu starten'.", en: "speaker_count_mismatch: Two cast members share the same character slot. Please use full names or assign unique cast IDs, then 'Clean Restart'.", es: "speaker_count_mismatch: Dos miembros del elenco comparten el mismo espacio de personaje. Por favor, usa nombres completos o asigna IDs de elenco únicos, luego 'Reiniciar Limpio'." }),
         })
         .eq("id", sceneId);
       return json(
         {
           error: "speaker_count_mismatch",
-          message: `${speakers.length} Sprecher, aber nur ${distinctCharIds.size} eindeutige Character-IDs. Pipeline würde Speaker-Pass kollidieren.`,
+          message: tl({ de: `${speakers.length} Sprecher, aber nur ${distinctCharIds.size} eindeutige Character-IDs. Pipeline würde Speaker-Pass kollidieren.`, en: `${speakers.length} speakers, but only ${distinctCharIds.size} unique character IDs. Pipeline would collide speaker pass.`, es: `${speakers.length} oradores, pero solo ${distinctCharIds.size} IDs de personaje únicos. La tubería colisionaría el pase de orador.` }),
           speakers: speakers.length,
           distinct_character_ids: distinctCharIds.size,
         },
@@ -5357,7 +5358,7 @@ serve(async (req) => {
         } else {
           (pass as any).preclip_error = preclipResult.error ?? "preclip_unknown";
           if (speakers.length >= 2) {
-            const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde nicht rechtzeitig fertig (${preclipResult.error ?? "preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
+            const reason = `v187_preclip_required_no_fullplate_fallback: Preclip für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}tl({ de: " wurde nicht rechtzeitig fertig (${preclipResult.error ?? ", en: " did not finish in time (${preclipResult.error ?? ", es: " no terminó a tiempo (${preclipResult.error ?? " })preclip_unknown"}). Kein Full-Plate-Fallback, damit Sync.so nicht erneut generation_input_face_selection_invalid auslöst.`;
             console.error(
               `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v187_preclip_required_no_fullplate_fallback speaker=${pass.speaker_name ?? "?"} err=${preclipResult.error ?? "preclip_unknown"} class=${preclipResult.errorClass ?? "unknown"} window=[${unionStart.toFixed(2)},${unionEnd.toFixed(2)}] — refusing full-plate dispatch`,
             );
@@ -5498,8 +5499,8 @@ serve(async (req) => {
           ? ` (Dialog-Turn ${turnStartSec.toFixed(1)}s–${turnEndSec.toFixed(1)}s)`
           : "";
       const friendlyClipError =
-        `Lip-Sync abgebrochen: „${failedSpeakerName}"${turnLabel} konnte im Scene-Clip nicht eindeutig zugeordnet werden ` +
-        `(${failReason}). Bitte Szene neu rendern — alle Sprecher müssen während ihres Turns frontal und unverdeckt im Bild sein. ` +
+        tl({ de: `Lip-Sync abgebrochen: „${failedSpeakerName}"${turnLabel} konnte im Scene-Clip nicht eindeutig zugeordnet werden `, en: `Lip-sync aborted: "${failedSpeakerName}"${turnLabel} could not be uniquely assigned in the scene clip `, es: `Sincronización labial abortada: "${failedSpeakerName}"${turnLabel} no pudo asignarse de forma única en el clip de escena ` }) +
+        tl({ de: `(${failReason}). Bitte Szene neu rendern — alle Sprecher müssen während ihres Turns frontal und unverdeckt im Bild sein. `, en: `(${failReason}). Please re-render scene — all speakers must be frontal and uncovered in the picture during their turn. `, es: `(${failReason}). Por favor, vuelve a renderizar la escena — todos los oradores deben estar frontales y descubiertos en la imagen durante su turno. ` }) +
         `Credits wurden zurückerstattet.`;
       await supabase
         .from("composer_scenes")
@@ -5776,7 +5777,7 @@ serve(async (req) => {
           errorClass: "v163_preclip_frame_count_unavailable",
           message:
             `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" wurde vor Sync.so abgebrochen: ` +
-            "die exakte Preclip-Framezahl fehlt, daher kann keine sichere bounding_boxes_url erzeugt werden. Credits wurden zurückerstattet.",
+            tl({ de: "die exakte Preclip-Framezahl fehlt, daher kann keine sichere bounding_boxes_url erzeugt werden. Credits wurden zurückerstattet.", en: "the exact preclip frame count is missing, so a secure bounding_boxes_url cannot be generated. Credits have been refunded.", es: "falta el recuento exacto de fotogramas del preclip, por lo que no se puede generar una bounding_boxes_url segura. Los créditos han sido reembolsados." }),
           meta: {
             v163_exact_framecount_required: true,
             preclip_duration_sec: preclipPersistedDurSec || null,
@@ -5899,7 +5900,7 @@ serve(async (req) => {
           errorClass: "v152_bbox_hard_fail",
           message:
             `Lip-Sync für „${pass.speaker_name ?? `Sprecher ${currentPassIdx + 1}`}" konnte nicht vorbereitet werden ` +
-            `(${v152FailReason}). Bitte Szene neu rendern — Sprecher muss frontal und unverdeckt im Bild sein. ` +
+            tl({ de: `(${v152FailReason}). Bitte Szene neu rendern — Sprecher muss frontal und unverdeckt im Bild sein. `, en: `(${v152FailReason}). Please re-render scene — speaker must be frontal and uncovered in the picture. `, es: `(${v152FailReason}). Por favor, vuelve a renderizar la escena — el orador debe estar frontal y descubierto en la imagen. ` }) +
             `Credits wurden zurückerstattet.`,
           meta: {
             v152_unified_path: true,
@@ -7916,5 +7917,5 @@ serve(async (req) => {
       }
     }
   }
-});
+})(req)));
 

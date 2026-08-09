@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.7.1";
 import { withTelemetry } from '../_shared/telemetry.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-serve(withTelemetry('generate-post-v2', async (req) => {
+serve((req: Request) => withLang(req, () => (withTelemetry('generate-post-v2', async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -179,7 +180,7 @@ AUSGABE (JSON):
           type: "function",
           function: {
             name: "generate_post",
-            description: "Generiere Social Media Post mit Hooks, Caption und Hashtags",
+            description: tl({ de: "Generiere Social Media Post mit Hooks, Caption und Hashtags", en: "Generate Social Media Post with Hooks, Caption, and Hashtags", es: "Generar publicación de redes sociales con ganchos, pie de foto y hashtags" }),
             parameters: {
               type: "object",
               properties: {
@@ -276,7 +277,7 @@ AUSGABE (JSON):
                 type: "function",
                 function: {
                   name: "generate_post",
-                  description: "Generiere Social Media Post mit Hooks, Caption und Hashtags",
+                  description: tl({ de: "Generiere Social Media Post mit Hooks, Caption und Hashtags", en: "Generate Social Media Post with Hooks, Caption, and Hashtags", es: "Generar publicación de redes sociales con ganchos, pie de foto y hashtags" }),
                   parameters: {
                     type: "object",
                     properties: {
@@ -442,4 +443,4 @@ AUSGABE (JSON):
       }
     );
   }
-}));
+}))(req)));

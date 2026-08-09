@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +25,7 @@ const INTERPOLATION_CREDITS = {
   '120_to_240': 10,
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -172,12 +173,12 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));
 
 function getInterpolationDescription(mode: string): string {
   switch (mode) {
     case 'smooth':
-      return 'Optimiert für flüssige Bewegungen und Sport-Videos';
+      return tl({ de: 'Optimiert für flüssige Bewegungen und Sport-Videos', en: 'Optimized for smooth movements and sports videos', es: 'Optimizado para movimientos fluidos y videos deportivos' });
     case 'fast':
       return 'Schnelle Verarbeitung, leichte Qualitätseinbußen möglich';
     case 'film':

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,7 @@ interface CoPilotContext {
   scenes?: Array<{ mood?: string; description?: string }>;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -92,7 +93,7 @@ Antworte auf Deutsch, prägnant und hilfreich. Bei Befehls-Anfragen, gib das erk
       
       if (response.status === 429) {
         return new Response(JSON.stringify({ 
-          error: 'Rate limit erreicht. Bitte versuche es später erneut.' 
+          error: tl({ de: 'Rate limit erreicht. Bitte versuche es später erneut.', en: 'Rate limit reached. Please try again later.', es: 'Límite de solicitudes alcanzado. Por favor, inténtalo de nuevo más tarde.' }) 
         }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -134,5 +135,5 @@ Antworte auf Deutsch, prägnant und hilfreich. Bei Befehls-Anfragen, gib das erk
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));
 

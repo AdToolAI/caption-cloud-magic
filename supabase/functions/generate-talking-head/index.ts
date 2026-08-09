@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -323,7 +324,7 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
 
     // Non-retryable: avatar-limit hit
     if (respText.includes('401028') || /photo avatars/i.test(respText)) {
-      throw new Error('HEYGEN_AVATAR_LIMIT: HeyGen-Avatar-Kontingent voll — bitte einen Moment warten und erneut versuchen. (Auto-Cleanup läuft.)');
+      throw new Error(tl({ de: 'HEYGEN_AVATAR_LIMIT: HeyGen-Avatar-Kontingent voll — bitte einen Moment warten und erneut versuchen. (Auto-Cleanup läuft.)', en: 'HEYGEN_AVATAR_LIMIT: HeyGen avatar quota full — please wait a moment and try again. (Auto-cleanup in progress.)', es: 'HEYGEN_AVATAR_LIMIT: Cuota de avatares de HeyGen llena — por favor, espera un momento e inténtalo de nuevo. (Limpieza automática en curso.)' }));
     }
 
     // Retryable categories
@@ -536,7 +537,7 @@ async function refundCredits(
 }
 
 // ---------- Main handler ----------
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -697,4 +698,4 @@ Deno.serve(async (req) => {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));

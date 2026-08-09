@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,7 @@ interface DiagnosticResult {
   actionLabel?: string;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -75,7 +76,7 @@ serve(async (req) => {
           diagnostics.push({
             category: 'connections',
             status: 'error',
-            message: `${c.provider} Token ist abgelaufen! Bitte neu verbinden.`,
+            message: tl({ de: `${c.provider} Token ist abgelaufen! Bitte neu verbinden.`, en: `${c.provider} token has expired! Please reconnect.`, es: `¡El token de ${c.provider} ha caducado! Por favor, vuelve a conectarte.` }),
             action: `/settings?reconnect=${c.provider}`,
             actionLabel: `${c.provider} neu verbinden`
           });
@@ -118,7 +119,7 @@ serve(async (req) => {
         diagnostics.push({
           category: 'credits',
           status: 'error',
-          message: 'Keine Credits mehr vorhanden! Du kannst keine KI-Features nutzen.',
+          message: tl({ de: 'Keine Credits mehr vorhanden! Du kannst keine KI-Features nutzen.', en: 'No credits left! You cannot use AI features.', es: '¡No quedan créditos! No puedes usar las funciones de IA.' }),
           action: '/credits',
           actionLabel: 'Credits aufladen'
         });
@@ -177,7 +178,7 @@ serve(async (req) => {
         diagnostics.push({
           category: 'rendering',
           status: 'ok',
-          message: `${activeRenders.length} Video${activeRenders.length > 1 ? 's werden' : ' wird'} gerendert (${minutesRunning} Min.)`,
+          message: tl({ de: `${activeRenders.length} Video${activeRenders.length > 1 ? 's werden' : ' wird'} gerendert (${minutesRunning} Min.)`, en: `${activeRenders.length} video${activeRenders.length > 1 ? 's are' : ' is'} rendering (${minutesRunning} min.)`, es: `${activeRenders.length} video${activeRenders.length > 1 ? 's se están' : ' se está'} renderizando (${minutesRunning} min.)` }),
         });
       }
     }
@@ -235,4 +236,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));

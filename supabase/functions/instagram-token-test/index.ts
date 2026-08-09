@@ -1,13 +1,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return json(null, 204);
   }
@@ -81,7 +82,7 @@ Deno.serve(async (req) => {
       // Benutzerfreundliche Fehlermeldungen
       let human = 'Token-Validierung fehlgeschlagen';
       if (code === 190) {
-        human = 'Token ist ungültig oder abgelaufen';
+        human = tl({ de: 'Token ist ungültig oder abgelaufen', en: 'Token is invalid or expired', es: 'El token no es válido o ha caducado' });
       } else if (code === 100) {
         human = 'Ungültige Instagram User ID oder fehlende Berechtigungen';
       } else if ((msg || '').includes('Invalid platform')) {
@@ -139,7 +140,7 @@ Deno.serve(async (req) => {
       },
     });
   }
-});
+})(req)));
 
 // Helfer: einheitliches JSON + No-Cache + Version-Header
 function json(payload: any, status = 200) {

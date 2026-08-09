@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -169,29 +170,29 @@ interface CategoryStyleProfile {
 
 const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
   'advertisement': {
-    visualDirection: 'Bold, hoher Kontrast, schnelle Schnitte. Markenfarben dominant. Jedes Frame muss verkaufen. Produkt immer im Fokus. Cleane Backgrounds mit Farbflächen oder Gradient.',
+    visualDirection: tl({ de: 'Bold, hoher Kontrast, schnelle Schnitte. Markenfarben dominant. Jedes Frame muss verkaufen. Produkt immer im Fokus. Cleane Backgrounds mit Farbflächen oder Gradient.', en: 'Bold, high contrast, fast cuts. Brand colors dominant. Every frame must sell. Product always in focus. Clean backgrounds with color blocks or gradients.', es: 'Audaz, alto contraste, cortes rápidos. Colores de marca dominantes. Cada fotograma debe vender. Producto siempre en foco. Fondos limpios con bloques de color o degradados.' }),
     pacingGuide: 'Schnell: 3-5 Sekunden pro Szene. Hook maximal 2s. Kein Moment der Langeweile. Jede Szene hat EINE klare Botschaft.',
     animationSet: ['popIn', 'bounce', 'flyIn', 'slideUp'],
     textAnimationSet: ['bounceIn', 'glowPulse', 'splitReveal'],
-    characterUsage: 'Minimal — nur in CTA-Szene als Presenter. Kein Character in Produktszenen. Character zeigt auf Produkt/CTA.',
+    characterUsage: tl({ de: 'Minimal — nur in CTA-Szene als Presenter. Kein Character in Produktszenen. Character zeigt auf Produkt/CTA.', en: 'Minimal — only in CTA scene as presenter. No character in product scenes. Character points to product/CTA.', es: 'Mínimo — solo en la escena de CTA como presentador. Sin personaje en las escenas de producto. El personaje señala el producto/CTA.' }),
     effectsProfile: 'PopIn für Produkt-Reveal, Bounce für CTA-Button, GlowPulse für Preise/Angebote. KEINE subtilen Effekte.',
-    transitionStyle: 'Nur "slide" und "zoom" Transitions. Schnell und energetisch. Kein Fade (zu langsam für Ads).',
-    soundDesign: 'Viele SFX: whoosh bei Transitions, pop bei Feature-Reveals, success bei CTA. Jede Szene hat einen Sound.',
+    transitionStyle: tl({ de: 'Nur "slide" und "zoom" Transitions. Schnell und energetisch. Kein Fade (zu langsam für Ads).', en: 'Only "slide" and "zoom" transitions. Fast and energetic. No fade (too slow for ads).', es: 'Solo transiciones de "deslizamiento" y "zoom". Rápidas y enérgicas. Sin fundido (demasiado lento para anuncios).' }),
+    soundDesign: tl({ de: 'Viele SFX: whoosh bei Transitions, pop bei Feature-Reveals, success bei CTA. Jede Szene hat einen Sound.', en: 'Many SFX: whoosh for transitions, pop for feature reveals, success for CTA. Every scene has a sound.', es: 'Muchos SFX: whoosh para transiciones, pop para revelaciones de características, éxito para CTA. Cada escena tiene un sonido.' }),
     contrastOverlay: 'bold',
   },
   'storytelling': {
-    visualDirection: 'Cinematic, warme Farbtöne, weiche Übergänge, emotionale Bildsprache. Wie ein Kurzfilm. Tiefe, atmosphärische Bilder mit Bokeh-Effekt. Goldene Stunde, Dämmerung, intime Settings.',
+    visualDirection: tl({ de: 'Cinematic, warme Farbtöne, weiche Übergänge, emotionale Bildsprache. Wie ein Kurzfilm. Tiefe, atmosphärische Bilder mit Bokeh-Effekt. Goldene Stunde, Dämmerung, intime Settings.', en: 'Cinematic, warm tones, soft transitions, emotional imagery. Like a short film. Deep, atmospheric images with bokeh effect. Golden hour, dusk, intimate settings.', es: 'Cinemático, tonos cálidos, transiciones suaves, imágenes emotivas. Como un cortometraje. Imágenes profundas y atmosféricas con efecto bokeh. Hora dorada, atardecer, ambientes íntimos.' }),
     pacingGuide: 'Langsam: 6-10 Sekunden pro Szene. Lass den Moment wirken. Pausen zwischen Sätzen. Der Zuschauer soll fühlen, nicht nur verstehen.',
     animationSet: ['kenBurns', 'fadeIn', 'parallax'],
     textAnimationSet: ['fadeWords', 'typewriter'],
     characterUsage: 'Durchgehend sichtbar als Erzähler. Emotionale Gesten: thinking bei Reflexion, pointing bei Wendepunkten, celebrating beim Happy End.',
-    effectsProfile: 'NUR KenBurns und sanfte Parallax-Effekte. KEINE PopIns, KEINE Bounces. Subtile Vignette-Schatten für Tiefe.',
-    transitionStyle: 'Nur "fade" und "dissolve". Langsam (1s+). Crossfade zwischen Szenen für filmisches Feeling.',
+    effectsProfile: tl({ de: 'NUR KenBurns und sanfte Parallax-Effekte. KEINE PopIns, KEINE Bounces. Subtile Vignette-Schatten für Tiefe.', en: 'ONLY KenBurns and subtle parallax effects. NO PopIns, NO Bounces. Subtle vignette shadows for depth.', es: 'SOLO efectos KenBurns y paralaje sutiles. SIN PopIns, SIN Bounces. Sombras de viñeta sutiles para profundidad.' }),
+    transitionStyle: tl({ de: 'Nur "fade" und "dissolve". Langsam (1s+). Crossfade zwischen Szenen für filmisches Feeling.', en: 'Only "fade" and "dissolve". Slow (1s+). Crossfade between scenes for a cinematic feel.', es: 'Solo "fade" y "disolver". Lento (1s+). Fundido cruzado entre escenas para una sensación cinematográfica.' }),
     soundDesign: 'Wenig SFX. Maximal 1-2 dezente Sounds im gesamten Video. Musik trägt die Emotion, nicht die Soundeffekte.',
     contrastOverlay: 'cinematic',
   },
   'tutorial': {
-    visualDirection: 'Clean, didaktisch, gut strukturiert. Helle Farben, klare Typografie, Step-Indikatoren (1, 2, 3). Jede Szene hat eine nummerierte Überschrift. Whiteboard-Ästhetik oder Clean-UI.',
+    visualDirection: tl({ de: 'Clean, didaktisch, gut strukturiert. Helle Farben, klare Typografie, Step-Indikatoren (1, 2, 3). Jede Szene hat eine nummerierte Überschrift. Whiteboard-Ästhetik oder Clean-UI.', en: 'Clean, didactic, well-structured. Bright colors, clear typography, step indicators (1, 2, 3). Each scene has a numbered heading. Whiteboard aesthetic or Clean-UI.', es: 'Limpio, didáctico, bien estructurado. Colores brillantes, tipografía clara, indicadores de pasos (1, 2, 3). Cada escena tiene un título numerado. Estética de pizarra o UI limpia.' }),
     pacingGuide: 'Mittel: 5-8 Sekunden pro Szene. Genug Zeit zum Verstehen, aber nicht langweilig. Jeder Schritt hat eine klare Nummer.',
     animationSet: ['slideUp', 'fadeIn', 'flyIn'],
     textAnimationSet: ['typewriter', 'highlight', 'splitReveal'],
@@ -202,11 +203,11 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     contrastOverlay: 'clean',
   },
   'product-video': {
-    visualDirection: 'Premium, Showcase-Qualität. Produkt zentral im Bild. Dunkle Hintergründe mit Spot-Beleuchtung. Studio-Ästhetik. Glänzende Oberflächen, Reflexionen.',
+    visualDirection: tl({ de: 'Premium, Showcase-Qualität. Produkt zentral im Bild. Dunkle Hintergründe mit Spot-Beleuchtung. Studio-Ästhetik. Glänzende Oberflächen, Reflexionen.', en: 'Premium, showcase quality. Product central in the image. Dark backgrounds with spot lighting. Studio aesthetic. Glossy surfaces, reflections.', es: 'Calidad premium, de exhibición. Producto central en la imagen. Fondos oscuros con iluminación puntual. Estética de estudio. Superficies brillantes, reflejos.' }),
     pacingGuide: 'Mittel-schnell: 4-6 Sekunden pro Szene. Produkt-Reveal langsamer (6-8s), Features schneller (3-4s).',
     animationSet: ['parallax', 'morphIn', 'kenBurns', 'fadeIn'],
     textAnimationSet: ['splitReveal', 'glowPulse', 'fadeWords'],
-    characterUsage: 'Minimal. Nur in Intro und CTA. Produkt ist der Star, nicht der Character.',
+    characterUsage: tl({ de: 'Minimal. Nur in Intro und CTA. Produkt ist der Star, nicht der Character.', en: 'Minimal. Only in intro and CTA. Product is the star, not the character.', es: 'Mínimo. Solo en la introducción y CTA. El producto es la estrella, no el personaje.' }),
     effectsProfile: 'Parallax für Tiefe, MorphIn für Produkt-Reveal, SpotlightEffect für Features. GlowPulse auf Preis/USP.',
     transitionStyle: '"zoom" für Produkt-Close-ups, "dissolve" zwischen Features, "fade" für Intro/Outro.',
     soundDesign: 'Premium SFX: whoosh bei Reveals, pop bei Feature-Highlights. Elegante, nicht aggressive Sounds.',
@@ -217,9 +218,9 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     pacingGuide: 'Mittel: 5-7 Sekunden pro Szene. Ruhig und kompetent. Keine Hektik.',
     animationSet: ['fadeIn', 'slideUp'],
     textAnimationSet: ['fadeWords', 'highlight'],
-    characterUsage: 'Sporadisch, formell. Character trägt "Anzug" (default presenter). Gesten: explaining und idle. KEIN celebrating oder pointing.',
-    effectsProfile: 'NUR FadeIn und SlideUp. KEINE Bounce, PopIn oder GlowPulse. Dezente Highlight-Underlines für Key Facts.',
-    transitionStyle: 'Nur "fade". Langsam und professionell. Keine Wipes oder Zooms.',
+    characterUsage: tl({ de: 'Sporadisch, formell. Character trägt "Anzug" (default presenter). Gesten: explaining und idle. KEIN celebrating oder pointing.', en: 'Sporadic, formal. Character wears a "suit" (default presenter). Gestures: explaining and idle. NO celebrating or pointing.', es: 'Esporádico, formal. El personaje lleva un "traje" (presentador predeterminado). Gestos: explicando e inactivo. NO celebrando ni señalando.' }),
+    effectsProfile: tl({ de: 'NUR FadeIn und SlideUp. KEINE Bounce, PopIn oder GlowPulse. Dezente Highlight-Underlines für Key Facts.', en: 'ONLY FadeIn and SlideUp. NO Bounce, PopIn or GlowPulse. Subtle highlight underlines for Key Facts.', es: 'SOLO FadeIn y SlideUp. SIN Bounce, PopIn o GlowPulse. Subrayados sutiles para resaltar los datos clave.' }),
+    transitionStyle: tl({ de: 'Nur "fade". Langsam und professionell. Keine Wipes oder Zooms.', en: 'Only "fade". Slow and professional. No wipes or zooms.', es: 'Solo "fade". Lento y profesional. Sin barridos ni zooms.' }),
     soundDesign: 'Minimal: maximal 1-2 dezente Sounds. Kein whoosh, kein pop. Nur subtle success am Ende.',
     contrastOverlay: 'subtle',
   },
@@ -231,7 +232,7 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     characterUsage: 'Optional, casual. Character wirkt wie ein Creator/Influencer. Gesten: waving, pointing, celebrating. Energetisch.',
     effectsProfile: 'PopIn überall. FloatingIcons mit Emojis. GlowPulse auf Headlines. Confetti bei Reveals. Maximale visuelle Energie.',
     transitionStyle: '"slide" und "push". Schnell und dynamisch. Wipe-Effekte erlaubt.',
-    soundDesign: 'Viele SFX: whoosh, pop, alert, success. Jede Szene hat Sound. Beat-Aligned wenn möglich.',
+    soundDesign: tl({ de: 'Viele SFX: whoosh, pop, alert, success. Jede Szene hat Sound. Beat-Aligned wenn möglich.', en: 'Many SFX: whoosh, pop, alert, success. Every scene has sound. Beat-aligned if possible.', es: 'Muchos SFX: whoosh, pop, alert, success. Cada escena tiene sonido. Sincronizado con el ritmo si es posible.' }),
     contrastOverlay: 'bold',
   },
   'testimonial': {
@@ -239,10 +240,10 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     pacingGuide: 'Langsam-mittel: 5-8 Sekunden pro Szene. Lass die Person sprechen. Emotionale Momente atmen lassen.',
     animationSet: ['fadeIn', 'kenBurns'],
     textAnimationSet: ['fadeWords', 'highlight', 'typewriter'],
-    characterUsage: 'Zitierende Person durchgehend sichtbar. Position: center oder right. Gesten: idle (Standard), thinking (beim Problem), celebrating (beim Ergebnis).',
+    characterUsage: tl({ de: 'Zitierende Person durchgehend sichtbar. Position: center oder right. Gesten: idle (Standard), thinking (beim Problem), celebrating (beim Ergebnis).', en: 'Quoting person continuously visible. Position: center or right. Gestures: idle (default), thinking (during problem), celebrating (at result).', es: 'Persona citada visible continuamente. Posición: centro o derecha. Gestos: inactivo (predeterminado), pensando (durante el problema), celebrando (al resultado).' }),
     effectsProfile: 'NUR FadeIn. Quote-Highlight für Zitate (Anführungszeichen-Grafik). Stats-Overlay für Ergebnisse/Zahlen.',
     transitionStyle: 'Nur "fade" und "dissolve". Sanft und respektvoll.',
-    soundDesign: 'Minimal: keine SFX außer dezentes success am Ende. Die Stimme dominiert.',
+    soundDesign: tl({ de: 'Minimal: keine SFX außer dezentes success am Ende. Die Stimme dominiert.', en: 'Minimal: no SFX except subtle success at the end. The voice dominates.', es: 'Mínimo: sin SFX excepto un sutil éxito al final. La voz domina.' }),
     contrastOverlay: 'cinematic',
   },
   'explainer': {
@@ -251,7 +252,7 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     animationSet: ['morphIn', 'slideUp', 'fadeIn', 'flyIn'],
     textAnimationSet: ['typewriter', 'splitReveal', 'highlight'],
     characterUsage: 'Durchgehend als Erklärer sichtbar. Position: right. Gesten: explaining (Standard), pointing (bei wichtigen Punkten).',
-    effectsProfile: 'MorphIn für Konzept-Transformationen. DrawOnEffect für Prozess-Schritte. Highlight-Underlines. Icons zur Visualisierung.',
+    effectsProfile: tl({ de: 'MorphIn für Konzept-Transformationen. DrawOnEffect für Prozess-Schritte. Highlight-Underlines. Icons zur Visualisierung.', en: 'MorphIn for concept transformations. DrawOnEffect for process steps. Highlight-Underlines. Icons for visualization.', es: 'MorphIn para transformaciones de conceptos. DrawOnEffect para pasos de proceso. Subrayados de resaltado. Iconos para visualización.' }),
     transitionStyle: '"fade" und "morph". Konzeptuelle Übergänge, die inhaltlich Sinn machen.',
     soundDesign: 'Dezent: pop bei Konzept-Wechseln, success bei Schlussfolgerung. Unterstützend, nicht ablenkend.',
     contrastOverlay: 'clean',
@@ -262,7 +263,7 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     animationSet: ['popIn', 'bounce', 'flyIn'],
     textAnimationSet: ['bounceIn', 'waveIn', 'glowPulse'],
     characterUsage: 'Sporadisch. Character als Event-Host. Gesten: waving, celebrating, pointing auf Datum/Location.',
-    effectsProfile: 'PopIn für Datum/Location-Reveal. Bounce für Countdown. Konfetti (MorphTransition sparkle) bei Highlights. FloatingIcons mit Party-Emojis.',
+    effectsProfile: tl({ de: 'PopIn für Datum/Location-Reveal. Bounce für Countdown. Konfetti (MorphTransition sparkle) bei Highlights. FloatingIcons mit Party-Emojis.', en: 'PopIn for date/location reveal. Bounce for countdown. Confetti (MorphTransition sparkle) for highlights. FloatingIcons with party emojis.', es: 'PopIn para revelar fecha/ubicación. Bounce para cuenta regresiva. Confeti (MorphTransition sparkle) para momentos destacados. FloatingIcons con emojis de fiesta.' }),
     transitionStyle: '"slide" und "zoom". Dynamisch und feierlich.',
     soundDesign: 'Energetisch: whoosh bei Reveals, pop bei Highlights, success bei CTA. Beat-Aligned für musikalisches Feeling.',
     contrastOverlay: 'bold',
@@ -284,7 +285,7 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     animationSet: ['slideUp', 'fadeIn'],
     textAnimationSet: ['fadeWords', 'highlight', 'splitReveal'],
     characterUsage: 'Sporadisch als Moderator. Gesten: explaining, pointing auf Daten. Formell.',
-    effectsProfile: 'SlideUp für Chart-Reveals. Stats-Overlay für Zahlen. Highlight für Key Insights. KEINE Bounces oder PopIns.',
+    effectsProfile: tl({ de: 'SlideUp für Chart-Reveals. Stats-Overlay für Zahlen. Highlight für Key Insights. KEINE Bounces oder PopIns.', en: 'SlideUp for chart reveals. Stats-overlay for numbers. Highlight for Key Insights. NO Bounces or PopIns.', es: 'SlideUp para revelar gráficos. Superposición de estadísticas para números. Resaltado para ideas clave. SIN Bounces ni PopIns.' }),
     transitionStyle: 'Nur "fade" und "slide". Clean und professionell. Slide-Deck-Feeling.',
     soundDesign: 'Minimal: pop bei Slide-Wechsel. Keine dramatischen Sounds. Professionell.',
     contrastOverlay: 'clean',
@@ -294,10 +295,10 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     pacingGuide: 'Flexibel — richte dich nach der Video-Länge und dem Thema. Verteile die Zeit gleichmäßig.',
     animationSet: ['fadeIn', 'slideUp', 'popIn', 'kenBurns', 'parallax', 'morphIn', 'flyIn', 'bounce'],
     textAnimationSet: ['fadeWords', 'typewriter', 'highlight', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn'],
-    characterUsage: 'Nach Bedarf. Richte dich nach dem Briefing.',
-    effectsProfile: 'Wähle passende Effekte basierend auf dem Szenen-Typ und der Stimmung.',
-    transitionStyle: 'Mix aus allen verfügbaren Transitions. Passe zum Inhalt.',
-    soundDesign: 'Angemessen zum Inhalt. Nicht zu viel, nicht zu wenig.',
+    characterUsage: tl({ de: 'Nach Bedarf. Richte dich nach dem Briefing.', en: 'As needed. Follow the briefing.', es: 'Según sea necesario. Sigue el briefing.' }),
+    effectsProfile: tl({ de: 'Wähle passende Effekte basierend auf dem Szenen-Typ und der Stimmung.', en: 'Choose suitable effects based on scene type and mood.', es: 'Elige efectos adecuados según el tipo de escena y el estado de ánimo.' }),
+    transitionStyle: tl({ de: 'Mix aus allen verfügbaren Transitions. Passe zum Inhalt.', en: 'Mix of all available transitions. Match the content.', es: 'Mezcla de todas las transiciones disponibles. Que coincida con el contenido.' }),
+    soundDesign: tl({ de: 'Angemessen zum Inhalt. Nicht zu viel, nicht zu wenig.', en: 'Appropriate to the content. Not too much, not too little.', es: 'Adecuado al contenido. Ni demasiado, ni demasiado poco.' }),
     contrastOverlay: 'subtle',
   },
 };
@@ -331,7 +332,7 @@ function getCategoryKey(category: string): string {
   return categoryMap[category] || 'custom';
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -523,7 +524,7 @@ AUSGABEFORMAT (JSON):
       "sceneNumber": 1,
       "sceneType": "opening|rising_action|climax|falling_action|resolution|epilogue",
       "title": "Kapitel-Titel (erzählerisch, z.B. 'Der Anfang', 'Der Wendepunkt')",
-      "voiceover": "Der erzählende Text für diese Szene...",
+      "voiceover": tl({ de: "Der erzählende Text für diese Szene...", en: "The narrative text for this scene...", es: "El texto narrativo para esta escena..." }),
       "visualDescription": "ENGLISH cinematic image prompt: [Scene] + [Atmosphere] + [Lighting]. Moody, emotional, like a film still. NEVER describe humans.",
       "durationSeconds": ${sceneDuration},
       
@@ -584,7 +585,7 @@ AUSGABEFORMAT (JSON):
       "sceneNumber": 1,
       "sceneType": "hook|problem|solution|feature|proof|cta|intro|benefit|testimonial",
       "title": "Szenen-Titel (kurz, prägnant)",
-      "voiceover": "Der gesprochene Text für diese Szene...",
+      "voiceover": tl({ de: "Der gesprochene Text für diese Szene...", en: "The spoken text for this scene...", es: "El texto hablado para esta escena..." }),
       "visualDescription": "ENGLISH image prompt. Concrete scene WITHOUT people and WITHOUT text-bearing objects: [Object/Scene] + [State/Detail] + [Environment] + [Lighting]. NEVER describe humans, persons, silhouettes, hands, or body parts. NEVER describe dashboards, calendars, charts, monitors showing data, analytics interfaces, spreadsheets, or any object that inherently displays text/numbers. Example: 'A tidy desk with a closed laptop, potted plants, a warm desk lamp, bright office with glass walls, golden hour light, shallow depth of field'",
       "durationSeconds": ${sceneDuration},
       
@@ -615,9 +616,9 @@ WICHTIG: Jede Szene MUSS die Animations-Parameter enthalten! Verwende NUR Animat
     const moodConfig = briefing.moodConfig;
     const moodInstructions = moodConfig ? `
 STIMMUNGS-PRESET: "${moodConfig.preset}"
-- Text-Dichte: ${moodConfig.textDensity < 33 ? 'WENIG Text — nur Headlines und Keywords, kurze Sätze' : moodConfig.textDensity < 66 ? 'MITTEL — ausgewogene Mischung aus Headlines und Erklärungen' : 'VIEL Text — ausführliche Erklärungen, Storytelling, längere Sätze'}
+- Text-Dichte: ${moodConfig.textDensity < 33 ? 'WENIG Text — nur Headlines und Keywords, kurze Sätze' : moodConfig.textDensity < 66 ? tl({ de: 'MITTEL — ausgewogene Mischung aus Headlines und Erklärungen', en: 'MEDIUM — balanced mix of headlines and explanations', es: 'MEDIO — mezcla equilibrada de titulares y explicaciones' }) : 'VIEL Text — ausführliche Erklärungen, Storytelling, längere Sätze'}
 - Animations-Intensität: ${moodConfig.animationIntensity < 33 ? 'SUBTIL — sanfte, langsame Animationen. Bevorzuge fadeIn, kenBurns' : moodConfig.animationIntensity < 66 ? 'NORMAL — ausgewogene Animationen' : 'DYNAMISCH — energetische, schnelle Animationen. Bevorzuge popIn, bounce, flyIn'}
-- Szenen-Badges: ${moodConfig.showSceneBadges ? 'JA — verwende prägnante Szenen-Titel' : 'NEIN — keine expliziten Szenen-Label'}
+- Szenen-Badges: ${moodConfig.showSceneBadges ? 'JA — verwende prägnante Szenen-Titel' : tl({ de: 'NEIN — keine expliziten Szenen-Label', en: 'NO — no explicit scene labels', es: 'NO — sin etiquetas de escena explícitas' })}
 ` : '';
 
     // ============================================================
@@ -779,7 +780,7 @@ ERINNERUNG: Verwende NUR Animationen/Effekte aus dem "${categoryKey}"-Design-Sys
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));
 
 // ============================================================
 // Helper functions with category-aware defaults

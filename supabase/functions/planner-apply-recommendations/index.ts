@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -136,7 +137,7 @@ serve(async (req) => {
       console.log("[Apply Recommendations] No recommendations generated - possible auth issue");
       return new Response(
         JSON.stringify({ 
-          error: "Keine Empfehlungen verfügbar. Bitte stellen Sie sicher, dass Sie angemeldet sind.",
+          error: tl({ de: "Keine Empfehlungen verfügbar. Bitte stellen Sie sicher, dass Sie angemeldet sind.", en: "No recommendations available. Please ensure you are logged in.", es: "No hay recomendaciones disponibles. Por favor, asegúrate de haber iniciado sesión." }),
           suggestions: [],
           recommendations: []
         }),
@@ -205,4 +206,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+})(req)));

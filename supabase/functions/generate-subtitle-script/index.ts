@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -50,7 +51,7 @@ serve(async (req) => {
     const toneDesc = toneMap[tone]?.[lang] || toneMap.friendly[lang];
 
     const systemPrompts: Record<string, string> = {
-      de: `Du bist ein Experte für Video-Skripte und Untertitel. Schreibe NUR das JSON-Array zurück, keine Erklärungen. Jedes Segment muss genau zur angegebenen Sprechzeit passen.`,
+      de: tl({ de: `Du bist ein Experte für Video-Skripte und Untertitel. Schreibe NUR das JSON-Array zurück, keine Erklärungen. Jedes Segment muss genau zur angegebenen Sprechzeit passen.`, en: `You are an expert in video scripts and subtitles. Return ONLY the JSON array, no explanations. Each segment must precisely match the specified speaking time.`, es: `Eres un experto en guiones de video y subtítulos. Devuelve SÓLO el array JSON, sin explicaciones. Cada segmento debe coincidir precisamente con el tiempo de habla especificado.` }),
       en: `You are an expert for video scripts and subtitles. Return ONLY the JSON array, no explanations. Each segment must fit the specified speaking time exactly.`,
       es: `Eres un experto en guiones de video y subtítulos. Devuelve SOLO el array JSON, sin explicaciones. Cada segmento debe ajustarse exactamente al tiempo de habla indicado.`,
     };
@@ -153,4 +154,4 @@ Formato: ["Texto del segmento 1", "Texto del segmento 2", ...]`,
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

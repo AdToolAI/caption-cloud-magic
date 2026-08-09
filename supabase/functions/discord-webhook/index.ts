@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,7 +19,7 @@ interface DiscordEmbed {
   timestamp?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -75,7 +76,7 @@ Deno.serve(async (req) => {
       case "test":
         embed = {
           title: "🎮 AdTool AI — Verbindung erfolgreich!",
-          description: "Dein Discord-Webhook ist korrekt eingerichtet. Du erhältst ab jetzt automatische Benachrichtigungen.",
+          description: tl({ de: "Dein Discord-Webhook ist korrekt eingerichtet. Du erhältst ab jetzt automatische Benachrichtigungen.", en: "Your Discord webhook is set up correctly. You will now receive automatic notifications.", es: "Tu webhook de Discord está configurado correctamente. A partir de ahora recibirás notificaciones automáticas." }),
           color: 5793266, // green
           footer: { text: "AdTool AI Gaming Hub" },
           timestamp: new Date().toISOString(),
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
         break;
 
       case "go_live":
-        content = custom_message || "🔴 Stream ist jetzt LIVE!";
+        content = custom_message || tl({ de: "🔴 Stream ist jetzt LIVE!", en: "🔴 Stream is now LIVE!", es: "🔴 ¡El stream está EN VIVO!" });
         embed = {
           title: `🔴 ${stream_title || "Stream ist live!"}`,
           description: custom_message || "Der Stream hat gerade begonnen — schau jetzt rein!",
@@ -106,7 +107,7 @@ Deno.serve(async (req) => {
       case "stream_end":
         embed = {
           title: "⬛ Stream beendet",
-          description: custom_message || "Der Stream ist jetzt offline. Danke fürs Zuschauen!",
+          description: custom_message || tl({ de: "Der Stream ist jetzt offline. Danke fürs Zuschauen!", en: "The stream is now offline. Thanks for watching!", es: "El stream está ahora offline. ¡Gracias por verlo!" }),
           color: 0x95a5a6,
           fields: [],
           footer: { text: "AdTool AI Gaming Hub" },
@@ -120,7 +121,7 @@ Deno.serve(async (req) => {
       case "new_clip":
         embed = {
           title: `✂️ Neuer Clip: ${clip_title || "Highlight"}`,
-          description: clip_url ? `[Clip ansehen](${clip_url})` : "Ein neuer Clip wurde erstellt!",
+          description: clip_url ? `[Clip ansehen](${clip_url})` : tl({ de: "Ein neuer Clip wurde erstellt!", en: "A new clip has been created!", es: "¡Se ha creado un nuevo clip!" }),
           color,
           footer: { text: "AdTool AI Gaming Hub" },
           timestamp: new Date().toISOString(),
@@ -191,4 +192,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+})(req)));

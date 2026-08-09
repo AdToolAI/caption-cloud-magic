@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -360,7 +361,7 @@ function generateIssuesSummary(analysis: any[]) {
   
   if (expiredCount > 0) {
     const platforms = analysis.filter(a => a.isExpired).map(a => a.platform).join(', ');
-    issues.push(`🚨 ${expiredCount} abgelaufene Token (${platforms}) - müssen DRINGEND neu verbunden werden!`);
+    issues.push(tl({ de: `🚨 ${expiredCount} abgelaufene Token (${platforms}) - müssen DRINGEND neu verbunden werden!`, en: `🚨 ${expiredCount} expired tokens (${platforms}) - need to be reconnected URGENTLY!`, es: `🚨 ${expiredCount} tokens caducados (${platforms}) - ¡necesitan ser reconectados URGENTEMENTE!` }));
   }
   
   if (expiringSoonCount > 0) {
@@ -377,7 +378,7 @@ function generateIssuesSummary(analysis: any[]) {
     : '### STATUS: Alles in Ordnung! ✨';
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -576,7 +577,7 @@ ${hasIssueKeywords ? `
 Der Nutzer hat Keywords verwendet die auf ein Problem hindeuten.
 - Frage gezielt nach Details zum Problem
 - Biete an, das Anliegen an den Support weiterzuleiten wenn du nicht helfen kannst
-- Sage sowas wie: "Falls ich dir nicht helfen kann, kannst du das gerne an unser Support-Team weiterleiten - klick einfach auf 'Support kontaktieren'."
+- Sage sowas wie: tl({ de: "Falls ich dir nicht helfen kann, kannst du das gerne an unser Support-Team weiterleiten - klick einfach auf 'Support kontaktieren'.", en: "If I can't help you, feel free to forward this to our support team - just click 'Contact Support'.", es: "Si no puedo ayudarte, no dudes en reenviar esto a nuestro equipo de soporte; simplemente haz clic en 'Contactar soporte'." })
 ` : ''}
 `
       },
@@ -605,7 +606,7 @@ Der Nutzer hat Keywords verwendet die auf ein Problem hindeuten.
       
       if (response.status === 429) {
         return new Response(JSON.stringify({ 
-          error: 'Rate limit erreicht. Bitte versuche es in einer Minute erneut.' 
+          error: tl({ de: 'Rate limit erreicht. Bitte versuche es in einer Minute erneut.', en: 'Rate limit reached. Please try again in one minute.', es: 'Límite de tasa alcanzado. Por favor, inténtalo de nuevo en un minuto.' }) 
         }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -759,4 +760,4 @@ Der Nutzer hat Keywords verwendet die auf ein Problem hindeuten.
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));

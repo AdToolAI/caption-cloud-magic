@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +12,7 @@ const corsHeaders = {
 const PUSH_MESSAGES = {
   de: {
     title: "Deine Streak ist in Gefahr ⚡",
-    body: (days: number) => `${days} Tage in Folge — verliere sie nicht! Mach jetzt eine kleine Aktion.`,
+    body: (days: number) => tl({ de: `${days} Tage in Folge — verliere sie nicht! Mach jetzt eine kleine Aktion.`, en: `${days} consecutive days — don't lose them! Take a small action now.`, es: `¡${days} días consecutivos — no los pierdas! Realiza una pequeña acción ahora.` }),
   },
   en: {
     title: "Your streak is in danger ⚡",
@@ -23,7 +24,7 @@ const PUSH_MESSAGES = {
   },
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -126,4 +127,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+})(req)));

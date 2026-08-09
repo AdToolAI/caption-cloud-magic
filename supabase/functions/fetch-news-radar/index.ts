@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +15,7 @@ const FALLBACK_NEWS = [
   { headline: "📱 Instagram testet neues Creator-Abo-Modell", category: "platform", source: "The Verge" },
   { headline: "💰 TikTok Shop expandiert in neue europäische Märkte", category: "monetization", source: "TechCrunch" },
   { headline: "📊 LinkedIn-Algorithmus priorisiert jetzt Kommentare statt Reaktionen", category: "analytics", source: "Social Media Today" },
-  { headline: "🤖 Adobe Firefly bekommt neue KI-Video-Funktionen für Marketer", category: "ai_tools", source: "Adobe Blog" },
+  { headline: tl({ de: "🤖 Adobe Firefly bekommt neue KI-Video-Funktionen für Marketer", en: "🤖 Adobe Firefly gets new AI video features for marketers", es: "🤖 Adobe Firefly incorpora nuevas funciones de video con IA para especialistas en marketing" }), category: "ai_tools", source: "Adobe Blog" },
   { headline: "📱 YouTube Shorts Monetarisierung erreicht 2M+ Creator", category: "monetization", source: "YouTube" },
   { headline: "🤖 Canva launcht KI-gestützte Batch-Erstellung für Social Media", category: "ai_tools", source: "Canva" },
   { headline: "📊 Kurzvideos generieren 2,5x mehr Engagement als statische Posts", category: "analytics", source: "HubSpot" },
@@ -42,7 +43,7 @@ function validateDiversity(news: any[]): boolean {
   return sources.size >= 4 && categories.size >= 3 && maxPerSource <= 3;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -269,4 +270,4 @@ Focus on ACTIONABLE, BREAKING news from the last 24 hours that directly impacts 
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

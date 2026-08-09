@@ -3,6 +3,7 @@ import { decryptToken } from '../_shared/crypto.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -39,7 +40,7 @@ async function uploadMedia(accessToken: string, mediaUrl: string, mediaType: str
   return uploadData.media_id_string;
 }
 
-Deno.serve(withTelemetry('x-publish', async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (withTelemetry('x-publish', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -80,7 +81,7 @@ Deno.serve(withTelemetry('x-publish', async (req) => {
       .single();
 
     if (profile?.plan !== 'enterprise') {
-      throw new Error('X/Twitter Publishing ist nur für Enterprise-Kunden verfügbar');
+      throw new Error(tl({ de: 'X/Twitter Publishing ist nur für Enterprise-Kunden verfügbar', en: 'X/Twitter Publishing is only available for Enterprise customers', es: 'La publicación en X/Twitter solo está disponible para clientes Enterprise' }));
     }
 
     // Get connection
@@ -140,4 +141,4 @@ Deno.serve(withTelemetry('x-publish', async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-}));
+}))(req)));

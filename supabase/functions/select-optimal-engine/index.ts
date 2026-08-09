@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -108,7 +109,7 @@ serve(async (req) => {
     if (factors.complexity > 0) reasons.push('Einfache Animationen gut für Remotion');
     if (factors.credits > 0) reasons.push('Kredite sparen mit günstigerer Option');
     if (factors.queueLoad > 0) reasons.push('Geringere Warteschlange');
-    if (factors.history > 0) reasons.push('Gute Historie mit dieser Engine');
+    if (factors.history > 0) reasons.push(tl({ de: 'Gute Historie mit dieser Engine', en: 'Good history with this engine', es: 'Buen historial con este motor' }));
     
     if (factors.duration < 0) reasons.push('Längere Videos besser mit Shotstack');
     if (factors.complexity < 0) reasons.push('Komplexe Effekte optimal für Shotstack');
@@ -137,4 +138,4 @@ serve(async (req) => {
       }
     );
   }
-});
+})(req)));

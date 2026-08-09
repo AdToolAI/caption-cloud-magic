@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return json(null, 204);
   }
@@ -164,14 +165,14 @@ Deno.serve(async (req) => {
     console.error('Token debug error:', err);
     return json({
       ok: false,
-      error: err?.message || 'Unerwarteter Fehler beim Token-Debug',
+      error: err?.message || tl({ de: 'Unerwarteter Fehler beim Token-Debug', en: 'Unexpected error during token debug', es: 'Error inesperado durante la depuración del token' }),
       details: {
         name: err?.name,
         stack: err?.stack?.substring(0, 500),
       }
     }, 500);
   }
-});
+})(req)));
 
 function json(payload: any, status = 200) {
   return new Response(payload ? JSON.stringify(payload) : null, {

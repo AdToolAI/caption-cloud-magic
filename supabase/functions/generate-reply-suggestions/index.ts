@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -88,7 +89,7 @@ Antworte im folgenden JSON-Format:
             type: "function",
             function: {
               name: "generate_reply_suggestions",
-              description: "Generiere 3 Antwortvorschläge für einen Kommentar",
+              description: tl({ de: "Generiere 3 Antwortvorschläge für einen Kommentar", en: "Generate 3 reply suggestions for a comment", es: "Generar 3 sugerencias de respuesta para un comentario" }),
               parameters: {
                 type: "object",
                 properties: {
@@ -121,13 +122,13 @@ Antworte im folgenden JSON-Format:
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit erreicht. Bitte versuche es später erneut." }),
+          JSON.stringify({ error: tl({ de: "Rate limit erreicht. Bitte versuche es später erneut.", en: "Rate limit reached. Please try again later.", es: "Límite de solicitudes alcanzado. Por favor, inténtalo de nuevo más tarde." }) }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "Guthaben aufgebraucht. Bitte lade dein Lovable AI Guthaben auf." }),
+          JSON.stringify({ error: tl({ de: "Guthaben aufgebraucht. Bitte lade dein Lovable AI Guthaben auf.", en: "Credits exhausted. Please top up your Lovable AI credits.", es: "Créditos agotados. Por favor, recarga tus créditos de Lovable AI." }) }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -175,4 +176,4 @@ Antworte im folgenden JSON-Format:
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+})(req)));

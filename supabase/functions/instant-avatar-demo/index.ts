@@ -2,6 +2,7 @@
 // Generates 5 camera angles of a user-uploaded portrait via Lovable AI Gateway
 // (Nano Banana 2 / gemini-3.1-flash-image). Rate-limited per IP hash.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,7 +82,7 @@ async function generateAngle(
   return b64;
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -162,7 +163,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "rate_limited",
-          message: "Du hast dein Demo-Kontingent erreicht. Probier es später erneut oder starte kostenlos für unbegrenzte Avatare.",
+          message: tl({ de: "Du hast dein Demo-Kontingent erreicht. Probier es später erneut oder starte kostenlos für unbegrenzte Avatare.", en: "You've reached your demo quota. Try again later or start for free for unlimited avatars.", es: "Has alcanzado tu cuota de demostración. Inténtalo de nuevo más tarde o empieza gratis para avatares ilimitados." }),
         }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -202,4 +203,4 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-});
+})(req)));

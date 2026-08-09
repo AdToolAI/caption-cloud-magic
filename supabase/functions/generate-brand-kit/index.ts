@@ -2,13 +2,14 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   console.log('=== GENERATE-BRAND-KIT START ===');
   console.log('Request method:', req.method);
   
@@ -226,7 +227,7 @@ Language: ${language || 'de'}`;
         console.error('Failed to parse AI response. Content preview:', content.substring(0, 500));
         return new Response(
           JSON.stringify({ 
-            error: 'AI-Antwort konnte nicht verarbeitet werden',
+            error: tl({ de: 'AI-Antwort konnte nicht verarbeitet werden', en: 'AI response could not be processed', es: 'No se pudo procesar la respuesta de la IA' }),
             details: 'Ungültiges JSON-Format',
             context: { preview: content.substring(0, 200), parseError: e?.message || String(e) }
           }),
@@ -285,7 +286,7 @@ Language: ${language || 'de'}`;
       console.error('Error details:', JSON.stringify(saveError, null, 2));
       return new Response(
         JSON.stringify({ 
-          error: 'Fehler beim Speichern',
+          error: tl({ de: 'Fehler beim Speichern', en: 'Error saving', es: 'Error al guardar' }),
           details: saveError.message,
           context: { dbError: saveError.details, hint: saveError.hint, code: saveError.code }
         }),
@@ -318,4 +319,4 @@ Language: ${language || 'de'}`;
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

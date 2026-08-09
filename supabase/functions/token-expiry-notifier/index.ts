@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,7 +19,7 @@ interface ExpiringToken {
   days_until_expiry: number;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -166,8 +167,8 @@ serve(async (req) => {
                   </h2>
                   <p style="color: #a0aec0; line-height: 1.6; margin: 0 0 24px 0;">
                     ${hasExpired
-                      ? 'Einer oder mehrere deiner Social Media Tokens sind abgelaufen. Bitte verbinde die betroffenen Accounts erneut, um weiterhin automatisch posten zu können.'
-                      : 'Einer oder mehrere deiner Social Media Tokens laufen bald ab. Erneuere die Verbindung rechtzeitig, um Unterbrechungen zu vermeiden.'}
+                      ? tl({ de: 'Einer oder mehrere deiner Social Media Tokens sind abgelaufen. Bitte verbinde die betroffenen Accounts erneut, um weiterhin automatisch posten zu können.', en: 'One or more of your social media tokens have expired. Please reconnect the affected accounts to continue posting automatically.', es: 'Uno o más de tus tokens de redes sociales han caducado. Por favor, vuelve a conectar las cuentas afectadas para seguir publicando automáticamente.' })
+                      : tl({ de: 'Einer oder mehrere deiner Social Media Tokens laufen bald ab. Erneuere die Verbindung rechtzeitig, um Unterbrechungen zu vermeiden.', en: 'One or more of your social media tokens will expire soon. Renew the connection in time to avoid interruptions.', es: 'Uno o más de tus tokens de redes sociales caducarán pronto. Renueva la conexión a tiempo para evitar interrupciones.' })}
                   </p>
                   <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
                     <p style="color: #ffffff; margin: 0; line-height: 1.8;">
@@ -225,4 +226,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+})(req)));

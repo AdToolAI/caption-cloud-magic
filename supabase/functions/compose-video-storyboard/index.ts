@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import {
+import { tl, withLang } from "../_shared/i18n.ts";
   ALL_EFFECT_IDS,
   EFFECT_DESCRIPTIONS,
   getDefaultEffects,
@@ -117,7 +118,7 @@ function promptCharacterActionFallback(prompt: unknown, characterName: string | 
 function neutralCharacterAction(language: string): { en: string; user: string } {
   const en = "performs the scene action naturally, visible to camera";
   const user =
-    language === "de" ? "führt die Szenen-Aktion natürlich aus, sichtbar zur Kamera" :
+    language === "de" ? tl({ de: "führt die Szenen-Aktion natürlich aus, sichtbar zur Kamera", en: "naturally performs the scene action, visible to the camera", es: "realiza la acción de la escena de forma natural, visible para la cámara" }) :
     language === "es" ? "realiza la acción de la escena con naturalidad, visible a cámara" :
     en;
   return { en, user };
@@ -151,7 +152,7 @@ Use sceneType values loosely — map "hook"=opening, "problem"=conflict beats, "
   custom: `FREE EDITOR MODE — follow the user's free description as literally as possible. Treat "productName" as the title, "productDescription" as the user's full creative brief (TOP PRIORITY — the storyboard must reflect it scene-by-scene), "usps" as optional style hints. Do NOT impose AIDA or any fixed framework. Generate scenes that mirror the user's description in order. Text overlays only if the brief implies them.`,
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -322,7 +323,7 @@ CRITICAL RULES:
 - sceneActionEn MUST describe the GROUP situation including ALL character names (e.g. "Sarah, Matthew and Kailee discuss the launch around the desk"), never just one character.
 - Do NOT use "the two of them" or pronouns — always restate names.
 - Never put the same identical pair in two consecutive scenes with the same shotTypes — vary framing.`;
-})()}
+})(req)))()}
 
 Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.${styleDirective}`;
 

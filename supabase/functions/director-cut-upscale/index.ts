@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +23,7 @@ const RESOLUTION_CONFIG = {
   '8k': { width: 7680, height: 4320, scale: 8 },
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -167,7 +168,7 @@ serve(async (req) => {
               success: true,
               job_id: prediction.id,
               status: 'processing',
-              message: `${resolution.toUpperCase()} Upscaling gestartet. Dies kann einige Minuten dauern.`,
+              message: tl({ de: `${resolution.toUpperCase()} Upscaling gestartet. Dies kann einige Minuten dauern.`, en: `${resolution.toUpperCase()} upscaling started. This may take a few minutes.`, es: `Escalado a ${resolution.toUpperCase()} iniciado. Esto puede tardar unos minutos.` }),
               credits_used: creditCost,
               settings: {
                 target_resolution: resolution,
@@ -196,7 +197,7 @@ serve(async (req) => {
         success: true,
         job_id: jobId,
         status: 'simulated',
-        message: `${resolution.toUpperCase()} Upscaling-Job erstellt (Simulation). In Produktion wird Replicate API verwendet.`,
+        message: tl({ de: `${resolution.toUpperCase()} Upscaling-Job erstellt (Simulation). In Produktion wird Replicate API verwendet.`, en: `${resolution.toUpperCase()} upscaling job created (simulation). In production, Replicate API is used.`, es: `Trabajo de escalado a ${resolution.toUpperCase()} creado (simulación). En producción, se utiliza la API de Replicate.` }),
         credits_required: creditCost,
         settings: {
           target_resolution: resolution,
@@ -221,4 +222,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

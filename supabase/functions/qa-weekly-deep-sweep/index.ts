@@ -11,6 +11,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -586,7 +587,7 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
     if (!heygen.ok && errBlob.includes("400127")) {
       result.status = "skipped";
       result.error_message =
-        "HeyGen erkennt im aktuellen Portrait kein Gesicht. Klicke erneut auf 'Bootstrap Assets' — das Portrait wird beim nächsten Bootstrap-Lauf zwingend ersetzt.";
+        tl({ de: "HeyGen erkennt im aktuellen Portrait kein Gesicht. Klicke erneut auf 'Bootstrap Assets' — das Portrait wird beim nächsten Bootstrap-Lauf zwingend ersetzt.", en: "HeyGen does not detect a face in the current portrait. Click 'Bootstrap Assets' again — the portrait will be replaced during the next bootstrap run.", es: "HeyGen no detecta una cara en el retrato actual. Haz clic de nuevo en 'Bootstrap Assets' — el retrato será reemplazado durante la próxima ejecución de bootstrap." });
     } else if (heygen.ok && url) {
       result.output_url = url;
       result.validation_checks.video_reachable = await headOk(url);
@@ -726,7 +727,7 @@ async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
 
 // ----------------------------- ORCHESTRATOR -----------------------------
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // QA smoke short-circuit (must come before admin-token check)
@@ -984,4 +985,4 @@ Deno.serve(async (req) => {
     }),
     { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
-});
+})(req)));

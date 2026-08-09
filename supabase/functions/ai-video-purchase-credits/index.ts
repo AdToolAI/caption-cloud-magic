@@ -3,6 +3,7 @@ import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { FOUNDERS_CREDIT_COUPON } from "../_shared/stripe-config.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +52,7 @@ const STRIPE_PRICE_IDS = {
   }
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -162,7 +163,7 @@ serve(async (req) => {
             founders_discount: isFounder ? 'true' : 'false',
           },
           footer: currency === 'EUR' 
-            ? 'Alle Preise inkl. 19% MwSt. (Deutschland). Vielen Dank für Ihren Einkauf.'
+            ? tl({ de: 'Alle Preise inkl. 19% MwSt. (Deutschland). Vielen Dank für Ihren Einkauf.', en: 'All prices include 19% VAT (Germany). Thank you for your purchase.', es: 'Todos los precios incluyen el 19% de IVA (Alemania). Gracias por tu compra.' })
             : 'Thank you for your purchase.',
         },
       },
@@ -192,4 +193,4 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
-});
+})(req)));

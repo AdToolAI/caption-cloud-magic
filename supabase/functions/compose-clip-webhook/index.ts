@@ -8,6 +8,7 @@ import { countDialogSpeakers as detectSpeakerCount } from "../_shared/dialog-spe
 import { isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -89,7 +90,7 @@ async function enrichEmptyPredError(
 // v81: detectSpeakerCount is now the shared countDialogSpeakers (aliased on import
 // above) so the regex stays identical across dispatcher and refund webhook.
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -457,7 +458,7 @@ serve(async (req) => {
               .from('composer_scenes')
               .update({
                 clip_status: 'failed',
-                clip_error: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.',
+                clip_error: tl({ de: 'legacy_talking_head_route_blocked: Composer-Szenen laufen jetzt ausschließlich über Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Bitte "Sauber neu starten" nutzen.', en: 'legacy_talking_head_route_blocked: Composer scenes now run exclusively via Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Please use "Clean Restart".', es: 'legacy_talking_head_route_blocked: Las escenas de Composer ahora se ejecutan exclusivamente a través de Cinematic-Sync (HappyHorse/Hailuo → Sync.so). Por favor, use "Reiniciar Limpio".' }),
                 lip_sync_status: null,
                 twoshot_stage: null,
                 dialog_shots: null,
@@ -672,4 +673,4 @@ serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

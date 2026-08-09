@@ -1,3 +1,4 @@
+import { tl, withLang } from "../_shared/i18n.ts";
 // supabase/functions/briefing-deep-parse/catalog.ts
 //
 // Edge-side mirror of `src/lib/video-composer/catalog/index.ts`.
@@ -52,7 +53,7 @@ const ALL: Record<CatalogAxis, Entry[]> = {
   gestik: [
     e('gestik','still','ruhig','still','hands at rest','keine geste'),
     e('gestik','open_palms','offene hände','open palms','open hands','offene handflächen'),
-    e('gestik','point_to_camera','zeigen','pointing','point to camera','zur kamera zeigen'),
+    e('gestik','point_to_camera','zeigen','pointing','point to camera',tl({ de: 'zur kamera zeigen', en: 'point to camera', es: 'apuntar a la cámara' })),
     e('gestik','count_fingers','finger zählen','counting fingers','aufzählen'),
     e('gestik','thumbs_up','daumen hoch','thumbs up'),
     e('gestik','hands_explain','erklärende hände','explaining hands','gesticulating'),

@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -89,7 +90,7 @@ const CONTENT_TYPE_PROMPTS: Record<string, (duration: number, tone: string, targ
     NUR sprechbarer Text - KEINE Visuell-Beschreibungen!`
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -150,7 +151,7 @@ WICHTIG - NUR sprechbarer Text:
 
 Beispiele:
 ❌ FALSCH: "Eine dynamische Abfolge von professionellen Produktbildern zeigt die Produkte im Detail. (Visuell: Montage von 5-6 Bildern)"
-✅ RICHTIG: "Entdecken Sie unsere neue Kollektion mit innovativen Designs und hochwertiger Verarbeitung."
+✅ RICHTIG: tl({ de: "Entdecken Sie unsere neue Kollektion mit innovativen Designs und hochwertiger Verarbeitung.", en: "Discover our new collection with innovative designs and high-quality craftsmanship.", es: "Descubre nuestra nueva colección con diseños innovadores y mano de obra de alta calidad." })
 
 ❌ FALSCH: "(Hintergrund: Moderne Musik läuft)"
 ✅ RICHTIG: [Weglassen - keine Erwähnung]
@@ -224,4 +225,4 @@ Format: Gib das Script in folgendem JSON-Format zurück:
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

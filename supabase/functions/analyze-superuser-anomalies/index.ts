@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +26,7 @@ interface ScenarioStat {
   errorMessages: string[];
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "analyze-superuser-anomalies" });
@@ -136,7 +137,7 @@ Deno.serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: "Du bist ein DevOps-Analyst. Analysiere Test-Anomalien und identifiziere übergreifende Patterns (z.B. alle Failures betreffen die selbe Edge Function, Datenbank, oder Sprachen). Antworte auf Deutsch in 2-3 Sätzen.",
+                content: tl({ de: "Du bist ein DevOps-Analyst. Analysiere Test-Anomalien und identifiziere übergreifende Patterns (z.B. alle Failures betreffen die selbe Edge Function, Datenbank, oder Sprachen). Antworte auf Deutsch in 2-3 Sätzen.", en: "You are a DevOps analyst. Analyze test anomalies and identify overarching patterns (e.g., all failures affect the same Edge Function, database, or languages). Respond in German in 2-3 sentences.", es: "Eres un analista de DevOps. Analiza las anomalías de las pruebas e identifica patrones generales (por ejemplo, todos los fallos afectan a la misma función Edge, base de datos o idiomas). Responde en alemán en 2-3 frases." }),
               },
               {
                 role: "user",
@@ -210,4 +211,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+})(req)));

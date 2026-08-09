@@ -24,6 +24,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -66,7 +67,7 @@ function isPayload(x: unknown): x is Payload {
     typeof p.yavg === "number";
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
@@ -297,7 +298,7 @@ Deno.serve(async (req) => {
     const turnEnd = Number(
       (Array.isArray(pass.segments) && (pass.segments as Array<{ endTime?: number }>)[0]?.endTime) ?? 0,
     ).toFixed(1);
-    const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`;
+    const userMsg = tl({ de: `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`, en: `Lip-sync for ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) could not be generated after ${NOOP_LADDER.length + 1} attempts. Please re-render plate.`, es: `La sincronización labial para ${passSpeakerName} (Turno ${turnStart}s–${turnEnd}s) no pudo generarse después de ${NOOP_LADDER.length + 1} intentos. Por favor, vuelve a renderizar la placa.` });
 
     await admin
       .from("composer_scenes")
@@ -337,7 +338,7 @@ Deno.serve(async (req) => {
     console.error(`[report-lipsync-motion-probe] error: ${(e as Error).message}`);
     return json({ error: "internal", message: (e as Error).message }, 500);
   }
-});
+})(req)));
 
 interface DispatchLog {
   scene_id: string;
