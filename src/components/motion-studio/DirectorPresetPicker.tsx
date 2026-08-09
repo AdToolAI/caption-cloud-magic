@@ -175,7 +175,7 @@ export default function DirectorPresetPicker({
             <PopoverTrigger asChild>
               <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1">
                 <Sparkles className="h-3 w-3" />
-                {activeCount > 0 ? 'Anpassen' : 'Hinzufügen'}
+                {activeCount > 0 ? tx({ de: 'Anpassen', en: 'Adjust', es: 'Ajustar' }) : tx({ de: 'Hinzufügen', en: 'Add', es: 'Añadir' })}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[420px] p-0" align="end">

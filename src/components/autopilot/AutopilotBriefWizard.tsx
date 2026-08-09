@@ -283,7 +283,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             </div>
 
             <div className="flex justify-between gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setStep(1)}>Zurück</Button>
+              <Button variant="ghost" onClick={() => setStep(1)}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
               <Button disabled={!aupValid} onClick={() => setStep(3)} className="gap-1.5">
                 Weiter <ChevronRight className="h-4 w-4" />
               </Button>
@@ -306,7 +306,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             </div>
 
             <div>
-              <Label htmlFor="confirm">Tippe <strong className="text-primary">{CONFIRM_PHRASE}</strong> zur Bestätigung *</Label>
+              <Label htmlFor="confirm">{tx({ de: "Tippe ", en: "Type ", es: "Escribe " })}<strong className="text-primary">{CONFIRM_PHRASE}</strong>{tx({ de: " zur Bestätigung *", en: " to confirm *", es: " para confirmar *" })}</Label>
               <Input
                 id="confirm"
                 value={confirmText}
@@ -318,7 +318,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             </div>
 
             <div className="flex justify-between gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setStep(2)}>Zurück</Button>
+              <Button variant="ghost" onClick={() => setStep(2)}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
               <Button
                 disabled={!confirmValid || toggle.isPending}
                 onClick={handleActivate}

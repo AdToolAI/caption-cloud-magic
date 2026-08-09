@@ -404,7 +404,7 @@ export function SceneAnalysisStep({
     
     // Pass empty effects for this scene to clear it
     onApplySuggestions({}, { [sceneId]: {} });
-    toast.info('Szeneneffekte zurückgesetzt');
+    toast.info(tx({ de: 'Szeneneffekte zurückgesetzt', en: 'Scene effects reset', es: 'Efectos de escena restablecidos' }));
   };
 
   // Check if scene has effects applied

@@ -161,12 +161,12 @@ export default function SocialMediaSettings() {
                         {connected ? (
                           <div className="flex items-center gap-1 text-sm text-green-600">
                             <CheckCircle className="h-4 w-4" />
-                            <span>Verbunden</span>
+                            <span>{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">
                             <XCircle className="h-4 w-4" />
-                            <span>Nicht verbunden</span>
+                            <span>{tx({ de: "Nicht verbunden", en: "Not connected", es: "No conectado" })}</span>
                           </div>
                         )}
                       </div>

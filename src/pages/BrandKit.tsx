@@ -118,7 +118,7 @@ const BrandKit = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
       toast({
-        title: "Gelöscht",
+        title: tx({ de: "Gelöscht", en: "Deleted", es: "Eliminado" }),
         description: tx({ de: "Brand Kit wurde erfolgreich gelöscht", en: "Brand kit deleted successfully", es: "Brand kit eliminado correctamente" })
       });
     }
