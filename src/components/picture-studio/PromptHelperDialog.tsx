@@ -119,7 +119,7 @@ export function PromptHelperDialog({
           : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
       }`}
     >
-      {value}
+      {CHIP_LABELS[value] ? tx(CHIP_LABELS[value]) : value}
     </button>
   );
 
