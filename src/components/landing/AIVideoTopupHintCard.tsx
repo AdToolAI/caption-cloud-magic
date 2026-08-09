@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Zap, ArrowRight, ShieldCheck } from "lucide-react";
@@ -39,7 +40,7 @@ export const AIVideoTopupHintCard = () => {
       <div className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2">
         <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Technische Fehler werden automatisch erstattet.{' '}
+          {tx({ de: "Technische Fehler werden automatisch erstattet.", en: "Technical errors are automatically refunded.", es: "Los errores técnicos se reembolsan automáticamente." })}{' '}
           <Link to="/legal/ai-video-refund" className="text-primary hover:underline">
             Refund-Policy
           </Link>

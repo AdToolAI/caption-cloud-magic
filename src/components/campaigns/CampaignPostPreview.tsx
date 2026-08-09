@@ -1,4 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { tx } from "@/lib/i18nText";
 import { Instagram, Facebook, Linkedin, Video as VideoIcon } from "lucide-react";
 import { InstagramPostPreview } from "@/components/post-generator/InstagramPostPreview";
 import { FacebookPostPreview } from "@/components/post-generator/FacebookPostPreview";
@@ -33,7 +34,7 @@ export const CampaignPostPreview = ({
     return (
       <div className="p-6 text-center text-muted-foreground text-sm border border-dashed border-white/20 rounded-xl">
         <VideoIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p>Vorschau für {platforms.join(", ")} nicht verfügbar</p>
+        <p>{tx({ de: `Vorschau für ${platforms.join(", ")} nicht verfügbar`, en: `Preview for ${platforms.join(", ")} not available`, es: `Vista previa para ${platforms.join(", ")} no disponible` })}</p>
       </div>
     );
   }
