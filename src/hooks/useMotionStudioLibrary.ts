@@ -101,7 +101,7 @@ export function useMotionStudioLibrary() {
         if (prev.some((c) => c.id === created.id)) return prev;
         return [created, ...prev];
       });
-      toast.success(tx({ de: `„${created.name}tx({ de: " wurde gespeichert`, en: `", en: "was saved`, en:`", es: "fue salvado`, en:`" })${created.name}" has been saved`, es: `"${created.name}" se ha guardado` }));
+      toast.success(tx({ de: `„${created.name}“ wurde gespeichert`, en: `“${created.name}” has been saved`, es: `«${created.name}» se ha guardado` }));
       // Fire-and-forget reconciliation
       loadAll();
       return created;
@@ -163,7 +163,7 @@ export function useMotionStudioLibrary() {
         if (prev.some((l) => l.id === created.id)) return prev;
         return [created, ...prev];
       });
-      toast.success(tx({ de: `„${created.name}tx({ de: " wurde gespeichert`, en: `", en: "was saved`, en:`", es: "fue salvado`, en:`" })${created.name}" has been saved`, es: `"${created.name}" se ha guardado` }));
+      toast.success(tx({ de: `„${created.name}“ wurde gespeichert`, en: `“${created.name}” has been saved`, es: `«${created.name}» se ha guardado` }));
       loadAll();
       return created;
     },
@@ -472,7 +472,7 @@ export function useMotionStudioLibrary() {
         toast.error(tx({ de: `Snippet speichern fehlgeschlagen: ${error.message}`, en: `Failed to save snippet: ${error.message}`, es: `Error al guardar el snippet: ${error.message}` }));
         return null;
       }
-      toast.success(tx({ de: `Snippet „${data.name}tx({ de: " gespeichert`, en: `Snippet “${data.name}” saved`, es: `Fragmento ", en: "saved`, en: `Snippet “${data.name}” saved`, es: `Fragmento", es: "guardado`, en: `Fragmento “${data.name}” guardado`, es: `Fragmento" })${data.name}" guardado` }));
+      toast.success(tx({ de: `Snippet „${data.name}“ gespeichert`, en: `Snippet “${data.name}” saved`, es: `Fragmento «${data.name}» guardado` }));
       return data as SceneSnippet;
     },
     [user],
@@ -622,7 +622,7 @@ export function useMotionStudioLibrary() {
         toast.error(tx({ de: `Klonen fehlgeschlagen: ${error.message}`, en: `Cloning failed: ${error.message}`, es: `Error de clonación: ${error.message}` }));
         return null;
       }
-      toast.success(tx({ de: `„${data.name}tx({ de: " in deine Library kopiert`, en: `", en: "copied to your library`, en:`", es: "copiado a tu biblioteca`, en:`" })${data.name}" copied to your library`, es: `"${data.name}" copiado a tu biblioteca` }));
+      toast.success(tx({ de: `„${data.name}“ in deine Library kopiert`, en: `“${data.name}” copied to your library`, es: `«${data.name}» copiado a tu biblioteca` }));
       return data as SceneSnippet;
     },
     [user],
