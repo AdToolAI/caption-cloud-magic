@@ -167,22 +167,48 @@ export function ImageGenerator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  /**
+   * Referenzbilder gehen in den Storage (Pfad startet mit der User-ID) und
+   * werden als URL an das Modell geschickt. Base64-Daten-URLs sprengen sonst
+   * die Request-Grenzen von Replicate bei größeren Fotos.
+   */
+  const uploadReference = async (file: File, apply: (url: string | null) => void) => {
+    if (!user) { toast.error(t('picStudio.loginRequired')); return; }
+    // Sofortige lokale Vorschau
+    const localPreview = URL.createObjectURL(file);
+    apply(localPreview);
+    setRefUploading(true);
+    try {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const path = `${user.id}/picture-studio/refs/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage
+        .from('background-projects')
+        .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
+      if (error) throw error;
+      const { data } = supabase.storage.from('background-projects').getPublicUrl(path);
+      apply(data.publicUrl);
+    } catch (err: any) {
+      console.error('[ImageGenerator] reference upload failed:', err);
+      apply(null);
+      toast.error(tx({ de: 'Referenzbild konnte nicht hochgeladen werden', en: 'Reference image could not be uploaded', es: 'No se pudo subir la imagen de referencia' }));
+    } finally {
+      URL.revokeObjectURL(localPreview);
+      setRefUploading(false);
+    }
+  };
+
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setReferenceImage(reader.result as string);
-    reader.readAsDataURL(file);
+    void uploadReference(file, setReferenceImage);
   };
 
   const handleStyleRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setStyleReference(reader.result as string);
-    reader.readAsDataURL(file);
+    void uploadReference(file, setStyleReference);
   };
 
   const brandKitPayload = useBrandKit && activeBrandKit ? {
