@@ -895,8 +895,8 @@ function DialogModeTab({
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground mt-1">
-            Alle Dialog-Clips werden in der Reihenfolge an diese Szene angehängt.
-            tx({ de: "Wechsle danach in den Director's Cut für Shot-Reverse-Shot-Schnitt.", en: "Then switch to Director's Cut for shot-reverse-shot editing.", es: "Luego cambia a Director's Cut para la edición de plano contraplano." })
+            {tx({ de: "Alle Dialog-Clips werden in der Reihenfolge an diese Szene angehängt.", en: "All dialog clips are appended to this scene in order.", es: "Todos los clips de diálogo se añaden a esta escena en orden." })}{' '}
+            {tx({ de: "Wechsle danach in den Director's Cut für Shot-Reverse-Shot-Schnitt.", en: "Then switch to Director's Cut for shot-reverse-shot editing.", es: "Luego cambia a Director's Cut para la edición de plano contraplano." })}
           </p>
         </div>
       )}
