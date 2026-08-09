@@ -30,8 +30,6 @@ interface SendVerificationRequest {
 const ALLOWED_ORIGINS = new Set<string>([
   "https://useadtool.ai",
   "https://www.useadtool.ai",
-  "https://captiongenie.app",
-  "https://www.captiongenie.app",
   "https://caption-cloud-magic.lovable.app",
 ]);
 
