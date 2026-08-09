@@ -227,7 +227,7 @@ const AllComments = () => {
         prev.map(c => (c.id === commentId ? { ...c, status: newStatus } : c))
       );
 
-      toast({ title: "Status aktualisiert" });
+      toast({ title: tx({ de: "Status aktualisiert", en: "Status updated", es: "Estado actualizado" }) });
     } catch (error) {
       console.error("Error updating status:", error);
       toast({
@@ -280,12 +280,12 @@ const AllComments = () => {
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
-                Importieren
+                tx({ de: 'Importieren', en: 'Import', es: 'Importar' })
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Kommentare importieren</DialogTitle>
+                <DialogTitle>tx({ de: 'Kommentare importieren', en: 'Import comments', es: 'Importar comentarios' }) + "</DialogTitle>"
               </DialogHeader>
               <Textarea
                 placeholder="Ein Kommentar pro Zeile..."
@@ -293,12 +293,12 @@ const AllComments = () => {
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
               />
-              <Button onClick={handleImport}>Import starten</Button>
+              <Button onClick={handleImport}>tx({ de: 'Import starten', en: 'Start import', es: 'Iniciar importación' }) + "</Button>"
             </DialogContent>
           </Dialog>
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            Exportieren
+            tx({ de: 'Exportieren', en: 'Export', es: 'Exportar' })
           </Button>
         </div>
       </div>
@@ -306,23 +306,23 @@ const AllComments = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-5 gap-4">
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Gesamt</div>
+          <div className="text-sm text-muted-foreground">" + tx({ de: 'Gesamt', en: 'Total', es: 'Total' }) + "</div>
           <div className="text-2xl font-bold">{kpiData.total}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Neu (24h)</div>
+          <div className="text-sm text-muted-foreground">" + tx({ de: 'Neu (24h)', en: 'New (24h)', es: 'Nuevo (24h)' }) + "</div>
           <div className="text-2xl font-bold">{kpiData.new24h}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Offene Fragen</div>
+          <div className="text-sm text-muted-foreground">" + tx({ de: 'Offene Fragen', en: 'Open questions', es: 'Preguntas abiertas' }) + "</div>
           <div className="text-2xl font-bold">{kpiData.openQuestions}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Leads</div>
+          <div className="text-sm text-muted-foreground">" + tx({ de: 'Leads', en: 'Leads', es: 'Leads' }) + "</div>
           <div className="text-2xl font-bold">{kpiData.leads}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Toxisch</div>
+          <div className="text-sm text-muted-foreground">" + tx({ de: 'Toxisch', en: 'Toxic', es: 'Tóxico' }) + "</div>
           <div className="text-2xl font-bold">{kpiData.toxicCount}</div>
         </Card>
       </div>
@@ -340,10 +340,10 @@ const AllComments = () => {
         </div>
         <Select value={filterPlatform} onValueChange={setFilterPlatform}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Plattform" />
+            <SelectValue placeholder={tx({ de: "Plattform", en: "Platform", es: "Plataforma" })} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Alle</SelectItem>
+            <SelectItem value="">{tx({ de: "Alle", en: "All", es: "Todos" })}</SelectItem>
             <SelectItem value="instagram">Instagram</SelectItem>
             <SelectItem value="tiktok">TikTok</SelectItem>
             <SelectItem value="youtube">YouTube</SelectItem>
@@ -351,13 +351,13 @@ const AllComments = () => {
         </Select>
         <Select value={filterSentiment} onValueChange={setFilterSentiment}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Sentiment" />
+            <SelectValue placeholder={tx({ de: "Sentiment", en: "Sentiment", es: "Sentimiento" })} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Alle</SelectItem>
-            <SelectItem value="positive">Positiv</SelectItem>
-            <SelectItem value="neutral">Neutral</SelectItem>
-            <SelectItem value="negative">Negativ</SelectItem>
+            <SelectItem value="">{tx({ de: "Alle", en: "All", es: "Todos" })}</SelectItem>
+            <SelectItem value="positive">{tx({ de: "Positiv", en: "Positive", es: "Positivo" })}</SelectItem>
+            <SelectItem value="neutral">{tx({ de: "Neutral", en: "Neutral", es: "Neutral" })}</SelectItem>
+            <SelectItem value="negative">{tx({ de: "Negativ", en: "Negative", es: "Negativo" })}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -365,20 +365,20 @@ const AllComments = () => {
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
           <TabsTrigger value="alle">Alle</TabsTrigger>
-          <TabsTrigger value="inbox">Inbox</TabsTrigger>
-          <TabsTrigger value="leads">Leads</TabsTrigger>
-          <TabsTrigger value="fragen">Fragen</TabsTrigger>
-          <TabsTrigger value="beschwerden">Beschwerden</TabsTrigger>
-          <TabsTrigger value="toxisch">Toxisch</TabsTrigger>
-          <TabsTrigger value="erledigt">Erledigt</TabsTrigger>
+          <TabsTrigger value="inbox">{tx({ de: "Inbox", en: "Inbox", es: "Bandeja de entrada" })}</TabsTrigger>
+          <TabsTrigger value="leads">{tx({ de: "Leads", en: "Leads", es: "Leads" })}</TabsTrigger>
+          <TabsTrigger value="fragen">{tx({ de: "Fragen", en: "Questions", es: "Preguntas" })}</TabsTrigger>
+          <TabsTrigger value="beschwerden">{tx({ de: "Beschwerden", en: "Complaints", es: "Quejas" })}</TabsTrigger>
+          <TabsTrigger value="toxisch">{tx({ de: "Toxisch", en: "Toxic", es: "Tóxico" })}</TabsTrigger>
+          <TabsTrigger value="erledigt">{tx({ de: "Erledigt", en: "Done", es: "Hecho" })}</TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedTab} className="mt-6">
           {loading ? (
-            <div className="text-center py-12">Lädt...</div>
+            <div className="text-center py-12">{tx({ de: "Lädt...", en: "Loading...", es: "Cargando..." })}</div>
           ) : comments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.
+              tx({ de: "Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.", en: "No saved comments yet – import data or connect a source.", es: "Aún no hay comentarios guardados: importa datos o conecta una fuente." })
             </div>
           ) : (
             <Table>
@@ -387,15 +387,15 @@ const AllComments = () => {
                   <TableHead className="w-12">
                     <Checkbox />
                   </TableHead>
-                  <TableHead>Zeit</TableHead>
-                  <TableHead>Plattform</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Kommentar</TableHead>
-                  <TableHead>Sentiment</TableHead>
-                  <TableHead>Intent</TableHead>
-                  <TableHead>Priorität</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Aktionen</TableHead>
+                  <TableHead>{tx({ de: "Zeit", en: "Time", es: "Tiempo" })}</TableHead>
+                  <TableHead>{tx({ de: "Plattform", en: "Platform", es: "Plataforma" })}</TableHead>
+                  <TableHead>{tx({ de: "User", en: "User", es: "Usuario" })}</TableHead>
+                  <TableHead>{tx({ de: "Kommentar", en: "Comment", es: "Comentario" })}</TableHead>
+                  <TableHead>{tx({ de: "Sentiment", en: "Sentiment", es: "Sentimiento" })}</TableHead>
+                  <TableHead>{tx({ de: "Intent", en: "Intent", es: "Intento" })}</TableHead>
+                  <TableHead>{tx({ de: "Priorität", en: "Priority", es: "Prioridad" })}</TableHead>
+                  <TableHead>{tx({ de: "Status", en: "Status", es: "Estado" })}</TableHead>
+                  <TableHead>{tx({ de: "Aktionen", en: "Actions", es: "Acciones" })}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -429,22 +429,22 @@ const AllComments = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="open">Offen</SelectItem>
-                          <SelectItem value="replied">Beantwortet</SelectItem>
-                          <SelectItem value="ignored">Ignoriert</SelectItem>
-                          <SelectItem value="flagged">Markiert</SelectItem>
+                          <SelectItem value="open">{tx({ de: "Offen", en: "Open", es: "Abierto" })}</SelectItem>
+                          <SelectItem value="replied">{tx({ de: "Beantwortet", en: "Answered", es: "Respondido" })}</SelectItem>
+                          <SelectItem value="ignored">{tx({ de: "Ignoriert", en: "Ignored", es: "Ignorado" })}</SelectItem>
+                          <SelectItem value="flagged">{tx({ de: "Markiert", en: "Flagged", es: "Marcado" })}</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" title="Antwort kopieren">
+                        <Button variant="ghost" size="sm" title={tx({ de: "Antwort kopieren", en: "Copy answer", es: "Copiar respuesta" })}>
                           <Copy className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title="Als erledigt markieren">
+                        <Button variant="ghost" size="sm" title={tx({ de: "Als erledigt markieren", en: "Mark as done", es: "Marcar como hecho" })}>
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title="Flaggen">
+                        <Button variant="ghost" size="sm" title={tx({ de: "Flaggen", en: "Flag", es: "Marcar" })}>
                           <Flag className="h-4 w-4" />
                         </Button>
                       </div>

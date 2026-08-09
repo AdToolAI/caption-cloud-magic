@@ -113,7 +113,7 @@ export function BugReportsAdmin() {
                 Bug Reports
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                User-eingereichte Bug-Meldungen aus der App
+                {tx({ de: "User-eingereichte Bug-Meldungen aus der App", en: "User-submitted bug reports from the app", es: "Informes de errores enviados por los usuarios desde la aplicación" })}
               </p>
             </div>
             <div className="flex gap-2">
@@ -122,10 +122,10 @@ export function BugReportsAdmin() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Alle</SelectItem>
-                  <SelectItem value="open">🔵 Offen</SelectItem>
-                  <SelectItem value="in_progress">🟡 In Arbeit</SelectItem>
-                  <SelectItem value="resolved">🟢 Gelöst</SelectItem>
+                  <SelectItem value="all">{tx({ de: "Alle", en: "All", es: "Todos" })}</SelectItem>
+                  <SelectItem value="open">tx({ de: "🔵 Offen", en: "🔵 Open", es: "🔵 Abierto" })</SelectItem>
+                  <SelectItem value="in_progress">tx({ de: "🟡 In Arbeit", en: "🟡 In Progress", es: "🟡 En progreso" })</SelectItem>
+                  <SelectItem value="resolved">tx({ de: "🟢 Gelöst", en: "🟢 Resolved", es: "🟢 Resuelto" })</SelectItem>
                   <SelectItem value="wont_fix">Won't Fix</SelectItem>
                   <SelectItem value="duplicate">Duplicate</SelectItem>
                 </SelectContent>
@@ -138,11 +138,11 @@ export function BugReportsAdmin() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Lade...</div>
+            <div className="text-center py-8 text-muted-foreground">{tx({ de: "Lade...", en: "Loading...", es: "Cargando..." })}</div>
           ) : reports.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Bug className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p>Keine Bug-Reports im Filter „{filter}"</p>
+              <p>{tx({ de: `Keine Bug-Reports im Filter „${filter}"`, en: `No bug reports in filter "${filter}"`, es: `No hay informes de errores en el filtro "${filter}"` })}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -206,7 +206,7 @@ export function BugReportsAdmin() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium mb-1">Beschreibung</p>
+                  <p className="text-sm font-medium mb-1">{tx({ de: "Beschreibung", en: "Description", es: "Descripción" })}</p>
                   <p className="text-sm whitespace-pre-wrap text-muted-foreground">
                     {selected.description}
                   </p>
@@ -214,7 +214,7 @@ export function BugReportsAdmin() {
 
                 {selected.screenshot_url && (
                   <div>
-                    <p className="text-sm font-medium mb-1">Screenshot</p>
+                    <p className="text-sm font-medium mb-1">{tx({ de: "Screenshot", en: "Screenshot", es: "Captura de pantalla" })}</p>
                     <a href={selected.screenshot_url} target="_blank" rel="noopener noreferrer">
                       <img
                         src={selected.screenshot_url}
@@ -256,11 +256,11 @@ export function BugReportsAdmin() {
                 )}
 
                 <div>
-                  <p className="text-sm font-medium mb-1">Admin Notizen</p>
+                  <p className="text-sm font-medium mb-1">{tx({ de: "Admin Notizen", en: "Admin Notes", es: "Notas de administrador" })}</p>
                   <Textarea
                     value={adminNotes}
                     onChange={(e) => setAdminNotes(e.target.value)}
-                    placeholder="Interne Notizen, Lösungsschritte..."
+                    placeholder={tx({ de: "Interne Notizen, Lösungsschritte...", en: "Internal notes, solution steps...", es: "Notas internas, pasos de solución..." })}
                     rows={3}
                   />
                 </div>
@@ -275,9 +275,9 @@ export function BugReportsAdmin() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="open">Offen</SelectItem>
-                      <SelectItem value="in_progress">In Arbeit</SelectItem>
-                      <SelectItem value="resolved">Gelöst</SelectItem>
+                      <SelectItem value="open">{tx({ de: "Offen", en: "Open", es: "Abierto" })}</SelectItem>
+                      <SelectItem value="in_progress">{tx({ de: "In Arbeit", en: "In Progress", es: "En progreso" })}</SelectItem>
+                      <SelectItem value="resolved">{tx({ de: "Gelöst", en: "Resolved", es: "Resuelto" })}</SelectItem>
                       <SelectItem value="wont_fix">Won't Fix</SelectItem>
                       <SelectItem value="duplicate">Duplicate</SelectItem>
                     </SelectContent>

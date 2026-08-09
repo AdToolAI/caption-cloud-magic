@@ -94,7 +94,7 @@ export default function StockVideos() {
 
   async function toggleFavorite(v: StockVideo) {
     if (!user) {
-      toast({ title: "Login nötig", description: tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }) });
+      toast({ title: tx({ de: "Login nötig", en: "Login required", es: "Inicio de sesión requerido" }), description: tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }) });
       return;
     }
     if (favoriteIds.has(v.id)) {
@@ -105,7 +105,7 @@ export default function StockVideos() {
         .eq("source", v.provider)
         .eq("external_id", v.external_id);
       setFavorites((prev) => prev.filter((f) => f.id !== v.id));
-      toast({ title: "Aus Favoriten entfernt" });
+      toast({ title: tx({ de: "Aus Favoriten entfernt", en: "Removed from favorites", es: "Eliminado de favoritos" }) });
     } else {
       await supabase.from("user_video_library").insert({
         user_id: user.id,
@@ -128,7 +128,7 @@ export default function StockVideos() {
         },
       });
       setFavorites((prev) => [v, ...prev]);
-      toast({ title: "Zu Favoriten hinzugefügt", description: v.title });
+      toast({ title: tx({ de: "Zu Favoriten hinzugefügt", en: "Added to favorites", es: "Añadido a favoritos" }), description: v.title });
     }
   }
 
@@ -206,8 +206,8 @@ export default function StockVideos() {
                 Stock Videos
               </h1>
               <p className="text-muted-foreground mt-2 max-w-2xl">
-                Kuratierte 4K- und HD-Clips aus Pexels und Pixabay — mit Hover-Preview, automatischen Lizenz-Zertifikaten
-                und direkter Übergabe an Composer oder Director's Cut.
+                {tx({ de: "Kuratierte 4K- und HD-Clips aus Pexels und Pixabay — mit Hover-Preview, automatischen Lizenz-Zertifikaten", en: "Curated 4K and HD clips from Pexels and Pixabay — with hover preview, automatic license certificates", es: "Clips seleccionados en 4K y HD de Pexels y Pixabay — con vista previa al pasar el ratón, certificados de licencia automáticos" })}
+                {tx({ de: "und direkter Übergabe an Composer oder Director's Cut.", en: "and direct handoff to Composer or Director's Cut.", es: "y transferencia directa a Composer o Director's Cut." })}
               </p>
             </motion.div>
 
@@ -227,7 +227,7 @@ export default function StockVideos() {
                 className="bg-yellow-500/90 text-black hover:bg-yellow-500 h-11 px-5"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                <span className="ml-2">Suchen</span>
+                <span className="ml-2">{tx({ de: "Suchen", en: "Search", es: "Buscar" })}</span>
               </Button>
             </form>
           </div>
@@ -239,8 +239,8 @@ export default function StockVideos() {
 
           <Tabs defaultValue="results">
             <TabsList className="bg-black/40 border border-yellow-500/15">
-              <TabsTrigger value="results">Ergebnisse ({results.length})</TabsTrigger>
-              <TabsTrigger value="favorites">Favoriten ({favorites.length})</TabsTrigger>
+              <TabsTrigger value="results">{tx({ de: `Ergebnisse (${results.length})`, en: `Results (${results.length})`, es: `Resultados (${results.length})` })}</TabsTrigger>
+              <TabsTrigger value="favorites">{tx({ de: `Favoriten (${favorites.length})`, en: `Favorites (${favorites.length})`, es: `Favoritos (${favorites.length})` })}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="results" className="mt-4">
