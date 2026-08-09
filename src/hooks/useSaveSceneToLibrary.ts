@@ -63,7 +63,7 @@ export function useSaveSceneToLibrary() {
           },
         });
         if (error) throw error;
-        if (!data?.ok) throw new Error(data?.error || 'Speichern fehlgeschlagen');
+        if (!data?.ok) throw new Error(data?.error || tx({ de: 'Speichern fehlgeschlagen', en: 'Save failed', es: 'Guardado fallido' }));
 
         setSavedSceneIds((prev) => {
           const next = new Set(prev);
@@ -76,15 +76,15 @@ export function useSaveSceneToLibrary() {
         queryClient.invalidateQueries({ queryKey: ['media-library'] });
 
         toast({
-          title: data.already ? 'Bereits in Mediathek' : 'In Mediathek gespeichert',
+          title: data.already ? tx({ de: 'Bereits in Mediathek', en: 'Already in library', es: 'Ya está en la biblioteca' }) : tx({ de: 'In Mediathek gespeichert', en: 'Saved to library', es: 'Guardado en la biblioteca' }),
           description: tx({ de: 'Die Szene ist jetzt als eigenständiger Clip verfügbar.', en: 'The scene is now available as a standalone clip.', es: 'La escena ya está disponible como un clip independiente.' }),
         });
         return true;
       } catch (e) {
         console.error('[useSaveSceneToLibrary] error', e);
         toast({
-          title: 'Speichern fehlgeschlagen',
-          description: e instanceof Error ? e.message : 'Unbekannter Fehler',
+          title: tx({ de: 'Speichern fehlgeschlagen', en: 'Save failed', es: 'Guardado fallido' }),
+          description: e instanceof Error ? e.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
           variant: 'destructive',
         });
         return false;

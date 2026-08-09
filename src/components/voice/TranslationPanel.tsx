@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Languages, Play } from 'lucide-react';
 import { useVoiceTranslation } from '@/hooks/useVoiceTranslation';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
+import { useTx } from '@/lib/i18nText';
 
 const LANGUAGES = [
   { code: 'de', name: 'Deutsch' },
@@ -20,6 +21,7 @@ const LANGUAGES = [
 ];
 
 export function TranslationPanel() {
+  const tx = useTx();
   const [text, setText] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('de');
   const [targetLanguage, setTargetLanguage] = useState('en');
@@ -41,13 +43,13 @@ export function TranslationPanel() {
       <Card className="p-4">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Languages className="h-5 w-5" />
-          Text übersetzen & Voiceover erstellen
+          {tx({ de: "Text übersetzen & Voiceover erstellen", en: "Translate text & create voiceover", es: "Traducir texto y crear locución" })}
         </h3>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Von</Label>
+              <Label>{tx({ de: "Von", en: "From", es: "Desde" })}</Label>
               <Select value={sourceLanguage} onValueChange={setSourceLanguage}>
                 <SelectTrigger>
                   <SelectValue />
@@ -63,7 +65,7 @@ export function TranslationPanel() {
             </div>
 
             <div>
-              <Label>Nach</Label>
+              <Label>{tx({ de: "Nach", en: "To", es: "Hacia" })}</Label>
               <Select value={targetLanguage} onValueChange={setTargetLanguage}>
                 <SelectTrigger>
                   <SelectValue />
@@ -80,23 +82,23 @@ export function TranslationPanel() {
           </div>
 
           <div>
-            <Label>Text</Label>
+            <Label>{tx({ de: "Text", en: "Text", es: "Texto" })}</Label>
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Gib deinen Text ein..."
+              placeholder={tx({ de: "Gib deinen Text ein...", en: "Enter your text...", es: "Introduce tu texto..." })}
               rows={4}
             />
           </div>
 
           <div>
-            <Label>Voice (Optional)</Label>
+            <Label>{tx({ de: "Voice (Optional)", en: "Voice (optional)", es: "Voz (opcional)" })}</Label>
             <Select value={selectedVoice} onValueChange={setSelectedVoice}>
               <SelectTrigger>
-                <SelectValue placeholder="Standard Voice" />
+                <SelectValue placeholder={tx({ de: "Standard Voice", en: "Default voice", es: "Voz predeterminada" })} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Standard Voice</SelectItem>
+                <SelectItem value="">{tx({ de: "Standard Voice", en: "Default voice", es: "Voz predeterminada" })}</SelectItem>
                 {voices.filter(v => v.is_active).map((voice) => (
                   <SelectItem key={voice.id} value={voice.id}>
                     {voice.name} ({voice.language})
@@ -112,14 +114,14 @@ export function TranslationPanel() {
             className="w-full gap-2"
           >
             <Languages className="h-4 w-4" />
-            {loading ? 'Übersetzt...' : 'Übersetzen & Voiceover erstellen'}
+            {loading ? tx({ de: 'Übersetzt...', en: 'Translating...', es: 'Traduciendo...' }) : tx({ de: 'Übersetzen & Voiceover erstellen', en: 'Translate & create voiceover', es: 'Traducir y crear locución' })}
           </Button>
         </div>
       </Card>
 
       {translation && (
         <Card className="p-4">
-          <h4 className="font-semibold mb-2">Ergebnis</h4>
+          <h4 className="font-semibold mb-2">{tx({ de: "Ergebnis", en: "Result", es: "Resultado" })}</h4>
           <div className="space-y-3">
             <div className="p-3 bg-muted rounded">
               <p className="text-sm">{translation.translated_text}</p>
@@ -136,7 +138,7 @@ export function TranslationPanel() {
                 }}
               >
                 <Play className="h-3 w-3" />
-                Voiceover abspielen
+                {tx({ de: "Voiceover abspielen", en: "Play voiceover", es: "Reproducir locución" })}
               </Button>
 
               <Button
@@ -146,7 +148,7 @@ export function TranslationPanel() {
                   window.open(translation.voiceover_url, '_blank');
                 }}
               >
-                Download
+                {tx({ de: "Download", en: "Download", es: "Descargar" })}
               </Button>
             </div>
           </div>

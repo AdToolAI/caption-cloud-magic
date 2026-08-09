@@ -141,7 +141,7 @@ export function useAudiobookProject() {
       char_count: countChars(c.body),
     }));
     const { error } = await supabase.from('audiobook_chapters').insert(rows);
-    if (error) { toast.error('Import fehlgeschlagen'); return; }
+    if (error) { toast.error(tx({ de: 'Import fehlgeschlagen', en: 'Import failed', es: 'Importación fallida' })); return; }
     await loadChapters(project.id);
     toast.success(`${parsed.length} Kapitel importiert`);
   }, [project, loadChapters]);
@@ -212,7 +212,7 @@ export function useAudiobookProject() {
       if (error) {
         const details = error instanceof FunctionsHttpError
           ? await error.context.text().catch(() => '') : error.message;
-        let message = details || 'Rendern fehlgeschlagen';
+        let message = details || tx({ de: 'Rendern fehlgeschlagen', en: 'Rendering failed', es: 'Renderizado fallido' });
         try { message = JSON.parse(details).message ?? message; } catch { /* plain text */ }
         throw new Error(message);
       }
@@ -221,8 +221,8 @@ export function useAudiobookProject() {
       });
       await loadChapters(project.id);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Rendern fehlgeschlagen';
-      toast.error('Vertonung fehlgeschlagen', { description: message });
+      const message = err instanceof Error ? err.message : tx({ de: 'Rendern fehlgeschlagen', en: 'Rendering failed', es: 'Renderizado fallido' });
+      toast.error(tx({ de: 'Vertonung fehlgeschlagen', en: 'Voicing failed', es: 'Doblaje fallido' }), { description: message });
       setChapters((prev) => prev.map((c) => (c.id === chapter.id
         ? { ...c, render_status: 'failed', error_message: message } : c)));
     } finally {
