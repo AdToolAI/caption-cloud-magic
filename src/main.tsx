@@ -5,7 +5,11 @@ import posthog from "posthog-js";
 import { PostHogProvider } from 'posthog-js/react';
 import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
+import { installFunctionsLangHeader } from "@/lib/functionsLang";
 import "./index.css";
+
+installFunctionsLangHeader();
+
 
 // Initialize Sentry
 Sentry.init({
