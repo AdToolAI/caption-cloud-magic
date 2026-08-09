@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,7 +11,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -158,7 +159,7 @@ ${keywords ? `- Wichtige Keywords: ${keywords}` : ''}
 ## DEINE ANTWORT-PHILOSOPHIE
 1. **TIEFGRÜNDIG** - Gib fundierte Insights, nicht oberflächliche Tipps
 2. **DATENBASIERT** - Referenziere aktuelle Trends, Algorithmus-Updates, Studien wenn relevant
-3. **PERSONALISIERT** - Jede Antwort ist maßgeschneidert für ${brandName ? `"${brandName}"` : 'diese Marke'}
+3. **PERSONALISIERT** - Jede Antwort ist maßgeschneidert für ${brandName ? `"${brandName}"` : tl({ de: 'diese Marke', en: 'this brand', es: 'esta marca' })}
 4. **UMSETZBAR** - Konkrete Schritt-für-Schritt Anleitungen
 5. **INSPIRIEREND** - Teile kreative Ideen und Best Practices
 
@@ -381,4 +382,4 @@ Du kannst erweiterte Multi-Step-Analysen, personalisierte Wachstums-Roadmaps, de
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

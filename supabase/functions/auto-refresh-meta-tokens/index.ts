@@ -8,6 +8,7 @@ import { decryptToken, encryptToken } from '../_shared/crypto.ts';
 
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -17,7 +18,7 @@ const corsHeaders = {
 const THRESHOLD_DAYS = 14; // refresh wenn weniger als 14d Restlaufzeit
 const SECRET_NAME = 'IG_PAGE_ACCESS_TOKEN';
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -128,7 +129,7 @@ Deno.serve(async (req) => {
         action: 'refresh',
         refreshed: false,
         reason: 'token_invalid',
-        message: 'Token ist nicht mehr gültig — manueller Re-Auth nötig via instagram-token-renew.',
+        message: tl({ de: 'Token ist nicht mehr gültig — manueller Re-Auth nötig via instagram-token-renew.', en: 'Token is no longer valid — manual re-auth required via instagram-token-renew.', es: 'El token ya no es válido — se requiere reautenticación manual a través de instagram-token-renew.' }),
         status,
       }, 200);
     }
@@ -234,7 +235,7 @@ Deno.serve(async (req) => {
     console.error('[auto-refresh-meta] Unexpected error:', err);
     return json({ ok: false, error: err?.message || 'unexpected', stack: err?.stack?.substring(0, 400) }, 500);
   }
-});
+})(req)));
 
 function json(payload: any, status = 200) {
   return new Response(JSON.stringify(payload), {

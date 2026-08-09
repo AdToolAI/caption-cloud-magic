@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,7 +28,7 @@ interface TransitionRecommendation {
   reasoning: string;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -239,7 +240,7 @@ Generiere Transition-Empfehlungen im Format:
         } else if (scene.mood === 'emotional' || nextScene?.mood === 'emotional') {
           transitionType = 'fade';
           duration = 0.8;
-          reasoning = 'Weicher Übergang für emotionale Szenen';
+          reasoning = tl({ de: 'Weicher Übergang für emotionale Szenen', en: 'Smooth transition for emotional scenes', es: 'Transición suave para escenas emotivas' });
         } else if (video_genre === 'action' || video_genre === 'sport') {
           transitionType = transitionTypes[Math.floor(Math.random() * 3) + 2]; // wipe or zoom
           duration = 0.4;
@@ -291,4 +292,4 @@ Generiere Transition-Empfehlungen im Format:
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

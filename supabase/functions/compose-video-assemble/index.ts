@@ -5,6 +5,7 @@ import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -86,7 +87,7 @@ function parseMvhdDuration(buf: Uint8Array): number | null {
   }
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -154,7 +155,7 @@ serve(async (req) => {
     const skippedScenes = totalScenesCount - renderable.length;
 
     if (renderable.length === 0) {
-      throw new Error('Keine fertigen Clips vorhanden. Bitte mindestens einen Clip generieren.');
+      throw new Error(tl({ de: 'Keine fertigen Clips vorhanden. Bitte mindestens einen Clip generieren.', en: 'No finished clips available. Please generate at least one clip.', es: 'No hay clips terminados disponibles. Por favor, genere al menos un clip.' }));
     }
 
     if (skippedScenes > 0 && scenes) {
@@ -788,4 +789,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

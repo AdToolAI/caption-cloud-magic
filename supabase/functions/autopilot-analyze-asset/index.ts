@@ -5,6 +5,7 @@
 // blurry 200px logo has to be caught here, not three minutes into a render.
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,14 +14,14 @@ const corsHeaders = {
 };
 
 const ROLE_GUIDE: Record<string, string> = {
-  logo: "Ein Marken-Logo. Prüfe, ob es freigestellt oder auf klarem Hintergrund ist und ob die Auflösung für eine Einblendung reicht.",
+  logo: tl({ de: "Ein Marken-Logo. Prüfe, ob es freigestellt oder auf klarem Hintergrund ist und ob die Auflösung für eine Einblendung reicht.", en: "A brand logo. Check if it is isolated or on a clear background and if the resolution is sufficient for an overlay.", es: "Un logotipo de marca. Compruebe si está aislado o sobre un fondo claro y si la resolución es suficiente para una superposición." }),
   product: "Ein Produktfoto. Beschreibe Form, Material, Farbe, Etikett und Blickwinkel so präzise, dass ein Bildmodell dasselbe Produkt erzeugt.",
-  person: "Eine Person. Beschreibe Alter, Erscheinung, Frisur, Kleidung und Lichtsituation. Keine Identitätsbewertung, keine Vermutungen über Herkunft.",
+  person: tl({ de: "Eine Person. Beschreibe Alter, Erscheinung, Frisur, Kleidung und Lichtsituation. Keine Identitätsbewertung, keine Vermutungen über Herkunft.", en: "A person. Describe age, appearance, hairstyle, clothing, and lighting situation. No identity assessment, no assumptions about origin.", es: "Una persona. Describa la edad, apariencia, peinado, vestimenta y situación de iluminación. Sin evaluación de identidad, sin suposiciones sobre el origen." }),
   place: "Ein Ort. Beschreibe Raum, Materialien, Tageszeit, Lichtstimmung und Atmosphäre.",
-  style: "Eine Stil-Referenz. Beschreibe ausschließlich Farbwelt, Kontrast, Licht, Korn und Look — nicht den Bildinhalt.",
+  style: tl({ de: "Eine Stil-Referenz. Beschreibe ausschließlich Farbwelt, Kontrast, Licht, Korn und Look — nicht den Bildinhalt.", en: "A style reference. Describe only color scheme, contrast, light, grain, and look — not the image content.", es: "Una referencia de estilo. Describa solo la paleta de colores, el contraste, la luz, el grano y el aspecto, no el contenido de la imagen." }),
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -54,8 +55,8 @@ Deno.serve(async (req) => {
           {
             role: "system",
             content:
-              "Du analysierst Kundenbilder für eine Videoproduktion. Antworte ausschließlich über den Tool-Call. " +
-              "Die Beschreibung ist IMMER auf Englisch, weil sie an Bildmodelle geht. Die Warnung ist auf Deutsch.",
+              tl({ de: "Du analysierst Kundenbilder für eine Videoproduktion. Antworte ausschließlich über den Tool-Call. ", en: "You are analyzing customer images for a video production. Respond exclusively via the tool call.", es: "Estás analizando imágenes de clientes para una producción de video. Responde exclusivamente a través de la llamada a la herramienta." }) +
+              tl({ de: "Die Beschreibung ist IMMER auf Englisch, weil sie an Bildmodelle geht. Die Warnung ist auf Deutsch.", en: "The description is ALWAYS in English because it goes to image models. The warning is in German.", es: "La descripción SIEMPRE está en inglés porque se envía a modelos de imagen. La advertencia está en alemán." }),
           },
           {
             role: "user",
@@ -65,7 +66,7 @@ Deno.serve(async (req) => {
                 text: [
                   `Rolle des Bildes: ${ROLE_GUIDE[role] ?? ROLE_GUIDE.product}`,
                   note ? `Wunsch des Kunden: "${note}"` : "",
-                  "Bewerte ehrlich, ob das Bild für eine hochwertige Videoproduktion brauchbar ist (Schärfe, Auflösung, Freisteller, störender Hintergrund).",
+                  tl({ de: "Bewerte ehrlich, ob das Bild für eine hochwertige Videoproduktion brauchbar ist (Schärfe, Auflösung, Freisteller, störender Hintergrund).", en: "Honestly assess whether the image is suitable for high-quality video production (sharpness, resolution, cutout, distracting background).", es: "Evalúe honestamente si la imagen es adecuada para una producción de video de alta calidad (nitidez, resolución, recorte, fondo que distrae)." }),
                 ].filter(Boolean).join("\n"),
               },
               { type: "image_url", image_url: { url: imageUrl } },
@@ -131,7 +132,7 @@ Deno.serve(async (req) => {
     console.error("[autopilot-analyze-asset] fatal", err);
     return json({ error: err instanceof Error ? err.message : "unknown" }, 500);
   }
-});
+})(req)));
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {

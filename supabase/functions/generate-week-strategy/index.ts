@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { pickWeekSlots, type Lang, type ScoredSlot } from "../_shared/posting-times-fetcher.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +27,7 @@ function levelConfig(level: Level, isDE: boolean) {
       minPosts: 7,
       maxPosts: 7,
       tone: isDE
-        ? "Datengetrieben, knapp, Profi-Sprache. Nutze konkrete Slots, Serien-Konzepte und Multi-Plattform-Strategien."
+        ? tl({ de: "Datengetrieben, knapp, Profi-Sprache. Nutze konkrete Slots, Serien-Konzepte und Multi-Plattform-Strategien.", en: "Data-driven, concise, professional language. Use concrete slots, series concepts, and multi-platform strategies.", es: "Orientado a datos, conciso, lenguaje profesional. Utiliza franjas horarias concretas, conceptos de series y estrategias multiplataforma." })
         : "Data-driven, concise, expert language. Use concrete slots, series concepts and multi-platform strategies.",
       complexity: isDE
         ? "Multi-Plattform-Mix, Serien (Teil 1/2/3), datenbasierte Empfehlungen mit Performance-Bezug, Cross-Posting-Strategien."
@@ -38,7 +39,7 @@ function levelConfig(level: Level, isDE: boolean) {
       minPosts: 5,
       maxPosts: 5,
       tone: isDE
-        ? "Konkret, mit Performance-Hinweisen. Direkt und motivierend, aber nicht zu fachlich."
+        ? tl({ de: "Konkret, mit Performance-Hinweisen. Direkt und motivierend, aber nicht zu fachlich.", en: "Concrete, with performance tips. Direct and motivating, but not too technical.", es: "Concreto, con consejos de rendimiento. Directo y motivador, pero no demasiado técnico." })
         : "Concrete, with performance hints. Direct and motivating, but not too technical.",
       complexity: isDE
         ? "Mix aus Reels/Karussell/Story, Trend-Anlehnung, A/B-Hooks, klare CTAs."
@@ -49,7 +50,7 @@ function levelConfig(level: Level, isDE: boolean) {
     minPosts: 3,
     maxPosts: 3,
     tone: isDE
-      ? "Erkläre einfach, ermutigend, keine Fachbegriffe. Schritt-für-Schritt, motivierend."
+      ? tl({ de: "Erkläre einfach, ermutigend, keine Fachbegriffe. Schritt-für-Schritt, motivierend.", en: "Explain simply, encouragingly, no jargon. Step-by-step, motivating.", es: "Explica de forma sencilla, alentadora, sin jerga. Paso a paso, motivador." })
       : "Explain simply, encouraging, no jargon. Step-by-step, motivating.",
     complexity: isDE
       ? "Einfache Formate (Foto + Caption), klare Hooks, Schritt-für-Schritt Ideen, leicht umsetzbar."
@@ -57,7 +58,7 @@ function levelConfig(level: Level, isDE: boolean) {
   };
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "generate-week-strategy" });
@@ -134,7 +135,7 @@ serve(async (req) => {
     const levelLabelEN = level === "advanced" ? "Advanced" : level === "intermediate" ? "Intermediate" : "Beginner";
 
     const systemPrompt = isDE
-      ? `Du bist ein Social-Media-Stratege. Du erhältst eine FESTE Liste von vorberechneten Posting-Slots (Datum + Uhrzeit + Plattform), die anhand der Heatmap-Engine optimiert wurden. Deine einzige Aufgabe: für jeden Slot eine kreative Content-Idee, Caption, Hashtags, Tipps und Strategie-Phase liefern. ÄNDERE NIEMALS Datum, Uhrzeit oder Plattform. Tonalität: ${cfg.tone} Komplexität: ${cfg.complexity} Antworte ausschließlich über den Tool-Call.`
+      ? tl({ de: `Du bist ein Social-Media-Stratege. Du erhältst eine FESTE Liste von vorberechneten Posting-Slots (Datum + Uhrzeit + Plattform), die anhand der Heatmap-Engine optimiert wurden. Deine einzige Aufgabe: für jeden Slot eine kreative Content-Idee, Caption, Hashtags, Tipps und Strategie-Phase liefern. ÄNDERE NIEMALS Datum, Uhrzeit oder Plattform. Tonalität: ${cfg.tone} Komplexität: ${cfg.complexity} Antworte ausschließlich über den Tool-Call.`, en: `You are a social media strategist. You will receive a FIXED list of pre-calculated posting slots (date + time + platform) optimized by the heatmap engine. Your only task: provide a creative content idea, caption, hashtags, tips, and strategy phase for each slot. NEVER change the date, time, or platform. Tone: ${cfg.tone} Complexity: ${cfg.complexity} Respond exclusively via the tool call.`, es: `Eres un estratega de redes sociales. Recibirás una lista FIJA de franjas horarias de publicación precalculadas (fecha + hora + plataforma) optimizadas por el motor de mapa de calor. Tu única tarea: proporcionar una idea de contenido creativo, pie de foto, hashtags, consejos y fase de estrategia para cada franja. NUNCA cambies la fecha, la hora o la plataforma. Tono: ${cfg.tone} Complejidad: ${cfg.complexity} Responde exclusivamente a través de la llamada a la herramienta.` })
       : `You are a social media strategist. You receive a FIXED list of pre-computed posting slots (date + time + platform), optimized via the heatmap engine. Your only job: for each slot, produce a creative content idea, caption, hashtags, tips and strategy phase. NEVER change date, time or platform. Tone: ${cfg.tone} Complexity: ${cfg.complexity} Respond only via the tool call.`;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -353,4 +354,4 @@ Create one content suggestion for EACH of these ${pickedSlots.length} slots in t
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+})(req)));

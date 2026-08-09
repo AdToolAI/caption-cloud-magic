@@ -1,13 +1,14 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -105,7 +106,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           requestId,
-          message: "Alle Kommentare bereits aktuell analysiert",
+          message: tl({ de: "Alle Kommentare bereits aktuell analysiert", en: "All comments already analyzed", es: "Todos los comentarios ya analizados" }),
           analyzed: 0 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -207,4 +208,4 @@ Antworte NUR mit einem JSON-Array mit genau ${commentsToAnalyze.length} Objekten
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+})(req)));

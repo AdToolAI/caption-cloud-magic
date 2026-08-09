@@ -1,5 +1,6 @@
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
 
     let mediaContext = '';
     if (media_url) {
-      mediaContext = `\n\nEin Bild/Video ist beigefügt (URL: ${media_url}). Analysiere den visuellen Inhalt und erstelle die Caption passend zum Medium.`;
+      mediaContext = tl({ de: `\\n\\nEin Bild/Video ist beigefügt (URL: ${media_url}). Analysiere den visuellen Inhalt und erstelle die Caption passend zum Medium.`, en: `\\n\\nAn image/video is attached (URL: ${media_url}). Analyze the visual content and create a caption suitable for the medium.`, es: `\\n\\nSe adjunta una imagen/video (URL: ${media_url}). Analiza el contenido visual y crea un pie de foto adecuado para el medio.` });
     }
 
     const prompt = `Du bist ein professioneller Social-Media-Texter. Schreibe auf ${langName}.
@@ -64,7 +65,7 @@ Erstelle außerdem 5-8 relevante Hashtags.
 
 Antworte NUR mit einem JSON-Objekt:
 {
-  "caption": "deine caption hier",
+  "caption": tl({ de: "deine caption hier", en: "your caption here", es: "tu pie de foto aquí" }),
   "hashtags": ["hashtag1", "hashtag2", "hashtag3"]
 }`;
 
@@ -134,4 +135,4 @@ Antworte NUR mit einem JSON-Objekt:
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

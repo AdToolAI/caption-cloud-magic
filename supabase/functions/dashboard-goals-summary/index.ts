@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -186,7 +187,7 @@ Gib die Empfehlungen als JSON-Array zurück:
             recommendations = [
               {
                 title: 'Posting-Frequenz erhöhen',
-                detail: 'Erhöhe deine Posts auf 5-7 pro Woche für bessere Sichtbarkeit.',
+                detail: tl({ de: 'Erhöhe deine Posts auf 5-7 pro Woche für bessere Sichtbarkeit.', en: 'Increase your posts to 5-7 per week for better visibility.', es: 'Aumenta tus publicaciones a 5-7 por semana para una mejor visibilidad.' }),
                 impact: 'hoch',
                 eta: '3 Tage'
               }
@@ -258,7 +259,7 @@ Gib die Empfehlungen als JSON-Array zurück:
       }
     );
   }
-});
+})(req)));
 
 function calculateStreak(metrics: any[]): number {
   if (!metrics || metrics.length === 0) return 0;

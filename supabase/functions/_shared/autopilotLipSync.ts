@@ -30,6 +30,7 @@ import {
   validateFrameFace,
 } from "./syncso-preflight.ts";
 import { enforceMinFaceSize } from "./anchor-min-face-size.ts";
+import { tl, withLang } from "./i18n.ts";
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const SYNC_MODEL = "sync-3";
@@ -459,7 +460,7 @@ export async function runLipSyncPasses(args: {
   if (!circuit.allow) {
     return {
       ok: false,
-      reason: "Sync.so ist gerade nicht erreichbar (Schutzschalter offen)",
+      reason: tl({ de: "Sync.so ist gerade nicht erreichbar (Schutzschalter offen)", en: "Sync.so is currently unreachable (circuit breaker open)", es: "Sync.so no está disponible actualmente (disyuntor abierto)" }),
       errorClass: "circuit_open",
       passesDone: 0,
     };
@@ -470,7 +471,7 @@ export async function runLipSyncPasses(args: {
   if (probe.isUnsupportedCodec) {
     return {
       ok: false,
-      reason: `Clip-Codec ${probe.codec} wird von Sync.so nicht akzeptiert`,
+      reason: tl({ de: `Clip-Codec ${probe.codec} wird von Sync.so nicht akzeptiert`, en: `Clip codec ${probe.codec} is not accepted by Sync.so`, es: `El códec de clip ${probe.codec} no es aceptado por Sync.so` }),
       errorClass: "video_codec_unsupported",
       passesDone: 0,
     };

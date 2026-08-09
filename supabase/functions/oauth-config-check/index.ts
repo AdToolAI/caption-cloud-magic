@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,7 +18,7 @@ type ProviderCheck = {
   note?: string;
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -90,7 +91,7 @@ serve(async (req) => {
         redirect_uri: `${backendCallback}?provider=youtube`,
         expected_redirect: `${backendCallback}?provider=youtube`,
         redirect_ok: true,
-        note: "Redirect wird serverseitig gebaut; muss in der Google Cloud Console eingetragen sein.",
+        note: tl({ de: "Redirect wird serverseitig gebaut; muss in der Google Cloud Console eingetragen sein.", en: "Redirect is built server-side; must be entered in Google Cloud Console.", es: "La redirección se construye en el lado del servidor; debe introducirse en la Google Cloud Console." }),
       },
     ];
 
@@ -251,4 +252,4 @@ serve(async (req) => {
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-});
+})(req)));

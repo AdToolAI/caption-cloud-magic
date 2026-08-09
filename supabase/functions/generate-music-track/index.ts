@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -97,7 +98,7 @@ function extractAudioUrl(output: any): string | null {
   return null;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -150,7 +151,7 @@ serve(async (req) => {
 
     if (engine.requiresLyrics && (!lyrics || !lyrics.trim() || lyrics.trim().length < 10)) {
       return new Response(JSON.stringify({
-        error: "Lyrics zu kurz (min. 10 Zeichen). Bitte Songtext eingeben oder AI-Lyrics generieren.",
+        error: tl({ de: "Lyrics zu kurz (min. 10 Zeichen). Bitte Songtext eingeben oder AI-Lyrics generieren.", en: "Lyrics too short (min. 10 characters). Please enter lyrics or generate AI lyrics.", es: "Letra demasiado corta (mín. 10 caracteres). Por favor, introduce la letra o genera letras con IA." }),
         code: "MISSING_LYRICS",
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -371,4 +372,4 @@ serve(async (req) => {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
-});
+})(req)));

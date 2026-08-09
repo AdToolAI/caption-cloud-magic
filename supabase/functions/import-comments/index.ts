@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -180,7 +181,7 @@ serve(async (req) => {
         inserted,
         skipped,
         totalStored: totalStored || 0,
-        message: `Import abgeschlossen: ${inserted} neu, ${skipped} Duplikate. Gesamt gespeichert: ${totalStored || 0}/50.`,
+        message: tl({ de: `Import abgeschlossen: ${inserted} neu, ${skipped} Duplikate. Gesamt gespeichert: ${totalStored || 0}/50.`, en: `Import complete: ${inserted} new, ${skipped} duplicates. Total saved: ${totalStored || 0}/50.`, es: `Importación completa: ${inserted} nuevos, ${skipped} duplicados. Total guardado: ${totalStored || 0}/50.` }),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -191,4 +192,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+})(req)));

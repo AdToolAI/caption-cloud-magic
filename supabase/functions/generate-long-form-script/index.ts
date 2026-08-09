@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +17,7 @@ interface ScriptRequest {
   referenceImageBase64?: string;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -93,9 +94,9 @@ AUSGABEFORMAT (JSON):
       "sceneNumber": 1,
       "duration": 12,
       "visualPrompt": "Englischer Sora 2 Prompt mit visuellen Details... MUSS enden mit Übergangs-Setup für nächste Szene",
-      "narration": "Was diese Szene vermittelt (${language === 'de' ? 'auf Deutsch' : 'in English'})",
+      "narration": tl({ de: "Was diese Szene vermittelt (${language === 'de' ? 'auf Deutsch' : 'in English'})", en: "What this scene conveys (${language === 'de' ? 'in German' : 'in English'})", es: "Lo que transmite esta escena (${language === 'de' ? 'en alemán' : 'en inglés'})" }),
       "suggestedTransition": "crossfade",
-      "transitionNote": "Kurze Notiz wie diese Szene zur nächsten überleitet"
+      "transitionNote": tl({ de: "Kurze Notiz wie diese Szene zur nächsten überleitet", en: "Brief note on how this scene transitions to the next", es: "Breve nota sobre cómo esta escena enlaza con la siguiente" })
     }
   ],
   "totalDuration": ${targetDuration}
@@ -110,7 +111,7 @@ Seitenverhältnis: ${aspectRatio} (berücksichtige dies bei der visuellen Kompos
 
 "${idea}"
 
-${hasImage ? 'WICHTIG: Analysiere zuerst das bereitgestellte Referenzbild und baue deine Szenen darauf auf!' : ''}
+${hasImage ? tl({ de: 'WICHTIG: Analysiere zuerst das bereitgestellte Referenzbild und baue deine Szenen darauf auf!', en: 'IMPORTANT: First analyze the provided reference image and build your scenes based on it!', es: 'IMPORTANTE: ¡Primero analiza la imagen de referencia proporcionada y construye tus escenas basándote en ella!' }) : ''}
 
 Erstelle genau ${sceneCount} Szenen mit jeweils max. 12 Sekunden. 
 ACHTE BESONDERS auf Frame-Chain-Kontinuität: Jede Szene muss nahtlos in die nächste übergehen!
@@ -208,4 +209,4 @@ Antworte NUR mit dem JSON-Objekt, keine zusätzlichen Erklärungen.`;
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+})(req)));

@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -45,7 +46,7 @@ function pickLambdaConcurrency(framesTotal: number): {
   return { framesPerLambda: 360, maxConcurrency: 5 };                            // >60s
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -565,7 +566,7 @@ serve(async (req) => {
     if (isThrottleError) {
       return new Response(
         JSON.stringify({
-          error: 'AWS Render-Kapazität vorübergehend erschöpft. Bitte versuche es in 1-2 Minuten erneut.',
+          error: tl({ de: 'AWS Render-Kapazität vorübergehend erschöpft. Bitte versuche es in 1-2 Minuten erneut.', en: 'AWS render capacity temporarily exhausted. Please try again in 1-2 minutes.', es: 'Capacidad de renderizado de AWS temporalmente agotada. Por favor, inténtalo de nuevo en 1-2 minutos.' }),
           retryable: true,
         }),
         {
@@ -583,7 +584,7 @@ serve(async (req) => {
       }
     );
   }
-});
+})(req)));
 
 // ====== HELPER FUNCTIONS FOR INTELLIGENT DEFAULTS ======
 

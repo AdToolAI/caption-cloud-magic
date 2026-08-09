@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,7 +15,7 @@ interface CheckResult {
   action_taken?: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "consistency-watcher" });
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
         severity: "critical",
         metric_value: staleCount || 0,
         threshold: 5,
-        message: `${staleCount} Calendar Events sind über 1h überfällig — Dispatcher prüfen!`,
+        message: tl({ de: `${staleCount} Calendar Events sind über 1h überfällig — Dispatcher prüfen!`, en: `${staleCount} Calendar Events are over 1h overdue — check Dispatcher!`, es: `¡${staleCount} eventos del calendario tienen más de 1 hora de retraso — revisa el Dispatcher!` }),
       });
     }
     results.push({ check: "stale_calendar_events", count: staleCount || 0, severity: (staleCount || 0) > 5 ? "critical" : "info" });
@@ -217,4 +218,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+})(req)));

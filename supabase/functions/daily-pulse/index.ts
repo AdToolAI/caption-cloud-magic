@@ -10,12 +10,13 @@ const corsHeaders = {
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 import { sendAdminEmail } from '../_shared/admin-mail.ts';
 import { ADMIN_ALERT_EMAIL } from '../_shared/admin-config.ts';
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const LAUNCH_DATE = '2026-07-26T00:00:00Z';
 const GOLD = '#F5C76A';
 const INK = '#050816';
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -101,7 +102,7 @@ Deno.serve(async (req) => {
 
     const headline =
       signups === 0
-        ? `Tag ${daysSinceLaunch} seit Launch — keine neue Registrierung`
+        ? tl({ de: `Tag ${daysSinceLaunch} seit Launch — keine neue Registrierung`, en: `Day ${daysSinceLaunch} since launch — no new registration`, es: `Día ${daysSinceLaunch} desde el lanzamiento — sin nuevos registros` })
         : `Tag ${daysSinceLaunch} seit Launch — ${signups} neue Registrierung${signups === 1 ? '' : 'en'}`;
 
     const note =
@@ -144,4 +145,4 @@ Deno.serve(async (req) => {
     console.error('[DAILY-PULSE] error:', msg);
     return json({ error: msg }, 500);
   }
-});
+})(req)));

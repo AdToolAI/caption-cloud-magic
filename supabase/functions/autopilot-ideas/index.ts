@@ -7,6 +7,7 @@
 // afterwards (src/lib/autopilot/ideaFeasibility.ts is mirrored here).
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,13 +35,13 @@ const ANGLES = [
     id: "visual_metaphor",
     label: "Visuelle Metapher",
     mechanism:
-      "Übersetze den Nutzen in ein einziges starkes Bild, das man nicht erklären muss. Es löst sich am Ende im Produkt auf.",
+      tl({ de: "Übersetze den Nutzen in ein einziges starkes Bild, das man nicht erklären muss. Es löst sich am Ende im Produkt auf.", en: "Translate the benefit into a single strong image that doesn't need explanation. It resolves into the product at the end.", es: "Traduce el beneficio en una única imagen potente que no necesite explicación. Al final, se resuelve en el producto." }),
   },
   {
     id: "micro_story",
     label: "Mikro-Story mit Wendung",
     mechanism:
-      "Winzige Geschichte mit Kippmoment. Der Zuschauer glaubt zuerst etwas anderes zu sehen — die Wendung macht das Produkt zur Pointe.",
+      tl({ de: "Winzige Geschichte mit Kippmoment. Der Zuschauer glaubt zuerst etwas anderes zu sehen — die Wendung macht das Produkt zur Pointe.", en: "Tiny story with a tipping point. The viewer initially thinks they're seeing something else — the twist makes the product the punchline.", es: "Pequeña historia con un punto de inflexión. El espectador cree inicialmente que está viendo otra cosa — el giro convierte el producto en el remate." }),
   },
   {
     id: "product_poetry",
@@ -103,7 +104,7 @@ const IDEA_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -119,7 +120,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const brief = String(body?.brief ?? "").trim();
-    if (brief.length < 8) return json({ error: "Bitte beschreibe dein Video etwas genauer." }, 400);
+    if (brief.length < 8) return json({ error: tl({ de: "Bitte beschreibe dein Video etwas genauer.", en: "Please describe your video in more detail.", es: "Por favor, describe tu video con más detalle." }) }, 400);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY missing" }, 500);
@@ -143,7 +144,7 @@ Deno.serve(async (req) => {
       options.lipSync
         ? `Lip-Sync gewünscht: bis zu ${options.lipSyncSpeakers} sprechende Person(en) im Bild.`
         : "Kein Lip-Sync — niemand spricht sichtbar in die Kamera.",
-      options.voiceover ? "Ein Voiceover ist erwünscht." : "Kein Voiceover — der Film wirkt über Bild und Ton.",
+      options.voiceover ? "Ein Voiceover ist erwünscht." : tl({ de: "Kein Voiceover — der Film wirkt über Bild und Ton.", en: "No voiceover — the film works through image and sound.", es: "Sin voz en off — la película funciona a través de la imagen y el sonido." }),
       characters.length
         ? `Verfügbare Charaktere (nur diese):\n${characters
             .map((c: Record<string, unknown>) => `- ${c.id} — ${c.name}${c.description ? `: ${c.description}` : ""}`)
@@ -153,7 +154,7 @@ Deno.serve(async (req) => {
         ? `Vom Kunden hochgeladene Bilder (usesAssetIds exakt übernehmen):\n${assets
             .map((a: Record<string, unknown>) =>
               `- ${a.id} [${a.role}] ${a.description ?? ""}${a.note ? ` — Kundenwunsch: ${a.note}` : ""}${
-                a.role === "logo" ? " (wird als Einblendung gelegt, nicht generiert)" : ""
+                a.role === "logo" ? tl({ de: " (wird als Einblendung gelegt, nicht generiert)", en: " (will be added as an overlay, not generated)", es: " (se añadirá como superposición, no se generará)" }) : ""
               }${a.role === "style" ? " (nur Look übernehmen, nicht den Inhalt)" : ""}`)
             .join("\n")}`
         : "Keine eigenen Bilder hochgeladen.",
@@ -293,7 +294,7 @@ Deno.serve(async (req) => {
     console.error("[autopilot-ideas] fatal", err);
     return json({ error: err instanceof Error ? err.message : "unknown" }, 500);
   }
-});
+})(req)));
 
 function clampDuration(seconds: number): number {
   if (!Number.isFinite(seconds)) return 30;

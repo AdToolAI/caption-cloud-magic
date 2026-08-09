@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { encryptToken } from '../_shared/crypto.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,7 +29,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
     .replace(/=/g, '');
 }
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
     if (profileError) {
       console.error('Profile fetch error:', profileError);
       return new Response(
-        JSON.stringify({ error: 'Fehler beim Abrufen des Profils' }),
+        JSON.stringify({ error: tl({ de: 'Fehler beim Abrufen des Profils', en: 'Error retrieving profile', es: 'Error al recuperar el perfil' }) }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -95,7 +96,7 @@ Deno.serve(async (req) => {
       console.log('User does not have Enterprise plan:', profile?.plan);
       return new Response(
         JSON.stringify({ 
-          error: 'X/Twitter Integration ist nur für Enterprise-Kunden verfügbar',
+          error: tl({ de: 'X/Twitter Integration ist nur für Enterprise-Kunden verfügbar', en: 'X/Twitter integration is only available for Enterprise customers', es: 'La integración con X/Twitter solo está disponible para clientes Enterprise' }),
           upgrade_required: true 
         }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -161,4 +162,4 @@ Deno.serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

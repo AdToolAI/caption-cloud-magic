@@ -56,6 +56,7 @@ import {
   summarizeSceneAssets,
   type AssetRef,
 } from "../_shared/asset-ref.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const ANCHOR_AUDIT_VERSION = 15;
 
 const corsHeaders = {
@@ -1785,7 +1786,7 @@ serve(async (req) => {
           JSON.stringify({
             error: "invalid_provider_for_lipsync",
             message:
-              `Lip-Sync ist aktuell nur mit HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) oder Luma (5/9s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`,
+              tl({ de: `Lip-Sync ist aktuell nur mit HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) oder Luma (5/9s) möglich. Aktuell: ${scene.clipSource}. Bitte Provider wechseln oder Lip-Sync deaktivieren.`, en: `Lip-sync is currently only possible with HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) or Luma (5/9s). Current: ${scene.clipSource}. Please change provider or disable lip-sync.`, es: `La sincronización labial solo es posible actualmente con HappyHorse (3–15s), Hailuo (6/10s), Kling (3–15s), Wan (3–10s), Seedance (3–12s) o Luma (5/9s). Actual: ${scene.clipSource}. Por favor, cambia de proveedor o desactiva la sincronización labial.` }),
             scene_id: scene.id,
             picked: scene.clipSource,
             allowed: Array.from(LIPSYNC_PROVIDERS),
@@ -1801,7 +1802,7 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({
               error: "invalid_duration_for_provider",
-              message: `Hailuo unterstützt nur 6s oder 10s. Gewählt: ${d}s. Bitte Szenenlänge auf 6 oder 10 setzen oder Provider wechseln.`,
+              message: tl({ de: `Hailuo unterstützt nur 6s oder 10s. Gewählt: ${d}s. Bitte Szenenlänge auf 6 oder 10 setzen oder Provider wechseln.`, en: `Hailuo only supports 6s or 10s. Selected: ${d}s. Please set scene length to 6 or 10 or change provider.`, es: `Hailuo solo soporta 6s o 10s. Seleccionado: ${d}s. Por favor, establece la duración de la escena en 6 o 10 o cambia de proveedor.` }),
               scene_id: scene.id,
               provider: "ai-hailuo",
               picked: d,
@@ -2249,7 +2250,7 @@ serve(async (req) => {
               // used + no matching brand_character), fail loud BEFORE Hailuo
               // ever dispatches — otherwise the UI sees a silent 30s timeout.
               if (portraitUrls.length === 0 && scriptSpeakers.length > 0) {
-                const msg = `cinematic_sync_anchor_missing_single_speaker: Konnte für die Sprecher [${scriptSpeakers.join(", ")}] keine Portraits aus den Brand Characters auflösen. Bitte einen Brand Character mit Portrait im Cast zuweisen.`;
+                const msg = tl({ de: `cinematic_sync_anchor_missing_single_speaker: Konnte für die Sprecher [${scriptSpeakers.join(", ")}] keine Portraits aus den Brand Characters auflösen. Bitte einen Brand Character mit Portrait im Cast zuweisen.`, en: `cinematic_sync_anchor_missing_single_speaker: Could not resolve portraits for speakers [${scriptSpeakers.join(", ")}] from Brand Characters. Please assign a Brand Character with a portrait in the cast.`, es: `cinematic_sync_anchor_missing_single_speaker: No se pudieron resolver los retratos para los oradores [${scriptSpeakers.join(", ")}] de los Brand Characters. Por favor, asigna un Brand Character con un retrato en el elenco.` });
                 console.warn(
                   `[compose-video-clips] cinematic-sync scene ${scene.id}: ${msg}`,
                 );
@@ -2935,7 +2936,7 @@ serve(async (req) => {
                                 ? {
                                     clip_status: "awaiting_manual_face_map",
                                     clip_error:
-                                      `anchor_identity_needs_review: ${resolved}/${expected} Sprecher konnten automatisch zugeordnet werden. Bitte im Face-Map-Review die Sprecher den Gesichtern auf dem Anchor zuweisen, bevor der Clip gerendert wird.`,
+                                      tl({ de: `anchor_identity_needs_review: ${resolved}/${expected} Sprecher konnten automatisch zugeordnet werden. Bitte im Face-Map-Review die Sprecher den Gesichtern auf dem Anchor zuweisen, bevor der Clip gerendert wird.`, en: `anchor_identity_needs_review: ${resolved}/${expected} speakers could be automatically assigned. Please assign the speakers to the faces on the anchor in the Face-Map-Review before rendering the clip.`, es: `anchor_identity_needs_review: ${resolved}/${expected} oradores pudieron ser asignados automáticamente. Por favor, asigne los oradores a las caras en el ancla en la Revisión de Mapa Facial antes de renderizar el clip.` }),
                                   }
                                 : {}),
                               updated_at: new Date().toISOString(),
@@ -3243,7 +3244,7 @@ serve(async (req) => {
                     const duplicatedSuffix = identityDuplicated.length > 0
                       ? ` Doppelt: ${identityDuplicated.join(", ")}.`
                       : "";
-                    const warn = `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor-Identity-Check unsicher (Cast mit ähnlichen Gesichtern / gleichem Nachnamen?). Render läuft trotzdem weiter. Bitte Ergebnis prüfen und ggf. neu rendern.`;
+                    const warn = tl({ de: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor-Identity-Check unsicher (Cast mit ähnlichen Gesichtern / gleichem Nachnamen?). Render läuft trotzdem weiter. Bitte Ergebnis prüfen und ggf. neu rendern.`, en: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Anchor identity check uncertain (cast with similar faces / same last name?). Render still proceeds. Please check result and re-render if necessary.`, es: `${code}_soft_warn: ${identityNotes || identityFailure}${missingSuffix}${duplicatedSuffix} — Verificación de identidad del ancla incierta (¿elenco con caras similares / mismo apellido?). El renderizado continúa. Por favor, verifique el resultado y vuelva a renderizar si es necesario.` });
                     console.log(
                       `[compose-video-clips] v267_anchor_soft_warn scene=${scene.id} reason=${identityFailure} faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} missing=[${identityMissing.join(",")}] duplicated=[${identityDuplicated.join(",")}]`,
                     );
@@ -3285,7 +3286,7 @@ serve(async (req) => {
         // instead of an "endless lip-sync".
         if (!scene.referenceImageUrl) {
           const msg =
-            "cinematic_sync_anchor_missing: Für Cinematic-Sync konnte kein Charakter-Anchor komponiert werden (keine Portraits aufgelöst). Bitte einen Brand Character mit Portrait dem Cast zuweisen und erneut versuchen.";
+            tl({ de: "cinematic_sync_anchor_missing: Für Cinematic-Sync konnte kein Charakter-Anchor komponiert werden (keine Portraits aufgelöst). Bitte einen Brand Character mit Portrait dem Cast zuweisen und erneut versuchen.", en: "cinematic_sync_anchor_missing: No character anchor could be composed for Cinematic-Sync (no portraits resolved). Please assign a Brand Character with a portrait to the cast and try again.", es: "cinematic_sync_anchor_missing: No se pudo componer un ancla de personaje para Cinematic-Sync (no se resolvieron retratos). Por favor, asigne un Personaje de Marca con un retrato al elenco e intente de nuevo." });
           console.warn(
             `[compose-video-clips] scene ${scene.id}: v195_cinematic_sync_anchor_missing → hard-fail before provider dispatch`,
           );
@@ -3601,7 +3602,7 @@ serve(async (req) => {
           );
           await safeMarkSceneFailed(
             scene.id,
-            "preview_gate_no_anchor: Für diese Szene konnte kein Anchor-Bild komponiert werden (kein Cast oder Upload/Stock-Szene). Bitte direkt rendern statt Preview.",
+            tl({ de: "preview_gate_no_anchor: Für diese Szene konnte kein Anchor-Bild komponiert werden (kein Cast oder Upload/Stock-Szene). Bitte direkt rendern statt Preview.", en: "preview_gate_no_anchor: No anchor image could be composed for this scene (no cast or upload/stock scene). Please render directly instead of previewing.", es: "preview_gate_no_anchor: No se pudo componer una imagen de ancla para esta escena (sin elenco o escena de carga/stock). Por favor, renderice directamente en lugar de previsualizar." }),
             { isCinematicSyncScene: scene.engineOverride === "cinematic-sync" },
           );
           results.push({
@@ -4385,7 +4386,7 @@ serve(async (req) => {
           // KEEP clip_source on ai-happyhorse so the UI doesn't lie.
           if (isCinematicSyncHH && !isI2V) {
             const msg =
-              "happyhorse_cinematic_sync_missing_anchor: HappyHorse Lip-Sync braucht einen Scene-Anchor (Cast-Portrait). Bitte mindestens einen Charakter mit Portrait dem Cast hinzufügen oder Engine auf Standard wechseln. HappyHorse wurde NICHT auf Hailuo umgestellt — deine Auswahl bleibt erhalten.";
+              tl({ de: "happyhorse_cinematic_sync_missing_anchor: HappyHorse Lip-Sync braucht einen Scene-Anchor (Cast-Portrait). Bitte mindestens einen Charakter mit Portrait dem Cast hinzufügen oder Engine auf Standard wechseln. HappyHorse wurde NICHT auf Hailuo umgestellt — deine Auswahl bleibt erhalten.", en: "happyhorse_cinematic_sync_missing_anchor: HappyHorse Lip-Sync needs a scene anchor (cast portrait). Please add at least one character with a portrait to the cast or switch engine to standard. HappyHorse was NOT switched to Hailuo — your selection remains.", es: "happyhorse_cinematic_sync_missing_anchor: HappyHorse Lip-Sync necesita un ancla de escena (retrato del elenco). Por favor, añada al menos un personaje con un retrato al elenco o cambie el motor a estándar. HappyHorse NO se cambió a Hailuo — su selección permanece." });
             console.warn(
               `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} — no composed reference_image_url, failing loud (v174, no silent Hailuo migration).`,
             );

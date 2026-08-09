@@ -516,16 +516,16 @@ scenes[i]._meta.aiFilled (e.g. "transition.type", "textOverlay.text",
     scenes[i]._meta.aiFilled when the briefing did not state them.
 
   • performances (v230, per-character, MANDATORY for multi-cast scenes):
-    When a scene has 2+ speakers in `cast`, ALSO emit a `performances`
+    When a scene has 2+ speakers in \`cast\`, ALSO emit a \`performances\`
     object keyed by each cast member's mentionKey (with leading "@"),
-    where each value has the same shape as `performance` and is derived
+    where each value has the same shape as \`performance\` and is derived
     from that character's role/attitude in the briefing. Examples:
         skeptical customer   → { mimik: "concerned",  gestik: "cross-arms", blick: "away",       energy: 2 }
         enthusiastic founder → { mimik: "confident",  gestik: "open-palms", blick: "to-camera",  energy: 4 }
         subject-matter expert→ { mimik: "confident",  gestik: "hand-on-chin", blick: "to-speaker", energy: 3 }
         attentive listener   → { mimik: "curious",    gestik: "still",      blick: "to-speaker", energy: 2 }
         excited teammate     → { mimik: "warm-smile", gestik: "lean-in",    blick: "to-speaker", energy: 4 }
-    Enums are the same as for `performance`:
+    Enums are the same as for \`performance\`:
         mimik  ∈ {neutral, warm-smile, curious, concerned, confident, surprised}
         gestik ∈ {still, hand-on-chin, open-palms, point, cross-arms, lean-in}
         blick  ∈ {to-camera, to-speaker, away, down-thinking}

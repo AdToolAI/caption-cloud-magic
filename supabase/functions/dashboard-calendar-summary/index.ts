@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { getRedisCache } from '../_shared/redis-cache.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,7 @@ interface QueryParams {
   tz?: string;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -153,7 +154,7 @@ serve(async (req) => {
     if (overdue > 0) {
       alerts.push({
         type: 'overdue',
-        message: `${overdue} Post(s) überfällig – jetzt veröffentlichen oder neu planen`,
+        message: tl({ de: `${overdue} Post(s) überfällig – jetzt veröffentlichen oder neu planen`, en: `${overdue} post(s) overdue – publish or reschedule now`, es: `${overdue} publicación(es) atrasada(s) – publicar o reprogramar ahora` }),
         relatedIds: posts?.filter(p => p.status === 'scheduled' && new Date(p.scheduled_at) < now).map(p => p.id) || [],
       });
     }
@@ -168,7 +169,7 @@ serve(async (req) => {
     if (emptyDays.length > 0) {
       alerts.push({
         type: 'empty',
-        message: `${emptyDays.length} Tag(e) ohne Slots – jetzt Auto-Planung starten`,
+        message: tl({ de: `${emptyDays.length} Tag(e) ohne Slots – jetzt Auto-Planung starten`, en: `${emptyDays.length} day(s) without slots – start auto-scheduling now`, es: `${emptyDays.length} día(s) sin espacios – iniciar programación automática ahora` }),
         relatedIds: [],
       });
     }
@@ -213,7 +214,7 @@ serve(async (req) => {
       }
     );
   }
-});
+})(req)));
 
 function calculateConflicts(posts: any[]): string[][] {
   const conflicts: string[][] = [];

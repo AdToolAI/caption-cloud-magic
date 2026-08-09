@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -126,7 +127,7 @@ async function rehostAndPersist(params: {
   }
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -141,7 +142,7 @@ serve(async (req) => {
   // BEFORE any wallet deduction, so users never get charged for a 404.
   return new Response(
     JSON.stringify({
-      error: "Pika 2.2 ist derzeit nicht verfügbar (Provider-Migration in Arbeit).",
+      error: tl({ de: "Pika 2.2 ist derzeit nicht verfügbar (Provider-Migration in Arbeit).", en: "Pika 2.2 is currently unavailable (provider migration in progress).", es: "Pika 2.2 no está disponible actualmente (migración de proveedor en curso)." }),
       code: "PROVIDER_DEPRECATED",
       provider: "pika",
     }),
@@ -349,4 +350,4 @@ serve(async (req) => {
     );
   }
   /* eslint-enable */
-});
+})(req)));

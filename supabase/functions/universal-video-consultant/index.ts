@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -441,7 +442,7 @@ function buildAdaptiveSystemPrompt(
     const subMode = detectStorytellingSubMode(messages);
     if (subMode === 'invented') {
       role = lang === 'de' 
-        ? 'Du bist Max, ein visionärer Autor und kreativer Drehbuchschreiber. Entwickle eine fesselnde FIKTIVE STORY.'
+        ? tl({ de: 'Du bist Max, ein visionärer Autor und kreativer Drehbuchschreiber. Entwickle eine fesselnde FIKTIVE STORY.', en: 'You are Max, a visionary author and creative screenwriter. Develop a captivating FICTIONAL STORY.', es: 'Eres Max, un autor visionario y guionista creativo. Desarrolla una HISTORIA FICTICIA cautivadora.' })
         : lang === 'es'
         ? 'Eres Max, un autor visionario y guionista creativo. Desarrolla una HISTORIA FICTICIA cautivadora.'
         : 'You are Max, a visionary author and creative screenwriter. Develop a captivating FICTIONAL STORY.';
@@ -485,26 +486,26 @@ function buildAdaptiveSystemPrompt(
     // First message — greeting + first question (or product research if entity detected)
     if (knownEntity.detected) {
       phaseInstruction = lang === 'de'
-        ? `Dies ist der START des Interviews. Der Nutzer hat bereits ein konkretes Produkt/eine Marke genannt: "${knownEntity.entityName}". Begrüße kurz, stelle dich als Max vor, und nutze dann SOFORT dein Wissen über dieses Produkt/diese Marke. Fasse zusammen was du weißt (Zielgruppe, USP, Markenwerte, typischer Stil) und frage den Nutzer ob das so stimmt. Stelle KEINE Fragen zu Informationen die du bereits kennst.`
+        ? tl({ de: `Dies ist der START des Interviews. Der Nutzer hat bereits ein konkretes Produkt/eine Marke genannt: "${knownEntity.entityName}". Begrüße kurz, stelle dich als Max vor, und nutze dann SOFORT dein Wissen über dieses Produkt/diese Marke. Fasse zusammen was du weißt (Zielgruppe, USP, Markenwerte, typischer Stil) und frage den Nutzer ob das so stimmt. Stelle KEINE Fragen zu Informationen die du bereits kennst.`, en: `This is the START of the interview. The user has already named a specific product/brand: "${knownEntity.entityName}". Briefly greet, introduce yourself as Max, and then IMMEDIATELY use your knowledge of this product/brand. Summarize what you know (target audience, USP, brand values, typical style) and ask the user if that is correct. DO NOT ask questions about information you already know.`, es: `Este es el INICIO de la entrevista. El usuario ya ha nombrado un producto/marca específico: "${knownEntity.entityName}". Saluda brevemente, preséntate como Max, y luego UTILIZA INMEDIATAMENTE tu conocimiento sobre este producto/marca. Resume lo que sabes (público objetivo, PVU, valores de marca, estilo típico) y pregunta al usuario si es correcto. NO hagas preguntas sobre información que ya conoces.` })
         : lang === 'es'
         ? `Este es el INICIO. El usuario ya mencionó un producto/marca específico: "${knownEntity.entityName}". Saluda brevemente, preséntate como Max, y usa INMEDIATAMENTE tu conocimiento sobre este producto/marca. Resume lo que sabes (público, USP, valores de marca, estilo típico) y pregunta si es correcto.`
         : `This is the START. The user already mentioned a specific product/brand: "${knownEntity.entityName}". Greet briefly, introduce yourself as Max, then IMMEDIATELY use your knowledge about this product/brand. Summarize what you know (target audience, USP, brand values, typical style) and ask if that's correct.`;
     } else {
       phaseInstruction = lang === 'de' 
-        ? `Dies ist der START des Interviews. Begrüße den Kunden warmherzig und professionell, stelle dich als Max vor, und stelle dann deine ERSTE Frage. Wähle die relevanteste offene Pflicht-Information aus der Liste unten.`
+        ? tl({ de: `Dies ist der START des Interviews. Begrüße den Kunden warmherzig und professionell, stelle dich als Max vor, und stelle dann deine ERSTE Frage. Wähle die relevanteste offene Pflicht-Information aus der Liste unten.`, en: `This is the START of the interview. Greet the customer warmly and professionally, introduce yourself as Max, and then ask your FIRST question. Choose the most relevant open-ended mandatory information from the list below.`, es: `Este es el INICIO de la entrevista. Saluda al cliente de forma cálida y profesional, preséntate como Max y luego haz tu PRIMERA pregunta. Elige la información obligatoria más relevante y abierta de la lista a continuación.` })
         : lang === 'es'
         ? `Este es el INICIO de la entrevista. Saluda al cliente con calidez y profesionalismo, preséntate como Max, y haz tu PRIMERA pregunta. Elige la información obligatoria más relevante de la lista.`
         : `This is the START of the interview. Greet the client warmly and professionally, introduce yourself as Max, and ask your FIRST question. Choose the most relevant required info from the list below.`;
     }
   } else if (isNearComplete) {
     phaseInstruction = lang === 'de'
-      ? `Alle Pflichtinformationen sind gesammelt! Du kannst jetzt:\n- Optionale Details erfragen (${optionalMissing.slice(0, 3).join(', ')})\n- Oder eine ZUSAMMENFASSUNG aller gesammelten Infos geben und fragen ob alles passt\n- Setze "isComplete": true wenn der Nutzer bestätigt oder du genug Infos hast`
+      ? tl({ de: `Alle Pflichtinformationen sind gesammelt! Du kannst jetzt:\\n- Optionale Details erfragen (${optionalMissing.slice(0, 3).join(', ')})\\n- Oder eine ZUSAMMENFASSUNG aller gesammelten Infos geben und fragen ob alles passt\\n- Setze "isComplete": true wenn der Nutzer bestätigt oder du genug Infos hast`, en: `All mandatory information has been collected! You can now:\\n- Ask for optional details (${optionalMissing.slice(0, 3).join(', ')})\\n- Or provide a SUMMARY of all collected information and ask if everything is correct\\n- Set "isComplete": true when the user confirms or you have enough information`, es: `¡Toda la información obligatoria ha sido recopilada! Ahora puedes:\\n- Solicitar detalles opcionales (${optionalMissing.slice(0, 3).join(', ')})\\n- O proporcionar un RESUMEN de toda la información recopilada y preguntar si todo es correcto\\n- Establece "isComplete": true cuando el usuario confirme o tengas suficiente información` })
       : lang === 'es'
       ? `¡Toda la información obligatoria está recopilada! Puedes:\n- Preguntar detalles opcionales (${optionalMissing.slice(0, 3).join(', ')})\n- O dar un RESUMEN y preguntar si todo está correcto\n- Pon "isComplete": true cuando el usuario confirme`
       : `All required information is gathered! You can:\n- Ask optional details (${optionalMissing.slice(0, 3).join(', ')})\n- Or give a SUMMARY of all gathered info and ask if everything looks good\n- Set "isComplete": true when the user confirms or you have enough info`;
   } else {
     phaseInstruction = lang === 'de'
-      ? `Du brauchst noch: ${missingSummary}\nStelle die nächste relevante Frage. Wenn der Nutzer in seiner Antwort bereits mehrere Infos gegeben hat, überspringe die entsprechenden Themen.`
+      ? tl({ de: `Du brauchst noch: ${missingSummary}\\nStelle die nächste relevante Frage. Wenn der Nutzer in seiner Antwort bereits mehrere Infos gegeben hat, überspringe die entsprechenden Themen.`, en: `You still need: ${missingSummary}\\nAsk the next relevant question. If the user has already provided multiple pieces of information in their answer, skip the corresponding topics.`, es: `Todavía necesitas: ${missingSummary}\\nHaz la siguiente pregunta relevante. Si el usuario ya ha proporcionado varias informaciones en su respuesta, omite los temas correspondientes.` })
       : lang === 'es'
       ? `Aún necesitas: ${missingSummary}\nHaz la siguiente pregunta relevante. Si el usuario ya dio varias informaciones en su respuesta, salta esos temas.`
       : `You still need: ${missingSummary}\nAsk the next relevant question. If the user already provided multiple pieces of info in their answer, skip those topics.`;
@@ -536,7 +537,7 @@ PERSÖNLICHKEIT & INDIVIDUALITÄT:
 - Reagiere auf die SPEZIFISCHEN Antworten des Nutzers — wenn er "Calvin Klein Parfüm" sagt, beziehe dich auf Luxusmarken-Konventionen
 - Passe deinen Tonfall an den Kunden an — bei einem Startup lockerer, bei einer Anwaltskanzlei professioneller
 - Stelle FOLLOW-UP-Fragen wenn eine Antwort besonders interessant ist — sei neugierig!
-- Variiere deine Fragestellungen — nutze manchmal Szenarien ("Stell dir vor dein idealer Kunde sieht das Video..."), manchmal direkte Fragen, manchmal kreative Übungen ("Beschreibe dein Produkt in 3 Worten")
+- Variiere deine Fragestellungen — nutze manchmal Szenarien (tl({ de: "Stell dir vor dein idealer Kunde sieht das Video...", en: "Imagine your ideal customer watching the video...", es: "Imagina a tu cliente ideal viendo el video..." })), manchmal direkte Fragen, manchmal kreative Übungen ("Beschreibe dein Produkt in 3 Worten")
 - Gib bei jeder Frage einen kurzen KONTEXT warum du das fragst (z.B. "Das hilft mir den perfekten Filmstil zu wählen")
 - Zeige Begeisterung für gute Antworten und baue darauf auf`,
     },
@@ -823,9 +824,9 @@ const extractRecommendation = (messages: any[], category: string) => {
 
 const ERROR_MESSAGES: Record<Lang, { rateLimited: string; creditsExhausted: string; genericError: string; retry: string; skip: string; rechargeCredits: string }> = {
   de: {
-    rateLimited: 'Entschuldigung, ich bin gerade etwas überlastet. Bitte versuche es in einer Minute erneut. 🕐',
-    creditsExhausted: 'Die Credits sind aufgebraucht. Bitte lade dein Konto auf.',
-    genericError: 'Entschuldigung, es gab einen technischen Fehler. Bitte versuche es erneut. 🔧',
+    rateLimited: tl({ de: 'Entschuldigung, ich bin gerade etwas überlastet. Bitte versuche es in einer Minute erneut. 🕐', en: 'Sorry, I\'m a bit overloaded right now. Please try again in a minute. 🕐', es: 'Lo siento, estoy un poco sobrecargado en este momento. Por favor, inténtalo de nuevo en un minuto. 🕐' }),
+    creditsExhausted: tl({ de: 'Die Credits sind aufgebraucht. Bitte lade dein Konto auf.', en: 'Credits are used up. Please top up your account.', es: 'Los créditos se han agotado. Por favor, recarga tu cuenta.' }),
+    genericError: tl({ de: 'Entschuldigung, es gab einen technischen Fehler. Bitte versuche es erneut. 🔧', en: 'Sorry, there was a technical error. Please try again. 🔧', es: 'Lo siento, hubo un error técnico. Por favor, inténtalo de nuevo. 🔧' }),
     retry: 'Erneut versuchen',
     skip: 'Beratung überspringen',
     rechargeCredits: 'Credits aufladen',
@@ -852,7 +853,7 @@ const ERROR_MESSAGES: Record<Lang, { rateLimited: string; creditsExhausted: stri
 // MAIN HANDLER
 // ═══════════════════════════════════════════════════════════════
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1045,4 +1046,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));

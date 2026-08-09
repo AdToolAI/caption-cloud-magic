@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +17,7 @@ function errorResponse(step: string, error: string, statusCode: number) {
   );
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -101,7 +102,7 @@ serve(async (req) => {
       console.error("[save-ai-video] download_source fetch error:", fetchErr);
       return errorResponse(
         "download_source",
-        "Video nicht mehr verfügbar — die temporäre URL ist abgelaufen. Bitte generiere das Video erneut.",
+        tl({ de: "Video nicht mehr verfügbar — die temporäre URL ist abgelaufen. Bitte generiere das Video erneut.", en: "Video no longer available — the temporary URL has expired. Please regenerate the video.", es: "El video ya no está disponible — la URL temporal ha caducado. Por favor, regenera el video." }),
         410
       );
     }
@@ -110,7 +111,7 @@ serve(async (req) => {
       console.error("[save-ai-video] download_source HTTP error:", videoResponse.status, videoResponse.statusText);
       return errorResponse(
         "download_source",
-        "Video nicht mehr verfügbar — die temporäre URL ist abgelaufen. Bitte generiere das Video erneut.",
+        tl({ de: "Video nicht mehr verfügbar — die temporäre URL ist abgelaufen. Bitte generiere das Video erneut.", en: "Video no longer available — the temporary URL has expired. Please regenerate the video.", es: "El video ya no está disponible — la URL temporal ha caducado. Por favor, regenera el video." }),
         410
       );
     }
@@ -182,4 +183,4 @@ serve(async (req) => {
       500
     );
   }
-});
+})(req)));

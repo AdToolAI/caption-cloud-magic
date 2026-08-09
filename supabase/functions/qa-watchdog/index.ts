@@ -15,6 +15,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { recordHeartbeat } from "../_shared/heartbeat.ts";
 import { withSentryCron } from "../_shared/sentryCron.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -74,7 +75,7 @@ async function fileBug(sb: any, a: Anomaly): Promise<boolean> {
   return true;
 }
 
-Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 5 }, async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 5 }, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const start = Date.now();
@@ -360,7 +361,7 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       anomalies.push({
         kind: "workflow",
         severity: "high",
-        title: `Watchdog v381: ${orphanGenerating.length} Szenen zeigten "generating" ohne aktiven Run`,
+        title: tl({ de: `Watchdog v381: ${orphanGenerating.length} Szenen zeigten "generating" ohne aktiven Run`, en: `Watchdog v381: ${orphanGenerating.length} scenes showed "generating" without an active run`, es: `Watchdog v381: ${orphanGenerating.length} escenas mostraron "generando" sin una ejecución activa` }),
         description: `Terminal gesetzt, damit der Ladebalken stoppt. Sample:\n${(orphanGenerating as any[])
           .slice(0, 20)
           .map(
@@ -571,4 +572,4 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-}));
+}))(req)));

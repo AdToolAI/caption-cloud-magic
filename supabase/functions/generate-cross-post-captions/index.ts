@@ -2,6 +2,7 @@
 // Uses Lovable AI Gateway (Gemini 2.5 Flash) with tool-calling for strict JSON.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 
 const corsHeaders = {
@@ -48,7 +49,7 @@ const LANG_NAME = (l?: string) =>
   : l?.toLowerCase().startsWith("es") ? "Spanish"
   : "English";
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -214,7 +215,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+})(req)));
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -236,8 +237,8 @@ function summarizeBriefing(plan: unknown, text?: string): string {
 function buildMockDrafts(channels: Channel[], lang: string) {
   const sampleByLang = {
     German: {
-      hook: "Stopp ❌ wenn du auch ständig vergisst zu posten…",
-      story: "Wir haben es satt. Deshalb haben wir AdTool gebaut — dein Briefing → fertiges Video → automatisch auf alle Kanäle.",
+      hook: tl({ de: "Stopp ❌ wenn du auch ständig vergisst zu posten…", en: "Stop ❌ if you also constantly forget to post…", es: "Para ❌ si tú también olvidas constantemente publicar…" }),
+      story: tl({ de: "Wir haben es satt. Deshalb haben wir AdTool gebaut — dein Briefing → fertiges Video → automatisch auf alle Kanäle.", en: "We're fed up. That's why we built AdTool — your briefing → finished video → automatically to all channels.", es: "Estamos hartos. Por eso creamos AdTool — tu briefing → video terminado → automáticamente a todos los canales." }),
     },
     English: {
       hook: "Stop ❌ scrolling if your posting schedule is a mess…",
@@ -253,7 +254,7 @@ function buildMockDrafts(channels: Channel[], lang: string) {
     channel: c,
     caption:
       c === "tiktok" ? `${s.hook} 👇`
-      : c === "linkedin" ? `${s.story}\n\nWas hält dich heute vom posten ab?`
+      : c === "linkedin" ? tl({ de: `${s.story}\\n\\nWas hält dich heute vom posten ab?`, en: `${s.story}\\n\\nWhat's stopping you from posting today?`, es: `${s.story}\\n\\n¿Qué te impide publicar hoy?` })
       : `${s.hook}\n\n${s.story}\n\n👉 14 Tage gratis testen.`,
     hashtags:
       c === "tiktok" ? ["fyp", "contentcreator", "aitools"]

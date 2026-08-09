@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
 ].join(' ');
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,7 +22,7 @@ Deno.serve(async (req) => {
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
     if (!clientId) {
       return new Response(
-        JSON.stringify({ error: 'YouTube ist serverseitig nicht konfiguriert (GOOGLE_CLIENT_ID fehlt).' }),
+        JSON.stringify({ error: tl({ de: 'YouTube ist serverseitig nicht konfiguriert (GOOGLE_CLIENT_ID fehlt).', en: 'YouTube is not configured server-side (GOOGLE_CLIENT_ID is missing).', es: 'YouTube no está configurado en el lado del servidor (falta GOOGLE_CLIENT_ID).' }) }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -80,7 +81,7 @@ Deno.serve(async (req) => {
     if (stateError) {
       console.error('[youtube-oauth-start] failed to store state:', stateError);
       return new Response(
-        JSON.stringify({ error: 'Verbindung konnte nicht gestartet werden' }),
+        JSON.stringify({ error: tl({ de: 'Verbindung konnte nicht gestartet werden', en: 'Connection could not be started', es: 'No se pudo iniciar la conexión' }) }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -117,4 +118,4 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
-});
+})(req)));

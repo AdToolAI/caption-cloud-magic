@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-qa-mock',
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -147,7 +148,7 @@ serve(async (req) => {
 
     if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
       return new Response(
-        JSON.stringify({ error: 'Rate limit erreicht, bitte versuche es später erneut.', articles: [], videos: [] }),
+        JSON.stringify({ error: tl({ de: 'Rate limit erreicht, bitte versuche es später erneut.', en: 'Rate limit reached, please try again later.', es: 'Límite de tasa alcanzado, por favor inténtalo de nuevo más tarde.' }), articles: [], videos: [] }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -157,4 +158,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

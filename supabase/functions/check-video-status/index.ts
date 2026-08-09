@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -88,7 +89,7 @@ Deno.serve(async (req) => {
     if (!shotstackResponse.ok) {
       const errorText = await shotstackResponse.text();
       console.error('Shotstack status check error:', errorText);
-      throw new Error('Fehler beim Abrufen des Video-Status');
+      throw new Error(tl({ de: 'Fehler beim Abrufen des Video-Status', en: 'Error retrieving video status', es: 'Error al recuperar el estado del video' }));
     }
 
     const shotstackData = await shotstackResponse.json();
@@ -148,4 +149,4 @@ Deno.serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

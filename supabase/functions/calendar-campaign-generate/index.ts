@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -130,7 +131,7 @@ serve(async (req) => {
       console.error("❌ Campaign creation failed:", campaignError);
       return new Response(
         JSON.stringify({
-          error: "Kampagne konnte nicht erstellt werden",
+          error: tl({ de: "Kampagne konnte nicht erstellt werden", en: "Campaign could not be created", es: "No se pudo crear la campaña" }),
           code: "CAMPAIGN_INSERT_FAILED",
           details: campaignError.message,
         }),
@@ -217,7 +218,7 @@ serve(async (req) => {
       console.error("❌ Events creation error:", eventsError);
       return new Response(
         JSON.stringify({
-          error: "Events konnten nicht erstellt werden",
+          error: tl({ de: "Events konnten nicht erstellt werden", en: "Events could not be created", es: "No se pudieron crear los eventos" }),
           code: eventsError.code || "EVENTS_INSERT_FAILED",
           details: eventsError.message,
           hint: eventsError.hint || null,
@@ -262,4 +263,4 @@ serve(async (req) => {
       }
     );
   }
-});
+})(req)));

@@ -8,6 +8,7 @@ import {
   sanitizeEffects,
   type SceneEffectId,
 } from "../_shared/composer-effects.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -117,7 +118,7 @@ function promptCharacterActionFallback(prompt: unknown, characterName: string | 
 function neutralCharacterAction(language: string): { en: string; user: string } {
   const en = "performs the scene action naturally, visible to camera";
   const user =
-    language === "de" ? "führt die Szenen-Aktion natürlich aus, sichtbar zur Kamera" :
+    language === "de" ? tl({ de: "führt die Szenen-Aktion natürlich aus, sichtbar zur Kamera", en: "naturally performs the scene action, visible to the camera", es: "realiza la acción de la escena de forma natural, visible para la cámara" }) :
     language === "es" ? "realiza la acción de la escena con naturalidad, visible a cámara" :
     en;
   return { en, user };
@@ -151,7 +152,7 @@ Use sceneType values loosely — map "hook"=opening, "problem"=conflict beats, "
   custom: `FREE EDITOR MODE — follow the user's free description as literally as possible. Treat "productName" as the title, "productDescription" as the user's full creative brief (TOP PRIORITY — the storyboard must reflect it scene-by-scene), "usps" as optional style hints. Do NOT impose AIDA or any fixed framework. Generate scenes that mirror the user's description in order. Text overlays only if the brief implies them.`,
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1035,4 +1036,4 @@ Generate the storyboard using the create_storyboard function.`;
       }
     );
   }
-});
+})(req)));

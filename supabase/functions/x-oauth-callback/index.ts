@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { encryptToken, decryptToken } from '../_shared/crypto.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (stateError || !oauthState) {
-      throw new Error('Ungültiger oder abgelaufener OAuth-State. Bitte erneut verbinden.');
+      throw new Error(tl({ de: 'Ungültiger oder abgelaufener OAuth-State. Bitte erneut verbinden.', en: 'Invalid or expired OAuth state. Please reconnect.', es: 'Estado de OAuth inválido o caducado. Por favor, vuelva a conectar.' }));
     }
 
     // Check if user has Enterprise plan (X/Twitter access)
@@ -53,12 +54,12 @@ Deno.serve(async (req) => {
 
     if (profileError) {
       console.error('Profile fetch error:', profileError);
-      throw new Error('Fehler beim Abrufen des Benutzerprofils');
+      throw new Error(tl({ de: 'Fehler beim Abrufen des Benutzerprofils', en: 'Error fetching user profile', es: 'Error al obtener el perfil de usuario' }));
     }
 
     if (profile?.plan !== 'enterprise') {
       console.log('User does not have Enterprise plan:', profile?.plan);
-      throw new Error('X/Twitter ist nur für Enterprise-Kunden verfügbar. Bitte upgrade deinen Plan.');
+      throw new Error(tl({ de: 'X/Twitter ist nur für Enterprise-Kunden verfügbar. Bitte upgrade deinen Plan.', en: 'X/Twitter is only available for Enterprise customers. Please upgrade your plan.', es: 'X/Twitter solo está disponible para clientes Enterprise. Por favor, actualice su plan.' }));
     }
 
     const codeVerifier = await decryptToken(oauthState.code_verifier);
@@ -82,7 +83,7 @@ Deno.serve(async (req) => {
 
     if (!tokenResponse.ok) {
       console.error('Token exchange error:', JSON.stringify(tokenData));
-      throw new Error(`Token-Austausch fehlgeschlagen: ${tokenData.error_description || tokenData.error || 'Unbekannter Fehler'}`);
+      throw new Error(tl({ de: `Token-Austausch fehlgeschlagen: ${tokenData.error_description || tokenData.error || 'Unbekannter Fehler'}`, en: `Token exchange failed: ${tokenData.error_description || tokenData.error || 'Unknown error'}`, es: `Fallo en el intercambio de tokens: ${tokenData.error_description || tokenData.error || 'Error desconocido'}` }));
     }
 
     // Fetch user info
@@ -113,13 +114,13 @@ Deno.serve(async (req) => {
       
       if (isEnrollmentError) {
         throw new Error(
-          'X API Zugriff verweigert: Die X-App ist nicht korrekt konfiguriert. ' +
+          tl({ de: 'X API Zugriff verweigert: Die X-App ist nicht korrekt konfiguriert. ', en: 'X API access denied: The X app is not configured correctly.', es: 'Acceso a la API de X denegado: La aplicación X no está configurada correctamente.' }) +
           'Bitte stelle im X Developer Portal (developer.x.com) sicher, dass die App ' +
-          'einem Projekt zugeordnet ist und mindestens "Basic" API-Zugang hat.'
+          tl({ de: 'einem Projekt zugeordnet ist und mindestens "Basic" API-Zugang hat.', en: 'is assigned to a project and has at least "Basic" API access.', es: 'está asignado a un proyecto y tiene al menos acceso a la API "Básico".' })
         );
       }
       
-      throw new Error(`X Profilabruf fehlgeschlagen: ${detail || title || errorMessages || 'Unbekannter Fehler'}`);
+      throw new Error(tl({ de: `X Profilabruf fehlgeschlagen: ${detail || title || errorMessages || 'Unbekannter Fehler'}`, en: `X profile retrieval failed: ${detail || title || errorMessages || 'Unknown error'}`, es: `Fallo al recuperar el perfil de X: ${detail || title || errorMessages || 'Error desconocido'}` }));
     }
 
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
@@ -190,4 +191,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Location': redirectUrl },
     });
   }
-});
+})(req)));

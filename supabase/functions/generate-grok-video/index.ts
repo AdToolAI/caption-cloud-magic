@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,7 +34,7 @@ interface GenerateRequest {
   enableAudio?: boolean;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -216,7 +217,7 @@ serve(async (req) => {
       if (errMsg.includes('not found') || errMsg.includes('does not exist')) {
         return new Response(
           JSON.stringify({
-            error: "Grok Imagine ist auf Replicate noch nicht öffentlich verfügbar. Credits wurden zurückerstattet.",
+            error: tl({ de: "Grok Imagine ist auf Replicate noch nicht öffentlich verfügbar. Credits wurden zurückerstattet.", en: "Grok Imagine is not yet publicly available on Replicate. Credits have been refunded.", es: "Grok Imagine aún no está disponible públicamente en Replicate. Los créditos han sido reembolsados." }),
             code: "MODEL_UNAVAILABLE"
           }),
           { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -255,4 +256,4 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
-});
+})(req)));

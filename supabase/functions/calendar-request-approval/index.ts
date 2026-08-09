@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -91,7 +92,7 @@ serve(async (req) => {
       type: 'approval_request',
       event_id,
       title: 'Approval angefordert',
-      message: `Freigabe für Event "${event.title}" wurde angefordert`,
+      message: tl({ de: `Freigabe für Event "${event.title}" wurde angefordert`, en: `Approval for event "${event.title}" has been requested`, es: `Se ha solicitado la aprobación para el evento "${event.title}"` }),
       metadata: { approver_email: approver.email, stage: 'review' }
     }));
 
@@ -117,4 +118,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

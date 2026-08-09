@@ -5,6 +5,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
@@ -13,7 +14,7 @@ const corsHeaders = {
 
 const MIN_CREDIT_THRESHOLD = 50;
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   // QA smoke short-circuit
   if (isQaMockRequest(req)) {
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
 
         await safeEmit(admin, userId, "autopilot_paused_briefing_missing",
           "Autopilot pausiert: Briefing fehlt",
-          "Du hast die Briefing-Deadline (Sonntag 18:00 UTC) verpasst. Bitte bestätige das Wochen-Review, um den Autopiloten wieder zu starten.");
+          tl({ de: "Du hast die Briefing-Deadline (Sonntag 18:00 UTC) verpasst. Bitte bestätige das Wochen-Review, um den Autopiloten wieder zu starten.", en: "You missed the briefing deadline (Sunday 6 PM UTC). Please confirm the weekly review to restart the autopilot.", es: "Perdiste la fecha límite del briefing (domingo 6 PM UTC). Por favor, confirma la revisión semanal para reiniciar el piloto automático." }));
         briefingPaused++;
         continue;
       }
@@ -81,7 +82,7 @@ Deno.serve(async (req) => {
 
         await safeEmit(admin, userId, "autopilot_paused_low_credits",
           "Autopilot pausiert: Credits aufgebraucht",
-          `Dein Credit-Stand (${balance}) liegt unter der Mindest-Schwelle (${MIN_CREDIT_THRESHOLD}). Bitte aufladen, um fortzufahren.`);
+          tl({ de: `Dein Credit-Stand (${balance}) liegt unter der Mindest-Schwelle (${MIN_CREDIT_THRESHOLD}). Bitte aufladen, um fortzufahren.`, en: `Your credit balance (${balance}) is below the minimum threshold (${MIN_CREDIT_THRESHOLD}). Please top up to continue.`, es: `Tu saldo de crédito (${balance}) está por debajo del umbral mínimo (${MIN_CREDIT_THRESHOLD}). Por favor, recarga para continuar.` }));
         creditPaused++;
       }
     }
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
     console.error("safety-check error", e);
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
-});
+})(req)));
 
 async function safeEmit(admin: ReturnType<typeof createClient>, userId: string, kind: string, title: string, body: string) {
   try {

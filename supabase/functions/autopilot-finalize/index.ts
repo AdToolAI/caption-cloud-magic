@@ -15,6 +15,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { AUTOPILOT_PRICE, chargeStage, refundStage } from "../_shared/autopilotCredits.ts";
 import { clampGain, describeLayer, generateSfx, planSceneAudio } from "../_shared/autopilotSound.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,7 +33,7 @@ const FINALIZE_STALE_MS = 30 * 60_000;
 
 
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "autopilot-finalize", ok: true });
 
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
     console.error("[autopilot-finalize] fatal", err);
     return json({ error: err instanceof Error ? err.message : "unknown" }, 500);
   }
-});
+})(req)));
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -116,7 +117,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
 
 
     if (usable.length === 0) {
-      await fail(admin, productionId, userId, "Keine fertige Szene für den Endschnitt vorhanden.");
+      await fail(admin, productionId, userId, tl({ de: "Keine fertige Szene für den Endschnitt vorhanden.", en: "No finished scene available for final cut.", es: "No hay escena terminada disponible para el corte final." }));
       return;
     }
 
@@ -189,7 +190,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
             stage: "audio",
             role: "sound",
             severity: "warn",
-            message: "Voiceover konnte nicht erzeugt werden — Credits erstattet, Film läuft ohne Sprecher.",
+            message: tl({ de: "Voiceover konnte nicht erzeugt werden — Credits erstattet, Film läuft ohne Sprecher.", en: "Voiceover could not be generated — credits refunded, film plays without narrator.", es: "No se pudo generar la voz en off — créditos reembolsados, la película se reproduce sin narrador." }),
           });
         } else {
           await log(admin, productionId, userId, {
@@ -203,7 +204,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
           stage: "audio",
           role: "sound",
           severity: "warn",
-          message: "Guthaben reicht nicht für das Voiceover — Film wird ohne Sprecher geschnitten.",
+          message: tl({ de: "Guthaben reicht nicht für das Voiceover — Film wird ohne Sprecher geschnitten.", en: "Insufficient credits for voiceover — film will be cut without narrator.", es: "Créditos insuficientes para la voz en off — la película se cortará sin narrador." }),
         });
       }
     }
@@ -304,7 +305,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
                 stage: "sfx",
                 sceneIndex: plan.sceneIndex,
                 euros: AUTOPILOT_PRICE.sfxPerClip,
-                label: `Tonebene Szene ${plan.sceneIndex + 1} fehlgeschlagen`,
+                label: tl({ de: `Tonebene Szene ${plan.sceneIndex + 1} fehlgeschlagen`, en: `Audio track for scene ${plan.sceneIndex + 1} failed`, es: `Pista de audio de la escena ${plan.sceneIndex + 1} falló` }),
               });
             } else {
               await log(admin, productionId, userId, {
@@ -440,8 +441,8 @@ async function finalize(admin: Admin, production: any, userId: string) {
         productionId,
         userId,
         renderJson?.error === "Insufficient credits"
-          ? "Guthaben reicht für den Endschnitt nicht aus."
-          : `Endschnitt konnte nicht gestartet werden: ${renderJson?.error ?? renderRes.status}`,
+          ? tl({ de: "Guthaben reicht für den Endschnitt nicht aus.", en: "Insufficient credits for final cut.", es: "Créditos insuficientes para el corte final." })
+          : tl({ de: `Endschnitt konnte nicht gestartet werden: ${renderJson?.error ?? renderRes.status}`, en: `Final cut could not be started: ${renderJson?.error ?? renderRes.status}`, es: `No se pudo iniciar el corte final: ${renderJson?.error ?? renderRes.status}` }),
       );
       return;
     }
@@ -455,7 +456,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
     await log(admin, productionId, userId, {
       stage: "finalizing",
       role: "editor",
-      message: `Endschnitt gestartet — ${scenes.length} Szenen, ${Math.round(durationSeconds)}s.`,
+      message: tl({ de: `Endschnitt gestartet — ${scenes.length} Szenen, ${Math.round(durationSeconds)}s.`, en: `Final cut started — ${scenes.length} scenes, ${Math.round(durationSeconds)}s.`, es: `Corte final iniciado — ${scenes.length} escenas, ${Math.round(durationSeconds)}s.` }),
       meta: { render_id: renderId },
     });
 
@@ -464,7 +465,7 @@ async function finalize(admin: Admin, production: any, userId: string) {
 
 
     if (!finalUrl) {
-      await fail(admin, productionId, userId, "Endschnitt wurde nicht rechtzeitig fertig. Die Szenen bleiben erhalten.");
+      await fail(admin, productionId, userId, tl({ de: "Endschnitt wurde nicht rechtzeitig fertig. Die Szenen bleiben erhalten.", en: "Final cut did not finish in time. Scenes are retained.", es: "El corte final no terminó a tiempo. Las escenas se conservan." }));
       return;
     }
 

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,7 +39,7 @@ function getNextExecutionTime(pattern: string, lastExecution?: string): Date {
   return next;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -113,7 +114,7 @@ serve(async (req) => {
             type: 'recurring_event_created',
             event_id: createdEvent.id,
             title: 'Recurring Event erstellt',
-            message: `Automatisches Event "${createdEvent.title}" wurde erstellt`,
+            message: tl({ de: `Automatisches Event "${createdEvent.title}" wurde erstellt`, en: `Automatic event "${createdEvent.title}" has been created`, es: `Se ha creado el evento automático "${createdEvent.title}"` }),
             metadata: { rule_id: rule.id, rule_name: rule.name }
           }));
 
@@ -156,4 +157,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

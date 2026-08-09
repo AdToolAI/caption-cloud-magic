@@ -1,3 +1,4 @@
+import { tl, withLang } from "./i18n.ts";
 /**
  * v384 — Zustandsmaschine für `composer_scenes` (Server-Seite).
  *
@@ -278,7 +279,7 @@ export async function transitionScene(
     if (fromIdx >= 0 && toIdx > fromIdx + 1) {
       console.warn(
         `[v391_transition_gap] scene=${sceneId} ${result.state} → ${to} ` +
-          `nicht direkt erlaubt — Zwischenzustaende werden nachgeholt: ` +
+          tl({ de: `nicht direkt erlaubt — Zwischenzustaende werden nachgeholt: `, en: `not directly allowed — intermediate states will be caught up: `, es: `no permitido directamente — los estados intermedios se pondrán al día: ` }) +
           LINEAR_CHAIN.slice(fromIdx + 1, toIdx + 1).join(" → "),
       );
       for (let i = fromIdx + 1; i <= toIdx; i++) {

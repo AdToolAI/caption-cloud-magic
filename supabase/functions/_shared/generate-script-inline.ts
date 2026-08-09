@@ -1,3 +1,4 @@
+import { tl, withLang } from "./i18n.ts";
 /**
  * Inline script generation logic — extracted from generate-universal-script
  * to avoid Edge-to-Edge fetch timeouts (504 on cold starts).
@@ -222,7 +223,7 @@ const CATEGORY_STYLE_PROFILES: Record<string, CategoryStyleProfile> = {
     animationSet: ['popIn', 'bounce', 'flyIn'],
     textAnimationSet: ['bounceIn', 'waveIn', 'glowPulse'],
     characterUsage: 'Sporadisch als Event-Host.',
-    effectsProfile: 'PopIn für Datum/Location-Reveal.',
+    effectsProfile: tl({ de: 'PopIn für Datum/Location-Reveal.', en: 'Pop-in for date/location reveal.', es: 'Ventana emergente para revelar fecha/ubicación.' }),
     transitionStyle: '"slide" und "zoom".',
     soundDesign: 'Energetisch.',
     contrastOverlay: 'bold',
@@ -476,7 +477,7 @@ cta: animation="${getDefaultAnimation('cta', categoryKey)}" textAnimation="${get
   "summary": "..." }`;
 
   const systemPromptIntro: Record<Lang, string> = {
-    de: `Du bist ein erfahrener Drehbuchautor für professionelle, animierte Videos.\n\nWICHTIG: Du erstellst ein "${categoryKey}"-Video. Halte dich STRIKT an das Design-System!\n\nSTORYTELLING-STRUKTUR: ${structure.name}\nSZENEN: ${structure.structure.join(' → ')}\n\n${animGuide}\n\nREGELN:\n1. Erstelle genau ${scenesCount} Szenen\n2. Jede Szene ~${sceneDuration} Sekunden\n3. Sprechertext AUF ${voiceoverLangMap[lang]}\n${coreRules}\n\nAUSGABEFORMAT (JSON):\n${jsonSchema}`,
+    de: tl({ de: `Du bist ein erfahrener Drehbuchautor für professionelle, animierte Videos.\\n\\nWICHTIG: Du erstellst ein "${categoryKey}"-Video. Halte dich STRIKT an das Design-System!\\n\\nSTORYTELLING-STRUKTUR: ${structure.name}\\nSZENEN: ${structure.structure.join(' → ')}\\n\\n${animGuide}\\n\\nREGELN:\\n1. Erstelle genau ${scenesCount} Szenen\\n2. Jede Szene ~${sceneDuration} Sekunden\\n3. Sprechertext AUF ${voiceoverLangMap[lang]}\\n${coreRules}\\n\\nAUSGABEFORMAT (JSON):\\n${jsonSchema}`, en: `You are an experienced scriptwriter for professional, animated videos.\\n\\nIMPORTANT: You are creating a "${categoryKey}" video. Adhere STRICTLY to the design system!\\n\\nSTORYTELLING STRUCTURE: ${structure.name}\\nSCENES: ${structure.structure.join(' → ')}\\n\\n${animGuide}\\n\\nRULES:\\n1. Create exactly ${scenesCount} scenes\\n2. Each scene ~${sceneDuration} seconds\\n3. Voiceover text IN ${voiceoverLangMap[lang]}\\n${coreRules}\\n\\nOUTPUT FORMAT (JSON):\\n${jsonSchema}`, es: `Eres un guionista experimentado para videos animados profesionales.\\n\\nIMPORTANTE: Estás creando un video de "${categoryKey}". ¡Adhiérete ESTRICTAMENTE al sistema de diseño!\\n\\nESTRUCTURA NARRATIVA: ${structure.name}\\nESCENAS: ${structure.structure.join(' → ')}\\n\\n${animGuide}\\n\\nREGLAS:\\n1. Crea exactamente ${scenesCount} escenas\\n2. Cada escena ~${sceneDuration} segundos\\n3. Texto de voz en OFF EN ${voiceoverLangMap[lang]}\\n${coreRules}\\n\\nFORMATO DE SALIDA (JSON):\\n${jsonSchema}` }),
     en: `You are an experienced scriptwriter for professional, animated videos.\n\nIMPORTANT: You are creating a "${categoryKey}" video. Follow the design system STRICTLY!\n\nSTORYTELLING STRUCTURE: ${structure.name}\nSCENES: ${structure.structure.join(' → ')}\n\n${animGuide}\n\nRULES:\n1. Create exactly ${scenesCount} scenes\n2. Each scene ~${sceneDuration} seconds\n3. Write voiceover IN ${voiceoverLangMap[lang]}\n${coreRules}\n\nOUTPUT FORMAT (JSON):\n${jsonSchema}`,
     es: `Eres un guionista experimentado para videos profesionales y animados.\n\nIMPORTANTE: Estás creando un video "${categoryKey}". ¡Sigue el sistema de diseño ESTRICTAMENTE!\n\nESTRUCTURA: ${structure.name}\nESCENAS: ${structure.structure.join(' → ')}\n\n${animGuide}\n\nREGLAS:\n1. Crea exactamente ${scenesCount} escenas\n2. Cada escena ~${sceneDuration} segundos\n3. Narración EN ${voiceoverLangMap[lang]}\n${coreRules}\n\nFORMATO DE SALIDA (JSON):\n${jsonSchema}`,
   };

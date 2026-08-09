@@ -11,6 +11,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -74,7 +75,7 @@ both hands relaxed and partially out of frame"). Erfinde keine neue Bildidee.
 Antworte NUR über den Tool-Call.`;
 
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "autopilot-anchor-gate", ok: true });
 
@@ -183,7 +184,7 @@ Deno.serve(async (req) => {
     console.error("[autopilot-anchor-gate] fatal", err);
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
   }
-});
+})(req)));
 
 // ---------------------------------------------------------------- generation
 
@@ -297,10 +298,10 @@ async function judge(args: {
   const userText = [
     `Geplante Szene (englischer Prompt):\n${args.prompt}`,
     args.styleGuide
-      ? `Verbindlicher Look des Films (für style_match):\n${args.styleGuide}\nJede Abweichung in Richtung Anime, Illustration, Cartoon, 3D-Render oder Gemälde ist ein harter Durchfall.`
-      : "Keine gesonderte Stilvorgabe — style_match mit 100 bewerten, sofern der Frame fotorealistisch ist.",
+      ? tl({ de: `Verbindlicher Look des Films (für style_match):\\n${args.styleGuide}\\nJede Abweichung in Richtung Anime, Illustration, Cartoon, 3D-Render oder Gemälde ist ein harter Durchfall.`, en: `Binding look of the film (for style_match):\\n${args.styleGuide}\\nAny deviation towards anime, illustration, cartoon, 3D render, or painting is a hard fail.`, es: `Aspecto vinculante de la película (para style_match):\\n${args.styleGuide}\\nCualquier desviación hacia anime, ilustración, dibujos animados, render 3D o pintura es un fallo rotundo.` })
+      : tl({ de: "Keine gesonderte Stilvorgabe — style_match mit 100 bewerten, sofern der Frame fotorealistisch ist.", en: "No specific style guide — rate style_match 100 if the frame is photorealistic.", es: "Sin guía de estilo específica — califica style_match 100 si el fotograma es fotorrealista." }),
     args.hasPortraits
-      ? `Im Bild erwartete Personen: ${args.characterNames.join(", ") || "(unbenannt)"} — genau ${args.characterNames.length || "diese"} Person(en), keine weiteren.`
+      ? tl({ de: `Im Bild erwartete Personen: ${args.characterNames.join(", ") || "(unbenannt)"} — genau ${args.characterNames.length || "diese"} Person(en), keine weiteren.`, en: `Expected persons in the image: ${args.characterNames.join(", ") || "(unnamed)"} — exactly ${args.characterNames.length || "these"} person(s), no others.`, es: `Personas esperadas en la imagen: ${args.characterNames.join(", ") || "(sin nombre)"} — exactamente ${args.characterNames.length || "estas"} persona(s), ninguna otra.` })
       : "Keine Referenzpersonen — identity_fidelity mit 100 bewerten.",
     args.mustContain.length ? `Muss sichtbar sein: ${args.mustContain.join(", ")}` : "",
   ]
