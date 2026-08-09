@@ -63,7 +63,7 @@ export const CommentDiagnostics = ({ data, loading }: CommentDiagnosticsProps) =
             <Lightbulb className="h-8 w-8 text-primary/60" />
           </motion.div>
           <p className="text-muted-foreground">{tx({ de: "Noch keine Diagnose verfügbar.", en: "No diagnosis available yet.", es: "Aún no hay diagnóstico disponible." })}</p>
-          <p className="text-sm mt-2 text-muted-foreground/70">Importiere Kommentare und analysiere sie.</p>
+          <p className="text-sm mt-2 text-muted-foreground/70">{tx({ de: "Importiere Kommentare und analysiere sie.", en: "Import comments and analyze them.", es: "Importar comentarios y analizarlos." })}</p>
         </div>
       </motion.div>
     );
@@ -133,7 +133,7 @@ export const CommentDiagnostics = ({ data, loading }: CommentDiagnosticsProps) =
           <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
             <Lightbulb className="h-3 w-3 text-primary" />
           </div>
-          Gesamt-Aussage
+          tx({ de: "Gesamt-Aussage", en: "General Statement", es: "Declaración General" })
         </h3>
         <p className="text-sm text-muted-foreground">{data.generalStatement}</p>
       </motion.div>
@@ -150,12 +150,12 @@ export const CommentDiagnostics = ({ data, loading }: CommentDiagnosticsProps) =
           <div className="w-6 h-6 rounded-lg bg-cyan-500/20 flex items-center justify-center">
             <Target className="h-3 w-3 text-cyan-400" />
           </div>
-          Ziele
+          tx({ de: "Ziele", en: "Goals", es: "Objetivos" })
         </h3>
         <div className="space-y-4">
           <div>
             <div className="flex justify-between text-sm mb-2">
-              <span>Positive-Quote</span>
+              <span>{tx({ de: "Positive-Quote", en: "Positive Rate", es: "Tasa Positiva" })}</span>
               <span className="font-mono text-primary">
                 {(data.quoteTargets.positiveRateCurrent * 100).toFixed(0)}% / {(data.quoteTargets.positiveRateTarget * 100).toFixed(0)}%
               </span>
@@ -172,7 +172,7 @@ export const CommentDiagnostics = ({ data, loading }: CommentDiagnosticsProps) =
           </div>
           <div>
             <div className="flex justify-between text-sm mb-2">
-              <span>Antwort-Quote</span>
+              <span>{tx({ de: "Antwort-Quote", en: "Response Rate", es: "Tasa de Respuesta" })}</span>
               <span className="font-mono text-primary">
                 {(data.quoteTargets.replyRateCurrent * 100).toFixed(0)}% / {(data.quoteTargets.replyRateTarget * 100).toFixed(0)}%
               </span>
@@ -198,7 +198,7 @@ export const CommentDiagnostics = ({ data, loading }: CommentDiagnosticsProps) =
         className="p-4 rounded-xl backdrop-blur-xl bg-card/60 border border-white/10
                    hover:border-primary/20 transition-all duration-300"
       >
-        <h3 className="font-semibold mb-4">Verbesserungs-Vorschläge</h3>
+        <h3 className="font-semibold mb-4">tx({ de: "Verbesserungs-Vorschläge", en: "Improvement Suggestions", es: "Sugerencias de Mejora" })</h3>
         <div className="space-y-3">
           {data.recommendations.map((rec, idx) => (
             <motion.div 

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, TrendingUp, Clock } from 'lucide-react';
@@ -24,12 +25,15 @@ export function AIRecommendationsPanel({ recommendations, trends }: AIRecommenda
   const getImpactColor = (impact: string) => {
     switch (impact.toLowerCase()) {
       case 'hoch':
+      case tx({ de: 'hoch', en: 'high', es: 'alto' }):
       case 'high':
         return 'bg-red-500/10 text-red-700 dark:text-red-400';
       case 'mittel':
+      case tx({ de: 'mittel', en: 'medium', es: 'medio' }):
       case 'medium':
         return 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400';
       case 'niedrig':
+      case tx({ de: 'niedrig', en: 'low', es: 'bajo' }):
       case 'low':
         return 'bg-blue-500/10 text-blue-700 dark:text-blue-400';
       default:

@@ -226,8 +226,8 @@ export default function ScenePerformancePanel({ scene, characters, language, onU
           const fallbackId = slot.characterId || `__cast_${slotIdx}__`;
           const fallbackName =
             slot.characterId
-              ? `Charakter ${slot.characterId.slice(0, 6)}`
-              : `Sprecher ${slotIdx + 1}`;
+              ? tx({ de: `Charakter ${slot.characterId.slice(0, 6)}`, en: `Character ${slot.characterId.slice(0, 6)}`, es: `Personaje ${slot.characterId.slice(0, 6)}` })
+              : tx({ de: `Sprecher ${slotIdx + 1}`, en: `Speaker ${slotIdx + 1}`, es: `Locutor ${slotIdx + 1}` });
           const ch = lookup ?? { id: fallbackId, name: fallbackName };
           const perf = performance[ch.id] ?? {};
           const hasAny = !!(perf.expression || perf.gesture || perf.gaze || perf.energy);

@@ -58,7 +58,7 @@ const LABELS = {
 } as const;
 
 interface Props {
-  /** The canonical Cast & World pool. No briefing-only character source. */
+  /** The canonical tx({ de: "Cast & Welt", en: "Cast & World", es: "Reparto & Mundo" }) pool. No briefing-only character source. */
   characters: ComposerCharacter[];
   value?: CharacterShot[];
   /** Backwards-compat: legacy single-slot value. */
@@ -152,7 +152,7 @@ export function CharacterCastPicker({
     return s;
   }, [cast, resolutionPool, canonOpts]);
 
-  // A Cast & World person is already taken under any canonical/alias id.
+  // A tx({ de: "Cast & Welt", en: "Cast & World", es: "Reparto & Mundo" }) person is already taken under any canonical/alias id.
   const isTaken = (c: ComposerCharacter) =>
     inCast.has(c.id) ||
     !!(c.brandCharacterId && inCast.has(c.brandCharacterId));

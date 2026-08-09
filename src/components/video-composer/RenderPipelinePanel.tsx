@@ -125,7 +125,7 @@ export default function RenderPipelinePanel({
                 </Badge>
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Szenen einzeln rendern · Final stitchen · Direkt in Director&apos;s Cut öffnen.
+                {tx({ de: 'Szenen einzeln rendern · {tx({ de: 'Final stitchen', en: 'Final stitch', es: 'Unión final' })} · Direkt in Director&apos;s Cut öffnen.', en: 'Render scenes individually · Final stitch · Open directly in Director&apos;s Cut.', es: 'Renderizar escenas individualmente · Unión final · Abrir directamente en Director&apos;s Cut.' })}
               </p>
             </div>
           </div>
@@ -145,31 +145,31 @@ export default function RenderPipelinePanel({
                 className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
               >
                 <Film className="h-3.5 w-3.5 mr-1.5" />
-                Final stitchen
+                {tx({ de: 'Final stitchen', en: 'Final stitch', es: 'Unión final' })}
               </Button>
             )}
             {status === 'partial' && !videoUrl && (
               <>
                 <Button size="sm" variant="outline" onClick={continueWithPartial}>
                   <Scissors className="h-3.5 w-3.5 mr-1.5" />
-                  Mit fertigen Clips stitchen
+                  {tx({ de: 'Mit fertigen Clips stitchen', en: 'Stitch with ready clips', es: 'Unir con clips terminados' })}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={reset}>
                   <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                  Abbrechen
+                  {tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}
                 </Button>
               </>
             )}
             {status === 'failed' && (
               <Button size="sm" variant="outline" onClick={reset}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Neu starten
+                {tx({ de: '{tx({ de: 'Neu', en: 'New', es: 'Nuevo' })} starten', en: 'Restart', es: 'Reiniciar' })}
               </Button>
             )}
             {(status === 'ready' || (status === 'partial' && videoUrl)) && (
               <Button size="sm" variant="ghost" onClick={reset}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Neu
+                {tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}
               </Button>
             )}
           </div>
@@ -182,9 +182,9 @@ export default function RenderPipelinePanel({
               <span className="flex items-center gap-1.5">
                 {isBusy && <Loader2 className="h-3 w-3 animate-spin" />}
                 <span>
-                  {completed} / {scenes.length} Szenen fertig
+                  {tx({ de: `${completed} / ${scenes.length} Szenen fertig`, en: `${completed} / ${scenes.length} scenes finished`, es: `${completed} / ${scenes.length} escenas terminadas` })}
                   {failedCount > 0 && (
-                    <span className="text-destructive ml-1">· {failedCount} fehlgeschlagen</span>
+                    <span className="text-destructive ml-1">· {tx({ de: `${failedCount} fehlgeschlagen`, en: `${failedCount} failed`, es: `${failedCount} fallidas` })}</span>
                   )}
                 </span>
               </span>
@@ -194,7 +194,7 @@ export default function RenderPipelinePanel({
             {status === 'stitching' && (
               <p className="text-[11px] text-primary/80 flex items-center gap-1.5">
                 <Film className="h-3 w-3" />
-                Stitching {stitchProgress}% · finales Video wird erzeugt …
+                {tx({ de: `Stitching ${stitchProgress}% · finales Video wird erzeugt …`, en: `Stitching ${stitchProgress}% · final video is being created...`, es: `Uniendo ${stitchProgress}% · se está creando el video final...` })}
               </p>
             )}
           </div>
@@ -205,7 +205,7 @@ export default function RenderPipelinePanel({
           <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4 space-y-3">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-400" />
-              <p className="text-sm font-medium">Video bereit — wo weiter?</p>
+              <p className="text-sm font-medium">{tx({ de: 'Video bereit — wo weiter?', en: 'Video ready — what next?', es: 'Video listo — ¿qué sigue?' })}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -214,16 +214,16 @@ export default function RenderPipelinePanel({
                 className="bg-gradient-to-r from-primary to-accent"
               >
                 <Scissors className="h-3.5 w-3.5 mr-1.5" />
-                In Director&apos;s Cut öffnen
+                {tx({ de: 'In Director&apos;s Cut öffnen', en: 'Open in Director&apos;s Cut', es: 'Abrir en Director&apos;s Cut' })}
               </Button>
               <Button size="sm" variant="outline" onClick={downloadVideo}>
                 <Download className="h-3.5 w-3.5 mr-1.5" />
-                Herunterladen
+                {tx({ de: 'Herunterladen', en: 'Download', es: 'Descargar' })}
               </Button>
               <Button size="sm" variant="ghost" asChild>
                 <a href="/mediathek" target="_blank" rel="noopener noreferrer">
                   <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-                  Mediathek
+                  {tx({ de: 'Mediathek', en: 'Media Library', es: 'Mediateca' })}
                 </a>
               </Button>
             </div>
@@ -235,8 +235,8 @@ export default function RenderPipelinePanel({
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200/90 flex items-start gap-2">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             <span>
-              {failedCount} Szene(n) fehlgeschlagen. Du kannst die fehlenden einzeln neu generieren oder
-              jetzt mit den fertigen {completed} Clips stitchen.
+              {tx({ de: `${failedCount} Szene(n) fehlgeschlagen. Du kannst die fehlenden einzeln neu generieren oder`, en: `${failedCount} scene(s) failed. You can regenerate the missing ones individually or`, es: `${failedCount} escena(s) fallida(s). Puedes regenerar las faltantes individualmente o` })}
+              {tx({ de: `jetzt mit den fertigen ${completed} Clips stitchen.`, en: `stitch now with the ${completed} ready clips.`, es: `unir ahora con los ${completed} clips terminados.` })}
             </span>
           </div>
         )}
