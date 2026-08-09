@@ -68,7 +68,7 @@ export function CIPreflightDialog({
         {allClean ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
             <CheckCircle2 className="h-10 w-10 text-emerald-500" />
-            <p className="text-sm text-muted-foreground">Keine Auffälligkeiten. Alles sauber verdrahtet.</p>
+            <p className="text-sm text-muted-foreground">{tx({ de: "Keine Auffälligkeiten. Alles sauber verdrahtet.", en: "No issues found. Everything is wired cleanly.", es: "Sin incidencias. Todo está bien conectado." })}</p>
           </div>
         ) : (
           <ScrollArea className="max-h-[50vh] pr-2">

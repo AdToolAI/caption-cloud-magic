@@ -126,7 +126,7 @@ export default function MusicBrowser() {
     }
     setFavorites(new Set([...favorites, track.id]));
     quota.refresh();
-    toast({ title: 'Zur Library hinzugefügt' });
+    toast({ title: tx({ de: 'Zur Library hinzugefügt', en: 'Added to library', es: 'Añadido a la biblioteca' }) });
   }
 
   function useIn(target: 'composer' | 'directors-cut', track: StockMusicTrack) {

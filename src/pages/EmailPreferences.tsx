@@ -34,7 +34,7 @@ const COPY: Record<Lang, {
   },
   de: {
     title: tx({ de: "E-Mail-Einstellungen", en: "Email Settings", es: "Configuración de correo electrónico" }),
-    desc: "Verwalte, welche E-Mails du von AdTool erhältst.",
+    desc: tx({ de: "Verwalte, welche E-Mails du von AdTool erhältst.", en: "Manage which emails you receive from AdTool.", es: "Gestiona qué correos electrónicos recibes de AdTool." }),
     loading: tx({ de: "Einstellungen werden geladen…", en: "Settings are loading…", es: "Cargando configuración…" }),
     invalid: tx({ de: "Dieser Abmelde-Link ist ungültig oder abgelaufen.", en: "This unsubscribe link is invalid or has expired.", es: "Este enlace para cancelar la suscripción no es válido o ha caducado." }),
     back: tx({ de: "Zur Startseite", en: "To Homepage", es: "A la página de inicio" }),

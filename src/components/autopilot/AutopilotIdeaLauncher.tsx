@@ -132,7 +132,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData?.user?.id;
-      if (!userId) throw new Error('Nicht angemeldet.');
+      if (!userId) throw new Error(tx({ de: 'Nicht angemeldet.', en: 'Not logged in.', es: 'No has iniciado sesión.' }));
 
       for (const file of Array.from(files).slice(0, room)) {
         if (!file.type.startsWith('image/')) continue;
@@ -455,7 +455,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/30 px-4 py-3">
           <div>
             <p className="text-sm font-medium">Voiceover</p>
-            <p className="text-xs text-muted-foreground">Erzählerstimme über dem Film</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: "Erzählerstimme über dem Film", en: "Narrator voice over the film", es: "Voz narradora sobre la película" })}</p>
           </div>
           <Switch checked={options.voiceover} onCheckedChange={(v) => set('voiceover', v)} />
         </div>

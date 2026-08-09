@@ -44,7 +44,7 @@ export const ImageAnalysisPanel = ({ imageUrl, brandKitId }: ImageAnalysisPanelP
       <div className="flex items-center justify-center h-64 text-destructive">
         <div className="text-center space-y-2">
           <AlertCircle className="w-8 h-8 mx-auto" />
-          <p className="text-sm">Bildanalyse fehlgeschlagen</p>
+          <p className="text-sm">{tx({ de: "Bildanalyse fehlgeschlagen", en: "Image analysis failed", es: "Error al analizar la imagen" })}</p>
         </div>
       </div>
     );
