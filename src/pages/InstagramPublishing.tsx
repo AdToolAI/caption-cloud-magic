@@ -1097,7 +1097,7 @@ export default function InstagramPublishing() {
               size="lg"
             >
               {renewLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {renewLoading ? tx({ de: "Token wird geprüft und erneuert...", en: "Token is being checked and renewed...", es: "El token se está verificando y renovando..." }) : tx({ de: `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"} Token prüfen und speichern`, en: `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"} Check and save tokens`, es: `3️⃣ ${tokenTypeChoice === "página"? "Página": "Usuario"} Verificar y guardar tokens` })}
+              {renewLoading ? tx({ de: "Token wird geprüft und erneuert...", en: "Token is being checked and renewed...", es: "El token se está verificando y renovando..." }) : tx({ de: `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"}-Token prüfen und speichern`, en: `3️⃣ Check and save ${tokenTypeChoice === "page" ? "Page" : "User"} token`, es: `3️⃣ Verificar y guardar el token de ${tokenTypeChoice === "page" ? "página" : "usuario"}` })}
             </Button>
 
             {/* Success Result */}

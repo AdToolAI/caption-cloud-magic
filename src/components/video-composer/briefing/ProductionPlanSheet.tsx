@@ -914,8 +914,8 @@ export default function ProductionPlanSheet({
       toast({
         title: 'Location angelegt',
         description: matched > 1
-          ? tx({ de: `„${created.name}tx({ de: " — für ${matched} Szenen übernommen.`, en: `", en: "— adopted for ${matched} scenes.`, en: `", es: "— adoptado para escenas ${matched}.`, en: `" })${created.name}" — adopted for ${matched} scenes.`, es: `"${created.name}" — adoptado para ${matched} escenas.` })
-          : tx({ de: `„${created.name}tx({ de: " ist jetzt in der Library.`, en: `", en: "is now in the library.`, en:`", es: "ahora está en la biblioteca.`, en:`" })${created.name}" is now in the library.`, es: `"${created.name}" ahora está en la biblioteca.` }),
+          ? tx({ de: `„${created.name}“ — für ${matched} Szenen übernommen.`, en: `“${created.name}” — adopted for ${matched} scenes.`, es: `«${created.name}» — adoptado para ${matched} escenas.` })
+          : tx({ de: `„${created.name}“ ist jetzt in der Library.`, en: `“${created.name}” is now in the library.`, es: `«${created.name}» ahora está en la biblioteca.` }),
       });
     } catch (e: any) {
       toast({ title: tx({ de: 'Konnte Location nicht anlegen', en: 'Could not create location', es: 'No se pudo crear la ubicación' }), description: e?.message || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }), variant: 'destructive' });

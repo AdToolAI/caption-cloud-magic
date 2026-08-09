@@ -48,7 +48,7 @@ export function AutopilotWeeklyReviewPanel() {
               <div className="font-medium text-sm">
                 {deadlinePassed
                   ? tx({ de: "Briefing-Deadline überschritten — Autopilot wird pausiert", en: "Briefing deadline exceeded — autopilot is paused", es: "Se superó la fecha límite para la sesión informativa: el piloto automático está en pausa" })
-                  : tx({ de: `Bitte bis ${deadline.toLocaleString('de-DE', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`, en: `Please confirm by ${deadline.toLocaleString('de-DE', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC`, es: `Confirme antes de ${deadline.toLocaleString('de-DE', { weekday: 'largo', hour: '2 dígitos', minute: '2 dígitos' })} UTC` })}
+                  : tx({ de: `Bitte bis ${deadline.toLocaleString('de-DE', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`, en: `Please confirm by ${deadline.toLocaleString('en-US', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC`, es: `Confirma antes de ${deadline.toLocaleString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC` })}
               </div>
               <div className="text-xs text-muted-foreground">
                 {deadline && !deadlinePassed && `Noch ${formatDistanceToNow(deadline, { locale: de })}`}
