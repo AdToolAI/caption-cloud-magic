@@ -5,6 +5,7 @@ import { generateContentHash } from '../_shared/content-hash.ts';
 import { withTimeout } from '../_shared/timeout.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { 
+import { tl, withLang } from "../_shared/i18n.ts";
   instagramCircuitBreaker, 
   linkedinCircuitBreaker, 
   xCircuitBreaker,
@@ -618,7 +619,7 @@ async function publishToFacebook(
         provider: 'facebook',
         ok: false,
         error_code: 'FB_NO_CONNECTION',
-        error_message: 'Facebook-Seite nicht verbunden. Bitte unter Verbindungen verknüpfen.',
+        error_message: tl({ de: 'Facebook-Seite nicht verbunden. Bitte unter Verbindungen verknüpfen.', en: 'Facebook page not connected. Please link under Connections.', es: 'Página de Facebook no conectada. Por favor, vincule en Conexiones.' }),
       };
     }
 
@@ -1037,7 +1038,7 @@ async function publishToYouTube(
         provider: 'youtube',
         ok: false,
         error_code: 'YT_NO_CONNECTION',
-        error_message: 'YouTube-Kanal nicht verbunden. Bitte unter Verbindungen verknüpfen.',
+        error_message: tl({ de: 'YouTube-Kanal nicht verbunden. Bitte unter Verbindungen verknüpfen.', en: 'YouTube channel not connected. Please link under Connections.', es: 'Canal de YouTube no conectado. Por favor, vincule en Conexiones.' }),
       };
     }
 
@@ -1175,7 +1176,7 @@ async function publishToYouTube(
         provider: 'youtube',
         ok: false,
         error_code: 'YT_NO_MEDIA',
-        error_message: 'YouTube benötigt eine Videodatei. Bitte laden Sie ein Video hoch.',
+        error_message: tl({ de: 'YouTube benötigt eine Videodatei. Bitte laden Sie ein Video hoch.', en: 'YouTube requires a video file. Please upload a video.', es: 'YouTube requiere un archivo de video. Por favor, suba un video.' }),
       };
     }
 
@@ -1186,7 +1187,7 @@ async function publishToYouTube(
         provider: 'youtube',
         ok: false,
         error_code: 'YT_INVALID_MEDIA',
-        error_message: 'YouTube benötigt eine Videodatei. Bitte laden Sie ein Video hoch, kein Bild.',
+        error_message: tl({ de: 'YouTube benötigt eine Videodatei. Bitte laden Sie ein Video hoch, kein Bild.', en: 'YouTube requires a video file. Please upload a video, not an image.', es: 'YouTube requiere un archivo de video. Por favor, suba un video, no una imagen.' }),
       };
     }
 
@@ -1196,7 +1197,7 @@ async function publishToYouTube(
         provider: 'youtube',
         ok: false,
         error_code: 'YT_FILE_TOO_SMALL',
-        error_message: `Videodatei ist zu klein (${videoFile.size} Bytes). Bitte laden Sie ein gültiges Video hoch.`,
+        error_message: tl({ de: `Videodatei ist zu klein (${videoFile.size} Bytes). Bitte laden Sie ein gültiges Video hoch.`, en: `Video file is too small (${videoFile.size} bytes). Please upload a valid video.`, es: `El archivo de video es demasiado pequeño (${videoFile.size} bytes). Por favor, suba un video válido.` }),
       };
     }
 
@@ -1348,7 +1349,7 @@ function createIdempotencyKey(payload: PublishPayload, userId: string): string {
 // MAIN HANDLER
 // ============================================================================
 
-Deno.serve(withTelemetry('publish', async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (withTelemetry('publish', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1431,7 +1432,7 @@ Deno.serve(withTelemetry('publish', async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'TOO_MANY_CONCURRENT_JOBS', 
-          message: 'Max 4 gleichzeitige Publishes erreicht. Bitte warten Sie, bis vorherige Jobs abgeschlossen sind.' 
+          message: tl({ de: 'Max 4 gleichzeitige Publishes erreicht. Bitte warten Sie, bis vorherige Jobs abgeschlossen sind.', en: 'Max 4 concurrent publishes reached. Please wait for previous jobs to complete.', es: 'Se alcanzó el máximo de 4 publicaciones simultáneas. Por favor, espere a que se completen los trabajos anteriores.' }) 
         }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -1675,4 +1676,4 @@ Deno.serve(withTelemetry('publish', async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-}));
+}))(req)));

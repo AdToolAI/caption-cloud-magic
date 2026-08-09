@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return json(null, 204);
   }
@@ -97,7 +98,7 @@ Deno.serve(async (req) => {
         const err = llTokenData.error || {};
         return json({
           ok: false,
-          error: 'Page Token konnte nicht in Long-Lived umgewandelt werden',
+          error: tl({ de: 'Page Token konnte nicht in Long-Lived umgewandelt werden', en: 'Could not convert Page Token to Long-Lived', es: 'No se pudo convertir el Token de Página a Larga Duración' }),
           details: {
             step: 'exchange_page_token',
             code: err.code,
@@ -126,7 +127,7 @@ Deno.serve(async (req) => {
       // MODE 2: User Token → Page Token Conversion
       console.log('Mode: User Token → Page Token Conversion');
       
-      // 1) Exchange short-lived user token for long-lived user token
+      // 1)(req))) Exchange short-lived user token for long-lived user token
       console.log('Step 1: Exchanging short-lived User Token for long-lived...');
       const llTokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${APP_ID}&client_secret=${APP_SECRET}&fb_exchange_token=${encodeURIComponent(shortUserToken)}`;
       
@@ -166,20 +167,20 @@ Deno.serve(async (req) => {
         if (err.code === 100 || err.message?.includes('accounts')) {
           return json({
             ok: false,
-            error: 'Keine Berechtigung für /me/accounts. Verwende stattdessen einen Page Token!',
+            error: tl({ de: 'Keine Berechtigung für /me/accounts. Verwende stattdessen einen Page Token!', en: 'No permission for /me/accounts. Use a Page Token instead!', es: 'Sin permiso para /me/accounts. ¡Usa un Token de Página en su lugar!' }),
             details: {
               step: 'fetch_pages',
               code: err.code,
               type: err.type,
               message: err.message,
-              hint: 'Gehe zu Graph API Explorer → "Get Page Access Token" wählen → Token kopieren und im Dialog "Page Token" auswählen'
+              hint: tl({ de: 'Gehe zu Graph API Explorer → "Get Page Access Token" wählen → Token kopieren und im Dialog "Page Token" auswählen', en: 'Go to Graph API Explorer → select "Get Page Access Token" → copy token and select "Page Token" in the dialog', es: 'Ve al Explorador de la API de Graph → selecciona "Obtener Token de Acceso de Página" → copia el token y selecciona "Token de Página" en el diálogo' })
             }
           }, 400);
         }
         
         return json({
           ok: false,
-          error: 'Page-Daten konnten nicht geladen werden',
+          error: tl({ de: 'Page-Daten konnten nicht geladen werden', en: 'Could not load page data', es: 'No se pudieron cargar los datos de la página' }),
           details: {
             step: 'fetch_pages',
             code: err.code,
@@ -194,7 +195,7 @@ Deno.serve(async (req) => {
         console.error(`Page ${PAGE_ID} not found in user's pages:`, pagesData.data);
         return json({
           ok: false,
-          error: `Facebook Page ${PAGE_ID} nicht gefunden. Stelle sicher, dass du Admin-Rechte für diese Seite hast.`,
+          error: tl({ de: `Facebook Page ${PAGE_ID} nicht gefunden. Stelle sicher, dass du Admin-Rechte für diese Seite hast.`, en: `Facebook Page ${PAGE_ID} not found. Make sure you have admin rights for this page.`, es: `Página de Facebook ${PAGE_ID} no encontrada. Asegúrate de tener derechos de administrador para esta página.` }),
           details: {
             step: 'find_page',
             available_pages: pagesData.data?.map((p: any) => ({ id: p.id, name: p.name })),
@@ -297,7 +298,7 @@ Deno.serve(async (req) => {
       return json({
         ok: false,
         saved: false,
-        error: 'Token konnte nicht gespeichert werden',
+        error: tl({ de: 'Token konnte nicht gespeichert werden', en: 'Could not save token', es: 'No se pudo guardar el token' }),
         details: saveError
       }, 500);
     }

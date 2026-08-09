@@ -6,6 +6,7 @@ import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-p
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { pickRenderTier, checkRenderAdmission } from "../_shared/render-concurrency.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -227,7 +228,7 @@ async function startRemotionRender(params: {
         }
         const category = lambdaResponse.status === 429 || throttled ? 'rate_limit' : 'lambda_start_failed';
         const message = throttled
-          ? 'AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten.'
+          ? tl({ de: 'AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten.', en: 'AWS capacity currently exhausted. Please restart in one minute.', es: 'Capacidad de AWS agotada actualmente. Por favor, reinicia en un minuto.' })
           : `Lambda-Start fehlgeschlagen (${lambdaResponse.status}): ${responseText || 'Keine Antwort'}`;
         await failRenderAndRefundOnce({
           supabaseAdmin, pendingRenderId, userId, creditsRequired,
@@ -299,9 +300,9 @@ async function startRemotionRender(params: {
         ? 'timeout'
         : (throttled ? 'rate_limit' : 'lambda_start_failed');
       const friendly = throttled
-        ? 'AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten.'
+        ? tl({ de: 'AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten.', en: 'AWS capacity currently exhausted. Please restart in one minute.', es: 'Capacidad de AWS agotada actualmente. Por favor, reinicia en un minuto.' })
         : category === 'timeout'
-          ? 'AWS hat den Render-Start abgebrochen (Netzwerk-Timeout). Bitte erneut starten.'
+          ? tl({ de: 'AWS hat den Render-Start abgebrochen (Netzwerk-Timeout). Bitte erneut starten.', en: 'AWS aborted the render start (network timeout). Please restart.', es: 'AWS abortó el inicio del renderizado (tiempo de espera de red). Por favor, reinicia.' })
           : `Lambda-Start Ausnahme: ${message}`;
       await failRenderAndRefundOnce({
         supabaseAdmin, pendingRenderId, userId, creditsRequired,
@@ -312,7 +313,7 @@ async function startRemotionRender(params: {
     }
   }
 
-  const message = `AWS-Kapazität dauerhaft erschöpft nach ${MAX_ATTEMPTS} Versuchen. Bitte später erneut versuchen.`;
+  const message = tl({ de: `AWS-Kapazität dauerhaft erschöpft nach ${MAX_ATTEMPTS} Versuchen. Bitte später erneut versuchen.`, en: `AWS capacity permanently exhausted after ${MAX_ATTEMPTS} attempts. Please try again later.`, es: `Capacidad de AWS permanentemente agotada después de ${MAX_ATTEMPTS} intentos. Por favor, inténtalo de nuevo más tarde.` });
   if (lastError) {
     await failRenderAndRefundOnce({
       supabaseAdmin, pendingRenderId, userId, creditsRequired,
@@ -323,7 +324,7 @@ async function startRemotionRender(params: {
   return { ok: false, error: message, errorCategory: 'rate_limit', status: 429 };
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -928,7 +929,7 @@ serve(async (req) => {
         ok: true,
         render_id: pendingRenderId,
         status: 'rendering',
-        message: 'Video-Rendering wurde gestartet. Status wird automatisch aktualisiert.'
+        message: tl({ de: 'Video-Rendering wurde gestartet. Status wird automatisch aktualisiert.', en: 'Video rendering has started. Status will update automatically.', es: 'El renderizado de video ha comenzado. El estado se actualizará automáticamente.' })
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -959,4 +960,4 @@ serve(async (req) => {
       }
     );
   }
-});
+})(req)));

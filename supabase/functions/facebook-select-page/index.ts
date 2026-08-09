@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { encryptToken } from '../_shared/crypto.ts';
 import { verifyPageInstagramLink } from '../_shared/meta-page-discovery.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +10,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-Deno.serve(async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS });
   }
@@ -110,13 +111,13 @@ Deno.serve(async (req) => {
       let userMessage: string;
       if (code === 'no_instagram_link_on_page') {
         userMessage =
-          'Diese Facebook-Seite hat kein verknüpftes Instagram Business-Konto. Verknüpfe zuerst dein Instagram-Konto in den Facebook-Seiteneinstellungen.';
+          tl({ de: 'Diese Facebook-Seite hat kein verknüpftes Instagram Business-Konto. Verknüpfe zuerst dein Instagram-Konto in den Facebook-Seiteneinstellungen.', en: 'This Facebook page has no linked Instagram Business account. First link your Instagram account in the Facebook page settings.', es: 'Esta página de Facebook no tiene una cuenta de Instagram Business vinculada. Primero vincula tu cuenta de Instagram en la configuración de la página de Facebook.' });
       } else if (code === 'missing_page_access_token') {
         userMessage =
-          'Für diese Seite wurde kein gültiges Page Access Token von Meta zurückgegeben. Bitte trenne die Verbindung und verbinde Instagram erneut.';
+          tl({ de: 'Für diese Seite wurde kein gültiges Page Access Token von Meta zurückgegeben. Bitte trenne die Verbindung und verbinde Instagram erneut.', en: 'No valid Page Access Token was returned by Meta for this page. Please disconnect and reconnect Instagram.', es: 'Meta no devolvió un Token de Acceso a la Página válido para esta página. Por favor, desconecta y vuelve a conectar Instagram.' });
       } else {
         userMessage =
-          'Meta konnte die Seite gerade nicht prüfen (Page-Node nicht lesbar). Bitte versuche es in einem Moment erneut oder verbinde Instagram neu.';
+          tl({ de: 'Meta konnte die Seite gerade nicht prüfen (Page-Node nicht lesbar). Bitte versuche es in einem Moment erneut oder verbinde Instagram neu.', en: 'Meta could not check the page right now (Page-Node not readable). Please try again in a moment or reconnect Instagram.', es: 'Meta no pudo verificar la página en este momento (Nodo de página no legible). Por favor, inténtalo de nuevo en un momento o vuelve a conectar Instagram.' });
       }
       return new Response(
         JSON.stringify({ error: userMessage, code }),
@@ -135,7 +136,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           error:
-            'Instagram-Profil konnte nicht geladen werden. Meta hat den Profil-Request abgelehnt.',
+            tl({ de: 'Instagram-Profil konnte nicht geladen werden. Meta hat den Profil-Request abgelehnt.', en: 'Instagram profile could not be loaded. Meta rejected the profile request.', es: 'No se pudo cargar el perfil de Instagram. Meta rechazó la solicitud de perfil.' }),
           code: 'ig_profile_fetch_failed',
           details: errBody.slice(0, 300),
         }),
@@ -196,4 +197,4 @@ Deno.serve(async (req) => {
       headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));

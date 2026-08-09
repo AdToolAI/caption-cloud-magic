@@ -4,6 +4,7 @@ import { instagramCircuitBreaker } from '../_shared/circuit-breaker.ts';
 import { withTimeout } from '../_shared/timeout.ts';
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -107,7 +108,7 @@ async function getPostMeta(postId: string, accessToken: string) {
   return graphGet(`/${postId}?fields=id,permalink,media_url,caption,timestamp`, accessToken);
 }
 
-Deno.serve(withTelemetry('instagram-publish', async (req) => {
+Deno.serve((req: Request) => withLang(req, () => (withTelemetry('instagram-publish', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -135,7 +136,7 @@ Deno.serve(withTelemetry('instagram-publish', async (req) => {
       console.error('Token fetch error:', tokenError);
       return new Response(
         JSON.stringify({ 
-          error: 'Instagram Page Access Token nicht gefunden. Bitte Token über "Token erneuern" einfügen.',
+          error: tl({ de: 'Instagram Page Access Token nicht gefunden. Bitte Token über "Token erneuern" einfügen.', en: 'Instagram Page Access Token not found. Please insert token via "Renew Token".', es: 'Token de acceso a la página de Instagram no encontrado. Por favor, inserta el token a través de "Renovar Token".' }),
           details: tokenError?.message 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -219,25 +220,25 @@ Deno.serve(withTelemetry('instagram-publish', async (req) => {
     
     // Spezifische Fehlermeldungen basierend auf häufigen Fehlern
     if (message?.includes('Invalid platform')) {
-      userMessage = 'Ungültige Anfrage: Deine Meta App ist nicht korrekt konfiguriert. ' +
+      userMessage = tl({ de: 'Ungültige Anfrage: Deine Meta App ist nicht korrekt konfiguriert. ', en: 'Invalid request: Your Meta App is not configured correctly.', es: 'Solicitud no válida: Tu aplicación de Meta no está configurada correctamente.' }) +
         'Stelle sicher, dass:\n' +
         '1. App-Typ = Business\n' +
         '2. Instagram Graph API aktiviert ist\n' +
         '3. Website-Plattform mit korrekter Domain konfiguriert ist\n' +
-        '4. Page Access Token (nicht User Token) verwendet wird';
+        tl({ de: '4. Page Access Token (nicht User Token) verwendet wird', en: '4. Page Access Token (not User Token) is used', es: '4. Se utiliza el Token de Acceso a la Página (no el Token de Usuario)' });
     } else if (code === 190) {
-      userMessage = 'Token ist ungültig oder abgelaufen. Bitte generiere einen neuen Long-Lived Page Access Token.';
+      userMessage = tl({ de: 'Token ist ungültig oder abgelaufen. Bitte generiere einen neuen Long-Lived Page Access Token.', en: 'Token is invalid or expired. Please generate a new Long-Lived Page Access Token.', es: 'El token es inválido o ha caducado. Por favor, genera un nuevo Token de Acceso a la Página de Larga Duración.' });
     } else if (code === 100) {
       userMessage = 'Ungültige Anfrage-Parameter. Stelle sicher, dass:\n' +
         '1. Die IG_USER_ID korrekt ist (Instagram Business Account ID)\n' +
         '2. Die Bild-URL öffentlich zugänglich ist\n' +
-        '3. Alle erforderlichen Permissions vorhanden sind';
+        tl({ de: '3. Alle erforderlichen Permissions vorhanden sind', en: '3. All required Permissions are present', es: '3. Todos los permisos requeridos están presentes' });
     } else if (subcode === 2207003) {
-      userMessage = 'Creation nicht gefunden. Bitte erneut versuchen. Stelle sicher, dass das Seiten-Token genutzt wird und die Scopes instagram_content_publish aktiv sind.';
+      userMessage = tl({ de: 'Creation nicht gefunden. Bitte erneut versuchen. Stelle sicher, dass das Seiten-Token genutzt wird und die Scopes instagram_content_publish aktiv sind.', en: 'Creation not found. Please try again. Make sure the page token is used and the instagram_content_publish scopes are active.', es: 'Creación no encontrada. Por favor, inténtalo de nuevo. Asegúrate de que se utiliza el token de página y de que los ámbitos instagram_content_publish están activos.' });
     } else if (message?.includes('permissions')) {
       userMessage = 'Fehlende Permissions. Stelle sicher, dass dein Token folgende Scopes hat: instagram_basic, instagram_content_publish, pages_show_list';
     } else if (message?.includes('OAuth')) {
-      userMessage = 'OAuth-Fehler: Der Page Access Token ist möglicherweise falsch konfiguriert. ' +
+      userMessage = tl({ de: 'OAuth-Fehler: Der Page Access Token ist möglicherweise falsch konfiguriert. ', en: 'OAuth error: The Page Access Token may be misconfigured.', es: 'Error de OAuth: El Token de Acceso a la Página puede estar mal configurado.' }) +
         'Nutze die "Token diagnostizieren" Funktion um das Problem zu identifizieren.';
     }
 
@@ -261,4 +262,4 @@ Deno.serve(withTelemetry('instagram-publish', async (req) => {
       'Instagram publish timed out'
     );
   });
-}));
+}))(req)));

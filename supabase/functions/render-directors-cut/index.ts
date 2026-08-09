@@ -7,6 +7,7 @@ import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { pickRenderTier, checkRenderAdmission } from "../_shared/render-concurrency.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -243,7 +244,7 @@ function calculateCredits(
   return totalCredits;
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -848,7 +849,7 @@ serve(async (req) => {
         .from('director_cut_renders')
         .update({ 
           status: 'failed',
-          error_message: 'AWS Render-Kapazität vorübergehend erschöpft. Bitte versuche es in 1-2 Minuten erneut.',
+          error_message: tl({ de: 'AWS Render-Kapazität vorübergehend erschöpft. Bitte versuche es in 1-2 Minuten erneut.', en: 'AWS render capacity temporarily exhausted. Please try again in 1-2 minutes.', es: 'Capacidad de renderizado de AWS temporalmente agotada. Por favor, inténtalo de nuevo en 1-2 minutos.' }),
           completed_at: new Date().toISOString(),
           render_config: mergeRenderConfig(renderJob.render_config, {
             ...(renderJob.render_config || {}),
@@ -863,7 +864,7 @@ serve(async (req) => {
       
       return new Response(JSON.stringify({ 
         error: 'RATE_LIMIT_EXCEEDED',
-        message: 'Momentan werden viele Videos gerendert. Bitte versuche es in 1-2 Minuten erneut.',
+        message: tl({ de: 'Momentan werden viele Videos gerendert. Bitte versuche es in 1-2 Minuten erneut.', en: 'Many videos are currently being rendered. Please try again in 1-2 minutes.', es: 'Actualmente se están renderizando muchos videos. Por favor, inténtalo de nuevo en 1-2 minutos.' }),
         retry_after_seconds: 60,
       }), {
         status: 429,
@@ -905,7 +906,7 @@ serve(async (req) => {
       remotion_render_id: renderId,
       credits_used: creditsNeeded,
       estimated_time_seconds: duration * 2,
-      message: 'Rendering gestartet. Du wirst benachrichtigt, wenn das Video fertig ist.',
+      message: tl({ de: 'Rendering gestartet. Du wirst benachrichtigt, wenn das Video fertig ist.', en: 'Rendering started. You will be notified when the video is ready.', es: 'Renderizado iniciado. Se te notificará cuando el video esté listo.' }),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -915,7 +916,7 @@ serve(async (req) => {
     const rawMessage = (error as Error)?.message || 'Unknown render error';
     const startTimedOut = isAbortLikeError(error);
     const message = startTimedOut
-      ? 'Render konnte nicht gestartet werden: AWS Lambda hat innerhalb der Start-Frist keine Render-ID zurückgegeben. Credits wurden automatisch zurückerstattet.'
+      ? tl({ de: 'Render konnte nicht gestartet werden: AWS Lambda hat innerhalb der Start-Frist keine Render-ID zurückgegeben. Credits wurden automatisch zurückerstattet.', en: 'Render could not be started: AWS Lambda did not return a render ID within the start deadline. Credits have been automatically refunded.', es: 'No se pudo iniciar el renderizado: AWS Lambda no devolvió un ID de renderizado dentro del plazo de inicio. Los créditos han sido reembolsados automáticamente.' })
       : rawMessage;
 
     if (activeRenderJob?.id) {
@@ -958,4 +959,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-});
+})(req)));

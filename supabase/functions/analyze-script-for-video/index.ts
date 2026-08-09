@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -29,7 +30,7 @@ interface ScriptSegment {
   wordTimings?: WordTiming[];
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -100,7 +101,7 @@ Input: "HOOK (30s gesamt): Sie suchen nach hochwertigen Produkten? Entdecken Sie
 (Entferne: "HOOK (30s gesamt):")
 
 Beispiel 2:
-Input: "HAUPTTEIL: Eine dynamische und schnelle Abfolge von professionellen Produktbildern und kurzen Videoclips, die die Produkte im Detail und in der Anwendung zeigen. Im Hintergrund läuft eine moderne und unaufdringliche Musik."
+Input: tl({ de: "HAUPTTEIL: Eine dynamische und schnelle Abfolge von professionellen Produktbildern und kurzen Videoclips, die die Produkte im Detail und in der Anwendung zeigen. Im Hintergrund läuft eine moderne und unaufdringliche Musik.", en: "MAIN PART: A dynamic and fast sequence of professional product images and short video clips showing the products in detail and in use. Modern and unobtrusive music plays in the background.", es: "PARTE PRINCIPAL: Una secuencia dinámica y rápida de imágenes de productos profesionales y videoclips cortos que muestran los productos en detalle y en uso. Música moderna y discreta suena de fondo." })
 → text: "" (LEER - dies ist reine Beschreibung, KEIN sprechbarer Text!)
 Oder falls es danach noch sprechbaren Text gibt, nur diesen verwenden.
 
@@ -110,8 +111,8 @@ Input: "Unsere Produkte vereinen Design und Qualität. (Visuell: Close-up Shots 
 (Entferne: "(Visuell: Close-up Shots der Produkte)")
 
 Beispiel 4:
-Input: "CALL-TO-ACTION: Sichere dir jetzt bis zum 30.11.2025 15 % Rabatt auf deinen gesamten Einkauf!"
-→ text: "Sichere dir jetzt bis zum 30.11.2025 15 % Rabatt auf deinen gesamten Einkauf!"
+Input: tl({ de: "CALL-TO-ACTION: Sichere dir jetzt bis zum 30.11.2025 15 % Rabatt auf deinen gesamten Einkauf!", en: "CALL TO ACTION: Get 15% off your entire purchase now until November 30, 2025!", es: "LLAMADA A LA ACCIÓN: ¡Obtén un 15% de descuento en toda tu compra ahora hasta el 30 de noviembre de 2025!" })
+→ text: tl({ de: "Sichere dir jetzt bis zum 30.11.2025 15 % Rabatt auf deinen gesamten Einkauf!", en: "Get 15% off your entire purchase now until November 30, 2025!", es: "¡Obtén un 15% de descuento en toda tu compra ahora hasta el 30 de noviembre de 2025!" })
 (Entferne: "CALL-TO-ACTION:")
 
 Für jedes Segment musst du folgendes bestimmen:
@@ -277,4 +278,4 @@ Antworte NUR mit einem JSON-Objekt in diesem exakten Format (kein zusätzlicher 
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+})(req)));

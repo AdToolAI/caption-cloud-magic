@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
@@ -24,7 +25,7 @@ function jsonResponse(payload: Record<string, unknown>, status = 200) {
   });
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -43,14 +44,14 @@ serve(async (req) => {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      throw new ApiError('Bitte melde dich erneut an.', 401);
+      throw new ApiError(tl({ de: 'Bitte melde dich erneut an.', en: 'Please log in again.', es: 'Por favor, inicia sesión de nuevo.' }), 401);
     }
 
     let body: Record<string, unknown>;
     try {
       body = await req.json();
     } catch {
-      throw new ApiError('Ungültige Anfrage: JSON konnte nicht gelesen werden.', 400);
+      throw new ApiError(tl({ de: 'Ungültige Anfrage: JSON konnte nicht gelesen werden.', en: 'Invalid request: JSON could not be read.', es: 'Solicitud no válida: No se pudo leer el JSON.' }), 400);
     }
 
     const { name, sample_urls, language, description, remove_background_noise } = body;
@@ -65,7 +66,7 @@ serve(async (req) => {
 
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
     if (!ELEVENLABS_API_KEY) {
-      throw new ApiError('Voice-Cloning ist noch nicht verbunden. Bitte ElevenLabs-Verbindung prüfen.', 503);
+      throw new ApiError(tl({ de: 'Voice-Cloning ist noch nicht verbunden. Bitte ElevenLabs-Verbindung prüfen.', en: 'Voice cloning is not yet connected. Please check ElevenLabs connection.', es: 'La clonación de voz aún no está conectada. Por favor, verifica la conexión de ElevenLabs.' }), 503);
     }
 
     // Download audio samples, keep their real container so ElevenLabs
@@ -78,14 +79,14 @@ serve(async (req) => {
         const response = await fetch(url);
         if (!response.ok) {
           throw new ApiError(
-            `Audio-Sample ${idx + 1} konnte nicht gelesen werden. Bitte erneut hochladen.`,
+            tl({ de: `Audio-Sample ${idx + 1} konnte nicht gelesen werden. Bitte erneut hochladen.`, en: `Audio sample ${idx + 1} could not be read. Please upload again.`, es: `La muestra de audio ${idx + 1} no pudo ser leída. Por favor, súbela de nuevo.` }),
             400,
             `Fetch status ${response.status}`,
           );
         }
         const blob = await response.blob();
         if (blob.size < 4096) {
-          throw new ApiError(`Audio-Sample ${idx + 1} ist leer oder zu kurz.`, 400);
+          throw new ApiError(tl({ de: `Audio-Sample ${idx + 1} ist leer oder zu kurz.`, en: `Audio sample ${idx + 1} is empty or too short.`, es: `La muestra de audio ${idx + 1} está vacía o es demasiado corta.` }), 400);
         }
         const contentType = response.headers.get('content-type') || blob.type || 'audio/mpeg';
         const extFromType: Record<string, string> = {
@@ -123,7 +124,7 @@ serve(async (req) => {
       const error = await cloneResponse.text();
       console.error(`[clone-voice] ElevenLabs error ${cloneResponse.status}: ${error}`);
       throw new ApiError(
-        'Voice-Cloning-Anbieter konnte die Stimme nicht erstellen.',
+        tl({ de: 'Voice-Cloning-Anbieter konnte die Stimme nicht erstellen.', en: 'Voice cloning provider could not create the voice.', es: 'El proveedor de clonación de voz no pudo crear la voz.' }),
         cloneResponse.status,
         error,
       );
@@ -146,7 +147,7 @@ serve(async (req) => {
       .single();
 
     if (error) {
-      throw new ApiError('Die geklonte Stimme konnte nicht gespeichert werden.', 500, error.message);
+      throw new ApiError(tl({ de: 'Die geklonte Stimme konnte nicht gespeichert werden.', en: 'The cloned voice could not be saved.', es: 'La voz clonada no pudo ser guardada.' }), 500, error.message);
     }
 
     return jsonResponse({ 
@@ -166,4 +167,4 @@ serve(async (req) => {
       500,
     );
   }
-});
+})(req)));
