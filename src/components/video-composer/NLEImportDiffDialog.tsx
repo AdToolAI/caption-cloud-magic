@@ -1,4 +1,4 @@
-import { tx } from "@/lib/i18nText";
+import { tx, useTx } from "@/lib/i18nText";
 import React from 'react';
 import {
   Dialog,
