@@ -47,7 +47,7 @@ export function computeCutDown(
       droppedIndexes: [],
       shrinkRatio: 1,
       feasible: false,
-      reason: 'Keine Szenen in der Timeline.',
+      reason: tx({ de: 'Keine Szenen in der Timeline.', en: 'No scenes in the timeline.', es: 'No hay escenas en la línea de tiempo.' }),
     };
   }
 
@@ -139,7 +139,7 @@ export function computeCutDown(
     shrinkRatio,
     feasible,
     reason: feasible
-      ? `${keptIndexes.length}/${scenes.length} Szenen behalten, auf ${finalTotal.toFixed(1)}s gestrafft.`
-      : `Cut-Down erreicht ${finalTotal.toFixed(1)}s (Ziel ${target}s) — Quelle zu kurz für exaktes Ziel.`,
+      ? tx({ de: `${keptIndexes.length}/${scenes.length} Szenen behalten, auf ${finalTotal.toFixed(1)}s gestrafft.`, en: `${keptIndexes.length}/${scenes.length} Keep scenes, tightened to ${finalTotal.toFixed(1)}s.`, es: `${keptIndexes.length}/${scenes.length} Mantener escenas, ajustadas a ${finalTotal.toFixed(1)}s.` })
+      : tx({ de: `Cut-Down erreicht ${finalTotal.toFixed(1)}s (Ziel ${target}s) — Quelle zu kurz für exaktes Ziel.`, en: `Cut-down reached ${finalTotal.toFixed(1)}s (target ${target}s) — source too short for exact target.`, es: `La reducción alcanzó ${finalTotal.toFixed(1)}s (objetivo ${target}s): fuente demasiado corta para el objetivo exacto.` }),
   };
 }

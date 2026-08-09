@@ -344,7 +344,7 @@ export function ContentStudioProvider({
 
   const generateCopy = useCallback(async () => {
     if (!brief.trim()) {
-      toast.error("Bitte kurz beschreiben, worum es geht");
+      toast.error(tx({ de: "Bitte kurz beschreiben, worum es geht", en: "Please briefly describe what it is about", es: "Por favor describe brevemente de qué se trata." }));
       return;
     }
     setCopyBusy(true);
@@ -361,7 +361,7 @@ export function ContentStudioProvider({
       intentRef.current = isPostIntent(next.intent) ? next.intent : detectIntent(brief);
       goTo("copy");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Generierung fehlgeschlagen");
+      toast.error(error instanceof Error ? error.message : tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error de generación" }));
     } finally {
       setCopyBusy(false);
     }
@@ -372,7 +372,7 @@ export function ContentStudioProvider({
       body: { prompt: prompt.trim(), style: "realistic", aspectRatio: "1:1", quality: "fast", textFree: true },
     });
     if (error) throw error;
-    if (data?.ok === false || data?.error) throw new Error(data.error || "Bildgenerierung fehlgeschlagen");
+    if (data?.ok === false || data?.error) throw new Error(data.error || tx({ de: "Bildgenerierung fehlgeschlagen", en: "Image generation failed", es: "Error al generar la imagen" }));
     const url: string | undefined = data?.image?.url ?? data?.image;
     if (!url) throw new Error("Kein Bild erhalten");
     return url;
@@ -409,7 +409,7 @@ export function ContentStudioProvider({
         userImageRef.current = false;
         applyImageEverywhere(final);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Bildgenerierung fehlgeschlagen";
+        const message = err instanceof Error ? err.message : tx({ de: "Bildgenerierung fehlgeschlagen", en: "Image generation failed", es: "Error al generar la imagen" });
         setImageError(message);
         toast.error(message);
       } finally {

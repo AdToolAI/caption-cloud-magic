@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
 export const HAILUO_VIDEO_MODELS = {
@@ -14,7 +15,7 @@ export const HAILUO_VIDEO_MODELS = {
     allowedDurations: [6, 10] as const,
     allowedResolutions: ['768p', '1080p'] as const,
     description: {
-      EUR: 'Realistische AI-Videos ab 0,84€ pro 6 Sekunden',
+      EUR: tx({ de: 'Realistische AI-Videos ab 0,84€ pro 6 Sekunden', en: 'Realistic AI videos from €0.84 per 6 seconds', es: 'Vídeos realistas con IA desde 0,84€ cada 6 segundos' }),
       USD: 'Realistic AI videos from $0.84 per 6 seconds',
     },
     badge: 'Empfohlen',
@@ -33,7 +34,7 @@ export const HAILUO_VIDEO_MODELS = {
     allowedDurations: [6, 10] as const,
     allowedResolutions: ['768p', '1080p'] as const,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 1,38€ pro 6 Sekunden',
+      EUR: tx({ de: 'Premium 1080p-Qualität ab 1,38€ pro 6 Sekunden', en: 'Premium 1080p quality from €1.38 per 6 seconds', es: 'Calidad premium 1080p desde 1,38€ por 6 segundos' }),
       USD: 'Premium 1080p quality from $1.38 per 6 seconds',
     },
     badge: 'Premium',

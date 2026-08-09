@@ -154,7 +154,7 @@ export function LiveSweepTab() {
         description: `${(data as any)?.assets?.length ?? 0} Asset(s) im Bucket.`,
       });
     } catch (e: any) {
-      toast.error("Bootstrap fehlgeschlagen", { description: e?.message });
+      toast.error(tx({ de: "Bootstrap fehlgeschlagen", en: "Bootstrap failed", es: "El arranque falló" }), { description: e?.message });
     } finally {
       setBootstrapping(false);
     }
@@ -198,7 +198,7 @@ export function LiveSweepTab() {
           }
         } catch { /* ignore */ }
       }
-      toast.error("Sweep fehlgeschlagen", { description: e?.message });
+      toast.error(tx({ de: "Sweep fehlgeschlagen", en: "Sweep failed", es: "barrido fallido" }), { description: e?.message });
       setSweeping(false);
     }
   };

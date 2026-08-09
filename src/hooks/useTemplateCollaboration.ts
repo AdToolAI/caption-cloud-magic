@@ -171,7 +171,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     onSuccess: () => {
       toast({
         title: 'Kommentar hinzugefügt',
-        description: 'Ihr Kommentar wurde erfolgreich hinzugefügt.',
+        description: tx({ de: 'Ihr Kommentar wurde erfolgreich hinzugefügt.', en: 'Your comment has been added successfully.', es: 'Tu comentario ha sido agregado exitosamente.' }),
       });
     },
     onError: (error) => {
@@ -254,7 +254,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-approvals'] });
       toast({
         title: 'Freigabe aktualisiert',
-        description: 'Der Freigabestatus wurde aktualisiert.',
+        description: tx({ de: 'Der Freigabestatus wurde aktualisiert.', en: 'The release status has been updated.', es: 'El estado de la versión ha sido actualizado.' }),
       });
     },
     onError: (error) => {

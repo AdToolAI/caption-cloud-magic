@@ -58,7 +58,7 @@ export const useRenderQueue = () => {
 
       if (error) throw error;
 
-      toast.success('Job wurde abgebrochen');
+      toast.success(tx({ de: 'Job wurde abgebrochen', en: 'Job was canceled', es: 'El trabajo fue cancelado' }));
       return true;
     } catch (error: any) {
       console.error('Error cancelling job:', error);

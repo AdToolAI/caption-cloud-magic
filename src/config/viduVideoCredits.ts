@@ -39,7 +39,7 @@ export const VIDU_VIDEO_MODELS = {
     flatCostEUR: 0.60,
     flatCostUSD: 0.60,
     fixedDuration: 5,
-    description: '5s Clip aus reinem Prompt',
+    description: tx({ de: '5s Clip aus reinem Prompt', en: '5s clip from pure prompt', es: 'Clip de 5 segundos de Pure Prompt' }),
     badge: 'T2V',
   },
 } as const;

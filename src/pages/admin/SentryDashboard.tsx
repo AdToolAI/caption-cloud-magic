@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,7 @@ export function SentryDashboard() {
       await loadCached();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Fehler';
-      toast.error(`Sync fehlgeschlagen: ${msg}`);
+      toast.error(tx({ de: `Sync fehlgeschlagen: ${msg}`, en: `Sync failed: ${msg}`, es: `Error de sincronización: ${msg}` }));
     } finally {
       setSyncing(false);
     }

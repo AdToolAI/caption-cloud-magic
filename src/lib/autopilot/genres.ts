@@ -92,7 +92,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   explainer: {
     id: 'explainer',
     label: 'Erklärvideo',
-    description: 'Schritt für Schritt: Ausgangslage, Vorgehen, Ergebnis.',
+    description: tx({ de: 'Schritt für Schritt: Ausgangslage, Vorgehen, Ergebnis.', en: 'Step by step: initial situation, procedure, result.', es: 'Paso a paso: situación inicial, procedimiento, resultado.' }),
     beats: ['hook', 'problem', 'reveal', 'proof', 'cta'],
     shotLadder: ['medium', 'wide', 'insert', 'medium', 'wide'],
     defaultMoves: ['static', 'overhead_top_down', 'static', 'slow_push_in', 'static'],

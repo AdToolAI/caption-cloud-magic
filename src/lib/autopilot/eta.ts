@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Restzeit-Schätzung für einen laufenden Autopilot-Lauf.
  *
@@ -31,11 +32,11 @@ export interface EtaResult {
 function humanize(seconds: number): string {
   if (seconds <= 60) return 'gleich fertig';
   const minutes = Math.round(seconds / 60);
-  if (minutes <= 2) return 'noch ca. 2 Min.';
-  if (minutes >= 45) return 'noch ca. 45+ Min.';
+  if (minutes <= 2) return tx({ de: 'noch ca. 2 Min.', en: 'about 2 more minutes.', es: 'unos 2 minutos más.' });
+  if (minutes >= 45) return tx({ de: 'noch ca. 45+ Min.', en: 'about 45+ minutes left', es: 'quedan unos 45+ minutos' });
   // Auf 5 Minuten runden — suggeriert keine Scheingenauigkeit.
   const rounded = Math.max(5, Math.round(minutes / 5) * 5);
-  return `noch ca. ${rounded} Min.`;
+  return tx({ de: `noch ca. ${rounded} Min.`, en: `still approx. ${rounded} min.`, es: `todavía aprox. ${redondeado} mín.` });
 }
 
 export function estimateRemaining(

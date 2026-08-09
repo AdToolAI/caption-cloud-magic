@@ -94,12 +94,12 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       encouraged: ['imperatives', 'direct questions', 'punchy verbs'],
     },
     hookPatterns: {
-      de: ['Hör auf zu warten.', 'Wann ist genug genug?', 'Du verdienst mehr.'],
+      de: [tx({ de: 'Hör auf zu warten.', en: 'Stop waiting.', es: 'Deja de esperar.' }), tx({ de: 'Wann ist genug genug?', en: 'When is enough enough?', es: '¿Cuándo es suficiente?' }), tx({ de: 'Du verdienst mehr.', en: 'You deserve more.', es: 'Mereces más.' })],
       en: ['Stop waiting.', "When's enough enough?", 'You deserve more.'],
       es: ['Deja de esperar.', '¿Cuándo es suficiente?', 'Mereces más.'],
     },
     ctaPatterns: {
-      de: ['Mach es jetzt.', 'Wechsle. Heute.', 'Beweis es dir.'],
+      de: [tx({ de: 'Mach es jetzt.', en: 'Do it now.', es: 'Hazlo ahora.' }), 'Wechsle. Heute.', tx({ de: 'Beweis es dir.', en: 'Prove it to yourself.', es: 'Pruébalo tú mismo.' })],
       en: ['Do it now.', 'Switch. Today.', 'Prove it to yourself.'],
       es: ['Hazlo ahora.', 'Cambia. Hoy.', 'Demuéstratelo.'],
     },
@@ -126,7 +126,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       de: [
         'Es begann an einem Mittwoch im November...',
         'Ich erinnere mich an den Geruch...',
-        'Damals, als alles noch einfacher schien...',
+        tx({ de: 'Damals, als alles noch einfacher schien...', en: 'Back when everything seemed simpler...', es: 'Cuando todo parecía más sencillo...' }),
       ],
       en: [
         'It began on a Wednesday in November...',
@@ -140,7 +140,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       ],
     },
     ctaPatterns: {
-      de: ['Schreibe deine Geschichte.', 'Beginne dein Kapitel.', 'Erlebe es selbst.'],
+      de: [tx({ de: 'Schreibe deine Geschichte.', en: 'Write your story.', es: 'Escribe tu historia.' }), tx({ de: 'Beginne dein Kapitel.', en: 'Start your chapter.', es: 'Comienza tu capítulo.' }), 'Erlebe es selbst.'],
       en: ['Write your story.', 'Begin your chapter.', 'Live it yourself.'],
       es: ['Escribe tu historia.', 'Comienza tu capítulo.', 'Vívelo tú mismo.'],
     },
@@ -247,9 +247,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        'Wir wissen, wie sich das anfühlt.',
+        tx({ de: 'Wir wissen, wie sich das anfühlt.', en: 'We know how that feels.', es: 'Sabemos cómo se siente eso.' }),
         tx({ de: 'Du bist nicht allein damit.', en: 'You\'re not alone in this.', es: 'No estás solo en esto.' }),
-        'Manche Tage sind schwerer als andere.',
+        tx({ de: 'Manche Tage sind schwerer als andere.', en: 'Some days are harder than others.', es: 'Algunos días son más difíciles que otros.' }),
       ],
       en: [
         'We know how that feels.',
@@ -288,9 +288,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        'Was wäre, wenn alles möglich wäre?',
+        tx({ de: 'Was wäre, wenn alles möglich wäre?', en: 'What if anything was possible?', es: '¿Y si todo fuera posible?' }),
         tx({ de: 'Stell dir eine Welt vor, in der...', en: 'Imagine a world where...', es: 'Imagina un mundo donde...' }),
-        'Die Zukunft beginnt nicht morgen.',
+        tx({ de: 'Die Zukunft beginnt nicht morgen.', en: 'The future doesn\'t start tomorrow.', es: 'El futuro no empieza mañana.' }),
       ],
       en: [
         'What if everything were possible?',
@@ -304,7 +304,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       ],
     },
     ctaPatterns: {
-      de: ['Gestalte mit uns.', 'Werde Teil davon.', 'Die Welt wartet nicht.'],
+      de: [tx({ de: 'Gestalte mit uns.', en: 'Create with us.', es: 'Crea con nosotros.' }), 'Werde Teil davon.', tx({ de: 'Die Welt wartet nicht.', en: 'The world doesn\'t wait.', es: 'El mundo no espera.' })],
       en: ['Shape it with us.', 'Be part of it.', "The world isn't waiting."],
       es: ['Constrúyelo con nosotros.', 'Sé parte de ello.', 'El mundo no espera.'],
     },
@@ -329,9 +329,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        'In drei Schritten zum Ergebnis.',
+        tx({ de: 'In drei Schritten zum Ergebnis.', en: 'Three steps to the result.', es: 'Tres pasos para el resultado.' }),
         'So funktioniert es. Wirklich.',
-        'Brauchst du nur 60 Sekunden.',
+        tx({ de: 'Brauchst du nur 60 Sekunden.', en: 'You only need 60 seconds.', es: 'Sólo necesitas 60 segundos.' }),
       ],
       en: ['Three steps to the result.', 'How it works. Really.', "It only takes 60 seconds."],
       es: ['Tres pasos al resultado.', 'Cómo funciona. De verdad.', 'Solo 60 segundos.'],
@@ -362,9 +362,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        'Vergiss alles, was du wusstest.',
-        'Wir sind die Schlechten. Aber wir liefern.',
-        'Sicherheit ist überbewertet.',
+        tx({ de: 'Vergiss alles, was du wusstest.', en: 'Forget everything you knew.', es: 'Olvida todo lo que sabías.' }),
+        tx({ de: 'Wir sind die Schlechten. Aber wir liefern.', en: 'We are the bad ones. But we deliver.', es: 'Nosotros somos los malos. Pero cumplimos.' }),
+        tx({ de: 'Sicherheit ist überbewertet.', en: 'Security is overrated.', es: 'La seguridad está sobrevalorada.' }),
       ],
       en: [
         'Forget everything you knew.',
@@ -378,7 +378,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       ],
     },
     ctaPatterns: {
-      de: ['Wage es.', 'Brich die Regel.', 'Du oder die anderen.'],
+      de: ['Wage es.', 'Brich die Regel.', tx({ de: 'Du oder die anderen.', en: 'You or the others.', es: 'Tú o los demás.' })],
       en: ['Dare it.', 'Break the rule.', 'You or them.'],
       es: ['Atrévete.', 'Rompe la regla.', 'Tú o ellos.'],
     },
@@ -402,12 +402,12 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       encouraged: ['exclamations', 'urgency words', 'pop-culture refs'],
     },
     hookPatterns: {
-      de: ['JETZT! Hier! Limited!', 'Du bist nicht bereit dafür!', 'Drei. Zwei. Eins. Los!'],
+      de: ['JETZT! Hier! Limited!', tx({ de: 'Du bist nicht bereit dafür!', en: 'You\'re not ready for this!', es: '¡No estás preparado para esto!' }), 'Drei. Zwei. Eins. Los!'],
       en: ['NOW! Here! Limited!', "You're not ready for this!", 'Three. Two. One. Go!'],
       es: ['¡AHORA! ¡Aquí! ¡Limitado!', '¡No estás listo!', 'Tres. Dos. Uno. ¡Vamos!'],
     },
     ctaPatterns: {
-      de: ['Sicher dir deins!', 'Bevor es weg ist!', 'Klick. Sofort.'],
+      de: [tx({ de: 'Sicher dir deins!', en: 'Secure yours!', es: '¡Asegura el tuyo!' }), tx({ de: 'Bevor es weg ist!', en: 'Before it\'s gone!', es: '¡Antes de que se acabe!' }), 'Klick. Sofort.'],
       en: ['Get yours!', "Before it's gone!", 'Click. Now.'],
       es: ['¡Consigue el tuyo!', '¡Antes de que se acabe!', 'Haz clic. Ya.'],
     },
@@ -434,7 +434,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       de: [
         'Klinisch geprüft seit 1987.',
         'Drei unabhängige Studien. Ein Ergebnis.',
-        'Wir messen, was andere versprechen.',
+        tx({ de: 'Wir messen, was andere versprechen.', en: 'We measure what others promise.', es: 'Medimos lo que otros prometen.' }),
       ],
       en: [
         'Clinically tested since 1987.',
@@ -489,7 +489,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       ],
     },
     ctaPatterns: {
-      de: ['Mach mit.', 'Sei dabei.', 'Heute beginnen.'],
+      de: [tx({ de: 'Mach mit.', en: 'Join in.', es: 'Participar.' }), 'Sei dabei.', 'Heute beginnen.'],
       en: ['Join in.', 'Be there.', 'Start today.'],
       es: ['Únete.', 'Acompáñanos.', 'Empieza hoy.'],
     },

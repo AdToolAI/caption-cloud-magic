@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import type { SceneAnalysis } from '@/types/directors-cut';
 
 /**
@@ -50,7 +51,7 @@ export function analyzeAnchorDrift(
     const headTrim = Math.max(0, currentIn - anchor);
 
     let severity: AnchorDriftSeverity = 'ok';
-    let reason = 'Anchor intakt — Szene startet am Identity-Frame.';
+    let reason = tx({ de: 'Anchor intakt — Szene startet am Identity-Frame.', en: 'Anchor intact — scene starts at the identity frame.', es: 'Ancla intacta: la escena comienza en el marco de identidad.' });
     if (headTrim >= driftThreshold) {
       severity = 'drift';
       reason = `Head-Trim ${headTrim.toFixed(2)}s — Identity-Anchor abgeschnitten.`;

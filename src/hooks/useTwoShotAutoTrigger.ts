@@ -134,7 +134,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                   dialog_shots: null,
                   replicate_prediction_id: null,
                   clip_error:
-                    'auto-reset: talking_head_master_invalid_for_cinematic_sync — bitte Clip neu generieren',
+                    tx({ de: 'auto-reset: talking_head_master_invalid_for_cinematic_sync — bitte Clip neu generieren', en: 'auto-reset: talking_head_master_invalid_for_cinematic_sync — please regenerate clip', es: 'reinicio automático: talk_head_master_invalid_for_cinematic_sync — regenera el clip' }),
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', d.id);

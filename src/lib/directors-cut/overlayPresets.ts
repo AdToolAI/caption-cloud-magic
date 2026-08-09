@@ -72,7 +72,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'lt-line',
     name: 'Lower Third — Linie',
     category: 'Lower Third',
-    description: 'Reduziert, ohne Fläche',
+    description: tx({ de: 'Reduziert, ohne Fläche', en: 'Reduced, without space', es: 'Reducido, sin espacio' }),
     kind: 'lowerThird',
     build: () =>
       base(
@@ -86,7 +86,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'lt-glass',
     name: 'Lower Third — Glas',
     category: 'Lower Third',
-    description: 'Glasoptik mit weichem Rand',
+    description: tx({ de: 'Glasoptik mit weichem Rand', en: 'Glass look with soft edge', es: 'Aspecto de cristal con borde suave.' }),
     kind: 'lowerThird',
     build: () =>
       base(
@@ -102,7 +102,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'banner-bottom',
     name: 'Banner unten',
     category: 'Banner',
-    description: 'Vollbreiter Balken mit Aussage',
+    description: tx({ de: 'Vollbreiter Balken mit Aussage', en: 'Full-width bar with a statement', es: 'Barra de ancho completo con una declaración.' }),
     kind: 'banner',
     build: () => base('banner', 'NUR HEUTE: 30 % RABATT', { fill: 'rgba(10,10,15,0.85)', uppercase: true, radius: 0 }, { animation: 'slideUp' }),
   },
@@ -110,7 +110,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'banner-top-gold',
     name: 'Banner oben — Gold',
     category: 'Banner',
-    description: 'Goldverlauf für Ankündigungen',
+    description: tx({ de: 'Goldverlauf für Ankündigungen', en: 'Gold gradient for announcements', es: 'Degradado dorado para anuncios.' }),
     kind: 'banner',
     build: () =>
       base(
@@ -124,7 +124,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'banner-half',
     name: 'Banner halb',
     category: 'Banner',
-    description: 'Halbbreiter Balken mit Unterzeile',
+    description: tx({ de: 'Halbbreiter Balken mit Unterzeile', en: 'Half-width bar with subline', es: 'Barra de medio ancho con sublínea' }),
     kind: 'banner',
     build: () =>
       base(
@@ -148,7 +148,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'badge-new',
     name: 'Störer — NEU',
     category: 'Störer',
-    description: 'Pill-Badge für Neuheiten',
+    description: tx({ de: 'Pill-Badge für Neuheiten', en: 'Pill badge for new products', es: 'Insignia de píldora para nuevos productos.' }),
     kind: 'badge',
     build: () =>
       base(
@@ -192,14 +192,14 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'card-feature',
     name: 'Schild — Feature',
     category: 'Schild',
-    description: 'Produktvorteil mit Bildplatz',
+    description: tx({ de: 'Produktvorteil mit Bildplatz', en: 'Product advantage with image space', es: 'Ventaja del producto con espacio de imagen' }),
     kind: 'card',
     build: () =>
       base(
         'card',
-        'In 60 Sekunden fertig',
+        tx({ de: 'In 60 Sekunden fertig', en: 'Ready in 60 seconds', es: 'Listo en 60 segundos' }),
         { fill: 'rgba(255,255,255,0.12)', borderWidth: 0.0012, borderColor: 'rgba(255,255,255,0.3)', align: 'left', fontSizeRel: 0.034 },
-        { animation: 'blurIn', slots: { title: 'In 60 Sekunden fertig', subtitle: 'Vom Briefing zum Clip' } },
+        { animation: 'blurIn', slots: { title: tx({ de: 'In 60 Sekunden fertig', en: 'Ready in 60 seconds', es: 'Listo en 60 segundos' }), subtitle: tx({ de: 'Vom Briefing zum Clip', en: 'From briefing to clip', es: 'De la sesión informativa al clip' }) } },
       ),
   },
   {
@@ -222,7 +222,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'cta-gold',
     name: 'CTA — Gold',
     category: 'CTA',
-    description: 'Button-Optik mit Pfeil',
+    description: tx({ de: 'Button-Optik mit Pfeil', en: 'Button look with arrow', es: 'Botón con flecha' }),
     kind: 'cta',
     build: () => base('cta', 'Jetzt starten', { fill: GOLD, color: INK, uppercase: true, fontSizeRel: 0.036 }, { animation: 'pop' }),
   },
@@ -296,7 +296,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'quote-classic',
     name: 'Zitat',
     category: 'Zitat',
-    description: 'Aussage mit Quellenzeile',
+    description: tx({ de: 'Aussage mit Quellenzeile', en: 'Statement with source line', es: 'Declaración con línea fuente' }),
     kind: 'quote',
     build: () =>
       base(
@@ -330,7 +330,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'text-kicker',
     name: 'Kicker',
     category: 'Text',
-    description: 'Kleine Zeile über der Headline',
+    description: tx({ de: 'Kleine Zeile über der Headline', en: 'Small line above the headline', es: 'Pequeña línea encima del título' }),
     kind: 'text',
     build: () =>
       base(

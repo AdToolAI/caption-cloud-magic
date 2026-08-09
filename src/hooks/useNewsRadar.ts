@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ensureValidSession } from "@/lib/ensureSession";
@@ -11,13 +12,13 @@ export interface NewsItem {
 
 const FALLBACK_NEWS: NewsItem[] = [
   { headline: "📱 Instagram testet neues Creator-Abo-Modell", category: "platform", source: "The Verge" },
-  { headline: "💰 TikTok Shop expandiert in neue Märkte", category: "monetization", source: "TechCrunch" },
+  { headline: tx({ de: "💰 TikTok Shop expandiert in neue Märkte", en: "💰 TikTok Shop is expanding into new markets", es: "💰 TikTok Shop se está expandiendo a nuevos mercados" }), category: "monetization", source: "TechCrunch" },
   { headline: "📊 LinkedIn-Algorithmus priorisiert Kommentare", category: "analytics", source: "Social Media Today" },
   { headline: "🤖 Adobe Firefly bekommt KI-Video-Funktionen", category: "ai_tools", source: "Adobe Blog" },
   { headline: "💬 Meta verbessert Community-Management-Tools", category: "community", source: "Meta Newsroom" },
   { headline: "📱 YouTube Shorts Monetarisierung erreicht 2M+ Creator", category: "monetization", source: "YouTube" },
   { headline: "🤖 Canva launcht KI-Batch-Erstellung", category: "ai_tools", source: "Canva" },
-  { headline: "📊 Kurzvideos: 2,5x mehr Engagement als statische Posts", category: "analytics", source: "HubSpot" },
+  { headline: tx({ de: "📊 Kurzvideos: 2,5x mehr Engagement als statische Posts", en: "📊 Short videos: 2.5x more engagement than static posts", es: "📊 Vídeos cortos: 2,5 veces más participación que las publicaciones estáticas" }), category: "analytics", source: "HubSpot" },
 ];
 
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour

@@ -21,7 +21,7 @@ const ForgotPassword = () => {
     e.preventDefault();
 
     if (!email) {
-      toast.error("Bitte geben Sie Ihre E-Mail-Adresse ein");
+      toast.error(tx({ de: "Bitte geben Sie Ihre E-Mail-Adresse ein", en: "Please enter your email address", es: "Por favor ingrese su dirección de correo electrónico" }));
       return;
     }
 

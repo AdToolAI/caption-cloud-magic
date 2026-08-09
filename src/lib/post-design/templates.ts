@@ -220,7 +220,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
             img(image, 0.5, "bottom"),
             badge(tx({ de: "Nur diese Woche", en: "Only this week", es: "Solo esta semana" })),
             text("-20%", { y: 0.42, size: 0.19, weight: 800, x: 0.08, w: 0.84, h: 0.22, color: P.accent }),
-            text("auf alle Pakete", { y: 0.66, size: 0.05, weight: 600 , h: 0.09 }),
+            text(tx({ de: "auf alle Pakete", en: "on all packages", es: "en todos los paquetes" }), { y: 0.66, size: 0.05, weight: 600 , h: 0.09 }),
             { ...badge("Jetzt sichern", { y: 0.82, w: 0.46, size: 0.032 }), h: 0.09 },
           ],
         }],
@@ -238,7 +238,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
           layers: [
             img(image, 0.72, "full"),
             badge("3 Tipps"),
-            text("So gelingt es dir", { y: 0.2, size: 0.07, weight: 700, h: 0.1 }),
+            text(tx({ de: "So gelingt es dir", en: "This is how you succeed", es: "Así es como triunfas" }), { y: 0.2, size: 0.07, weight: 700, h: 0.1 }),
             text("01  Klar starten\n02  Konsequent bleiben\n03  Ergebnis zeigen", { y: 0.4, size: 0.042, weight: 500, font: "body", h: 0.32, lineHeight: 1.9 }),
             logo({ y: 0.88 }),
           ],
@@ -276,7 +276,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
           layers: [
             img(image, 0.45, "bottom"),
             text("JETZT LIVE", { y: 0.1, size: 0.028, weight: 700, font: "mono", uppercase: true, letterSpacing: 0.34, align: "center", x: 0.1, w: 0.8, h: 0.05, color: P.accent }),
-            text("Das neue Kapitel", { y: 0.6, size: 0.088, weight: 700, align: "center", x: 0.08, w: 0.84 }),
+            text(tx({ de: "Das neue Kapitel", en: "The new chapter", es: "El nuevo capitulo" }), { y: 0.6, size: 0.088, weight: 700, align: "center", x: 0.08, w: 0.84 }),
             text(tx({ de: "Ab heute verfügbar", en: "Available from today", es: "Disponible desde hoy" }), { y: 0.76, size: 0.032, weight: 400, font: "body", align: "center", x: 0.08, w: 0.84, h: 0.06 }),
             logo({ x: 0.41, y: 0.88, w: 0.18 }),
           ],
@@ -350,7 +350,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
           layers: [
             { ...img(image, 0, "bottom"), x: 0.07, y: 0.07, w: 0.86, h: 0.68, radius: 24 },
             text("Ein Bild. Ein Satz.", { y: 0.79, size: 0.055, weight: 600, align: "center", x: 0.08, w: 0.84, h: 0.09, shadow: false }),
-            text("Mehr braucht es nicht.", { y: 0.885, size: 0.026, weight: 400, font: "body", align: "center", x: 0.08, w: 0.84, h: 0.05, shadow: false, color: P.accent }),
+            text(tx({ de: "Mehr braucht es nicht.", en: "Nothing more is needed.", es: "No se necesita nada más." }), { y: 0.885, size: 0.026, weight: 400, font: "body", align: "center", x: 0.08, w: 0.84, h: 0.05, shadow: false, color: P.accent }),
           ],
         }],
         "Rahmen", "Rahmen",
@@ -366,7 +366,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
           id: uid("s"), background: P.background,
           layers: [
             img(image, 0.68, "full"),
-            text("Frage an dich:", { y: 0.3, size: 0.032, weight: 500, font: "mono", uppercase: true, letterSpacing: 0.2, align: "center", x: 0.1, w: 0.8, h: 0.05, color: P.accent }),
+            text(tx({ de: "Frage an dich:", en: "Question for you:", es: "Pregunta para ti:" }), { y: 0.3, size: 0.032, weight: 500, font: "mono", uppercase: true, letterSpacing: 0.2, align: "center", x: 0.1, w: 0.8, h: 0.05, color: P.accent }),
             text("Wie viele Stunden kostet\ndich ein Post gerade?", { y: 0.4, size: 0.062, weight: 600, align: "center", x: 0.1, w: 0.8, h: 0.22 }),
             text("Antwort in die Kommentare \u2193", { y: 0.72, size: 0.028, weight: 400, font: "body", align: "center", x: 0.1, w: 0.8, h: 0.05 }),
           ],
@@ -420,7 +420,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
           id: uid("s"), background: P.surface,
           layers: [
             { ...img(image, 0.1, "bottom"), y: 0, h: 0.4 },
-            text("In 3 Schritten zum Post", { y: 0.46, size: 0.05, weight: 700, h: 0.08 }),
+            text(tx({ de: "In 3 Schritten zum Post", en: "Get your post in 3 steps", es: "Obtén tu publicación en 3 pasos" }), { y: 0.46, size: 0.05, weight: 700, h: 0.08 }),
             text("1  Briefing eingeben", { y: 0.58, size: 0.034, weight: 500, font: "body", h: 0.06 }),
             text("2  Design wählen", { y: 0.66, size: 0.034, weight: 500, font: "body", h: 0.06 }),
             text("3  Exportieren", { y: 0.74, size: 0.034, weight: 500, font: "body", h: 0.06 }),

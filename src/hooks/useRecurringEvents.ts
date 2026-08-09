@@ -95,7 +95,7 @@ export function useRecurringEvents(workspace_id?: string) {
       queryClient.invalidateQueries({ queryKey: ['recurring-event-rules'] });
       toast({
         title: '🗑️ Regel gelöscht',
-        description: 'Recurring Rule wurde entfernt',
+        description: tx({ de: 'Recurring Rule wurde entfernt', en: 'Recurring Rule has been removed', es: 'Se ha eliminado la regla recurrente.' }),
       });
     },
   });

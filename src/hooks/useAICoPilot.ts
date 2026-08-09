@@ -363,11 +363,11 @@ function generateContextualResponse(input: string, context: CoPilotContext): str
   if (lowerInput.includes('hilf') || lowerInput.includes('help')) {
     return tx({
       de: `Ich kann dir bei vielen Aufgaben helfen! Probiere:
-• "Analysiere Szenen" - Startet KI-Analyse
+• tx({ de: "Analysiere Szenen", en: "Analyze scenes", es: "Analizar escenas" }) - Startet KI-Analyse
 • "Generiere Übergänge" - Erstellt passende Übergänge
-• "Teile Szene" - Aktuelle Szene splitten (oder Taste S)
-• "Dupliziere Szene" - Szene kopieren (oder Taste D)
-• "Lösche Szene" - Szene entfernen (oder Delete)
+• tx({ de: "Teile Szene", en: "Share scene", es: "compartir escena" }) - Aktuelle Szene splitten (oder Taste S)
+• tx({ de: "Dupliziere Szene", en: "Duplicate scene", es: "escena duplicada" }) - Szene kopieren (oder Taste D)
+• tx({ de: "Lösche Szene", en: "Delete scene", es: "eliminar escena" }) - Szene entfernen (oder Delete)
 • "Wende Cinematic Style an" - Für filmischen Look
 • "Erhöhe die Lautstärke" - Audio anpassen`,
       en: `I can help you with many tasks! Try:

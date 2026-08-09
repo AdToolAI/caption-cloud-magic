@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +34,7 @@ export function useBulkScheduling() {
       if (error) throw error;
 
       toast({
-        title: '🎉 Bulk Scheduling erfolgreich',
+        title: tx({ de: '🎉 Bulk Scheduling erfolgreich', en: '🎉 Bulk scheduling successful', es: '🎉 Programación masiva exitosa' }),
         description: `${data.events_created} Events geplant`,
       });
 

@@ -247,7 +247,7 @@ export default function MediaProfiles() {
         <Card>
           <CardContent className="py-12 text-center">
             <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">Workspace wird geladen...</p>
+            <p className="text-muted-foreground">{tx({ de: "Workspace wird geladen...", en: "Loading Workspace...", es: "Cargando espacio de trabajo..." })}</p>
           </CardContent>
         </Card>
       </div>
@@ -286,7 +286,7 @@ export default function MediaProfiles() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Alle Plattformen</SelectItem>
+              <SelectItem value="all">{tx({ de: "Alle Plattformen", en: "All platforms", es: "Todas las plataformas" })}</SelectItem>
               <SelectItem value="instagram">Instagram</SelectItem>
               <SelectItem value="facebook">Facebook</SelectItem>
               <SelectItem value="tiktok">TikTok</SelectItem>
@@ -415,7 +415,7 @@ export default function MediaProfiles() {
         <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Profil wirklich löschen?</AlertDialogTitle>
+              <AlertDialogTitle>{tx({ de: "Profil wirklich löschen?", en: "Really delete your profile?", es: "¿De verdad eliminas tu perfil?" })}</AlertDialogTitle>
               <AlertDialogDescription>
                 Diese Aktion kann nicht rückgängig gemacht werden. Das Profil wird dauerhaft gelöscht.
               </AlertDialogDescription>

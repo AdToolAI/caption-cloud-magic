@@ -965,7 +965,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
                       <div>
-                        <p className="font-medium">Klicke auf "Get Page Access Token"</p>
+                        <p className="font-medium">{tx({ de: "Klicke auf \"Get Page Access Token\"", en: "Click on “Get Page Access Token”", es: "Haga clic en \"Obtener token de acceso a la página\"" })}</p>
                         <p className="text-muted-foreground">Im Token-Dropdown → <strong>"Get Page Access Token"</strong> auswählen</p>
                       </div>
                     </li>
@@ -980,7 +980,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
                       <div>
                         <p className="font-medium">Kopiere den generierten Token</p>
-                        <p className="text-muted-foreground">Der Token wird direkt angezeigt - einfach kopieren!</p>
+                        <p className="text-muted-foreground">{tx({ de: "Der Token wird direkt angezeigt - einfach kopieren!", en: "The token is displayed directly - just copy it!", es: "El token se muestra directamente, ¡simplemente cópielo!" })}</p>
                       </div>
                     </li>
                   </ol>
@@ -1027,7 +1027,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
                       <div>
-                        <p className="font-medium">Klicke auf "Generate Access Token"</p>
+                        <p className="font-medium">{tx({ de: "Klicke auf \"Generate Access Token\"", en: "Click on “Generate Access Token”", es: "Haga clic en \"Generar token de acceso\"" })}</p>
                         <p className="text-muted-foreground">Neben dem Token-Feld</p>
                       </div>
                     </li>
@@ -1064,7 +1064,7 @@ export default function InstagramPublishing() {
                   <Alert variant="destructive" className="mt-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      <strong>Achtung:</strong> User Token Modus benötigt die Permission <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
+                      <strong>Achtung:</strong> {tx({ de: "User Token Modus benötigt die Permission", en: "User token mode requires permission", es: "El modo token de usuario requiere permiso" })} <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
                     </AlertDescription>
                   </Alert>
                 </CardContent>
@@ -1085,7 +1085,7 @@ export default function InstagramPublishing() {
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                ℹ️ Dieser Token wird {tokenTypeChoice === "page" ? "direkt in einen Long-Lived Page Token umgewandelt" : "verwendet, um einen Long-Lived Page Token zu generieren"} und nicht gespeichert.
+                ℹ️ Dieser Token wird {tokenTypeChoice === "page" ? tx({ de: "direkt in einen Long-Lived Page Token umgewandelt", en: "converted directly into a long-lived page token", es: "convertido directamente en un token de página de larga duración" }) : tx({ de: "verwendet, um einen Long-Lived Page Token zu generieren", en: "used to generate a long-lived page token", es: "utilizado para generar un token de página de larga duración" })} und nicht gespeichert.
               </p>
             </div>
 
@@ -1208,12 +1208,12 @@ export default function InstagramPublishing() {
                     Bitte prüfe:
                   </p>
                   <ul className="list-disc list-inside text-sm mt-1">
-                    <li>Hast du die richtige App gewählt?</li>
-                    <li>Hast du den richtigen Token-Typ ausgewählt (Page vs. User)?</li>
+                    <li>{tx({ de: "Hast du die richtige App gewählt?", en: "Did you choose the right app?", es: "¿Elegiste la aplicación correcta?" })}</li>
+                    <li>{tx({ de: "Hast du den richtigen Token-Typ ausgewählt (Page vs. User)?", en: "Did you select the correct token type (Page vs. User)?", es: "¿Seleccionó el tipo de token correcto (Página versus Usuario)?" })}</li>
                     {tokenTypeChoice === "user" && (
-                      <li>Sind alle Berechtigungen ausgewählt (besonders pages_show_list)?</li>
+                      <li>{tx({ de: "Sind alle Berechtigungen ausgewählt (besonders pages_show_list)?", en: "Are all permissions selected (especially pages_show_list)?", es: "¿Están seleccionados todos los permisos (especialmente páginas_show_list)?" })}</li>
                     )}
-                    <li>Ist die Facebook-Seite mit Instagram verknüpft?</li>
+                    <li>{tx({ de: "Ist die Facebook-Seite mit Instagram verknüpft?", en: "Is the Facebook page linked to Instagram?", es: "¿La página de Facebook está vinculada a Instagram?" })}</li>
                   </ul>
                   {tokenTypeChoice === "user" && error.includes("accounts") && (
                     <Alert className="mt-3 border-orange-500">

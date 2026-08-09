@@ -81,9 +81,9 @@ const PROGRESS: Record<SceneState, number> = {
 export const SCENE_STATE_LABEL: Record<SceneState, string> = {
   idle: 'Bereit',
   plate_queued: 'In der Warteschlange',
-  plate_rendering: 'Clip wird generiert',
+  plate_rendering: tx({ de: 'Clip wird generiert', en: 'Clip is generated', es: 'Se genera el clip' }),
   plate_ready: 'Clip fertig',
-  audio_prep: 'Voiceover wird erzeugt',
+  audio_prep: tx({ de: 'Voiceover wird erzeugt', en: 'Voiceover is generated', es: 'Se genera voz en off' }),
   audio_ready: 'Voiceover fertig',
   lipsync_dispatched: tx({ de: 'Lip-Sync wird gestartet', en: 'Starting lip-sync', es: 'Iniciando sincronización labial' }),
   lipsync_running: 'Lip-Sync läuft',

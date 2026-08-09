@@ -31,7 +31,7 @@ export function useGoalCompletionListener() {
           // Show celebration toast
           toast({
             title: `🏆 ${t('events.goalCompleted')}`,
-            description: '🎉 Herzlichen Glückwunsch! Du hast dein Ziel erreicht!',
+            description: tx({ de: '🎉 Herzlichen Glückwunsch! Du hast dein Ziel erreicht!', en: '🎉 Congratulations! You have reached your goal!', es: '🎉 ¡Felicidades! ¡Has alcanzado tu objetivo!' }),
             duration: 5000,
           });
 

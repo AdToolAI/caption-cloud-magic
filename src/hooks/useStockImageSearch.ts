@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * useStockImageSearch — thin wrapper around the `search-stock-images`
  * Edge Function (Pexels + Pixabay, 24h `stock_search_cache` backed).
@@ -38,8 +39,8 @@ export function useStockImageSearch() {
       if (error) throw error;
       setResults((data?.images ?? []) as StockImage[]);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Photo-Suche fehlgeschlagen';
-      toast({ title: 'Suche fehlgeschlagen', description: message, variant: 'destructive' });
+      const message = err instanceof Error ? err.message : tx({ de: 'Photo-Suche fehlgeschlagen', en: 'Photo search failed', es: 'La búsqueda de fotos falló' });
+      toast({ title: tx({ de: 'Suche fehlgeschlagen', en: 'Search failed', es: 'La búsqueda falló' }), description: message, variant: 'destructive' });
       setResults([]);
     } finally {
       setLoading(false);

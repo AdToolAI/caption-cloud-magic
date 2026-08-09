@@ -237,7 +237,7 @@ export default function EmailDirector() {
                   </button>
                 ))}
                 {!loading && campaigns.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-6">Noch keine Kampagnen</p>
+                  <p className="text-xs text-muted-foreground text-center py-6">{tx({ de: "Noch keine Kampagnen", en: "No campaigns yet", es: "Aún no hay campañas" })}</p>
                 )}
               </div>
             </Card>
@@ -299,7 +299,7 @@ export default function EmailDirector() {
                           className="w-full h-[280px] border border-border rounded-md bg-background"
                         />
                         <div className="mt-3 pt-3 border-t border-border">
-                          <Label className="text-xs mb-2 block">Test-Send mit Subject:</Label>
+                          <Label className="text-xs mb-2 block">{tx({ de: "Test-Send mit Subject:", en: "Test send with subject:", es: "Envío de prueba con asunto:" })}</Label>
                           <div className="flex flex-wrap gap-2">
                             {active.subjects?.map((s, si) => (
                               <Button

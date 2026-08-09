@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -59,7 +60,7 @@ export function useStockVideoSearch() {
       setResults((data?.results ?? []) as StockVideo[]);
     } catch (err) {
       console.error("[useStockVideoSearch]", err);
-      toast({ title: "Suche fehlgeschlagen", description: (err as Error).message, variant: "destructive" });
+      toast({ title: tx({ de: "Suche fehlgeschlagen", en: "Search failed", es: "La búsqueda falló" }), description: (err as Error).message, variant: "destructive" });
       if (id === seq.current) setResults([]);
     } finally {
       if (id === seq.current) setLoading(false);

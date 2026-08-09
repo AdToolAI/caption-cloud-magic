@@ -102,7 +102,7 @@ export default function QACockpit() {
       queryClient.invalidateQueries({ queryKey: ["qa-bugs"] });
       setSelectedBug(null);
     },
-    onError: (e: any) => toast.error(`Fehler: ${e?.message ?? String(e)}`),
+    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(s)}`, es: `Error: ${e?.mensaje ?? Instrumentos de cuerda)}` })),
   });
 
   const mutePattern = useMutation({
@@ -116,7 +116,7 @@ export default function QACockpit() {
       toast.success("Pattern stummgeschaltet — zukünftige Runs ignorieren ihn");
       queryClient.invalidateQueries({ queryKey: ["qa-muted-patterns"] });
     },
-    onError: (e: any) => toast.error(`Fehler: ${e?.message ?? String(e)}`),
+    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(s)}`, es: `Error: ${e?.mensaje ?? Instrumentos de cuerda)}` })),
   });
 
   const unmutePattern = useMutation({
@@ -185,7 +185,7 @@ export default function QACockpit() {
         toast.warning(`Übersprungen: ${data?.reason ?? "unbekannt"}`);
       }
     },
-    onError: (e: any) => toast.error(`Fehler: ${e?.message ?? String(e)}`),
+    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(s)}`, es: `Error: ${e?.mensaje ?? Instrumentos de cuerda)}` })),
   });
 
   const setupTestUser = useMutation({
@@ -202,15 +202,15 @@ export default function QACockpit() {
         setShowPassword(false);
         setCopied(false);
         toast.success(`Test-User bereit: ${data.email}`, {
-          description: "Vollständige Zugangsdaten im Dialog — sofort als Secret speichern.",
+          description: tx({ de: "Vollständige Zugangsdaten im Dialog — sofort als Secret speichern.", en: "Complete access data in the dialog - save immediately as a secret.", es: "Complete los datos de acceso en el cuadro de diálogo; guárdelos inmediatamente como secreto." }),
         });
       } else {
-        toast.info(`Test-User existiert bereits: ${data?.email}`, {
-          description: "Klick auf 'Passwort zurücksetzen' um neue Zugangsdaten zu erzeugen.",
+        toast.info(tx({ de: `Test-User existiert bereits: ${data?.email}`, en: `Test user already exists: ${data?.email}`, es: `El usuario de prueba ya existe: ${data?.email}` }), {
+          description: tx({ de: "Klick auf 'Passwort zurücksetzen' um neue Zugangsdaten zu erzeugen.", en: "Click on 'Reset password' to generate new access data.", es: "Haga clic en 'Restablecer contraseña' para generar nuevos datos de acceso." }),
         });
       }
     },
-    onError: (e: any) => toast.error(`Setup fehlgeschlagen: ${e?.message ?? String(e)}`),
+    onError: (e: any) => toast.error(tx({ de: `Setup fehlgeschlagen: ${e?.message ?? String(e)}`, en: `Setup failed: ${e?.message ?? String(s)}`, es: `Error de configuración: ${e?.message ?? Instrumentos de cuerda)}` })),
   });
 
   const handleCopy = async () => {
@@ -481,14 +481,14 @@ export default function QACockpit() {
                     )}
                     {r.metadata?.result?.error && /preview auth bridge/i.test(r.metadata.result.error) && (
                       <p className="text-[11px] text-amber-300 mt-1">
-                        Hinweis: Ziel-URL ist durch Lovable-Preview-Auth geschützt. Setze das Secret <code className="font-mono">QA_TARGET_URL</code> auf eine öffentliche Domain (z. B. <code className="font-mono">https://useadtool.ai</code>).
+                        Hinweis: Ziel-URL ist durch Lovable-Preview-Auth geschützt. Setze das Secret <code className="font-mono">QA_TARGET_URL</code> {tx({ de: "auf eine öffentliche Domain (z. B.", en: "to a public domain (e.g.", es: "a un dominio público (p. ej." })} <code className="font-mono">https://useadtool.ai</code>).
                       </p>
                     )}
                   </div>
                 </CardContent>
               </Card>
             ))}
-            {(runs.data ?? []).length === 0 && <EmptyState label="Noch keine Runs" />}
+            {(runs.data ?? []).length === 0 && <EmptyState label={tx({ de: "Noch keine Runs", en: "No runs yet", es: "Aún no hay carreras" })} />}
           </TabsContent>
 
           {/* BUG INBOX */}
@@ -598,7 +598,7 @@ export default function QACockpit() {
                                   className="h-7 text-xs"
                                   onClick={() => {
                                     const sample = (b.title || "").replace(/^Console:\s*/, "").replace(/^Network \d+:\s*/, "").replace(/\s*\(×\d+\)\s*$/, "").trim();
-                                    const pattern = prompt("Regex-Pattern, das gemutet werden soll:", sample.slice(0, 80));
+                                    const pattern = prompt(tx({ de: "Regex-Pattern, das gemutet werden soll:", en: "Regex pattern to be muted:", es: "Patrón de expresiones regulares que se silenciará:" }), sample.slice(0, 80));
                                     if (!pattern) return;
                                     const reason = prompt("Grund (optional):", "Bekanntes Rauschen") ?? "";
                                     mutePattern.mutate({ pattern, reason });
@@ -642,7 +642,7 @@ export default function QACockpit() {
                     Cap: {(m.cost_cap_cents / 100).toFixed(2)}€ · Real:{" "}
                     {(m.cost_real_providers ?? []).length > 0
                       ? (m.cost_real_providers ?? []).join(", ")
-                      : "alle gemockt"}
+                      : tx({ de: "alle gemockt", en: "all mocked", es: "todos se burlaron" })}
                   </div>
                 </CardContent>
               </Card>
@@ -745,7 +745,7 @@ export default function QACockpit() {
             <DialogDescription className="text-amber-300/90 flex items-start gap-2 mt-2">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
-                Dieses Passwort wird <strong>nur jetzt einmalig</strong> angezeigt. Speichere es sofort als
+                Dieses Passwort wird <strong>{tx({ de: "nur jetzt einmalig", en: "only now once", es: "solo ahora una vez" })}</strong> angezeigt. Speichere es sofort als
                 Secret <code className="px-1 py-0.5 bg-black/40 rounded text-[#F5C76A]">QA_TEST_USER_PASSWORD</code>.
               </span>
             </DialogDescription>
@@ -881,7 +881,7 @@ export default function QACockpit() {
                 )}
 
                 {selectedBug.network_trace?.login_screenshot_url && (
-                  <Section title="Auth-Seite zum Zeitpunkt des Fehlers">
+                  <Section title={tx({ de: "Auth-Seite zum Zeitpunkt des Fehlers", en: "Auth page at the time of the error", es: "Página de autenticación en el momento del error" })}>
                     <a href={selectedBug.network_trace.login_screenshot_url} target="_blank" rel="noopener noreferrer">
                       <img
                         src={selectedBug.network_trace.login_screenshot_url}
@@ -951,7 +951,7 @@ export default function QACockpit() {
                       variant="outline"
                       onClick={() => {
                         const sample = (selectedBug.title || "").replace(/^Console:\s*/, "").replace(/^Network \d+:\s*/, "").replace(/\s*\(×\d+\)\s*$/, "").trim();
-                        const pattern = prompt("Regex-Pattern, das gemutet werden soll:", sample.slice(0, 80));
+                        const pattern = prompt(tx({ de: "Regex-Pattern, das gemutet werden soll:", en: "Regex pattern to be muted:", es: "Patrón de expresiones regulares que se silenciará:" }), sample.slice(0, 80));
                         if (!pattern) return;
                         const reason = prompt("Grund (optional):", "Bekanntes Rauschen") ?? "";
                         mutePattern.mutate({ pattern, reason });

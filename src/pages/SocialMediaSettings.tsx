@@ -89,7 +89,7 @@ export default function SocialMediaSettings() {
               : `${targetPlatform} verbinden`,
             { 
               description: reconnectPlatform 
-                ? 'Klicke auf den Developer Portal Button um dein Token zu erneuern.'
+                ? tx({ de: 'Klicke auf den Developer Portal Button um dein Token zu erneuern.', en: 'Click on the Developer Portal button to renew your token.', es: 'Haga clic en el botón Portal de desarrollador para renovar su token.' })
                 : 'Folge den Schritten um die Plattform zu verbinden.'
             }
           );

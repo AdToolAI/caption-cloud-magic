@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
 export const AI_VIDEO_CREDIT_PACKS = {
@@ -21,7 +22,7 @@ export const AI_VIDEO_CREDIT_PACKS = {
       USD: 10.00,
     },
     description: {
-      EUR: 'Perfekt zum Ausprobieren',
+      EUR: tx({ de: 'Perfekt zum Ausprobieren', en: 'Perfect to try out', es: 'Perfecto para probar' }),
       USD: 'Perfect for testing',
     },
     badge: undefined as string | undefined,
@@ -155,7 +156,7 @@ export const AI_VIDEO_MODELS = {
       USD: 0.60,
     },
     maxDuration: 30,
-    description: 'Hochwertige AI-Videos ab 6,00€ pro 10 Sekunden',
+    description: tx({ de: 'Hochwertige AI-Videos ab 6,00€ pro 10 Sekunden', en: 'High-quality AI videos from €6.00 ​​per 10 seconds', es: 'Vídeos con IA de alta calidad desde 6,00 € por 10 segundos' }),
     badge: 'Premium-Engine',
   },
   'sora-2-pro': {
@@ -166,7 +167,7 @@ export const AI_VIDEO_MODELS = {
       USD: 1.35,
     },
     maxDuration: 30,
-    description: 'Premium-Qualität ab 13,50€ pro 10 Sekunden',
+    description: tx({ de: 'Premium-Qualität ab 13,50€ pro 10 Sekunden', en: 'Premium quality from €13.50 per 10 seconds', es: 'Calidad premium desde 13,50€ los 10 segundos' }),
     badge: 'Premium-Engine',
   },
 } as const;

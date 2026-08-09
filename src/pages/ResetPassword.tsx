@@ -47,7 +47,7 @@ const ResetPassword = () => {
     }
 
     if (password !== confirmPassword) {
-      toast.error("Passwörter stimmen nicht überein");
+      toast.error(tx({ de: "Passwörter stimmen nicht überein", en: "Passwords do not match", es: "Las contraseñas no coinciden" }));
       return;
     }
 
@@ -69,7 +69,7 @@ const ResetPassword = () => {
       }
     } else {
       setSuccess(true);
-      toast.success("Passwort erfolgreich geändert!");
+      toast.success(tx({ de: "Passwort erfolgreich geändert!", en: "Password changed successfully!", es: "¡La contraseña se cambió correctamente!" }));
       
       // Redirect to auth page after 3 seconds
       setTimeout(() => {

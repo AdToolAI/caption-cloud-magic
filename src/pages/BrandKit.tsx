@@ -269,7 +269,7 @@ const BrandKit = () => {
 
   const handleExportPDF = () => {
     toast({
-      title: "Export wird vorbereitet",
+      title: tx({ de: "Export wird vorbereitet", en: "Export is being prepared", es: "Se está preparando la exportación." }),
       description: "PDF-Export kommt in Kürze"
     });
   };
@@ -312,7 +312,7 @@ const BrandKit = () => {
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
       toast({
         title: "Dupliziert",
-        description: "Brand Kit wurde kopiert"
+        description: tx({ de: "Brand Kit wurde kopiert", en: "Brand Kit has been copied", es: "El kit de marca ha sido copiado." })
       });
     } catch (error) {
       toast({
@@ -444,7 +444,7 @@ const BrandKit = () => {
                   className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl overflow-hidden hover:shadow-[0_0_30px_hsla(43,90%,68%,0.08)] transition-all duration-300"
                 >
                   <div className="p-6 border-b border-white/10">
-                    <h3 className="text-xl font-semibold">Neues Marken-Set erstellen</h3>
+                    <h3 className="text-xl font-semibold">{tx({ de: "Neues Marken-Set erstellen", en: "Create a new brand set", es: "Crear un nuevo conjunto de marcas" })}</h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       Fülle die Informationen aus oder nutze den Wizard
                     </p>
@@ -628,7 +628,7 @@ const BrandKit = () => {
                       >
                         <Star className="h-6 w-6 text-primary" />
                       </motion.div>
-                      <h3 className="text-xl font-semibold">Was macht dieses Feature besonders?</h3>
+                      <h3 className="text-xl font-semibold">{tx({ de: "Was macht dieses Feature besonders?", en: "What makes this feature special?", es: "¿Qué hace que esta característica sea especial?" })}</h3>
                     </div>
                   </div>
                   
@@ -931,7 +931,7 @@ const BrandKit = () => {
                             size="sm"
                             className="hover:bg-destructive/20 hover:text-destructive"
                             onClick={() => {
-                              if (confirm("Wirklich löschen?")) {
+                              if (confirm(tx({ de: "Wirklich löschen?", en: "Really delete?", es: "¿Realmente eliminar?" }))) {
                                 deleteMutation.mutate(kit.id);
                               }
                             }}

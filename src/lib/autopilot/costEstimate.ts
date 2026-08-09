@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Cost preview.
  *
@@ -75,34 +76,34 @@ export function estimateProductionCost(input: CostInput): CostEstimate {
   lines.push(line('Bildfreigabe', `${scenes} Standbilder inkl. Nachbesserung`, anchorEuros));
 
   lines.push(
-    line('Bewegtbild', `${Math.round(total)} Sekunden Hailuo 2.3 Pro`, total * PRICE.motionPerSecond),
+    line('Bewegtbild', tx({ de: `${Math.round(total)} Sekunden Hailuo 2.3 Pro`, en: `${Math.round(total)} seconds Hailuo 2.3 Pro`, es: `${Math.round(total)} segundos Hailuo 2.3 Pro` }), total * PRICE.motionPerSecond),
   );
 
   if (input.lipSyncEnabled && speaking > 0) {
     lines.push(
       line(
         'Lip-Sync',
-        `${Math.round(speaking)} Sekunden · ${Math.max(1, input.lipSyncSpeakers)} Sprecher`,
+        tx({ de: `${Math.round(speaking)} Sekunden · ${Math.max(1, input.lipSyncSpeakers)} Sprecher`, en: `${Math.round(speaking)} seconds · ${Math.max(1, input.lipSyncSpeakers)} speaker`, es: `${Math.round(speaking)} segundos · ${Math.max(1, input.lipSyncSpeakers)} altavoz` }),
         speaking * PRICE.lipSyncPerSecond,
       ),
     );
   }
 
   if (input.voiceoverEnabled) {
-    lines.push(line('Voiceover', `${Math.round(total)} Sekunden Sprachaufnahme`, total * PRICE.voicePerSecond));
+    lines.push(line('Voiceover', tx({ de: `${Math.round(total)} Sekunden Sprachaufnahme`, en: `${Math.round(total)} seconds of voice recording`, es: `${Math.round(total)} segundos de grabación de voz` }), total * PRICE.voicePerSecond));
   }
 
   if (input.musicEnabled !== false) {
-    lines.push(line('Musik', 'Musikbett für den ganzen Film', PRICE.music));
+    lines.push(line('Musik', tx({ de: 'Musikbett für den ganzen Film', en: 'Music bed for the whole film', es: 'Cama musical para toda la película.' }), PRICE.music));
   }
 
   // Room tone per scene plus a foley hit in roughly every second scene.
   const soundLayers = scenes + Math.ceil(scenes / 2);
   lines.push(
-    line('Ton-Design', `${soundLayers} Ebenen Raumton und Geräusche`, soundLayers * PRICE.soundLayer),
+    line('Ton-Design', tx({ de: `${soundLayers} Ebenen Raumton und Geräusche`, en: `${soundLayers} Layers of spatial sound and noise`, es: `${soundLayers} Capas de sonido y ruido espacial` }), soundLayers * PRICE.soundLayer),
   );
 
-  lines.push(line('Endschnitt', `${Math.round(total)} Sekunden Render`, total * PRICE.renderPerSecond));
+  lines.push(line('Endschnitt', tx({ de: `${Math.round(total)} Sekunden Render`, en: `${Math.round(total)} seconds render`, es: `${Math.round(total)} segundos de renderizado` }), total * PRICE.renderPerSecond));
 
   const totalEuros = Math.round(lines.reduce((acc, l) => acc + l.euros, 0) * 100) / 100;
 

@@ -190,7 +190,7 @@ export default function MotionStudioLibrary() {
               items={filteredLocs}
               onEdit={openEditLoc}
               onDelete={(id) => {
-                if (confirm('Diese Location wirklich löschen?')) deleteLocation(id);
+                if (confirm(tx({ de: 'Diese Location wirklich löschen?', en: 'Really delete this location?', es: '¿Realmente eliminar esta ubicación?' }))) deleteLocation(id);
               }}
               onCreate={openNewLoc}
             />
@@ -405,7 +405,7 @@ function EmptyState({ kind, onCreate }: { kind: 'characters' | 'locations'; onCr
         )}
       </div>
       <h3 className="text-lg font-semibold mb-1.5">
-        {isChars ? 'Noch keine Charaktere' : 'Noch keine Locations'}
+        {isChars ? tx({ de: 'Noch keine Charaktere', en: 'No characters yet', es: 'Aún no hay personajes' }) : tx({ de: 'Noch keine Locations', en: 'No locations yet', es: 'Aún no hay ubicaciones' })}
       </h3>
       <p className="text-sm text-muted-foreground max-w-md mb-5">
         {isChars

@@ -67,10 +67,10 @@ function StudioBody({
 
       {s.restored && (
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-2.5 text-sm">
-          <span className="text-foreground/80">Entwurf wiederhergestellt — du kannst dort weitermachen, wo du aufgehört hast.</span>
+          <span className="text-foreground/80">{tx({ de: "Entwurf wiederhergestellt — du kannst dort weitermachen, wo du aufgehört hast.", en: "Draft restored — you can pick up where you left off.", es: "Borrador restaurado: puedes continuar donde lo dejaste." })}</span>
           <div className="ml-auto flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={s.reset}>Verwerfen</Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={s.dismissRestored} aria-label="Hinweis schließen">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={s.dismissRestored} aria-label={tx({ de: "Hinweis schließen", en: "Close note", es: "Cerrar nota" })}>
               <X className="h-4 w-4" />
             </Button>
           </div>

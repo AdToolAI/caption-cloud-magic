@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Universal Catalog — stable IDs for every selectable scene axis.
  *
@@ -101,7 +102,7 @@ const GESTIK: CatalogEntry[] = [
   entry('gestik', 'count_fingers',    'Finger zählen',     'Counting fingers', 'counting on fingers gesture', ['aufzählen','enumerate']),
   entry('gestik', 'thumbs_up',        'Daumen hoch',       'Thumbs up',        'thumbs up gesture'),
   entry('gestik', 'hands_explain',    'Erklärende Hände',  'Explaining hands', 'natural explaining hand motion', ['erklärend','gesticulating']),
-  entry('gestik', 'hand_to_chest',    'Hand auf Brust',    'Hand on chest',    'hand to chest sincere gesture', ['sincere','aufrichtig']),
+  entry('gestik', 'hand_to_chest',    tx({ de: 'Hand auf Brust', en: 'Hand on chest', es: 'Mano en el pecho' }),    'Hand on chest',    'hand to chest sincere gesture', ['sincere','aufrichtig']),
   entry('gestik', 'arms_crossed',     'Arme verschränkt',  'Arms crossed',     'arms crossed posture'),
   entry('gestik', 'lean_forward',     'Nach vorne lehnen', 'Lean forward',     'leaning forward into the camera', ['lean in']),
   entry('gestik', 'shrug',            'Schulterzucken',    'Shrug',            'casual shoulder shrug'),
@@ -114,7 +115,7 @@ const BLICK: CatalogEntry[] = [
   entry('blick', 'up',            'Nach oben',        'Looking up',    'gaze upward, contemplative'),
   entry('blick', 'side_left',     'Links',            'Looking left',  'gaze to the left'),
   entry('blick', 'side_right',    'Rechts',           'Looking right', 'gaze to the right'),
-  entry('blick', 'at_object',     'Auf Objekt',       'At object',     'gaze on a held object', ['auf produkt','at product']),
+  entry('blick', 'at_object',     'Auf Objekt',       'At object',     'gaze on a held object', [tx({ de: 'auf produkt', en: 'on product', es: 'en el producto' }),'at product']),
   entry('blick', 'at_partner',    'Auf Gegenüber',    'At partner',    'gaze at scene partner', ['interlocutor','gegenüber']),
 ];
 
@@ -193,7 +194,7 @@ const DELIVERY: CatalogEntry[] = [
 ];
 
 const MUSIC_ENERGY: CatalogEntry[] = [
-  entry('music_energy', 'silent',  'Stille',     'Silent',  'no music',                       ['none','keine musik']),
+  entry('music_energy', 'silent',  'Stille',     'Silent',  'no music',                       ['none',tx({ de: 'keine musik', en: 'no music', es: 'sin musica' })]),
   entry('music_energy', 'low',     'Niedrig',    'Low',     'low-energy ambient bed',         ['ambient','ruhig']),
   entry('music_energy', 'mid',     'Mittel',     'Mid',     'mid-tempo motivational',         ['medium','motivational']),
   entry('music_energy', 'high',    'Hoch',       'High',    'high-energy driving beat',       ['driving','energetic']),

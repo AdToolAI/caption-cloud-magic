@@ -90,7 +90,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: 'AI Video Studio',
-        body: 'Direktzugang zu 29+ Video-Modellen. Für schnelle Shots ohne Composer-Overhead.',
+        body: tx({ de: 'Direktzugang zu 29+ Video-Modellen. Für schnelle Shots ohne Composer-Overhead.', en: 'Direct access to 29+ video models. For quick shots without composer overhead.', es: 'Acceso directo a más de 29 modelos de vídeo. Para tomas rápidas sin que el compositor esté por encima.' }),
       },
       en: {
         title: 'AI Video Studio',
@@ -150,7 +150,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     copy: {
       de: {
         title: "Director's Cut Composer",
-        body: 'Der finale Editor: Timeline, Subtitles, Music-Mix, Export. WYSIWYG bis zum Render.',
+        body: tx({ de: 'Der finale Editor: Timeline, Subtitles, Music-Mix, Export. WYSIWYG bis zum Render.', en: 'The final editor: timeline, subtitles, music mix, export. WYSIWYG to render.', es: 'El editor final: línea de tiempo, subtítulos, mezcla de música, exportación. WYSIWYG para renderizar.' }),
       },
       en: {
         title: "Director's Cut Composer",
@@ -218,7 +218,7 @@ export const TRIGGER_REGISTRY: TriggerDefinition[] = [
     cooldownDays: 365,
     copy: {
       de: {
-        title: 'Erste Szene gerendert 🎬',
+        title: tx({ de: 'Erste Szene gerendert 🎬', en: 'First scene rendered 🎬', es: 'Primera escena renderizada 🎬' }),
         body: tx({ de: 'Sehr gut. Als nächstes: eigene Musik im Audio Studio dazu — oder direkt in den Composer für den finalen Cut.', en: 'Very good. Next: add your own music in the Audio Studio — or directly to the Composer for the final cut.', es: 'Muy bien. Siguiente: añade tu propia música en el Estudio de Audio — o directamente al Compositor para el corte final.' }),
         cta: 'Zum Audio Studio',
         ctaHref: '/audio-studio',

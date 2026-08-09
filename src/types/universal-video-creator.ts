@@ -322,7 +322,7 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
     description: tx({ de: 'Professionelle Werbevideos für Unternehmen und Dienstleistungen', en: 'Professional promotional videos for businesses and services', es: 'Videos promocionales profesionales para empresas y servicios' }),
     icon: '🏢',
     color: 'from-blue-500 to-indigo-500',
-    recommendedDuration: '15-90 Sekunden',
+    recommendedDuration: tx({ de: '15-90 Sekunden', en: '15-90 seconds', es: '15-90 segundos' }),
     exampleUseCase: 'TV-Spot, Online-Werbung, Social Media Ads, Imagefilm',
     features: ['AIDA-Struktur', 'Starke CTAs', 'Professioneller Ton']
   },
@@ -332,17 +332,17 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
     description: tx({ de: 'Kreative Produktvideos mit deinen eigenen Produktfotos', en: 'Creative product videos with your own product photos', es: 'Videos de productos creativos con tus propias fotos de productos' }),
     icon: '📦',
     color: 'from-green-500 to-emerald-500',
-    recommendedDuration: '15-90 Sekunden',
+    recommendedDuration: tx({ de: '15-90 Sekunden', en: '15-90 seconds', es: '15-90 segundos' }),
     exampleUseCase: 'Produktlaunch, E-Commerce, Unboxing, Feature-Demo',
     features: ['Produktbilder-Upload', 'KI-Bildbearbeitung', 'Kreative Drehbücher']
   },
   {
     category: 'storytelling',
     name: 'Storytelling',
-    description: 'Emotionale Geschichten — erfunden oder wahr, filmisch erzählt',
+    description: tx({ de: 'Emotionale Geschichten — erfunden oder wahr, filmisch erzählt', en: 'Emotional stories – fictional or true, told on film', es: 'Historias emocionales, ficticias o reales, contadas en una película.' }),
     icon: '📖',
     color: 'from-purple-500 to-pink-500',
-    recommendedDuration: '60-180 Sekunden',
+    recommendedDuration: tx({ de: '60-180 Sekunden', en: '60-180 seconds', es: '60-180 segundos' }),
     exampleUseCase: 'Markenfilm, Kurzfilm, Gründergeschichte, fiktive Story',
     features: ["Hero's Journey", 'Emotionale Bögen', 'Cinematic Stil']
   },

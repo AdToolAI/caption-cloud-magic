@@ -49,7 +49,7 @@ export function useBrandAssets(brandKitId: string | null | undefined) {
       });
       qc.invalidateQueries({ queryKey: ["brand-assets", brandKitId] });
     } catch (e: any) {
-      toast({ title: "Asset-Generierung fehlgeschlagen", description: e.message, variant: "destructive" });
+      toast({ title: tx({ de: "Asset-Generierung fehlgeschlagen", en: "Asset generation failed", es: "La generación de activos falló" }), description: e.message, variant: "destructive" });
     } finally {
       setGenerating(false);
     }

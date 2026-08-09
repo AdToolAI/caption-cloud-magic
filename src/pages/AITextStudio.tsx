@@ -435,7 +435,7 @@ export default function AITextStudio() {
       if (error) throw error;
       setCompareResults(data?.results || null);
     } catch (e: any) {
-      toast.error(e?.message || "Compare fehlgeschlagen");
+      toast.error(e?.message || tx({ de: "Compare fehlgeschlagen", en: "Compare failed", es: "Comparación fallida" }));
     } finally {
       setCompareLoading(false);
     }
@@ -630,7 +630,7 @@ export default function AITextStudio() {
               variant="ghost"
               onClick={newConversation}
               className="h-7"
-              title="Setzt den aktuellen Chat zurück. Dein bisheriges Gespräch findest du jederzeit unter History."
+              title={tx({ de: "Setzt den aktuellen Chat zurück. Dein bisheriges Gespräch findest du jederzeit unter History.", en: "Resets the current chat. You can find your previous conversation at any time under History.", es: "Restablece el chat actual. Puedes encontrar tu conversación anterior en cualquier momento en Historial." })}
             >
               <Sparkles className="h-3 w-3 mr-1" /> Neue Konversation
             </Button>
@@ -690,7 +690,7 @@ export default function AITextStudio() {
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Prompt eingeben… (⌘+Enter zum Senden)"
+              placeholder={tx({ de: "Prompt eingeben… (⌘+Enter zum Senden)", en: "Promptly type… (⌘+Enter to send)", es: "Escriba rápidamente… (⌘+Intro para enviar)" })}
               className="min-h-[80px]"
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter") send();
@@ -781,7 +781,7 @@ export default function AITextStudio() {
         {/* HISTORY TAB */}
         <TabsContent value="history" className="space-y-2">
           {history.length === 0 && (
-            <p className="text-sm text-muted-foreground">Noch keine Konversationen.</p>
+            <p className="text-sm text-muted-foreground">{tx({ de: "Noch keine Konversationen.", en: "No conversations yet.", es: "Aún no hay conversaciones." })}</p>
           )}
           {history.map((c) => {
             const isBranch = !!c.parent_conversation_id;

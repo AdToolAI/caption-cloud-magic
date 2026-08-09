@@ -272,7 +272,7 @@ const AllComments = () => {
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Alle Kommentare</h1>
+          <h1 className="text-3xl font-bold">{tx({ de: "Alle Kommentare", en: "All comments", es: "Todos los comentarios" })}</h1>
           <p className="text-muted-foreground">{tx({ de: "Persistente Kommentarverwaltung über alle Plattformen", en: "Persistent comment management across all platforms", es: "Gestión persistente de comentarios en todas las plataformas" })}</p>
         </div>
         <div className="flex gap-2">

@@ -152,7 +152,7 @@ export const useCloudStorage = () => {
 
       toast({
         title: 'Google Drive getrennt',
-        description: 'Die Verbindung wurde entfernt.',
+        description: tx({ de: 'Die Verbindung wurde entfernt.', en: 'The connection has been removed.', es: 'La conexión ha sido eliminada.' }),
       });
     } catch (err) {
       console.error('Error disconnecting:', err);

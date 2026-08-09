@@ -94,7 +94,7 @@ export function useTwitch() {
     setError(null);
 
     const data = await invokeFunction('twitch-user', { login: username });
-    if (!data?.data?.length) throw new Error('Twitch-Benutzer nicht gefunden');
+    if (!data?.data?.length) throw new Error(tx({ de: 'Twitch-Benutzer nicht gefunden', en: 'Twitch user not found', es: 'Usuario de Twitch no encontrado' }));
 
     const tUser = data.data[0];
     await supabase

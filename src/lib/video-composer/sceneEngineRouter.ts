@@ -150,7 +150,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
       engine: 'sync-polish',
       label: '✨ Sync.so Polish',
       reason:
-        'Hailuo/HappyHorse-Plate mit Sync.so Polish-Pass — echte Mundbewegung auf KI-Gesicht.',
+        tx({ de: 'Hailuo/HappyHorse-Plate mit Sync.so Polish-Pass — echte Mundbewegung auf KI-Gesicht.', en: 'Hailuo/HappyHorse Plate with Sync.so Polish Pass — real mouth movement on AI face.', es: 'Hailuo/HappyHorse Plate con Sync.so Polish Pass: movimiento real de la boca en la cara de la IA.' }),
       extraCostEur: 0.05,
     };
   }
@@ -161,7 +161,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
     label: '🎬 B-Roll',
     reason:
       hasDialog && hasCast
-        ? 'Off-Screen-Narration — aktiviere den Lip-Sync-Toggle für echte Mundbewegung.'
+        ? tx({ de: 'Off-Screen-Narration — aktiviere den Lip-Sync-Toggle für echte Mundbewegung.', en: 'Off-screen narration — activate the lip sync toggle for real mouth movement.', es: 'Narración fuera de pantalla: activa la sincronización de labios para un movimiento real de la boca.' })
         : tx({ de: 'Off-Screen-Narration — Voiceover läuft über die Szene, keine Lip-Sync nötig.', en: 'Off-Screen Narration — Voiceover plays over the scene, no Lip-Sync needed.', es: 'Narración fuera de pantalla — La voz en off se reproduce sobre la escena, no se necesita sincronización labial.' }),
     extraCostEur: 0,
   };

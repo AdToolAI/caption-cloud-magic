@@ -56,7 +56,7 @@ export function useFrameContinuity() {
           video!.addEventListener('loadedmetadata', onMeta, { once: true });
           video!.addEventListener('error', onErr, { once: true });
           setTimeout(
-            () => reject(new Error('Video-Laden hat zu lange gedauert')),
+            () => reject(new Error(tx({ de: 'Video-Laden hat zu lange gedauert', en: 'Video took too long to load', es: 'El vídeo tardó demasiado en cargarse' }))),
             15000
           );
         });
@@ -72,13 +72,13 @@ export function useFrameContinuity() {
           video!.addEventListener('seeked', onSeeked, { once: true });
           video!.addEventListener(
             'error',
-            () => reject(new Error('Seek fehlgeschlagen')),
+            () => reject(new Error(tx({ de: 'Seek fehlgeschlagen', en: 'Seek failed', es: 'búsqueda fallida' }))),
             { once: true }
           );
           try {
             video!.currentTime = target;
           } catch (e) {
-            reject(e instanceof Error ? e : new Error('Seek hat geworfen'));
+            reject(e instanceof Error ? e : new Error(tx({ de: 'Seek hat geworfen', en: 'Seek threw', es: 'buscar lanzó' })));
           }
           setTimeout(() => reject(new Error('Seek-Timeout')), 10000);
         });
@@ -95,7 +95,7 @@ export function useFrameContinuity() {
 
         const blob: Blob = await new Promise((resolve, reject) =>
           canvas.toBlob(
-            (b) => (b ? resolve(b) : reject(new Error('Canvas toBlob fehlgeschlagen'))),
+            (b) => (b ? resolve(b) : reject(new Error(tx({ de: 'Canvas toBlob fehlgeschlagen', en: 'Canvas toBlob failed', es: 'Error en Canvas toBlob' })))),
             'image/jpeg',
             0.88
           )
@@ -112,7 +112,7 @@ export function useFrameContinuity() {
             upsert: true,
             cacheControl: '31536000',
           });
-        if (upErr) throw new Error(`Upload fehlgeschlagen: ${upErr.message}`);
+        if (upErr) throw new Error(tx({ de: `Upload fehlgeschlagen: ${upErr.message}`, en: `Upload failed: ${upErr.message}`, es: `Error al cargar: ${upErr.message}` }));
 
         const { data: pub } = supabase.storage
           .from('composer-frames')
@@ -132,7 +132,7 @@ export function useFrameContinuity() {
         return { lastFrameUrl: publicUrl };
       } catch (err) {
         const msg =
-          err instanceof Error ? err.message : 'Frame-Extraktion fehlgeschlagen';
+          err instanceof Error ? err.message : tx({ de: 'Frame-Extraktion fehlgeschlagen', en: 'Frame extraction failed', es: 'Falló la extracción del marco' });
         console.error('[useFrameContinuity] error:', err);
         toast.error(msg);
         return null;

@@ -56,7 +56,7 @@ export default function Autopilot() {
         {
           icon: <Calendar className="h-5 w-5" />,
           title: 'Wochenplan & Approval-Inbox',
-          description: 'Co-Pilot-Modus: Du genehmigst per Klick. Auto-Publish: Die KI veröffentlicht zu optimalen Zeiten.',
+          description: tx({ de: 'Co-Pilot-Modus: Du genehmigst per Klick. Auto-Publish: Die KI veröffentlicht zu optimalen Zeiten.', en: 'Co-pilot mode: You approve with one click. Auto-Publish: The AI ​​publishes at optimal times.', es: 'Modo copiloto: Apruebas con un clic. Publicación automática: la IA publica en momentos óptimos.' }),
         },
       ]}
     />
@@ -317,13 +317,13 @@ function ActivationToggle({
 
 function ToolsPanel() {
   const tools = [
-    { name: 'Video Composer', desc: 'Mehrszenige AI-Videos mit konsistenten Charakteren', status: 'verfügbar' },
+    { name: 'Video Composer', desc: tx({ de: 'Mehrszenige AI-Videos mit konsistenten Charakteren', en: 'Multi-scene AI videos with consistent characters', es: 'Vídeos de IA de múltiples escenas con personajes consistentes' }), status: 'verfügbar' },
     { name: 'Picture Studio', desc: 'AI-Bilder, Magic Edit, Style-Reference, Brand-Kit', status: 'verfügbar' },
     { name: 'Music Studio', desc: 'Hintergrundmusik via Stable Audio + MiniMax', status: 'verfügbar' },
     { name: 'Talking Head Avatare', desc: tx({ de: 'Lippensynchrone Avatar-Videos mit Stimme', en: 'Lip-sync avatar videos with voice', es: 'Vídeos de avatares con sincronización labial y voz' }), status: 'verfügbar' },
-    { name: 'Trend Radar', desc: 'Lokalisierte Trends, alle 5 Stunden aktualisiert', status: 'live' },
+    { name: 'Trend Radar', desc: tx({ de: 'Lokalisierte Trends, alle 5 Stunden aktualisiert', en: 'Localized trends, updated every 5 hours', es: 'Tendencias localizadas, actualizadas cada 5 horas.' }), status: 'live' },
     { name: 'Posting Berater', desc: 'Optimale Veröffentlichungszeiten pro Plattform/Sprache', status: 'verfügbar' },
-    { name: 'KI-QA-Gate', desc: 'Vision-Check auf Brand-CI, Copyright, Deepfakes', status: 'aktiv' },
+    { name: 'KI-QA-Gate', desc: tx({ de: 'Vision-Check auf Brand-CI, Copyright, Deepfakes', en: 'Vision check for brand CI, copyright, deepfakes', es: 'Verificación de visión para CI de marca, derechos de autor y deepfakes' }), status: 'aktiv' },
     { name: 'Performance-Loop', desc: 'Lernende Optimierung — kommt in Stufe 2', status: 'geplant' },
   ];
   return (

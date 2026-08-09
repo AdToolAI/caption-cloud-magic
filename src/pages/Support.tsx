@@ -21,7 +21,7 @@ const TEXT = {
   },
   de: {
     title: "Support-Center",
-    subtitle: "Melde Probleme mit vollem Kontext — Antwort meist innerhalb von 24h, bei blockierenden Fällen schneller.",
+    subtitle: tx({ de: "Melde Probleme mit vollem Kontext — Antwort meist innerhalb von 24h, bei blockierenden Fällen schneller.", en: "Report problems with full context — response usually within 24 hours, faster for blocking cases.", es: "Informe problemas con contexto completo: respuesta generalmente dentro de las 24 horas, más rápido para casos bloqueados." }),
     tNew: "Neuer Fall",
     tMine: "Meine Tickets",
     tHelp: "Schnelle Hilfe",

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -40,7 +41,7 @@ export function useTalkingHead() {
 
       setResult(data);
       toast({
-        title: 'Talking-Head wird generiert',
+        title: tx({ de: 'Talking-Head wird generiert', en: 'Talking head is generated', es: 'Se genera cabeza parlante' }),
         description: 'Die Generierung läuft im Hintergrund (1–3 Minuten).',
       });
       return data;
@@ -48,7 +49,7 @@ export function useTalkingHead() {
       console.error('[useTalkingHead] Error:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Generierung fehlgeschlagen',
+        description: error instanceof Error ? error.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }),
         variant: 'destructive',
       });
       return null;

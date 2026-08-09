@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,7 +56,7 @@ export function MetaTokenHealthTab() {
       }
       qc.invalidateQueries({ queryKey: ["meta-token-status"] });
     },
-    onError: (err: any) => toast.error(err?.message || "Refresh fehlgeschlagen"),
+    onError: (err: any) => toast.error(err?.message || tx({ de: "Refresh fehlgeschlagen", en: "Refresh failed", es: "Error al actualizar" })),
     onSettled: () => setRefreshing(false),
   });
 

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Compare Lab — Standalone Page
 //
 // Hosts the full CompareLabGrid + a sidebar of recent runs.
@@ -52,7 +53,7 @@ export default function CompareLab() {
         <title>Compare Lab — Multi-Engine AI Video Showdown</title>
         <meta
           name="description"
-          content="Vergleiche dieselbe Idee parallel auf bis zu 6 KI-Video-Engines. AI-Judge wählt den Sieger."
+          content={tx({ de: "Vergleiche dieselbe Idee parallel auf bis zu 6 KI-Video-Engines. AI-Judge wählt den Sieger.", en: "Compare the same idea in parallel on up to 6 AI video engines. AI judge chooses the winner.", es: "Compare la misma idea en paralelo en hasta 6 motores de vídeo de IA. El juez de AI elige al ganador." })}
         />
         <link rel="canonical" href="/compare-lab" />
       </Helmet>

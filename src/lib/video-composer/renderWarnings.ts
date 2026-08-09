@@ -45,7 +45,7 @@ export function getRenderWarnings(scene: ComposerScene): RenderWarning[] {
   if (src === 'ai-hailuo' && dur >= 10 && quality !== 'standard') {
     out.push({
       level: 'warning',
-      message: 'Hailuo bei 10s wird automatisch auf 768p gerendert (Provider-Limit).',
+      message: tx({ de: 'Hailuo bei 10s wird automatisch auf 768p gerendert (Provider-Limit).', en: 'Hailuo at 10s is automatically rendered at 768p (provider limit).', es: 'Hailuo a 10 segundos se renderiza automáticamente a 768p (límite del proveedor).' }),
     });
   }
 
@@ -54,7 +54,7 @@ export function getRenderWarnings(scene: ComposerScene): RenderWarning[] {
     out.push({
       level: 'warning',
       message:
-        'HappyHorse Multi-Speaker ist Beta — Identity-Drift möglich. Hailuo ist die stabile Empfehlung.',
+        tx({ de: 'HappyHorse Multi-Speaker ist Beta — Identity-Drift möglich. Hailuo ist die stabile Empfehlung.', en: 'HappyHorse Multi-Speaker is beta — identity drift possible. Hailuo is the stable recommendation.', es: 'HappyHorse Multi-Speaker es beta: es posible una deriva de identidad. Hailuo es la recomendación estable.' }),
     });
   }
 

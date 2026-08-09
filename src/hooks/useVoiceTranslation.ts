@@ -41,7 +41,7 @@ export function useVoiceTranslation() {
       console.error('Error translating:', error);
       toast({
         title: 'Fehler',
-        description: 'Übersetzung fehlgeschlagen',
+        description: tx({ de: 'Übersetzung fehlgeschlagen', en: 'Translation failed', es: 'La traducción falló' }),
         variant: 'destructive',
       });
       return null;

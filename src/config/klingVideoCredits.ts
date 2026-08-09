@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
 // Margin policy: exactly 3.00× Replicate cost (updated 14.07.2026 for Kling 3.0 Omni).
@@ -14,7 +15,7 @@ export const KLING_VIDEO_MODELS = {
     maxDuration: 10,
     allowedDurations: [5, 8, 10] as const,
     description: {
-      EUR: 'Schneller Draft-Cut ab 0,45 € pro 5 Sekunden',
+      EUR: tx({ de: 'Schneller Draft-Cut ab 0,45 € pro 5 Sekunden', en: 'Fast draft cut from €0.45 per 5 seconds', es: 'Reducción rápida del borrador desde 0,45 € cada 5 segundos' }),
       USD: 'Fast draft cut from $0.45 per 5 seconds',
     },
     badge: 'Fast',
@@ -28,7 +29,7 @@ export const KLING_VIDEO_MODELS = {
     maxDuration: 15,
     allowedDurations: [5, 8, 10, 15] as const,
     description: {
-      EUR: 'Sweet Spot mit Ambient-Audio ab 0,60 € pro 5 Sekunden',
+      EUR: tx({ de: 'Sweet Spot mit Ambient-Audio ab 0,60 € pro 5 Sekunden', en: 'Sweet Spot with ambient audio from €0.60 per 5 seconds', es: 'Sweet Spot con audio ambiental desde 0,60€ los 5 segundos' }),
       USD: 'Sweet spot with ambient audio from $0.60 per 5 seconds',
     },
     badge: 'Ambient Audio',
@@ -42,7 +43,7 @@ export const KLING_VIDEO_MODELS = {
     maxDuration: 15,
     allowedDurations: [3, 5, 8, 10, 15] as const,
     description: {
-      EUR: 'Kling 3.0 · 1080p · 0,90 € pro 5 Sekunden',
+      EUR: tx({ de: 'Kling 3.0 · 1080p · 0,90 € pro 5 Sekunden', en: 'Sound 3.0 · 1080p · €0.90 per 5 seconds', es: 'Sonido 3.0 · 1080p · 0,90 € por 5 segundos' }),
       USD: 'Kling 3.0 · 1080p · $0.90 per 5 seconds',
     },
     badge: 'Empfohlen',
@@ -56,7 +57,7 @@ export const KLING_VIDEO_MODELS = {
     maxDuration: 15,
     allowedDurations: [5, 8, 10, 15] as const,
     description: {
-      EUR: 'Native Lip-Sync auf Englisch · DE/ES silent-only · 3,00 € pro 5 Sekunden',
+      EUR: tx({ de: 'Native Lip-Sync auf Englisch · DE/ES silent-only · 3,00 € pro 5 Sekunden', en: 'Native Lip-Sync in English · DE/ES silent-only · €3.00 per 5 seconds', es: 'Lip-Sync nativo en inglés · DE/ES solo en silencio · 3,00 € por 5 segundos' }),
       USD: 'Native lip-sync in English · DE/ES silent-only · $3.00 per 5 seconds',
     },
     badge: 'Lip-Sync EN',

@@ -121,7 +121,7 @@ export const useVideoCreation = () => {
       if (result.status === 'failed') {
         setPolling(false);
         toast({
-          title: 'Video-Rendering fehlgeschlagen',
+          title: tx({ de: 'Video-Rendering fehlgeschlagen', en: 'Video rendering failed', es: 'Error al renderizar el vídeo' }),
           description: result.error_message || tx({ de: 'Ein Fehler ist aufgetreten', en: 'An error occurred', es: 'Ha ocurrido un error' }),
           variant: 'destructive'
         });

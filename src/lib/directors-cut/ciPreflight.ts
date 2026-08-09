@@ -136,7 +136,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'voice-lock-mismatch',
       severity: 'warn',
       title: 'Voice-Lock weicht ab',
-      detail: `Projekt ist auf Voice "${lock.voiceId}" gelockt, Voice-Over nutzt "${input.currentVoiceId}".`,
+      detail: tx({ de: `Projekt ist auf Voice "${lock.voiceId}" gelockt, Voice-Over nutzt "${input.currentVoiceId}".`, en: `Project is locked to voice "${lock.voiceId}", voice over uses "${input.currentVoiceId}".`, es: `El proyecto está bloqueado para la voz "${lock.voiceId}", la voz en off usa "${input.currentVoiceId}".` }),
       hint: tx({ de: 'Entsperre den Lock oder generiere das Voice-Over mit der gelockten Stimme neu.', en: 'Unlock the lock or regenerate the voice-over with the locked voice.', es: 'Desbloquea el candado o regenera la voz en off con la voz bloqueada.' }),
     });
   }
@@ -160,7 +160,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'short-scenes',
       severity: 'warn',
-      title: `${shortScenes.length} sehr kurze Szene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`,
+      title: tx({ de: `${shortScenes.length} sehr kurze Szene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`, en: `${shortScenes.length} very short scene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`, es: `${shortScenes.length} escena muy corta${shortScenes.length > 1? 'n' : ''} (<0,2s)` }),
       detail: tx({ de: 'Unter 0.2s wird die Szene im finalen Render kaum sichtbar.', en: 'Below 0.2s, the scene will be barely visible in the final render.', es: 'Por debajo de 0.2s, la escena apenas será visible en el render final.' }),
     });
   }
@@ -176,7 +176,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       findings.push({
         id: 'subtitle-contrast',
         severity: 'warn',
-        title: `${bad.length} Untertitel mit schwachem Kontrast`,
+        title: tx({ de: `${bad.length} Untertitel mit schwachem Kontrast`, en: `${bad.length} Low contrast subtitles`, es: `${bad.length} Subtítulos de bajo contraste` }),
         detail: tx({ de: 'Kontrast unter 3:1 → schwer lesbar (WCAG AA erfordert 4.5:1 für Text).', en: 'Contrast below 3:1 → hard to read (WCAG AA requires 4.5:1 for text).', es: 'Contraste inferior a 3:1 → difícil de leer (WCAG AA requiere 4.5:1 para texto).' }),
       });
     }
@@ -208,7 +208,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'music-no-vo',
       severity: 'info',
-      title: 'Musik ohne Voice-Over',
+      title: tx({ de: 'Musik ohne Voice-Over', en: 'Music without voice-over', es: 'Música sin voz en off' }),
       hint: tx({ de: 'Ducking wird nicht angewendet — Musik läuft auf voller (gedämpfter) Lautstärke.', en: 'Ducking not applied — music plays at full (attenuated) volume.', es: 'Ducking no aplicado — la música se reproduce a volumen completo (atenuado).' }),
     });
   }
@@ -330,7 +330,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'too-long-for-social',
       severity: 'info',
       title: `Video ${Math.round(input.totalDuration)}s lang`,
-      hint: 'Für TikTok / Reels / Shorts liefern 15–60s meist die beste Retention. Nutze Auto Cut-Down für kürzere Varianten.',
+      hint: tx({ de: 'Für TikTok / Reels / Shorts liefern 15–60s meist die beste Retention. Nutze Auto Cut-Down für kürzere Varianten.', en: 'For TikTok / Reels / Shorts, 15-60s usually delivers the best retention. Use Auto Cut-Down for shorter versions.', es: 'Para TikTok/Reels/Shorts, entre 15 y 60 años suele ofrecer la mejor retención. Utilice Auto Cut-Down para versiones más cortas.' }),
     });
   }
 

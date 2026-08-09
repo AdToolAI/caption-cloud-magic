@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ export function CostMonitor() {
       setData(json);
     } catch (e) {
       console.error('Cost snapshot failed', e);
-      toast.error('Cost-Snapshot fehlgeschlagen');
+      toast.error(tx({ de: 'Cost-Snapshot fehlgeschlagen', en: 'Cost snapshot failed', es: 'Error en la instantánea de costos' }));
     } finally {
       setLoading(false);
     }

@@ -472,7 +472,7 @@ export function useMotionStudioLibrary() {
         toast.error(tx({ de: `Snippet speichern fehlgeschlagen: ${error.message}`, en: `Failed to save snippet: ${error.message}`, es: `Error al guardar el snippet: ${error.message}` }));
         return null;
       }
-      toast.success(`Snippet „${data.name}" gespeichert`);
+      toast.success(tx({ de: `Snippet „${data.name}" gespeichert`, en: `Snippet “${data.name}” saved`, es: `Fragmento "${data.name}" guardado` }));
       return data as SceneSnippet;
     },
     [user],
@@ -487,7 +487,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(`Snippet aktualisieren fehlgeschlagen: ${error.message}`);
+        toast.error(tx({ de: `Snippet aktualisieren fehlgeschlagen: ${error.message}`, en: `Update snippet failed: ${error.message}`, es: `Fragmento de actualización fallido: ${error.message}` }));
         return null;
       }
       toast.success('Snippet aktualisiert');
@@ -560,7 +560,7 @@ export function useMotionStudioLibrary() {
   const toggleSnippetLike = useCallback(
     async (snippetId: string, currentlyLiked: boolean): Promise<boolean> => {
       if (!user) {
-        toast.error('Bitte einloggen');
+        toast.error(tx({ de: 'Bitte einloggen', en: 'Please log in', es: 'Por favor inicia sesión' }));
         return currentlyLiked;
       }
       if (currentlyLiked) {
@@ -570,7 +570,7 @@ export function useMotionStudioLibrary() {
           .eq('user_id', user.id)
           .eq('snippet_id', snippetId);
         if (error) {
-          toast.error('Unlike fehlgeschlagen');
+          toast.error(tx({ de: 'Unlike fehlgeschlagen', en: 'Unlike failed', es: 'A diferencia de fallido' }));
           return currentlyLiked;
         }
         return false;
@@ -579,7 +579,7 @@ export function useMotionStudioLibrary() {
           .from('motion_studio_snippet_likes')
           .insert({ user_id: user.id, snippet_id: snippetId });
         if (error) {
-          toast.error('Like fehlgeschlagen');
+          toast.error(tx({ de: 'Like fehlgeschlagen', en: 'Like failed', es: 'como fallido' }));
           return currentlyLiked;
         }
         return true;
@@ -591,7 +591,7 @@ export function useMotionStudioLibrary() {
   const cloneCommunitySnippet = useCallback(
     async (snippet: SceneSnippet): Promise<SceneSnippet | null> => {
       if (!user) {
-        toast.error('Bitte einloggen');
+        toast.error(tx({ de: 'Bitte einloggen', en: 'Please log in', es: 'Por favor inicia sesión' }));
         return null;
       }
       const { data, error } = await (supabase as any)
@@ -619,10 +619,10 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(`Klonen fehlgeschlagen: ${error.message}`);
+        toast.error(tx({ de: `Klonen fehlgeschlagen: ${error.message}`, en: `Cloning failed: ${error.message}`, es: `Error de clonación: ${error.message}` }));
         return null;
       }
-      toast.success(`„${data.name}" in deine Library kopiert`);
+      toast.success(tx({ de: `„${data.name}" in deine Library kopiert`, en: `"${data.name}" copied to your library`, es: `"${data.name}" copiado a tu biblioteca` }));
       return data as SceneSnippet;
     },
     [user],
