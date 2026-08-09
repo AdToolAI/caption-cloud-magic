@@ -19800,6 +19800,8 @@ Object.assign(translations.de, {
     tiktokSandbox: 'TikTok läuft im {env}-Modus — nur Testkonten können sich verbinden.',
     redirectMismatch: 'Redirect-URI zeigt nicht auf den Backend-Callback — Verbinden schlägt fehl.',
     publishPending: 'Verbinden möglich, Posten noch in Prüfung.',
+    ytChannel: 'Kanal: {name}',
+    ytNoRefreshToken: 'Kein Refresh-Token gespeichert — YouTube neu verbinden, sonst schlägt der Upload nach 1 Stunde fehl.',
     metaAppTitle: 'Meta App-Grunddaten',
     metaAppComplete: 'Vollständig',
     metaAppIncomplete: 'Felder fehlen',
