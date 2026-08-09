@@ -178,6 +178,8 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Konkrete Anweisungen, keine Charts.", "Concrete actions, not just charts.", "Instrucciones concretas, no solo gráficos."],
           [
             "Statt Charts liefert AdTool AI klare Anweisungen: Hook @0,8s stärker, CTA @6,2s, Cut @12s. Umsetzen, veröffentlichen, weiter.",
+            "Instead of charts, AdTool AI gives concrete calls: sharper hook @0.8s, CTA @6.2s, cut @12s. Apply, publish, move on.",
+            "En vez de gráficos, AdTool AI da instrucciones claras: hook @0,8s más fuerte, CTA @6,2s, corte @12s. Aplicar, publicar, seguir.",
           ],
         ),
       },
