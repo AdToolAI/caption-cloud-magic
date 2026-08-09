@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Music2, Sparkles, Loader2, Play, Pause, Download, Library as LibraryIcon, Wand2, Zap, Crown, Activity, Send } from 'lucide-react';
@@ -132,7 +133,7 @@ export function MusicGeneratorPanel({
     if (tierHasVocals(newTier, instrumental) && !isLanguageSupported(newTier, vocalLanguage)) {
       setVocalLanguage('en');
       toast.info('Sprache auf Englisch zurückgesetzt', {
-        description: `Der Provider dieses Tiers unterstützt die zuvor gewählte Sprache nicht.`,
+        description: tx({ de: `Der Provider dieses Tiers unterstützt die zuvor gewählte Sprache nicht.`, en: `The provider of this tier does not support the previously selected language.`, es: `El proveedor de este nivel no admite el idioma seleccionado anteriormente.` }),
       });
     }
   };

@@ -98,7 +98,7 @@ export function SuppressionManager() {
     if (!newEmail.trim()) return;
     const ok = await callManage({ action: 'add', email: newEmail, reason: newReason, note: newNote || undefined });
     if (ok) {
-      toast.success(`${newEmail} wurde zur Suppression-Liste hinzugefügt`);
+      toast.success(tx({ de: `${newEmail} wurde zur Suppression-Liste hinzugefügt`, en: `${newEmail} was added to the suppression list`, es: `${newEmail} fue añadido a la lista de supresión` }));
       setAdding(false); setNewEmail(''); setNewNote(''); setNewReason('manual');
       load();
     }

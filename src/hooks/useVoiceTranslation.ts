@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +33,7 @@ export function useVoiceTranslation() {
 
       toast({
         title: 'Übersetzung & Voiceover erstellt',
-        description: `Text wurde nach ${params.target_language} übersetzt`,
+        description: tx({ de: `Text wurde nach ${params.target_language} übersetzt`, en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }),
       });
 
       return data;

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -276,9 +277,9 @@ export default function VoiceSubtitlesTab({
     }
     if (perSceneVoCount > 0) {
       const ok = window.confirm(
-        `Es existieren bereits ${perSceneVoCount} Per-Szene-Voiceover-Clips (aus dem Storyboard-Dialog). ` +
-        `Wenn du jetzt einen globalen Voiceover generierst, wird der globale VO in jenen Szenen automatisch stummgeschaltet, ` +
-        `damit nicht zwei Stimmen gleichzeitig spielen.\n\nFortfahren?`
+        tx({ de: `Es existieren bereits ${perSceneVoCount} Per-Szene-Voiceover-Clips (aus dem Storyboard-Dialog). `, en: `There are already ${perSceneVoCount} per-scene voiceover clips (from the storyboard dialog). `, es: `Ya existen ${perSceneVoCount} clips de voz en off por escena (del diálogo del guion gráfico). ` }) +
+        tx({ de: `Wenn du jetzt einen globalen Voiceover generierst, wird der globale VO in jenen Szenen automatisch stummgeschaltet, `, en: `If you generate a global voiceover now, the global VO will be automatically muted in those scenes, `, es: `Si generas una voz en off global ahora, la voz en off global se silenciará automáticamente en esas escenas, ` }) +
+        tx({ de: `damit nicht zwei Stimmen gleichzeitig spielen.\\n\\nFortfahren?`, en: `so that two voices don't play at the same time.\\n\\nContinue?`, es: `para que no se reproduzcan dos voces al mismo tiempo.\\n\\n¿Continuar?` })
       );
       if (!ok) return;
     }

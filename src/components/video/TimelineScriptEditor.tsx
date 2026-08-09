@@ -203,7 +203,7 @@ export const TimelineScriptEditor = ({
       
       toast({
         title: "✓ Auto-Sync erfolgreich",
-        description: `${syncedSegments.length} Segmente mit präzisem Timing und Untertiteln synchronisiert`
+        description: tx({ de: `${syncedSegments.length} Segmente mit präzisem Timing und Untertiteln synchronisiert`, en: `${syncedSegments.length} segments synchronized with precise timing and subtitles`, es: `${syncedSegments.length} segmentos sincronizados con timing preciso y subtítulos` })
       });
     } catch (error) {
       console.error('Auto-Sync error:', error);

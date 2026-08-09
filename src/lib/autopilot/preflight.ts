@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Preflight — pure, AI-free validation that runs BEFORE any paid step.
  *
@@ -96,7 +97,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
       findings.push(
         warn(
           'turns_too_many',
-          `${turns.length} Sprecher in einer Szene — ab 5 wird der Lip-Sync unzuverlässig.`,
+          tx({ de: `${turns.length} Sprecher in einer Szene — ab 5 wird der Lip-Sync unzuverlässig.`, en: `${turns.length} speakers in one scene — lip-sync becomes unreliable from 5.`, es: `${turns.length} oradores en una escena; la sincronización labial deja de ser fiable a partir de 5.` }),
           id,
         ),
       );

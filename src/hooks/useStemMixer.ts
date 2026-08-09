@@ -100,7 +100,7 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
             if (buf.duration > maxDur) maxDur = buf.duration;
           } catch (err: any) {
             console.error(`[useStemMixer] decode failed for ${stem.type}:`, err);
-            toast.error(`${stem.type} konnte nicht geladen werden`);
+            toast.error(tx({ de: `${stem.type} konnte nicht geladen werden`, en: `${stem.type} could not be loaded`, es: `No se pudo cargar ${stem.type}` }));
           }
         }
         await ctx.close();

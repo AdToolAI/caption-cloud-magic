@@ -41,7 +41,7 @@ export const useVideoBatch = () => {
 
       toast({
         title: 'Batch-Rendering gestartet',
-        description: `${batchData.length} Videos werden erstellt. Das dauert einige Minuten.`
+        description: tx({ de: `${batchData.length} Videos werden erstellt. Das dauert einige Minuten.`, en: `${batchData.length} videos are being created. This will take a few minutes.`, es: `Se están creando ${batchData.length} videos. Esto tardará unos minutos.` })
       });
 
       return {

@@ -608,7 +608,7 @@ export default function MediaLibrary() {
         }
         toast({
           title: 'Platz geschaffen',
-          description: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`,
+          description: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }),
         });
       } catch (cleanupErr: any) {
         toast({

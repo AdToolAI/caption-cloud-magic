@@ -135,7 +135,7 @@ export function AICompanionWidget() {
   // Add welcome message when first opened - include error context if detected
   useEffect(() => {
     if (isOpen && messages.length === 0 && user) {
-      let welcomeContent = `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features.`;
+      let welcomeContent = tx({ de: `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features.`, en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` });
       
       // If we detected an error, include it in the welcome message
       if (detectedError) {
@@ -143,7 +143,7 @@ export function AICompanionWidget() {
       } else if (hasIssues) {
         welcomeContent += `\n\n⚠️ Ich habe ${errorCount > 0 ? `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'}` : ''}${errorCount > 0 && warningCount > 0 ? ' und ' : ''}${warningCount > 0 ? `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}` : ''} in deinem Account erkannt. Soll ich dir mehr Details zeigen?`;
       } else {
-        welcomeContent += ` Was kann ich für dich tun?`;
+        welcomeContent += tx({ de: ` Was kann ich für dich tun?`, en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` });
       }
       
       setMessages([{
@@ -516,7 +516,7 @@ export function AICompanionWidget() {
     setMessages([{
       id: 'welcome',
       role: 'assistant',
-      content: `Hey! 👋 Neues Gespräch mit ${preferences.bot_name} gestartet. Was kann ich für dich tun?`,
+      content: tx({ de: `Hey! 👋 Neues Gespräch mit ${preferences.bot_name} gestartet. Was kann ich für dich tun?`, en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }),
       timestamp: new Date()
     }]);
   };

@@ -280,7 +280,7 @@ export function PostHogEventTester() {
     
     toast({
       title: 'Dashboard Events gesendet',
-      description: `${successCount} Events für alle Plans gesendet! Check PostHog in ~1 Minute.`,
+      description: tx({ de: `${successCount} Events für alle Plans gesendet! Check PostHog in ~1 Minute.`, en: `${successCount} events sent for all plans! Check PostHog in ~1 minute.`, es: `¡${successCount} eventos enviados para todos los planes! Revisa PostHog en ~1 minuto.` }),
     });
   };
 

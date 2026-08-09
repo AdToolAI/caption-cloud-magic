@@ -915,7 +915,7 @@ export default function ProductionPlanSheet({
         title: 'Location angelegt',
         description: matched > 1
           ? `„${created.name}" — für ${matched} Szenen übernommen.`
-          : `„${created.name}" ist jetzt in der Library.`,
+          : tx({ de: `„${created.name}" ist jetzt in der Library.`, en: `"${created.name}" is now in the library.`, es: `"${created.name}" ahora está en la biblioteca.` }),
       });
     } catch (e: any) {
       toast({ title: 'Konnte Location nicht anlegen', description: e?.message || 'Unbekannter Fehler', variant: 'destructive' });
@@ -1075,7 +1075,7 @@ export default function ProductionPlanSheet({
     toast({
       title: fixed > 0 ? `${fixed} Zuordnung${fixed === 1 ? '' : 'en'} automatisch repariert` : 'Keine weiteren Auto-Matches',
       description: fixed > 0
-        ? `${castFixed} Cast · ${locationFixed} Location — du kannst alles im Dropdown noch anpassen.`
+        ? tx({ de: `${castFixed} Cast · ${locationFixed} Location — du kannst alles im Dropdown noch anpassen.`, en: `${castFixed} Cast · ${locationFixed} Location — you can still adjust everything in the dropdown.`, es: `${castFixed} Elenco · ${locationFixed} Ubicación — aún puedes ajustar todo en el menú desplegable.` })
         : undefined,
     });
   };

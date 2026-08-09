@@ -132,7 +132,7 @@ export default function TalkingHeadDialog({
     if (!c.referenceImageUrl) {
       toast({
         title: 'Charakter ohne Foto',
-        description: `"${c.name}" hat noch kein Referenzbild. Lege eines im Briefing an oder importiere ihn aus der Avatar-Bibliothek.`,
+        description: tx({ de: `"${c.name}" hat noch kein Referenzbild. Lege eines im Briefing an oder importiere ihn aus der Avatar-Bibliothek.`, en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }),
         variant: 'destructive',
       });
       return;
@@ -197,7 +197,7 @@ export default function TalkingHeadDialog({
     setNewPhotoUrl('');
     toast({
       title: 'Charakter hinzugefügt',
-      description: `"${character.name}" ist jetzt Teil deines Briefing-Casts.`,
+      description: tx({ de: `"${character.name}" ist jetzt Teil deines Briefing-Casts.`, en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }),
     });
   };
 
@@ -233,7 +233,7 @@ export default function TalkingHeadDialog({
     setShowLibrary(false);
     toast({
       title: 'Avatar importiert',
-      description: `"${av.name}" wurde in deinen Briefing-Cast übernommen.`,
+      description: tx({ de: `"${av.name}" wurde in deinen Briefing-Cast übernommen.`, en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }),
     });
   };
 
@@ -712,7 +712,7 @@ function DialogModeTab({
 }: DialogModeTabProps) {
   const [script, setScript] = useState(
     cast.length >= 2
-      ? `${cast[0].name}: Hi! Schön dich zu sehen.\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, was empfiehlst du?\n${cast[0].name}: Definitiv unser neues Produkt — du wirst es lieben.`
+      ? tx({ de: `${cast[0].name}: Hi! Schön dich zu sehen.\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, was empfiehlst du?\\n${cast[0].name}: Definitiv unser neues Produkt — du wirst es lieben.`, en: `${cast[0].name}: Hi! Nice to see you.\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, what do you recommend?\\n${cast[0].name}: Definitely our new product — you'll love it.`, es: `${cast[0].name}: ¡Hola! Encantado de verte.\\n${cast[1].name}: Hola ${cast[0].name.split(' ')[0]}, ¿qué me recomiendas?\\n${cast[0].name}: Definitivamente nuestro nuevo producto, te encantará.` })
       : '',
   );
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, string>>({});
@@ -745,7 +745,7 @@ function DialogModeTab({
       if (!voicePerSpeaker[sp.id]) {
         toast({
           title: 'Stimme fehlt',
-          description: `Wähle eine Stimme für "${sp.name}".`,
+          description: tx({ de: `Wähle eine Stimme für "${sp.name}".`, en: `Choose a voice for "${sp.name}".`, es: `Elige una voz para "${sp.name}".` }),
           variant: 'destructive',
         });
         return;

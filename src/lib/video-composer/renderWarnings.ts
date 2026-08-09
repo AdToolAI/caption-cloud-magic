@@ -70,7 +70,7 @@ export function getRenderWarnings(scene: ComposerScene): RenderWarning[] {
   if (lipsync && !providerSupportsLipsync(src)) {
     out.push({
       level: 'warning',
-      message: `${src} kann keinen Lip-Sync rendern — wird auf Hailuo migriert (Provider-Wechsel kann Kosten beeinflussen).`,
+      message: tx({ de: `${src} kann keinen Lip-Sync rendern — wird auf Hailuo migriert (Provider-Wechsel kann Kosten beeinflussen).`, en: `${src} cannot render lip-sync — migrating to Hailuo (provider change may affect costs).`, es: `${src} no puede renderizar la sincronización labial — migrando a Hailuo (el cambio de proveedor puede afectar los costos).` }),
     });
   }
 
@@ -88,7 +88,7 @@ export function getRenderWarnings(scene: ComposerScene): RenderWarning[] {
   if (lipsync && voSeconds && voSeconds > dur + 0.25) {
     out.push({
       level: 'warning',
-      message: `Voiceover (${voSeconds.toFixed(1)}s) ist länger als die Szene (${dur}s) — das Audio wird gekürzt.`,
+      message: tx({ de: `Voiceover (${voSeconds.toFixed(1)}s) ist länger als die Szene (${dur}s) — das Audio wird gekürzt.`, en: `Voiceover (${voSeconds.toFixed(1)}s) is longer than the scene (${dur}s) — audio will be cut.`, es: `La voz en off (${voSeconds.toFixed(1)}s) es más larga que la escena (${dur}s) — el audio se cortará.` }),
     });
   }
 

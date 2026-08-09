@@ -293,7 +293,7 @@ export function useComposerPersistence() {
             .single();
 
           if (scnErr || !newScene) {
-            throw new Error(scnErr?.message || `Szene ${i + 1} konnte nicht gespeichert werden`);
+            throw new Error(scnErr?.message || tx({ de: `Szene ${i + 1} konnte nicht gespeichert werden`, en: `Scene ${i + 1} could not be saved`, es: `No se pudo guardar la escena ${i + 1}` }));
           }
 
           persistedScenes.push({

@@ -188,7 +188,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
 
       toast({
         title: `${data.triggered} Formate werden gerendert 🚀`,
-        description: `Geschätzte Kosten: €${data.totalCost.toFixed(2)}. Die Versionen erscheinen automatisch, sobald sie fertig sind.`,
+        description: tx({ de: `Geschätzte Kosten: €${data.totalCost.toFixed(2)}. Die Versionen erscheinen automatisch, sobald sie fertig sind.`, en: `Estimated cost: €${data.totalCost.toFixed(2)}. Versions will appear automatically once ready.`, es: `Costo estimado: €${data.totalCost.toFixed(2)}. Las versiones aparecerán automáticamente una vez listas.` }),
       });
       clearAll();
     } catch (err: any) {

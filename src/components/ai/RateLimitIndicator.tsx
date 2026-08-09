@@ -60,7 +60,7 @@ export function RateLimitIndicator({ remainingCalls, maxCalls, resetTime }: Rate
         {isLow && (
           <p className="text-xs text-muted-foreground">
             {remainingCalls === 0 
-              ? `Bitte warte ${countdown} Sekunden für den nächsten Call`
+              ? tx({ de: `Bitte warte ${countdown} Sekunden für den nächsten Call`, en: `Please wait ${countdown} seconds for the next call`, es: `Por favor, espera ${countdown} segundos para la siguiente llamada` })
               : tx({ de: 'Nur noch wenige Calls verfügbar in dieser Minute', en: 'Only a few calls available this minute', es: 'Solo quedan unas pocas llamadas disponibles este minuto' })}
           </p>
         )}

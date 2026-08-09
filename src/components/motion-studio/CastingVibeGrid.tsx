@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -94,7 +95,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
     async (variant: CharacterVariant) => {
       const ok = await setCharacterPrimaryVariant(character.id, variant.id);
       if (ok) {
-        toast.success(`„${VIBE_LABELS[variant.vibe] ?? variant.vibe}" ist jetzt primär`);
+        toast.success(tx({ de: `„${VIBE_LABELS[variant.vibe] ?? variant.vibe}" ist jetzt primär`, en: `"${VIBE_LABELS[variant.vibe] ?? variant.vibe}" is now primary`, es: `"${VIBE_LABELS[variant.vibe] ?? variant.vibe}" es ahora el principal` }));
         await reload();
         onPrimaryChanged?.(variant);
       }

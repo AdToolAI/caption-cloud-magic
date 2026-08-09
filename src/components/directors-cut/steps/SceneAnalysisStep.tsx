@@ -1226,7 +1226,7 @@ export function SceneAnalysisStep({
                     });
                   }
                   onScenesUpdate(newScenes);
-                  toast.success(`${newScenes.length} Szenen aus Auto-Cut erstellt`);
+                  toast.success(tx({ de: `${newScenes.length} Szenen aus Auto-Cut erstellt`, en: `${newScenes.length} scenes created from Auto-Cut`, es: `Se crearon ${newScenes.length} escenas a partir de Auto-Cut` }));
                 }
               }}
             />
