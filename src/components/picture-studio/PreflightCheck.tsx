@@ -61,8 +61,8 @@ export function PreflightCheck({
   if (wordCount > 0 && wordCount < 8) {
     tips.push({
       icon: 'info',
-      text: `Dein Prompt ist sehr kurz (${wordCount} Wörter). Der Prompt-Helfer baut daraus einen ausführlichen Master-Prompt.`,
-      action: { label: 'Prompt-Helfer öffnen', run: onOpenHelper },
+      text: tx({ de: `Dein Prompt ist sehr kurz (${wordCount} Wörter). Der Prompt-Helfer baut daraus einen ausführlichen Master-Prompt.`, en: `Your prompt is very short (${wordCount} words). The prompt helper will turn it into a detailed master prompt.`, es: `Tu prompt es muy corto (${wordCount} palabras). El asistente de prompts creará un master prompt detallado.` }),
+      action: { label: tx({ de: 'Prompt-Helfer öffnen', en: 'Open prompt helper', es: 'Abrir asistente de prompts' }), run: onOpenHelper },
     });
   }
 
