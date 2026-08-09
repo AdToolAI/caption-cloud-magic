@@ -6,7 +6,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 interface Recommendation {
   title: string;
   detail: string;
-  impact: 'hoch' | 'mittel' | 'niedrig';
+  impact: string;
   eta: string;
 }
 

@@ -30,13 +30,13 @@ interface RenderPipelinePanelProps {
 }
 
 const statusLabel: Record<PipelineStatus, string> = {
-  idle: 'Bereit',
+  idle: tx({ de: 'Bereit', en: 'Ready', es: 'Listo' }),
   queueing: tx({ de: 'Warteschlange wird vorbereitet …', en: 'Queue is being prepared...', es: 'Se está preparando la cola...' }),
   generating: tx({ de: 'Szenen werden generiert …', en: 'Scenes are being generated...', es: 'Se están generando las escenas...' }),
-  stitching: 'Wird zusammengeschnitten …',
-  ready: 'Fertig 🎬',
-  partial: 'Teilweise fertig — Entscheidung nötig',
-  failed: 'Fehlgeschlagen',
+  stitching: tx({ de: 'Wird zusammengeschnitten …', en: 'Stitching...', es: 'Uniendo...' }),
+  ready: tx({ de: 'Fertig 🎬', en: 'Finished 🎬', es: 'Terminado 🎬' }),
+  partial: tx({ de: 'Teilweise fertig — Entscheidung nötig', en: 'Partially finished — decision needed', es: 'Parcialmente terminado - se requiere decisión' }),
+  failed: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' }),
 };
 
 const statusVariant: Record<PipelineStatus, string> = {
