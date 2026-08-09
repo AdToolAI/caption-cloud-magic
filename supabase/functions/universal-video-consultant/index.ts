@@ -983,7 +983,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       }
       
       if (!cleanedMessage) {
-        const messageMatch = aiContent.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)(req)))"/);
+        const messageMatch = aiContent.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
         if (messageMatch) {
           cleanedMessage = messageMatch[1]
             .replace(/\\n/g, '\n')
@@ -1046,4 +1046,4 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+})(req)));
