@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Sparkles, Minimize2, Loader2, History, Settings, Maximize2, HeadphonesIcon, AlertTriangle, Info } from 'lucide-react';
@@ -241,7 +242,7 @@ export function AICompanionWidget() {
         setMessages(prev => [...prev, {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          content: 'Fehler beim Abrufen der Daten. Bitte versuche es erneut.',
+          content: tx({ de: 'Fehler beim Abrufen der Daten. Bitte versuche es erneut.', en: 'Error retrieving data. Please try again.', es: 'Error al recuperar los datos. Por favor, inténtalo de nuevo.' }),
           timestamp: new Date()
         }]);
       } finally {
@@ -465,7 +466,7 @@ export function AICompanionWidget() {
       console.error('AI Companion error:', error);
       setMessages(prev => prev.map(m => 
         m.id === assistantId 
-          ? { ...m, content: 'Entschuldigung, es gab einen Fehler. Bitte versuche es erneut.' }
+          ? { ...m, content: tx({ de: 'Entschuldigung, es gab einen Fehler. Bitte versuche es erneut.', en: 'Sorry, an error occurred. Please try again.', es: 'Lo sentimos, ha ocurrido un error. Por favor, inténtalo de nuevo.' }) }
           : m
       ));
     } finally {

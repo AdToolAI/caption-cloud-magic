@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Bot, Volume2, Mic, Sparkles, Save, Loader2 } from 'lucide-react';
@@ -111,12 +112,12 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
 
       onSettingsChange(settings);
       toast({
-        title: 'Einstellungen gespeichert',
+        title: tx({ de: 'Einstellungen gespeichert', en: 'Settings saved', es: 'Ajustes guardados' }),
         description: `${settings.bot_name} ist jetzt konfiguriert.`,
       });
       onClose();
       toast({
-        title: 'Einstellungen gespeichert',
+        title: tx({ de: 'Einstellungen gespeichert', en: 'Settings saved', es: 'Ajustes guardados' }),
         description: `${settings.bot_name} ist jetzt konfiguriert.`,
       });
       onClose();
@@ -124,7 +125,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
       console.error('Error saving settings:', error);
       toast({
         title: 'Fehler',
-        description: 'Einstellungen konnten nicht gespeichert werden.',
+        description: tx({ de: 'Einstellungen konnten nicht gespeichert werden.', en: 'Could not save settings.', es: 'No se pudieron guardar los ajustes.' }),
         variant: 'destructive',
       });
     } finally {
@@ -152,7 +153,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
       console.error('Error previewing voice:', error);
       toast({
         title: 'Fehler',
-        description: 'Sprachvorschau konnte nicht abgespielt werden.',
+        description: tx({ de: 'Sprachvorschau konnte nicht abgespielt werden.', en: 'Could not play voice preview.', es: 'No se pudo reproducir la vista previa de voz.' }),
         variant: 'destructive',
       });
     } finally {
