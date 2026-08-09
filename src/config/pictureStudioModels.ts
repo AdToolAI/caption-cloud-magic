@@ -102,7 +102,7 @@ export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
     model: 'FLUX 1.1 Pro Ultra',
     cost: 0.10,
     modeQuality: { create: 4, transform: 2, restyle: 3 },
-    aspectRatios: ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16', '21:9'],
+    aspectRatios: ['1:1', '3:2', '2:3', '4:5', '5:4', '16:9', '9:16', '21:9'],
     specialist: true,
     bestFor: [tx({ de: 'Midjourney-naher Look', en: 'Midjourney-like look', es: 'Estética tipo Midjourney' }), 'Fotorealismus', '4 MP'],
     promptStyleHint: 'Rich cinematic prompts with lens, lighting and film-stock language.',
