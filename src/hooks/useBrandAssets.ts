@@ -44,8 +44,8 @@ export function useBrandAssets(brandKitId: string | null | undefined) {
       const okCount = data?.ok?.length ?? 0;
       const failCount = data?.failed?.length ?? 0;
       toast({
-        title: "Brand-Pack generiert",
-        description: `${okCount} Assets erstellt${failCount ? `, ${failCount} fehlgeschlagen` : ""}.`,
+        title: tx({ de: "Brand-Pack generiert", en: "Brand pack generated", es: "Paquete de marca generado" }),
+        description: tx({ de: `${okCount} Assets erstellt${failCount ? `, ${failCount} fehlgeschlagen` : ""}.`, en: `${okCount} assets created${failCount ? `, ${failCount} failed` : ""}.`, es: `${okCount} activos creados${failCount ? `, ${failCount} fallidos` : ""}.` }),
       });
       qc.invalidateQueries({ queryKey: ["brand-assets", brandKitId] });
     } catch (e: any) {

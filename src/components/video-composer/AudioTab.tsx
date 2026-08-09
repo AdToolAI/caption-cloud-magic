@@ -311,7 +311,7 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
             {/* Free-text search */}
             <div className="space-y-1.5">
               <Label className="text-xs flex items-center gap-1">
-                <Search className="h-3 w-3" /> {t('videoComposer.musicSearchLabel') || 'Suchen (Titel, Künstler, Stichwort)'}
+                <Search className="h-3 w-3" /> {t('videoComposer.musicSearchLabel') || tx({ de: 'Suchen (Titel, Künstler, Stichwort)', en: 'Search (Title, Artist, Keyword)', es: 'Buscar (título, artista, palabra clave)' })}
               </Label>
               <Input
                 value={musicQuery}
@@ -322,11 +322,11 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
                     handleSearchMusic();
                   }
                 }}
-                placeholder={t('videoComposer.musicSearchPlaceholder') || 'z.B. Beach Sunset, Lofi Chill, Hans Zimmer...'}
+                placeholder={t('videoComposer.musicSearchPlaceholder') || tx({ de: 'z.B. Beach Sunset, Lofi Chill, Hans Zimmer...', en: 'e.g. Beach Sunset, Lofi Chill, Hans Zimmer...', es: 'p. ej. Beach Sunset, Lofi Chill, Hans Zimmer...' })}
                 className="bg-background/50 h-9"
               />
               <p className="text-[10px] text-muted-foreground">
-                {t('videoComposer.musicSearchHint') || 'Leer lassen, um nach Genre + Stimmung zu suchen.'}
+                {t('videoComposer.musicSearchHint') || tx({ de: 'Leer lassen, um nach Genre + Stimmung zu suchen.', en: 'Leave blank to search by genre + mood.', es: 'Déjalo en blanco para buscar por género y estado de ánimo.' })}
               </p>
             </div>
 

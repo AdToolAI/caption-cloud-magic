@@ -165,7 +165,7 @@ export function useMultiSceneRender(opts: Options) {
             stitched_video_url: data.outputFile,
             completed_at: new Date().toISOString(),
           });
-          toast.success('🎬 Video bereit!');
+          toast.success(tx({ de: '🎬 Video bereit!', en: '🎬 Video ready!', es: '🎬 ¡Vídeo listo!' }));
           return;
         }
         if (data?.errors?.length) {

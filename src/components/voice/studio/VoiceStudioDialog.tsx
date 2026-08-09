@@ -27,7 +27,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Mic,
   Square,
-  Upload,
+  tx({ de: "Upload", en: "Upload", es: "Carga" }),
   Trash2,
   Play,
   Pause,
@@ -197,7 +197,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       tick();
     } catch (err) {
       console.error("[VoiceStudio] mic error:", err);
-      toast.error(tx({ de: "Mikrofonzugriff wurde abgelehnt oder ist nicht verfügbar.", en: "Microphone access denied or unavailable.", es: "Acceso al micrófono denegado o no disponible." }));
+      toast.error(tx({ de: "tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" })zugriff wurde abgelehnt oder ist nicht verfügbar.", en: "Microphone access denied or unavailable.", es: "Acceso al micrófono denegado o no disponible." }));
     }
   }, []);
 
@@ -228,7 +228,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
 
       if (silent) return;
       if (chunks.length === 0) {
-        toast.error("Aufnahme war leer.");
+        toast.error(tx({ de: "Aufnahme war leer.", en: "Recording was empty.", es: "La grabación estaba vacía." }));
         setRecElapsed(0);
         return;
       }
@@ -240,7 +240,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
         return;
       }
       if (samples.length >= MAX_SAMPLES) {
-        toast.error(`Maximal ${MAX_SAMPLES} Samples.`);
+        toast.error(tx({ de: `Maximal ${MAX_SAMPLES} Samples.`, en: `Maximum ${MAX_SAMPLES} samples.`, es: `Máximo ${MAX_SAMPLES} muestras.` }));
         return;
       }
       const id = crypto.randomUUID();
@@ -261,12 +261,12 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
     [samples.length],
   );
 
-  const handleUpload = async (files: FileList | null) => {
+  const handletx({ de: "Upload", en: "Upload", es: "Carga" }) = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const accepted: Sample[] = [];
     for (const f of Array.from(files)) {
       if (samples.length + accepted.length >= MAX_SAMPLES) {
-        toast.error(`Maximal ${MAX_SAMPLES} Samples.`);
+        toast.error(tx({ de: `Maximal ${MAX_SAMPLES} Samples.`, en: `Maximum ${MAX_SAMPLES} samples.`, es: `Máximo ${MAX_SAMPLES} muestras.` }));
         break;
       }
       const type = (f.type || "").toLowerCase();
@@ -293,7 +293,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
     }
     if (accepted.length) {
       setSamples((prev) => [...prev, ...accepted]);
-      toast.success(`${accepted.length} Sample(s) hinzugefügt`);
+      toast.success(tx({ de: `${accepted.length} Sample(s) hinzugefügt`, en: `${accepted.length} sample(s) added`, es: `${accepted.length} muestra(s) añadida(s)` }));
     }
   };
 
@@ -348,14 +348,14 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) {
-        toast.error("Nicht angemeldet.");
+        toast.error(tx({ de: "Nicht angemeldet.", en: "Not logged in.", es: "No has iniciado sesión." }));
         return;
       }
 
       const draftId = crypto.randomUUID();
       const sampleUrls: string[] = [];
 
-      // 2. Upload all samples to voiceover-audio bucket
+      // 2. tx({ de: "Upload", en: "Upload", es: "Carga" }) all samples to voiceover-audio bucket
       for (let i = 0; i < samples.length; i++) {
         const s = samples[i];
         const ext = s.fileName.split(".").pop() || "wav";
@@ -404,11 +404,11 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Voice Studio — Eigene Stimme klonen
+            tx({ de: "Voice Studio — Eigene Stimme klonen", en: "Voice Studio — Clone your own voice", es: "Estudio de voz: clona tu propia voz" })
           </DialogTitle>
           <DialogDescription>
-            Nimm dich beim Vorlesen des Skripts auf oder lade eine WhatsApp-Sprachnachricht hoch.
-            Wir säubern Hintergrundrauschen automatisch.
+            tx({ de: "Nimm dich beim Vorlesen des Skripts auf oder lade eine WhatsApp-Sprachnachricht hoch.", en: "Record yourself reading the script or upload a WhatsApp voice message.", es: "Grábate leyendo el guion o sube un mensaje de voz de WhatsApp." })
+            tx({ de: "Wir säubern Hintergrundrauschen automatisch.", en: "We clean background noise automatically.", es: "Limpiamos el ruido de fondo automáticamente." })
           </DialogDescription>
         </DialogHeader>
 
@@ -425,7 +425,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 {n}
               </div>
               <span className={`text-xs ${step === n ? "font-semibold" : "text-muted-foreground"}`}>
-                {n === 1 ? "Skript" : n === 2 ? "Aufnehmen" : "Klonen"}
+                {n === 1 ? tx({ de: "Skript", en: "Script", es: "Guion" }) : n === 2 ? tx({ de: "Aufnehmen", en: "Record", es: "Grabar" }) : tx({ de: "Klonen", en: "Clone", es: "Clonar" })}
               </span>
               {n < 3 && <div className="flex-1 h-px bg-border" />}
             </div>
@@ -435,7 +435,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
         {step === 1 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Label className="text-sm">Sprache:</Label>
+              <Label className="text-sm">{tx({ de: "Sprache:", en: "Language:", es: "Idioma:" })}</Label>
               <Select
                 value={scriptLang}
                 onValueChange={(v) => setScriptLang(v as TrainingScriptLang)}
@@ -461,12 +461,12 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 id="speaker-name"
                 value={speakerName}
                 onChange={(e) => setSpeakerName(e.target.value)}
-                placeholder="z. B. Max"
+                placeholder={tx({ de: "z. B. Max", en: "e.g. Max", es: "p. ej. Max" })}
                 maxLength={40}
               />
               <p className="text-xs text-muted-foreground">
-                Wir ersetzen den Platzhalter <code>{"{NAME}"}</code> im Skript automatisch —
-                so klingt die Vorstellung natürlich.
+                tx({ de: "Wir ersetzen den Platzhalter", en: "We replace the placeholder", es: "Reemplazamos el marcador de posición" }) <code>{"{NAME}"}</code> tx({ de: "im Skript automatisch —", en: "in the script automatically —", es: "en el guion automáticamente —" })
+                tx({ de: "so klingt die Vorstellung natürlich.", en: "this way the introduction sounds natural.", es: "así la presentación suena natural." })
               </p>
             </div>
             <Card className="p-4 bg-muted/30 max-h-72 overflow-y-auto">
@@ -515,17 +515,17 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 </p>
               </div>
               <p className="text-[11px] text-muted-foreground mt-2">
-                Tipp: Aufnahme starten, kurz durchatmen, dann natürlich vorlesen.
+                tx({ de: "Tipp: Aufnahme starten, kurz durchatmen, dann natürlich vorlesen.", en: "Tip: Start recording, take a quick breath, then read naturally.", es: "Consejo: Inicia la grabación, respira profundamente y luego lee con naturalidad." })
               </p>
             </Card>
 
             <Tabs defaultValue="mic">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="mic" className="gap-2">
-                  <Mic className="h-4 w-4" /> Mikrofon
+                  <Mic className="h-4 w-4" /> tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" })
                 </TabsTrigger>
                 <TabsTrigger value="upload" className="gap-2">
-                  <Upload className="h-4 w-4" /> Datei / WhatsApp
+                  <tx({ de: "Upload", en: "Upload", es: "Carga" }) className="h-4 w-4" /> Datei / WhatsApp
                 </TabsTrigger>
               </TabsList>
 
@@ -534,10 +534,10 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">
-                        {isRecording ? "Aufnahme läuft…" : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
+                        {isRecording ? "tx({ de: "Aufnahme läuft…", en: "Recording in progress...", es: "Grabación en curso..." })" : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Ziel: 60–90 Sekunden pro Aufnahme, in ruhiger Umgebung.
+                        tx({ de: "Ziel: 60–90 Sekunden pro Aufnahme, in ruhiger Umgebung.", en: "Goal: 60–90 seconds per recording, in a quiet environment.", es: "Objetivo: 60-90 segundos por grabación, en un entorno tranquilo." })
                       </p>
                     </div>
                     <div className="text-2xl font-mono tabular-nums">
@@ -578,7 +578,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                     type="file"
                     accept="audio/*"
                     multiple
-                    onChange={(e) => handleUpload(e.target.files)}
+                    onChange={(e) => handletx({ de: "Upload", en: "Upload", es: "Carga" })(e.target.files)}
                   />
                   <p className="text-xs text-muted-foreground">
                     Tipp: Sende dir deine WhatsApp-Sprachnachricht selbst → „Teilen" → Datei
@@ -591,9 +591,9 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
             {samples.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm">Deine Samples</Label>
+                  <Label className="text-sm">{tx({ de: "Deine Samples", en: "Your samples", es: "Tus muestras" })}</Label>
                   <div className="text-xs text-muted-foreground">
-                    Gesamt: <span className="font-mono">{formatSec(totalSec)}</span> /{" "}
+                    tx({ de: "Gesamt: ", en: "Total: ", es: "Total: " })<span className="font-mono">{formatSec(totalSec)}</span> /{" "}
                     min. {MIN_TOTAL_SEC}s
                   </div>
                 </div>
@@ -619,7 +619,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                       <div className="flex-1 min-w-0">
                         <p className="text-sm truncate">{s.fileName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatSec(s.durationSec)} · {s.source === "mic" ? "Mikrofon" : "Upload"}
+                          {formatSec(s.durationSec)} · {s.source === "mic" ? "tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" })" : "tx({ de: "Upload", en: "Upload", es: "Carga" })"}
                         </p>
                       </div>
                       <Badge variant="secondary" className="text-[10px]">
@@ -654,18 +654,18 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
           <div className="space-y-4">
             <div className="grid gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="voice-name">Name der Stimme *</Label>
+                <Label htmlFor="voice-name">{tx({ de: "Name der Stimme *", en: "Voice name *", es: "Nombre de la voz *" })}</Label>
                 <Input
                   id="voice-name"
                   value={voiceName}
                   onChange={(e) => setVoiceName(e.target.value)}
-                  placeholder="z. B. Mein Voiceover"
+                  placeholder={tx({ de: "z. B. Mein Voiceover", en: "e.g. My voiceover", es: "p. ej. Mi voz en off" })}
                   maxLength={40}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
-                  <Label>Sprache</Label>
+                  <Label>{tx({ de: "Sprache", en: "Language", es: "Idioma" })}</Label>
                   <Select value={voiceLang} onValueChange={setVoiceLang}>
                     <SelectTrigger>
                       <SelectValue />
@@ -679,7 +679,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="flex items-center gap-2">
-                    Rauschen entfernen
+                    tx({ de: "Rauschen entfernen", en: "Remove noise", es: "Eliminar ruido" })
                     <Switch checked={removeNoise} onCheckedChange={setRemoveNoise} />
                   </Label>
                   <p className="text-xs text-muted-foreground">
@@ -688,7 +688,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 </div>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="voice-desc">Beschreibung (optional)</Label>
+                <Label htmlFor="voice-desc">{tx({ de: "Beschreibung (optional)", en: "Description (optional)", es: "Descripción (opcional)" })}</Label>
                 <Textarea
                   id="voice-desc"
                   value={voiceDesc}
@@ -704,8 +704,8 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
               <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
               <div className="text-xs space-y-2">
                 <p>
-                  Zusammenfassung: <strong>{samples.length}</strong> Sample(s),{" "}
-                  <strong>{formatSec(totalSec)}</strong> gesamt.
+                  tx({ de: "Zusammenfassung: ", en: "Summary: ", es: "Resumen: " })<strong>{samples.length}</strong> Sample(s),{" "}
+                  <strong>{formatSec(totalSec)}</strong> tx({ de: " gesamt.", en: " total.", es: " en total." })
                 </p>
                 <label className="flex items-start gap-2 cursor-pointer">
                   <Checkbox
@@ -728,7 +728,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
               <Button onClick={handleSubmit} disabled={!canSubmit} className="gap-2">
                 {submitting ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Klonen läuft…
+                    <Loader2 className="h-4 w-4 animate-spin" /> tx({ de: "Klonen läuft…", en: "Cloning in progress...", es: "Clonación en curso..." })
                   </>
                 ) : (
                   <>

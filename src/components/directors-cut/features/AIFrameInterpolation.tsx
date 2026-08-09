@@ -112,12 +112,12 @@ export function AIFrameInterpolation({
       {settings.enabled && (
         <div className="space-y-4">
           <div className="p-2 bg-muted/50 rounded text-center">
-            <span className="text-sm text-muted-foreground">Quell-Framerate: </span>
+            <span className="text-sm text-muted-foreground">tx({ de: "tx({ de: "Quell-Framerate: ", en: "Source framerate: ", es: "Frecuencia de fotogramas de origen: " })", en: "Source framerate: ", es: "Frecuencia de fotogramas de origen: " })</span>
             <span className="text-sm font-medium">{sourceFps} FPS</span>
           </div>
 
           <div className="space-y-2">
-            <Label>Ziel-Framerate</Label>
+            <Label>{tx({ de: "Ziel-Framerate", en: "Target Framerate", es: "Tasa de fotogramas objetivo" })}</Label>
             <RadioGroup
               value={String(settings.targetFps)}
               onValueChange={(value) => 
@@ -148,7 +148,7 @@ export function AIFrameInterpolation({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Motion Smoothing</Label>
+              <Label>{tx({ de: "Motion Smoothing", en: "Motion Smoothing", es: "Suavizado de movimiento" })}</Label>
               <span className="text-sm text-muted-foreground">
                 {settings.motionSmoothing}%
               </span>
@@ -162,15 +162,15 @@ export function AIFrameInterpolation({
               step={5}
             />
             <p className="text-xs text-muted-foreground">
-              Höhere Werte = weichere Bewegungen
+              {tx({ de: "Höhere Werte = weichere Bewegungen", en: "Higher values = smoother movements", es: "Valores más altos = movimientos más suaves" })}
             </p>
           </div>
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Motion Blur beibehalten</Label>
+              <Label>{tx({ de: "Motion Blur beibehalten", en: "Preserve motion blur", es: "Preservar desenfoque de movimiento" })}</Label>
               <p className="text-xs text-muted-foreground">
-                Erhält natürliche Bewegungsunschärfe
+                {tx({ de: "Erhält natürliche Bewegungsunschärfe", en: "Maintains natural motion blur", es: "Mantiene el desenfoque de movimiento natural" })}
               </p>
             </div>
             <Switch
@@ -185,7 +185,7 @@ export function AIFrameInterpolation({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                <Label>Slow-Motion Faktor</Label>
+                <Label>{tx({ de: "Slow-Motion Faktor", en: "Slow-Motion Factor", es: "Factor de cámara lenta" })}</Label>
               </div>
               <span className="text-sm text-muted-foreground">
                 {settings.slowMotionFactor}x
@@ -201,7 +201,7 @@ export function AIFrameInterpolation({
               step={0.5}
             />
             <p className="text-xs text-muted-foreground">
-              1x = Normal, 8x = Extreme Zeitlupe
+              {tx({ de: "1x = Normal, 8x = Extreme Zeitlupe", en: "1x = Normal, 8x = Extreme slow motion", es: "1x = Normal, 8x = Cámara lenta extrema" })}
             </p>
           </div>
 
@@ -220,12 +220,12 @@ export function AIFrameInterpolation({
             {isProcessing ? (
               <>
                 <Zap className="h-4 w-4 animate-pulse" />
-                Interpolation läuft...
+                tx({ de: "Interpolation läuft...", en: "Interpolation in progress...", es: "Interpolación en curso..." })
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Interpolation starten ({selectedOption?.credits} Credits)
+                tx({ de: `Interpolation starten (${selectedOption?.credits} Credits)`, en: `Start interpolation (${selectedOption?.credits} credits)`, es: `Iniciar interpolación (${selectedOption?.credits} créditos)` })
               </>
             )}
           </Button>
@@ -233,7 +233,7 @@ export function AIFrameInterpolation({
           <div className="p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
               <strong>Hinweis:</strong> Für beste Slow-Motion Ergebnisse 240 FPS wählen. 
-              Die KI generiert fehlende Frames basierend auf Bewegungsanalyse.
+              {tx({ de: "Die KI generiert fehlende Frames basierend auf Bewegungsanalyse.", en: "The AI ​​generates missing frames based on motion analysis.", es: "La IA genera fotogramas faltantes basándose en el análisis del movimiento." })}
             </p>
           </div>
         </div>

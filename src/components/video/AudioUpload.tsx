@@ -18,7 +18,7 @@ export function AudioUpload({
   value,
   onChange,
   disabled = false,
-  label = 'Hintergrundmusik'
+  label = tx({ de: "Hintergrundmusik", en: "Background music", es: "Música de fondo" })
 }: AudioUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -33,7 +33,7 @@ export function AudioUpload({
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Audio zu groß. Maximal 10MB erlaubt');
+      toast.error(tx({ de: 'Audio zu groß. Maximal 10MB erlaubt', en: 'Audio too large. Maximum 10MB allowed', es: 'Audio demasiado grande. Máximo 10 MB permitidos' }));
       return;
     }
 
@@ -54,7 +54,7 @@ export function AudioUpload({
       const url = URL.createObjectURL(file);
       onChange({ url, volume: 0.5 });
       setProgress(100);
-      toast.success('Audio hochgeladen');
+      toast.success(tx({ de: 'Audio hochgeladen', en: 'Audio uploaded', es: 'Audio subido' }));
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }));
@@ -146,7 +146,7 @@ export function AudioUpload({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Lautstärke</Label>
+              <Label className="text-xs">{tx({ de: "Lautstärke", en: "Volume", es: "Volumen" })}</Label>
               <span className="text-xs text-muted-foreground">
                 {Math.round(value.volume * 100)}%
               </span>

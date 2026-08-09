@@ -76,7 +76,7 @@ export function useNLEExport(projectId?: string) {
   const runExport = useCallback(
     async (format: NLEFormat, opts?: { fps?: number }) => {
       if (!projectId) {
-        toast.error('Kein Projekt ausgewählt');
+        toast.error(tx({ de: 'Kein Projekt ausgewählt', en: 'No project selected', es: 'Ningún proyecto seleccionado' }));
         return null;
       }
       setExporting(format);
@@ -91,7 +91,7 @@ export function useNLEExport(projectId?: string) {
         });
         if (error) throw new Error(error.message);
         if (!data?.success || !data.downloadUrl) {
-          throw new Error('Kein Download-Link erhalten');
+          throw new Error(tx({ de: 'Kein Download-Link erhalten', en: 'No download link received', es: 'No se recibió ningún enlace de descarga' }));
         }
 
         const ext = format === 'bundle' ? 'zip' : format === 'fcpxml' ? 'fcpxml' : 'edl';
@@ -135,7 +135,7 @@ export function useNLEExport(projectId?: string) {
   const previewImport = useCallback(
     async (file: File) => {
       if (!projectId) {
-        toast.error('Kein Projekt ausgewählt');
+        toast.error(tx({ de: 'Kein Projekt ausgewählt', en: 'No project selected', es: 'Ningún proyecto seleccionado' }));
         return null;
       }
       try {
@@ -168,7 +168,7 @@ export function useNLEExport(projectId?: string) {
         if (!data?.success) throw new Error(data?.error || tx({ de: 'Import fehlgeschlagen', en: 'Import failed', es: 'Importación fallida' }));
         const a = data.applied;
         toast.success(
-          `Übernommen: ${a?.reordered ?? 0} umsortiert, ${a?.trimmed ?? 0} getrimmt`,
+          tx({ de: `Übernommen: ${a?.reordered ?? 0} umsortiert, ${a?.trimmed ?? 0} getrimmt`, en: `Applied: ${a?.reordered ?? 0} reordered, ${a?.trimmed ?? 0} trimmed`, es: `Aplicado: ${a?.reordered ?? 0} reordenado, ${a?.trimmed ?? 0} recortado` }),
           { id: toastId },
         );
         return data;

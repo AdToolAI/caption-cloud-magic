@@ -75,7 +75,7 @@ const templates: SmartTemplate[] = [
   {
     id: 'vlog-style',
     name: 'Vlog Style',
-    description: 'Natürliche Jump Cuts, authentische Farben, persönlicher Touch',
+    description: tx({ de: 'Natürliche Jump Cuts, authentische Farben, persönlicher Touch', en: 'Natural jump cuts, authentic colors, personal touch', es: 'Cortes de salto naturales, colores auténticos, toque personal' }),
     icon: <Video className="w-5 h-5" />,
     color: 'from-green-500 to-emerald-500',
     preview: {
@@ -93,7 +93,7 @@ const templates: SmartTemplate[] = [
   {
     id: 'music-video',
     name: 'Music Video',
-    description: 'Beat-Sync Schnitte, hohe Sättigung, dramatische Übergänge',
+    description: tx({ de: 'Beat-Sync Schnitte, hohe Sättigung, dramatische Übergänge', en: 'Beat-sync cuts, high saturation, dramatic transitions', es: 'Cortes de sincronización de ritmo, alta saturación, transiciones dramáticas' }),
     icon: <Music2 className="w-5 h-5" />,
     color: 'from-purple-500 to-violet-500',
     preview: {
@@ -146,7 +146,7 @@ export function SmartTemplates({ onApply, currentTemplateId }: SmartTemplatesPro
           <h3 className="font-semibold">Smart Templates</h3>
         </div>
         <Badge variant="secondary" className="text-xs">
-          One-Click Styles
+          tx({ de: "One-Click Styles", en: "One-Click Styles", es: "Estilos de un clic" })
         </Badge>
       </div>
 
@@ -236,19 +236,19 @@ export function SmartTemplates({ onApply, currentTemplateId }: SmartTemplatesPro
                         className="pt-2 border-t border-border/50 space-y-1.5"
                       >
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">Übergang</span>
+                          <span className="text-muted-foreground">{tx({ de: "Übergang", en: "Transition", es: "Transición" })}</span>
                           <span className="font-medium capitalize">{template.preview.transitionType}</span>
                         </div>
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">{tx({ de: "Ø Szene", en: "Ø Scene", es: "Ø Escena" })}</span>
+                          <span className="text-muted-foreground">{tx({ de: "tx({ de: "Ø Szene", en: "Ø Scene", es: "Ø Escena" })", en: "Ø Scene", es: "Ø Escena" })}</span>
                           <span className="font-medium">{template.preview.avgSceneDuration}s</span>
                         </div>
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">Kontrast</span>
+                          <span className="text-muted-foreground">{tx({ de: "Kontrast", en: "Contrast", es: "Contraste" })}</span>
                           <span className="font-medium">{template.preview.effects.contrast}%</span>
                         </div>
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">Sättigung</span>
+                          <span className="text-muted-foreground">{tx({ de: "Sättigung", en: "Saturation", es: "Saturación" })}</span>
                           <span className="font-medium">{template.preview.effects.saturation}%</span>
                         </div>
                       </motion.div>
@@ -290,8 +290,8 @@ export function SmartTemplates({ onApply, currentTemplateId }: SmartTemplatesPro
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Eye className="w-4 h-4" />
               <span>
-                Klicke auf ein Template, um es auf alle Szenen anzuwenden. 
-                Die Einstellungen können danach noch angepasst werden.
+                {tx({ de: "Klicke auf ein Template, um es auf alle Szenen anzuwenden.", en: "Click on a template to apply it to all scenes.", es: "Haz clic en una plantilla para aplicarla a todas las escenas." })} 
+                {tx({ de: "Die Einstellungen können danach noch angepasst werden.", en: "The settings can still be adjusted afterwards.", es: "Los ajustes todavía se pueden adaptar después." })}
               </span>
             </div>
           </motion.div>

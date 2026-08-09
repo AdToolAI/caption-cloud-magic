@@ -40,18 +40,18 @@ interface EffectGroup {
 const EFFECT_GROUPS: EffectGroup[] = [
   {
     id: 'noise',
-    label: 'Rauschunterdrückung',
+    label: tx({ de: 'Rauschunterdrückung', en: 'Noise Reduction', es: 'Reducción de ruido' }),
     icon: Volume2,
     effects: [
-      { key: 'highPassFilter', label: 'Hochpass', shortLabel: 'HP 120Hz', description: 'Entfernt tiefes Rumpeln' },
-      { key: 'lowPassFilter', label: 'Tiefpass', shortLabel: 'LP 10kHz', description: 'Entfernt Zischen' },
-      { key: 'notchFilter', label: 'Notch', shortLabel: '50/60Hz', description: 'Entfernt Netzbrummen' },
+      { key: 'highPassFilter', label: tx({ de: 'Hochpass', en: 'High Pass', es: 'Paso alto' }), shortLabel: 'HP 120Hz', description: 'Entfernt tiefes Rumpeln' },
+      { key: 'lowPassFilter', label: tx({ de: 'Tiefpass', en: 'Low Pass', es: 'Paso bajo' }), shortLabel: 'LP 10kHz', description: 'Entfernt Zischen' },
+      { key: 'notchFilter', label: tx({ de: 'Notch', en: 'Notch', es: 'Muesca' }), shortLabel: '50/60Hz', description: 'Entfernt Netzbrummen' },
       { key: 'noiseGate', label: 'Gate', shortLabel: '-40dB', description: tx({ de: 'Schaltet Stille stumm', en: 'Mutes silence', es: 'Silencia el silencio' }) },
     ]
   },
   {
     id: 'voice',
-    label: 'Stimme',
+    label: tx({ de: 'Stimme', en: 'Voice', es: 'Voz' }),
     icon: Mic,
     effects: [
       { key: 'voiceEQ', label: 'Voice EQ', shortLabel: '+3dB 3kHz', description: 'Klarheit boosten' },
@@ -62,19 +62,19 @@ const EFFECT_GROUPS: EffectGroup[] = [
   },
   {
     id: 'finishing',
-    label: 'Finishing',
+    label: tx({ de: 'Finishing', en: 'Finishing', es: 'Acabado' }),
     icon: Sparkles,
     effects: [
       { key: 'boxinessCut', label: 'Box-Cut', shortLabel: '-2.5dB 250Hz', description: 'Boxy Sound entfernen' },
       { key: 'mudCut', label: 'Mud-Cut', shortLabel: '-2dB 500Hz', description: 'Schlammigkeit' },
       { key: 'airBoost', label: 'Air', shortLabel: '+1.5dB 10kHz+', description: tx({ de: 'Brillanz hinzufügen', en: 'Add brilliance', es: 'Añade brillo' }) },
-      { key: 'compression', label: 'Komp.', shortLabel: '4:1 -24dB', description: 'Dynamik komprimieren' },
+      { key: 'compression', label: tx({ de: 'Komp.', en: 'Comp.', es: 'Comp.' }), shortLabel: '4:1 -24dB', description: 'Dynamik komprimieren' },
       { key: 'limiter', label: 'Limiter', shortLabel: '-1dB 20:1', description: 'Clipping verhindern' },
     ]
   },
   {
     id: 'stereo',
-    label: 'Stereo & Output',
+    label: tx({ de: 'Stereo label: 'Stereo & Output' Output', en: 'Stereo label: 'Stereo & Output' Output', es: 'Estéreo y salida' }),
     icon: Music,
     effects: [
       { key: 'stereoWidener', label: 'Stereo Widener', shortLabel: '15ms Haas', description: tx({ de: 'Stereo-Bild verbreitern', en: 'Widen stereo image', es: 'Ampliar imagen estéreo' }) },
@@ -84,10 +84,10 @@ const EFFECT_GROUPS: EffectGroup[] = [
 ];
 
 const PRESETS = [
-  { id: 'minimal', label: 'Minimal', icon: Settings2, config: PRESET_MINIMAL },
-  { id: 'podcast', label: 'Podcast', icon: Mic, config: PRESET_PODCAST },
-  { id: 'radio', label: 'Radio', icon: Radio, config: PRESET_RADIO },
-  { id: 'maximal', label: 'Maximal', icon: Zap, config: PRESET_MAXIMAL },
+  { id: 'minimal', label: tx({ de: 'Minimal', en: 'Minimal', es: 'Mínimo' }), icon: Settings2, config: PRESET_MINIMAL },
+  { id: 'podcast', label: tx({ de: 'Podcast', en: 'Podcast', es: 'Pódcast' }), icon: Mic, config: PRESET_PODCAST },
+  { id: 'radio', label: tx({ de: 'Radio', en: 'Radio', es: 'Radio' }), icon: Radio, config: PRESET_RADIO },
+  { id: 'maximal', label: tx({ de: 'Maximal', en: 'Maximal', es: 'Máximo' }), icon: Zap, config: PRESET_MAXIMAL },
 ];
 
 export function EffectControlPanel({ 
@@ -141,7 +141,7 @@ export function EffectControlPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sliders className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-sm">Effekt-Mixer</h3>
+          <h3 className="font-semibold text-sm">{tx({ de: 'Effekt-Mixer', en: 'Effect Mixer', es: 'Mezclador de efectos' })}</h3>
           <span className="text-xs text-muted-foreground">
             ({enabledCount}/{totalEffects})
           </span>
@@ -241,12 +241,12 @@ export function EffectControlPanel({
         {isProcessing ? (
           <>
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            Verarbeite...
+            {tx({ de: 'Verarbeite...', en: 'Processing...', es: 'Procesando...' })}
           </>
         ) : (
           <>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Neu verarbeiten
+            {tx({ de: 'Neu verarbeiten', en: 'Reprocess', es: 'Reprocesar' })}
           </>
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
@@ -254,7 +254,7 @@ export function EffectControlPanel({
       
       {/* Info */}
       <p className="text-[10px] text-muted-foreground text-center">
-        {tx({ de: 'Klicke auf einzelne Effekte um sie ein/auszuschalten, dann "Neu verarbeiten".', en: 'Click individual effects to toggle them, then "Reprocess".', es: 'Haz clic en los efectos para activarlos o desactivarlos y luego "Reprocesar".' })}
+        {tx({ de: 'Klicke auf einzelne Effekte um sie ein/auszuschalten, dann "{tx({ de: 'Neu verarbeiten', en: 'Reprocess', es: 'Reprocesar' })}".', en: 'Click individual effects to toggle them, then "Reprocess".', es: 'Haz clic en los efectos para activarlos o desactivarlos y luego "Reprocesar".' })}
       </p>
     </div>
   );

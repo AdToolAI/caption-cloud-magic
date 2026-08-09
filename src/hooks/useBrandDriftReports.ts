@@ -47,8 +47,8 @@ export function useBrandDriftReports(brandKitId: string | null | undefined) {
     },
     onSuccess: (data: any) => {
       toast({
-        title: "Konsistenz-Scan abgeschlossen",
-        description: `${data?.drifts ?? 0} Drifts gefunden`,
+        title: tx({ de: "Konsistenz-Scan abgeschlossen", en: "Consistency scan completed", es: "Escaneo de consistencia completado" }),
+        description: tx({ de: `${data?.drifts ?? 0} Drifts gefunden`, en: `${data?.drifts ?? 0} drifts found`, es: `Se han encontrado ${data?.drifts ?? 0} desviaciones` }),
       });
       qc.invalidateQueries({ queryKey: ["brand-drift-reports", brandKitId] });
       qc.invalidateQueries({ queryKey: ["brand-kits"] });

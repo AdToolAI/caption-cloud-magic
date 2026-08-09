@@ -184,7 +184,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <h3 className="text-lg font-bold">Final Mix Export Hub</h3>
-              <Badge variant="outline" className="border-primary/40 text-primary">Sendefertig</Badge>
+              <Badge variant="outline" className="border-primary/40 text-primary">{tx({ de: 'Sendefertig', en: 'Ready to broadcast', es: 'Listo para emitir' })}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">
               Voiceover + Music + Stems + SFX → ein finales 48kHz WAV mit Loudness-Normalisierung
@@ -199,7 +199,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <AudioLines className="w-5 h-5 text-primary" />
-            <h4 className="font-semibold">Quellen ({mixer.sources.length})</h4>
+            <h4 className="font-semibold">tx({ de: `Quellen (${mixer.sources.length})`, en: `Sources (${mixer.sources.length})`, es: `Fuentes (${mixer.sources.length})` })</h4>
             {mixer.decoding && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
           </div>
           <div className="flex gap-2">
@@ -218,8 +218,8 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
         {mixer.sources.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border/40 rounded-xl">
             <FileAudio className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">{tx({ de: "Noch keine Quellen.", en: "No sources yet.", es: "Aún no hay fuentes." })}</p>
-            <p className="text-xs mt-1">{tx({ de: "Füge Voiceover, Music oder Stems aus dem Studio hinzu.", en: "Add voiceover, music, or stems from the studio.", es: "Añade voz en off, música o stems desde el estudio." })}</p>
+            <p className="text-sm">{tx({ de: "{tx({ de: 'Noch keine Quellen.', en: 'No sources yet.', es: 'Aún no hay fuentes.' })}", en: "No sources yet.", es: "Aún no hay fuentes." })}</p>
+            <p className="text-xs mt-1">{tx({ de: "{tx({ de: 'Füge Voiceover, Music oder Stems aus dem Studio hinzu.', en: 'Add voiceover, music or stems from the studio.', es: 'Agregue voz en off, música o temas del estudio.' })}", en: "Add voiceover, music, or stems from the studio.", es: "Añade voz en off, música o stems desde el estudio." })}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -355,7 +355,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
       <Card className="backdrop-blur-xl bg-card/60 border-border/50 p-5">
         <div className="flex items-center gap-2 mb-3">
           <Activity className="w-5 h-5 text-primary" />
-          <h4 className="font-semibold">Loudness-Ziel</h4>
+          <h4 className="font-semibold">{tx({ de: 'Loudness-Ziel', en: 'Loudness target', es: 'Objetivo de sonoridad' })}</h4>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -384,20 +384,20 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
             disabled={measuring || mixer.sources.length === 0}
           >
             {measuring ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Activity className="w-4 h-4 mr-2" />}
-            Aktuelle Lautheit messen
+            {tx({ de: 'Aktuelle Lautheit messen', en: 'Measure current loudness', es: 'Medir sonoridad actual' })}
           </Button>
         </div>
 
         {measuredLufs !== null && (
           <div className="rounded-lg bg-muted/30 p-3 flex items-center justify-between">
             <div>
-              <p className="text-[11px] text-muted-foreground">Gemessen</p>
+              <p className="text-[11px] text-muted-foreground">{tx({ de: 'Gemessen', en: 'Measured', es: 'Medido' })}</p>
               <p className={`text-lg font-mono font-bold ${lufsColor}`}>
                 {measuredLufs.toFixed(1)} LUFS
               </p>
             </div>
             <div className="text-right">
-              <p className="text-[11px] text-muted-foreground">Ziel</p>
+              <p className="text-[11px] text-muted-foreground">tx({ de: 'Ziel', en: 'Target', es: 'Objetivo' })}</p>
               <p className="text-lg font-mono font-bold text-primary">
                 {mixer.target.id === 'none' ? '—' : `${mixer.target.lufs} LUFS`}
               </p>

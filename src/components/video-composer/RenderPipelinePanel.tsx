@@ -125,7 +125,7 @@ export default function RenderPipelinePanel({
                 </Badge>
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {tx({ de: 'Szenen einzeln rendern · {tx({ de: 'Final stitchen', en: 'Final stitch', es: 'Unión final' })} · Direkt in Director&apos;s Cut öffnen.', en: 'Render scenes individually · Final stitch · Open directly in Director&apos;s Cut.', es: 'Renderizar escenas individualmente · Unión final · Abrir directamente en Director&apos;s Cut.' })}
+                {tx({ de: "Szenen einzeln rendern · Final stitchen · Direkt in Director's Cut öffnen.", en: "Render scenes individually · Final stitch · Open directly in Director's Cut.", es: "Renderizar escenas individualmente · Unión final · Abrir directamente en Director's Cut." })}
               </p>
             </div>
           </div>
@@ -163,7 +163,7 @@ export default function RenderPipelinePanel({
             {status === 'failed' && (
               <Button size="sm" variant="outline" onClick={reset}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                {tx({ de: '{tx({ de: 'Neu', en: 'New', es: 'Nuevo' })} starten', en: 'Restart', es: 'Reiniciar' })}
+                {tx({ de: 'Neu starten', en: 'Restart', es: 'Reiniciar' })}
               </Button>
             )}
             {(status === 'ready' || (status === 'partial' && videoUrl)) && (

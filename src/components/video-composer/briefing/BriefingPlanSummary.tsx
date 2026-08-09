@@ -132,22 +132,22 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardTrigger asChild>
                 <Badge variant="outline" className="border-emerald-400/40 text-emerald-300 gap-1 cursor-help">
                   <FileCheck2 className="h-3 w-3" />
-                  Skript 1:1 übernommen
+                  {tx({ de: 'Skript 1:1 übernommen', en: 'Script applied 1:1', es: 'Guion aplicado 1:1' })}
                   {(fidelity.repairedTexts ?? 0) + (fidelity.repairedSpeakers ?? 0) > 0 && (
                     <span className="opacity-70">· {(fidelity.repairedTexts ?? 0) + (fidelity.repairedSpeakers ?? 0)} repariert</span>
                   )}
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[320px] text-[11px]">
-                <div className="font-medium mb-1">Briefing-Treue (LITERAL)</div>
+                <div className="font-medium mb-1">{tx({ de: 'Briefing-Treue (LITERAL)', en: 'Briefing Fidelity (LITERAL)', es: 'Fidelidad de las instrucciones (LITERAL)' })}</div>
                 <div className="text-muted-foreground space-y-0.5">
                   <div>{tx({ de: "Szenen im Skript:", en: "Scenes in the script:", es: "Escenas del guión:" })} <span className="text-foreground">{fidelity.scenesInScript ?? 0}</span></div>
                   <div>{tx({ de: "Szenen gematcht:", en: "Scenes matched:", es: "Escenas coincidentes:" })} <span className="text-foreground">{fidelity.scenesMatched ?? 0}</span></div>
-                  <div>Dialog-Texte repariert: <span className="text-foreground">{fidelity.repairedTexts ?? 0}</span></div>
-                  <div>Sprecher neu zugeordnet: <span className="text-foreground">{fidelity.repairedSpeakers ?? 0}</span></div>
+                  <div>{tx({ de: 'Dialog-Texte repariert:', en: 'Dialog texts repaired:', es: 'Textos de diálogo reparados:' })} <span className="text-foreground">{fidelity.repairedTexts ?? 0}</span></div>
+                  <div>{tx({ de: 'Sprecher neu zugeordnet:', en: 'Speakers reassigned:', es: 'Altavoces reasignados:' })} <span className="text-foreground">{fidelity.repairedSpeakers ?? 0}</span></div>
                 </div>
                 <div className="mt-2 text-[10px] text-muted-foreground">
-                  Dein Skript wurde wörtlich übernommen. Die KI hat nur Visuals & Meta ergänzt.
+                  {tx({ de: 'Dein Skript wurde wörtlich übernommen. Die KI hat nur Visuals & Meta ergänzt.', en: 'Your script was taken literally. The AI ​​only added visuals & meta.', es: 'Tu guion fue tomado literalmente. La IA solo agregó elementos visuales y metadatos.' })}
                 </div>
               </HoverCardContent>
             </HoverCard>
@@ -157,17 +157,17 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardTrigger asChild>
                 <Badge variant="outline" className="border-sky-400/40 text-sky-300 gap-1 cursor-help">
                   <Clock className="h-3 w-3" />
-                  Skript-Timing verwendet
+                  {tx({ de: 'Skript-Timing verwendet', en: 'Script timing used', es: 'Se utilizó el tiempo de guion' })}
                   {/* J7 — chip reflects the ACTUAL rendered scene count (post-reducer),
                       not the raw detector output, so it can never disagree with the sheet. */}
-                  <span className="opacity-70">· {plan.scenes?.length ?? 0} {(plan.scenes?.length ?? 0) === 1 ? 'Shot' : 'Shots'}</span>
+                  <span className="opacity-70">· {plan.scenes?.length ?? 0} {tx({ de: (plan.scenes?.length ?? 0) === 1 ? 'Shot' : 'Shots', en: (plan.scenes?.length ?? 0) === 1 ? 'Shot' : 'Shots', es: (plan.scenes?.length ?? 0) === 1 ? 'Escena' : 'Escenas' })}</span>
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[320px] text-[11px]">
-                <div className="font-medium mb-1">Skript gewinnt vor Board-Dauer</div>
+                <div className="font-medium mb-1">{tx({ de: 'Skript gewinnt vor Board-Dauer', en: 'Script wins over board duration', es: 'El guion gana sobre la duración del tablero' })}</div>
                 <div className="text-muted-foreground">
                   Dein Skript enthält {scriptTiming!.mode === 'SHOT_MARKERS' ? 'explizite Shot-Marker' : 'strukturierte Sprecher-Blöcke'}.
-                  Die im Board eingetragene Gesamtdauer wurde ignoriert und die Szenen folgen dem Skript.
+                  {tx({ de: 'Die im Board eingetragene Gesamtdauer wurde ignoriert und die Szenen folgen dem Skript.', en: 'The total duration entered in the board was ignored and the scenes follow the script.', es: 'Se ignoró la duración total ingresada en el tablero y las escenas siguen el guion.' })}
                 </div>
               </HoverCardContent>
             </HoverCard>
@@ -177,14 +177,14 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardTrigger asChild>
                 <Badge variant="outline" className="border-sky-400/40 text-sky-300 gap-1 cursor-help">
                   <Clock className="h-3 w-3" />
-                  {meta?.source === 'local-fallback' ? 'Lokaler Fallback' : 'Skript-Dauer verwendet'}
+                  {meta?.source === 'local-fallback' ? tx({ de: 'Lokaler Fallback', en: 'Local Fallback', es: 'Reserva local' }) : tx({ de: 'Skript-Dauer verwendet', en: 'Script duration used', es: 'Duración del guion utilizada' })}
                   <span className="opacity-70">· {canonicalDuration}s</span>
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[320px] text-[11px]">
-                <div className="font-medium mb-1">Briefing-Dauer gewinnt</div>
+                <div className="font-medium mb-1">{tx({ de: 'Briefing-Dauer gewinnt', en: 'Briefing duration wins', es: 'La duración del briefing gana' })}</div>
                 <div className="text-muted-foreground">
-                  Die Gesamtdauer wurde direkt aus dem Briefing gelesen und vor dem Board-Wert angewendet.
+                  {tx({ de: 'Die Gesamtdauer wurde direkt aus dem Briefing gelesen und vor dem Board-Wert angewendet.', en: 'The total duration was read directly from the briefing and applied before the board value.', es: 'La duración total se leyó directamente del briefing y se aplicó antes del valor del tablero.' })}
                   {canonicalTiming?.sceneCount ? tx({ de: ` Erkannte Struktur: ${canonicalTiming.sceneCount} Szenen.`, en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }) : ''}
                 </div>
               </HoverCardContent>
@@ -195,14 +195,14 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardTrigger asChild>
                 <Badge variant="outline" className="border-emerald-400/40 text-emerald-300 gap-1 cursor-help">
                   <Clock className="h-3 w-3" />
-                  Szenensumme verwendet
+                  {tx({ de: 'Szenensumme verwendet', en: 'Scene sum used', es: 'Suma de escenas utilizada' })}
                   <span className="opacity-70">· {appliedDuration}s</span>
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[340px] text-[11px]">
-                <div className="font-medium mb-1">Widersprüchliche Dauer repariert</div>
+                <div className="font-medium mb-1">{tx({ de: 'Widersprüchliche Dauer repariert', en: 'Conflicting duration repaired', es: 'Duración en conflicto reparada' })}</div>
                 <div className="text-muted-foreground">
-                  Die sichtbaren Szenendauern wurden als Wahrheit verwendet, weil die erkannte Dauer nicht zur Szenensumme passte.
+                  {tx({ de: 'Die sichtbaren Szenendauern wurden als Wahrheit verwendet, weil die erkannte Dauer nicht zur Szenensumme passte.', en: 'The visible scene durations were used as truth because the detected duration did not match the sum of scenes.', es: 'Las duraciones de las escenas visibles se utilizaron como verdad porque la duración detectada no coincidía con la suma de las escenas.' })}
                   {typeof canonicalDuration === 'number' ? ` Ignorierter Wert: ${canonicalDuration}s.` : ''}
                 </div>
               </HoverCardContent>
@@ -213,12 +213,12 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardTrigger asChild>
                 <Badge variant="outline" className="border-orange-400/40 text-orange-300 gap-1 cursor-help">
                   <Timer className="h-3 w-3" />
-                  Auto-Extend
-                  <span className="opacity-70">· {extendCount} {extendCount === 1 ? 'Szene' : 'Szenen'}</span>
+                  {tx({ de: 'Auto-Extend', en: 'Auto-Extend', es: 'Extensión automática' })}
+                  <span className="opacity-70">· {extendCount} {tx({ de: extendCount === 1 ? 'Szene' : 'Szenen', en: extendCount === 1 ? 'Scene' : 'Scenes', es: extendCount === 1 ? 'Escena' : 'Escenas' })}</span>
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[340px] text-[11px]">
-                <div className="font-medium mb-1">Dauer automatisch verlängert</div>
+                <div className="font-medium mb-1">{tx({ de: 'Dauer automatisch verlängert', en: 'Duration automatically extended', es: 'Duración extendida automáticamente' })}</div>
                 <div className="text-muted-foreground space-y-0.5">
                   {(durationExtend ?? []).slice(0, 6).map((d, i) => (
                     <div key={i}>
@@ -229,7 +229,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                   ))}
                 </div>
                 <div className="mt-2 text-[10px] text-muted-foreground">
-                  Skript ist länger als die geplante Dauer — die Szene wurde um 1s über die Sprechdauer verlängert, damit die VO nicht abgeschnitten wird.
+                  {tx({ de: 'Skript ist länger als die geplante Dauer — die Szene wurde um 1s über die Sprechdauer verlängert, damit die VO nicht abgeschnitten wird.', en: 'The script is longer than the planned duration — the scene was extended by 1s over the speaking duration so that the VO is not cut off.', es: 'El guion es más largo que la duración prevista: la escena se amplió 1 s por encima de la duración del habla para que la voz en off no se corte.' })}
                 </div>
               </HoverCardContent>
             </HoverCard>
@@ -239,7 +239,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
               <HoverCardTrigger asChild>
                 <Badge variant="outline" className="gap-1 cursor-help">
                   <Sparkles className="h-3 w-3 text-amber-300" />
-                  {aiFilledCount} AI-Felder ergänzt
+                  {aiFilledCount} {tx({ de: 'AI-Felder ergänzt', en: 'AI fields added', es: 'Campos de IA añadidos' })}
                   <span className="opacity-60">· ~{aiFillPct}%</span>
                 </Badge>
               </HoverCardTrigger>
@@ -248,7 +248,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <div className="text-muted-foreground space-y-1">
                   {meta?.aiFilled?.length ? (
                     <div>
-                      <span className="text-foreground">Plan-Ebene:</span>{' '}
+                      <span className="text-foreground">{tx({ de: 'Plan-Ebene:', en: 'Plan Level:', es: 'Nivel del plan:' })}</span>{' '}
                       {meta.aiFilled.join(', ')}
                     </div>
                   ) : null}
@@ -278,7 +278,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 </Badge>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-[380px] text-[11px] font-mono">
-                <div className="font-sans font-medium mb-1.5 text-foreground">Parser-Diagnostik</div>
+                <div className="font-sans font-medium mb-1.5 text-foreground">{tx({ de: 'Parser-Diagnostik', en: 'Parser Diagnostics', es: 'Diagnóstico del analizador' })}</div>
                 <div className="space-y-1 text-muted-foreground">
                   <div>
                     <span className="text-foreground">Pass A:</span>{' '}
@@ -347,7 +347,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
           )}
         </div>
         <span className="text-muted-foreground text-[10px]">
-          ✨ markiert = von der KI auf Basis deines Briefings ergänzt.
+          {tx({ de: '✨ markiert = von der KI auf Basis deines Briefings ergänzt.', en: '✨ marked = added by the AI ​​based on your briefing.', es: '✨ marcado = añadido por la IA basándose en tus instrucciones.' })}
         </span>
       </div>
 

@@ -52,7 +52,7 @@ export const ScaleCockpit = () => {
   return (
     <div
       role="img"
-      aria-label="Multi-Channel Skalierungs-Vorschau"
+      aria-label={tx({ de: "Multi-Channel Skalierungs-Vorschau", en: "Multi-channel scaling preview", es: "Vista previa de escalado multicanal" })}
       className="relative h-[170px] w-full rounded-xl border border-border/40 bg-gradient-to-br from-background/40 to-card/20 p-3 overflow-hidden"
     >
       {/* ticker */}

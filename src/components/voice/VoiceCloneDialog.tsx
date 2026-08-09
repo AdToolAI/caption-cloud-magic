@@ -87,22 +87,22 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Voice klonen</DialogTitle>
+          <DialogTitle>{tx({ de: "Voice klonen", en: "Clone voice", es: "Clonar voz" })}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="voice-name">Voice Name</Label>
+            <Label htmlFor="voice-name">{tx({ de: "Voice Name", en: "Voice name", es: "Nombre de la voz" })}</Label>
             <Input
               id="voice-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="z.B. Meine Stimme"
+              placeholder={tx({ de: "z.B. Meine Stimme", en: "e.g. My voice", es: "p. ej. Mi voz" })}
             />
           </div>
 
           <div>
-            <Label htmlFor="language">Sprache</Label>
+            <Label htmlFor="language">{tx({ de: "Sprache", en: "Language", es: "Idioma" })}</Label>
             <Select value={language} onValueChange={setLanguage}>
               <SelectTrigger>
                 <SelectValue />
@@ -118,7 +118,7 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
           </div>
 
           <div>
-            <Label>Audio-Samples (min. 3)</Label>
+            <Label>{tx({ de: "Audio-Samples (min. 3)", en: "Audio samples (min. 3)", es: "Muestras de audio (mín. 3)" })}</Label>
             <div className="mt-2 space-y-2">
               {audioFiles.map((file, index) => (
                 <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
@@ -136,7 +136,7 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
               {audioFiles.length < 5 && (
                 <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-muted rounded cursor-pointer hover:border-primary transition-colors">
                   <Upload className="h-4 w-4" />
-                  <span className="text-sm">Audio hochladen (.mp3, .wav)</span>
+                  <span className="text-sm">{tx({ de: "Audio hochladen (.mp3, .wav)", en: "Upload audio (.mp3, .wav)", es: "Subir audio (.mp3, .wav)" })}</span>
                   <input
                     type="file"
                     accept="audio/*"
@@ -157,7 +157,7 @@ export function VoiceCloneDialog({ open, onOpenChange }: VoiceCloneDialogProps) 
             disabled={loading || uploading || audioFiles.length < 1}
             className="w-full"
           >
-            {uploading ? 'Lädt hoch...' : loading ? 'Klont Voice...' : 'Voice klonen'}
+            {uploading ? tx({ de: 'Lädt hoch...', en: 'Uploading...', es: 'Subiendo...' }) : loading ? tx({ de: 'Klont Voice...', en: 'Cloning voice...', es: 'Clonando voz...' }) : tx({ de: 'Voice klonen', en: 'Clone voice', es: 'Clonar voz' })}
           </Button>
         </div>
       </DialogContent>

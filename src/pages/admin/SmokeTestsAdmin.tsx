@@ -139,7 +139,7 @@ export function SmokeTestsAdmin() {
         <CardContent>
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="rounded-lg border border-border p-4">
-              <p className="text-sm text-muted-foreground">Tests Total</p>
+              <p className="text-sm text-muted-foreground">{tx({ de: "Tests Total", en: "Total tests", es: "Total de pruebas" })}</p>
               <p className="text-2xl font-bold">{summary.length}</p>
             </div>
             <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4">
@@ -153,12 +153,12 @@ export function SmokeTestsAdmin() {
           </div>
 
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Lade...</div>
+            <div className="text-center py-8 text-muted-foreground">{tx({ de: "Lade...", en: "Loading...", es: "Cargando..." })}</div>
           ) : summary.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p className="font-medium">{tx({ de: "Noch keine Smoke-Test-Daten", en: "No smoke test data yet", es: "Aún no hay datos de pruebas de humo" })}</p>
-              <p className="text-sm mt-1">Klicke „Jetzt ausführen" um den ersten Test zu starten.</p>
+              <p className="text-sm mt-1">tx({ de: "Klicke „Jetzt ausführen" um den ersten Test zu starten.", en: "Click "Execute now" to start the first test.", es: "Haz clic en "Ejecutar ahora" para iniciar la primera prueba." })</p>
             </div>
           ) : (
             <div className="space-y-2">

@@ -124,14 +124,14 @@ export function AudiobookPanel() {
               value={project.title}
               onChange={(e) => updateProject({ title: e.target.value })}
               className="h-9 text-base font-semibold bg-background/40"
-              placeholder="Titel des Hörbuchs"
+              placeholder={tx({ de: "Titel des Hörbuchs", en: "Audiobook title", es: "Título del audiolibro" })}
             />
             <div className="flex gap-2 flex-wrap">
               <Input
                 value={project.author ?? ''}
                 onChange={(e) => updateProject({ author: e.target.value })}
                 className="h-9 text-sm bg-background/40 max-w-[16rem]"
-                placeholder="Autor / Sprecher-Label"
+                placeholder={tx({ de: "Autor / Sprecher-Label", en: "Author / Speaker Label", es: "Autor / Etiqueta de orador" })}
               />
               <Select
                 value={project.language}
@@ -149,7 +149,7 @@ export function AudiobookPanel() {
             </div>
           </div>
           <div className="text-right text-xs text-muted-foreground space-y-1">
-            <div><span className="text-foreground font-semibold">{chapters.length}</span> Kapitel</div>
+            <div><span className="text-foreground font-semibold">{chapters.length}</span> tx({ de: "Kapitel", en: "Chapters", es: "Capítulos" }) + "</div>"
             <div>{totals.chars.toLocaleString('de-DE')} Zeichen</div>
             <div>≈ {formatDuration(totals.duration)}</div>
             <div className="text-primary font-semibold">
