@@ -145,7 +145,11 @@ export function AICompanionWidget() {
           es: `¡Hola! 👋 Soy ${preferences.bot_name}. He detectado que se ha producido un error:\n\n🚨 **${detectedError.message}**\n\n${detectedError.url ? `Página: ${detectedError.url}\n\n` : ''}¿Quieres que te ayude a solucionarlo? ¿O prefieres que envíe el error a nuestro equipo de soporte?`,
         });
       } else if (hasIssues) {
-        welcomeContent += `\n\n⚠️ Ich habe ${errorCount > 0 ? `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'}` : ''}${errorCount > 0 && warningCount > 0 ? ' und ' : ''}${warningCount > 0 ? `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}` : ''} in deinem Account erkannt. Soll ich dir mehr Details zeigen?`;
+        welcomeContent += tx({
+          de: `\n\n⚠️ Ich habe ${errorCount > 0 ? `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'}` : ''}${errorCount > 0 && warningCount > 0 ? ' und ' : ''}${warningCount > 0 ? `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}` : ''} in deinem Account erkannt. Soll ich dir mehr Details zeigen?`,
+          en: `\n\n⚠️ I detected ${errorCount > 0 ? `${errorCount} critical issue${errorCount > 1 ? 's' : ''}` : ''}${errorCount > 0 && warningCount > 0 ? ' and ' : ''}${warningCount > 0 ? `${warningCount} warning${warningCount > 1 ? 's' : ''}` : ''} in your account. Would you like more details?`,
+          es: `\n\n⚠️ He detectado ${errorCount > 0 ? `${errorCount} problema${errorCount > 1 ? 's' : ''} crítico${errorCount > 1 ? 's' : ''}` : ''}${errorCount > 0 && warningCount > 0 ? ' y ' : ''}${warningCount > 0 ? `${warningCount} advertencia${warningCount > 1 ? 's' : ''}` : ''} en tu cuenta. ¿Quieres ver más detalles?`,
+        });
       } else {
         welcomeContent += tx({ de: ` Was kann ich für dich tun?`, en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` });
       }
