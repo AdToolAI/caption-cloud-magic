@@ -171,12 +171,12 @@ export const useTemplateCollaboration = (templateId?: string) => {
     onSuccess: () => {
       toast({
         title: 'Kommentar hinzugefügt',
-        description: 'Ihr Kommentar wurde erfolgreich hinzugefügt.',
+        description: tx({ de: 'Ihr Kommentar wurde erfolgreich hinzugefügt.', en: 'Your comment has been added successfully.', es: 'Tu comentario ha sido agregado exitosamente.' }),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Kommentar konnte nicht hinzugefügt werden', en: 'Could not add comment', es: 'No se pudo añadir el comentario' }),
         variant: 'destructive',
       });
@@ -221,7 +221,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Freigabe konnte nicht beantragt werden', en: 'Could not request approval', es: 'No se pudo solicitar la aprobación' }),
         variant: 'destructive',
       });
@@ -254,12 +254,12 @@ export const useTemplateCollaboration = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-approvals'] });
       toast({
         title: 'Freigabe aktualisiert',
-        description: 'Der Freigabestatus wurde aktualisiert.',
+        description: tx({ de: 'Der Freigabestatus wurde aktualisiert.', en: 'The release status has been updated.', es: 'El estado de la versión ha sido actualizado.' }),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Freigabe konnte nicht aktualisiert werden', en: 'Could not update approval', es: 'No se pudo actualizar la aprobación' }),
         variant: 'destructive',
       });

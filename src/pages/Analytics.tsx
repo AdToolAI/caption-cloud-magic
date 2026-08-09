@@ -152,10 +152,10 @@ export default function Analytics() {
 
       if (error) throw error;
 
-      toast.success(`${data.totalAnalyzed} Hashtags erfolgreich analysiert`);
+      toast.success(tx({ de: `${data.totalAnalyzed} Hashtags erfolgreich analysiert`, en: `${data.totalAnalyzed} Hashtags successfully analyzed`, es: `${data.totalAnalyzed} Hashtags analizados exitosamente` }));
       fetchAnalytics();
     } catch (error: any) {
-      toast.error(error.message || "Hashtag-Analyse fehlgeschlagen");
+      toast.error(error.message || tx({ de: "Hashtag-Analyse fehlgeschlagen", en: "Hashtag analysis failed", es: "Error en el análisis del hashtag" }));
     } finally {
       setAnalyzing(false);
     }
@@ -170,10 +170,10 @@ export default function Analytics() {
 
       if (error) throw error;
 
-      toast.success(`${data.analyzed} Posts erfolgreich analysiert`);
+      toast.success(tx({ de: `${data.analyzed} Posts erfolgreich analysiert`, en: `${data.analyzed} Posts successfully analyzed`, es: `${data.analyzed} Publicaciones analizadas exitosamente` }));
       fetchAnalytics();
     } catch (error: any) {
-      toast.error(error.message || "Content-Analyse fehlgeschlagen");
+      toast.error(error.message || tx({ de: "Content-Analyse fehlgeschlagen", en: "Content analysis failed", es: "El análisis de contenido falló" }));
     } finally {
       setAnalyzing(false);
     }

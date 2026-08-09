@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { tx } from '@/lib/i18nText';
 
 export type Platform = 'instagram' | 'tiktok' | 'linkedin' | 'youtube' | 'facebook' | 'x';
 
@@ -72,15 +73,15 @@ export function usePlatformCredentials() {
 
       await fetchCredentials();
       toast({
-        title: connected ? '✅ Verbunden' : '❌ Getrennt',
-        description: `${platform} wurde ${connected ? 'verbunden' : 'getrennt'}`,
+        title: connected ? tx({ de: '✅ Verbunden', en: '✅ Connected', es: '✅ Conectado' }) : tx({ de: '❌ Getrennt', en: '❌ Disconnected', es: '❌ Desconectado' }),
+        description: connected ? tx({ de: `${platform} wurde verbunden`, en: `${platform} connected`, es: `${platform} conectado` }) : tx({ de: `${platform} wurde getrennt`, en: `${platform} disconnected`, es: `${platform} desconectado` }),
       });
 
       return true;
     } catch (error: any) {
       console.error('Error updating connection status:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });

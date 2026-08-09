@@ -43,7 +43,7 @@ const FeatureFlagDemo = () => {
     {
       name: "enable_new_planner_ui",
       title: "New Planner UI",
-      description: "Überarbeitete Planner-Oberfläche mit verbesserter UX",
+      description: tx({ de: "Überarbeitete Planner-Oberfläche mit verbesserter UX", en: "Redesigned Planner interface with improved UX", es: "Interfaz de Planner rediseñada con UX mejorada" }),
       rollout: "50%",
       status: newPlannerUI,
       icon: Layout,

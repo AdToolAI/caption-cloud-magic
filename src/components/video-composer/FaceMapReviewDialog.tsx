@@ -229,13 +229,13 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
       });
 
       toast({
-        title: "Face-Map gespeichert",
+        title: tx({ de: "Face-Map gespeichert", en: "Face map saved", es: "Mapa facial guardado" }),
         description: tx({ de: "Der Clip wird jetzt mit der korrigierten Sprecher-Zuordnung neu gerendert.", en: "The clip will now be re-rendered with the corrected speaker assignment.", es: "El clip se volverá a renderizar con la asignación de orador corregida." }),
       });
       onOpenChange(false);
     } catch (err) {
       toast({
-        title: "Speichern fehlgeschlagen",
+        title: tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Error al guardar" }),
         description: err instanceof Error ? err.message : String(err),
         variant: "destructive",
       });

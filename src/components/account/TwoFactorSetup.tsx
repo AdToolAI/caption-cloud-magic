@@ -64,7 +64,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
       console.error('MFA enroll error:', err);
       setError(err.message || tx({ de: 'Fehler beim Einrichten der 2FA', en: 'Error setting up 2FA', es: 'Error al configurar la 2FA' }));
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: err.message || tx({ de: 'Fehler beim Einrichten der 2FA', en: 'Error setting up 2FA', es: 'Error al configurar la 2FA' }),
         variant: "destructive"
       });
@@ -100,7 +100,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
       setStep('success');
       toast({
         title: "2FA aktiviert",
-        description: "Zwei-Faktor-Authentifizierung wurde erfolgreich eingerichtet"
+        description: tx({ de: "Zwei-Faktor-Authentifizierung wurde erfolgreich eingerichtet", en: "Two-factor authentication was successfully set up", es: "La autenticación de dos factores se configuró correctamente" })
       });
       
       setTimeout(() => {
@@ -118,8 +118,8 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
   const copySecret = () => {
     navigator.clipboard.writeText(secret);
     toast({
-      title: "Kopiert",
-      description: "Geheimer Schlüssel wurde kopiert"
+      title: tx({ de: "Kopiert", en: "Copied", es: "Copiado" }),
+      description: tx({ de: "Geheimer Schlüssel wurde kopiert", en: "Secret key was copied", es: "La clave secreta fue copiada" })
     });
   };
 
@@ -127,7 +127,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
     { id: 'intro', label: 'Start' },
     { id: 'qr', label: 'QR-Code' },
     { id: 'verify', label: 'Verifizieren' },
-    { id: 'success', label: 'Fertig' }
+    { id: 'success', label: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }) }
   ];
 
   const currentStepIndex = steps.findIndex(s => s.id === step);
@@ -199,8 +199,8 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                     So funktioniert es:
                   </h4>
                   <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-2">
-                    <li>Lade eine Authenticator-App herunter (Google Authenticator, Authy, etc.)</li>
-                    <li>Scanne den QR-Code mit der App</li>
+                    <li>{tx({ de: "Lade eine Authenticator-App herunter (Google Authenticator, Authy, etc.)", en: "Download an authenticator app (Google Authenticator, Authy, etc.)", es: "Descargue una aplicación de autenticación (Google Authenticator, Authy, etc.)" })}</li>
+                    <li>{tx({ de: "Scanne den QR-Code mit der App", en: "Scan the QR code with the app", es: "Escanea el código QR con la aplicación" })}</li>
                     <li>Gib den generierten Code ein, um die Einrichtung abzuschließen</li>
                   </ol>
                 </div>

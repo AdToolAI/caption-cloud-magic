@@ -44,9 +44,11 @@ const DEFAULT_PREFERENCES: CompanionPreferences = {
 
 // Keywords that trigger support escalation offer
 const ESCALATION_KEYWORDS = [
-  'bug', 'fehler', 'funktioniert nicht', 'kaputt', 'problem', 'error',
+  'bug', 'fehler', tx({ de: 'funktioniert nicht', en: 'doesn\'t work', es: 'no funciona' }), 'kaputt', 'problem', 'error',
   'hilfe', 'help', 'support', 'broken', 'crash', 'absturz', 'hängt',
-  'lädt nicht', 'geht nicht', 'defekt', 'falsch', 'failed'
+  tx({ de: 'lädt nicht', en: 'doesn\'t load', es: 'no se carga' }), tx({ de: 'geht nicht', en: 'it does not work', es: 'no funciona' }), 'defekt', 'falsch', 'failed',
+  'not working', 'won\'t load', 'doesn\'t work',
+  'no funciona', 'no carga', 'no va',
 ];
 
 export function AICompanionWidget() {
@@ -135,7 +137,7 @@ export function AICompanionWidget() {
   // Add welcome message when first opened - include error context if detected
   useEffect(() => {
     if (isOpen && messages.length === 0 && user) {
-      let welcomeContent = tx({ de: `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features.`, en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` });
+      let welcomeContent = tx({ de: tx({ de: tx({ de: tx({ de: `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features.`, en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` }), en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` }), en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` }), en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` });
       
       // If we detected an error, include it in the welcome message
       if (detectedError) {
@@ -151,7 +153,7 @@ export function AICompanionWidget() {
           es: `\n\n⚠️ He detectado ${errorCount > 0 ? `${errorCount} problema${errorCount > 1 ? 's' : ''} crítico${errorCount > 1 ? 's' : ''}` : ''}${errorCount > 0 && warningCount > 0 ? ' y ' : ''}${warningCount > 0 ? `${warningCount} advertencia${warningCount > 1 ? 's' : ''}` : ''} en tu cuenta. ¿Quieres ver más detalles?`,
         });
       } else {
-        welcomeContent += tx({ de: ` Was kann ich für dich tun?`, en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` });
+        welcomeContent += tx({ de: tx({ de: tx({ de: tx({ de: ` Was kann ich für dich tun?`, en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` }), en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` }), en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` }), en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` });
       }
       
       setMessages([{
@@ -237,7 +239,7 @@ export function AICompanionWidget() {
             responseContent = formatTipsResponse(data);
             break;
           default:
-            responseContent = 'Befehl nicht erkannt.';
+            responseContent = tx({ de: 'Befehl nicht erkannt.', en: 'Command not recognized.', es: 'Comando no reconocido.' });
         }
 
         setMessages(prev => [...prev, {
@@ -268,7 +270,7 @@ export function AICompanionWidget() {
         setMessages(prev => [...prev, {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          content: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" gestartet! Folge den Schritten auf dem Bildschirm.`,
+          content: tx({ de: tx({ de: tx({ de: tx({ de: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" gestartet! Folge den Schritten auf dem Bildschirm.`, en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALS[tutorialId].name}"! Siga los pasos en la pantalla.` }), en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }), en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }), en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }),
           timestamp: new Date()
         }]);
       }
@@ -524,7 +526,7 @@ export function AICompanionWidget() {
     setMessages([{
       id: 'welcome',
       role: 'assistant',
-      content: tx({ de: `Hey! 👋 Neues Gespräch mit ${preferences.bot_name} gestartet. Was kann ich für dich tun?`, en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }),
+      content: tx({ de: tx({ de: tx({ de: tx({ de: `Hey! 👋 Neues Gespräch mit ${preferences.bot_name} gestartet. Was kann ich für dich tun?`, en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }), en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }), en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }), en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }),
       timestamp: new Date()
     }]);
   };
@@ -639,7 +641,7 @@ export function AICompanionWidget() {
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowSettings(true)}
-                  title="Einstellungen"
+                  title={tx({ de: "Einstellungen", en: "Settings", es: "Configuración" })}
                 >
                   <Settings className="w-4 h-4" />
                 </Button>
@@ -720,9 +722,9 @@ export function AICompanionWidget() {
                   animate={{ opacity: 1, y: 0 }}
                   className="text-sm text-muted-foreground text-center"
                 >
-                  {isListening ? 'Ich höre zu... Sprich jetzt.' : 
+                  {isListening ? tx({ de: 'Ich höre zu... Sprich jetzt.', en: 'Listening... Speak now.', es: 'Escuchando... Habla ahora.' }) : 
                    isSpeaking ? `${preferences.bot_name} spricht...` : 
-                   'Tippe auf das Mikrofon um zu sprechen'}
+                   tx({ de: 'Tippe auf das Mikrofon um zu sprechen', en: 'Tap the microphone to speak', es: 'Toca el micrófono para hablar' })}
                 </motion.p>
                 
                 {/* Big Mic Button */}
@@ -931,7 +933,7 @@ export function AICompanionWidget() {
                         setShowSlashCommands(e.target.value.startsWith('/'));
                       }}
                       onKeyDown={handleKeyDown}
-                      placeholder="Frag mich etwas... (/ für Befehle)"
+                      placeholder={tx({ de: "Frag mich etwas... (/ für Befehle)", en: "Ask me something... (/ for commands)", es: "Pregúntame algo... (/ para comandos)" })}
                       className="min-h-[44px] max-h-[120px] resize-none bg-muted/30 border-white/10 focus:border-primary/50 ai-companion-scrollbar"
                       rows={1}
                     />

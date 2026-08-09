@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
@@ -120,11 +121,11 @@ export default function SnippetBuilderDialog({
   const handleUpload = useCallback(
     async (file: File) => {
       if (!user) {
-        toast.error('Bitte einloggen');
+        toast.error(tx({ de: 'Bitte einloggen', en: 'Please log in', es: 'Por favor inicia sesión' }));
         return;
       }
       if (!file.type.startsWith('image/')) {
-        toast.error('Nur Bilder erlaubt');
+        toast.error(tx({ de: 'Nur Bilder erlaubt', en: 'Only pictures allowed', es: 'Sólo se permiten fotografías' }));
         return;
       }
       setUploading(true);
@@ -143,7 +144,7 @@ export default function SnippetBuilderDialog({
           toast.success('Vorschau gesetzt');
         }
       } catch (e: any) {
-        toast.error(`Upload fehlgeschlagen: ${e.message ?? e}`);
+        toast.error(tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? e}` }), en: tx({ de: `Upload failed: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? e}` }), es: `Error al cargar: ${e.message ?? mi}` }), en: tx({ de: `Upload failed: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? e}` }), es: `Error al cargar: ${e.message ?? mi}` }), en: tx({ de: `Upload failed: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? e}` }), es: `Error al cargar: ${e.message ?? mi}` }), en: tx({ de: `Upload failed: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? e}` }), es: `Error al cargar: ${e.message ?? mi}` }));
       } finally {
         setUploading(false);
       }
@@ -161,7 +162,7 @@ export default function SnippetBuilderDialog({
       return;
     }
     if (isPublic && !thumbnailUrl) {
-      toast.error('Öffentliche Snippets benötigen ein Vorschaubild');
+      toast.error(tx({ de: 'Öffentliche Snippets benötigen ein Vorschaubild', en: 'Public snippets require a thumbnail', es: 'Los fragmentos públicos requieren una miniatura' }));
       return;
     }
 
@@ -244,7 +245,7 @@ export default function SnippetBuilderDialog({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={thumbnailUrl} alt="Vorschau" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-[10px] text-muted-foreground">Kein Bild</span>
+                  <span className="text-[10px] text-muted-foreground">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</span>
                 )}
               </div>
               <div className="flex flex-col gap-1.5">
@@ -317,7 +318,7 @@ export default function SnippetBuilderDialog({
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Kurzbeschreibung für die Library-Karte"
+              placeholder={tx({ de: "Kurzbeschreibung für die Library-Karte", en: "Short description for the library card", es: "Breve descripción de la tarjeta de la biblioteca" })}
               className="bg-background/60 mt-1"
             />
           </div>
@@ -337,7 +338,7 @@ export default function SnippetBuilderDialog({
 
           {/* Duration */}
           <div>
-            <Label className="text-xs">Dauer (Sekunden, optional)</Label>
+            <Label className="text-xs">{tx({ de: "Dauer (Sekunden, optional)", en: "Duration (seconds, optional)", es: "Duración (segundos, opcional)" })}</Label>
             <Input
               type="number"
               min={1}
@@ -410,7 +411,7 @@ export default function SnippetBuilderDialog({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            {isEdit ? 'Speichern' : 'Snippet anlegen'}
+            {isEdit ? tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' }) : 'Snippet anlegen'}
           </Button>
         </DialogFooter>
       </DialogContent>

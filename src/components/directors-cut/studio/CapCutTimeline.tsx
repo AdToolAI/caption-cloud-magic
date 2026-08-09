@@ -338,7 +338,7 @@ const DraggableScene: React.FC<{
               className="cursor-pointer text-red-300 hover:bg-red-500/20 focus:bg-red-500/20"
             >
               <Trash2 className="h-3.5 w-3.5 mr-2" />
-              {t('dc.deleteScene') || 'Löschen'}
+              {t('dc.deleteScene') || tx({ de: 'Löschen', en: 'Delete', es: 'Borrar' })}
             </ContextMenuItem>
           </>
         )}
@@ -825,7 +825,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                     className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
                   >
                     <Film className="h-4 w-4 mr-2 text-indigo-400" />
-                    {t('dc.videoFromLibrary') || 'Video aus Bibliothek'}
+                    {t('dc.videoFromLibrary') || tx({ de: "Video aus Bibliothek", en: "Video from library", es: "Vídeo de la biblioteca" })}
                   </DropdownMenuItem>
                 )}
                 {onSceneAdd && (
@@ -834,7 +834,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                     className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
                   >
                     <Square className="h-4 w-4 mr-2 text-zinc-400" />
-                    {t('dc.emptySceneBlackscreen') || 'Leere Szene (Schwarzbild)'}
+                    {t('dc.emptySceneBlackscreen') || tx({ de: "Leere Szene (Schwarzbild)", en: "Empty scene (black screen)", es: "Escena vacía (pantalla negra)" })}
                   </DropdownMenuItem>
                 )}
                 {onInsertAtPlayhead && (

@@ -142,7 +142,7 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
           description: `Du benötigst ${CREDITS_COST} Credits für AI Sound Design`,
         });
       } else {
-        toast.error('Generierung fehlgeschlagen', {
+        toast.error(tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Generación fallida" }), {
           description: error.message || tx({ de: 'Bitte versuche es erneut', en: 'Please try again', es: 'Por favor, inténtalo de nuevo' }),
         });
       }

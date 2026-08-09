@@ -225,7 +225,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: ['16:9', '9:16'],
     costPerSecond: VEO_VIDEO_MODELS['veo-3.1-pro'].costPerSecond,
     badge: 'Premium',
-    tagline: 'Beste Audio + Video Qualität',
+    tagline: tx({ de: 'Beste Audio + Video Qualität', en: 'Best audio + video quality', es: 'Mejor calidad de audio y vídeo' }),
     legacyRoute: '/veo-video-studio',
   },
   {
@@ -277,7 +277,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     resolution: '1080p',
     aspectRatios: sharedAspect,
     costPerSecond: LTX_VIDEO_MODELS['ltx-pro'].costPerSecond,
-    tagline: '1080p · sehr günstig',
+    tagline: tx({ de: '1080p · sehr günstig', en: '1080p · very cheap', es: '1080p · muy barato' }),
     legacyRoute: '/ltx-video-studio',
   },
   {
@@ -462,7 +462,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: sharedAspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-10s'].costPerSecond,
     badge: 'Neu · 10s',
-    tagline: 'Ray 3.2 Langclip · 10 Sekunden am Stück',
+    tagline: tx({ de: tx({ de: tx({ de: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Sekunden am Stück', en: 'seconds straight', es: 'segundos seguidos' })}`, en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Seconds in a row', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }), en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Seconds in a row', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }), en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Seconds in a row', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }),
     legacyRoute: '/luma-video-studio',
   },
   {
@@ -530,7 +530,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: sharedAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
     badge: 'Neu',
-    tagline: 'Seedance 2.5 · bis 30 s pro Szene · 720p',
+    tagline: tx({ de: tx({ de: tx({ de: `Seedance 2.5 · ${tx({ de: 'bis 30 s pro Szene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }), en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }), en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }),
     legacyRoute: '/seedance-video-studio',
   },
 
@@ -628,7 +628,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: ['16:9', '9:16', '1:1'],
     costPerSecond: { EUR: 0.12, USD: 0.12 },
     badge: 'I2V',
-    tagline: 'Animiert ein Standbild zu einem 5s-Clip',
+    tagline: tx({ de: 'Animiert ein Standbild zu einem 5s-Clip', en: 'Animates a still image into a 5s clip', es: 'Anima una imagen fija en un clip de 5s' }),
     legacyRoute: '/vidu-studio',
   },
   {
@@ -645,7 +645,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: ['16:9', '9:16', '1:1'],
     costPerSecond: { EUR: 0.12, USD: 0.12 },
     badge: 'T2V',
-    tagline: '5s Clip aus reinem Prompt',
+    tagline: tx({ de: '5s Clip aus reinem Prompt', en: '5s clip from pure prompt', es: 'Clip de 5 segundos de Pure Prompt' }),
     legacyRoute: '/vidu-studio',
   },
 

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Phase 5.6 — Composer Undo-History Hook
  *
@@ -87,7 +88,7 @@ export function useComposerHistory(projectId: string | undefined) {
   const undoLast = useCallback(async (onRestored?: () => void | Promise<void>) => {
     if (!projectId) return;
     if (count === 0) {
-      toast({ title: 'Nichts zum Rückgängigmachen', description: 'Der Verlauf ist leer.' });
+      toast({ title: tx({ de: 'Nichts zum Rückgängigmachen', en: 'Nothing to undo', es: 'Nada que deshacer' }), description: tx({ de: 'Der Verlauf ist leer.', en: 'The history is empty.', es: 'La historia está vacía.' }) });
       return;
     }
     try {
@@ -104,12 +105,12 @@ export function useComposerHistory(projectId: string | undefined) {
         });
         await onRestored?.();
       } else {
-        toast({ title: 'Nichts zum Rückgängigmachen', description: data?.reason ?? '' });
+        toast({ title: tx({ de: 'Nichts zum Rückgängigmachen', en: 'Nothing to undo', es: 'Nada que deshacer' }), description: data?.reason ?? '' });
       }
       refreshCount();
     } catch (err) {
       toast({
-        title: 'Undo fehlgeschlagen',
+        title: tx({ de: 'Undo fehlgeschlagen', en: 'Undo failed', es: 'Error al deshacer' }),
         description: err instanceof Error ? err.message : String(err),
         variant: 'destructive',
       });

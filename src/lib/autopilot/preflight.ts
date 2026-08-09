@@ -121,7 +121,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
       findings.push(warn('dialogue_no_voice', tx({ de: 'Stimme wird automatisch gewählt.', en: 'Voice will be automatically selected.', es: 'La voz se seleccionará automáticamente.' }), id));
     }
     if (!scene.voiceLanguage) {
-      findings.push(warn('dialogue_no_language', 'Dialog ohne Sprachcode — nutze Projektsprache.', id));
+      findings.push(warn('dialogue_no_language', tx({ de: 'Dialog ohne Sprachcode — nutze Projektsprache.', en: 'Dialogue without language code — use project language.', es: 'Diálogo sin código de idioma: utilice el idioma del proyecto.' }), id));
     }
     if (scene.characterIds.length > 0 && scene.speakerCharacterId) {
       if (!scene.characterIds.includes(scene.speakerCharacterId)) {
@@ -189,11 +189,11 @@ export function preflightTreatment(treatment: AutopilotTreatment): PreflightResu
 
   const orders = treatment.scenes.map((s) => s.orderIndex);
   if (new Set(orders).size !== orders.length) {
-    findings.push(block('duplicate_order', 'Zwei Szenen haben denselben Reihenfolge-Index.'));
+    findings.push(block('duplicate_order', tx({ de: 'Zwei Szenen haben denselben Reihenfolge-Index.', en: 'Two scenes have the same order index.', es: 'Dos escenas tienen el mismo índice de orden.' })));
   }
 
   const hasHook = treatment.scenes.some((s) => s.beat === 'hook');
-  if (!hasHook) findings.push(warn('no_hook', 'Kein Hook in den ersten Sekunden.'));
+  if (!hasHook) findings.push(warn('no_hook', tx({ de: 'Kein Hook in den ersten Sekunden.', en: 'No hook in the first few seconds.', es: 'Ningún gancho en los primeros segundos.' })));
 
   for (const scene of treatment.scenes) findings.push(...preflightScene(scene));
 

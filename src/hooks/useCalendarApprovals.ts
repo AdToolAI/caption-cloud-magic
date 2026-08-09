@@ -31,7 +31,7 @@ export function useCalendarApprovals() {
     } catch (error: any) {
       console.error('Request approval error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });
@@ -52,14 +52,14 @@ export function useCalendarApprovals() {
 
       toast({
         title: '✅ Freigabe erteilt',
-        description: data.all_approved ? 'Alle Freigaben erteilt!' : 'Freigabe erfolgreich',
+        description: data.all_approved ? tx({ de: 'Alle Freigaben erteilt!', en: 'All approvals granted!', es: '¡Todas las aprobaciones concedidas!' }) : tx({ de: 'Freigabe erfolgreich', en: 'Release successful', es: 'Lanzamiento exitoso' }),
       });
 
       return data;
     } catch (error: any) {
       console.error('Approve error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });
@@ -87,7 +87,7 @@ export function useCalendarApprovals() {
     } catch (error: any) {
       console.error('Reject error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });

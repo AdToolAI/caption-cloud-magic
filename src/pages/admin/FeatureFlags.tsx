@@ -97,7 +97,7 @@ export default function FeatureFlags() {
   const handleSave = () => {
     localStorage.setItem('feature_flags_override', JSON.stringify(flags));
     toast({
-      title: 'Feature Flags gespeichert',
+      title: tx({ de: 'Feature Flags gespeichert', en: 'Feature flags saved', es: 'Marcas de funciones guardadas' }),
       description: tx({ de: 'Die Änderungen werden sofort wirksam.', en: 'Changes will take effect immediately.', es: 'Los cambios surtirán efecto inmediatamente.' }),
     });
     setHasChanges(false);

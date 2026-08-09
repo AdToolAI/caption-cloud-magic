@@ -79,7 +79,7 @@ export default function CinematicStylePresets({ value, onApply, compact = false,
                     isOn ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground',
                   )}
                   title={m === 'identity'
-                    ? (lang === 'de' ? 'Eigene Szene pro Look' : lang === 'es' ? 'Escena propia por look' : 'Distinct scene per look')
+                    ? (lang === 'de' ? tx({ de: "Eigene Szene pro Look", en: "Own scene per look", es: "Escena propia por mirada" }) : lang === 'es' ? 'Escena propia por look' : 'Distinct scene per look')
                     : (lang === 'de' ? tx({ de: 'Gleiche Szene, alle Looks', en: 'Same scene, all looks', es: 'Misma escena, todos los looks' }) : lang === 'es' ? 'Misma escena, todos los looks' : 'Same scene, all looks')}
                 >
                   <Icon className="h-2.5 w-2.5" />

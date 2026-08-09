@@ -201,11 +201,11 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         // on early-phase crashes (so supabase-js doesn't bury the message
         // behind a generic "non-2xx" string). Detect and surface it.
         if (data && (data as any).ok === false) {
-          const reason = (data as any).error || (data as any).message || 'Unbekannter Fehler.';
+          const reason = (data as any).error || (data as any).message || tx({ de: 'Unbekannter Fehler.', en: 'Unknown error.', es: 'Error desconocido.' });
           const stage = (data as any).stage ? ` [${(data as any).stage}]` : '';
           opts.onOptimisticPatch?.(scene.id, { clipStatus: 'failed' });
           toast({
-            title: 'Generierung fehlgeschlagen',
+            title: tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }),
             description: `${reason}${stage}`,
             variant: 'destructive',
           });
@@ -233,7 +233,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         console.error('[useSceneGenerate] failed', err);
         const realMsg = await extractFunctionsError(err);
         toast({
-          title: 'Generierung fehlgeschlagen',
+          title: tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }),
           description: realMsg || err?.message || tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
           variant: 'destructive',
         });

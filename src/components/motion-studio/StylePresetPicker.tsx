@@ -86,13 +86,13 @@ export default function StylePresetPicker({
     setSaving(false);
     if (result) {
       toast({
-        title: t(language, '✓ Style gespeichert', '✓ Style saved', '✓ Estilo guardado'),
+        title: t(language, tx({ de: "✓ Style gespeichert", en: "✓ Style saved", es: "✓ Estilo guardado" }), '✓ Style saved', '✓ Estilo guardado'),
       });
       setSaveName('');
       setSavePublic(false);
     } else {
       toast({
-        title: t(language, 'Speichern fehlgeschlagen', 'Save failed', 'Fallo al guardar'),
+        title: t(language, tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Error al guardar" }), 'Save failed', 'Fallo al guardar'),
         variant: 'destructive',
       });
     }
@@ -232,7 +232,7 @@ export default function StylePresetPicker({
             {hasCurrent && (
               <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
                 <Label className="text-xs">
-                  {t(language, 'Aktuelle Konfiguration speichern', 'Save current configuration', 'Guardar configuración actual')}
+                  {t(language, tx({ de: "Aktuelle Konfiguration speichern", en: "Save current configuration", es: "Guardar la configuración actual" }), 'Save current configuration', 'Guardar configuración actual')}
                 </Label>
                 <Input
                   placeholder={t(language, 'Name (z. B. „Mein Cinematic Vlog")', 'Name (e.g. "My Cinematic Vlog")', 'Nombre (p. ej. "Mi Cinematic Vlog")')}

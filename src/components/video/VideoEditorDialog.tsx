@@ -249,13 +249,13 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
       },
     });
     if (result) {
-      toast({ title: "Video wird generiert", description: tx({ de: `Version ${result.version_number} wird erstellt.`, en: `Version ${result.version_number} is being created.`, es: `Se está creando la versión ${result.version_number}.` }) });
+      toast({ title: tx({ de: "Video wird generiert", en: "Video is generated", es: "Se genera vídeo" }), description: tx({ de: tx({ de: tx({ de: tx({ de: `Version ${result.version_number} wird erstellt.`, en: `Version ${result.version_number} is being created.`, es: `Se está creando la versión ${result.version_number}.` }), en: `Version ${result.version_number} is being created.`, es: `Se está creando la versión ${result.version_number}.` }), en: `Version ${result.version_number} is being created.`, es: `Se está creando la versión ${result.version_number}.` }), en: `Version ${result.version_number} is being created.`, es: `Se está creando la versión ${result.version_number}.` }) });
       onOpenChange(false);
     }
   };
 
   const handleClose = () => {
-    if (hasChanges && !window.confirm(`${changeCount} ungespeicherte Änderung(en). Schließen?`)) return;
+    if (hasChanges && !window.confirm(tx({ de: tx({ de: tx({ de: tx({ de: `${changeCount} ungespeicherte Änderung(en). Schließen?`, en: `${changeCount} unsaved change(s). Close?`, es: `${changeCount} cambios no guardados. ¿Cerca?` }), en: `${changeCount} unsaved change(s). Close?`, es: `${changeCount} cambios no guardados. ¿Cerca?` }), en: `${changeCount} unsaved change(s). Close?`, es: `${changeCount} cambios no guardados. ¿Cerca?` }), en: `${changeCount} unsaved change(s). Close?`, es: `${changeCount} cambios no guardados. ¿Cerca?` }))) return;
     onOpenChange(false);
   };
 

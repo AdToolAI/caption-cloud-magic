@@ -151,7 +151,7 @@ export function ComingSoonScreen({
               )}
             >
               <Bell className="h-4 w-4" />
-              {notified ? 'Du wirst benachrichtigt' : 'Benachrichtigt mich beim Launch'}
+              {notified ? tx({ de: 'Du wirst benachrichtigt', en: 'You will be notified', es: 'Serás notificado' }) : tx({ de: 'Benachrichtigt mich beim Launch', en: 'Notify me when launching', es: 'Notificarme al iniciar' })}
             </Button>
 
             {isAdmin && adminPreview && (

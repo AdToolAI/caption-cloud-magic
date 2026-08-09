@@ -57,13 +57,13 @@ export const ScriptEditor = ({
         onChange(data.optimizedText);
         toast({
           title: "✨ Optimiert!",
-          description: `Skript wurde ${label}.`,
+          description: tx({ de: tx({ de: tx({ de: `Skript wurde ${label}.`, en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }), en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }), en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }),
         });
       }
     } catch (error) {
       console.error('Optimization error:', error);
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Skript konnte nicht optimiert werden.", en: "Script could not be optimized.", es: "No se pudo optimizar el guion." }),
         variant: "destructive",
       });
@@ -137,7 +137,7 @@ export const ScriptEditor = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleOptimize('cta', 'mit CTA versehen')}
+              onClick={() => handleOptimize('cta', tx({ de: 'mit CTA versehen', en: 'provided with CTA', es: 'provisto de CTA' }))}
               disabled={isOptimizing || !value.trim()}
               className="justify-start"
             >

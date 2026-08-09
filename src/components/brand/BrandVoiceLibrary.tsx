@@ -77,7 +77,7 @@ export function BrandVoiceLibrary({ brandKitId }: { brandKitId: string | null })
                 ? "Wort (z.B. 'cheap')"
                 : draftKind === "tagline"
                 ? "Tagline-Beispiel"
-                : "Satz oder Regel"
+                : tx({ de: "Satz oder Regel", en: "sentence or rule", es: "sentencia o regla" })
             }
             className="bg-background/60"
           />
@@ -103,7 +103,7 @@ export function BrandVoiceLibrary({ brandKitId }: { brandKitId: string | null })
                   <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
                 </div>
                 {items.length === 0 ? (
-                  <p className="text-xs text-muted-foreground/70 italic">Noch keine Einträge.</p>
+                  <p className="text-xs text-muted-foreground/70 italic">{tx({ de: "Noch keine Einträge.", en: "No entries yet.", es: "Aún no hay entradas." })}</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {items.map((s) => (

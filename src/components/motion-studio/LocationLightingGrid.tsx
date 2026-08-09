@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +59,7 @@ export default function LocationLightingGrid({
   const generate = useCallback(
     async (preset: { id: string; label: string; prompt: string }) => {
       if (!location.reference_image_url) {
-        toast.error('Diese Location braucht ein Referenzbild');
+        toast.error(tx({ de: 'Diese Location braucht ein Referenzbild', en: 'This location needs a reference image', es: 'Esta ubicación necesita una imagen de referencia.' }));
         return;
       }
       setGeneratingVibe(preset.id);
@@ -73,7 +74,7 @@ export default function LocationLightingGrid({
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        if (!data?.imageUrl) throw new Error('Kein Bild generiert');
+        if (!data?.imageUrl) throw new Error(tx({ de: 'Kein Bild generiert', en: 'No image generated', es: 'No se genera ninguna imagen' }));
 
         const persisted =
           (await persistRemoteImage(data.imageUrl, 'location', location.id)) ?? data.imageUrl;
@@ -81,7 +82,7 @@ export default function LocationLightingGrid({
         toast.success(`„${preset.label}" generiert ✨`);
         await reload();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Generierung fehlgeschlagen';
+        const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });
         toast.error(msg);
       } finally {
         setGeneratingVibe(null);

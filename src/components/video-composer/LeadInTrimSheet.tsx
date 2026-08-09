@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Scissors, Wand2 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -52,12 +53,12 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
       toast({
         title: trimSeconds > 0 ? `✂️ Lead-In erkannt: ${trimSeconds}s` : 'Kein Freeze erkannt',
         description: trimSeconds > 0
-          ? 'Slider angepasst. „Speichern" zum Übernehmen.'
-          : 'Der Clip startet sauber mit Bewegung.',
+          ? tx({ de: 'Slider angepasst. „Speichern" zum Übernehmen.', en: 'Slider adjusted. "Save" to apply.', es: 'Control deslizante ajustado. "Guardar" para aplicar.' })
+          : tx({ de: 'Der Clip startet sauber mit Bewegung.', en: 'The clip starts cleanly with movement.', es: 'El clip comienza limpiamente con movimiento.' }),
       });
     } catch (err) {
       toast({
-        title: 'Auto-Detect fehlgeschlagen',
+        title: tx({ de: 'Auto-Detect fehlgeschlagen', en: 'Auto detect failed', es: 'Falló la detección automática' }),
         description: err instanceof Error ? err.message : String(err),
         variant: 'destructive',
       });
@@ -74,11 +75,11 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
         .update({ clip_lead_in_trim_seconds: trim })
         .eq('id', scene.id);
       if (error) throw error;
-      toast({ title: '✓ Trim gespeichert', description: `${trim.toFixed(2)}s am Anfang werden übersprungen.` });
+      toast({ title: tx({ de: '✓ Trim gespeichert', en: '✓ Trim saved', es: '✓ Recorte guardado' }), description: tx({ de: `${trim.toFixed(2)}s am Anfang werden übersprungen.`, en: `${trim.toFixed(2)}s at the beginning are skipped.`, es: `Los ${trim.toFixed(2)}s al principio se omiten.` }) });
       onOpenChange(false);
     } catch (err) {
       toast({
-        title: 'Speichern fehlgeschlagen',
+        title: tx({ de: 'Speichern fehlgeschlagen', en: 'Save failed', es: 'Error al guardar' }),
         description: err instanceof Error ? err.message : String(err),
         variant: 'destructive',
       });

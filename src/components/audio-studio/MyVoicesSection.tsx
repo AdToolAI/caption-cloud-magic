@@ -56,7 +56,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
       await audio.play();
     } catch (err) {
       console.error('[MyVoicesSection] preview failed:', err);
-      toast.error('Voice-Preview fehlgeschlagen');
+      toast.error(tx({ de: 'Voice-Preview fehlgeschlagen', en: 'Voice preview failed', es: 'Error en la vista previa de voz' }));
     } finally {
       setPreviewingId(null);
     }

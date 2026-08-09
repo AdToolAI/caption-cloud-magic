@@ -44,7 +44,7 @@ export const useBatchVideoCreation = () => {
         if (data.error === 'VALIDATION_ERROR') {
           toast({
             title: 'CSV Validierungsfehler',
-            description: `${data.message}. Erste Fehler: ${data.details?.join(', ')}`,
+            description: tx({ de: tx({ de: tx({ de: `${data.message}. Erste Fehler: ${data.details?.join(', ')}`, en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${data.message}. Primer error: ${data.details?.join(', ')}` }), en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${datos.mensaje}. Primer error: ${data.details?.join(', ')}` }), en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${datos.mensaje}. Primer error: ${data.details?.join(', ')}` }),
             variant: 'destructive'
           });
           return null;
@@ -67,7 +67,7 @@ export const useBatchVideoCreation = () => {
     } catch (error) {
       console.error('Batch creation error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Batch konnte nicht erstellt werden', en: 'Could not create batch', es: 'No se pudo crear el lote' }),
         variant: 'destructive'
       });

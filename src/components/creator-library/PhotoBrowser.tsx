@@ -93,7 +93,7 @@ export default function PhotoBrowser() {
       metadata: { photographer: img.user.name, source_url: img.user.url },
     } as any);
     if (error) {
-      toast({ title: 'Speichern fehlgeschlagen', description: error.message, variant: 'destructive' });
+      toast({ title: tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Error al guardar" }), description: error.message, variant: 'destructive' });
       return;
     }
     setFavorites(new Set([...favorites, key]));

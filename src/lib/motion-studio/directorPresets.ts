@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Motion Studio Pro – Director Preset Library (Phase 3)
 //
 // These presets transform plain prompts into cinematic directives by appending
@@ -38,7 +39,7 @@ export const DIRECTOR_PRESETS: DirectorPreset[] = [
     description: 'Klassischer fester Standpunkt — ruhig, professionell.' },
   { id: 'cam-dolly-in',   category: 'camera', icon: '🎥', label: 'Slow Dolly In',
     modifier: 'slow dolly-in push, smooth cinematic motion',
-    description: 'Langsame Annäherung — baut Spannung auf.' },
+    description: tx({ de: 'Langsame Annäherung — baut Spannung auf.', en: 'Slow approach – builds tension.', es: 'Enfoque lento: genera tensión.' }) },
   { id: 'cam-tracking',   category: 'camera', icon: '🎥', label: 'Tracking Shot',
     modifier: 'smooth lateral tracking shot, gimbal stabilized',
     description: 'Seitliche Verfolgung — modern, dynamisch.' },
@@ -58,7 +59,7 @@ export const DIRECTOR_PRESETS: DirectorPreset[] = [
   // ─── Lens / Focal Length ───────────────────────────────────────
   { id: 'lens-anamorphic', category: 'lens', icon: '🔭', label: 'Anamorphic 2x',
     modifier: 'anamorphic lens, 2.39:1 aspect, horizontal lens flares, oval bokeh',
-    description: 'Hollywood-Kinolook mit horizontalen Flares.' },
+    description: tx({ de: 'Hollywood-Kinolook mit horizontalen Flares.', en: 'Hollywood cinema look with horizontal flares.', es: 'Look de cine de Hollywood con bengalas horizontales.' }) },
   { id: 'lens-wide-24',    category: 'lens', icon: '🔭', label: 'Wide 24mm',
     modifier: 'wide-angle 24mm lens, expansive depth, slight edge distortion',
     description: 'Weitwinkel — viel Raum.' },

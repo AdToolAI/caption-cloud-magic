@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,15 +33,15 @@ export default function UpgradeEnterprise() {
 
       if (error) throw error;
 
-      toast.success("🎉 Erfolgreich auf Enterprise upgegradet!");
-      toast.success(`${data.credits.toLocaleString()} Credits verfügbar!`);
+      toast.success(tx({ de: "🎉 Erfolgreich auf Enterprise upgegradet!", en: "🎉 Successfully upgraded to Enterprise!", es: "🎉 ¡Actualizado exitosamente a Enterprise!" }));
+      toast.success(tx({ de: `${data.credits.toLocaleString()} Credits verfügbar!`, en: `${data.credits.toLocaleString()} Credits available!`, es: `${data.credits.toLocaleString()} ¡Créditos disponibles!` }));
       
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (error: any) {
       console.error('Upgrade error:', error);
-      toast.error(error.message || "Upgrade fehlgeschlagen");
+      toast.error(error.message || tx({ de: "Upgrade fehlgeschlagen", en: "Upgrade failed", es: "La actualización falló" }));
     } finally {
       setLoading(false);
     }

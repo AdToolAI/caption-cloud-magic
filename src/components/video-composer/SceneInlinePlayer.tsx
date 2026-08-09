@@ -14,6 +14,7 @@
  * Selection styling (gold border + glow) is controlled by `isActive`.
  */
 import { useEffect, useRef, useState } from 'react';
+import { tx } from '@/lib/i18nText';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,6 @@ import type { ComposerScene } from '@/types/video-composer';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 import { isInFlightState, sceneState } from '@/lib/composer/sceneState';
-import { tx } from "@/lib/i18nText";
 
 interface Props {
   scene: ComposerScene;
@@ -54,10 +54,7 @@ export default function SceneInlinePlayer({
   onGenerate,
 }: Props) {
   const { t, language } = useTranslation();
-  const notRenderedLabel =
-    language === 'en' ? 'Not rendered yet'
-      : language === 'es' ? 'Aún no renderizado'
-        : 'Noch nicht gerendert';
+  const notRenderedLabel = tx({ de: 'Noch nicht gerendert', en: 'Not rendered yet', es: 'Aún no renderizado' });
   const { reset: resetLipSync, resettingId } = useResetLipSync();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
@@ -381,7 +378,7 @@ export default function SceneInlinePlayer({
 
         {/* v124 — Failure overlay: shows the actual backend error (e.g.
             anchor_identity_failed) plus a Re-Render button, instead of an
-            endless tx({ de: "Szene wird gebaut…", en: "Scene is building…", es: "La escena se está construyendo…" }) spinner. */}
+            endless "Szene wird gebaut…" spinner. */}
         {isFailed && (() => {
           const rawErr = String(
             (scene as any).clipError ?? (scene as any).clip_error ?? '',

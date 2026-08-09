@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { tx } from '@/lib/i18nText';
 
 /**
  * Extract a frame from a remote video URL via offscreen <video> + canvas,

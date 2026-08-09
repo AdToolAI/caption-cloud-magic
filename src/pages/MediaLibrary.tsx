@@ -167,7 +167,7 @@ export default function MediaLibrary() {
           if (payload.eventType === 'INSERT') {
             toast({
               title: "🎉 Neue Medien hinzugefügt!",
-              description: "Deine Media Library wurde aktualisiert",
+              description: tx({ de: "Deine Media Library wurde aktualisiert", en: "Your media library has been updated", es: "Su biblioteca multimedia ha sido actualizada" }),
             });
           }
         }
@@ -225,7 +225,7 @@ export default function MediaLibrary() {
           console.log('🎥 Neues Video hinzugefügt:', payload);
           scheduleReload();
           toast({
-            title: "🎬 Neues AI-Video verfügbar!",
+            title: tx({ de: "🎬 Neues AI-Video verfügbar!", en: "🎬 New AI video available!", es: "🎬 ¡Nuevo vídeo de IA disponible!" }),
             description: tx({ de: "Dein AI-Video wurde zur Mediathek hinzugefügt", en: "Your AI video was added to the media library", es: "Tu vídeo de IA se añadió a la mediateca" })
           });
         }
@@ -376,11 +376,11 @@ export default function MediaLibrary() {
           title: isSoraAI 
             ? (metadata?.prompt?.slice(0, 60) + '...' || 'AI Video')
             : isDirectorCutEnhancement
-              ? `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`
+              ? tx({ de: tx({ de: tx({ de: tx({ de: `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...` }), en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Realce'}...` }), en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Realce'}...` }), en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Realce'}...` })
               : isDirectorsCut
                 ? `Director's Cut - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                 : isMotionStudioClip
-                  ? `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`
+                  ? tx({ de: tx({ de: tx({ de: tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}` }), en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` }), en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` }), en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
                   : isUniversalCreator
                     ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                     : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
@@ -393,7 +393,7 @@ export default function MediaLibrary() {
                 : isMotionStudioClip
                   ? `${motionModel} · ${metadata?.duration_seconds ?? '?'}s${metadata?.prompt ? ` · ${String(metadata.prompt).slice(0, 50)}…` : ''}`
                   : isUniversalCreator
-                    ? 'Gerendert mit Universal Creator'
+                    ? tx({ de: 'Gerendert mit Universal Creator', en: 'Rendered with Universal Creator', es: 'Renderizado con Universal Creator' })
                     : '',
           url: video.output_url || '',
           thumbUrl: video.output_url || '',
@@ -608,11 +608,11 @@ export default function MediaLibrary() {
         }
         toast({
           title: 'Platz geschaffen',
-          description: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }),
+          description: tx({ de: tx({ de: tx({ de: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, es: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.` }), en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }), en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }), en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }),
         });
       } catch (cleanupErr: any) {
         toast({
-          title: 'Auto-Cleanup fehlgeschlagen',
+          title: tx({ de: 'Auto-Cleanup fehlgeschlagen', en: 'Auto cleanup failed', es: 'Error en la limpieza automática' }),
           description: cleanupErr?.message || tx({ de: 'Bitte manuell ältere Medien löschen.', en: 'Please delete older media manually.', es: 'Elimina manualmente los medios antiguos.' }),
           variant: 'destructive',
         });
@@ -716,7 +716,7 @@ export default function MediaLibrary() {
 
       toast({
         title: 'Gelöscht',
-        description: 'Medium erfolgreich gelöscht',
+        description: tx({ de: 'Medium erfolgreich gelöscht', en: 'Media deleted successfully', es: 'Medios eliminados correctamente' }),
       });
 
       setSelectedAssets(prev => prev.filter(assetId => assetId !== id));
@@ -760,7 +760,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "✉️ Media gesendet",
-      description: "Wird im Composer geladen...",
+      description: tx({ de: "Wird im Composer geladen...", en: "Loading in composer...", es: "Cargando en compositor..." }),
     });
     
     navigate('/command-center?compose=1');
@@ -769,7 +769,7 @@ export default function MediaLibrary() {
   // Send to Calendar
   const sendToCalendar = (mediaItem: NormalizedMediaItem) => {
     sessionStorage.setItem('calendar_prefill', JSON.stringify({
-      title: mediaItem.title || `Post vom ${new Date().toLocaleDateString('de-DE')}`,
+      title: mediaItem.title || tx({ de: tx({ de: tx({ de: tx({ de: `Post vom ${new Date().toLocaleDateString('de-DE')}`, en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }),
       caption: mediaItem.caption || '',
       mediaUrl: mediaItem.url,
       mediaType: mediaItem.type,
@@ -779,7 +779,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "📅 Media gesendet",
-      description: "Wird im Kalender geladen...",
+      description: tx({ de: "Wird im Kalender geladen...", en: "Loading in calendar...", es: "Cargando en calendario..." }),
     });
     
     navigate('/command-center?view=calendar&prefill=true');
@@ -790,8 +790,8 @@ export default function MediaLibrary() {
     // Only allow images for background replacer
     if (mediaItem.type !== 'image') {
       toast({
-        title: "⚠️ Nur Bilder erlaubt",
-        description: "Smart Background funktioniert nur mit Bildern.",
+        title: tx({ de: "⚠️ Nur Bilder erlaubt", en: "⚠️ Only images allowed", es: "⚠️ Sólo se permiten imágenes" }),
+        description: tx({ de: "Smart Background funktioniert nur mit Bildern.", en: "Smart Background only works with images.", es: "Fondo inteligente solo funciona con imágenes." }),
         variant: "destructive",
       });
       return;
@@ -804,7 +804,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "🎨 Media gesendet",
-      description: "Wird in Smart Background geladen...",
+      description: tx({ de: "Wird in Smart Background geladen...", en: "Loading in Smart Background...", es: "Cargando en Fondo inteligente..." }),
     });
     
     navigate('/picture-studio?tab=background');
@@ -829,7 +829,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "✉️ Medien gesendet",
-      description: `${selectedItems.length} Dateien werden im Composer geladen...`,
+      description: tx({ de: tx({ de: tx({ de: tx({ de: `${selectedItems.length} Dateien werden im Composer geladen...`, en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }), en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }), en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }), en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }),
     });
     
     navigate('/command-center?compose=1');
@@ -852,7 +852,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "📸 Media gesendet",
-      description: `Erstes Medium wird im KI-Post-Generator geladen...`,
+      description: tx({ de: tx({ de: tx({ de: tx({ de: `Erstes Medium wird im KI-Post-Generator geladen...`, en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }), en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }), en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }), en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }),
     });
     
     navigate('/content-studio?step=layout');
@@ -868,7 +868,7 @@ export default function MediaLibrary() {
     const firstItem = selectedItems[0];
     
     sessionStorage.setItem('calendar_prefill', JSON.stringify({
-      title: firstItem.title || `Post vom ${new Date().toLocaleDateString('de-DE')}`,
+      title: firstItem.title || tx({ de: tx({ de: tx({ de: tx({ de: `Post vom ${new Date().toLocaleDateString('de-DE')}`, en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }),
       caption: firstItem.caption || '',
       mediaUrl: firstItem.url,
       mediaType: firstItem.type,
@@ -878,7 +878,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "📅 Media gesendet",
-      description: `Erstes Medium wird im Kalender geladen...`,
+      description: tx({ de: tx({ de: tx({ de: tx({ de: `Erstes Medium wird im Kalender geladen...`, en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }), en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }), en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }), en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }),
     });
     
     navigate('/command-center?view=calendar&prefill=true');
@@ -895,8 +895,8 @@ export default function MediaLibrary() {
     
     if (!firstImageItem) {
       toast({
-        title: "⚠️ Kein Bild ausgewählt",
-        description: "Smart Background funktioniert nur mit Bildern.",
+        title: tx({ de: "⚠️ Kein Bild ausgewählt", en: "⚠️ No image selected", es: "⚠️ Ninguna imagen seleccionada" }),
+        description: tx({ de: "Smart Background funktioniert nur mit Bildern.", en: "Smart Background only works with images.", es: "Fondo inteligente solo funciona con imágenes." }),
         variant: "destructive",
       });
       return;
@@ -909,7 +909,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "🎨 Media gesendet",
-      description: tx({ de: `Erstes Bild wird in Smart Background geladen...`, en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }),
+      description: tx({ de: tx({ de: tx({ de: tx({ de: `Erstes Bild wird in Smart Background geladen...`, en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }), en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }), en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }), en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }),
     });
     
     navigate('/picture-studio?tab=background');
@@ -1339,7 +1339,7 @@ export default function MediaLibrary() {
                           <FolderPlus className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>In Album speichern</TooltipContent>
+                      <TooltipContent>{tx({ de: "In Album speichern", en: "Save to album", es: "Guardar en álbum" })}</TooltipContent>
                     </Tooltip>
 
                     <Tooltip>
@@ -1377,7 +1377,7 @@ export default function MediaLibrary() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Löschen</TooltipContent>
+                      <TooltipContent>{tx({ de: "Löschen", en: "Delete", es: "Borrar" })}</TooltipContent>
                     </Tooltip>
                   </>
 
@@ -1428,7 +1428,7 @@ export default function MediaLibrary() {
         <Card className="p-12">
           <div className="text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg font-medium mb-2">Keine Medien gefunden</p>
+            <p className="text-lg font-medium mb-2">{tx({ de: "Keine Medien gefunden", en: "No media found", es: "No se encontraron medios" })}</p>
             <p className="text-sm text-muted-foreground mb-4">Laden Sie Ihre ersten Dateien hoch</p>
             <Button asChild>
               <label htmlFor="file-upload" className="cursor-pointer">

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +41,7 @@ export const SubscriptionTab = () => {
             {language === 'de' ? 'Aktueller Plan' : language === 'es' ? 'Plan Actual' : 'Current Plan'}
           </CardTitle>
           <CardDescription>
-            {language === 'de' ? 'Ihr aktuelles Abonnement und Abrechnungsdetails' : language === 'es' ? 'Tu suscripción actual y detalles de facturación' : 'Your current subscription and billing details'}
+            {language === 'de' ? tx({ de: 'Ihr aktuelles Abonnement und Abrechnungsdetails', en: 'Your current subscription and billing details', es: 'Su suscripción actual y detalles de facturación' }) : language === 'es' ? 'Tu suscripción actual y detalles de facturación' : 'Your current subscription and billing details'}
           </CardDescription>
         </CardHeader>
         <CardContent className="relative space-y-6">
@@ -69,8 +70,8 @@ export const SubscriptionTab = () => {
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {subscribed 
-                    ? (language === 'de' ? 'Zugriff auf alle Premium-Funktionen' : language === 'es' ? 'Acceso a todas las funciones premium' : 'Access to all premium features')
-                    : (language === 'de' ? 'Begrenzter Zugriff auf Basis-Funktionen' : language === 'es' ? 'Acceso limitado a funciones básicas' : 'Limited access to basic features')}
+                    ? (language === 'de' ? tx({ de: 'Zugriff auf alle Premium-Funktionen', en: 'Access to all premium features', es: 'Acceso a todas las funciones premium' }) : language === 'es' ? 'Acceso a todas las funciones premium' : 'Access to all premium features')
+                    : (language === 'de' ? tx({ de: 'Begrenzter Zugriff auf Basis-Funktionen', en: 'Limited access to basic functions', es: 'Acceso limitado a funciones básicas.' }) : language === 'es' ? 'Acceso limitado a funciones básicas' : 'Limited access to basic features')}
                 </p>
               </div>
             </div>
@@ -144,7 +145,7 @@ export const SubscriptionTab = () => {
             Credits
           </CardTitle>
           <CardDescription>
-            {language === 'de' ? 'Verwalten Sie Ihre Credits für KI-Generierungen' : language === 'es' ? 'Gestione sus créditos para generaciones de IA' : 'Manage your credits for AI generations'}
+            {language === 'de' ? tx({ de: 'Verwalten Sie Ihre Credits für KI-Generierungen', en: 'Manage your AI generation credits', es: 'Administre sus créditos de generación de IA' }) : language === 'es' ? 'Gestione sus créditos para generaciones de IA' : 'Manage your credits for AI generations'}
           </CardDescription>
         </CardHeader>
         <CardContent>

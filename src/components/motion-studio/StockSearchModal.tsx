@@ -86,7 +86,7 @@ export default function StockSearchPanel({
       setCached(Boolean(data?.cached));
     } catch (e) {
       console.error('Stock search failed:', e);
-      toast.error('Stock-Suche fehlgeschlagen');
+      toast.error(tx({ de: "Stock-Suche fehlgeschlagen", en: "Stock search failed", es: "La búsqueda de acciones falló" }));
     } finally {
       setLoading(false);
     }
@@ -109,13 +109,13 @@ export default function StockSearchPanel({
       }
       setBusyId(v.id);
       try {
-        toast.loading('Frame wird extrahiert…', { id: `extract-${v.id}` });
+        toast.loading(tx({ de: "Frame wird extrahiert…", en: "Frame is being extracted…", es: "Se está extrayendo el marco..." }), { id: `extract-${v.id}` });
         const url = await extractFrameFromVideoUrl(v.url, user.id, { atSeconds: 1 });
         toast.success('Reference gesetzt', { id: `extract-${v.id}` });
         onUseAsReference(url, { source: v.source, author: v.user.name });
       } catch (e) {
         console.error('Frame extraction failed:', e);
-        toast.error('Frame-Extraktion fehlgeschlagen', { id: `extract-${v.id}` });
+        toast.error(tx({ de: "Frame-Extraktion fehlgeschlagen", en: "Frame extraction failed", es: "Falló la extracción del marco" }), { id: `extract-${v.id}` });
       } finally {
         setBusyId(null);
       }
@@ -148,7 +148,7 @@ export default function StockSearchPanel({
         source: v.source,
         author: v.user.name,
       });
-      toast.success('B-Roll-Szene eingefügt');
+      toast.success(tx({ de: "B-Roll-Szene eingefügt", en: "B-roll scene added", es: "Se agregó una escena B-roll." }));
     },
     [onUseAsBRoll]
   );

@@ -18,7 +18,7 @@ interface Props {
 const META: Record<string, { label: string; icon: typeof Bell; className: string }> = {
   autopilot_qa_review: { label: 'QA-Review', icon: AlertTriangle, className: 'text-amber-500 bg-amber-500/10' },
   autopilot_blocked: { label: 'Blockiert', icon: XCircle, className: 'text-destructive bg-destructive/10' },
-  autopilot_failed: { label: 'Fehler', icon: XCircle, className: 'text-destructive bg-destructive/10' },
+  autopilot_failed: { label: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }), icon: XCircle, className: 'text-destructive bg-destructive/10' },
   autopilot_posted: { label: 'Live', icon: Sparkles, className: 'text-emerald-500 bg-emerald-500/10' },
   autopilot_daily_digest: { label: 'Tagesübersicht', icon: CalIcon, className: 'text-primary bg-primary/10' },
   autopilot_strike: { label: 'Strike', icon: ShieldAlert, className: 'text-destructive bg-destructive/10' },
@@ -43,17 +43,17 @@ export function AutopilotApprovalInbox({ onOpenSlot }: Props) {
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-serif text-lg">Wartet auf Freigabe</h3>
+              <h3 className="font-serif text-lg">{tx({ de: "Wartet auf Freigabe", en: "Waiting for release", es: "Esperando la liberación" })}</h3>
               {reviewSlots.length > 0 && (
                 <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30">{reviewSlots.length}</Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">Slots, die du im Co-Pilot-Modus prüfen musst.</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: "Slots, die du im Co-Pilot-Modus prüfen musst.", en: "Slots you need to check in co-pilot mode.", es: "Slots que necesitas comprobar en modo copiloto." })}</p>
           </div>
         </div>
 
         {reviewSlots.length === 0 ? (
-          <EmptyState icon={CheckCheck} text="Alles freigegeben — keine Reviews offen." />
+          <EmptyState icon={CheckCheck} text={tx({ de: "Alles freigegeben — keine Reviews offen.", en: "Everything approved - no reviews open.", es: "Todo aprobado, no hay revisiones abiertas." })} />
         ) : (
           <ScrollArea className="h-[420px] pr-2">
             <div className="space-y-2">
@@ -140,7 +140,7 @@ function ReviewRow({
             )}
           </div>
           <p className="text-sm line-clamp-2">
-            {slot.caption || slot.topic_hint || 'Slot ohne Caption'}
+            {slot.caption || slot.topic_hint || tx({ de: 'Slot ohne Caption', en: 'Slot without caption', es: 'Ranura sin título' })}
           </p>
         </div>
       </div>

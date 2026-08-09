@@ -75,7 +75,7 @@ export default function SfxLibrary() {
       if (error) throw error;
       setResults((data?.results ?? []) as SfxItem[]);
     } catch (err: any) {
-      toast({ title: "Suche fehlgeschlagen", description: err?.message ?? "Unbekannter Fehler", variant: "destructive" });
+      toast({ title: tx({ de: "Suche fehlgeschlagen", en: "Search failed", es: "La búsqueda falló" }), description: err?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -159,7 +159,7 @@ export default function SfxLibrary() {
     audio.onended = () => setPlayingId(null);
     audio.onerror = () => {
       setPlayingId(null);
-      toast({ title: "Wiedergabe fehlgeschlagen", variant: "destructive" });
+      toast({ title: tx({ de: "Wiedergabe fehlgeschlagen", en: "Playback failed", es: "Error de reproducción" }), variant: "destructive" });
     };
     audio.play().catch(() => setPlayingId(null));
     audioRef.current = audio;
@@ -178,7 +178,7 @@ export default function SfxLibrary() {
         tags: item.tags,
       })
     );
-    toast({ title: "Im Composer geladen", description: tx({ de: "SFX wird beim Öffnen automatisch hinzugefügt.", en: "SFX is automatically added when opened.", es: "SFX se añade automáticamente al abrir." }) });
+    toast({ title: tx({ de: "Im Composer geladen", en: "Loaded in composer", es: "Cargado en compositor" }), description: tx({ de: "SFX wird beim Öffnen automatisch hinzugefügt.", en: "SFX is automatically added when opened.", es: "SFX se añade automáticamente al abrir." }) });
     navigate("/video-composer");
   }
 
@@ -194,7 +194,7 @@ export default function SfxLibrary() {
         tags: item.tags,
       })
     );
-    toast({ title: "In Director's Cut geladen", description: "SFX wird als Audio-Layer hinzugefügt." });
+    toast({ title: tx({ de: "In Director's Cut geladen", en: "Loaded into Director's Cut", es: "Cargado en la versión del director" }), description: tx({ de: "SFX wird als Audio-Layer hinzugefügt.", en: "SFX is added as an audio layer.", es: "SFX se agrega como una capa de audio." }) });
     navigate("/universal-directors-cut");
   }
 
@@ -355,7 +355,7 @@ export default function SfxLibrary() {
                 <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
               </div>
             ) : (
-              renderGrid(results, "Keine Ergebnisse — versuche eine andere Suche.")
+              renderGrid(results, tx({ de: "Keine Ergebnisse — versuche eine andere Suche.", en: "No results — try another search.", es: "No hay resultados: intente con otra búsqueda." }))
             )}
           </TabsContent>
 

@@ -33,13 +33,13 @@ export function BrandDnaExtractor({ onApply }: Props) {
         onSuccess: (d) => {
           setResult(d);
           toast({
-            title: "Brand DNA extrahiert",
-            description: `Konfidenz: ${Math.round((d.confidence ?? 0) * 100)}%`,
+            title: tx({ de: "Brand DNA extrahiert", en: "Brand DNA extracted", es: "ADN de marca extraído" }),
+            description: `${tx({ de: "Konfidenz", en: "Confidence", es: "Confianza" })}: ${Math.round((d.confidence ?? 0) * 100)}%`,
           });
         },
         onError: (e) => {
           toast({
-            title: "Extraktion fehlgeschlagen",
+            title: tx({ de: "Extraktion fehlgeschlagen", en: "Extraction failed", es: "Error de extracción" }),
             description: e.message ?? tx({ de: "Bitte versuche es erneut.", en: "Please try again.", es: "Por favor, inténtalo de nuevo." }),
             variant: "destructive",
           });
@@ -62,11 +62,11 @@ export function BrandDnaExtractor({ onApply }: Props) {
           <div>
             <h3 className="text-lg font-semibold">Brand DNA Extractor</h3>
             <p className="text-sm text-muted-foreground">
-              Gib deine Website-URL ein — die KI extrahiert Farben, Fonts, Tone & Keywords automatisch.
+              {tx({ de: "Gib deine Website-URL ein — die KI extrahiert Farben, Fonts, Tone & Keywords automatisch.", en: "Enter your website URL — the AI automatically extracts colors, fonts, tone & keywords.", es: "Introduce la URL de tu sitio web — la IA extrae automáticamente colores, fuentes, tono y palabras clave." })}
             </p>
           </div>
           <Badge variant="outline" className="ml-auto border-primary/30 text-primary">
-            NEU
+            {tx({ de: "NEU", en: "NEW", es: "NUEVO" })}
           </Badge>
         </div>
 
@@ -87,9 +87,9 @@ export function BrandDnaExtractor({ onApply }: Props) {
             className="bg-gradient-to-r from-primary to-accent text-primary-foreground"
           >
             {isPending ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analysiere…</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {tx({ de: "Analysiere…", en: "Analyzing…", es: "Analizando…" })}</>
             ) : (
-              <><Sparkles className="mr-2 h-4 w-4" /> DNA extrahieren</>
+              <><Sparkles className="mr-2 h-4 w-4" /> {tx({ de: "DNA extrahieren", en: "Extract DNA", es: "Extraer ADN" })}</>
             )}
           </Button>
         </div>
@@ -105,10 +105,10 @@ export function BrandDnaExtractor({ onApply }: Props) {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                    {result.source} · Konfidenz {Math.round((result.confidence ?? 0) * 100)}%
+                    {result.source} · {tx({ de: "Konfidenz", en: "Confidence", es: "Confianza" })} {Math.round((result.confidence ?? 0) * 100)}%
                   </div>
                   <div className="text-base font-semibold">
-                    {result.brand_name ?? "Unbenannte Marke"}
+                    {result.brand_name ?? tx({ de: "Unbenannte Marke", en: "Unnamed brand", es: "Marca sin nombre" })}
                   </div>
                 </div>
                 <Button
@@ -117,7 +117,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
                   onClick={() => onApply(result)}
                   className="bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30"
                 >
-                  <Check className="mr-1.5 h-4 w-4" /> Übernehmen
+                  <Check className="mr-1.5 h-4 w-4" /> {tx({ de: "Übernehmen", en: "Apply", es: "Aplicar" })}
                 </Button>
               </div>
 
@@ -128,7 +128,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
               {/* Palette */}
               {result.palette && result.palette.length > 0 && (
                 <div>
-                  <div className="mb-1.5 text-xs font-medium text-muted-foreground">Palette</div>
+                  <div className="mb-1.5 text-xs font-medium text-muted-foreground">{tx({ de: "Palette", en: "Palette", es: "Paleta" })}</div>
                   <div className="flex flex-wrap gap-1.5">
                     {result.palette.map((c) => (
                       <div key={c} className="flex items-center gap-1.5 rounded-md border border-white/10 bg-background/60 px-2 py-1">
@@ -144,19 +144,19 @@ export function BrandDnaExtractor({ onApply }: Props) {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 {result.fonts?.headline && (
                   <div>
-                    <div className="text-xs text-muted-foreground">Headline</div>
+                    <div className="text-xs text-muted-foreground">{tx({ de: "Headline", en: "Headline", es: "Titular" })}</div>
                     <div className="font-medium">{result.fonts.headline}</div>
                   </div>
                 )}
                 {result.fonts?.body && (
                   <div>
-                    <div className="text-xs text-muted-foreground">Body</div>
+                    <div className="text-xs text-muted-foreground">{tx({ de: "Body", en: "Body", es: "Cuerpo" })}</div>
                     <div className="font-medium">{result.fonts.body}</div>
                   </div>
                 )}
                 {result.tone && (
                   <div>
-                    <div className="text-xs text-muted-foreground">Tone</div>
+                    <div className="text-xs text-muted-foreground">{tx({ de: "Tone", en: "Tone", es: "Tono" })}</div>
                     <div className="font-medium capitalize">{result.tone}</div>
                   </div>
                 )}
@@ -184,7 +184,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <ImageIcon className="h-3.5 w-3.5" />
-          Tipp: Bald auch per Screenshot- oder Logo-Upload.
+          {tx({ de: "Tipp: Bald auch per Screenshot- oder Logo-Upload.", en: "Tip: Screenshot or logo upload coming soon too.", es: "Consejo: pronto también mediante captura de pantalla o subida de logo." })}
         </div>
       </div>
     </Card>

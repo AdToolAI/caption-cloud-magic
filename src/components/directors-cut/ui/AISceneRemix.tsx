@@ -72,7 +72,7 @@ const remixOptions: RemixOption[] = [
   {
     id: 'random',
     name: 'Random Shuffle',
-    description: 'Zufällige Anordnung für überraschende Ergebnisse',
+    description: tx({ de: 'Zufällige Anordnung für überraschende Ergebnisse', en: 'Random order for surprising results', es: 'Orden aleatorio para resultados sorprendentes' }),
     icon: <Shuffle className="w-5 h-5" />,
     color: 'from-cyan-500 to-blue-500',
   },
@@ -82,7 +82,7 @@ const platformOptions: RemixOption[] = [
   {
     id: 'tiktok',
     name: 'TikTok Optimiert',
-    description: 'Hook in ersten 3 Sekunden, schnelle Cuts',
+    description: tx({ de: 'Hook in ersten 3 Sekunden, schnelle Cuts', en: 'Hook in the first 3 seconds, fast cuts', es: 'Gancho en los primeros 3 segundos, cortes rápidos' }),
     icon: <Target className="w-5 h-5" />,
     color: 'from-pink-500 to-rose-500',
     badge: 'Viral',

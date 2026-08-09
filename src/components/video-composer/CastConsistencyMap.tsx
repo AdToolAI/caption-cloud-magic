@@ -264,7 +264,7 @@ export function CastConsistencyMap({ scenes, characters, embedded = false, onUpd
             <div className="flex-1">
               ⚠️ {orphans.map((o) => o.name).join(', ')} {orphans.length === 1 ? 'kommt' : 'kommen'} in keiner Szene vor.
               {canRepair
-                ? ' Die IDs tragen einen Outfit-/Katalog-Präfix — ein Klick repariert den Anker auf die Basis-UUID.'
+                ? tx({ de: ' Die IDs tragen einen Outfit-/Katalog-Präfix — ein Klick repariert den Anker auf die Basis-UUID.', en: 'The IDs carry an outfit/catalog prefix — clicking fixes the anchor to the base UUID.', es: 'Los ID llevan un prefijo de equipo/catálogo; al hacer clic, se fija el ancla al UUID base.' })
                 : tx({ de: ' Klicke in einer Szene auf den Charakter-Button, um sie als Anker hinzuzufügen — oder generiere das Storyboard neu.', en: ' In a scene, click the character button to add it as an anchor — or regenerate the storyboard.', es: ' En una escena, haz clic en el botón del personaje para añadirlo como ancla, o regenera el storyboard.' })}
             </div>
             {canRepair && (

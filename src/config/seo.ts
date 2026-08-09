@@ -40,10 +40,10 @@ export const SEO_CONFIG = {
   author: 'AdTool AI Team',
   keywords: [
     'KI Videogenerator',
-    'KI Video erstellen',
+    tx({ de: "KI Video erstellen", en: "Create AI video", es: "Crear vídeo de IA" }),
     'Lip-Sync KI',
-    'AI Avatar Video',
-    'Videoproduktion ohne Team',
+    tx({ de: "AI Avatar Video", en: "AI avatar video", es: "Vídeo de avatar de IA" }),
+    tx({ de: 'Videoproduktion ohne Team', en: 'Video production without a team', es: 'Producción de vídeo sin equipo.' }),
     'KI Voiceover',
     'Content Creator Tools',
     'KI Werbevideo',
@@ -98,7 +98,7 @@ export const PAGES_SEO = {
     ogImage: '/og-home.jpg',
     priority: 1.0,
     changefreq: 'weekly' as const,
-    keywords: ['KI Videogenerator', 'Lip-Sync KI', 'AI Avatar Video', 'KI Werbevideo'],
+    keywords: ['KI Videogenerator', 'Lip-Sync KI', tx({ de: "AI Avatar Video", en: "AI avatar video", es: "Vídeo de avatar de IA" }), 'KI Werbevideo'],
   },
   pricing: {
     path: '/pricing',
@@ -130,7 +130,7 @@ export const PAGES_SEO = {
   legal: {
     path: '/legal',
     title: 'Impressum & Rechtliches - AdTool AI',
-    description: 'Impressum, Datenschutzerklärung und AGB von AdTool AI. Transparente Informationen zu Datenschutz und rechtlichen Aspekten.',
+    description: tx({ de: 'Impressum, Datenschutzerklärung und AGB von AdTool AI. Transparente Informationen zu Datenschutz und rechtlichen Aspekten.', en: 'Imprint, data protection declaration and general terms and conditions of AdTool AI. Transparent information on data protection and legal aspects.', es: 'Pie de imprenta, declaración de protección de datos y términos y condiciones generales de AdTool AI. Información transparente sobre protección de datos y aspectos legales.' }),
     ogImage: '/og-image.jpg',
     priority: 0.3,
     changefreq: 'yearly' as const,

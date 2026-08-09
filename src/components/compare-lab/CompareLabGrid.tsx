@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Compare Lab — Reusable Grid Component
 //
 // Renders the full Compare Lab UI: engine picker, prompt + duration,
@@ -100,7 +101,7 @@ export default function CompareLabGrid({
                 <Textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Beschreibe die Szene, die du auf allen Engines vergleichen willst…"
+                  placeholder={tx({ de: "Beschreibe die Szene, die du auf allen Engines vergleichen willst…", en: "Describe the scene you want to compare on all engines...", es: "Describe la escena que deseas comparar en todos los motores..." })}
                   className="min-h-[100px] resize-none"
                   disabled={isStarting}
                 />
@@ -296,7 +297,7 @@ function OutputCard({
         {isFailed && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
             <AlertCircle className="h-6 w-6 text-destructive" />
-            <span className="text-xs text-muted-foreground">{output.error_message ?? 'Fehler'}</span>
+            <span className="text-xs text-muted-foreground">{output.error_message ?? tx({ de: 'Fehler', en: 'Mistake', es: 'Error' })}</span>
           </div>
         )}
         {output.video_url && (

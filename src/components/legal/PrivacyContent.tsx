@@ -23,18 +23,18 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
           </div>
         </LegalSection>
 
-        <LegalSection title="2. Datenerhebung und Verarbeitung" icon="database" index={1}>
+        <LegalSection title={tx({ de: "2. Datenerhebung und Verarbeitung", en: "2. Data collection and processing", es: "2. Recopilación y procesamiento de datos" })} icon="database" index={1}>
           <div className="space-y-4">
             <div>
               <h4 className="font-semibold text-foreground mb-2">2.1 Registrierungsdaten</h4>
               <ul className="list-disc list-inside space-y-1">
                 <li>E-Mail-Adresse (Pflichtfeld)</li>
                 <li>Name (optional)</li>
-                <li>Passwort (verschlüsselt gespeichert)</li>
+                <li>{tx({ de: "Passwort (verschlüsselt gespeichert)", en: "Password (saved encrypted)", es: "Contraseña (guardada cifrada)" })}</li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-foreground mb-2">2.2 Social Media Daten (mit Ihrer Einwilligung)</h4>
+              <h4 className="font-semibold text-foreground mb-2">{tx({ de: "2.2 Social Media Daten (mit Ihrer Einwilligung)", en: "2.2 Social media data (with your consent)", es: "2.2 Datos de redes sociales (con su consentimiento)" })}</h4>
               <ul className="list-disc list-inside space-y-1">
                 <li><strong>Instagram:</strong> Posts, Bilder, Videos, Metriken, Follower-Daten</li>
                 <li><strong>Facebook:</strong> Seiten-Informationen, Post-Performance, Insights</li>
@@ -47,14 +47,14 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
               <ul className="list-disc list-inside space-y-1">
                 <li>Verwendete Features (Caption Generator, Analytics, Calendar)</li>
                 <li>IP-Adresse (anonymisiert nach 7 Tagen)</li>
-                <li>Browser-Informationen und Gerätetyp</li>
+                <li>{tx({ de: "Browser-Informationen und Gerätetyp", en: "Browser information and device type", es: "Información del navegador y tipo de dispositivo" })}</li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold text-foreground mb-2">2.4 Zahlungsdaten</h4>
               <ul className="list-disc list-inside space-y-1">
                 <li>Kreditkarteninformationen (verarbeitet durch Stripe)</li>
-                <li>Rechnungsdaten und Transaktionshistorie</li>
+                <li>{tx({ de: "Rechnungsdaten und Transaktionshistorie", en: "Billing information and transaction history", es: "Información de facturación e historial de transacciones" })}</li>
               </ul>
             </div>
           </div>
@@ -62,7 +62,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
 
         <LegalSection title="3. Rechtsgrundlagen (DSGVO)" icon="scale" index={2}>
           <ul className="list-disc list-inside space-y-2">
-            <li><strong className="text-foreground">Art. 6 Abs. 1 lit. a DSGVO:</strong> Einwilligung für Social Media API-Zugriff</li>
+            <li><strong className="text-foreground">Art. 6 Abs. 1 lit. a DSGVO:</strong> {tx({ de: "Einwilligung für Social Media API-Zugriff", en: "Consent for social media API access", es: "Consentimiento para el acceso a la API de redes sociales" })}</li>
             <li><strong className="text-foreground">Art. 6 Abs. 1 lit. b DSGVO:</strong> Vertragserfüllung (Bereitstellung unserer Services)</li>
             <li><strong className="text-foreground">Art. 6 Abs. 1 lit. f DSGVO:</strong> {tx({ de: "Berechtigtes Interesse für Analytics und Sicherheit", en: "Legitimate interest for analytics and security", es: "Interés legítimo para análisis y seguridad" })}</li>
           </ul>
@@ -71,14 +71,14 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
         <LegalSection title="4. Zweck der Datenverarbeitung" icon="shield" index={3}>
           <ul className="list-disc list-inside space-y-2">
             <li><strong className="text-foreground">Service-Bereitstellung:</strong> Caption-Generierung, Analytics, Scheduling</li>
-            <li><strong className="text-foreground">Personalisierung:</strong> Empfehlungen basierend auf Ihrer Nutzung</li>
-            <li><strong className="text-foreground">Analytics:</strong> Verbesserung unserer AI-Modelle und Features</li>
+            <li><strong className="text-foreground">Personalisierung:</strong> {tx({ de: "Empfehlungen basierend auf Ihrer Nutzung", en: "Recommendations based on your usage", es: "Recomendaciones basadas en su uso" })}</li>
+            <li><strong className="text-foreground">Analytics:</strong> {tx({ de: "Verbesserung unserer AI-Modelle und Features", en: "Improving our AI models and features", es: "Mejorando nuestros modelos y características de IA" })}</li>
             <li><strong className="text-foreground">Support:</strong> Beantwortung von Anfragen</li>
             <li><strong className="text-foreground">Zahlungsabwicklung:</strong> Über Stripe</li>
           </ul>
         </LegalSection>
 
-        <LegalSection title="5. Drittanbieter und Datenübermittlung" icon="globe" index={4}>
+        <LegalSection title={tx({ de: "5. Drittanbieter und Datenübermittlung", en: "5. Third Party Providers and Data Transfer", es: "5. Proveedores externos y transferencia de datos" })} icon="globe" index={4}>
           <div className="space-y-4">
             <div className="p-3 rounded-lg bg-muted/30 border border-white/5">
               <h4 className="font-semibold text-foreground mb-1">Meta (Facebook & Instagram)</h4>
@@ -111,9 +111,9 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
         <LegalSection title="6. Speicherdauer" icon="database" index={5}>
           <ul className="list-disc list-inside space-y-2">
             <li><strong className="text-foreground">Aktive Konten:</strong> Solange Ihr Account existiert</li>
-            <li><strong className="text-foreground">Gelöschte Konten:</strong> 30 Tage Backup, dann permanente Löschung</li>
+            <li><strong className="text-foreground">Gelöschte Konten:</strong> {tx({ de: "30 Tage Backup, dann permanente Löschung", en: "30 days backup, then permanent deletion", es: "Copia de seguridad de 30 días, luego eliminación permanente" })}</li>
             <li><strong className="text-foreground">Rechnungsdaten:</strong> 10 Jahre (§ 147 AO)</li>
-            <li><strong className="text-foreground">Social Media Token:</strong> Bis zum Widerruf</li>
+            <li><strong className="text-foreground">Social Media Token:</strong> {tx({ de: "Bis zum Widerruf", en: "Until revoked", es: "Hasta que sea revocado" })}</li>
           </ul>
         </LegalSection>
 
@@ -121,7 +121,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
           <div className="space-y-3">
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Auskunftsrecht (Art. 15)</h4>
-              <p className="text-sm">Jederzeit Auskunft über Ihre gespeicherten Daten</p>
+              <p className="text-sm">{tx({ de: "Jederzeit Auskunft über Ihre gespeicherten Daten", en: "Information about your stored data at any time", es: "Información sobre sus datos almacenados en cualquier momento" })}</p>
             </div>
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Berichtigungsrecht (Art. 16)</h4>
@@ -133,7 +133,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
             </div>
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Datenübertragbarkeit (Art. 20)</h4>
-              <p className="text-sm">Export Ihrer Daten als JSON unter Account → Export</p>
+              <p className="text-sm">{tx({ de: "Export Ihrer Daten als JSON unter Account → Export", en: "Export your data as JSON under Account → Export", es: "Exporte sus datos como JSON en Cuenta → Exportar" })}</p>
             </div>
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Widerspruchsrecht (Art. 21)</h4>
@@ -142,7 +142,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
           </div>
         </LegalSection>
 
-        <LegalSection title="8. Cookies und Tracking" icon="cookie" index={7}>
+        <LegalSection title={tx({ de: "8. Cookies und Tracking", en: "8. Cookies and Tracking", es: "8. Cookies y seguimiento" })} icon="cookie" index={7}>
           <div className="space-y-4">
             <div>
               <h4 className="font-semibold text-foreground mb-2">Essenzielle Cookies (immer aktiv)</h4>
@@ -155,9 +155,9 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
             <div>
               <h4 className="font-semibold text-foreground mb-2">Analytics Cookies (Opt-In)</h4>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Google Analytics (nur mit Zustimmung)</li>
+                <li>{tx({ de: "Google Analytics (nur mit Zustimmung)", en: "Google Analytics (only with consent)", es: "Google Analytics (solo con consentimiento)" })}</li>
                 <li>IP-Anonymisierung aktiviert</li>
-                <li>Deaktivierung über Cookie-Banner</li>
+                <li>{tx({ de: "Deaktivierung über Cookie-Banner", en: "Deactivation via cookie banner", es: "Desactivación mediante banner de cookies" })}</li>
               </ul>
             </div>
           </div>
@@ -166,7 +166,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
         <LegalSection title="9. Datensicherheit" icon="lock" index={8}>
           <ul className="list-disc list-inside space-y-2">
             <li><strong className="text-foreground">Verschlüsselung:</strong> {tx({ de: "TLS 1.3 für alle Übertragungen", en: "TLS 1.3 for all transmissions", es: "TLS 1.3 para todas las transmisiones" })}</li>
-            <li><strong className="text-foreground">Passwörter:</strong> Bcrypt-Hash mit Salt</li>
+            <li><strong className="text-foreground">Passwörter:</strong> {tx({ de: "Bcrypt-Hash mit Salt", en: "Bcrypt hash with salt", es: "Hachís Bcrypt con sal" })}</li>
             <li><strong className="text-foreground">API-Token:</strong> Verschlüsselt in EU-Datenbank</li>
             <li><strong className="text-foreground">Zugriffskontrolle:</strong> Row Level Security (RLS)</li>
             <li><strong className="text-foreground">Backups:</strong> Tägliche verschlüsselte Backups</li>
@@ -175,14 +175,14 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
         </LegalSection>
 
         <LegalSection title="10. Internationale Datenübermittlung" icon="globe" index={9}>
-          <p className="mb-3">Daten werden primär in der EU verarbeitet. Ausnahmen:</p>
+          <p className="mb-3">{tx({ de: "Daten werden primär in der EU verarbeitet. Ausnahmen:", en: "Data is primarily processed in the EU. Exceptions:", es: "Los datos se procesan principalmente en la UE. Excepciones:" })}</p>
           <ul className="list-disc list-inside space-y-2">
             <li><strong className="text-foreground">Stripe (USA):</strong> EU-US Data Privacy Framework</li>
-            <li><strong className="text-foreground">Meta/Google API:</strong> Daten nur auf Anfrage abgerufen</li>
+            <li><strong className="text-foreground">Meta/Google API:</strong> {tx({ de: "Daten nur auf Anfrage abgerufen", en: "Data only accessed upon request", es: "Sólo se accede a los datos previa solicitud" })}</li>
           </ul>
         </LegalSection>
 
-        <LegalSection title="11. Kinder unter 16 Jahren" icon="users" index={10}>
+        <LegalSection title={tx({ de: "11. Kinder unter 16 Jahren", en: "11. Children under 16 years old", es: "11. Niños menores de 16 años" })} icon="users" index={10}>
           <p>{tx({ de: "Unser Service richtet sich nicht an Personen unter 16 Jahren. Sollten wir feststellen, dass ein Minderjähriger ohne elterliche Zustimmung ein Konto erstellt hat, löschen wir dieses unverzüglich.", en: "Our service is not intended for persons under 16 years of age. Should we discover that a minor has created an account without parental consent, we will delete it immediately.", es: "Nuestro servicio no está dirigido a personas menores de 16 años. Si descubrimos que un menor ha creado una cuenta sin el consentimiento de sus padres, la eliminaremos de inmediato." })}</p>
         </LegalSection>
 

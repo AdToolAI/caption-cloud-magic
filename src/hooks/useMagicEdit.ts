@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,7 +40,7 @@ export function useMagicEdit() {
       if (params.maskBlob) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          toast.error('Bitte einloggen');
+          toast.error(tx({ de: 'Bitte einloggen', en: 'Please log in', es: 'Por favor inicia sesión' }));
           return null;
         }
 
@@ -53,7 +54,7 @@ export function useMagicEdit() {
 
         if (uploadErr) {
           console.error('[useMagicEdit] mask upload error:', uploadErr);
-          toast.error(`Mask-Upload fehlgeschlagen: ${uploadErr.message}`);
+          toast.error(tx({ de: `Mask-Upload fehlgeschlagen: ${uploadErr.message}`, en: `Mask upload failed: ${uploadErr.message}`, es: `Error al cargar la máscara: ${uploadErr.message}` }));
           return null;
         }
 
@@ -104,7 +105,7 @@ export function useMagicEdit() {
       return null;
     } catch (err: any) {
       console.error('[useMagicEdit] error:', err);
-      toast.error(err.message || 'Magic Edit fehlgeschlagen');
+      toast.error(err.message || tx({ de: 'Magic Edit fehlgeschlagen', en: 'Magic edit failed', es: 'Error en la edición mágica' }));
       return null;
     } finally {
       setIsEditing(false);

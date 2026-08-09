@@ -236,7 +236,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       const { blob, durationSec } = encodeWav(chunks, sourceRate, 16000);
       setRecElapsed(0);
       if (blob.size < 4096 || durationSec < 3) {
-        toast.error("Aufnahme zu kurz. Sprich mindestens ein paar Sätze.");
+        toast.error(tx({ de: "Aufnahme zu kurz. Sprich mindestens ein paar Sätze.", en: "Recording too short. Say at least a few sentences.", es: "Grabación demasiado corta. Di al menos algunas frases." }));
         return;
       }
       if (samples.length >= MAX_SAMPLES) {
@@ -256,7 +256,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
           url,
         },
       ]);
-      toast.success(`Aufnahme gespeichert (${formatSec(durationSec)})`);
+      toast.success(tx({ de: `Aufnahme gespeichert (${formatSec(durationSec)})`, en: `Recording saved (${formatSec(durationSec)})`, es: `Grabación guardada (${formatSec(durationSec)})` }));
     },
     [samples.length],
   );
@@ -274,7 +274,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
         ACCEPTED_MIME.includes(type) ||
         /\.(mp3|wav|m4a|ogg|opus|webm|flac|aac)$/i.test(f.name);
       if (!okMime) {
-        toast.error(`Format nicht unterstützt: ${f.name}`);
+        toast.error(tx({ de: `Format nicht unterstützt: ${f.name}`, en: `Format not supported: ${f.name}`, es: `Formato no admitido: ${f.name}` }));
         continue;
       }
       if (f.size > MAX_FILE_BYTES) {
@@ -330,7 +330,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       await navigator.clipboard.writeText(personalizedText);
       toast.success("Skript kopiert");
     } catch {
-      toast.error("Kopieren fehlgeschlagen");
+      toast.error(tx({ de: "Kopieren fehlgeschlagen", en: "Copy failed", es: "Copia fallida" }));
     }
   };
 
@@ -375,7 +375,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       });
 
       if (result) {
-        toast.success('Stimme erfolgreich geklont', {
+        toast.success(tx({ de: 'Stimme erfolgreich geklont', en: 'Voice cloned successfully', es: 'Voz clonada con éxito' }), {
           description: tx({ de: 'Du findest sie jetzt unter „Meine Stimmen".', en: 'You can now find them under "My Voices".', es: 'Ahora puedes encontrarlas en "Mis voces".' }),
         });
         onOpenChange(false);
@@ -388,7 +388,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       }
     } catch (err) {
       console.error("[VoiceStudio] submit error:", err);
-      toast.error(err instanceof Error ? err.message : "Voice-Erstellung fehlgeschlagen");
+      toast.error(err instanceof Error ? err.message : tx({ de: "Voice-Erstellung fehlgeschlagen", en: "Voice creation failed", es: "Error al crear la voz" }));
     } finally {
       setSubmitting(false);
     }
@@ -534,7 +534,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">
-                        {isRecording ? "Aufnahme läuft…" : "Bereit zum Aufnehmen"}
+                        {isRecording ? "Aufnahme läuft…" : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Ziel: 60–90 Sekunden pro Aufnahme, in ruhiger Umgebung.

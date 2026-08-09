@@ -64,7 +64,7 @@ const tourCopy: Record<
           tx({ de: "Dein Dashboard zeigt dir Echtzeit-Branchen-News und virale Hooks — du weißt immer, was als nächstes zu posten ist.", en: "Your Dashboard shows you real-time industry news and viral hooks — you'll always know what to post next.", es: "Tu Dashboard te muestra noticias de la industria en tiempo real y ganchos virales — siempre sabrás qué publicar a continuación." }),
       },
       {
-        title: "Erstes Video in 90 Sekunden",
+        title: tx({ de: "Erstes Video in 90 Sekunden", en: "First video in 90 seconds", es: "Primer vídeo en 90 segundos." }),
         content:
           tx({ de: "Nutze einen der personalisierten Prompts hier, um dein erstes KI-Video mit Hailuo 2.3 zu erstellen. Der Brief ist bereits vorausgefüllt.", en: "Use one of the personalized prompts here to create your first AI video with Hailuo 2.3. The brief is already pre-filled.", es: "Usa una de las indicaciones personalizadas aquí para crear tu primer video de IA con Hailuo 2.3. El brief ya está prellenado." }),
       },
@@ -74,7 +74,7 @@ const tourCopy: Record<
           tx({ de: "Diese Checkliste zeigt die 5 Meilensteine, um die Plattform voll auszuschöpfen. Klicke einen offenen Schritt, um direkt zum passenden Tool zu springen.", en: "This checklist shows the 5 milestones to fully leverage the platform. Click an open step to jump directly to the corresponding tool.", es: "Esta lista de verificación muestra los 5 hitos para aprovechar al máximo la plataforma. Haz clic en un paso abierto para ir directamente a la herramienta correspondiente." }),
       },
       {
-        title: "Plane & poste auf Autopilot",
+        title: tx({ de: "Plane & poste auf Autopilot", en: "Plan & post on autopilot", es: "Planificar y publicar en piloto automático" }),
         content:
           tx({ de: "Sobald dein Post fertig ist, plane ihn im Kalender — Auto-Publishing übernimmt den Rest. Du bist startklar!", en: "Once your post is ready, schedule it in the calendar — Auto-Publishing does the rest. You're good to go!", es: "Una vez que tu publicación esté lista, prográmala en el calendario — la publicación automática hace el resto. ¡Estás listo para empezar!" }),
       },

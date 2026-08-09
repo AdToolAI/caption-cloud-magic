@@ -62,7 +62,7 @@ export const useVideoHistory = () => {
     onError: (error) => {
       toast({
         title: tx({ de: 'Fehler beim Löschen', en: 'Error deleting', es: 'Error al eliminar' }),
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        description: error instanceof Error ? error.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: 'destructive'
       });
     }

@@ -63,7 +63,7 @@ export function useContinuityDrift() {
         };
       } catch (err: any) {
         // Try to surface the actual edge-function error body for debugging
-        let msg = err instanceof Error ? err.message : 'Drift-Check fehlgeschlagen';
+        let msg = err instanceof Error ? err.message : tx({ de: 'Drift-Check fehlgeschlagen', en: 'Drift check failed', es: 'Error en la comprobación de deriva' });
         try {
           const ctx = err?.context;
           if (ctx?.body) {

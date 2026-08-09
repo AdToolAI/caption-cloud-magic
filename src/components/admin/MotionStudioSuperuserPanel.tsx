@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,7 +95,7 @@ export function MotionStudioSuperuserPanel() {
       .order("started_at", { ascending: false })
       .limit(200);
     if (error) {
-      toast.error("Konnte Runs nicht laden: " + error.message);
+      toast.error(tx({ de: "Konnte Runs nicht laden: ", en: "Couldn't load runs:", es: "No se pudieron cargar ejecuciones:" }) + error.message);
     } else {
       setRuns((data as Run[]) || []);
     }
@@ -117,7 +118,7 @@ export function MotionStudioSuperuserPanel() {
       );
       await loadRuns();
     } catch (e) {
-      toast.error("Lauf fehlgeschlagen: " + (e as Error).message);
+      toast.error(tx({ de: "Lauf fehlgeschlagen: ", en: "Run failed:", es: "La ejecución falló:" }) + (e as Error).message);
     } finally {
       setRunning(null);
     }

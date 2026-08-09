@@ -1,4 +1,5 @@
 import { Currency } from './pricing';
+import { tx } from '@/lib/i18nText';
 
 // Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
 // Std: $0.04/s → €0.12/s | Pro: $0.07/s → €0.21/s
@@ -16,7 +17,7 @@ export const WAN_VIDEO_MODELS = {
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: 'Schnelle AI-Videos ab 0,60€ pro 5 Sekunden',
+      EUR: tx({ de: 'Schnelle AI-Videos ab 0,60€ pro 5 Sekunden', en: 'Fast AI videos from €0.60 per 5 seconds', es: 'Vídeos rápidos con IA desde 0,60 € por 5 segundos' }),
       USD: 'Fast AI videos from $0.60 per 5 seconds',
     },
     badge: 'Standard',
@@ -34,7 +35,7 @@ export const WAN_VIDEO_MODELS = {
     maxDuration: 10,
     allowedDurations: [5, 10] as const,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 1,05€ pro 5 Sekunden',
+      EUR: tx({ de: 'Premium 1080p-Qualität ab 1,05€ pro 5 Sekunden', en: 'Premium 1080p quality from €1.05 per 5 seconds', es: 'Calidad premium 1080p desde 1,05€ por 5 segundos' }),
       USD: 'Premium 1080p quality from $1.05 per 5 seconds',
     },
     badge: 'Premium',

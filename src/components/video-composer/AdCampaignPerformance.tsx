@@ -146,14 +146,14 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
       }
 
       toast({
-        title: 'Winner geklont',
+        title: tx({ de: 'Winner geklont', en: 'Winner cloned', es: 'Ganador clonado' }),
         description: tx({ de: 'Neuer Master wurde erstellt — bereit für die nächste Iteration.', en: 'New master created — ready for the next iteration.', es: 'Nuevo máster creado — listo para la próxima iteración.' }),
       });
       onCloneWinner?.(cloned.id);
     } catch (err: any) {
       console.error('[AdCampaignPerformance] clone failed:', err);
       toast({
-        title: 'Klonen fehlgeschlagen',
+        title: tx({ de: 'Klonen fehlgeschlagen', en: 'Cloning failed', es: 'Error al clonar' }),
         description: err?.message ?? tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
         variant: 'destructive',
       });

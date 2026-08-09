@@ -211,7 +211,7 @@ export function ToolkitCastWorldPicker({
                 loading={loading}
                 onPick={(c) => addChar(c.id)}
                 language={language}
-                emptyLabel={t('Noch keine Charaktere.', 'No characters yet.', 'Aún no hay personajes.')}
+                emptyLabel={t(tx({ de: 'Noch keine Charaktere.', en: 'No characters yet.', es: 'Aún no hay personajes.' }), 'No characters yet.', 'Aún no hay personajes.')}
                 triggerLabel={t(tx({ de: 'Charakter hinzufügen', en: 'Add character', es: 'Añadir personaje' }), 'Add character', 'Añadir personaje')}
               />
             )}
@@ -239,7 +239,7 @@ export function ToolkitCastWorldPicker({
               loading={loading}
               onPick={(l) => onLocationIdChange((l as MotionStudioLocation).id)}
               language={language}
-              emptyLabel={t('Noch keine Locations.', 'No locations yet.', 'Aún no hay ubicaciones.')}
+              emptyLabel={t(tx({ de: 'Noch keine Locations.', en: 'No locations yet.', es: 'Aún no hay ubicaciones.' }), 'No locations yet.', 'Aún no hay ubicaciones.')}
               triggerLabel={t('Location wählen', 'Pick location', 'Elegir ubicación')}
               fullWidth
             />
@@ -265,7 +265,7 @@ export function ToolkitCastWorldPicker({
               loading={loading}
               onPick={(l) => onBuildingIdChange((l as MotionStudioLocation).id)}
               language={language}
-              emptyLabel={t('Noch keine Buildings.', 'No buildings yet.', 'Aún no hay edificios.')}
+              emptyLabel={t(tx({ de: 'Noch keine Buildings.', en: 'No buildings yet.', es: 'Aún no hay edificios.' }), 'No buildings yet.', 'Aún no hay edificios.')}
               triggerLabel={t('Building wählen', 'Pick building', 'Elegir edificio')}
               fullWidth
             />
@@ -297,8 +297,8 @@ export function ToolkitCastWorldPicker({
               loading={loading}
               onPick={(p) => toggleProp((p as MotionStudioLocation).id)}
               language={language}
-              emptyLabel={t('Noch keine Props.', 'No props yet.', 'Aún no hay objetos.')}
-              triggerLabel={t('Prop hinzufügen', 'Add prop', 'Añadir objeto')}
+              emptyLabel={t(tx({ de: 'Noch keine Props.', en: 'No props yet.', es: 'Aún no hay accesorios.' }), 'No props yet.', 'Aún no hay objetos.')}
+              triggerLabel={t(tx({ de: 'Prop hinzufügen', en: 'Add prop', es: 'Agregar accesorio' }), 'Add prop', 'Añadir objeto')}
             />
           )}
         </div>

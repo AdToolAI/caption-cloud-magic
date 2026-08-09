@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * StoryboardSceneStrip — vertical (desktop) / horizontal (mobile) cinematic
  * filmstrip that lists every scene as a glanceable thumbnail tile.
@@ -73,7 +74,7 @@ function SortableTile({
       {/* Drag handle (top-right corner, only visible on hover) */}
       <button
         type="button"
-        aria-label="Szene verschieben"
+        aria-label={tx({ de: "Szene verschieben", en: "Move scene", es: "Mover escena" })}
         className="absolute -left-2 top-2 z-10 h-7 w-5 flex items-center justify-center rounded-md bg-background/70 backdrop-blur border border-border/40 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground cursor-grab active:cursor-grabbing touch-none transition-opacity"
         {...attributes}
         {...listeners}

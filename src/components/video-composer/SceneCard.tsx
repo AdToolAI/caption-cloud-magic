@@ -826,12 +826,7 @@ export default function SceneCard({
     } catch (e: any) {
       console.error("[SceneCard] inspire failed", e);
       toast({
-        title:
-          lang === "de"
-            ? "Inspire fehlgeschlagen"
-            : lang === "es"
-              ? "Falló la inspiración"
-              : "Inspire failed",
+        title: tx({ de: "Inspire fehlgeschlagen", en: "Inspire failed", es: "Falló la inspiración" }),
         description: e?.message ?? "",
         variant: "destructive",
       });
@@ -1039,7 +1034,7 @@ export default function SceneCard({
                                       ? "bg-amber-500/10 text-amber-200 border border-amber-500/30"
                                       : "bg-sky-500/10 text-sky-200 border border-sky-500/30"
                                   }`}
-                                  title="Hinweis vor dem Render — der Server fängt diese Fälle automatisch ab."
+                                  title={tx({ de: "Hinweis vor dem Render — der Server fängt diese Fälle automatisch ab.", en: "Note before rendering — the server automatically catches these cases.", es: "Nota antes de renderizar — el servidor detecta automáticamente estos casos." })}
                                 >
                                   {w.level === "warning" ? "⚠️" : "ℹ️"} {w.message}
                                 </span>
@@ -1256,13 +1251,7 @@ export default function SceneCard({
                       variant="outline"
                       className="h-7 text-[10px] gap-1.5"
                       onClick={() => onHybridExtend("forward")}
-                      title={
-                        lang === "de"
-                          ? "Sequel — wie geht die Szene weiter?"
-                          : lang === "es"
-                            ? "Sequel — ¿cómo continúa la escena?"
-                            : "Sequel — how does the scene continue?"
-                      }
+                      title={tx({ de: "Sequel — wie geht die Szene weiter?", en: "Sequel — how does the scene continue?", es: "Sequel — ¿cómo continúa la escena?" })}
                     >
                       <ArrowRight className="h-3 w-3" />
                       {lang === "de"
@@ -2046,15 +2035,15 @@ export default function SceneCard({
                       } catch (e) {
                         console.warn("[SceneCard] re-sync failed", e);
                         toast({
-                          title: "Lip-Sync fehlgeschlagen",
-                          description: (e as any)?.message ?? "Unbekannter Fehler",
+                          title: tx({ de: "Lip-Sync fehlgeschlagen", en: "Lip sync failed", es: "Sincronización labial fallida" }),
+                          description: (e as any)?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
                           variant: "destructive",
                         });
                       }
                     }}
                     className="text-[10px] px-2 py-1 rounded border border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
                   >
-                    🔁 Lip-Sync neu rendern
+                    🔁 {tx({ de: "Lip-Sync neu rendern", en: "Re-render lip sync", es: "Volver a renderizar sincronización labial" })}
                   </button>
                   <button
                     type="button"
@@ -2116,7 +2105,7 @@ export default function SceneCard({
                         toast({
                           title: tx({ de: "Löschen fehlgeschlagen", en: "Deletion failed", es: "Error al eliminar" }),
                           description:
-                            (e as any)?.message ?? "Unbekannter Fehler",
+                            (e as any)?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
                           variant: "destructive",
                         });
                       }
@@ -2379,8 +2368,8 @@ export default function SceneCard({
                             : anchor.strategy === "first-frame-direct"
                               ? tx({ de: "Porträt wird als erstes Bild gesetzt — Modell startet mit Gesicht", en: "Portrait is set as the first image — the model starts with the face", es: "El retrato se establece como primera imagen — el modelo comienza con la cara" })
                               : anchor.strategy === "subject-reference"
-                                ? "Porträt geht in den Reference-Slot — keine Komposition-Sperre"
-                                : "Kein Bild-Anker, Identität bleibt im Text-Prompt"}
+                                ? tx({ de: "Porträt geht in den Reference-Slot — keine Komposition-Sperre", en: "Portrait goes into the reference slot — no composition lock", es: "El retrato va al slot de referencia — sin bloqueo de composición" })
+                                : tx({ de: "Kein Bild-Anker, Identität bleibt im Text-Prompt", en: "No image anchor, identity stays in the text prompt", es: "Sin ancla de imagen, la identidad permanece en el prompt de texto" })}
                           {" · "}
                           {meta.cost}
                         </span>
@@ -2393,7 +2382,7 @@ export default function SceneCard({
                               !scene.forcePortraitAsFirstFrame,
                           })
                         }
-                        title="Porträt direkt als erstes Bild verwenden (face-lock)"
+                        title={tx({ de: "Porträt direkt als erstes Bild verwenden (face-lock)", en: "Use portrait directly as the first image (face-lock)", es: "Usar el retrato directamente como primera imagen (face-lock)" })}
                         className={`px-2 py-1 rounded text-[10px] font-medium transition-all whitespace-nowrap ${
                           scene.forcePortraitAsFirstFrame
                             ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40"
@@ -2626,8 +2615,8 @@ export default function SceneCard({
                               } catch (e) {
                                 console.warn("[SceneCard] cancel lipsync failed", e);
                                 toast({
-                                  title: "Abbruch fehlgeschlagen",
-                                  description: (e as any)?.message ?? "Unbekannter Fehler",
+                                  title: tx({ de: "Abbruch fehlgeschlagen", en: "Cancellation failed", es: "Error al cancelar" }),
+                                  description: (e as any)?.message ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
                                   variant: "destructive",
                                 });
                               }
@@ -3010,10 +2999,10 @@ export default function SceneCard({
                           {scene.clipUrl
                             ? scene.stockMediaAuthor?.name
                               ? `${scene.stockMediaSource} · ${scene.stockMediaAuthor.name}`
-                              : "Stock ausgewählt"
+                              : tx({ de: "Stock ausgewählt", en: "Stock selected", es: "Stock seleccionado" })
                             : scene.clipSource === "stock"
-                              ? "Kein Video gewählt"
-                              : "Kein Bild gewählt"}
+                              ? tx({ de: "Kein Video gewählt", en: "No video selected", es: "Ningún video seleccionado" })
+                              : tx({ de: "Kein Bild gewählt", en: "No image selected", es: "Ninguna imagen seleccionada" })}
                         </p>
                       </div>
                     </div>
@@ -3070,11 +3059,7 @@ export default function SceneCard({
                     <div className="flex items-center gap-2">
                       <Video className="h-3 w-3 text-primary" />
                       <Label className="text-[11px] font-medium text-primary">
-                        {lang === "de"
-                          ? "Restyle mit Referenzvideo (V2V)"
-                          : lang === "es"
-                            ? "Restyle con video de referencia (V2V)"
-                            : "Restyle with reference video (V2V)"}
+                        {tx({ de: "Restyle mit Referenzvideo (V2V)", en: "Restyle with reference video (V2V)", es: "Restyle con video de referencia (V2V)" })}
                       </Label>
                       <Badge
                         variant="outline"
@@ -3090,11 +3075,7 @@ export default function SceneCard({
                           : lang === "es"
                             ? "Runway Aleph requiere un video de referencia — sin él, la escena recurre a Hailuo."
                             : "Runway Aleph requires a reference video — without it the scene falls back to Hailuo."
-                        : lang === "de"
-                          ? "Optional: Lade ein Referenzvideo hoch, das die KI im Stil deines Prompts neu interpretiert."
-                          : lang === "es"
-                            ? "Opcional: sube un video de referencia que la IA reinterpretará al estilo de tu prompt."
-                            : "Optional: upload a reference video that the AI will restyle according to your prompt."}
+                        : tx({ de: "Optional: Lade ein Referenzvideo hoch, das die KI im Stil deines Prompts neu interpretiert.", en: "Optional: upload a reference video that the AI will restyle according to your prompt.", es: "Opcional: sube un video de referencia que la IA reinterpretará al estilo de tu prompt." })}
                     </p>
                     <SceneMediaUpload
                       projectId={projectId}
@@ -3117,11 +3098,7 @@ export default function SceneCard({
                 <div className="space-y-1.5 pt-1 border-t border-border/30">
                   <div className="text-[10px] text-muted-foreground/80 leading-snug">
                     {scene.clipSource.startsWith("ai-")
-                      ? lang === "de"
-                        ? "Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video)."
-                        : lang === "es"
-                          ? "Imagen de referencia opcional — la IA se basa en ella (Image-to-Video)."
-                          : "Optional reference image — the AI uses it as visual guide (image-to-video)."
+                      ? tx({ de: "Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video).", en: "Optional reference image — the AI uses it as visual guide (image-to-video).", es: "Imagen de referencia opcional — la IA se basa en ella (Image-to-Video)." })
                       : lang === "de"
                         ? tx({ de: "Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet.", en: "Optional reference image — used for continuity, brand-character sync, and future AI transitions.", es: "Imagen de referencia opcional — utilizada para continuidad, sincronización de personajes de marca y futuras transiciones de IA." })
                         : lang === "es"
@@ -3245,10 +3222,10 @@ export default function SceneCard({
               {secondaryOpen && (
                 <div
                   className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
-                  title="Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler)."
+                  title={tx({ de: "Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler).", en: "Transitions are added afterward in Universal Director's Cut (cleaner & more flexible).", es: "Las transiciones se añaden posteriormente en Universal Director's Cut (más limpio y flexible)." })}
                 >
                   <span className="text-[10px] text-muted-foreground">
-                    Harter Schnitt → Übergänge im Director's Cut
+                    {tx({ de: "Harter Schnitt → Übergänge im Director's Cut", en: "Hard cut → transitions in Director's Cut", es: "Corte directo → transiciones en Director's Cut" })}
                   </span>
                 </div>
               )}

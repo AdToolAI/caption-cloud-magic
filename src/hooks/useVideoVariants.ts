@@ -61,7 +61,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });
@@ -87,7 +87,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });
@@ -108,15 +108,15 @@ export const useVideoVariants = (videoCreationId?: string) => {
       if (error) throw error;
 
       toast({
-        title: 'Varianten werden generiert',
-        description: tx({ de: `${formats.length} Varianten werden erstellt`, en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }),
+        title: tx({ de: 'Varianten werden generiert', en: 'Variants are generated', es: 'Se generan variantes' }),
+        description: tx({ de: tx({ de: tx({ de: tx({ de: `${formats.length} Varianten werden erstellt`, en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }), en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }), en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }), en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }),
       });
 
       return data;
     } catch (error) {
       console.error('Error generating variants:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Varianten konnten nicht erstellt werden', en: 'Variants could not be created', es: 'No se pudieron crear las variantes' }),
         variant: 'destructive',
       });

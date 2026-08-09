@@ -33,16 +33,16 @@ const COPY: Record<Lang, {
 }> = {
   de: {
     eyebrow: "DIRECTOR AT WORK",
-    title: "Wir bauen dein Storyboard",
+    title: tx({ de: "Wir bauen dein Storyboard", en: "We build your storyboard", es: "Construimos tu storyboard" }),
     subtitle:
       tx({ de: "Skript, Cast und Szenen werden gerade komponiert — du musst nicht warten, wir benachrichtigen dich, sobald alles fertig ist.", en: "Script, cast, and scenes are currently being composed — you don't have to wait, we'll notify you as soon as everything is ready.", es: "El guion, el elenco y las escenas se están componiendo actualmente — no tienes que esperar, te notificaremos tan pronto como todo esté listo." }),
     phases: [
-      "Briefing wird analysiert…",
-      "Cast wird besetzt…",
+      tx({ de: "Briefing wird analysiert…", en: "Briefing is analyzed…", es: "Se analiza el briefing…" }),
+      tx({ de: "Cast wird besetzt…", en: "Cast is being cast…", es: "El elenco está siendo elegido..." }),
       tx({ de: "Szenen-Bögen werden geplant…", en: "Scene arcs are being planned…", es: "Se están planificando los arcos de la escena…" }),
-      "Skripte werden geschrieben…",
-      "Kamera & Look werden gesetzt…",
-      "Storyboard wird finalisiert…",
+      tx({ de: "Skripte werden geschrieben…", en: "Scripts are written...", es: "Los guiones están escritos..." }),
+      tx({ de: "Kamera & Look werden gesetzt…", en: "Camera & look are set…", es: "La cámara y el aspecto están configurados..." }),
+      tx({ de: "Storyboard wird finalisiert…", en: "Storyboard is being finalized...", es: "El guión gráfico se está ultimando..." }),
     ],
     notesTitle: "Director's Notes",
     notes: [
@@ -52,7 +52,7 @@ const COPY: Record<Lang, {
           tx({ de: "Sobald das Storyboard steht, zeigt dir die Cast Consistency Map oben, in welcher Szene welcher Charakter auftaucht — und ob ein Reference-Image, ein Frame-Chain oder nur ein Prompt-Anker genutzt wird. Reference (grüner Punkt) gibt die stärkste visuelle Konsistenz über mehrere Shots.", en: "Once the storyboard is ready, the Cast Consistency Map above will show you which character appears in which scene — and whether a Reference-Image, a Frame-Chain, or just a Prompt-Anchor is used. Reference (green dot) provides the strongest visual consistency across multiple shots.", es: "Una vez que el storyboard esté listo, el Mapa de Consistencia del Elenco de arriba te mostrará qué personaje aparece en qué escena — y si se utiliza una Imagen de Referencia, una Cadena de Frames o solo un Ancla de Prompt. La Referencia (punto verde) proporciona la mayor consistencia visual en múltiples tomas." }),
       },
       {
-        title: "Engine pro Szene",
+        title: tx({ de: "Engine pro Szene", en: "engine per scene", es: "motor por escena" }),
         body:
           tx({ de: "Jede Szene kann ein eigenes KI-Modell nutzen — Hailuo für günstige Realfilm-Looks, Kling für komplexe Choreografien, Vidu Q2 wenn mehrere Charaktere im selben Frame sein sollen. Über „Engine für alle“ überschreibst du alle Szenen auf einen Schlag.", en: "Each scene can use its own AI model — Hailuo for affordable live-action looks, Kling for complex choreographies, Vidu Q2 if multiple characters are to be in the same frame. With “Engine for all” you overwrite all scenes at once.", es: "Cada escena puede usar su propio modelo de IA — Hailuo para looks de acción real asequibles, Kling para coreografías complejas, Vidu Q2 si varios personajes deben estar en el mismo encuadre. Con “Motor para todos” sobrescribes todas las escenas a la vez." }),
       },
@@ -88,8 +88,8 @@ const COPY: Record<Lang, {
       },
     ],
     newsLabel: "AdTool News Radar · LIVE",
-    footer: "Dauert in der Regel 10–20 Sekunden.",
-    noNewsFallback: "News-Radar wird geladen…",
+    footer: tx({ de: "Dauert in der Regel 10–20 Sekunden.", en: "Typically takes 10-20 seconds.", es: "Normalmente tarda entre 10 y 20 segundos." }),
+    noNewsFallback: tx({ de: "News-Radar wird geladen…", en: "News radar is loading...", es: "El radar de noticias se está cargando..." }),
   },
   en: {
     eyebrow: "DIRECTOR AT WORK",

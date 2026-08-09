@@ -94,7 +94,7 @@ export default function SceneMediaUpload({
         toast.success(`Video hochgeladen (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
       } catch (err) {
         console.error('[SceneMediaUpload] Upload error:', err);
-        toast.error(err instanceof Error ? err.message : 'Upload fehlgeschlagen');
+        toast.error(err instanceof Error ? err.message : tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
       } finally {
         setTimeout(() => {
           setUploading(false);

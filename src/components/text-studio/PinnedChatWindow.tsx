@@ -185,7 +185,7 @@ export default function PinnedChatWindow() {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        if (resp.status === 402) toast.error(err.error || "Wallet leer – bitte Credits aufladen.");
+        if (resp.status === 402) toast.error(err.error || tx({ de: "Wallet leer – bitte Credits aufladen.", en: "Wallet empty – please top up with credits.", es: "Cartera vacía: recargue con créditos." }));
         else if (resp.status === 429) toast.error(tx({ de: "Rate limit – kurz warten und erneut probieren.", en: "Rate limit – please wait a moment and try again.", es: "Límite de peticiones – por favor, espera un momento e inténtalo de nuevo." }));
         else toast.error(err.error || tx({ de: "Fehler beim Senden", en: "Error sending", es: "Error al enviar" }));
         setMessages(next);
@@ -364,7 +364,7 @@ export default function PinnedChatWindow() {
               void send();
             }
           }}
-          placeholder="Nachricht … (⌘+Enter)"
+          placeholder={tx({ de: "Nachricht … (⌘+Enter)", en: "Message… (⌘+Enter)", es: "Mensaje… (⌘+Entrar)" })}
           className="min-h-[44px] max-h-[120px] resize-none text-sm bg-white/5 border-white/10 text-white placeholder:text-white/30"
           disabled={streaming}
         />

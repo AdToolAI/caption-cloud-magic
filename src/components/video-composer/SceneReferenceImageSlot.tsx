@@ -32,11 +32,11 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
 
   const handleUpload = async (file: File) => {
     if (!user) {
-      toast.error('Bitte einloggen, um ein Referenzbild hochzuladen.');
+      toast.error(tx({ de: 'Bitte einloggen, um ein Referenzbild hochzuladen.', en: 'Please log in to upload a reference image.', es: 'Inicie sesión para cargar una imagen de referencia.' }));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Datei zu groß (max. 10 MB).');
+      toast.error(tx({ de: 'Datei zu groß (max. 10 MB).', en: 'File too large (max. 10 MB).', es: 'Archivo demasiado grande (máx. 10 MB).' }));
       return;
     }
     setUploading(true);
@@ -51,9 +51,9 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
         .from('ai-video-reference')
         .getPublicUrl(path);
       onUpdate({ referenceImageUrl: publicUrl } as Partial<ComposerScene>);
-      toast.success('Referenzbild gesetzt — wird als i2v-Startframe verwendet.');
+      toast.success(tx({ de: 'Referenzbild gesetzt — wird als i2v-Startframe verwendet.', en: 'Reference image set — used as i2v start frame.', es: 'Conjunto de imágenes de referencia: utilizado como cuadro de inicio de i2v.' }));
     } catch (err: any) {
-      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploading(false);
     }

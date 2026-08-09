@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Snake — Tastatur + Wisch, Highscore lokal. Feste Tickrate, pausierbar.
  */
@@ -190,7 +191,7 @@ export default function SnakeGame() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        {dead ? 'Vorbei — neu starten.' : 'Pfeiltasten, Wischen oder Buttons.'}
+        {dead ? 'Vorbei — neu starten.' : tx({ de: 'Pfeiltasten, Wischen oder Buttons.', en: 'Arrow keys, swipe or buttons.', es: 'Teclas de flecha, deslizar o botones.' })}
       </p>
     </div>
   );

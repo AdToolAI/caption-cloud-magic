@@ -179,7 +179,7 @@ export const CampaignDisplayCard = ({
                   <div className="p-2 bg-card/80">
                     <p className="text-xs font-medium truncate">{media.title}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {media.type === 'video' ? '🎥 Video' : '🖼️ Bild'}
+                      {media.type === 'video' ? tx({ de: '🎥 Video', en: '🎥 Video', es: '🎥 Video' }) : tx({ de: '🖼️ Bild', en: '🖼️ Image', es: '🖼️ Imagen' })}
                     </p>
                   </div>
                 </div>

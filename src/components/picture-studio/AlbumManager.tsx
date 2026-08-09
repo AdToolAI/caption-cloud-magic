@@ -152,7 +152,7 @@ export function AlbumManager() {
         return;
       }
 
-      toast.success("Bild verschoben! 📁");
+      toast.success(tx({ de: "Bild verschoben! 📁", en: "Image moved! 📁", es: "¡Imagen movida! 📁" }));
       // Remove from unsorted + update album count
       setUnsortedImages(prev => prev.filter(img => img.id !== imageData.id));
       setAlbums(prev => prev.map(a =>
@@ -221,7 +221,7 @@ export function AlbumManager() {
         {albumImages.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>Keine Bilder in diesem Album</p>
+            <p>{tx({ de: "Keine Bilder in diesem Album", en: "No images in this album", es: "No hay imágenes en este álbum." })}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -324,7 +324,7 @@ export function AlbumManager() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Neues Album erstellen</DialogTitle>
+            <DialogTitle>{tx({ de: "Neues Album erstellen", en: "Create new album", es: "Crear nuevo álbum" })}</DialogTitle>
           </DialogHeader>
           <Input
             placeholder="Album Name..."
@@ -333,7 +333,7 @@ export function AlbumManager() {
             onKeyDown={(e) => e.key === 'Enter' && createAlbum()}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Abbrechen</Button>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
             <Button onClick={createAlbum} disabled={creating || !newAlbumName.trim()}>
               {creating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FolderPlus className="h-4 w-4 mr-1" />}
               Erstellen

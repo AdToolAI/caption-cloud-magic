@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -33,7 +34,7 @@ export const useBatchActions = () => {
 
       toast.success(`${videos?.length || 0} Videos abgebrochen`);
     } catch (error) {
-      toast.error('Abbruch fehlgeschlagen');
+      toast.error(tx({ de: 'Abbruch fehlgeschlagen', en: 'Abort failed', es: 'Abortar falló' }));
     } finally {
       setLoading(false);
     }
@@ -71,16 +72,16 @@ export const useBatchActions = () => {
         successCount++;
       }
 
-      toast.success(`${successCount} Videos werden wiederholt`);
+      toast.success(tx({ de: `${successCount} Videos werden wiederholt`, en: `${successCount} Videos are repeated`, es: `${successCount} Los vídeos se repiten` }));
     } catch (error) {
-      toast.error('Retry fehlgeschlagen');
+      toast.error(tx({ de: 'Retry fehlgeschlagen', en: 'Retry failed', es: 'Reintentar falló' }));
     } finally {
       setLoading(false);
     }
   };
 
   const deleteBatch = async (batchJobId: string) => {
-    if (!confirm('Wirklich löschen?')) return;
+    if (!confirm(tx({ de: 'Wirklich löschen?', en: 'Really delete?', es: '¿Realmente eliminar?' }))) return;
 
     setLoading(true);
     try {
@@ -88,7 +89,7 @@ export const useBatchActions = () => {
       await supabase.from('batch_jobs').delete().eq('id', batchJobId);
       toast.success('Batch gelöscht');
     } catch (error) {
-      toast.error('Löschen fehlgeschlagen');
+      toast.error(tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' }));
     } finally {
       setLoading(false);
     }

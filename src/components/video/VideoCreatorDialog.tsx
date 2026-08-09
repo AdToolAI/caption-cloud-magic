@@ -139,11 +139,11 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       }
 
       handleFieldChange(key, JSON.stringify(uploadedUrls));
-      toast.success(`${uploadedUrls.length} Bild(er) hochgeladen`);
+      toast.success(tx({ de: `${uploadedUrls.length} Bild(er) hochgeladen`, en: `${uploadedUrls.length} Image(s) uploaded`, es: `${uploadedUrls.length} Imagen(es) cargada(s)` }));
     } catch (error) {
       console.error('Upload error:', error);
       if (error instanceof Error) {
-        toast.error(tx({ de: `Bild-Upload fehlgeschlagen: ${error.message}`, en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }));
+        toast.error(tx({ de: tx({ de: tx({ de: tx({ de: `Bild-Upload fehlgeschlagen: ${error.message}`, en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }));
       } else {
         toast.error(tx({ de: 'Bild-Upload fehlgeschlagen', en: 'Image upload failed', es: 'Error al subir la imagen' }));
       }
@@ -182,7 +182,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       toast.success(`${uploadedUrls.length} Video(s) hochgeladen`);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Video-Upload fehlgeschlagen');
+      toast.error(tx({ de: "Video-Upload fehlgeschlagen", en: "Video upload failed", es: "Error al subir el vídeo" }));
     } finally {
       setUploadingImages(prev => {
         const next = new Set(prev);
@@ -405,7 +405,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             }`}>
               {String(customizations[field.key] || '').length}/{field.maxLength}
               {String(customizations[field.key] || '').length > field.maxLength && (
-                <span className="ml-1">⚠️ Text ist zu lang!</span>
+                <span className="ml-1">{tx({ de: "⚠️ Text ist zu lang!", en: "⚠️ Text is too long!", es: "⚠️ ¡El texto es demasiado largo!" })}</span>
               )}
             </p>
           </div>
@@ -473,8 +473,8 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
               </Button>
             )}
             <Video className="h-5 w-5" />
-            {step === 'gallery' && 'Template auswählen'}
-            {step === 'customize' && `Video erstellen: ${selectedTemplate?.name}`}
+            {step === 'gallery' && tx({ de: "Template auswählen", en: "Select template", es: "Seleccionar plantilla" })}
+            {step === 'customize' && tx({ de: tx({ de: tx({ de: tx({ de: `Video erstellen: ${selectedTemplate?.name}`, en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` })}
             {step === 'rendering' && tx({ de: 'Video wird erstellt...', en: 'Video is being created...', es: 'El video se está creando...' })}
           </DialogTitle>
         </DialogHeader>
@@ -620,7 +620,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                         onChange={(e) => setScriptText(e.target.value)}
                         rows={10}
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
-                        placeholder="Dein AI-generiertes Script erscheint hier..."
+                        placeholder={tx({ de: "Dein AI-generiertes Script erscheint hier...", en: "Your AI-generated script appears here...", es: "Su secuencia de comandos generada por IA aparece aquí..." })}
                       />
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
@@ -635,7 +635,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                 <TabsContent value="ai-music" className="mt-4">
                   <AIMusicSuggester
                     onSelect={(music) => {
-                      toast.success(`Musik ausgewählt: ${music.name}`);
+                      toast.success(tx({ de: `Musik ausgewählt: ${music.name}`, en: `Music selected: ${music.name}`, es: `Música seleccionada: ${music.name}` }));
                       // Handle music selection
                     }}
                   />

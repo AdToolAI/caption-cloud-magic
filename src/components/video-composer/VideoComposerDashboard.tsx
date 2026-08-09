@@ -723,7 +723,7 @@ export default function VideoComposerDashboard() {
         });
       } catch (e) {
         toast({
-          title: 'Cancel teilweise fehlgeschlagen',
+          title: tx({ de: "Cancel teilweise fehlgeschlagen", en: "Cancel partially failed", es: "Cancelar parcialmente fallido" }),
           description:
             (e instanceof Error ? e.message : String(e)) +
             tx({ de: ' — neues Projekt wird trotzdem gestartet.', en: ' — new project will be started anyway.', es: ' — se iniciará un nuevo proyecto de todos modos.' }),
@@ -1020,7 +1020,7 @@ export default function VideoComposerDashboard() {
 
   const STEP_HINTS: Record<TabId, string> = {
     briefing: 'Produkt, Zielgruppe & Tonalität',
-    storyboard: 'Szenen planen & anordnen',
+    storyboard: tx({ de: "Szenen planen & anordnen", en: "Plan & arrange scenes", es: "Planificar y organizar escenas" }),
     clips: 'AI-Clips generieren',
     text: 'Voiceover & Untertitel',
     audio: 'Musik & Sound-Mix',
@@ -1806,7 +1806,7 @@ export default function VideoComposerDashboard() {
                       const hasCutdowns = spawned.some(s => s.kind === 'cutdown');
                       toast({
                         title: 'Kampagne erweitert 🎬',
-                        description: tx({ de: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, en: `${spawned.length} variant(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns without VO — please re-synthesize in the child.' : ''}`, es: `${spawned.length} variante(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns sin VO — por favor, vuelve a sintetizar en el hijo.' : ''}` }),
+                        description: tx({ de: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, en: `${spawned.length} variant(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, es: `${spawned.length} variante(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}` }),
                       });
                       setActiveTab('campaign');
                     }

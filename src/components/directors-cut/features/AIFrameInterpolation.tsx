@@ -37,7 +37,7 @@ export function AIFrameInterpolation({
   const handleInterpolate = async () => {
     if (!videoUrl) {
       toast({
-        title: 'Kein Video ausgewählt',
+        title: tx({ de: 'Kein Video ausgewählt', en: 'No video selected', es: 'Ningún vídeo seleccionado' }),
         description: tx({ de: 'Bitte wähle zuerst ein Video aus.', en: 'Please select a video first.', es: 'Por favor, selecciona un video primero.' }),
         variant: 'destructive'
       });
@@ -70,16 +70,16 @@ export function AIFrameInterpolation({
 
       if (data?.success) {
         toast({
-          title: 'Frame Interpolation gestartet',
+          title: tx({ de: 'Frame Interpolation gestartet', en: 'Frame interpolation started', es: 'Se inició la interpolación de cuadros.' }),
           description: `${sourceFps}fps → ${settings.targetFps}fps. ${data.credits_required} Credits reserviert.`
         });
         onInterpolationComplete?.(data);
       }
     } catch (err) {
       console.error('Interpolation error:', err);
-      setError(err instanceof Error ? err.message : 'Interpolation fehlgeschlagen');
+      setError(err instanceof Error ? err.message : tx({ de: 'Interpolation fehlgeschlagen', en: 'Interpolation failed', es: 'La interpolación falló' }));
       toast({
-        title: 'Fehler bei Frame Interpolation',
+        title: tx({ de: 'Fehler bei Frame Interpolation', en: 'Frame interpolation error', es: 'Error de interpolación de trama' }),
         description: tx({ de: 'Bitte versuche es später erneut.', en: 'Please try again later.', es: 'Por favor, inténtalo de nuevo más tarde.' }),
         variant: 'destructive'
       });

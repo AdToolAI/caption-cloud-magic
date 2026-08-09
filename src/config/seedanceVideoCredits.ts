@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
 // Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
@@ -17,7 +18,7 @@ export const SEEDANCE_VIDEO_MODELS = {
     minDuration: 3,
     maxDuration: 15,
     description: {
-      EUR: 'Günstiger Draft-Renderer, 720p — ab 0,30€ pro 5 Sekunden',
+      EUR: tx({ de: 'Günstiger Draft-Renderer, 720p — ab 0,30€ pro 5 Sekunden', en: 'Cheap draft renderer, 720p — from €0.30 per 5 seconds', es: 'Renderizador de borradores económico, 720p: desde 0,30 € por 5 segundos' }),
       USD: 'Low-cost draft renderer, 720p — from $0.30 per 5 seconds',
     },
     badge: 'Schnell & Günstig',
@@ -33,7 +34,7 @@ export const SEEDANCE_VIDEO_MODELS = {
     minDuration: 3,
     maxDuration: 15,
     description: {
-      EUR: 'Seedance 2.0 Fast · 720p — ab 2,25€ pro 5 Sekunden',
+      EUR: tx({ de: 'Seedance 2.0 Fast · 720p — ab 2,25€ pro 5 Sekunden', en: 'Seedance 2.0 Fast · 720p — from €2.25 per 5 seconds', es: 'Seedance 2.0 Fast · 720p — desde 2,25 € por 5 segundos' }),
       USD: 'Seedance 2.0 Fast · 720p — from $2.25 per 5 seconds',
     },
     badge: 'Empfohlen',
@@ -49,7 +50,7 @@ export const SEEDANCE_VIDEO_MODELS = {
     minDuration: 3,
     maxDuration: 15,
     description: {
-      EUR: 'Seedance 2.0 Flagship · 720p — ab 2,70€ pro 5 Sekunden',
+      EUR: tx({ de: 'Seedance 2.0 Flagship · 720p — ab 2,70€ pro 5 Sekunden', en: 'Seedance 2.0 Flagship · 720p — from €2.70 per 5 seconds', es: 'Seedance 2.0 Flagship · 720p — desde 2,70 € por 5 segundos' }),
       USD: 'Seedance 2.0 flagship · 720p — from $2.70 per 5 seconds',
     },
     badge: 'Premium',
@@ -67,7 +68,7 @@ export const SEEDANCE_VIDEO_MODELS = {
     minDuration: 4,
     maxDuration: 30,
     description: {
-      EUR: 'Seedance 2.5 · 720p · bis 30 s pro Szene — ab 2,70€ pro 5 Sekunden',
+      EUR: tx({ de: 'Seedance 2.5 · 720p · bis 30 s pro Szene — ab 2,70€ pro 5 Sekunden', en: 'Seedance 2.5 · 720p · up to 30 s per scene — from €2.70 per 5 seconds', es: 'Seedance 2,5 · 720p · hasta 30 s por escena — desde 2,70 € por 5 segundos' }),
       USD: 'Seedance 2.5 · 720p · up to 30 s per scene — from $2.70 per 5 seconds',
     },
     badge: 'Neu',

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo } from 'react';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
@@ -118,7 +119,7 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
                             <Badge
                               variant="outline"
                               className="text-[9px] px-1 py-0 h-3.5 border-amber-400/40 text-amber-300 gap-0.5"
-                              title="Premium-Engine: echte Provider-Kosten werden direkt durchgereicht"
+                              title={tx({ de: "Premium-Engine: echte Provider-Kosten werden direkt durchgereicht", en: "Premium engine: real provider costs are passed on directly", es: "Motor premium: los costes reales del proveedor se repercuten directamente" })}
                             >
                               <Crown className="h-2.5 w-2.5" />
                               Premium-Engine

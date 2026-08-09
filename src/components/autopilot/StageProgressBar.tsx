@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * StageProgressBar — the one loading indicator the Autopilot uses.
  *
@@ -39,7 +40,7 @@ export function StageProgressBar({ value, label, hint, className, compact }: Pro
       {indeterminate ? (
         <div
           role="progressbar"
-          aria-label={label ?? 'Wird geladen'}
+          aria-label={label ?? tx({ de: 'Wird geladen', en: 'Is loading', es: 'esta cargando' })}
           className={cn(
             'relative overflow-hidden rounded-full bg-muted/40',
             compact ? 'h-1' : 'h-2',

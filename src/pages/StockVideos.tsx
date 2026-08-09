@@ -151,8 +151,8 @@ export default function StockVideos() {
     const key = target === "composer" ? "composer:incoming-stock-video" : "directors-cut:incoming-stock-video";
     sessionStorage.setItem(key, JSON.stringify(payload));
     toast({
-      title: target === "composer" ? "Im Composer geladen" : "In Director's Cut geladen",
-      description: "Clip wird automatisch hinzugefügt.",
+      title: target === "composer" ? tx({ de: "Im Composer geladen", en: "Loaded in composer", es: "Cargado en compositor" }) : tx({ de: "In Director's Cut geladen", en: "Loaded into Director's Cut", es: "Cargado en la versión del director" }),
+      description: tx({ de: "Clip wird automatisch hinzugefügt.", en: "Clip will be added automatically.", es: "El clip se agregará automáticamente." }),
     });
     navigate(target === "composer" ? "/video-composer" : "/universal-directors-cut");
   }

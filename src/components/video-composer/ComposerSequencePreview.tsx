@@ -1313,13 +1313,13 @@ export default function ComposerSequencePreview({
             (() => {
               const stage = String((currentScene as any).twoshotStage ?? '');
               const label =
-                stage === 'audio' ? 'Voiceover wird gebaut…'
-                : stage === 'anchor' ? 'Anchor wird komponiert…'
-                : stage === 'master_clip' ? 'Hailuo rendert die Szene…'
+                stage === 'audio' ? tx({ de: 'Voiceover wird gebaut…', en: 'Voiceover is being built…', es: 'Se está construyendo locución...' })
+                : stage === 'anchor' ? tx({ de: 'Anchor wird komponiert…', en: 'Anchor is composed…', es: 'El ancla está compuesta…' })
+                : stage === 'master_clip' ? tx({ de: 'Hailuo rendert die Szene…', en: 'Hailuo renders the scene...', es: 'Hailuo renderiza la escena...' })
                 : stage === 'lipsync_1' ? 'Sync.so Pass 1 läuft…'
                 : stage === 'lipsync_2' ? 'Sync.so Pass 2 läuft…'
                 : stage === 'continuity' ? 'Continuity-Check…'
-                : 'Lip-Sync wird vorbereitet…';
+                : tx({ de: 'Lip-Sync wird vorbereitet…', en: 'Lip sync is being prepared...', es: 'Se está preparando la sincronización de labios...' });
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
                   <span>🎬</span>

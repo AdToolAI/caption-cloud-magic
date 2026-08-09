@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -21,10 +22,10 @@ interface CompressionSettingsPanelProps {
 }
 
 const profileDescriptions: Record<CompressionProfile, string> = {
-  'social-media': 'Optimiert für Social Media (max 50MB, 1080p)',
-  'presentation': 'Hohe Qualität für Präsentationen (max 200MB, 4K)',
-  'archive': 'Minimale Komprimierung für Archivierung',
-  'custom': 'Eigene Einstellungen',
+  'social-media': tx({ de: 'Optimiert für Social Media (max 50MB, 1080p)', en: 'Optimized for social media (max 50MB, 1080p)', es: 'Optimizado para redes sociales (máximo 50 MB, 1080p)' }),
+  'presentation': tx({ de: 'Hohe Qualität für Präsentationen (max 200MB, 4K)', en: 'High quality for presentations (max 200MB, 4K)', es: 'Alta calidad para presentaciones (máximo 200 MB, 4K)' }),
+  'archive': tx({ de: 'Minimale Komprimierung für Archivierung', en: 'Minimum compression for archiving', es: 'Compresión mínima para archivar' }),
+  'custom': tx({ de: 'Eigene Einstellungen', en: 'Own settings', es: 'Configuraciones propias' }),
 };
 
 export const CompressionSettingsPanel = ({

@@ -30,10 +30,10 @@ const PHASE_LABEL_DE: Record<string, string> = {
 
 const DEFAULT_TIPS_BY_PLATFORM: Record<string, string[]> = {
   instagram: [
-    "Erste 3 Sekunden = starker Hook",
-    "Vertikales Format (9:16) für Reels",
+    tx({ de: "Erste 3 Sekunden = starker Hook", en: "First 3 seconds = strong hook", es: "Los primeros 3 segundos = gancho fuerte" }),
+    tx({ de: "Vertikales Format (9:16) für Reels", en: "Vertical format (9:16) for Reels", es: "Formato vertical (9:16) para Reels" }),
     "1 klare Botschaft pro Post",
-    "Cross-post in deine Story",
+    tx({ de: "Cross-post in deine Story", en: "Cross-post to your Story", es: "Publica también en tu Historia" }),
   ],
   tiktok: [
     "Trend-Sound nutzen erhöht Reichweite",
@@ -45,26 +45,26 @@ const DEFAULT_TIPS_BY_PLATFORM: Record<string, string[]> = {
     "Persönliche Story > Werbung",
     "Erste 2 Zeilen entscheiden über „Mehr anzeigen“",
     "Frage am Ende fördert Kommentare",
-    "Native Video > YouTube-Link",
+    tx({ de: "Native Video > YouTube-Link", en: "Native video > YouTube link", es: "Video nativo > enlace de YouTube" }),
   ],
   facebook: [
     tx({ de: "Bilder > Links für Reichweite", en: "Images > Links for reach", es: "Imágenes > Enlaces para alcance" }),
-    "Frage in der Caption für Engagement",
-    "Posts mit 80–120 Zeichen performen am besten",
+    tx({ de: "Frage in der Caption für Engagement", en: "Question in the caption for engagement", es: "Pregunta en el pie de foto para generar interacción" }),
+    tx({ de: "Posts mit 80–120 Zeichen performen am besten", en: "Posts with 80–120 characters perform best", es: "Las publicaciones con 80–120 caracteres funcionan mejor" }),
   ],
   youtube: [
     "Thumbnail entscheidet über CTR",
     "Erste 15 Sek = Retention",
-    "End-Screen für nächstes Video nutzen",
+    tx({ de: "End-Screen für nächstes Video nutzen", en: "Use the end screen for the next video", es: "Usa la pantalla final para el próximo video" }),
   ],
   x: [
-    "Knapp und scharf, max. 200 Zeichen",
-    "Thread für komplexe Themen",
-    "1 Bild erhöht Engagement um 35%",
+    tx({ de: "Knapp und scharf, max. 200 Zeichen", en: "Short and sharp, max. 200 characters", es: "Corto y directo, máx. 200 caracteres" }),
+    tx({ de: "Thread für komplexe Themen", en: "Thread for complex topics", es: "Hilo para temas complejos" }),
+    tx({ de: "1 Bild erhöht Engagement um 35%", en: "1 image increases engagement by 35%", es: "1 imagen aumenta el engagement en un 35%" }),
   ],
   twitter: [
-    "Knapp und scharf, max. 200 Zeichen",
-    "Thread für komplexe Themen",
+    tx({ de: "Knapp und scharf, max. 200 Zeichen", en: "Short and sharp, max. 200 characters", es: "Corto y directo, máx. 200 caracteres" }),
+    tx({ de: "Thread für komplexe Themen", en: "Thread for complex topics", es: "Hilo para temas complejos" }),
   ],
 };
 

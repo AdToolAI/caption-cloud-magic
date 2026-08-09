@@ -26,14 +26,14 @@ const copy: Record<Lang, {
 }> = {
   de: {
     title: "Bevor du kündigst",
-    desc: "Sag uns kurz, woran es liegt — ein Klick genügt. Das hilft uns, das Studio besser zu machen.",
+    desc: tx({ de: "Sag uns kurz, woran es liegt — ein Klick genügt. Das hilft uns, das Studio besser zu machen.", en: "Tell us briefly what the reason is — one click is enough. It helps us make the studio better.", es: "Cuéntanos brevemente el motivo — un clic es suficiente. Esto nos ayuda a mejorar el estudio." }),
     reasonsLabel: "Grund",
     reasons: [
       { key: "too_expensive", label: "Zu teuer" },
       { key: "not_using", label: "Ich nutze es zu selten" },
-      { key: "quality", label: "Ergebnisse überzeugen mich nicht" },
+      { key: "quality", label: tx({ de: "Ergebnisse überzeugen mich nicht", en: "Not convinced by the results", es: "No me convencen los resultados" }) },
       { key: "missing_feature", label: "Eine Funktion fehlt mir" },
-      { key: "temporary", label: "Nur eine Pause" },
+      { key: "temporary", label: tx({ de: "Nur eine Pause", en: "Just a pause", es: "Solo una pausa" }) },
       { key: "other", label: "Anderer Grund" },
     ],
     warnTitle: "Dein Gründer-Vorteil verfällt",

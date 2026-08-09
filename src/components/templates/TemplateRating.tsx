@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useState } from 'react';
 import { useSubmitRating, useUserTemplateRating } from '@/hooks/useTemplateRatings';
+import { tx } from '@/lib/i18nText';
 
 interface TemplateRatingProps {
   templateId: string;
@@ -81,7 +82,7 @@ export const TemplateRating = ({
           </div>
 
           <Textarea
-            placeholder="Optional: Schreiben Sie eine Rezension..."
+            placeholder={tx({ de: "Optional: Schreiben Sie eine Rezension...", en: "Optional: Write a review...", es: "Opcional: Escribe una reseña..." })}
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
             rows={3}

@@ -125,7 +125,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'no-scenes',
       severity: 'fail',
-      title: 'Keine Szenen auf der Timeline',
+      title: tx({ de: "Keine Szenen auf der Timeline", en: "No scenes on the timeline", es: "No hay escenas en la línea de tiempo." }),
     });
   }
 
@@ -136,7 +136,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'voice-lock-mismatch',
       severity: 'warn',
       title: 'Voice-Lock weicht ab',
-      detail: `Projekt ist auf Voice "${lock.voiceId}" gelockt, Voice-Over nutzt "${input.currentVoiceId}".`,
+      detail: tx({ de: `Projekt ist auf Voice "${lock.voiceId}" gelockt, Voice-Over nutzt "${input.currentVoiceId}".`, en: `Project is locked to voice "${lock.voiceId}", voice over uses "${input.currentVoiceId}".`, es: `El proyecto está bloqueado para la voz "${lock.voiceId}", la voz en off usa "${input.currentVoiceId}".` }),
       hint: tx({ de: 'Entsperre den Lock oder generiere das Voice-Over mit der gelockten Stimme neu.', en: 'Unlock the lock or regenerate the voice-over with the locked voice.', es: 'Desbloquea el candado o regenera la voz en off con la voz bloqueada.' }),
     });
   }
@@ -160,7 +160,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'short-scenes',
       severity: 'warn',
-      title: `${shortScenes.length} sehr kurze Szene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`,
+      title: tx({ de: `${shortScenes.length} sehr kurze Szene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`, en: `${shortScenes.length} very short scene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`, es: `${shortScenes.length} escena muy corta${shortScenes.length > 1 ? 'n' : ''} (<0,2s)` }),
       detail: tx({ de: 'Unter 0.2s wird die Szene im finalen Render kaum sichtbar.', en: 'Below 0.2s, the scene will be barely visible in the final render.', es: 'Por debajo de 0.2s, la escena apenas será visible en el render final.' }),
     });
   }
@@ -176,7 +176,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       findings.push({
         id: 'subtitle-contrast',
         severity: 'warn',
-        title: `${bad.length} Untertitel mit schwachem Kontrast`,
+        title: tx({ de: `${bad.length} Untertitel mit schwachem Kontrast`, en: `${bad.length} Low contrast subtitles`, es: `${bad.length} Subtítulos de bajo contraste` }),
         detail: tx({ de: 'Kontrast unter 3:1 → schwer lesbar (WCAG AA erfordert 4.5:1 für Text).', en: 'Contrast below 3:1 → hard to read (WCAG AA requires 4.5:1 for text).', es: 'Contraste inferior a 3:1 → difícil de leer (WCAG AA requiere 4.5:1 para texto).' }),
       });
     }
@@ -199,7 +199,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'aspect-missing',
       severity: 'warn',
       title: 'Kein Seitenverhältnis gewählt',
-      hint: 'Standardmäßig wird 16:9 verwendet.',
+      hint: tx({ de: "Standardmäßig wird 16:9 verwendet.", en: "By default 16:9 is used.", es: "Por defecto se utiliza 16:9." }),
     });
   }
 
@@ -208,7 +208,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'music-no-vo',
       severity: 'info',
-      title: 'Musik ohne Voice-Over',
+      title: tx({ de: 'Musik ohne Voice-Over', en: 'Music without voice-over', es: 'Música sin voz en off' }),
       hint: tx({ de: 'Ducking wird nicht angewendet — Musik läuft auf voller (gedämpfter) Lautstärke.', en: 'Ducking not applied — music plays at full (attenuated) volume.', es: 'Ducking no aplicado — la música se reproduce a volumen completo (atenuado).' }),
     });
   }
@@ -227,9 +227,9 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'aspect-mismatch',
       severity: 'warn',
-      title: tx({ de: `${mismatched.length} Szene${mismatched.length > 1 ? 'n' : ''} mit abweichendem Seitenverhältnis`, en: `${mismatched.length} scene${mismatched.length > 1 ? 's' : ''} with mismatched aspect ratio`, es: `${mismatched.length} escena${mismatched.length > 1 ? 's' : ''} con relación de aspecto no coincidente` }),
+      title: tx({ de: `${mismatched.length} Szene${mismatched.length > 1 ? 'n' : ''} mit abweichendem Seitenverhältnis`, en: `${mismatched.length} scene${mismatched.length > 1 ? 'n' : ''} with mismatched aspect ratio`, es: `${mismatched.length} escena${mismatched.length > 1 ? 'n' : ''} con relación de aspecto no coincidente` }),
       detail: tx({ de: `Projekt rendert in ${targetLabel} — betroffene Szenen werden beschnitten oder mit Letterbox versehen.`, en: `Project renders in ${targetLabel} — affected scenes will be cropped or letterboxed.`, es: `El proyecto se renderiza en ${targetLabel} — las escenas afectadas se recortarán o se les añadirá letterbox.` }),
-      hint: 'Ersetze Assets oder ändere das Export-Seitenverhältnis passend.',
+      hint: tx({ de: "Ersetze Assets oder ändere das Export-Seitenverhältnis passend.", en: "Replace assets or change the export aspect ratio appropriately.", es: "Reemplace los activos o cambie la relación de aspecto de exportación de manera adecuada." }),
     });
   }
 
@@ -265,7 +265,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
         severity: 'warn',
         title: 'Mix wirkt zu laut',
         detail: `Musik ${musicVol}% + Voice-Over ${voVol}% überschreiten voraussichtlich -14 LUFS (Social-Standard).`,
-        hint: 'Reduziere Musik auf ~40–50% oder aktiviere stärkeres Ducking.',
+        hint: tx({ de: "Reduziere Musik auf ~40–50% oder aktiviere stärkeres Ducking.", en: "Reduce music to ~40-50% or enable more ducking.", es: "Reduzca la música a ~40-50% o habilite más agacharse." }),
       });
     }
   } else if (hasMusic && !hasVO && musicVol > 85) {
@@ -298,8 +298,8 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'missing-thumbnails',
       severity: 'warn',
-      title: tx({ de: `${missingThumbs.length} Szene${missingThumbs.length > 1 ? 'n' : ''} ohne geladenes Asset`, en: `${missingThumbs.length} scene${missingThumbs.length > 1 ? 's' : ''} without loaded asset`, es: `${missingThumbs.length} escena${missingThumbs.length > 1 ? 's' : ''} sin recurso cargado` }),
-      detail: 'Ohne Thumbnail fehlt beim Render eventuell das zugrundeliegende Video.',
+      title: tx({ de: `${missingThumbs.length} Szene${missingThumbs.length > 1 ? 'n' : ''} ohne geladenes Asset`, en: `${missingThumbs.length} scene${missingThumbs.length > 1 ? 'n' : ''} without loaded asset`, es: `${missingThumbs.length} escena${missingThumbs.length > 1 ? 'n' : ''} sin recurso cargado` }),
+      detail: tx({ de: "Ohne Thumbnail fehlt beim Render eventuell das zugrundeliegende Video.", en: "Without a thumbnail, the underlying video may be missing from the render.", es: "Sin una miniatura, es posible que el vídeo subyacente no aparezca en el renderizado." }),
       hint: tx({ de: 'Öffne die Szene und lade das Asset neu oder ersetze es.', en: 'Open the scene and reload or replace the asset.', es: 'Abre la escena y recarga o reemplaza el recurso.' }),
     });
   }
@@ -330,7 +330,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'too-long-for-social',
       severity: 'info',
       title: `Video ${Math.round(input.totalDuration)}s lang`,
-      hint: 'Für TikTok / Reels / Shorts liefern 15–60s meist die beste Retention. Nutze Auto Cut-Down für kürzere Varianten.',
+      hint: tx({ de: 'Für TikTok / Reels / Shorts liefern 15–60s meist die beste Retention. Nutze Auto Cut-Down für kürzere Varianten.', en: 'For TikTok / Reels / Shorts, 15-60s usually delivers the best retention. Use Auto Cut-Down for shorter versions.', es: 'Para TikTok/Reels/Shorts, entre 15 y 60 años suele ofrecer la mejor retención. Utilice Auto Cut-Down para versiones más cortas.' }),
     });
   }
 

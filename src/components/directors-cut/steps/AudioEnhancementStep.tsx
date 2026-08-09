@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,7 +64,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
       });
 
       if (error) {
-        throw new Error(error.message || 'AI Audio-Analyse fehlgeschlagen');
+        throw new Error(error.message || tx({ de: 'AI Audio-Analyse fehlgeschlagen', en: 'AI audio analysis failed', es: 'El análisis de audio de IA falló' }));
       }
 
       if (data?.recommendations && Array.isArray(data.recommendations)) {
@@ -84,16 +85,16 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
 
         toast({
           title: 'AI Audio-Optimierung abgeschlossen',
-          description: `Audio-Settings wurden optimiert. (${data.credits_used || 3} Credits)`,
+          description: tx({ de: tx({ de: tx({ de: `Audio-Settings wurden optimiert. (${data.credits_used || 3} Credits)`, en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }), en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }), en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }),
         });
       } else {
-        throw new Error('Ungültige Antwort vom Server');
+        throw new Error(tx({ de: 'Ungültige Antwort vom Server', en: 'Invalid response from server', es: 'Respuesta no válida del servidor' }));
       }
     } catch (err: any) {
       console.error('Audio optimization error:', err);
       toast({
-        title: 'Fehler',
-        description: err.message || 'AI Audio-Analyse fehlgeschlagen',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
+        description: err.message || tx({ de: 'AI Audio-Analyse fehlgeschlagen', en: 'AI audio analysis failed', es: 'El análisis de audio de IA falló' }),
         variant: 'destructive',
       });
       

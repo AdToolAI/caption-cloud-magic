@@ -133,7 +133,7 @@ export async function extractRefinementFrames(
       reject(new Error(tx({ de: 'Refinement Timeout', en: 'Refinement timeout', es: 'Tiempo de espera agotado en el refinamiento' })));
     }, 30000);
 
-    video.onerror = () => { clearTimeout(timeout); reject(new Error('Video error')); };
+    video.onerror = () => { clearTimeout(timeout); reject(new Error(tx({ de: "Video error", en: "Video error", es: "Error de vídeo" }))); };
 
     video.onloadedmetadata = async () => {
       clearTimeout(timeout);

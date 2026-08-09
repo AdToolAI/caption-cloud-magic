@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   testId: string;
@@ -81,7 +82,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Test-Variante erstellen</DialogTitle>
+          <DialogTitle>{tx({ de: "Test-Variante erstellen", en: "Create test variant", es: "Crear variante de prueba" })}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -122,7 +123,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
                 <Label htmlFor="thumb-style">Style</Label>
                 <Select value={thumbnailStyle} onValueChange={setThumbnailStyle}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Style auswählen" />
+                    <SelectValue placeholder={tx({ de: 'Style auswählen', en: 'Select style', es: 'Seleccionar estilo' })} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="minimal">Minimal</SelectItem>
@@ -149,7 +150,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
                 <Label htmlFor="text-font">Schriftart</Label>
                 <Select value={textFont} onValueChange={setTextFont}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Schriftart auswählen" />
+                    <SelectValue placeholder={tx({ de: 'Schriftart auswählen', en: 'Select font', es: 'Seleccionar fuente' })} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="roboto">Roboto</SelectItem>

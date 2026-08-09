@@ -71,7 +71,7 @@ export function UniversalVideoWizard() {
   // Steps for manual mode
   const STEPS_MANUAL = [
     { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
-    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
+    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || tx({ de: 'Lade mindestens 4 Produktbilder hoch', en: 'Upload at least 4 product images', es: 'Sube al menos 4 imágenes de productos' }) }] : []),
     { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
     { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
     { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') },
@@ -88,7 +88,7 @@ export function UniversalVideoWizard() {
   // Steps for full-service mode  
   const STEPS_FULL_SERVICE = [
     { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
-    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
+    ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || tx({ de: 'Lade mindestens 4 Produktbilder hoch', en: 'Upload at least 4 product images', es: 'Sube al menos 4 imágenes de productos' }) }] : []),
     { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
     { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
     { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') },
@@ -281,7 +281,7 @@ export function UniversalVideoWizard() {
                 generationMode === 'manual' ? STEPS_MANUAL :
                 [
                   { id: 'category', label: t('uvc.stepCategory'), icon: Video, description: t('uvc.stepCategoryDesc') },
-                  ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || 'Lade mindestens 4 Produktbilder hoch' }] : []),
+                  ...(needsProductImages ? [{ id: 'product-images', label: t('uvc.stepProductImages') || 'Produktbilder', icon: Upload, description: t('uvc.stepProductImagesDesc') || tx({ de: 'Lade mindestens 4 Produktbilder hoch', en: 'Upload at least 4 product images', es: 'Sube al menos 4 imágenes de productos' }) }] : []),
                   { id: 'mood', label: t('uvc.stepMood'), icon: Palette, description: t('uvc.stepMoodDesc') },
                   { id: 'visual-style', label: t('uvc.stepVisualStyle'), icon: Film, description: t('uvc.stepVisualStyleDesc') },
                   { id: 'mode-select', label: t('uvc.stepMode'), icon: Sparkles, description: t('uvc.stepModeDesc') }
@@ -304,7 +304,7 @@ export function UniversalVideoWizard() {
   // Upload product images to Supabase storage
   const handleUploadProductImages = async () => {
     if (!user || productImages.length < 4) {
-      toast.error(language === 'de' ? 'Mindestens 4 Produktbilder erforderlich' : 'At least 4 product images required');
+      toast.error(language === 'de' ? tx({ de: 'Mindestens 4 Produktbilder erforderlich', en: 'Minimum of 4 product images required', es: 'Se requiere un mínimo de 4 imágenes de producto' }) : 'At least 4 product images required');
       return;
     }
     
@@ -330,7 +330,7 @@ export function UniversalVideoWizard() {
       }
       
       setUploadedProductImageUrls(urls);
-      toast.success(language === 'de' ? `${urls.length} Bilder hochgeladen` : `${urls.length} images uploaded`);
+      toast.success(language === 'de' ? tx({ de: `${urls.length} Bilder hochgeladen`, en: `${urls.length} images uploaded`, es: `${urls.length} imágenes cargadas` }) : `${urls.length} images uploaded`);
       
       // Find the index of the next step after product-images
       const currentSteps = generationMode === 'full-service' ? STEPS_FULL_SERVICE : 
@@ -867,7 +867,7 @@ export function UniversalVideoWizard() {
                 >
                   {isUploadingImages 
                     ? (language === 'de' ? 'Wird hochgeladen...' : 'Uploading...') 
-                    : (language === 'de' ? tx({ de: `Weiter mit ${productImages.length} Bildern`, en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }) : `Continue with ${productImages.length} images`)}
+                    : (language === 'de' ? tx({ de: tx({ de: tx({ de: tx({ de: `Weiter mit ${productImages.length} Bildern`, en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }), en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }), en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }), en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }) : `Continue with ${productImages.length} images`)}
                 </Button>
               </div>
             </div>

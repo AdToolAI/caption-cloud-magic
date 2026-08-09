@@ -180,13 +180,13 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
       toast.success('Download gestartet');
     } catch (error) {
       console.error('Download error:', error);
-      toast.error('Download fehlgeschlagen');
+      toast.error(tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Descarga fallida' }));
     }
   };
 
   // Delete sound
   const deleteSound = async (soundId: string) => {
-    if (!confirm('Möchtest du diesen Sound wirklich löschen?')) return;
+    if (!confirm(tx({ de: 'Möchtest du diesen Sound wirklich löschen?', en: 'Do you really want to delete this sound?', es: '¿Realmente quieres eliminar este sonido?' }))) return;
     
     try {
       const { error } = await supabase
@@ -200,7 +200,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
       toast.success('Sound gelöscht');
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error('Löschen fehlgeschlagen');
+      toast.error(tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' }));
     }
   };
 

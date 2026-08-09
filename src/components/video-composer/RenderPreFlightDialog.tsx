@@ -66,7 +66,7 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
       id: 'no-scenes',
       severity: 'blocker',
       icon: <XCircle className="h-3.5 w-3.5" />,
-      title: 'Keine Szenen vorhanden',
+      title: tx({ de: 'Keine Szenen vorhanden', en: 'No scenes available', es: 'No hay escenas disponibles' }),
       detail: tx({ de: 'Füge mindestens eine Szene hinzu, bevor du renderst.', en: 'Add at least one scene before rendering.', es: 'Añade al menos una escena antes de renderizar.' }),
     });
     return out;
@@ -89,7 +89,7 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
         severity: 'blocker',
         sceneIndex: idx,
         icon: <TypeIcon className="h-3.5 w-3.5" />,
-        title: `Szene ${idx}: Leer`,
+        title: tx({ de: `Szene ${idx}: Leer`, en: `Scene ${idx}: Empty`, es: `Escena ${idx}: vacía` }),
         detail: tx({ de: 'Weder Prompt noch Bild/Clip vorhanden — Render würde scheitern.', en: 'Neither prompt nor image/clip available — Render would fail.', es: 'Ni prompt ni imagen/clip disponibles — El render fallaría.' }),
       });
     }
@@ -101,8 +101,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
         severity: 'warning',
         sceneIndex: idx,
         icon: <Clock className="h-3.5 w-3.5" />,
-        title: `Szene ${idx}: Ungewöhnliche Dauer`,
-        detail: `Dauer = ${s.durationSeconds ?? 0}s — der Renderer erzwingt mindestens 1s.`,
+        title: tx({ de: `Szene ${idx}: Ungewöhnliche Dauer`, en: `Scene ${idx}: Unusual duration`, es: `Escena ${idx}: duración inusual` }),
+        detail: tx({ de: `Dauer = ${s.durationSeconds ?? 0}s — der Renderer erzwingt mindestens 1s.`, en: `Duration = ${s.durationSeconds ?? 0}s — the renderer forces at least 1s.`, es: `Duración = ${s.durationSeconds ?? 0}s: el renderizador fuerza al menos 1s.` }),
       });
     }
 
@@ -258,8 +258,8 @@ export default function RenderPreFlightDialog({
   const summary = canRender
     ? warnings.length === 0
       ? tx({ de: 'Alles klar — Pipeline bereit.', en: 'All clear — pipeline ready.', es: 'Todo listo — pipeline preparada.' })
-      : `${warnings.length} ${tx({ de: `Warnung${warnings.length === 1 ? '' : 'en'}`, en: `warning${warnings.length === 1 ? '' : 's'}`, es: `advertencia${warnings.length === 1 ? '' : 's'}` })} — ${tx({ de: 'du kannst trotzdem starten.', en: 'you can still start.', es: 'aún puedes iniciar.' })}`
-    : `${blockers.length} ${tx({ de: `Problem${blockers.length === 1 ? '' : 'e'}`, en: `issue${blockers.length === 1 ? '' : 's'}`, es: `problema${blockers.length === 1 ? '' : 's'}` })} ${tx({ de: 'verhindern den Render.', en: 'prevent rendering.', es: 'impiden el renderizado.' })}`;
+      : `${warnings.length} ${tx({ de: `Warnung${warnings.length === 1 ? '' : 'en'}`, en: `warning${warnings.length === 1 ? '' : 'en'}`, es: `advertencia${warnings.length === 1 ? '' : 'en'}` })} — ${tx({ de: 'du kannst trotzdem starten.', en: 'you can still start.', es: 'aún puedes iniciar.' })}`
+    : `${blockers.length} ${tx({ de: `Problem${blockers.length === 1 ? '' : 'e'}`, en: `issue${blockers.length === 1 ? '' : 'e'}`, es: `problema${blockers.length === 1 ? '' : 'e'}` })} ${tx({ de: 'verhindern den Render.', en: 'prevent rendering.', es: 'impiden el renderizado.' })}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquare, Send } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -60,15 +61,15 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
           }),
         },
       );
-      if (!response.ok) throw new Error("Coach nicht erreichbar");
+      if (!response.ok) throw new Error(tx({ de: "Coach nicht erreichbar", en: "Coach unreachable", es: "Coach no disponible" }));
       const payload = await response.json().catch(() => null);
       const answer: string =
-        payload?.reply ?? payload?.message ?? payload?.content ?? "Dazu habe ich gerade keine Antwort.";
+        payload?.reply ?? payload?.message ?? payload?.content ?? tx({ de: "Dazu habe ich gerade keine Antwort.", en: "I don't have an answer for that right now.", es: "No tengo una respuesta para eso ahora mismo." });
       setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: error instanceof Error ? error.message : "Coach nicht erreichbar" },
+        { role: "assistant", content: error instanceof Error ? error.message : tx({ de: "Coach nicht erreichbar", en: "Coach unreachable", es: "Coach no disponible" }) },
       ]);
     } finally {
       setBusy(false);

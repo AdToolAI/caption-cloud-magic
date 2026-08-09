@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useState, useEffect, useRef } from "react";
@@ -198,7 +199,7 @@ export const GadgetCardDynamic = () => {
       username: "John Doe",
       handle: "@portfolio",
       
-      caption: "Perfekter Abend am Meer. Die Natur ist der beste Künstler.",
+      caption: tx({ de: "Perfekter Abend am Meer. Die Natur ist der beste Künstler.", en: "Perfect evening by the sea. Nature is the best artist.", es: "Tarde perfecta junto al mar. La naturaleza es el mejor artista." }),
     },
     en: {
       username: "John Doe",

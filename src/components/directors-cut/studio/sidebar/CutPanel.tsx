@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -414,7 +415,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             className="min-w-0 h-auto min-h-9 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30 whitespace-normal text-center leading-tight px-2"
           >
             <Plus className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-            <span className="min-w-0 break-words [overflow-wrap:anywhere]">Leere Szene</span>
+            <span className="min-w-0 break-words [overflow-wrap:anywhere]">{tx({ de: "Leere Szene", en: "Empty scene", es: "escena vacia" })}</span>
           </Button>
         )}
         {(onAddVideoAsScene || onAddFromLibrary) && (
@@ -443,7 +444,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
               className="min-w-0 h-auto min-h-9 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30 whitespace-normal text-center leading-tight px-2"
             >
               <FileVideo className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-              <span className="min-w-0 break-words [overflow-wrap:anywhere]">Video hinzufügen</span>
+              <span className="min-w-0 break-words [overflow-wrap:anywhere]">{tx({ de: "Video hinzufügen", en: "Add video", es: "Añadir vídeo" })}</span>
             </Button>
           </>
         )}
@@ -534,8 +535,8 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                         type="button"
                         {...(sortableEnabled ? dragHandleProps : {})}
                         onClick={(e) => e.stopPropagation()}
-                        aria-label={t('dc.reorderScene') || 'Ziehen zum Vertauschen'}
-                        title={sortableEnabled ? (t('dc.reorderScene') || 'Ziehen zum Vertauschen') : undefined}
+                        aria-label={t('dc.reorderScene') || tx({ de: 'Ziehen zum Vertauschen', en: 'Drag to swap', es: 'Arrastra para intercambiar' })}
+                        title={sortableEnabled ? (t('dc.reorderScene') || tx({ de: 'Ziehen zum Vertauschen', en: 'Drag to swap', es: 'Arrastra para intercambiar' })) : undefined}
                         className={cn(
                           'flex items-center justify-center flex-shrink-0 p-0.5 rounded',
                           sortableEnabled

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * /queue — Global Render Queue.
  *
@@ -155,7 +156,7 @@ export default function RenderQueue() {
       toast.success(`${n} Job${n === 1 ? '' : 's'} abgebrochen · ${label}`);
       await refresh();
     } catch (e: any) {
-      toast.error(e?.message ?? 'Abbruch fehlgeschlagen');
+      toast.error(e?.message ?? tx({ de: 'Abbruch fehlgeschlagen', en: 'Abort failed', es: 'Abortar falló' }));
     } finally {
       setBusy(null);
       setConfirm(null);
@@ -189,7 +190,7 @@ export default function RenderQueue() {
               setConfirm({
                 kind: 'all',
                 ids: allActiveIds,
-                label: `Alle aktiven (${allActiveIds.length})`,
+                label: tx({ de: `Alle aktiven (${allActiveIds.length})`, en: `All active (${allActiveIds.length})`, es: `Todo activo (${allActiveIds.length})` }),
               })
             }
           >

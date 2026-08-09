@@ -124,7 +124,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
     } catch (error) {
       console.error('Error saving settings:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: 'Einstellungen konnten nicht gespeichert werden.', en: 'Could not save settings.', es: 'No se pudieron guardar los ajustes.' }),
         variant: 'destructive',
       });
@@ -152,7 +152,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
     } catch (error) {
       console.error('Error previewing voice:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: 'Sprachvorschau konnte nicht abgespielt werden.', en: 'Could not play voice preview.', es: 'No se pudo reproducir la vista previa de voz.' }),
         variant: 'destructive',
       });
@@ -210,7 +210,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
           <Input
             value={settings.bot_name}
             onChange={(e) => setSettings(prev => ({ ...prev, bot_name: e.target.value }))}
-            placeholder="Gib deinem Assistenten einen Namen"
+            placeholder={tx({ de: "Gib deinem Assistenten einen Namen", en: "Give your assistant a name", es: "Dale un nombre a tu asistente" })}
             className="bg-muted/30 border-white/10"
           />
           <p className="text-xs text-muted-foreground">

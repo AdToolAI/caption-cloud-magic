@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * driftAutoFix — pure builder that turns a DriftReport into a minimal,
  * SAFE patch set for ComposerScenes. Never touches lip-sync, cast, or
@@ -85,7 +86,7 @@ export function buildAutoFixPlan(
 
     // Hard skip: lip-sync scenes — touching duration/prompt risks the sync window.
     if (isLipsyncScene(ss)) {
-      skipped.push({ ...f, message: f.message + ' (übersprungen: Lip-Sync-Szene)' });
+      skipped.push({ ...f, message: f.message + tx({ de: ' (übersprungen: Lip-Sync-Szene)', en: '(skipped: lip sync scene)', es: '(omitido: escena de sincronización de labios)' }) });
       continue;
     }
 

@@ -53,7 +53,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
     {
       id: 'voice',
       label: 'Stimm-Optimierung',
-      description: 'Klarheit und Wärme',
+      description: tx({ de: 'Klarheit und Wärme', en: 'Clarity and warmth', es: 'Claridad y calidez' }),
       icon: Mic,
       enabled: true,
       intensity: 50
@@ -105,10 +105,10 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
       setProcessedUrl(finalUrl);
       onEnhanced(finalUrl);
-      toast.success('Audio erfolgreich optimiert!');
+      toast.success(tx({ de: 'Audio erfolgreich optimiert!', en: 'Audio successfully optimized!', es: '¡Audio optimizado con éxito!' }));
     } catch (error) {
       console.error('Enhancement error:', error);
-      toast.error('Fehler bei der Optimierung');
+      toast.error(tx({ de: 'Fehler bei der Optimierung', en: 'Optimization error', es: 'Error de optimización' }));
     } finally {
       setIsProcessing(false);
     }
@@ -126,10 +126,10 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
       const isolatedUrl = data?.enhancedUrl || audioUrl;
       setProcessedUrl(isolatedUrl);
       onEnhanced(isolatedUrl);
-      toast.success('Stimme erfolgreich isoliert!');
+      toast.success(tx({ de: 'Stimme erfolgreich isoliert!', en: 'Voice successfully isolated!', es: '¡Voz aislada con éxito!' }));
     } catch (error) {
       console.error('Isolation error:', error);
-      toast.error('Fehler bei der Stimmisolierung');
+      toast.error(tx({ de: 'Fehler bei der Stimmisolierung', en: 'Voice isolation error', es: 'Error de aislamiento de voz' }));
     } finally {
       setIsProcessing(false);
     }
@@ -318,7 +318,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-medium text-amber-500">Wichtiger Hinweis</h4>
+                  <h4 className="text-sm font-medium text-amber-500">{tx({ de: "Wichtiger Hinweis", en: "Important NOTE", es: "NOTA IMPORTANTE" })}</h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     Die Stimmisolierung entfernt <strong>alle</strong> Hintergrundgeräusche und Musik. 
                     Nur die reine Stimme bleibt erhalten. Ideal für Videos mit störender Hintergrundmusik 
@@ -330,13 +330,13 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
             {/* Use Cases */}
             <div className="space-y-3">
-              <Label className="text-xs text-muted-foreground">Ideal für:</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: "Ideal für:", en: "Ideal for:", es: "Ideal para:" })}</Label>
               <div className="grid gap-2">
                 {[
-                  { label: 'Videos mit Hintergrundmusik', desc: 'Musik komplett entfernen' },
-                  { label: 'Interviews mit Störgeräuschen', desc: 'Nur Sprecher behalten' },
+                  { label: tx({ de: 'Videos mit Hintergrundmusik', en: 'Videos with background music', es: 'Vídeos con música de fondo.' }), desc: 'Musik komplett entfernen' },
+                  { label: tx({ de: 'Interviews mit Störgeräuschen', en: 'Interviews with noise', es: 'Entrevistas con ruido' }), desc: 'Nur Sprecher behalten' },
                   { label: 'Podcast-Clips', desc: 'Reine Sprache extrahieren' },
-                  { label: 'Voice-Over aus Videos', desc: 'Stimme isolieren' }
+                  { label: tx({ de: 'Voice-Over aus Videos', en: 'Voice over from videos', es: 'Voz en off de vídeos' }), desc: 'Stimme isolieren' }
                 ].map((useCase, idx) => (
                   <div key={idx} className="p-3 rounded-lg bg-muted/20 border border-border/50">
                     <span className="text-sm font-medium">{useCase.label}</span>

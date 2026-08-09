@@ -127,7 +127,7 @@ export function useSocialPublishing() {
       return result;
     } catch (error: any) {
       console.error('Instagram publish error:', error);
-      toast({ title: 'Instagram Fehler', description: error?.message, variant: 'destructive' });
+      toast({ title: tx({ de: 'Instagram Fehler', en: 'Instagram error', es: 'Error de Instagram' }), description: error?.message, variant: 'destructive' });
       return { success: false, error: error?.message };
     } finally {
       setBusy(platformKey, false);
@@ -151,7 +151,7 @@ export function useSocialPublishing() {
       return data;
     } catch (error: any) {
       console.error('TikTok publish error:', error);
-      toast({ title: 'TikTok Fehler', description: error?.message, variant: 'destructive' });
+      toast({ title: tx({ de: 'TikTok Fehler', en: 'TikTok error', es: 'Error de TikTok' }), description: error?.message, variant: 'destructive' });
       return { success: false, error: error?.message };
     } finally {
       setBusy('tiktok', false);
@@ -184,7 +184,7 @@ export function useSocialPublishing() {
       return result;
     } catch (error: any) {
       console.error('LinkedIn publish error:', error);
-      toast({ title: 'LinkedIn Fehler', description: error?.message, variant: 'destructive' });
+      toast({ title: tx({ de: 'LinkedIn Fehler', en: 'LinkedIn error', es: 'Error de LinkedIn' }), description: error?.message, variant: 'destructive' });
       return { success: false, error: error?.message };
     } finally {
       setBusy('linkedin', false);
@@ -239,13 +239,13 @@ export function useSocialPublishing() {
       if (!ytResult?.ok) {
         const message = ytResult?.error_message
           || tx({ de: 'YouTube-Veröffentlichung fehlgeschlagen. Bitte Verbindung unter Einstellungen → Verbindungen prüfen.', en: 'YouTube publishing failed. Please check connection under Settings → Connections.', es: 'La publicación en YouTube falló. Por favor, comprueba la conexión en Ajustes → Conexiones.' });
-        toast({ title: 'YouTube Fehler', description: message, variant: 'destructive' });
+        toast({ title: tx({ de: 'YouTube Fehler', en: 'YouTube error', es: 'Error de YouTube' }), description: message, variant: 'destructive' });
         return { success: false, error: message };
       }
 
       toast({
         title: '📺 YouTube veröffentlicht',
-        description: ytResult.permalink || 'Video wurde hochgeladen.',
+        description: ytResult.permalink || tx({ de: 'Video wurde hochgeladen.', en: 'Video has been uploaded.', es: 'El video ha sido subido.' }),
       });
       return {
         success: true,
@@ -255,7 +255,7 @@ export function useSocialPublishing() {
       };
     } catch (error: any) {
       console.error('YouTube publish error:', error);
-      toast({ title: 'YouTube Fehler', description: error?.message, variant: 'destructive' });
+      toast({ title: tx({ de: 'YouTube Fehler', en: 'YouTube error', es: 'Error de YouTube' }), description: error?.message, variant: 'destructive' });
       return { success: false, error: error?.message };
     } finally {
       setBusy('youtube', false);

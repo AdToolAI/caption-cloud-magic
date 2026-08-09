@@ -472,14 +472,14 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   if (sanitized.droppedCharIds > 0) {
     repairLog.push({
       kind: 'cast-ids-sanitized',
-      label: tx({ de: `${sanitized.droppedCharIds} ungültige Charakter-Zuordnung${sanitized.droppedCharIds === 1 ? '' : 'en'} entfernt (kein Match in deiner Charakter-Bibliothek).`, en: `${sanitized.droppedCharIds} invalid character mapping${sanitized.droppedCharIds === 1 ? '' : 's'} removed (no match in your character library).`, es: `${sanitized.droppedCharIds} asignación${sanitized.droppedCharIds === 1 ? '' : 'es'} de personaje inválida${sanitized.droppedCharIds === 1 ? '' : 's'} eliminada${sanitized.droppedCharIds === 1 ? '' : 's'} (sin coincidencia en tu biblioteca de personajes).` }),
+      label: tx({ de: `${sanitized.droppedCharIds} ungültige Charakter-Zuordnung${sanitized.droppedCharIds === 1 ? '' : 'en'} entfernt (kein Match in deiner Charakter-Bibliothek).`, en: `${sanitized.droppedCharIds} invalid character mapping${sanitized.droppedCharIds === 1 ? '' : 'en'} removed (no match in your character library).`, es: `${sanitized.droppedCharIds} ungültige Charakter-Zuordnung${sanitized.droppedCharIds === 1 ? '' : 'en'} entfernt (kein Match in deiner Charakter-Bibliothek).` }),
       before: sanitized.droppedCharIds,
     });
   }
   if (sanitized.droppedVoiceIds > 0) {
     repairLog.push({
       kind: 'voice-ids-sanitized',
-      label: tx({ de: `${sanitized.droppedVoiceIds} versehentlich gesetzte Voice-ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} entfernt (Voice wird sauber aus dem Charakter-Default nachgeladen).`, en: `${sanitized.droppedVoiceIds} accidentally set voice ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} removed (voice will be reloaded cleanly from the character default).`, es: `${sanitized.droppedVoiceIds} ID de voz establecida por error${sanitized.droppedVoiceIds === 1 ? '' : 's'} eliminada${sanitized.droppedVoiceIds === 1 ? '' : 's'} (la voz se recargará limpiamente desde el valor predeterminado del personaje).` }),
+      label: tx({ de: `${sanitized.droppedVoiceIds} versehentlich gesetzte Voice-ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} entfernt (Voice wird sauber aus dem Charakter-Default nachgeladen).`, en: `${sanitized.droppedVoiceIds} accidentally set voice ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} removed (voice will be reloaded cleanly from the character default).`, es: `${sanitized.droppedVoiceIds} versehentlich gesetzte Voice-ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} entfernt (Voice wird sauber aus dem Charakter-Default nachgeladen).` }),
       before: sanitized.droppedVoiceIds,
     });
   }

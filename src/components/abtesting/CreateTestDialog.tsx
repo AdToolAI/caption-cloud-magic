@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -54,7 +55,7 @@ export function CreateTestDialog({ onCreateTest }: Props) {
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>A/B Test erstellen</DialogTitle>
+          <DialogTitle>{tx({ de: "A/B Test erstellen", en: "Create A/B test", es: "Crear prueba A/B" })}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -72,7 +73,7 @@ export function CreateTestDialog({ onCreateTest }: Props) {
             <Label htmlFor="template">Template *</Label>
             <Select value={templateId} onValueChange={setTemplateId}>
               <SelectTrigger>
-                <SelectValue placeholder="Template auswählen" />
+                <SelectValue placeholder={tx({ de: "Template auswählen", en: "Select template", es: "Seleccionar plantilla" })} />
               </SelectTrigger>
               <SelectContent>
                 {templatesLoading ? (
@@ -92,7 +93,7 @@ export function CreateTestDialog({ onCreateTest }: Props) {
             <Label htmlFor="hypothesis">Hypothese (optional)</Label>
             <Textarea
               id="hypothesis"
-              placeholder="z.B. Rote Thumbnails generieren 20% mehr Klicks als blaue"
+              placeholder={tx({ de: "z.B. Rote Thumbnails generieren 20% mehr Klicks als blaue", en: "e.g. Red thumbnails generate 20% more clicks than blue ones", es: "p.ej. Las miniaturas rojas generan un 20% más de clics que las azules" })}
               value={hypothesis}
               onChange={(e) => setHypothesis(e.target.value)}
               rows={3}

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * useStockMusicSearch — wrapper around `search-stock-music`
  * (Jamendo, CC-BY, royalty-free). Music is treated separately from
@@ -45,8 +46,8 @@ export function useStockMusicSearch() {
       if (error) throw error;
       setResults((data?.results ?? []) as StockMusicTrack[]);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Music-Suche fehlgeschlagen';
-      toast({ title: 'Suche fehlgeschlagen', description: message, variant: 'destructive' });
+      const message = err instanceof Error ? err.message : tx({ de: 'Music-Suche fehlgeschlagen', en: 'Music search failed', es: 'Error en la búsqueda de música' });
+      toast({ title: tx({ de: 'Suche fehlgeschlagen', en: 'Search failed', es: 'La búsqueda falló' }), description: message, variant: 'destructive' });
       setResults([]);
     } finally {
       setLoading(false);

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,7 +66,7 @@ export function useImageUpscaler() {
       return null;
     } catch (err: any) {
       console.error('[useImageUpscaler] error:', err);
-      toast.error(err.message || 'Upscaling fehlgeschlagen');
+      toast.error(err.message || tx({ de: 'Upscaling fehlgeschlagen', en: 'Upscaling failed', es: 'La ampliación falló' }));
       return null;
     } finally {
       setUpscalingId(null);

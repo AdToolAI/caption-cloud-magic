@@ -65,7 +65,7 @@ export const useAutoDirector = () => {
       return data.plan as AutoDirectorPlan;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Plan generation failed';
-      toast({ title: 'Auto-Director Fehler', description: msg, variant: 'destructive' });
+      toast({ title: tx({ de: 'Auto-Director Fehler', en: 'Auto director error', es: 'Error de director automático' }), description: msg, variant: 'destructive' });
       return null;
     } finally {
       setPlanning(false);
@@ -89,7 +89,7 @@ export const useAutoDirector = () => {
       return { projectId: data.projectId };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Execution failed';
-      toast({ title: 'Auto-Director Fehler', description: msg, variant: 'destructive' });
+      toast({ title: tx({ de: 'Auto-Director Fehler', en: 'Auto director error', es: 'Error de director automático' }), description: msg, variant: 'destructive' });
       return null;
     } finally {
       setExecuting(false);

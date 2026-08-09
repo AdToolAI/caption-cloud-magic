@@ -127,7 +127,7 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
     providerKey: "google",
     tier: "balanced",
     apiModel: "google/gemini-3.6-flash",
-    description: "Schnelles Allround-Modell mit 1M Kontext",
+    description: tx({ de: "Schnelles Allround-Modell mit 1M Kontext", en: "Fast all-round model with 1M context", es: "Modelo rápido y completo con contexto 1M" }),
     inputPricePer1k: 0.0005,
     outputPricePer1k: 0.0033,
     strengths: ["Allround", "1M Context", "Schnell"],

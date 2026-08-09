@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowDown, ArrowUp, Clock, Mail, Minus, Sparkles, TrendingUp, Users, Video } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { tx } from "@/lib/i18nText";
 
 interface FunnelData {
   period_days: number;
@@ -133,7 +134,7 @@ export function ConversionFunnel() {
   }
 
   if (!data) {
-    return <Card className="p-6"><p className="text-muted-foreground">Keine Daten verfügbar.</p></Card>;
+    return <Card className="p-6"><p className="text-muted-foreground">{tx({ de: "Keine Daten verfügbar.", en: "No data available.", es: "No hay datos disponibles." })}</p></Card>;
   }
 
   const verifyRate = data.signups > 0 ? (data.verified / data.signups) * 100 : 0;
@@ -181,7 +182,7 @@ export function ConversionFunnel() {
         />
         <StageCard
           icon={Video}
-          label="1. Video"
+          label={tx({ de: "1. Video", en: "1st video", es: "1.º video" })}
           value={data.first_video}
           rate={videoRate}
           prevValue={data.prev_first_video}
@@ -256,7 +257,7 @@ export function ConversionFunnel() {
           </div>
           <p className="text-xs text-muted-foreground mt-2">
             {data.reminders_sent === 0
-              ? "Noch keine Reminder versendet"
+              ? tx({ de: "Noch keine Reminder versendet", en: "No reminders sent yet", es: "Aún no se han enviado recordatorios" })
               : `${reminderRate.toFixed(1)}% verifizierten nach Reminder`}
           </p>
         </Card>

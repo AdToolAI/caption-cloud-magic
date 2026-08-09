@@ -323,8 +323,8 @@ export function AIStyleTransfer({
           {currentFilter && currentFilter !== 'none' && (
             <p className="text-[10px] text-muted-foreground">
               {selectedSceneId 
-                ? `Filter auf ausgewählte Szene angewendet`
-                : "Filter wird auf das gesamte Video angewendet"
+                ? tx({ de: 'Filter auf ausgewählte Szene angewendet', en: 'Filter applied to selected scene', es: 'Filtro aplicado a la escena seleccionada' })
+                : tx({ de: 'Filter wird auf das gesamte Video angewendet', en: 'Filter is applied to the entire video', es: 'El filtro se aplica a todo el video' })
               }
             </p>
           )}

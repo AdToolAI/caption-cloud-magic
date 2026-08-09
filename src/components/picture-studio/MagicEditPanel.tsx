@@ -216,13 +216,13 @@ export function MagicEditPanel() {
                 <Badge variant="outline" className="border-primary/40 text-primary">FLUX Fill Pro</Badge>
               </div>
               <p className="text-sm text-muted-foreground max-w-2xl">
-                Inpainting: Markiere einen Bereich und beschreibe was dort entstehen soll.
-                Outpainting: Erweitere das Bild über den ursprünglichen Rahmen hinaus.
+                {tx({ de: 'Inpainting: Markiere einen Bereich und beschreibe was dort entstehen soll.', en: 'Inpainting: mark an area and describe what should appear there.', es: 'Inpainting: marca un área y describe lo que debe aparecer allí.' })}
+                {tx({ de: 'Outpainting: Erweitere das Bild über den ursprünglichen Rahmen hinaus.', en: 'Outpainting: extend the image beyond its original frame.', es: 'Outpainting: extiende la imagen más allá de su marco original.' })}
               </p>
             </div>
             {wallet && (
               <Badge variant="secondary" className="text-sm">
-                Guthaben: {sym}{wallet.balance_euros.toFixed(2)}
+                {tx({ de: 'Guthaben', en: 'Balance', es: 'Saldo' })}: {sym}{wallet.balance_euros.toFixed(2)}
               </Badge>
             )}
           </div>
@@ -284,7 +284,7 @@ export function MagicEditPanel() {
                         setResultUrl(null);
                       }}
                     >
-                      Anderes Bild
+                      {tx({ de: 'Anderes Bild', en: 'Different image', es: 'Otra imagen' })}
                     </Button>
                   </div>
 
@@ -347,7 +347,7 @@ export function MagicEditPanel() {
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Pinselgröße</span>
+                          <span className="text-muted-foreground">{tx({ de: 'Pinselgröße', en: 'Brush size', es: 'Tamaño del pincel' })}</span>
                           <span className="font-mono">{brushSize}px</span>
                         </div>
                         <Slider
@@ -392,8 +392,8 @@ export function MagicEditPanel() {
                       onChange={(e) => setPrompt(e.target.value)}
                       placeholder={
                         mode === 'inpaint'
-                          ? 'z.B. "ein roter Sportwagen, fotorealistisch, dramatisches Licht"'
-                          : 'z.B. "weiter Sandstrand mit Palmen, goldene Stunde"'
+                          ? tx({ de: 'z.B. "ein roter Sportwagen, fotorealistisch, dramatisches Licht"', en: 'e.g. "a red sports car, photorealistic, dramatic lighting"', es: 'p. ej. "un coche deportivo rojo, fotorrealista, luz dramática"' })
+                          : tx({ de: 'z.B. "weiter Sandstrand mit Palmen, goldene Stunde"', en: 'e.g. "wide sandy beach with palm trees, golden hour"', es: 'p. ej. "amplia playa de arena con palmeras, hora dorada"' })
                       }
                       rows={4}
                       className="mt-2 resize-none"
@@ -408,12 +408,12 @@ export function MagicEditPanel() {
                   >
                     {isEditing ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Generiere...
+                        <Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: 'Generiere...', en: 'Generating...', es: 'Generando...' })}
                       </>
                     ) : (
                       <>
                         <Wand2 className="h-4 w-4" />
-                        {mode === 'inpaint' ? 'Magic Edit anwenden' : 'Bild erweitern'}
+                        {mode === 'inpaint' ? tx({ de: 'Magic Edit anwenden', en: 'Apply Magic Edit', es: 'Aplicar Magic Edit' }) : tx({ de: 'Bild erweitern', en: 'Extend image', es: 'Extender imagen' })}
                         <Badge variant="secondary" className="ml-1">{sym}{cost.toFixed(2)}</Badge>
                       </>
                     )}

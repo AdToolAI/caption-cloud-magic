@@ -35,7 +35,7 @@ export const COMPRESSION_PROFILES: CompressionProfile[] = [
     bitrate: '4000k',
     fps: 30,
     codec: 'h264',
-    description: 'Gute Qualität mit kleinerer Dateigröße'
+    description: tx({ de: 'Gute Qualität mit kleinerer Dateigröße', en: 'Good quality with smaller file size', es: 'Buena calidad con un tamaño de archivo más pequeño' })
   },
   {
     id: '480p',
@@ -64,7 +64,7 @@ export const FORMAT_PROFILES: FormatProfile[] = [
     extension: 'mp4',
     mimeType: 'video/mp4',
     codec: 'h264',
-    description: 'Universal kompatibel, beste Wahl für Social Media'
+    description: tx({ de: 'Universal kompatibel, beste Wahl für Social Media', en: 'Universal compatible, best choice for social media', es: 'Compatible universal, la mejor opción para las redes sociales' })
   },
   {
     id: 'webm',
@@ -72,7 +72,7 @@ export const FORMAT_PROFILES: FormatProfile[] = [
     extension: 'webm',
     mimeType: 'video/webm',
     codec: 'vp9',
-    description: 'Optimiert für Web, kleinere Dateigröße bei gleicher Qualität'
+    description: tx({ de: 'Optimiert für Web, kleinere Dateigröße bei gleicher Qualität', en: 'Optimized for web, smaller file size with the same quality', es: 'Optimizado para web, tamaño de archivo más pequeño con la misma calidad' })
   },
   {
     id: 'gif',
@@ -120,7 +120,7 @@ export const ASPECT_RATIO_PROFILES: AspectRatioProfile[] = [
     width: 1080,
     height: 1080,
     platforms: ['Instagram Feed', 'Facebook', 'LinkedIn'],
-    description: 'Optimiert für Feed-Posts'
+    description: tx({ de: 'Optimiert für Feed-Posts', en: 'Optimized for feed posts', es: 'Optimizado para publicaciones de feeds' })
   },
   {
     id: '4:5',
@@ -129,7 +129,7 @@ export const ASPECT_RATIO_PROFILES: AspectRatioProfile[] = [
     width: 1080,
     height: 1350,
     platforms: ['Instagram Feed'],
-    description: 'Maximale Feed-Sichtbarkeit auf Instagram'
+    description: tx({ de: 'Maximale Feed-Sichtbarkeit auf Instagram', en: 'Maximum feed visibility on Instagram', es: 'Máxima visibilidad del feed en Instagram' })
   }
 ];
 

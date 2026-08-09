@@ -53,7 +53,7 @@ export const NARRATIVE_ANGLES: AngleSpec[] = [
   },
   {
     id: 'micro_story',
-    label: 'Mikro-Story mit Wendung',
+    label: tx({ de: 'Mikro-Story mit Wendung', en: 'Micro story with a twist', es: 'Microhistoria con un giro' }),
     mechanism:
       tx({ de: 'Eine winzige Geschichte mit Anfang, Kippmoment und Auflösung. Der Zuschauer glaubt zuerst etwas anderes zu sehen — die Wendung macht das Produkt zur Pointe.', en: 'A tiny story with a beginning, a turning point, and a resolution. The viewer initially believes they are seeing something else — the twist makes the product the punchline.', es: 'Una pequeña historia con un principio, un punto de inflexión y una resolución. El espectador cree al principio que está viendo otra cosa — el giro convierte el producto en el remate.' }),
     beats: ['hook', 'problem', 'emotion', 'reveal', 'cta'],
@@ -63,7 +63,7 @@ export const NARRATIVE_ANGLES: AngleSpec[] = [
     id: 'product_poetry',
     label: 'Produkt-Poesie',
     mechanism:
-      'Reine Sinnlichkeit: Makro, Licht, Textur, Bewegung. Kein Argument, nur Begehren. Rhythmus und Ton tragen die Wirkung.',
+      tx({ de: 'Reine Sinnlichkeit: Makro, Licht, Textur, Bewegung. Kein Argument, nur Begehren. Rhythmus und Ton tragen die Wirkung.', en: 'Pure sensuality: macro, light, texture, movement. No argument, just desire. Rhythm and tone carry the effect.', es: 'Sensualidad pura: macro, luz, textura, movimiento. Sin discusión, sólo deseo. El ritmo y el tono llevan el efecto.' }),
     beats: ['hook', 'reveal', 'emotion', 'benefit', 'cta'],
     wantsSpeaker: false,
   },

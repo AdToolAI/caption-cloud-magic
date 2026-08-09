@@ -30,7 +30,7 @@ export const TRANSITION_TYPES = [
   { 
     id: 'crossfade', 
     name: 'Crossfade', 
-    description: 'Sanfte Überblendung für ruhige Übergänge',
+    description: tx({ de: 'Sanfte Überblendung für ruhige Übergänge', en: 'Smooth crossfade for calm transitions', es: 'Fundido suave para transiciones tranquilas' }),
     icon: '✦',
     gradient: 'from-blue-500 to-cyan-500',
     aiScore: 0.9,
@@ -39,7 +39,7 @@ export const TRANSITION_TYPES = [
   { 
     id: 'dissolve', 
     name: 'Dissolve', 
-    description: 'Auflösungs-Effekt für emotionale Momente',
+    description: tx({ de: 'Auflösungs-Effekt für emotionale Momente', en: 'Dissolve effect for emotional moments', es: 'Efecto de disolución para momentos emocionales' }),
     icon: '✧',
     gradient: 'from-purple-500 to-pink-500',
     aiScore: 0.85,
@@ -57,7 +57,7 @@ export const TRANSITION_TYPES = [
   { 
     id: 'fade', 
     name: 'Fade', 
-    description: 'Fade to Black für dramatische Effekte',
+    description: tx({ de: 'Fade to Black für dramatische Effekte', en: 'Fade to black for dramatic effects', es: 'Fundido a negro para efectos dramáticos' }),
     icon: '◐',
     gradient: 'from-slate-600 to-slate-800',
     aiScore: 0.8,
@@ -66,7 +66,7 @@ export const TRANSITION_TYPES = [
   { 
     id: 'slide', 
     name: 'Slide', 
-    description: 'Schiebe-Effekt für moderne Videos',
+    description: tx({ de: 'Schiebe-Effekt für moderne Videos', en: 'Slide effect for modern videos', es: 'Efecto de deslizamiento para vídeos modernos' }),
     icon: '→',
     gradient: 'from-orange-500 to-amber-500',
     aiScore: 0.7,
@@ -157,7 +157,7 @@ export function AITransitions({
         },
       });
 
-      if (error) throw new Error(error.message || 'AI Transition-Analyse fehlgeschlagen');
+      if (error) throw new Error(error.message || tx({ de: 'AI Transition-Analyse fehlgeschlagen', en: 'AI transition analysis failed', es: 'Falló el análisis de transiciones de IA' }));
 
       const recommendations = data?.analysis?.recommendations || data?.recommendations;
       
@@ -174,11 +174,11 @@ export function AITransitions({
         onTransitionsChange(generated);
         
         toast({
-          title: 'AI Übergänge generiert',
-          description: `${generated.length} szenenspezifische Übergänge mit Confidence Scores.`,
+          title: tx({ de: 'AI Übergänge generiert', en: 'AI transitions generated', es: 'Transiciones de IA generadas' }),
+          description: `${generated.length} ${tx({ de: 'szenenspezifische Übergänge mit Confidence Scores.', en: 'scene-specific transitions with confidence scores.', es: 'transiciones específicas de escena con puntuaciones de confianza.' })}`,
         });
       } else {
-        throw new Error('Ungültige Antwort vom Server');
+        throw new Error(tx({ de: 'Ungültige Antwort vom Server', en: 'Invalid response from server', es: 'Respuesta no válida del servidor' }));
       }
     } catch (err: any) {
       console.error('AI Transitions error:', err);
@@ -191,7 +191,7 @@ export function AITransitions({
         
         let transitionType = 'crossfade';
         let confidence = 0.75;
-        let reasoning = 'Standard-Übergang basierend auf Szenen-Analyse';
+        let reasoning = tx({ de: 'Standard-Übergang basierend auf Szenen-Analyse', en: 'Default transition based on scene analysis', es: 'Transición predeterminada según el análisis de escenas' });
         
         const matchingType = TRANSITION_TYPES.find(t => 
           t.bestFor.some(m => mood.includes(m))
@@ -216,8 +216,8 @@ export function AITransitions({
       onTransitionsChange(generated);
       
       toast({
-        title: 'Lokale AI-Analyse',
-        description: 'Übergänge basierend auf Szenen-Stimmung generiert.',
+        title: tx({ de: 'Lokale AI-Analyse', en: 'Local AI analysis', es: 'Análisis de IA local' }),
+        description: tx({ de: 'Übergänge basierend auf Szenen-Stimmung generiert.', en: 'Transitions generated based on scene mood.', es: 'Transiciones generadas según el estado de ánimo de la escena.' }),
       });
     } finally {
       setIsGenerating(false);

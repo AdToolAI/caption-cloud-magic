@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
 /**
@@ -25,7 +26,7 @@ export const VEO_VIDEO_MODELS = {
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Native Audio + 720p Video ab 1,80€ pro 4 Sekunden',
+      EUR: tx({ de: 'Native Audio + 720p Video ab 1,80€ pro 4 Sekunden', en: 'Native audio + 720p video from €1.80 per 4 seconds', es: 'Audio nativo + vídeo 720p desde 1,80€ los 4 segundos' }),
       USD: 'Native Audio + 720p Video from $1.80 per 4 seconds',
     },
     badge: '🎵 Native Audio',
@@ -44,7 +45,7 @@ export const VEO_VIDEO_MODELS = {
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: '1080p Lite mit Audio ab 2,64€ pro 4 Sekunden',
+      EUR: tx({ de: '1080p Lite mit Audio ab 2,64€ pro 4 Sekunden', en: '1080p Lite with audio from €2.64 per 4 seconds', es: '1080p Lite con audio desde 2,64€ los 4 segundos' }),
       USD: '1080p Lite with audio from $2.64 per 4 seconds',
     },
     badge: '🎵 HD Audio',
@@ -63,7 +64,7 @@ export const VEO_VIDEO_MODELS = {
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Schnelle 1080p-Generierung ab 4,80€ pro 4 Sekunden',
+      EUR: tx({ de: 'Schnelle 1080p-Generierung ab 4,80€ pro 4 Sekunden', en: 'Fast 1080p generation from €4.80 per 4 seconds', es: 'Generación rápida de 1080p desde 4,80 € por 4 segundos' }),
       USD: 'Fast 1080p generation from $4.80 per 4 seconds',
     },
     badge: '⚡ Premium-Engine',
@@ -82,7 +83,7 @@ export const VEO_VIDEO_MODELS = {
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Premium Cinematic 1080p ab 13,20€ pro 4 Sekunden',
+      EUR: tx({ de: 'Premium Cinematic 1080p ab 13,20€ pro 4 Sekunden', en: 'Premium Cinematic 1080p from €13.20 per 4 seconds', es: 'Cinemático Premium 1080p desde 13,20 € los 4 segundos' }),
       USD: 'Premium Cinematic 1080p from $13.20 per 4 seconds',
     },
     badge: '👑 Premium-Engine',

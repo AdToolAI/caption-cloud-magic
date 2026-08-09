@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -91,7 +92,7 @@ export function BugReportsAdmin() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success('Notizen gespeichert');
+      toast.success(tx({ de: 'Notizen gespeichert', en: 'Notes saved', es: 'Notas guardadas' }));
       setSelected(null);
       await load();
     }
@@ -281,7 +282,7 @@ export function BugReportsAdmin() {
                       <SelectItem value="duplicate">Duplicate</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button onClick={saveNotes}>Notizen speichern</Button>
+                  <Button onClick={saveNotes}>{tx({ de: "Notizen speichern", en: "Save notes", es: "guardar notas" })}</Button>
                 </div>
               </div>
             </>

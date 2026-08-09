@@ -132,7 +132,7 @@ export default function TalkingHeadDialog({
     if (!c.referenceImageUrl) {
       toast({
         title: tx({ de: 'Charakter ohne Foto', en: 'Character without photo', es: 'Personaje sin foto' }),
-        description: tx({ de: `"${c.name}" hat noch kein Referenzbild. Lege eines im Briefing an oder importiere ihn aus der Avatar-Bibliothek.`, en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }),
+        description: tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `"${c.name}" hat noch kein Referenzbild. Lege eines im Briefing an oder importiere ihn aus der Avatar-Bibliothek.`, en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }), en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }), en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }), en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }), en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }),
         variant: 'destructive',
       });
       return;
@@ -160,7 +160,7 @@ export default function TalkingHeadDialog({
     } catch (err) {
       toast({
         title: 'Upload-Fehler',
-        description: err instanceof Error ? err.message : 'Unbekannter Fehler',
+        description: err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: 'destructive',
       });
     } finally {
@@ -174,7 +174,7 @@ export default function TalkingHeadDialog({
       return;
     }
     if (!newPhotoUrl) {
-      toast({ title: 'Foto fehlt', description: 'Bitte lade ein Foto hoch.', variant: 'destructive' });
+      toast({ title: 'Foto fehlt', description: tx({ de: 'Bitte lade ein Foto hoch.', en: 'Please upload a photo.', es: 'Por favor sube una foto.' }), variant: 'destructive' });
       return;
     }
     if (!canAddToBriefing) return;
@@ -197,7 +197,7 @@ export default function TalkingHeadDialog({
     setNewPhotoUrl('');
     toast({
       title: 'Charakter hinzugefügt',
-      description: tx({ de: `"${character.name}" ist jetzt Teil deines Briefing-Casts.`, en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }),
+      description: tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `"${character.name}" ist jetzt Teil deines Briefing-Casts.`, en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }), en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }), en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }), en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }), en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }),
     });
   };
 
@@ -233,7 +233,7 @@ export default function TalkingHeadDialog({
     setShowLibrary(false);
     toast({
       title: 'Avatar importiert',
-      description: tx({ de: `"${av.name}" wurde in deinen Briefing-Cast übernommen.`, en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }),
+      description: tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `"${av.name}" wurde in deinen Briefing-Cast übernommen.`, en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }), en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }), en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }), en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }), en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }),
     });
   };
 
@@ -507,7 +507,7 @@ export default function TalkingHeadDialog({
                 id="script"
                 value={script}
                 onChange={(e) => setScript(e.target.value)}
-                placeholder="Hi, ich bin dein neuer KI-Avatar. Hier kommt mein Text..."
+                placeholder={tx({ de: "Hi, ich bin dein neuer KI-Avatar. Hier kommt mein Text...", en: "Hi, I am your new AI avatar. Here comes my text...", es: "Hola, soy tu nuevo avatar de IA. Aquí viene mi texto..." })}
                 rows={5}
                 className="mt-1"
               />
@@ -562,7 +562,7 @@ export default function TalkingHeadDialog({
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Nur in Media Library</SelectItem>
-                    <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">An Szene anhängen</div>
+                    <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">{tx({ de: "An Szene anhängen", en: "Attach to scene", es: "Adjuntar a la escena" })}</div>
                     {availableScenes.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
                     ))}
@@ -712,7 +712,7 @@ function DialogModeTab({
 }: DialogModeTabProps) {
   const [script, setScript] = useState(
     cast.length >= 2
-      ? tx({ de: `${cast[0].name}: Hi! Schön dich zu sehen.\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, was empfiehlst du?\\n${cast[0].name}: Definitiv unser neues Produkt — du wirst es lieben.`, en: `${cast[0].name}: Hi! Nice to see you.\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, what do you recommend?\\n${cast[0].name}: Definitely our new product — you'll love it.`, es: `${cast[0].name}: ¡Hola! Encantado de verte.\\n${cast[1].name}: Hola ${cast[0].name.split(' ')[0]}, ¿qué me recomiendas?\\n${cast[0].name}: Definitivamente nuestro nuevo producto, te encantará.` })
+      ? tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `${cast[0].name}: Hi! Schön dich zu sehen.\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, was empfiehlst du?\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n${cast[0].name}: Definitiv unser neues Produkt — du wirst es lieben.`, en: `${cast[0].name}: Hi! Nice to see you.\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, what do you recommend?\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n${cast[0].name}: Definitely our new product — you'll love it.`, es: `${cast[0].name}: ¡Hola! Encantado de verte.\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n${cast[1].name}: Hola ${cast[0].name.split(' ')[0]}, ¿qué recomiendas?\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\n${cast[0].name}: Definitivamente nuestro nuevo producto, te encantará.` }), en: `${cast[0].name}: Hi! Nice to see you.\\\\\\\\\\\\\\\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, what do you recommend?\\\\\\\\\\\\\\\\n${cast[0].name}: Definitely our new product — you'll love it.`, es: `${cast[0].name}: ¡Hola! Encantado de verte.\\\\\\\\\\\\\\\\n${cast[1].name}: Hola ${cast[0].name.split(' ')[0]}, ¿qué recomiendas?\\\\\\\\\\\\\\\\n${cast[0].name}: Definitivamente nuestro nuevo producto, te encantará.` }), en: `${cast[0].name}: Hi! Nice to see you.\\\\\\\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, what do you recommend?\\\\\\\\n${cast[0].name}: Definitely our new product — you'll love it.`, es: `${cast[0].name}: ¡Hola! Encantado de verte.\\\\\\\\n${cast[1].name}: Hola ${cast[0].name.split(' ')[0]}, ¿qué recomiendas?\\\\\\\\n${cast[0].name}: Definitivamente nuestro nuevo producto, te encantará.` }), en: `${cast[0].name}: Hi! Nice to see you.\\\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, what do you recommend?\\\\n${cast[0].name}: Definitely our new product — you'll love it.`, es: `${cast[0].name}: ¡Hola! Encantado de verte.\\\\n${cast[1].name}: Hola ${cast[0].name.split(' ')[0]}, ¿qué recomiendas?\\\\n${cast[0].name}: Definitivamente nuestro nuevo producto, te encantará.` }), en: `${cast[0].name}: Hi! Nice to see you.\\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, what do you recommend?\\n${cast[0].name}: Definitely our new product — you'll love it.`, es: `${cast[0].name}: ¡Hola! Encantado de verte.\\n${cast[1].name}: Hola ${cast[0].name.split(' ')[0]}, ¿qué me recomiendas?\\n${cast[0].name}: Definitivamente nuestro nuevo producto, te encantará.` })
       : '',
   );
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, string>>({});
@@ -734,7 +734,7 @@ function DialogModeTab({
   const handleGenerateDialog = async () => {
     if (blocks.length === 0) {
       toast({
-        title: 'Kein gültiges Dialog-Skript',
+        title: tx({ de: 'Kein gültiges Dialog-Skript', en: 'Not a valid dialog script', es: 'No es un script de diálogo válido' }),
         description: tx({ de: 'Format: "Sarah: Hallo!" — der Name muss exakt einem Cast-Charakter entsprechen.', en: 'Format: "Sarah: Hello!" — the name must exactly match a cast character.', es: 'Formato: "Sarah: ¡Hola!" — el nombre debe coincidir exactamente con un personaje del elenco.' }),
         variant: 'destructive',
       });
@@ -745,7 +745,7 @@ function DialogModeTab({
       if (!voicePerSpeaker[sp.id]) {
         toast({
           title: 'Stimme fehlt',
-          description: tx({ de: `Wähle eine Stimme für "${sp.name}".`, en: `Choose a voice for "${sp.name}".`, es: `Elige una voz para "${sp.name}".` }),
+          description: tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `Wähle eine Stimme für "${sp.name}".`, en: `Choose a voice for "${sp.name}".`, es: `Elige una voz para "${sp.name}".` }), en: `Choose a voice for "${sp.name}".`, es: `Elige una voz para "${sp.name}".` }), en: `Choose a voice for "${sp.name}".`, es: `Elige una voz para "${sp.name}".` }), en: `Choose a voice for "${sp.name}".`, es: `Elige una voz para "${sp.name}".` }), en: `Choose a voice for "${sp.name}".`, es: `Elige una voz para "${sp.name}".` }),
           variant: 'destructive',
         });
         return;
@@ -788,15 +788,15 @@ function DialogModeTab({
         setProgress({ current: i + 1, total: blocks.length });
       }
       toast({
-        title: 'Dialog gestartet',
-        description: `${results.length}/${blocks.length} Talking-Heads werden generiert (1–3 Min pro Clip).`,
+        title: tx({ de: 'Dialog gestartet', en: 'Dialogue started', es: 'Se inició el diálogo' }),
+        description: tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `${results.length}/${blocks.length} Talking-Heads werden generiert (1–3 Min pro Clip).`, en: `${results.length}/${blocks.length} Talking heads are generated (1-3 min per clip).`, es: `${results.length}/${blocks.length} Se generan cabezas parlantes (1-3 minutos por clip).` }), en: `${results.length}/${blocks.length} Talking heads are generated (1-3 min per clip).`, es: `${results.length}/${blocks.length} Se generan cabezas parlantes (1-3 minutos por clip).` }), en: `${results.length}/${blocks.length} Talking heads are generated (1-3 min per clip).`, es: `${results.length}/${blocks.length} Se generan cabezas parlantes (1-3 minutos por clip).` }), en: `${results.length}/${blocks.length} Talking heads are generated (1-3 min per clip).`, es: `${results.length}/${blocks.length} Se generan cabezas parlantes (1-3 minutos por clip).` }), en: `${results.length}/${blocks.length} Talking heads are generated (1-3 min per clip).`, es: `${results.length}/${blocks.length} Se generan cabezas parlantes (1-3 minutos por clip).` }),
       });
       onSuccess(results);
     } catch (e) {
       console.error('[DialogMode] error', e);
       toast({
-        title: 'Fehler',
-        description: e instanceof Error ? e.message : 'Generierung fehlgeschlagen',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
+        description: e instanceof Error ? e.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }),
         variant: 'destructive',
       });
     } finally {

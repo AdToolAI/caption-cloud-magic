@@ -59,7 +59,7 @@ A veces susurro, a veces hablo con energía, pero para este entrenamiento me man
 
 /** Replace the {NAME} placeholder with the given speaker name (fallback: localized "[Your name]"). */
 export function personalizeScript(text: string, name: string, lang: TrainingScriptLang): string {
-  const fallback = lang === "en" ? "[your name]" : lang === "es" ? "[tu nombre]" : "[dein Name]";
+  const fallback = lang === "en" ? "[your name]" : lang === "es" ? "[tu nombre]" : tx({ de: "[dein Name]", en: "[your name]", es: "[Su nombre]" });
   const value = name.trim() || fallback;
   return text.split(NAME_PLACEHOLDER).join(value);
 }

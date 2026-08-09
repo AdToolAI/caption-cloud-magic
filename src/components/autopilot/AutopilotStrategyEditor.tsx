@@ -172,7 +172,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       <Card className="p-5 space-y-3">
         <div>
           <Label className="text-xs uppercase tracking-widest text-muted-foreground">Themen-Pillars</Label>
-          <p className="text-[11px] text-muted-foreground mt-1">Kernthemen, um die sich dein Content drehen soll.</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{tx({ de: "Kernthemen, um die sich dein Content drehen soll.", en: "Core topics that your content should revolve around.", es: "Temas centrales en torno a los cuales debe girar su contenido." })}</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {pillars.map((p) => (
@@ -412,7 +412,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
           </span>
           <Button onClick={save} disabled={!dirty || upsert.isPending} size="sm" className="gap-1.5">
             <Save className="h-3.5 w-3.5" />
-            {upsert.isPending ? 'Speichere…' : 'Strategie speichern'}
+            {upsert.isPending ? 'Speichere…' : tx({ de: 'Strategie speichern', en: 'Save strategy', es: 'Guardar estrategia' })}
           </Button>
         </Card>
       </div>

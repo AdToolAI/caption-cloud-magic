@@ -8,6 +8,7 @@ import { useVideoVariants } from '@/hooks/useVideoVariants';
 import { Download, Trash2, Plus, Video, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FORMAT_PROFILES, ASPECT_RATIO_PROFILES, COMPRESSION_PROFILES } from '@/lib/compression-profiles';
+import { tx } from '@/lib/i18nText';
 
 interface VariantManagerProps {
   videoCreationId: string;
@@ -34,12 +35,12 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
       toast.success('Download gestartet');
     } catch (error) {
       console.error('Download error:', error);
-      toast.error('Download fehlgeschlagen');
+      toast.error(tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Descarga fallida' }));
     }
   };
 
   const handleDelete = async (variantId: string) => {
-    if (confirm('Variante wirklich löschen?')) {
+    if (confirm(tx({ de: 'Variante wirklich löschen?', en: 'Really delete variant?', es: '¿Realmente eliminar variante?' }))) {
       deleteVariant(variantId);
     }
   };

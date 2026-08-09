@@ -42,7 +42,7 @@ export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
     model: 'Seedream 4',
     cost: 0.04,
     modeQuality: { create: 3, transform: 2, restyle: 3 },
-    bestFor: ['Stilisierte Szenen', 'Mood-Boards', 'Social-Content'],
+    bestFor: [tx({ de: 'Stilisierte Szenen', en: 'Stylized scenes', es: 'escenas estilizadas' }), 'Mood-Boards', 'Social-Content'],
     promptStyleHint: 'Mid-length descriptive prompts with explicit style cues, lighting and camera language.',
   },
   pro: {
@@ -60,7 +60,7 @@ export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
     model: 'Nano Banana 2',
     cost: 0.20,
     modeQuality: { create: 4, transform: 4, restyle: 4 },
-    bestFor: ['Komplexe i2i mit vielen Personen', 'Stil-Transfer', 'Fotorealismus'],
+    bestFor: [tx({ de: 'Komplexe i2i mit vielen Personen', en: 'Complex i2i with many people', es: 'I2i complejo con mucha gente.' }), 'Stil-Transfer', 'Fotorealismus'],
     promptStyleHint: 'Structured prompts with explicit "preserve X from reference" instructions. Excellent at honoring composition.',
   },
 };
@@ -71,13 +71,13 @@ export const PICTURE_MODES: Record<PictureMode, {
   needsReference: boolean;
 }> = {
   create: {
-    label: 'Neues Bild',
+    label: tx({ de: 'Neues Bild', en: 'New picture', es: 'Nueva imagen' }),
     description: tx({ de: 'Text → Bild. Generiere komplett neu aus deinem Prompt.', en: 'Text → Image. Generate completely new from your prompt.', es: 'Texto → Imagen. Genera completamente nuevo a partir de tu prompt.' }),
     needsReference: false,
   },
   transform: {
-    label: 'Bild verwandeln',
-    description: 'Dein Bild als Vorlage. Komposition bleibt, Stil/Details ändern sich.',
+    label: tx({ de: 'Bild verwandeln', en: 'Transform image', es: 'Transformar imagen' }),
+    description: tx({ de: 'Dein Bild als Vorlage. Komposition bleibt, Stil/Details ändern sich.', en: 'Your image as a template. Composition remains, style/details change.', es: 'Tu imagen como plantilla. La composición permanece, el estilo/los detalles cambian.' }),
     needsReference: true,
   },
   restyle: {
@@ -114,12 +114,12 @@ export function recommendedTierForMode(mode: PictureMode): QualityTier {
 export function detectMismatch(tier: QualityTier, mode: PictureMode): string | null {
   const m = PICTURE_MODELS[tier];
   const score = m.modeQuality[mode];
-  if (score === 0) return `${m.label} (${m.model}) unterstützt diesen Modus nicht.`;
+  if (score === 0) return tx({ de: `${m.label} (${m.model}) unterstützt diesen Modus nicht.`, en: `${m.label} (${m.model}) does not support this mode.`, es: `${m.label} (${m.model}) no admite este modo.` });
   if (score <= 2) {
     const better = recommendedTierForMode(mode);
     const betterModel = PICTURE_MODELS[better];
     if (better !== tier) {
-      return `${m.label} ist schwach in diesem Modus. ${betterModel.label} (${betterModel.model}) liefert oft bessere Ergebnisse.`;
+      return tx({ de: `${m.label} ist schwach in diesem Modus. ${betterModel.label} (${betterModel.model}) liefert oft bessere Ergebnisse.`, en: `${m.label} is weak in this mode. ${betterModel.label} (${betterModel.model}) often gives better results.`, es: `${m.label} es débil en este modo. ${betterModel.label} (${betterModel.model}) suele dar mejores resultados.` });
     }
   }
   return null;

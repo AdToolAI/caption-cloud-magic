@@ -162,7 +162,7 @@ export function useGenerateAllClips({
           persisted = await onEnsurePersisted();
         } catch (err: any) {
           toast({
-            title: 'Fehler',
+            title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
             description: err?.message || tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' }),
             variant: 'destructive',
           });
@@ -303,10 +303,10 @@ export function useGenerateAllClips({
 
       // Edge function returns HTTP 200 with `{ok:false}` on early-phase crashes.
       if (data && (data as any).ok === false) {
-        const reason = (data as any).error || (data as any).message || 'Unbekannter Fehler.';
+        const reason = (data as any).error || (data as any).message || tx({ de: "Unbekannter Fehler.", en: "Unknown error.", es: "Error desconocido." });
         const stage = (data as any).stage ? ` [${(data as any).stage}]` : '';
         toast({
-          title: 'Generierung fehlgeschlagen',
+          title: tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Generación fallida" }),
           description: `${reason}${stage}`,
           variant: 'destructive',
         });
@@ -348,7 +348,7 @@ export function useGenerateAllClips({
       console.error('[useGenerateAllClips] failed:', err);
       const realMsg = await extractFunctionsError(err);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description:
           realMsg || tx({ de: 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', en: 'Clip generation failed — please try again.', es: 'Error al generar el clip — inténtalo de nuevo.' }),
         variant: 'destructive',

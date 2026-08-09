@@ -66,7 +66,7 @@ export function scorePairing(input: {
     return {
       score,
       label: "Starke Paarung",
-      hint: "Motiv und Text erzählen dieselbe Geschichte.",
+      hint: tx({ de: "Motiv und Text erzählen dieselbe Geschichte.", en: "The motif and text tell the same story.", es: "El motivo y el texto cuentan la misma historia." }),
       tone: "good",
     };
   }

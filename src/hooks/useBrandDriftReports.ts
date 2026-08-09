@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -52,7 +53,7 @@ export function useBrandDriftReports(brandKitId: string | null | undefined) {
       qc.invalidateQueries({ queryKey: ["brand-drift-reports", brandKitId] });
       qc.invalidateQueries({ queryKey: ["brand-kits"] });
     },
-    onError: (e: any) => toast({ title: "Scan fehlgeschlagen", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: tx({ de: "Scan fehlgeschlagen", en: "Scan failed", es: "Error de escaneo" }), description: e.message, variant: "destructive" }),
   });
 
   const resolve = useMutation({

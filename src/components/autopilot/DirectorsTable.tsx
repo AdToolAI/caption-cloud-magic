@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { tx, useTx } from '@/lib/i18nText';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
@@ -59,7 +60,6 @@ import {
 } from '@/lib/autopilot/autoVoice';
 import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/autopilot/types';
 import { cn } from '@/lib/utils';
-import { tx, useTx } from '@/lib/i18nText';
 
 const ASPECTS: Array<{ value: AutopilotAspect; label: string }> = [
   { value: '9:16', label: 'Hochkant 9:16 — Reels, Shorts, TikTok' },
@@ -75,10 +75,10 @@ const LANGUAGES = [
 ];
 
 const TREATMENT_PHASES = [
-  'Briefing wird gelesen …',
-  'Konzept und Dramaturgie …',
+  tx({ de: 'Briefing wird gelesen …', en: 'Reading briefing…', es: 'Leyendo el briefing…' }),
+  tx({ de: 'Konzept und Dramaturgie …', en: 'Concept and dramaturgy…', es: 'Concepto y dramaturgia…' }),
   tx({ de: 'Szenen werden gebaut …', en: 'Building scenes…', es: 'Creando escenas…' }),
-  'Dialoge und Besetzung …',
+  tx({ de: 'Dialoge und Besetzung …', en: 'Dialogues and casting…', es: 'Diálogos y reparto…' }),
   'Letzter Feinschliff …',
 ];
 
@@ -354,7 +354,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
     if (brief.trim().length < 8) {
       toast({
         title: 'Noch zu knapp',
-        description: 'Beschreibe in einem Satz, worum es im Video gehen soll.',
+        description: tx({ de: 'Beschreibe in einem Satz, worum es im Video gehen soll.', en: 'Describe in one sentence what the video should be about.', es: 'Describe en una frase de qué debería tratar el video.' }),
         variant: 'destructive',
       });
       return;
@@ -381,14 +381,14 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
       setProductionId(data.production_id);
       setTreatment(data.treatment as AutopilotTreatment);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      const message = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
       toast({
-        title: 'Treatment fehlgeschlagen',
+        title: tx({ de: 'Treatment fehlgeschlagen', en: 'Treatment failed', es: 'Error en el treatment' }),
         description:
           message === 'credits_exhausted'
-            ? 'Dein KI-Guthaben ist aufgebraucht.'
+            ? tx({ de: 'Dein KI-Guthaben ist aufgebraucht.', en: 'Your AI credits are used up.', es: 'Tus créditos de IA se han agotado.' })
             : message === 'rate_limited'
-              ? 'Zu viele Anfragen — bitte kurz warten.'
+              ? tx({ de: 'Zu viele Anfragen — bitte kurz warten.', en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
               : message,
         variant: 'destructive',
       });

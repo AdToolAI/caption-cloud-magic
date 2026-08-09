@@ -312,7 +312,7 @@ export default function StructuredPromptBuilder({
     } catch (e: any) {
       console.error('[StructuredPromptBuilder] suggest failed', e);
       toast({
-        title: t(language, 'KI-Vorschlag fehlgeschlagen', 'AI suggestion failed', 'Fallo la sugerencia IA'),
+        title: t(language, tx({ de: "KI-Vorschlag fehlgeschlagen", en: "AI suggestion failed", es: "La sugerencia de IA falló" }), 'AI suggestion failed', 'Fallo la sugerencia IA'),
         description: e?.message ?? '',
         variant: 'destructive',
       });
@@ -385,7 +385,7 @@ export default function StructuredPromptBuilder({
               variant="ghost"
               className="h-6 px-2 text-[10px] gap-1"
               onClick={onSavePreset}
-              title={t(language, 'Als Style speichern', 'Save as style', 'Guardar como estilo')}
+              title={t(language, tx({ de: "Als Style speichern", en: "Save as Style", es: "Guardar como estilo" }), 'Save as style', 'Guardar como estilo')}
             >
               <Save className="h-3 w-3" />
             </Button>

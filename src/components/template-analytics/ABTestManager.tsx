@@ -35,7 +35,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
   const handleCreateTest = async () => {
     if (!testName) {
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Bitte geben Sie einen Test-Namen ein", en: "Please enter a test name", es: "Por favor, introduce un nombre para la prueba" }),
         variant: "destructive",
       });
@@ -85,8 +85,8 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
     const success = await pauseTest(testId);
     if (success) {
       toast({
-        title: "Test pausiert",
-        description: "A/B Test wurde pausiert",
+        title: tx({ de: "Test pausiert", en: "Test paused", es: "Prueba pausada" }),
+        description: tx({ de: "A/B Test wurde pausiert", en: "A/B test was paused", es: "La prueba A/B se pausó" }),
       });
       fetchActiveTests(templateId);
     }
@@ -129,7 +129,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Neuen A/B Test erstellen</DialogTitle>
+                  <DialogTitle>{tx({ de: "Neuen A/B Test erstellen", en: "Create a new A/B test", es: "Crear una nueva prueba A/B" })}</DialogTitle>
                   <DialogDescription>
                     Erstelle einen neuen Test um verschiedene Varianten zu vergleichen
                   </DialogDescription>
@@ -150,7 +150,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       id="hypothesis"
                       value={hypothesis}
                       onChange={(e) => setHypothesis(e.target.value)}
-                      placeholder="z.B. Ein kürzerer Header wird die Conversion-Rate erhöhen"
+                      placeholder={tx({ de: "z.B. Ein kürzerer Header wird die Conversion-Rate erhöhen", en: "e.g. A shorter header will increase the conversion rate", es: "p. ej. Un encabezado más corto aumentará la tasa de conversión" })}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -183,7 +183,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                     />
                   </div>
                   <Button onClick={handleCreateTest} className="w-full" disabled={loading}>
-                    {loading ? "Erstelle..." : "Test erstellen"}
+                    {loading ? tx({ de: "Erstelle...", en: "Creating...", es: "Creando..." }) : tx({ de: "Test erstellen", en: "Create test", es: "Crear prueba" })}
                   </Button>
                 </div>
               </DialogContent>

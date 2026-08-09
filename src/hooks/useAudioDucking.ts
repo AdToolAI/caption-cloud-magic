@@ -265,7 +265,7 @@ export function useAudioDucking({
     title?: string,
   ): Promise<{ url: string; assetId?: string } | null> => {
     if (!duration || (!speechBuffer && !musicBuffer)) {
-      toast.error('Kein Audio zum Exportieren');
+      toast.error(tx({ de: 'Kein Audio zum Exportieren', en: 'No audio to export', es: 'No hay audio para exportar' }));
       return null;
     }
     setIsExporting(true);
@@ -346,13 +346,13 @@ export function useAudioDucking({
         console.warn('[useAudioDucking] library insert skipped:', err);
       }
 
-      toast.success('Mix gespeichert', {
+      toast.success(tx({ de: 'Mix gespeichert', en: 'Mix saved', es: 'Mezcla guardada' }), {
         description: `${formatDuration(rendered.duration)} · in der Bibliothek`,
       });
       return { url: publicUrl, assetId };
     } catch (err: any) {
       console.error('[useAudioDucking] export failed:', err);
-      toast.error('Export fehlgeschlagen', { description: err.message });
+      toast.error(tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Error de exportación' }), { description: err.message });
       return null;
     } finally {
       setIsExporting(false);

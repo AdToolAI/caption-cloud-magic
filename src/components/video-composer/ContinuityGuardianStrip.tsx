@@ -328,7 +328,7 @@ export default function ContinuityGuardianStrip({
     );
     const ok = await setSceneLock(scene.id, nextLocked, ref);
     if (ok) {
-      toast.success(nextLocked ? 'Szene verriegelt 🔒' : 'Lock gelöst');
+      toast.success(nextLocked ? tx({ de: 'Szene verriegelt 🔒', en: 'Scene locked 🔒', es: 'Escena bloqueada 🔒' }) : tx({ de: 'Lock gelöst', en: 'Lock released', es: 'Bloqueo liberado' }));
     }
   };
 

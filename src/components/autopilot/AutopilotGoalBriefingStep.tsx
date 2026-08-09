@@ -10,7 +10,7 @@ import { Target, TrendingUp, MousePointerClick, Mail, ShoppingCart } from 'lucid
 const GOALS = [
   { id: 'awareness', label: 'Reichweite', desc: 'Neue Follower & Views', icon: TrendingUp },
   { id: 'engagement', label: 'Engagement', desc: 'Likes, Kommentare, Saves', icon: Target },
-  { id: 'traffic', label: 'Traffic', desc: 'Klicks auf Link in Bio', icon: MousePointerClick },
+  { id: 'traffic', label: 'Traffic', desc: tx({ de: 'Klicks auf Link in Bio', en: 'Click on link in bio', es: 'Haz clic en el enlace de la biografía' }), icon: MousePointerClick },
   { id: 'leads', label: 'Leads', desc: 'E-Mails / DMs / Anfragen', icon: Mail },
   { id: 'sales', label: 'Verkäufe', desc: 'Direkter Produktverkauf', icon: ShoppingCart },
 ] as const;
@@ -52,7 +52,7 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
     <div className="space-y-6">
       {/* Goal */}
       <div>
-        <Label className="text-base font-semibold mb-3 block">Was ist das Ziel deines Kanals?</Label>
+        <Label className="text-base font-semibold mb-3 block">{tx({ de: "Was ist das Ziel deines Kanals?", en: "What is the goal of your channel?", es: "¿Cuál es el objetivo de tu canal?" })}</Label>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {GOALS.map((g) => {
             const Icon = g.icon;
@@ -108,8 +108,8 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
           {value.weekly_budget_eur < 20
             ? tx({ de: '⚠️ Niedriges Budget: KI-Videos werden automatisch deaktiviert. Fokus auf KI-Bilder und Stock-Reels.', en: '⚠️ Low budget: AI videos are automatically disabled. Focus on AI images and stock reels.', es: '⚠️ Presupuesto bajo: los videos de IA se desactivan automáticamente. Concéntrate en imágenes de IA y reels de stock.' })
             : value.weekly_budget_eur < 50
-            ? 'Mittleres Budget: gemischte Strategie aus Bildern, Stock & einzelnen KI-Videos.'
-            : 'Hohes Budget: Volle KI-Video-Pipeline möglich.'}
+            ? tx({ de: 'Mittleres Budget: gemischte Strategie aus Bildern, Stock & einzelnen KI-Videos.', en: 'Medium budget: mixed strategy of images, stock & individual AI videos.', es: 'Presupuesto medio: estrategia mixta de imágenes, stock y vídeos individuales de IA.' })
+            : tx({ de: 'Hohes Budget: Volle KI-Video-Pipeline möglich.', en: 'High budget: Full AI video pipeline possible.', es: 'Presupuesto alto: posible canalización completa de videos con IA.' })}
         </p>
       </div>
 
@@ -119,8 +119,8 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
         <div className="space-y-3">
           {([
             { key: 'ai_video', label: 'KI-Videos (teuer)', color: 'bg-rose-500' },
-            { key: 'stock_reel', label: 'Stock + KI-Bild Reels (mittel)', color: 'bg-amber-500' },
-            { key: 'static', label: 'Statische Bild-Posts (günstig)', color: 'bg-emerald-500' },
+            { key: 'stock_reel', label: tx({ de: 'Stock + KI-Bild Reels (mittel)', en: 'Stock + AI Image Reels (medium)', es: 'Carretes de imágenes de stock + AI (mediano)' }), color: 'bg-amber-500' },
+            { key: 'static', label: tx({ de: 'Statische Bild-Posts (günstig)', en: 'Static image posts (cheap)', es: 'Publicaciones de imágenes estáticas (baratas)' }), color: 'bg-emerald-500' },
           ] as const).map((row) => (
             <div key={row.key}>
               <div className="flex items-center justify-between text-sm mb-1">
@@ -153,10 +153,10 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
           />
         </div>
         <div>
-          <Label htmlFor="usp">USP / Was macht dich besonders?</Label>
+          <Label htmlFor="usp">{tx({ de: "USP / Was macht dich besonders?", en: "USP / What makes you special?", es: "USP / ¿Qué te hace especial?" })}</Label>
           <Textarea
             id="usp"
-            placeholder="z.B. KI-gestützte 1:1 Coachings ohne Wartezeit"
+            placeholder={tx({ de: "z.B. KI-gestützte 1:1 Coachings ohne Wartezeit", en: "e.g. AI-supported 1:1 coaching without waiting times", es: "p.ej. Entrenamiento 1:1 respaldado por IA sin tiempos de espera" })}
             maxLength={280}
             value={value.usp}
             onChange={(e) => set({ usp: e.target.value })}

@@ -88,11 +88,11 @@ export function useTemplatePurchase() {
       if (!result.ok) {
         const msg =
           result.error === 'INSUFFICIENT_CREDITS'
-            ? `Nicht genug Credits — du brauchst ${result.required}, hast aber nur ${result.balance}.`
+            ? tx({ de: `Nicht genug Credits — du brauchst ${result.required}, hast aber nur ${result.balance}.`, en: `Not enough credits — you need ${result.required}, but only have ${result.balance}.`, es: `Créditos insuficientes — necesitas ${result.required}, pero solo tienes ${result.balance}.` })
             : result.error === 'CANNOT_BUY_OWN_TEMPLATE'
             ? tx({ de: 'Du kannst dein eigenes Template nicht kaufen.', en: 'You cannot buy your own template.', es: 'No puedes comprar tu propia plantilla.' })
-            : `Kauf fehlgeschlagen: ${result.error}`;
-        toast({ title: 'Fehler', description: msg, variant: 'destructive' });
+            : tx({ de: `Kauf fehlgeschlagen: ${result.error}`, en: `Purchase failed: ${result.error}`, es: `Compra fallida: ${result.error}` });
+        toast({ title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }), description: msg, variant: 'destructive' });
         return;
       }
       if (result.already_owned) {
@@ -101,8 +101,8 @@ export function useTemplatePurchase() {
         toast({ title: 'Template hinzugefügt', description: tx({ de: 'Free-Template ist jetzt in deiner Bibliothek.', en: 'Free template is now in your library.', es: 'La plantilla gratuita ya está en tu biblioteca.' }) });
       } else {
         toast({
-          title: 'Kauf erfolgreich',
-          description: `${result.price_credits} Credits abgebucht. Creator erhält ${result.creator_earned}.`,
+          title: tx({ de: 'Kauf erfolgreich', en: 'Purchase successful', es: 'Compra exitosa' }),
+          description: tx({ de: `${result.price_credits} Credits abgebucht. Creator erhält ${result.creator_earned}.`, en: `${result.price_credits} credits deducted. Creator receives ${result.creator_earned}.`, es: `${result.price_credits} créditos debitados. El creador recibe ${result.creator_earned}.` }),
         });
       }
       queryClient.invalidateQueries({ queryKey: ['marketplace-owned'] });
@@ -110,8 +110,8 @@ export function useTemplatePurchase() {
       queryClient.invalidateQueries({ queryKey: ['marketplace-templates'] });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Unbekannter Fehler';
-      toast({ title: 'Kauf fehlgeschlagen', description: msg, variant: 'destructive' });
+      const msg = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
+      toast({ title: tx({ de: 'Kauf fehlgeschlagen', en: 'Purchase failed', es: 'Compra fallida' }), description: msg, variant: 'destructive' });
     },
   });
 }
@@ -161,8 +161,8 @@ export function useSubmitTemplateToMarketplace() {
       queryClient.invalidateQueries({ queryKey: ['admin-pending-templates'] });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Unbekannter Fehler';
-      toast({ title: 'Einreichung fehlgeschlagen', description: msg, variant: 'destructive' });
+      const msg = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
+      toast({ title: tx({ de: 'Einreichung fehlgeschlagen', en: 'Submission failed', es: 'Envío fallido' }), description: msg, variant: 'destructive' });
     },
   });
 }
@@ -218,13 +218,13 @@ export function useSubmitRating() {
       return data;
     },
     onSuccess: (_d, vars) => {
-      toast({ title: 'Bewertung gespeichert', description: tx({ de: 'Danke für dein Feedback!', en: 'Thanks for your feedback!', es: '¡Gracias por tus comentarios!' }) });
+      toast({ title: tx({ de: 'Bewertung gespeichert', en: 'Rating saved', es: 'Calificación guardada' }), description: tx({ de: 'Danke für dein Feedback!', en: 'Thanks for your feedback!', es: '¡Gracias por tus comentarios!' }) });
       queryClient.invalidateQueries({ queryKey: ['template-ratings', vars.templateId] });
       queryClient.invalidateQueries({ queryKey: ['marketplace-templates'] });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Unbekannter Fehler';
-      toast({ title: 'Bewertung fehlgeschlagen', description: msg, variant: 'destructive' });
+      const msg = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
+      toast({ title: tx({ de: 'Bewertung fehlgeschlagen', en: 'Rating failed', es: 'Calificación fallida' }), description: msg, variant: 'destructive' });
     },
   });
 }
@@ -267,7 +267,7 @@ export function useReviewTemplate() {
       queryClient.invalidateQueries({ queryKey: ['marketplace-templates'] });
     },
     onError: (err: unknown) => {
-      toast({ title: 'Aktion fehlgeschlagen', description: err instanceof Error ? err.message : 'Fehler', variant: 'destructive' });
+      toast({ title: tx({ de: 'Aktion fehlgeschlagen', en: 'Action failed', es: 'Acción fallida' }), description: err instanceof Error ? err.message : tx({ de: 'Fehler', en: 'Error', es: 'Error' }), variant: 'destructive' });
     },
   });
 }

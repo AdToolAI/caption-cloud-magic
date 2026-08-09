@@ -99,7 +99,7 @@ export default function CharacterEditor({
         return;
       }
       if (file.size > MAX_BYTES) {
-        toast.error(`Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB · max 20 MB).`);
+        toast.error(tx({ de: `Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB · max 20 MB).`, en: `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB · max 20 MB).`, es: `Archivo demasiado grande (${(file.size / 1024 / 1024).toFixed(1)} MB · máximo 20 MB).` }));
         return;
       }
       // Block E (Legal) — gate uploads behind persistent consent
@@ -139,7 +139,7 @@ export default function CharacterEditor({
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (!data?.imageUrl) throw new Error('Kein Bild generiert');
+      if (!data?.imageUrl) throw new Error(tx({ de: 'Kein Bild generiert', en: 'No image generated', es: 'No se genera ninguna imagen' }));
 
       // Convert data: URL → File and upload to library bucket for persistence
       try {
@@ -168,7 +168,7 @@ export default function CharacterEditor({
       }));
       toast.success('Character Sheet generiert ✨');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Generierung fehlgeschlagen';
+      const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });
       toast.error(msg);
     } finally {
       setGeneratingSheet(false);
@@ -188,11 +188,11 @@ export default function CharacterEditor({
 
   const handleSave = async () => {
     if (!draft.name.trim()) {
-      toast.error('Name ist erforderlich');
+      toast.error(tx({ de: 'Name ist erforderlich', en: 'Name is required', es: 'El nombre es obligatorio' }));
       return;
     }
     if (!draft.description.trim()) {
-      toast.error('Beschreibung ist erforderlich');
+      toast.error(tx({ de: 'Beschreibung ist erforderlich', en: 'Description is required', es: 'Se requiere descripción' }));
       return;
     }
     setSaving(true);
@@ -267,7 +267,7 @@ export default function CharacterEditor({
                 disabled={generatingSheet || !draft.description.trim()}
                 onClick={handleGenerateSheet}
                 className="h-7 text-[11px] gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                title={!draft.description.trim() ? 'Beschreibung erforderlich' : 'Foto-realistisches 4-View Sheet erzeugen'}
+                title={!draft.description.trim() ? tx({ de: 'Beschreibung erforderlich', en: 'Description required', es: 'Descripción requerida' }) : 'Foto-realistisches 4-View Sheet erzeugen'}
               >
                 {generatingSheet ? (
                   <Loader2 className="h-3 w-3 animate-spin" />

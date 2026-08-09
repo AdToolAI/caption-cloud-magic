@@ -227,17 +227,17 @@ const Pricing = () => {
             <div className="max-w-3xl mx-auto mb-10 rounded-2xl border border-border/70 bg-card/60 backdrop-blur-sm px-6 py-6">
               <h2 className="text-lg font-bold text-foreground mb-3">
                 {language === "de"
-                  ? "Kein Problem — nichts wurde abgebucht."
+                  ? tx({ de: "Kein Problem — nichts wurde abgebucht.", en: "No problem — nothing was debited.", es: "No hay problema, no se debitó nada." })
                   : language === "es"
                   ? "Sin problema: no se ha cobrado nada."
-                  : "No worries — nothing was charged."}
+                  : tx({ de: "No worries — nothing was charged.", en: "No worries — nothing was charged.", es: "No te preocupes, no se cobró nada." })}
               </h2>
               <ul className="space-y-2 text-sm text-muted-foreground mb-5">
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
                   <span>
                     {language === "de"
-                      ? "Monatlich kündbar — keine Mindestlaufzeit, keine Kündigungsfrist."
+                      ? tx({ de: "Monatlich kündbar — keine Mindestlaufzeit, keine Kündigungsfrist.", en: "Can be canceled monthly - no minimum term, no notice period.", es: "Se puede cancelar mensualmente - sin plazo mínimo, sin plazo de preaviso." })
                       : language === "es"
                       ? "Cancelable cada mes: sin permanencia ni preaviso."
                       : "Cancel monthly — no minimum term, no notice period."}

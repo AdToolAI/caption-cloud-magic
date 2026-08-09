@@ -115,7 +115,7 @@ export function useComposerPersistence() {
       const promise = (async () => {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
-        throw new Error('Du musst angemeldet sein, um ein Projekt zu speichern.');
+        throw new Error(tx({ de: 'Du musst angemeldet sein, um ein Projekt zu speichern.', en: 'You must be logged in to save a project.', es: 'Debes iniciar sesión para guardar un proyecto.' }));
       }
 
       let projectId = project.id;

@@ -33,13 +33,13 @@ const COPY: Record<Lang, {
       tx({ de: "Die Storyboard-Generierung ist nicht durchgelaufen. Dein Briefing ist unverändert gespeichert — du kannst es entweder direkt erneut starten oder zurück ins Briefing wechseln, um Details anzupassen.", en: "Storyboard generation did not complete. Your briefing is saved unchanged — you can either restart it directly or go back to the briefing to adjust details.", es: "La generación del storyboard no se completó. Tu briefing está guardado sin cambios — puedes reiniciarlo directamente o volver al briefing para ajustar los detalles." }),
     hintsTitle: "Mögliche Ursachen",
     hints: [
-      "Das KI-Gateway war kurz überlastet — ein erneuter Versuch in 20–30 Sekunden klappt meistens.",
-      "Das Briefing enthält evtl. zu wenig Substanz für ein vollständiges Storyboard. Mehr Kontext (USPs, Zielgruppe, Tonalität) hilft deutlich.",
+      tx({ de: "Das KI-Gateway war kurz überlastet — ein erneuter Versuch in 20–30 Sekunden klappt meistens.", en: "The AI ​​gateway was briefly overloaded - a new attempt in 20-30 seconds usually works.", es: "La puerta de enlace de IA se sobrecargó brevemente; un nuevo intento en 20 a 30 segundos suele funcionar." }),
+      tx({ de: "Das Briefing enthält evtl. zu wenig Substanz für ein vollständiges Storyboard. Mehr Kontext (USPs, Zielgruppe, Tonalität) hilft deutlich.", en: "The brief may not contain enough substance for a complete storyboard. More context (USPs, target group, tonality) helps significantly.", es: "Es posible que el resumen no contenga suficiente sustancia para un guión gráfico completo. Un mayor contexto (PVU, grupo objetivo, tonalidad) ayuda significativamente." }),
       tx({ de: "Sehr viele Charaktere oder sehr lange Skripte können Timeouts auslösen — reduziere ggf. die Cast-Größe oder die Video-Länge.", en: "Too many characters or very long scripts can trigger timeouts — reduce cast size or video length if necessary.", es: "Demasiados personajes o guiones muy largos pueden provocar tiempos de espera — reduce el tamaño del elenco o la duración del video si es necesario." }),
     ],
     retry: "Erneut versuchen",
     back: tx({ de: "Zurück zum Briefing", en: "Back to Briefing", es: "Volver al Briefing" }),
-    errorPrefix: "Fehler",
+    errorPrefix: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
     retryableHint: "Wiederholbar — KI-Dienst meldet temporäre Auslastung.",
   },
   en: {
@@ -49,7 +49,7 @@ const COPY: Record<Lang, {
       "The storyboard generation did not complete. Your briefing is still saved — you can retry directly or go back to the briefing to adjust details.",
     hintsTitle: "Possible causes",
     hints: [
-      "The AI gateway was briefly overloaded — retrying in 20–30 seconds usually succeeds.",
+      tx({ de: "The AI gateway was briefly overloaded — retrying in 20–30 seconds usually succeeds.", en: "The AI ​​gateway was briefly overloaded — retrying in 20–30 seconds usually succeeds.", es: "La puerta de enlace de IA se sobrecargó brevemente; por lo general, volver a intentarlo en 20 a 30 segundos tiene éxito." }),
       "Your briefing may not have enough substance for a full storyboard. More context (USPs, audience, tone) helps a lot.",
       "Very large casts or very long scripts can trigger timeouts — try reducing cast size or video length.",
     ],

@@ -59,7 +59,7 @@ export function VoiceInput({ onTranscription, onListeningChange, disabled }: Voi
         });
       } else if (event.error !== 'aborted') {
         toast({
-          title: 'Spracherkennung fehlgeschlagen',
+          title: tx({ de: 'Spracherkennung fehlgeschlagen', en: 'Speech recognition failed', es: 'Error en el reconocimiento de voz' }),
           description: tx({ de: 'Bitte versuche es erneut.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
           variant: 'destructive',
         });

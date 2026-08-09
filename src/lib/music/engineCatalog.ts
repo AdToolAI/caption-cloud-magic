@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Music Engine Catalog — single source of truth for Music Studio.
 // Adding a new provider = one new entry here.
 // Legacy tier IDs (quick/standard/pro) are mapped to current engines via LEGACY_TIER_ALIAS below.
@@ -95,7 +96,7 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     label: 'Vocal Mini',
     provider: 'MiniMax Music 1.5',
     subtitle: 'Schnelle Song-Skizze',
-    description: 'Songs mit Vocals & Lyrics, bis 60s.',
+    description: tx({ de: 'Songs mit Vocals & Lyrics, bis 60s.', en: 'Songs with vocals & lyrics, up to the 60s.', es: 'Canciones con voz y letra, hasta los años 60.' }),
     vocals: true,
     requiresLyrics: true,
     supportsInstrumentalToggle: false,
@@ -134,7 +135,7 @@ export const ENGINE_CATALOG: Record<string, MusicEngine> = {
     label: 'Vocal Pro',
     provider: 'Google Lyria 3 Pro',
     subtitle: 'Google – bis 3 Min.',
-    description: 'Google Lyria 3 Pro über Replicate — radio-nahe Vocal-Qualität, Songs bis ~3 Min.',
+    description: tx({ de: 'Google Lyria 3 Pro über Replicate — radio-nahe Vocal-Qualität, Songs bis ~3 Min.', en: 'Google Lyria 3 Pro via Replicate — radio-near vocal quality, songs up to ~3 min.', es: 'Google Lyria 3 Pro vía Replicate: calidad vocal cercana a la radio, canciones de hasta ~3 min.' }),
     vocals: true,
     requiresLyrics: false,
     supportsInstrumentalToggle: true,

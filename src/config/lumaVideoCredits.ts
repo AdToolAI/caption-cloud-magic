@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
 // Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
@@ -15,7 +16,7 @@ export const LUMA_VIDEO_MODELS = {
     maxDuration: 9,
     allowedDurations: [5, 9] as const,
     description: {
-      EUR: 'Cinematic AI-Videos ab 1,05€ pro 5 Sekunden',
+      EUR: tx({ de: 'Cinematic AI-Videos ab 1,05€ pro 5 Sekunden', en: 'Cinematic AI videos from €1.05 per 5 seconds', es: 'Vídeos cinematográficos con IA desde 1,05 € por 5 segundos' }),
       USD: 'Cinematic AI videos from $1.05 per 5 seconds',
     },
     badge: 'Empfohlen',
@@ -32,7 +33,7 @@ export const LUMA_VIDEO_MODELS = {
     maxDuration: 9,
     allowedDurations: [5, 9] as const,
     description: {
-      EUR: 'Premium cinematic Qualität ab 1,80€ pro 5 Sekunden',
+      EUR: tx({ de: 'Premium cinematic Qualität ab 1,80€ pro 5 Sekunden', en: 'Premium cinematic quality from €1.80 per 5 seconds', es: 'Calidad cinematográfica premium desde 1,80 € por 5 segundos' }),
       USD: 'Premium cinematic quality from $1.80 per 5 seconds',
     },
     badge: 'Premium',
@@ -85,7 +86,7 @@ export const LUMA_CAMERA_CONCEPTS = [
   { id: 'zoom_in', label: 'Zoom In', description: 'Hereinzoomen' },
   { id: 'zoom_out', label: 'Zoom Out', description: 'Herauszoomen' },
   { id: 'dolly_in', label: 'Dolly In', description: 'Kamerabewegung nach vorne' },
-  { id: 'dolly_out', label: 'Dolly Out', description: 'Kamerabewegung zurück' },
+  { id: 'dolly_out', label: 'Dolly Out', description: tx({ de: 'Kamerabewegung zurück', en: 'Camera movement back', es: 'Movimiento de cámara hacia atrás' }) },
   { id: 'pan_left', label: 'Pan Left', description: 'Schwenk nach links' },
   { id: 'pan_right', label: 'Pan Right', description: 'Schwenk nach rechts' },
   { id: 'tilt_up', label: 'Tilt Up', description: 'Neigung nach oben' },

@@ -324,7 +324,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       setReferencePlacement('start');
       toast.info(
         language === 'de'
-          ? tx({ de: `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Endframe.`, en: `Placement was reset to "At the beginning" — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a "Al principio" — ${model.name} no admite un fotograma final.` })
+          ? tx({ de: tx({ de: tx({ de: tx({ de: `Placement wurde auf „Am Anfangtx({ de: " zurückgesetzt — ${model.name} unterstützt keinen Endframe.`, en: `Placement has been reset to "At the beginningtx({ en: " — ${model.name} does not support an end frame.`, es: `La ubicación se ha restablecido a "Al principiotx({ es: " — ${model.name} no admite un marco final.` }), en: `Placement has been reset to "At the beginningtx({ en: " — ${model.name} does not support an end frame.`, es: `La ubicación se ha restablecido a "Al principiotx({ es: " — ${model.name} no admite un marco final.` }), en: tx({ de: tx({ de: `Placement was reset to ", en: "reset — ${model.name} does not support end frame.`, en: `Placement was reset to ", en: "reset — ${model.name} does not support end frame.`, es: `La ubicación se restableció a ", es: "reset — ${model.name} no admite el marco final.` }), en: tx({ de: `Placement was reset to ", en: "reset — ${model.name} does not support end frame.`, en: `Placement was reset to ", en: "reset — ${model.name} does not support end frame.`, es: `La ubicación se restableció a ", es: "reset — ${model.name} no admite el marco final.` }), es: `La ubicación se restableció a ", es: "reset — ${model.name} no admite el marco final.` }), en: tx({ de: tx({ de: `Placement was reset to", es: "reset — ${model.name} no admite fotograma final.`, en: `Placement was reset to", es: "reset — ${model.name} no admite fotograma final.`, es: `La ubicación se restableció a", es: "reset — ${model.name} no admite fotograma final.` }), en: tx({ de: `Placement was reset to", es: "reset — ${model.name} no admite fotograma final.`, en: `Placement was reset to", es: "reset — ${model.name} no admite fotograma final.`, es: `La ubicación se restableció a", es: "reset — ${model.name} no admite fotograma final.` }), es: `La ubicación se restableció a", es: "reset — ${model.name} no admite fotograma final.` }), es: `La ubicación se restableció a" })At the beginning" — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a "Al principio" — ${model.name} no admite un fotograma final.` }), en: tx({ de: tx({ de: tx({ de: `Placement was reset to "At the beginningtx({ de: tx({ de: tx({ de: tx({ de: " — ${model.name} does not support an end frame.`, en: `Placement was reset to ", en: "— ${model.name} does not support an end frame.`, en: `Placement was reset to", es: "— ${model.name} no admite un marco final.`, es: `La ubicación se restableció a" }), en: "— ${model.name} does not support an end frame.`, en: `Placement was reset to", es: "— ${model.name} no admite un marco final.`, es: `La ubicación se restableció a" })At the beginningtx({ de: tx({ de: " — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a "Al principiotx({ de: tx({ de: " — ${model.name} no admite un marco final.` }), en: tx({ de: `Placement was reset to ", en: "— ${model.name} does not support an end frame.`, en: `Placement was reset to ", en: "— ${model.name} does not support an end frame.`, es: `La ubicación se restableció a ", es: "— ${model.name} no admite un marco final.` }), en: tx({ de: `Placement was reset to", es: "— ${model.name} no admite un marco final.`, en: `Placement was reset to", es: "— ${model.name} no admite un marco final.`, es: `La ubicación se restableció a", es: "— ${model.name} no admite un marco final.` }), es: `La ubicación se restableció a" }), en: "— ${model.name} does not support an end frame.`, en: tx({ de: `Placement was reset to", es: "— ${model.name} no admite un marco final.`, en: `Placement was reset to", es: "— ${model.name} no admite un marco final.`, es: `La ubicación se restableció a", es: "— ${model.name} no admite un marco final.` }), es: `La ubicación se restableció a" })At the beginning" — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a "Al principio": ${model.name} no admite un marco final.` }), en: tx({ de: tx({ de: `Placement was reset to "At the beginning" — ${model.name} does not support an end frame.`, en: `Placement was reset to "At the beginning" — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a "Al principiotx({ de: ": ${model.name} no admite un marco final.` }), en: tx({ de: `Placement was reset to ", en: ": ${model.name} no admite a marco final.` }), en: tx({ de: `Placement was reset to", es: ": ${model.name} no admite a marco final.` }), en: tx({ de: `La ubicación se restableció a" })At the beginning" — ${model.name} does not support an end frame.`, en: `Placement was reset to "At the beginning" — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a "Al principio": ${model.name} no admite un marco final.` }), es: `La ubicación se restableció a "Al principio": ${model.name} no admite un marco final.` }), es: `La ubicación se restableció a "Al principio": ${model.name} no admite un marco final.` }), es: `La ubicación se restableció a "Al principio" — ${model.name} no admite un fotograma final.` })
           : `Placement reset to "At start" — ${model.name} does not support end-frame.`,
       );
     }
@@ -332,7 +332,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       setReferencePlacement('start');
       toast.info(
         language === 'de'
-          ? tx({ de: `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`, en: `Placement was reset to "At the beginning" — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principio" — ${model.name} no admite el modo ancla.` })
+          ? tx({ de: tx({ de: tx({ de: tx({ de: `Placement wurde auf „Am Anfangtx({ de: " zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`, en: `Placement has been reset to "At the beginningtx({ en: " — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principiotx({ es: " — ${model.name} no admite el modo de anclaje.` }), en: `Placement has been reset to "At the beginningtx({ en: " — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principiotx({ es: " — ${model.name} no admite el modo de anclaje.` }), en: tx({ de: tx({ de: `Placement was reset to ", en: "reset — ${model.name} does not support anchor mode.`, en: `Placement was reset to ", en: "reset — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a ", es: "reset — ${model.name} no admite el modo de anclaje.` }), en: tx({ de: `Placement was reset to ", en: "reset — ${model.name} does not support anchor mode.`, en: `Placement was reset to ", en: "reset — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a ", es: "reset — ${model.name} no admite el modo de anclaje.` }), es: `La ubicación se restableció a ", es: "reset — ${model.name} no admite el modo de anclaje.` }), en: tx({ de: tx({ de: `Placement was reset to", es: "reset — ${model.name} no soporta el modo ancla.`, en: `Placement was reset to", es: "reset — ${model.name} no soporta el modo ancla.`, es: `La ubicación se restableció a", es: "reset — ${model.name} no soporta el modo ancla.` }), en: tx({ de: `Placement was reset to", es: "reset — ${model.name} no soporta el modo ancla.`, en: `Placement was reset to", es: "reset — ${model.name} no soporta el modo ancla.`, es: `La ubicación se restableció a", es: "reset — ${model.name} no soporta el modo ancla.` }), es: `La ubicación se restableció a", es: "reset — ${model.name} no soporta el modo ancla.` }), es: `La ubicación se restableció a" })At the beginning" — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principio" — ${model.name} no admite el modo ancla.` }), en: tx({ de: tx({ de: tx({ de: `Placement was reset to "At the beginningtx({ de: tx({ de: tx({ de: tx({ de: " — ${model.name} does not support anchor mode.`, en: `Placement was reset to ", en: "— ${model.name} does not support anchor mode.`, en: `Placement was reset to", es: "— ${model.name} no admite el modo de anclaje.`, es: `La ubicación se restableció a" }), en: "— ${model.name} does not support anchor mode.`, en: `Placement was reset to", es: "— ${model.name} no admite el modo de anclaje.`, es: `La ubicación se restableció a" })At the beginningtx({ de: tx({ de: " — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principiotx({ de: tx({ de: " — ${model.name} no admite el modo de anclaje.` }), en: tx({ de: `Placement was reset to ", en: "— ${model.name} does not support anchor mode.`, en: `Placement was reset to ", en: "— ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a ", es: "— ${model.name} no admite el modo de anclaje.` }), en: tx({ de: `Placement was reset to", es: "— ${model.name} no admite el modo de anclaje.`, en: `Placement was reset to", es: "— ${model.name} no admite el modo de anclaje.`, es: `La ubicación se restableció a", es: "— ${model.name} no admite el modo de anclaje.` }), es: `La ubicación se restableció a" }), en: "— ${model.name} does not support anchor mode.`, en: tx({ de: `Placement was reset to", es: "— ${model.name} no admite el modo de anclaje.`, en: `Placement was reset to", es: "— ${model.name} no admite el modo de anclaje.`, es: `La ubicación se restableció a", es: "— ${model.name} no admite el modo de anclaje.` }), es: `La ubicación se restableció a" })At the beginning" — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principio": ${model.name} no admite el modo ancla.` }), en: tx({ de: tx({ de: `Placement was reset to "At the beginning" — ${model.name} does not support anchor mode.`, en: `Placement was reset to "At the beginning" — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principiotx({ de: ": ${model.name} no admite el modo ancla.` }), en: tx({ de: `Placement was reset to ", en: ": ${model.name} no admite el modo ancla.` }), en: tx({ de: `Placement was reset to", es: ": ${model.name} no admite el modo ancla.` }), en: tx({ de: `La ubicación se restableció a" })At the beginning" — ${model.name} does not support anchor mode.`, en: `Placement was reset to "At the beginning" — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principio": ${model.name} no admite el modo ancla.` }), es: `La ubicación se restableció a "Al principio": ${model.name} no admite el modo ancla.` }), es: `La ubicación se restableció a "Al principio": ${model.name} no admite el modo ancla.` }), es: `La ubicación se restableció a "Al principio" — ${model.name} no admite el modo ancla.` })
           : `Placement reset to "At start" — ${model.name} does not support anchor mode.`,
       );
     }
@@ -369,7 +369,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         .getPublicUrl(path);
       setStartImageUrl(publicUrl);
     } catch (err: any) {
-      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploading(false);
     }
@@ -379,9 +379,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const handleVideoUpload = async (file: File) => {
     if (!user) return;
     if (file.size > 50 * 1024 * 1024) {
-      toast.error(language === 'de'
-        ? 'Datei zu groß (max. 50 MB).'
-        : 'File too large (max 50 MB).');
+      toast.error(tx({ de: 'Datei zu groß (max. 50 MB).', en: 'File too large (max 50 MB).', es: 'Archivo demasiado grande (máx. 50 MB).' }));
       return;
     }
     setUploadingVideo(true);
@@ -397,7 +395,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         .getPublicUrl(path);
       setReferenceVideoUrl(publicUrl);
     } catch (err: any) {
-      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploadingVideo(false);
     }
@@ -412,7 +410,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!canAfford) {
       toast.error(
         language === 'de'
-          ? 'Nicht genügend Credits. Bitte Credits aufladen.'
+          ? tx({ de: 'Nicht genügend Credits. Bitte Credits aufladen.', en: 'Not enough credits. Please top up credits.', es: 'No hay suficientes créditos. Por favor recarga créditos.' })
           : 'Not enough credits. Please top up.',
       );
       return;
@@ -636,7 +634,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       if (referencePlacement === 'end' && !model.capabilities.endFrame) {
         toast.error(
           language === 'de'
-            ? tx({ de: `${model.name} unterstützt keinen Endframe. Bitte Luma Ray 2 wählen.`, en: `${model.name} does not support an end frame. Please select Luma Ray 2.`, es: `${model.name} no admite un fotograma final. Por favor, selecciona Luma Ray 2.` })
+            ? tx({ de: tx({ de: tx({ de: tx({ de: `${model.name} unterstützt keinen Endframe. Bitte Luma Ray 2 wählen.`, en: `${model.name} does not support an end frame. Please select Luma Ray 2.`, es: `${model.name} no admite un fotograma final. Por favor, selecciona Luma Ray 2.` }), en: `${model.name} does not support an end frame. Please select Luma Ray 2.`, es: `${model.name} no admite un fotograma final. Por favor, selecciona Luma Ray 2.` }), en: `${model.name} does not support an end frame. Please select Luma Ray 2.`, es: `${model.name} no admite un fotograma final. Por favor, selecciona Luma Ray 2.` }), en: `${model.name} does not support an end frame. Please select Luma Ray 2.`, es: `${model.name} no admite un fotograma final. Por favor, selecciona Luma Ray 2.` })
             : `${model.name} does not support end-frame. Please switch to Luma Ray 2.`,
         );
         setGenerating(false);
@@ -753,9 +751,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // Sora 2 cannot accept image input → toast hint when a character is selected
       if (model.family === 'sora' && (anchorChars.length > 0 || castLocation || castBuilding)) {
         toast.info(
-          language === 'de'
-            ? 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.'
-            : 'Sora 2 uses only the description (~70 % consistency). For longer stories switch to Kling or Hailuo.',
+          tx({ de: 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.', en: 'Sora 2 uses only the description (~70 % consistency). For longer stories switch to Kling or Hailuo.', es: 'Sora 2 usa solo la descripción (~70 % de consistencia). Para historias más largas, cambia a Kling o Hailuo.' }),
         );
       }
 
@@ -775,13 +771,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
       toast.success(
         language === 'de'
-          ? `Video wird generiert (${model.name}). Kosten: ${symbol}${cost.toFixed(2)}`
+          ? tx({ de: tx({ de: tx({ de: tx({ de: `Video wird generiert (${model.name}). Kosten: ${symbol}${cost.toFixed(2)}`, en: `Video is generated (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`, es: `Se genera el vídeo (${model.name}). Costo: ${symbol}${cost.toFixed(2)}` }), en: `Video is generated (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`, es: `Se genera el vídeo (${model.name}). Costo: ${symbol}${cost.toFixed(2)}` }), en: `Video is generated (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`, es: `Se genera el vídeo (${model.name}). Costo: ${symbol}${cost.toFixed(2)}` }), en: `Video is generated (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`, es: `Se genera el vídeo (${model.name}). Costo: ${symbol}${cost.toFixed(2)}` })
           : `Video generation started (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`,
       );
       refetchWallet();
       onAfterGenerate?.();
     } catch (err: any) {
-      toast.error(err?.message ?? 'Generierung fehlgeschlagen');
+      toast.error(err?.message ?? tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error en la generación' }));
     } finally {
       setGenerating(false);
     }
@@ -796,7 +792,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!canAfford) {
       toast.error(
         language === 'de'
-          ? 'Nicht genügend Credits. Bitte Credits aufladen.'
+          ? tx({ de: 'Nicht genügend Credits. Bitte Credits aufladen.', en: 'Not enough credits. Please top up credits.', es: 'No hay suficientes créditos. Por favor recarga créditos.' })
           : 'Not enough credits. Please top up.',
       );
       return;
@@ -940,7 +936,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             {language === 'de'
-              ? tx({ de: `${model.name} akzeptiert keine Bild-Referenz — die gewählten Charaktere werden nur textlich beschrieben. Für garantierte Charakter-Treue wähle ein Modell mit Bild-Anker (Kling, Veo, Hailuo, HappyHorse …).`, en: `${model.name} does not accept an image reference — the selected characters are only described textually. For guaranteed character fidelity, choose a model with image anchor (Kling, Veo, Hailuo, HappyHorse...).`, es: `${model.name} no acepta una referencia de imagen — los personajes seleccionados solo se describen textualmente. Para una fidelidad garantizada del personaje, elige un modelo con ancla de imagen (Kling, Veo, Hailuo, HappyHorse...).` })
+              ? tx({ de: tx({ de: tx({ de: tx({ de: `${model.name} akzeptiert keine Bild-Referenz — die gewählten Charaktere werden nur textlich beschrieben. Für garantierte Charakter-Treue wähle ein Modell mit Bild-Anker (Kling, Veo, Hailuo, HappyHorse …).`, en: `${model.name} does not accept an image reference — the selected characters are only described textually. For guaranteed character fidelity, choose a model with image anchor (Kling, Veo, Hailuo, HappyHorse...).`, es: `${model.name} no acepta una referencia de imagen — los personajes seleccionados solo se describen textualmente. Para una fidelidad garantizada del personaje, elige un modelo con ancla de imagen (Kling, Veo, Hailuo, HappyHorse...).` }), en: `${model.name} does not accept an image reference — the selected characters are only described textually. For guaranteed character fidelity, choose a model with image anchor (Kling, Veo, Hailuo, HappyHorse...).`, es: `${model.name} no acepta una referencia de imagen — los personajes seleccionados solo se describen textualmente. Para una fidelidad garantizada del personaje, elige un modelo con ancla de imagen (Kling, Veo, Hailuo, HappyHorse...).` }), en: `${model.name} does not accept an image reference — the selected characters are only described textually. For guaranteed character fidelity, choose a model with image anchor (Kling, Veo, Hailuo, HappyHorse...).`, es: `${model.name} no acepta una referencia de imagen — los personajes seleccionados solo se describen textualmente. Para una fidelidad garantizada del personaje, elige un modelo con ancla de imagen (Kling, Veo, Hailuo, HappyHorse...).` }), en: `${model.name} does not accept an image reference — the selected characters are only described textually. For guaranteed character fidelity, choose a model with image anchor (Kling, Veo, Hailuo, HappyHorse...).`, es: `${model.name} no acepta una referencia de imagen — los personajes seleccionados solo se describen textualmente. Para una fidelidad garantizada del personaje, elige un modelo con ancla de imagen (Kling, Veo, Hailuo, HappyHorse...).` })
               : language === 'es'
               ? `${model.name} no acepta imagen de referencia — los personajes se describen sólo por texto. Para fidelidad garantizada usa un modelo con anclaje de imagen (Kling, Veo, Hailuo, HappyHorse …).`
               : `${model.name} does not accept a reference image — the selected characters will only be described in text. For guaranteed character fidelity pick an image-anchor model (Kling, Veo, Hailuo, HappyHorse …).`}
@@ -1027,7 +1023,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           {startImageUrl && (
             <div className="space-y-2 pt-2 border-t border-border/40">
               <Label className="text-xs font-medium text-muted-foreground">
-                {language === 'de' ? 'Wo soll das Bild erscheinen?' : 'Where should the image appear?'}
+                {tx({ de: 'Wo soll das Bild erscheinen?', en: 'Where should the image appear?', es: '¿Dónde debe aparecer la imagen?' })}
               </Label>
               <div className="grid grid-cols-3 gap-1.5">
                 {([
@@ -1042,7 +1038,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     label: language === 'de' ? 'Am Ende' : 'At end',
                     hint: model.capabilities.endFrame
                       ? (language === 'de' ? tx({ de: 'Kamera fährt zum Bild hin', en: 'Camera moves to the image', es: 'La cámara se mueve a la imagen' }) : 'Camera transitions to image')
-                      : (language === 'de' ? 'Nur mit Luma Ray 2 möglich' : 'Only available with Luma Ray 2'),
+                      : tx({ de: 'Nur mit Luma Ray 2 möglich', en: 'Only available with Luma Ray 2', es: 'Solo disponible con Luma Ray 2' }),
                     supportedByCurrent: !!model.capabilities.endFrame,
                   },
                   {
@@ -1116,7 +1112,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <div className="flex items-center gap-2">
               <Film className="h-4 w-4 text-primary" />
               <Label className="text-sm font-medium">
-                {language === 'de' ? 'Referenz-Video (Video-to-Video)' : 'Reference video (Video-to-Video)'}
+                {tx({ de: 'Referenz-Video (Video-to-Video)', en: 'Reference video (Video-to-Video)', es: 'Video de referencia (Video-to-Video)' })}
               </Label>
               <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">V2V</Badge>
             </div>
@@ -1148,9 +1144,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <Film className="h-6 w-6 text-muted-foreground" />
               )}
               <span className="text-xs text-muted-foreground">
-                {language === 'de'
-                  ? 'Video hochladen (mp4/webm, max. 50 MB, ≤ 30s empfohlen)'
-                  : 'Upload a video (mp4/webm, max 50 MB, ≤ 30s recommended)'}
+                {tx({ de: 'Video hochladen (mp4/webm, max. 50 MB, ≤ 30s empfohlen)', en: 'Upload a video (mp4/webm, max 50 MB, ≤ 30s recommended)', es: 'Subir un video (mp4/webm, máx. 50 MB, ≤ 30s recomendado)' })}
               </span>
               <input
                 id="toolkit-video-upload"
@@ -1192,9 +1186,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground p-2 rounded-md bg-background/40 border border-border/40 max-w-xs">
               <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
               <span>
-                {language === 'de'
-                  ? 'V2V derzeit nur für Kling 3 Standard / Pro.'
-                  : 'V2V is currently only available for Kling 3 Standard / Pro.'}
+                {tx({ de: 'V2V derzeit nur für Kling 3 Standard / Pro.', en: 'V2V is currently only available for Kling 3 Standard / Pro.', es: 'V2V actualmente solo disponible para Kling 3 Standard / Pro.' })}
               </span>
             </div>
           </div>
@@ -1290,7 +1282,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {generateAudio && !ttsLangSupported && (
               <p className="text-[11px] leading-snug text-amber-500/90 pt-1 border-t border-border/30">
                 {language === 'de'
-                  ? `${model.name} unterstützt ${effectiveSpokenLang === 'de' ? 'Deutsch' : effectiveSpokenLang === 'es' ? 'Spanisch' : tx({ de: 'diese Sprache', en: 'this language', es: 'este idioma' })} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`
+                  ? tx({ de: tx({ de: tx({ de: `${model.name} unterstützt ${effectiveSpokenLang === 'de' ? 'Deutsch' : effectiveSpokenLang === 'es' ? 'Spanisch' : tx({ de: 'diese Sprache', en: 'this language', es: 'este idioma' })} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`, en: `${model.name} supports ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : tx({ de: 'this language', en: 'this language', es: 'este idioma' })} not reliable. No voiceover is created for this scene — only ambient sound/music. For real voiceover e.g. B. Choose Veo 3.1 or Sora 2, or add them later in Motion Studio.`, es: `¿${model.name} admite ${ EffectiveSpokenLang === 'de'? 'Alemán' : EffectiveSpokenLang === 'es' ? 'Español' : tx({ de: 'este idioma', en: 'este idioma', es: 'este idioma' })} no confiable. No se crea ninguna voz en off para esta escena, solo sonido/música ambiental. Para locuciones reales, p. B. Elija Veo 3.1 o Sora 2, o agréguelos más tarde en Motion Studio.` }), en: `${model.name} supports ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : tx({ de: 'this language', en: 'this language', es: 'este idioma' })} not reliable. No voiceover is created for this scene — only ambient sound/music. For real voiceover e.g. B. Choose Veo 3.1 or Sora 2, or add them later in Motion Studio.`, es: `¿${model.name} admite ${ EffectiveSpokenLang === 'de'? 'Alemán' : EffectiveSpokenLang === 'es' ? 'Español' : tx({ de: 'este idioma', en: 'este idioma', es: 'este idioma' })} no confiable. No se crea ninguna voz en off para esta escena, solo sonido/música ambiental. Para locuciones reales, p. B. Elija Veo 3.1 o Sora 2, o agréguelos más tarde en Motion Studio.` }), en: `${model.name} supports ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : tx({ de: 'this language', en: 'this language', es: 'este idioma' })} not reliable. No voiceover is created for this scene — only ambient sound/music. For real voiceover e.g. B. Choose Veo 3.1 or Sora 2, or add them later in Motion Studio.`, es: `¿${model.name} admite ${ EffectiveSpokenLang === 'de'? 'Alemán' : EffectiveSpokenLang === 'es' ? 'Español' : tx({ de: 'este idioma', en: 'este idioma', es: 'este idioma' })} no confiable. No se crea ninguna voz en off para esta escena, solo sonido/música ambiental. Para locuciones reales, p. B. Elija Veo 3.1 o Sora 2, o agréguelos más tarde en Motion Studio.` })
                   : language === 'es'
                   ? `${model.name} no admite ${effectiveSpokenLang === 'de' ? 'alemán' : effectiveSpokenLang === 'es' ? 'español' : 'este idioma'} de forma fiable. Esta escena se generará sin voz — solo sonido ambiente/música. Para voz real usa p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.`
                   : `${model.name} does not reliably support ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : 'this language'}. This scene will render without voiceover — ambient sound / music only. For real voiceover pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`}
@@ -1414,7 +1406,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                                 const usedElsewhere = omniLines.some((r, i) => i !== idx && r.characterId === ch.id);
                                 return (
                                   <SelectItem key={ch.id} value={ch.id} disabled={usedElsewhere}>
-                                    {ch.name}{usedElsewhere ? (language === 'de' ? ' · bereits zugewiesen' : ' · already assigned') : ''}
+                                    {ch.name}{usedElsewhere ? (language === 'de' ? tx({ de: ' · bereits zugewiesen', en: '· already assigned', es: '· ya asignado' }) : ' · already assigned') : ''}
                                   </SelectItem>
                                 );
                               })}
@@ -1489,7 +1481,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                               return (
                                 <p className="text-[10px] text-muted-foreground italic">
                                   {language === 'de'
-                                    ? tx({ de: `Hinweis: Cast-Stimme hinterlegt — wird in Motion Studio / Voiceover verwendet. Kling Omni nutzt hier eigene Presets.`, en: `Note: Cast voice stored — will be used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`, es: `Nota: Voz del elenco guardada — se usará en Motion Studio / Voiceover. Kling Omni usa sus propios preajustes aquí.` })
+                                    ? tx({ de: tx({ de: tx({ de: tx({ de: `Hinweis: Cast-Stimme hinterlegt — wird in Motion Studio / Voiceover verwendet. Kling Omni nutzt hier eigene Presets.`, en: `Note: Cast voice stored — will be used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`, es: `Nota: Voz del elenco guardada — se usará en Motion Studio / Voiceover. Kling Omni usa sus propios preajustes aquí.` }), en: `Note: Cast voice stored — will be used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`, es: `Nota: Voz del elenco guardada — se usará en Motion Studio / Voiceover. Kling Omni usa sus propios preajustes aquí.` }), en: `Note: Cast voice stored — will be used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`, es: `Nota: Voz del elenco guardada — se usará en Motion Studio / Voiceover. Kling Omni usa sus propios preajustes aquí.` }), en: `Note: Cast voice stored — will be used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`, es: `Nota: Voz del elenco guardada — se usará en Motion Studio / Voiceover. Kling Omni usa sus propios preajustes aquí.` })
                                     : `Note: Cast voice saved — used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`}
                                 </p>
                               );
@@ -1513,9 +1505,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                       )}
                       {!row.lipSync && (
                         <p className="text-[10px] text-muted-foreground italic pl-12">
-                          {language === 'de'
-                            ? 'Stumme:r Statist:in — erscheint im Anchor, spricht nicht.'
-                            : 'Silent extra — appears in the anchor, does not speak.'}
+                          {tx({ de: 'Stumme:r Statist:in — erscheint im Anchor, spricht nicht.', en: 'Silent extra — appears in the anchor, does not speak.', es: 'Extra silencioso — aparece en el ancla, no habla.' })}
                         </p>
                       )}
                     </div>
@@ -1539,7 +1529,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               {omniLines.length > 0 && (
                 <p className="text-[11px] leading-snug text-muted-foreground">
                   {language === 'de'
-                    ? tx({ de: `${omniLines.length} Charakter(e) im Anchor · ${withDialog}/${LIP_SYNC_MAX} mit Dialog · ${silent} stumme(r) Statist(en).`, en: `${omniLines.length} character(s) in Anchor · ${withDialog}/${LIP_SYNC_MAX} with dialog · ${silent} silent extra(s).`, es: `${omniLines.length} personaje(s) en Ancla · ${withDialog}/${LIP_SYNC_MAX} con diálogo · ${silent} extra(s) mudo(s).` })
+                    ? tx({ de: tx({ de: tx({ de: tx({ de: `${omniLines.length} Charakter(e) im Anchor · ${withDialog}/${LIP_SYNC_MAX} mit Dialog · ${silent} stumme(r) Statist(en).`, en: `${omniLines.length} character(s) in Anchor · ${withDialog}/${LIP_SYNC_MAX} with dialog · ${silent} silent extra(s).`, es: `${omniLines.length} personaje(s) en Ancla · ${withDialog}/${LIP_SYNC_MAX} con diálogo · ${silent} extra(s) mudo(s).` }), en: `${omniLines.length} character(s) in Anchor · ${withDialog}/${LIP_SYNC_MAX} with dialog · ${silent} silent extra(s).`, es: `${omniLines.length} personaje(s) en Ancla · ${withDialog}/${LIP_SYNC_MAX} con diálogo · ${silent} extra(s) mudo(s).` }), en: `${omniLines.length} character(s) in Anchor · ${withDialog}/${LIP_SYNC_MAX} with dialog · ${silent} silent extra(s).`, es: `${omniLines.length} personaje(s) en Ancla · ${withDialog}/${LIP_SYNC_MAX} con diálogo · ${silent} extra(s) mudo(s).` }), en: `${omniLines.length} character(s) in Anchor · ${withDialog}/${LIP_SYNC_MAX} with dialog · ${silent} silent extra(s).`, es: `${omniLines.length} personaje(s) en Ancla · ${withDialog}/${LIP_SYNC_MAX} con diálogo · ${silent} extra(s) mudo(s).` })
                     : `${omniLines.length} character(s) in anchor · ${withDialog}/${LIP_SYNC_MAX} with dialogue · ${silent} silent extra(s).`}
                 </p>
               )}
@@ -1568,11 +1558,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {composingScene ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Szene komponieren…' : 'Composing scene…'}</>
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Szene komponieren…', en: 'Composing scene…', es: 'Componiendo escena…' })}</>
           ) : generating ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Generiere…' : 'Generating…'}</>
           ) : (
-            <><Sparkles className="h-4 w-4 mr-2" /> {language === 'de' ? 'Video generieren' : 'Generate video'}</>
+            <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: 'Video generieren', en: 'Generate video', es: 'Generar video' })}</>
           )}
         </Button>
       </div>
@@ -1611,22 +1601,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {pendingPlacement?.placement === 'end'
-                ? (language === 'de' ? 'Endframe nur mit Luma Ray 2' : 'End-frame only with Luma Ray 2')
+                ? tx({ de: 'Endframe nur mit Luma Ray 2', en: 'End-frame only with Luma Ray 2', es: 'Fotograma final solo con Luma Ray 2' })
                 : (language === 'de' ? tx({ de: 'Anker-Modus benötigt Vidu Q2 oder Kling 3', en: 'Anchor mode requires Vidu Q2 or Kling 3', es: 'El modo Ancla requiere Vidu Q2 o Kling 3' }) : 'Anchor mode needs Vidu Q2 or Kling 3')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingPlacement?.placement === 'end'
                 ? (language === 'de'
-                    ? tx({ de: `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Ende" aktiv ist, sind andere Modelle im Picker ausgegraut.`, en: `The end frame function is only available with Luma Ray 2. Do you want to switch to ${pendingPlacement?.targetModelName} now? As long as "At the end" is active, other models in the picker are grayed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Quieres cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras "Al final" esté activo, otros modelos en el selector estarán deshabilitados.` })
+                    ? tx({ de: tx({ de: tx({ de: tx({ de: `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Endetx({ de: " aktiv ist, sind andere Modelle im Picker ausgegraut.`, en: `The end frame feature is only available with Luma Ray 2. Would you like to switch to ${pendingPlacement?.targetModelName} now? As long as "Am Endetx({ de: " is active, other models in the picker are grayed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Le gustaría cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras "Am Endetx({ de: " esté activo, los demás modelos en el selector aparecerán atenuados.` }), en: `The end frame feature is only available with Luma Ray 2. Would you like to switch to ${pendingPlacement?.targetModelName} now? As long as "Am Endetx({ de: " is active, other models in the picker are grayed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Le gustaría cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras "Am Endetx({ de: " esté activo, los demás modelos en el selector aparecerán atenuados.` }), en: `The end frame function is only available with Luma Ray 2. Do you want to switch to ${pendingPlacement?.targetModelName} now? As long as ", en: "is active, other models in the picker are grayed out.`, en: `The end frame function is only available with Luma Ray 2. Do you want to switch to ${pendingPlacement?.targetModelName} now? As long as", es: "está activo, otros modelos en el selector aparecen atenuados.`, es: `La función de final de fotograma solo está disponible con Luma Ray 2. ¿Quieres cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras" })At the end" is active, other models in the picker are grayed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Quieres cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras "Al final" esté activo, otros modelos en el selector estarán deshabilitados.` }), en: `The end frame function is only available with Luma Ray 2. Do you want to switch to ${pendingPlacement?.targetModelName} now? As long as "At the end" is active, other models in the picker are grayed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Quieres cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras "Al final" esté activo, otros modelos en el selector estarán deshabilitados.` })
                     : `The end-frame option is exclusive to Luma Ray 2. Switch to ${pendingPlacement?.targetModelName} now? While "At end" is active, other models will be greyed out.`)
                 : (language === 'de'
-                    ? tx({ de: `Der Anker-Modus (Referenzbild ohne festen Frame) ist nur mit Vidu Q2 oder Kling 3 verfügbar. Zu ${pendingPlacement?.targetModelName} wechseln?`, en: `Anchor mode (reference image without fixed frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`, es: `El modo ancla (imagen de referencia sin fotograma fijo) solo está disponible con Vidu Q2 o Kling 3. ¿Cambiar a ${pendingPlacement?.targetModelName}?` })
+                    ? tx({ de: tx({ de: tx({ de: tx({ de: `Der Anker-Modus (Referenzbild ohne festen Frame) ist nur mit Vidu Q2 oder Kling 3 verfügbar. Zu ${pendingPlacement?.targetModelName} wechseln?`, en: `Anchor mode (reference image without fixed frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`, es: `El modo ancla (imagen de referencia sin fotograma fijo) solo está disponible con Vidu Q2 o Kling 3. ¿Cambiar a ${pendingPlacement?.targetModelName}?` }), en: `Anchor mode (reference image without fixed frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`, es: `El modo ancla (imagen de referencia sin fotograma fijo) solo está disponible con Vidu Q2 o Kling 3. ¿Cambiar a ${pendingPlacement?.targetModelName}?` }), en: `Anchor mode (reference image without fixed frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`, es: `El modo ancla (imagen de referencia sin fotograma fijo) solo está disponible con Vidu Q2 o Kling 3. ¿Cambiar a ${pendingPlacement?.targetModelName}?` }), en: `Anchor mode (reference image without fixed frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`, es: `El modo ancla (imagen de referencia sin fotograma fijo) solo está disponible con Vidu Q2 o Kling 3. ¿Cambiar a ${pendingPlacement?.targetModelName}?` })
                     : `Anchor mode (reference image without a forced frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {language === 'de' ? 'Abbrechen' : 'Cancel'}
+              {language === 'de' ? tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' }) : 'Cancel'}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
@@ -1648,7 +1638,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       <AIVideoCostConfirmDialog
         open={costDialogOpen}
         payload={{
-          title: language === 'de' ? 'Video generieren?' : 'Generate video?',
+          title: tx({ de: 'Video generieren?', en: 'Generate video?', es: '¿Generar video?' }),
           description:
             language === 'de'
               ? tx({ de: 'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein AI-Guthaben wird belastet.', en: 'Overview of your costs — once you confirm, generation will start and your AI credit will be charged.', es: 'Resumen de tus costes: una vez que confirmes, la generación comenzará y se cargará tu crédito de IA.' })
@@ -1680,7 +1670,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       {/* Discreet hint about alternative models */}
       <p className="text-center text-[11px] text-muted-foreground">
         {tx({
-          de: tx({ de: `${AI_VIDEO_TOOLKIT_MODELS.length} Modelle verfügbar — wechsle oben das Modell, dein Prompt bleibt erhalten.`, en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch model above, your prompt will be kept.`, es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se mantendrá.` }),
+          de: tx({ de: tx({ de: tx({ de: tx({ de: `${AI_VIDEO_TOOLKIT_MODELS.length} Modelle verfügbar — wechsle oben das Modell, dein Prompt bleibt erhalten.`, en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch model above, your prompt will be kept.`, es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se mantendrá.` }), en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch model above, your prompt will be kept.`, es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se mantendrá.` }), en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch model above, your prompt will be kept.`, es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se mantendrá.` }), en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch model above, your prompt will be kept.`, es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se mantendrá.` }),
           en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch the model above, your prompt is preserved.`,
           es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se conserva.`,
         })}

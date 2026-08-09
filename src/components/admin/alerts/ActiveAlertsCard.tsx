@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,7 @@ export function ActiveAlertsCard() {
       .update({ resolved_at: new Date().toISOString() })
       .eq('id', id);
     if (error) {
-      toast.error('Resolve fehlgeschlagen');
+      toast.error(tx({ de: 'Resolve fehlgeschlagen', en: 'Resolve failed', es: 'Resolución fallida' }));
     } else {
       toast.success('Alert resolved');
       load();

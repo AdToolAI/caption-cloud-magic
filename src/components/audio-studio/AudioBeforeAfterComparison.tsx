@@ -125,12 +125,12 @@ export function AudioBeforeAfterComparison({
 
       if (dbError) throw dbError;
 
-      toast.success('In Bibliothek gespeichert!');
+      toast.success(tx({ de: "In Bibliothek gespeichert!", en: "Saved to library!", es: "¡Guardado en la biblioteca!" }));
       setShowSaveDialog(false);
       onSaved?.();
     } catch (error) {
       console.error('Save error:', error);
-      toast.error('Speichern fehlgeschlagen');
+      toast.error(tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Error al guardar" }));
     } finally {
       setIsSaving(false);
     }
@@ -600,7 +600,7 @@ export function AudioBeforeAfterComparison({
             <div className="flex flex-col items-center gap-2">
               <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
               <span className="text-sm text-muted-foreground">
-                {isReprocessing ? 'Audio wird neu verarbeitet...' : 'Waveforms werden geladen...'}
+                {isReprocessing ? tx({ de: "Audio wird neu verarbeitet...", en: "Audio is reprocessed...", es: "El audio se reprocesa..." }) : tx({ de: "Waveforms werden geladen...", en: "Loading waveforms...", es: "Cargando formas de onda..." })}
               </span>
             </div>
           </motion.div>

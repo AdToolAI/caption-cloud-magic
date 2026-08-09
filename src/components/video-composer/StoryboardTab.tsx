@@ -377,7 +377,7 @@ export default function StoryboardTab({
     if (changed === 0) return;
     onUpdateScenes(next);
     import('sonner').then(({ toast }) => {
-      toast.success(`Engine auf ${changed} Szene${changed === 1 ? '' : 'n'} übertragen`);
+      toast.success(tx({ de: `Engine auf ${changed} Szene${changed === 1 ? '' : 'n'} übertragen`, en: `Engine on ${changed} Scene${changed === 1 ? '' : 'n'} transferred`, es: `Motor en ${changed} Escena${changed === 1 ? '' : 'n'} transferido` }));
     });
   };
 
@@ -463,9 +463,9 @@ export default function StoryboardTab({
     confirmRender: (s) =>
       confirmRender({
         scenes: [s],
-        title: `Szene ${(s.orderIndex ?? 0) + 1} rendern?`,
+        title: tx({ de: `Szene ${(s.orderIndex ?? 0) + 1} rendern?`, en: `Render scene ${(s.orderIndex ?? 0) + 1}?`, es: `¿Renderizar escena ${(s.orderIndex ?? 0) + 1}?` }),
         description:
-          'Sobald du bestätigst, startet die Render-Pipeline (Video-Provider, ggf. Voiceover & Lip-Sync). Credits werden verbraucht.',
+          tx({ de: 'Sobald du bestätigst, startet die Render-Pipeline (Video-Provider, ggf. Voiceover & Lip-Sync). Credits werden verbraucht.', en: 'As soon as you confirm, the render pipeline starts (video provider, if necessary voiceover & lip sync). Credits are consumed.', es: 'Tan pronto como confirmes, se iniciará el proceso de renderizado (proveedor de video, si es necesario voz en off y sincronización de labios). Los créditos se consumen.' }),
       }),
   });
 
@@ -611,7 +611,7 @@ export default function StoryboardTab({
             onClick={generateAll}
             disabled={isGeneratingAll || scenes.length === 0 || pendingScenes.length === 0}
             className="gap-1 text-xs"
-            title="Alle ausstehenden KI-Clips parallel generieren"
+            title={tx({ de: "Alle ausstehenden KI-Clips parallel generieren", en: "Generate all outstanding AI clips in parallel", es: "Genere todos los clips de IA destacados en paralelo" })}
           >
             {isGeneratingAll ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -619,8 +619,8 @@ export default function StoryboardTab({
               <Play className="h-3.5 w-3.5" />
             )}
             {pendingScenes.length === 0
-              ? 'Alle Clips bereit'
-              : `Alle generieren (${pendingScenes.length} · €${remainingCost.toFixed(2)})`}
+              ? tx({ de: 'Alle Clips bereit', en: 'All clips ready', es: 'Todos los clips listos' })
+              : tx({ de: `Alle generieren (${pendingScenes.length} · €${remainingCost.toFixed(2)})`, en: `Generate all (${pendingScenes.length} · €${remainingCost.toFixed(2)})`, es: `Generar todo (${pendingScenes.length} · €${remainingCost.toFixed(2)})` })}
           </Button>
         </div>
       </div>

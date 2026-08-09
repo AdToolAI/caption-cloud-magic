@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { CreditBalance } from "@/components/credits/CreditBalance";
 import { CreditHistory } from "@/components/credits/CreditHistory";
@@ -35,7 +36,7 @@ const Credits = () => {
       price: `${symbol}${getCurrencyForLanguage(language) === 'USD' ? '14.99' : '14,99'}`,
       icon: Zap,
       popular: false,
-      description: language === 'de' ? 'Perfekt für gelegentliche Nutzung' : language === 'es' ? 'Perfecto para uso ocasional' : 'Perfect for occasional use'
+      description: language === 'de' ? tx({ de: 'Perfekt für gelegentliche Nutzung', en: 'Perfect for occasional use', es: 'Perfecto para uso ocasional' }) : language === 'es' ? 'Perfecto para uso ocasional' : 'Perfect for occasional use'
     },
     { 
       credits: 2500, 
@@ -43,7 +44,7 @@ const Credits = () => {
       price: `${symbol}${getCurrencyForLanguage(language) === 'USD' ? '29.95' : '29,95'}`,
       icon: Sparkles,
       popular: true,
-      description: language === 'de' ? 'Beliebteste Wahl für Profis' : language === 'es' ? 'La opción más popular para profesionales' : 'Most popular choice for pros'
+      description: language === 'de' ? tx({ de: 'Beliebteste Wahl für Profis', en: 'Most popular choice for professionals', es: 'La opción más popular para los profesionales.' }) : language === 'es' ? 'La opción más popular para profesionales' : 'Most popular choice for pros'
     },
     { 
       credits: 5000, 
@@ -51,7 +52,7 @@ const Credits = () => {
       price: `${symbol}${getCurrencyForLanguage(language) === 'USD' ? '44.95' : '44,95'}`,
       icon: Crown,
       popular: false,
-      description: language === 'de' ? 'Maximale Power für Teams' : language === 'es' ? 'Máximo poder para equipos' : 'Maximum power for teams'
+      description: language === 'de' ? tx({ de: 'Maximale Power für Teams', en: 'Maximum power for teams', es: 'Máxima potencia para equipos' }) : language === 'es' ? 'Máximo poder para equipos' : 'Maximum power for teams'
     },
   ];
 

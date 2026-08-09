@@ -47,7 +47,7 @@ export const ThumbnailManager = ({
     } catch (error) {
       console.error('Error regenerating thumbnail:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Thumbnail konnte nicht generiert werden', en: 'Thumbnail could not be generated', es: 'No se pudo generar la miniatura' }),
         variant: 'destructive',
       });
@@ -92,7 +92,7 @@ export const ThumbnailManager = ({
     } catch (error) {
       console.error('Error uploading thumbnail:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Thumbnail konnte nicht hochgeladen werden', en: 'Thumbnail could not be uploaded', es: 'No se pudo subir la miniatura' }),
         variant: 'destructive',
       });
@@ -127,7 +127,7 @@ export const ThumbnailManager = ({
 
         {/* Regenerate Thumbnail */}
         <div className="space-y-2">
-          <Label htmlFor="timestamp">Zeitstempel (Sekunden)</Label>
+          <Label htmlFor="timestamp">{tx({ de: "Zeitstempel (Sekunden)", en: "Timestamp (seconds)", es: "Marca de tiempo (segundos)" })}</Label>
           <div className="flex gap-2">
             <Input
               id="timestamp"
@@ -157,7 +157,7 @@ export const ThumbnailManager = ({
 
         {/* Upload Custom Thumbnail */}
         <div className="space-y-2">
-          <Label htmlFor="thumbnail-upload">Eigenes Thumbnail hochladen</Label>
+          <Label htmlFor="thumbnail-upload">{tx({ de: "Eigenes Thumbnail hochladen", en: "Upload your own thumbnail", es: "Sube tu propia miniatura" })}</Label>
           <div className="flex gap-2">
             <Input
               id="thumbnail-upload"

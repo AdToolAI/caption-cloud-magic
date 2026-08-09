@@ -46,7 +46,7 @@ export function useCalendarVideos() {
     } catch (error: any) {
       console.error('Link video error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: error.message,
         variant: 'destructive',
       });
@@ -71,15 +71,15 @@ export function useCalendarVideos() {
       if (error) throw error;
 
       toast({
-        title: '🎬 Rendering gestartet',
-        description: 'Video wird gerendert',
+        title: tx({ de: '🎬 Rendering gestartet', en: '🎬 Rendering started', es: '🎬 Se inició el renderizado' }),
+        description: tx({ de: "Video wird gerendert", en: "Video is rendering", es: "El vídeo se está renderizando." }),
       });
 
       return true;
     } catch (error: any) {
       console.error('Queue render error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: error.message,
         variant: 'destructive',
       });

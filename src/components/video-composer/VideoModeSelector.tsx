@@ -24,7 +24,7 @@ const MODES: Array<{
     badge: { label: { de: 'Premium', en: 'Premium', es: 'Premium' }, tone: 'gold' },
     title: {
       de: 'KI Video-Clips',
-      en: 'AI Video Clips',
+      en: tx({ de: "AI Video Clips", en: "AI video clips", es: "videoclips de IA" }),
       es: 'Clips de Video IA',
     },
     desc: {
@@ -83,7 +83,7 @@ const MODES: Array<{
 export default function VideoModeSelector({ value, language, onChange }: VideoModeSelectorProps) {
   const lang = (language === 'de' || language === 'es' ? language : 'en') as 'de' | 'en' | 'es';
   const headerTitle =
-    lang === 'de' ? 'Video-Modus' : lang === 'es' ? 'Modo de Video' : 'Video Mode';
+    lang === 'de' ? tx({ de: "Video-Modus", en: "Video mode", es: "Modo vídeo" }) : lang === 'es' ? tx({ de: "Modo de Video", en: "Modo de video", es: "Modo de vídeo" }) : tx({ de: "Video Mode", en: "Video fashion", es: "Vídeo moda" });
   const headerDesc =
     lang === 'de'
       ? tx({ de: 'Wähle, wie deine Szenen erstellt werden — Video, animierte Bilder oder eine Mischung.', en: 'Choose how your scenes are created — video, animated images, or a mix.', es: 'Elige cómo se crean tus escenas — vídeo, imágenes animadas o una mezcla.' })

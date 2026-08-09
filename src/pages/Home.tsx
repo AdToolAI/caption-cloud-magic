@@ -39,6 +39,7 @@ import { useStrategyMode, type StrategyPost } from "@/hooks/useStrategyMode";
 import { Switch } from "@/components/ui/switch";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { tx } from '@/lib/i18nText';
 
 interface Post {
   id: string;
@@ -524,7 +525,7 @@ const Home = () => {
       <SEO
         title={language === "de" ? "KI Social Media Manager" : language === "es" ? "Gestor de Redes Sociales con IA" : "AI Social Media Manager"}
         description={language === "de" 
-          ? "Erstelle & analysiere Social Media Content mit KI. Über 10.000 Creator vertrauen AdTool AI."
+          ? tx({ de: "Erstelle & analysiere Social Media Content mit KI. Über 10.000 Creator vertrauen AdTool AI.", en: "Create & analyze social media content with AI. Over 10,000 creators trust AdTool AI.", es: "Cree y analice contenido de redes sociales con IA. Más de 10.000 creadores confían en AdTool AI." })
           : language === "es"
           ? "Crea y analiza contenido de redes sociales con IA. Más de 10,000 creadores confían en AdTool AI."
           : "Create & analyze social media content with AI. Over 10,000 creators trust AdTool AI."}

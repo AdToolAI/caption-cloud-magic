@@ -44,7 +44,7 @@ export const useVideoCreation = () => {
       }
 
       toast({
-        title: 'Video-Rendering gestartet',
+        title: tx({ de: 'Video-Rendering gestartet', en: 'Video rendering started', es: 'Se inició la renderización de vídeo.' }),
         description: tx({ de: 'Dein Video wird erstellt. Das dauert ca. 30-60 Sekunden.', en: 'Your video is being created. This takes approx. 30-60 seconds.', es: 'Tu video se está creando. Esto toma aproximadamente 30-60 segundos.' })
       });
 
@@ -55,7 +55,7 @@ export const useVideoCreation = () => {
     } catch (error) {
       console.error('Video creation error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Video konnte nicht erstellt werden', en: 'Video could not be created', es: 'No se pudo crear el video' }),
         variant: 'destructive'
       });
@@ -121,7 +121,7 @@ export const useVideoCreation = () => {
       if (result.status === 'failed') {
         setPolling(false);
         toast({
-          title: 'Video-Rendering fehlgeschlagen',
+          title: tx({ de: 'Video-Rendering fehlgeschlagen', en: 'Video rendering failed', es: 'Error al renderizar el vídeo' }),
           description: result.error_message || tx({ de: 'Ein Fehler ist aufgetreten', en: 'An error occurred', es: 'Ha ocurrido un error' }),
           variant: 'destructive'
         });

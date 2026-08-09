@@ -138,10 +138,10 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
           <DialogTitle className="font-serif text-2xl flex items-center gap-2">
             {step === 1 && <><Sparkles className="h-5 w-5 text-primary" /> Brand Brief</>}
             {step === 2 && <><ShieldCheck className="h-5 w-5 text-emerald-400" /> Acceptable Use Policy</>}
-            {step === 3 && <><Lock className="h-5 w-5 text-destructive" /> Aktivierung bestätigen</>}
+            {step === 3 && <><Lock className="h-5 w-5 text-destructive" /> {tx({ de: 'Aktivierung bestätigen', en: 'Confirm activation', es: 'Confirmar activación' })}</>}
           </DialogTitle>
           <DialogDescription>
-            Schritt {step} von 3 — {step === 1 ? 'Definiere deine Strategie' : step === 2 ? 'Lies und akzeptiere die Regeln' : 'Letzte Sicherheits-Bestätigung'}
+            {tx({ de: 'Schritt', en: 'Step', es: 'Paso' })} {step} {tx({ de: 'von', en: 'of', es: 'de' })} 3 — {step === 1 ? tx({ de: 'Definiere deine Strategie', en: 'Define your strategy', es: 'Define tu estrategia' }) : step === 2 ? tx({ de: 'Lies und akzeptiere die Regeln', en: 'Read and accept the rules', es: 'Lee y acepta las reglas' }) : tx({ de: 'Letzte Sicherheits-Bestätigung', en: 'Final safety confirmation', es: 'Confirmación de seguridad final' })}
           </DialogDescription>
         </DialogHeader>
 

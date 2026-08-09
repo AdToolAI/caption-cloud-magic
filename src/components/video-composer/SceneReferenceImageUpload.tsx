@@ -84,10 +84,10 @@ export default function SceneReferenceImageUpload({
 
         setProgress(100);
         onChange(pub.publicUrl);
-        toast.success('Referenzbild hinzugefügt — die KI orientiert sich daran.');
+        toast.success(tr({ de: 'Referenzbild hinzugefügt — die KI orientiert sich daran.', en: 'Reference image added — the AI will use it as a guide.', es: 'Imagen de referencia añadida — la IA la usará como guía.' }));
       } catch (err) {
         console.error('[SceneReferenceImageUpload] Upload error:', err);
-        toast.error(err instanceof Error ? err.message : 'Upload fehlgeschlagen');
+        toast.error(err instanceof Error ? err.message : tr({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
       } finally {
         setTimeout(() => {
           setUploading(false);

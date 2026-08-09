@@ -82,7 +82,7 @@ export default function AIDirectorBriefDialog({
         }
       );
       if (error) throw error;
-      if (!data?.plan) throw new Error('Kein Plan zurückgegeben');
+      if (!data?.plan) throw new Error(tx({ de: 'Kein Plan zurückgegeben', en: 'No plan returned', es: 'No se devolvió ningún plan' }));
       setPlan(data.plan as DirectorPlan);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Director-Fehler';
@@ -99,7 +99,7 @@ export default function AIDirectorBriefDialog({
     onOpenChange(false);
     setBrief('');
     setPlan(null);
-    toast.success(`Storyboard "${plan.title}" geladen — ${plan.scenes.length} Szenen ✨`);
+    toast.success(tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `Storyboard "${plan.title}" geladen — ${plan.scenes.length} Szenen ✨`, en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }));
   };
 
   return (
@@ -124,7 +124,7 @@ export default function AIDirectorBriefDialog({
                 id="brief"
                 value={brief}
                 onChange={(e) => setBrief(e.target.value)}
-                placeholder="z.B. Espresso-Brand-Spot: Ein Barista in einer minimalen Berliner Bar zaubert morgens die perfekte Tasse — Fokus auf Handwerk, warmes Licht, Slow Motion am Ende."
+                placeholder={tx({ de: "z.B. Espresso-Brand-Spot: Ein Barista in einer minimalen Berliner Bar zaubert morgens die perfekte Tasse — Fokus auf Handwerk, warmes Licht, Slow Motion am Ende.", en: "e.g. espresso brand spot: A barista in a minimal Berlin bar conjures up the perfect cup in the morning - focus on craftsmanship, warm light, slow motion at the end.", es: "p.ej. Spot de la marca espresso: un barista en un bar minimalista de Berlín evoca la taza perfecta por la mañana: atención al trabajo artesanal, luz cálida y cámara lenta al final." })}
                 rows={5}
                 className="resize-none"
               />

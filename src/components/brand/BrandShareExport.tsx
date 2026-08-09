@@ -32,7 +32,7 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
       onTokenChange?.(data.token);
       toast({ title: "Share-Link erstellt", description: "Gültig 30 Tage." });
     } catch (e: any) {
-      toast({ title: "Fehler", description: e.message, variant: "destructive" });
+      toast({ title: tx({ de: "Fehler", en: "Mistake", es: "Error" }), description: e.message, variant: "destructive" });
     } finally {
       setSharing(false);
     }
@@ -62,7 +62,7 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
       window.open(data.url, "_blank");
       toast({ title: "PDF erstellt" });
     } catch (e: any) {
-      toast({ title: "Export fehlgeschlagen", description: e.message, variant: "destructive" });
+      toast({ title: tx({ de: "Export fehlgeschlagen", en: "Export failed", es: "Error de exportación" }), description: e.message, variant: "destructive" });
     } finally {
       setExporting(false);
     }

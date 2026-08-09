@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +26,7 @@ const STATUS_META: Record<AutopilotSlot['status'], { label: string; className: s
   scheduled:  { label: 'Geplant',     className: 'bg-primary/20 text-primary border-primary/40',                  icon: CalendarIcon },
   posted:     { label: 'Live',        className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/40',      icon: CheckCircle2 },
   blocked:    { label: 'Blockiert',   className: 'bg-destructive/15 text-destructive border-destructive/40',      icon: Ban },
-  failed:     { label: 'Fehler',      className: 'bg-destructive/10 text-destructive border-destructive/30',      icon: AlertTriangle },
+  failed:     { label: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),      className: 'bg-destructive/10 text-destructive border-destructive/30',      icon: AlertTriangle },
   skipped:    { label: 'Übersprungen',className: 'bg-muted/60 text-muted-foreground border-border line-through',  icon: SkipForward },
 };
 
@@ -76,7 +77,7 @@ export function AutopilotCalendarGrid({ queue, hasBrief, onSelectSlot }: Props) 
         <SummaryPill label="Slots gesamt" value={total} />
         <SummaryPill label="Live" value={posted} tone="success" />
         <SummaryPill label="Review nötig" value={review} tone="warn" highlight={review > 0} />
-        <SummaryPill label="Blockiert / Fehler" value={blocked} tone="danger" highlight={blocked > 0} />
+        <SummaryPill label={tx({ de: "Blockiert / Fehler", en: "Blocked / Error", es: "Bloqueado/Error" })} value={blocked} tone="danger" highlight={blocked > 0} />
       </div>
 
       {/* Two-week grid: 7 cols × 2 rows */}

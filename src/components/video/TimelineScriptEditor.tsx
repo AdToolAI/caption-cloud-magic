@@ -202,14 +202,14 @@ export const TimelineScriptEditor = ({
       onSegmentsChange(syncedSegments);
       
       toast({
-        title: "✓ Auto-Sync erfolgreich",
+        title: tx({ de: "✓ Auto-Sync erfolgreich", en: "✓ Auto-sync successful", es: "✓ Sincronización automática exitosa" }),
         description: tx({ de: `${syncedSegments.length} Segmente mit präzisem Timing und Untertiteln synchronisiert`, en: `${syncedSegments.length} segments synchronized with precise timing and subtitles`, es: `${syncedSegments.length} segmentos sincronizados con timing preciso y subtítulos` })
       });
     } catch (error) {
       console.error('Auto-Sync error:', error);
       toast({
-        title: "Auto-Sync fehlgeschlagen",
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        title: tx({ de: "Auto-Sync fehlgeschlagen", en: "Auto-sync failed", es: "Sincronización automática fallida" }),
+        description: error instanceof Error ? error.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: "destructive"
       });
     } finally {
@@ -276,8 +276,8 @@ export const TimelineScriptEditor = ({
     } catch (error) {
       console.error('Auto-Split error:', error);
       toast({
-        title: "Auto-Split fehlgeschlagen",
-        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        title: tx({ de: "Auto-Split fehlgeschlagen", en: "Auto-split failed", es: "División automática fallida" }),
+        description: error instanceof Error ? error.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: "destructive"
       });
     } finally {
@@ -438,7 +438,7 @@ export const TimelineScriptEditor = ({
                   
                   {segments.length === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                      Klicke "Segment hinzufügen" um zu starten
+                      {tx({ de: 'Klicke "Segment hinzufügen" um zu starten', en: 'Click "Add segment" to start', es: 'Haz clic en "Agregar segmento" para comenzar' })}
                     </div>
                   )}
                 </div>
@@ -528,7 +528,7 @@ export const TimelineScriptEditor = ({
                       onValueChange={(value) => updateSegment(selectedSegment.id, { imageIndex: parseInt(value) })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Kein Bild ausgewählt" />
+                        <SelectValue placeholder={tx({ de: "Kein Bild ausgewählt", en: "No image selected", es: "Ninguna imagen seleccionada" })} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="-1">Kein Bild</SelectItem>

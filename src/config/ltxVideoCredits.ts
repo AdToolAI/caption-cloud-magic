@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
 // Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
@@ -15,7 +16,7 @@ export const LTX_VIDEO_MODELS = {
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Schnelle, günstige Generierung ab 0,24€ pro 4 Sekunden',
+      EUR: tx({ de: 'Schnelle, günstige Generierung ab 0,24€ pro 4 Sekunden', en: 'Fast, cheap generation from €0.24 per 4 seconds', es: 'Generación rápida y económica desde 0,24€ cada 4 segundos' }),
       USD: 'Fast and affordable from $0.24 per 4 seconds',
     },
     badge: 'Schnell & Günstig',
@@ -32,7 +33,7 @@ export const LTX_VIDEO_MODELS = {
     maxDuration: 8,
     allowedDurations: [4, 6, 8] as const,
     description: {
-      EUR: 'Premium 1080p-Qualität ab 0,48€ pro 4 Sekunden',
+      EUR: tx({ de: 'Premium 1080p-Qualität ab 0,48€ pro 4 Sekunden', en: 'Premium 1080p quality from €0.48 per 4 seconds', es: 'Calidad premium 1080p desde 0,48€ por 4 segundos' }),
       USD: 'Premium 1080p quality from $0.48 per 4 seconds',
     },
     badge: 'Premium',

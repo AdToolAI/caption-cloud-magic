@@ -13,7 +13,7 @@ import { formatPrice } from "@/lib/currency";
 const copy = {
   de: {
     badge: "Express-Start",
-    title: "Erstelle dein erstes KI-Video in 90 Sekunden",
+    title: tx({ de: "Erstelle dein erstes KI-Video in 90 Sekunden", en: "Create your first AI video in 90 seconds", es: "Crea tu primer vídeo con IA en 90 segundos" }),
     body: tx({ de: "Wähle eine personalisierte Idee — Hailuo 2.3 generiert dein erstes Video in unter einer Minute. Du kannst den Prompt vor dem Start beliebig anpassen.", en: "Choose a personalized idea — Hailuo 2.3 generates your first video in under a minute. You can customize the prompt as you like before starting.", es: "Elige una idea personalizada — Hailuo 2.3 genera tu primer video en menos de un minuto. Puedes personalizar el prompt a tu gusto antes de empezar." }),
     cta: "Mit Hailuo 2.3 starten",
     chipsTitle: "Personalisierte Ideen",

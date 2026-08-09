@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { CoPilotMessage, CoPilotSuggestion } from '@/hooks/useAICoPilot';
 import { AICoPilotSuggestionsList } from './AICoPilotSuggestion';
+import { tx } from '@/lib/i18nText';
 
 interface AICoPilotProps {
   isOpen: boolean;
@@ -24,10 +25,10 @@ interface AICoPilotProps {
 }
 
 const quickCommands = [
-  { label: 'Szenen analysieren', command: 'Analysiere Szenen' },
-  { label: 'Übergänge generieren', command: 'Generiere Übergänge' },
-  { label: 'Auto-Cut', command: 'Aktiviere Auto-Cut' },
-  { label: 'Style Transfer', command: 'Öffne Style Transfer' },
+  { label: tx({ de: 'Szenen analysieren', en: 'Analyze scenes', es: 'Analizar escenas' }), command: tx({ de: 'Analysiere Szenen', en: 'Analyze scenes', es: 'Analizar escenas' }) },
+  { label: tx({ de: 'Übergänge generieren', en: 'Generate transitions', es: 'Generar transiciones' }), command: 'Generiere Übergänge' },
+  { label: tx({ de: 'Auto-Cut', en: 'Auto-Cut', es: 'Auto-Cut' }), command: 'Aktiviere Auto-Cut' },
+  { label: tx({ de: 'Style Transfer', en: 'Style Transfer', es: 'Style Transfer' }), command: 'Öffne Style Transfer' },
 ];
 
 export function AICoPilot({
@@ -243,7 +244,7 @@ export function AICoPilot({
                         ref={inputRef}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Schreibe einen Befehl..."
+                        placeholder={tx({ de: 'Schreibe einen Befehl...', en: 'Type a command...', es: 'Escribe un comando...' })}
                         className="flex-1 bg-muted/50"
                         disabled={isProcessing}
                       />

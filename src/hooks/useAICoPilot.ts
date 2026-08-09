@@ -171,9 +171,9 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
       newSuggestions.push({
         id: 'analyze-scenes',
         type: 'tip',
-        title: 'Szenen analysieren',
-        description: 'Starte die KI-Analyse für automatische Szenenerkennung.',
-        action: { label: 'Analyse starten', command: 'analyze_scenes' },
+        title: tx({ de: 'Szenen analysieren', en: 'Analyze scenes', es: 'Analizar escenas' }),
+        description: tx({ de: 'Starte die KI-Analyse für automatische Szenenerkennung.', en: 'Start the AI analysis for automatic scene detection.', es: 'Inicia el análisis de IA para la detección automática de escenas.' }),
+        action: { label: tx({ de: 'Analyse starten', en: 'Start analysis', es: 'Iniciar análisis' }), command: 'analyze_scenes' },
         priority: 'high',
         dismissed: false,
       });
@@ -183,9 +183,9 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
       newSuggestions.push({
         id: 'add-transitions',
         type: 'optimization',
-        title: 'Übergänge hinzufügen',
-        description: 'KI-generierte Übergänge verbessern den Videofluss.',
-        action: { label: 'KI-Übergänge', command: 'generate_transitions' },
+        title: tx({ de: 'Übergänge hinzufügen', en: 'Add transitions', es: 'Añadir transiciones' }),
+        description: tx({ de: 'KI-generierte Übergänge verbessern den Videofluss.', en: 'AI-generated transitions improve the video flow.', es: 'Las transiciones generadas por IA mejoran el flujo del vídeo.' }),
+        action: { label: tx({ de: 'KI-Übergänge', en: 'AI transitions', es: 'Transiciones IA' }), command: 'generate_transitions' },
         priority: 'medium',
         dismissed: false,
       });
@@ -195,8 +195,8 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
       newSuggestions.push({
         id: 'more-scenes',
         type: 'warning',
-        title: 'Wenige Szenen',
-        description: 'Bei längeren Videos empfehlen wir mehr Schnitte.',
+        title: tx({ de: 'Wenige Szenen', en: 'Few scenes', es: 'Pocas escenas' }),
+        description: tx({ de: 'Bei längeren Videos empfehlen wir mehr Schnitte.', en: 'For longer videos, we recommend more cuts.', es: 'Para vídeos más largos, recomendamos más cortes.' }),
         action: { label: 'Auto-Cut', command: 'auto_cut' },
         priority: 'high',
         dismissed: false,
@@ -207,9 +207,9 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
       newSuggestions.push({
         id: 'add-style',
         type: 'creative',
-        title: 'Style Transfer',
-        description: 'Verleihe deinem Video einen einzigartigen Look.',
-        action: { label: 'Styles erkunden', command: 'open_styles' },
+        title: tx({ de: 'Style Transfer', en: 'Style transfer', es: 'Transferencia de estilo' }),
+        description: tx({ de: 'Verleihe deinem Video einen einzigartigen Look.', en: 'Give your video a unique look.', es: 'Dale a tu vídeo un aspecto único.' }),
+        action: { label: tx({ de: 'Styles erkunden', en: 'Explore styles', es: 'Explorar estilos' }), command: 'open_styles' },
         priority: 'low',
         dismissed: false,
       });
@@ -269,7 +269,7 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
         const assistantMessage: CoPilotMessage = {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          content: commandResponses[localCommand.command] || '✅ Befehl ausgeführt',
+          content: commandResponses[localCommand.command] || tx({ de: '✅ Befehl ausgeführt', en: '✅ Command executed', es: '✅ Comando ejecutado' }),
           timestamp: new Date(),
           command: localCommand.command,
         };
@@ -363,11 +363,11 @@ function generateContextualResponse(input: string, context: CoPilotContext): str
   if (lowerInput.includes('hilf') || lowerInput.includes('help')) {
     return tx({
       de: `Ich kann dir bei vielen Aufgaben helfen! Probiere:
-• "Analysiere Szenen" - Startet KI-Analyse
+• tx({ de: "Analysiere Szenen", en: "Analyze scenes", es: "Analizar escenas" }) - Startet KI-Analyse
 • "Generiere Übergänge" - Erstellt passende Übergänge
-• "Teile Szene" - Aktuelle Szene splitten (oder Taste S)
-• "Dupliziere Szene" - Szene kopieren (oder Taste D)
-• "Lösche Szene" - Szene entfernen (oder Delete)
+• tx({ de: "Teile Szene", en: "Share scene", es: "compartir escena" }) - Aktuelle Szene splitten (oder Taste S)
+• tx({ de: "Dupliziere Szene", en: "Duplicate scene", es: "escena duplicada" }) - Szene kopieren (oder Taste D)
+• tx({ de: "Lösche Szene", en: "Delete scene", es: "eliminar escena" }) - Szene entfernen (oder Delete)
 • "Wende Cinematic Style an" - Für filmischen Look
 • "Erhöhe die Lautstärke" - Audio anpassen`,
       en: `I can help you with many tasks! Try:

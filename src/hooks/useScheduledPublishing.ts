@@ -103,14 +103,14 @@ export function useScheduledPublishing() {
 
       toast({
         title: '🚫 Veröffentlichung abgebrochen',
-        description: 'Die geplante Veröffentlichung wurde storniert',
+        description: tx({ de: "Die geplante Veröffentlichung wurde storniert", en: "The planned release has been canceled", es: "El lanzamiento previsto ha sido cancelado." }),
       });
 
       return true;
     } catch (error: any) {
       console.error('Cancel publication error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: error.message,
         variant: 'destructive',
       });

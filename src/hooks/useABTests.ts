@@ -79,7 +79,7 @@ export function useABTests() {
     } catch (error) {
       console.error('Failed to create test:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: 'Test konnte nicht erstellt werden', en: 'Could not create test', es: 'No se pudo crear la prueba' }),
         variant: 'destructive'
       });
@@ -116,14 +116,14 @@ export function useABTests() {
 
       toast({
         title: 'Variante erstellt',
-        description: 'Test-Variante wurde hinzugefügt'
+        description: tx({ de: "Test-Variante wurde hinzugefügt", en: "Test variant was added", es: "Se añadió variante de prueba." })
       });
 
       fetchTests();
     } catch (error) {
       console.error('Failed to create variant:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: 'Variante konnte nicht erstellt werden', en: 'Could not create variation', es: 'No se pudo crear la variación' }),
         variant: 'destructive'
       });
@@ -151,7 +151,7 @@ export function useABTests() {
     } catch (error) {
       console.error('Failed to start test:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: 'Test konnte nicht gestartet werden', en: 'Could not start test', es: 'No se pudo iniciar la prueba' }),
         variant: 'destructive'
       });
@@ -172,14 +172,14 @@ export function useABTests() {
 
       toast({
         title: 'Test beendet',
-        description: 'A/B Test wurde gestoppt'
+        description: tx({ de: "A/B Test wurde gestoppt", en: "A/B testing has been stopped", es: "Se han detenido las pruebas A/B" })
       });
 
       fetchTests();
     } catch (error) {
       console.error('Failed to stop test:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: 'Test konnte nicht gestoppt werden', en: 'Could not stop test', es: 'No se pudo detener la prueba' }),
         variant: 'destructive'
       });
@@ -231,14 +231,14 @@ export function useABTests() {
 
       toast({
         title: '🏆 Winner deklariert',
-        description: 'Beste Variante wurde als Winner markiert'
+        description: tx({ de: "Beste Variante wurde als Winner markiert", en: "The best option was marked as the winner", es: "La mejor opción quedó marcada como ganadora." })
       });
 
       fetchTests();
     } catch (error) {
       console.error('Failed to declare winner:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: 'Winner konnte nicht deklariert werden', en: 'Could not declare winner', es: 'No se pudo declarar al ganador' }),
         variant: 'destructive'
       });

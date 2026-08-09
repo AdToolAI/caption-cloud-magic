@@ -43,8 +43,8 @@ export default function ContentProjects() {
     const variants = {
       draft: { variant: "secondary" as const, icon: Clock, label: "Entwurf", className: "" },
       rendering: { variant: "default" as const, icon: RefreshCw, label: "Wird gerendert...", className: "" },
-      completed: { variant: "outline" as const, icon: CheckCircle2, label: "Fertig", className: "border-green-500 text-green-700" },
-      failed: { variant: "destructive" as const, icon: XCircle, label: "Fehler", className: "" },
+      completed: { variant: "outline" as const, icon: CheckCircle2, label: tx({ de: "Fertig", en: "Ready", es: "Listo" }), className: "border-green-500 text-green-700" },
+      failed: { variant: "destructive" as const, icon: XCircle, label: tx({ de: "Fehler", en: "Mistake", es: "Error" }), className: "" },
     };
 
     const config = variants[status as keyof typeof variants] || variants.draft;
@@ -70,7 +70,7 @@ export default function ContentProjects() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
-      toast.success("Video wird heruntergeladen");
+      toast.success(tx({ de: "Video wird heruntergeladen", en: "Video is downloading", es: "El vídeo se está descargando." }));
     } catch (error) {
       console.error("Download error:", error);
       toast.error(tx({ de: "Fehler beim Herunterladen", en: "Error downloading", es: "Error al descargar" }));
@@ -117,7 +117,7 @@ export default function ContentProjects() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Fertig</CardDescription>
+              <CardDescription>{tx({ de: "Fertig", en: "Ready", es: "Listo" })}</CardDescription>
               <CardTitle className="text-3xl text-green-600">{statusCounts.completed}</CardTitle>
             </CardHeader>
           </Card>
@@ -220,11 +220,11 @@ export default function ContentProjects() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Film className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <CardTitle className="mb-2">Keine Videos gefunden</CardTitle>
+                  <CardTitle className="mb-2">{tx({ de: "Keine Videos gefunden", en: "No videos found", es: "No se encontraron vídeos" })}</CardTitle>
                   <CardDescription>
                     {selectedStatus === "all"
-                      ? "Erstelle dein erstes Video im Content Studio"
-                      : `Keine Videos mit Status "${selectedStatus}"`}
+                      ? tx({ de: "Erstelle dein erstes Video im Content Studio", en: "Create your first video in Content Studio", es: "Crea tu primer vídeo en Content Studio" })
+                      : tx({ de: tx({ de: tx({ de: tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>
                     Zum Content Studio

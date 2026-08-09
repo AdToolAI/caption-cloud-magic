@@ -135,15 +135,15 @@ export const MediaEditor = ({
       // Note: In production, you'd use Unsplash API with proper API key
       // For now, this is a placeholder
       toast({
-        title: "Suche",
-        description: "Unsplash-Integration kommt bald!",
+        title: tx({ de: "Suche", en: "Search", es: "Búsqueda" }),
+        description: tx({ de: "Unsplash-Integration kommt bald!", en: "Unsplash integration coming soon!", es: "¡Integración con Unsplash próximamente!" }),
       });
       setSearchResults([]);
     } catch (error) {
       console.error('Search error:', error);
       toast({
-        title: "Fehler",
-        description: "Suche fehlgeschlagen.",
+        title: tx({ de: "Fehler", en: "Error", es: "Error" }),
+        description: tx({ de: "Suche fehlgeschlagen.", en: "Search failed.", es: "Error en la búsqueda." }),
         variant: "destructive",
       });
     } finally {
@@ -173,8 +173,8 @@ export const MediaEditor = ({
     setSelectedPreset(preset.name);
     
     toast({
-      title: "Filter angewendet",
-      description: `${preset.name} wurde angewendet`,
+      title: tx({ de: "Filter angewendet", en: "Filter applied", es: "Filtro aplicado" }),
+      description: `${preset.name} ${tx({ de: "wurde angewendet", en: "was applied", es: "fue aplicado" })}`,
     });
   };
 
@@ -184,15 +184,15 @@ export const MediaEditor = ({
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="upload">
             <Upload className="h-4 w-4 mr-2" />
-            Upload
+            {tx({ de: "Upload", en: "Upload", es: "Subir" })}
           </TabsTrigger>
           <TabsTrigger value="search">
             <Search className="h-4 w-4 mr-2" />
-            Suchen
+            {tx({ de: "Suchen", en: "Search", es: "Buscar" })}
           </TabsTrigger>
           <TabsTrigger value="filters">
             <Wand2 className="h-4 w-4 mr-2" />
-            Filter
+            {tx({ de: "Filter", en: "Filter", es: "Filtro" })}
           </TabsTrigger>
         </TabsList>
 
@@ -202,10 +202,10 @@ export const MediaEditor = ({
                onClick={() => fileInputRef.current?.click()}>
             <ImageIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-sm text-muted-foreground mb-2">
-              Klicke hier oder ziehe ein Bild hierher
+              {tx({ de: "Klicke hier oder ziehe ein Bild hierher", en: "Click here or drag an image here", es: "Haz clic aquí o arrastra una imagen aquí" })}
             </p>
             <p className="text-xs text-muted-foreground">
-              PNG, JPG oder WEBP (max. 10MB)
+              {tx({ de: "PNG, JPG oder WEBP (max. 10MB)", en: "PNG, JPG or WEBP (max. 10MB)", es: "PNG, JPG o WEBP (máx. 10MB)" })}
             </p>
             <input
               ref={fileInputRef}
@@ -218,7 +218,7 @@ export const MediaEditor = ({
 
           {selectedImage && (
             <div className="space-y-4">
-              <Label>Bildausschnitt anpassen</Label>
+              <Label>{tx({ de: "Bildausschnitt anpassen", en: "Adjust crop", es: "Ajustar recorte" })}</Label>
               <div className="max-h-[400px] overflow-auto border rounded">
                 <ReactCrop
                   crop={crop}
@@ -236,13 +236,13 @@ export const MediaEditor = ({
         <TabsContent value="search" className="space-y-4">
           <div className="flex gap-2">
             <Input
-              placeholder="Nach Bildern suchen..."
+              placeholder={tx({ de: "Nach Bildern suchen...", en: "Search for images...", es: "Buscar imágenes..." })}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleUnsplashSearch()}
             />
             <Button onClick={handleUnsplashSearch} disabled={isSearching}>
-              {isSearching ? 'Suche...' : 'Suchen'}
+              {isSearching ? tx({ de: 'Suche...', en: 'Searching...', es: 'Buscando...' }) : tx({ de: 'Suchen', en: 'Search', es: 'Buscar' })}
             </Button>
           </div>
 
@@ -272,7 +272,7 @@ export const MediaEditor = ({
         <TabsContent value="filters" className="space-y-6">
           {/* Filter Presets */}
           <div className="space-y-3">
-            <Label className="text-base font-semibold">Filter-Presets</Label>
+            <Label className="text-base font-semibold">{tx({ de: "Filter-Presets", en: "Filter presets", es: "Preajustes de filtro" })}</Label>
             <div className="grid grid-cols-4 gap-2">
               {filterPresets.map((preset) => (
                 <Button
@@ -292,12 +292,12 @@ export const MediaEditor = ({
 
           {/* Feineinstellung */}
           <div className="space-y-4">
-            <Label className="text-base font-semibold">Feineinstellung</Label>
+            <Label className="text-base font-semibold">{tx({ de: "Feineinstellung", en: "Fine-tuning", es: "Ajuste fino" })}</Label>
             
             {/* Brightness Slider */}
             <div className="space-y-2">
               <div className="flex justify-between">
-                <Label>Helligkeit</Label>
+                <Label>{tx({ de: "Helligkeit", en: "Brightness", es: "Brillo" })}</Label>
                 <span className="text-sm text-muted-foreground">{brightness}%</span>
               </div>
               <Slider
@@ -315,7 +315,7 @@ export const MediaEditor = ({
             {/* Contrast Slider */}
             <div className="space-y-2">
               <div className="flex justify-between">
-                <Label>Kontrast</Label>
+                <Label>{tx({ de: "Kontrast", en: "Contrast", es: "Contraste" })}</Label>
                 <span className="text-sm text-muted-foreground">{contrast}%</span>
               </div>
               <Slider
@@ -333,7 +333,7 @@ export const MediaEditor = ({
             {/* Saturation Slider */}
             <div className="space-y-2">
               <div className="flex justify-between">
-                <Label>Sättigung</Label>
+                <Label>{tx({ de: "Sättigung", en: "Saturation", es: "Saturación" })}</Label>
                 <span className="text-sm text-muted-foreground">{saturation}%</span>
               </div>
               <Slider
@@ -352,7 +352,7 @@ export const MediaEditor = ({
           {/* Live Preview */}
           {(selectedImage || currentImageUrl) && (
             <div className="space-y-2">
-              <Label>Vorschau</Label>
+              <Label>{tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}</Label>
               <div className="relative w-full h-48 border rounded-lg overflow-hidden bg-muted">
                 <img
                   src={selectedImage || currentImageUrl}
@@ -366,7 +366,7 @@ export const MediaEditor = ({
 
           {!selectedImage && !currentImageUrl && (
             <div className="text-center py-8 text-muted-foreground">
-              <p>Lade zuerst ein Bild hoch, um Filter anzuwenden</p>
+              <p>{tx({ de: "Lade zuerst ein Bild hoch, um Filter anzuwenden", en: "Upload an image first to apply filters", es: "Sube primero una imagen para aplicar filtros" })}</p>
             </div>
           )}
         </TabsContent>

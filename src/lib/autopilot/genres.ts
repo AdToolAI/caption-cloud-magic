@@ -32,7 +32,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   ad_spot: {
     id: 'ad_spot',
     label: 'Werbespot',
-    description: 'Klassischer Spot: Problem sichtbar machen, Lösung zeigen, Beweis liefern, Handlungsaufruf.',
+    description: tx({ de: 'Klassischer Spot: Problem sichtbar machen, Lösung zeigen, Beweis liefern, Handlungsaufruf.', en: 'Classic spot: Make the problem visible, show the solution, provide evidence, call to action.', es: 'Spot clásico: Visibilizar el problema, mostrar la solución, aportar evidencia, llamado a la acción.' }),
     beats: ['hook', 'problem', 'reveal', 'proof', 'benefit', 'cta'],
     shotLadder: ['close_up', 'medium', 'wide', 'insert', 'medium_close', 'medium'],
     defaultMoves: ['handheld', 'slow_push_in', 'slow_pull_out', 'static', 'rack_focus', 'static'],
@@ -92,7 +92,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   explainer: {
     id: 'explainer',
     label: 'Erklärvideo',
-    description: 'Schritt für Schritt: Ausgangslage, Vorgehen, Ergebnis.',
+    description: tx({ de: 'Schritt für Schritt: Ausgangslage, Vorgehen, Ergebnis.', en: 'Step by step: initial situation, procedure, result.', es: 'Paso a paso: situación inicial, procedimiento, resultado.' }),
     beats: ['hook', 'problem', 'reveal', 'proof', 'cta'],
     shotLadder: ['medium', 'wide', 'insert', 'medium', 'wide'],
     defaultMoves: ['static', 'overhead_top_down', 'static', 'slow_push_in', 'static'],

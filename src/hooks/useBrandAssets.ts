@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { tx } from '@/lib/i18nText';
 
 export interface BrandAsset {
   id: string;
@@ -48,7 +49,7 @@ export function useBrandAssets(brandKitId: string | null | undefined) {
       });
       qc.invalidateQueries({ queryKey: ["brand-assets", brandKitId] });
     } catch (e: any) {
-      toast({ title: "Asset-Generierung fehlgeschlagen", description: e.message, variant: "destructive" });
+      toast({ title: tx({ de: "Asset-Generierung fehlgeschlagen", en: "Asset generation failed", es: "La generación de activos falló" }), description: e.message, variant: "destructive" });
     } finally {
       setGenerating(false);
     }

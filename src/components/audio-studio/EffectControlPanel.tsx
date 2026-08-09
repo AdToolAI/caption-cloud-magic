@@ -46,7 +46,7 @@ const EFFECT_GROUPS: EffectGroup[] = [
       { key: 'highPassFilter', label: 'Hochpass', shortLabel: 'HP 120Hz', description: 'Entfernt tiefes Rumpeln' },
       { key: 'lowPassFilter', label: 'Tiefpass', shortLabel: 'LP 10kHz', description: 'Entfernt Zischen' },
       { key: 'notchFilter', label: 'Notch', shortLabel: '50/60Hz', description: 'Entfernt Netzbrummen' },
-      { key: 'noiseGate', label: 'Gate', shortLabel: '-40dB', description: 'Schaltet Stille stumm' },
+      { key: 'noiseGate', label: 'Gate', shortLabel: '-40dB', description: tx({ de: 'Schaltet Stille stumm', en: 'Mutes silence', es: 'Silencia el silencio' }) },
     ]
   },
   {
@@ -67,7 +67,7 @@ const EFFECT_GROUPS: EffectGroup[] = [
     effects: [
       { key: 'boxinessCut', label: 'Box-Cut', shortLabel: '-2.5dB 250Hz', description: 'Boxy Sound entfernen' },
       { key: 'mudCut', label: 'Mud-Cut', shortLabel: '-2dB 500Hz', description: 'Schlammigkeit' },
-      { key: 'airBoost', label: 'Air', shortLabel: '+1.5dB 10kHz+', description: 'Brillanz hinzufügen' },
+      { key: 'airBoost', label: 'Air', shortLabel: '+1.5dB 10kHz+', description: tx({ de: 'Brillanz hinzufügen', en: 'Add brilliance', es: 'Añade brillo' }) },
       { key: 'compression', label: 'Komp.', shortLabel: '4:1 -24dB', description: 'Dynamik komprimieren' },
       { key: 'limiter', label: 'Limiter', shortLabel: '-1dB 20:1', description: 'Clipping verhindern' },
     ]
@@ -77,7 +77,7 @@ const EFFECT_GROUPS: EffectGroup[] = [
     label: 'Stereo & Output',
     icon: Music,
     effects: [
-      { key: 'stereoWidener', label: 'Stereo Widener', shortLabel: '15ms Haas', description: 'Stereo-Bild verbreitern' },
+      { key: 'stereoWidener', label: 'Stereo Widener', shortLabel: '15ms Haas', description: tx({ de: 'Stereo-Bild verbreitern', en: 'Widen stereo image', es: 'Ampliar imagen estéreo' }) },
       { key: 'normalize', label: 'Normalize', shortLabel: '-1dB Peak', description: 'Lautstärke normalisieren' },
     ]
   }
@@ -152,7 +152,7 @@ export function EffectControlPanel({
           onClick={() => toggleAll(enabledCount < totalEffects / 2)}
           className="text-xs h-7"
         >
-          {enabledCount > totalEffects / 2 ? tx({ de: 'Alle aus', en: 'All off', es: 'Todo apagado' }) : 'Alle an'}
+          {enabledCount > totalEffects / 2 ? tx({ de: 'Alle aus', en: 'All off', es: 'Todo apagado' }) : tx({ de: 'Alle an', en: 'All on', es: 'Todo encendido' })}
         </Button>
       </div>
       
@@ -254,7 +254,7 @@ export function EffectControlPanel({
       
       {/* Info */}
       <p className="text-[10px] text-muted-foreground text-center">
-        Klicke auf einzelne Effekte um sie ein/auszuschalten, dann "Neu verarbeiten"
+        {tx({ de: 'Klicke auf einzelne Effekte um sie ein/auszuschalten, dann "Neu verarbeiten".', en: 'Click individual effects to toggle them, then "Reprocess".', es: 'Haz clic en los efectos para activarlos o desactivarlos y luego "Reprocesar".' })}
       </p>
     </div>
   );

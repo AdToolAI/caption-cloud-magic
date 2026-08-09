@@ -39,7 +39,7 @@ export default function SharePage() {
 
       // Check expiry
       if (new Date(shareLink.expires_at) < new Date()) {
-        setError('Dieser Link ist abgelaufen');
+        setError(tx({ de: 'Dieser Link ist abgelaufen', en: 'This link has expired', es: 'Este enlace ha caducado' }));
         return;
       }
 

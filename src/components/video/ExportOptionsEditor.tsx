@@ -23,9 +23,9 @@ interface ExportOptionsEditorProps {
 
 const aspectRatioInfo = {
   '16:9': { icon: Monitor, label: 'YouTube, Desktop', description: tx({ de: 'Standard für YouTube und Desktop', en: 'Standard for YouTube and desktop', es: 'Estándar para YouTube y escritorio' }) },
-  '9:16': { icon: Smartphone, label: 'TikTok, Stories', description: 'Vertikal für Mobile' },
-  '1:1': { icon: Instagram, label: 'Instagram Feed', description: 'Quadratisch für Instagram' },
-  '4:5': { icon: Film, label: 'Instagram Portrait', description: 'Portrait für Instagram Feed' },
+  '9:16': { icon: Smartphone, label: 'TikTok, Stories', description: tx({ de: 'Vertikal für Mobile', en: 'Vertical for mobile', es: 'verticales para móviles' }) },
+  '1:1': { icon: Instagram, label: 'Instagram Feed', description: tx({ de: 'Quadratisch für Instagram', en: 'Square for Instagram', es: 'Cuadrado para Instagram' }) },
+  '4:5': { icon: Film, label: 'Instagram Portrait', description: tx({ de: 'Portrait für Instagram Feed', en: 'Portrait for Instagram feed', es: 'Retrato para feed de Instagram' }) },
 };
 
 export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorProps) => {
@@ -173,7 +173,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <div>
               <div className="font-medium text-sm">Ende-Screen</div>
-              <div className="text-xs text-muted-foreground">CTA und Logo am Ende</div>
+              <div className="text-xs text-muted-foreground">{tx({ de: "CTA und Logo am Ende", en: "CTA and logo at the end", es: "CTA y logo al final" })}</div>
             </div>
             <Switch
               checked={options.includeEndScreen}

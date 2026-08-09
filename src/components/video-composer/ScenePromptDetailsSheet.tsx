@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * ScenePromptDetailsSheet — Phase 1 of the "Studio Set" simplification.
  *
@@ -63,7 +64,7 @@ const t = {
     livePrompt: 'Live Prompt (so wird er an die KI geschickt)',
     finalPrompt: 'Komponierter Final-Prompt',
     layers: 'Layer-Details',
-    layersHide: 'Details ausblenden',
+    layersHide: tx({ de: 'Details ausblenden', en: 'Hide details', es: 'Ocultar detalles' }),
     multiEngine: 'Multi-Engine Vorschau',
     multiEngineShow: 'Multi-Engine Vorschau anzeigen',
     multiEngineHide: 'Multi-Engine ausblenden',

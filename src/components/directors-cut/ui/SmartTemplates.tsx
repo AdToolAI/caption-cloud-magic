@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,7 +39,7 @@ const templates: SmartTemplate[] = [
   {
     id: 'tiktok-viral',
     name: 'TikTok Viral',
-    description: 'Schnelle Cuts, dynamische Wipes, hoher Kontrast für maximales Engagement',
+    description: tx({ de: 'Schnelle Cuts, dynamische Wipes, hoher Kontrast für maximales Engagement', en: 'Fast cuts, dynamic wipes, high contrast for maximum engagement', es: 'Cortes rápidos, barridos dinámicos y alto contraste para una máxima participación' }),
     icon: <Zap className="w-5 h-5" />,
     color: 'from-pink-500 to-rose-500',
     preview: {
@@ -56,7 +57,7 @@ const templates: SmartTemplate[] = [
   {
     id: 'cinematic',
     name: 'Cinematic',
-    description: 'Lange Takes, sanfte Dissolves, filmische Farbgebung für professionellen Look',
+    description: tx({ de: 'Lange Takes, sanfte Dissolves, filmische Farbgebung für professionellen Look', en: 'Long takes, smooth dissolves, cinematic coloring for a professional look', es: 'Tomas largas, fundidos suaves y coloración cinematográfica para una apariencia profesional' }),
     icon: <Film className="w-5 h-5" />,
     color: 'from-amber-500 to-orange-500',
     preview: {
@@ -110,7 +111,7 @@ const templates: SmartTemplate[] = [
   {
     id: 'documentary',
     name: 'Documentary',
-    description: 'Ruhige Crossfades, dezente Effekte, fokussiert auf Inhalt',
+    description: tx({ de: 'Ruhige Crossfades, dezente Effekte, fokussiert auf Inhalt', en: 'Quiet crossfades, subtle effects, focused on content', es: 'Fundidos cruzados silenciosos, efectos sutiles, centrados en el contenido.' }),
     icon: <BookOpen className="w-5 h-5" />,
     color: 'from-blue-500 to-cyan-500',
     preview: {
@@ -239,7 +240,7 @@ export function SmartTemplates({ onApply, currentTemplateId }: SmartTemplatesPro
                           <span className="font-medium capitalize">{template.preview.transitionType}</span>
                         </div>
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">Ø Szene</span>
+                          <span className="text-muted-foreground">{tx({ de: "Ø Szene", en: "Ø Scene", es: "Ø Escena" })}</span>
                           <span className="font-medium">{template.preview.avgSceneDuration}s</span>
                         </div>
                         <div className="flex justify-between text-[10px]">

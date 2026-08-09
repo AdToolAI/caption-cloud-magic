@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { MediaProfileConfig, Platform } from './mediaProfileSchema';
 
 export interface PresetDefinition {
@@ -37,7 +38,7 @@ export const PLATFORM_PRESETS: Record<Platform, Record<string, PresetDefinition>
     },
     'story-9-16': {
       name: 'Story/Reel 9:16',
-      description: 'Story oder Reel (1080x1920)',
+      description: tx({ de: 'Story oder Reel (1080x1920)', en: 'Story or Reel (1080x1920)', es: 'Historia o carrete (1080x1920)' }),
       config: {
         aspect: '9:16',
         width: 1080,

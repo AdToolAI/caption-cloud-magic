@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/integrations/supabase/client";
@@ -375,11 +376,11 @@ export function EventCreateDialog({
       setCaption(data.caption);
       setHashtags(data.hashtags.join(", "));
 
-      toast.success("✨ Caption erfolgreich generiert!");
+      toast.success(tx({ de: "✨ Caption erfolgreich generiert!", en: "✨ Caption successfully generated!", es: "✨ ¡Subtítulo generado exitosamente!" }));
 
     } catch (error: any) {
       console.error("Caption generation error:", error);
-      toast.error(error.message || "Caption-Generierung fehlgeschlagen");
+      toast.error(error.message || tx({ de: "Caption-Generierung fehlgeschlagen", en: "Caption generation failed", es: "Falló la generación de subtítulos" }));
     } finally {
       setIsGeneratingCaption(false);
     }
@@ -730,7 +731,7 @@ export function EventCreateDialog({
                 <Label htmlFor="videoProject">Video Projekt verknüpfen</Label>
                 <Select value={videoProjectId} onValueChange={setVideoProjectId}>
                   <SelectTrigger id="videoProject">
-                    <SelectValue placeholder="Video Projekt auswählen (optional)" />
+                    <SelectValue placeholder={tx({ de: "Video Projekt auswählen (optional)", en: "Select video project (optional)", es: "Seleccionar proyecto de vídeo (opcional)" })} />
                   </SelectTrigger>
                   <SelectContent>
                     {videoProjects.map(project => (
@@ -762,7 +763,7 @@ export function EventCreateDialog({
               </div>
               
               <div className="space-y-2">
-                <Label>Approver hinzufügen</Label>
+                <Label>{tx({ de: "Approver hinzufügen", en: "Add Approver", es: "Agregar aprobador" })}</Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="Email"

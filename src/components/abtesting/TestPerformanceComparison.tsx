@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Database } from '@/integrations/supabase/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Badge } from '@/components/ui/badge';
+import { tx } from '@/lib/i18nText';
 
 type ABTestVariant = Database['public']['Tables']['ab_test_variants']['Row'];
 
@@ -78,7 +79,7 @@ export function TestPerformanceComparison({ variants, targetMetric }: Props) {
             </p>
           </div>
           <Badge variant={hasSignificantData ? 'default' : 'secondary'}>
-            {hasSignificantData ? 'Statistisch signifikant' : 'Benötigt mehr Daten'}
+            {hasSignificantData ? 'Statistisch signifikant' : tx({ de: 'Benötigt mehr Daten', en: 'Needs more data', es: 'Necesita más datos' })}
           </Badge>
         </div>
 

@@ -55,7 +55,7 @@ export default function Planner() {
     // Timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
       console.error("Workspace load timeout");
-      setError("Laden dauert zu lange. Bitte Seite neu laden.");
+      setError(tx({ de: "Laden dauert zu lange. Bitte Seite neu laden.", en: "Loading takes too long. Please reload the page.", es: "La carga tarda demasiado. Por favor recarga la página." }));
       setLoading(false);
     }, 10000);
 
@@ -101,7 +101,7 @@ export default function Planner() {
     } catch (error: any) {
       clearTimeout(timeoutId);
       console.error("Unexpected error loading workspace:", error);
-      toast.error("Unerwarteter Fehler: " + error.message);
+      toast.error(tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error:", es: "Error inesperado:" }) + error.message);
       setError(tx({ de: "Ein unerwarteter Fehler ist aufgetreten", en: "An unexpected error occurred", es: "Se ha producido un error inesperado" }));
       setLoading(false);
     }
@@ -273,7 +273,7 @@ export default function Planner() {
       loadBlocks(weekplan.id);
       toast.success("Post geplant");
     } else {
-      toast.error("Unerwartetes Problem beim Speichern");
+      toast.error(tx({ de: "Unerwartetes Problem beim Speichern", en: "Unexpected problem saving", es: "Problema inesperado al guardar" }));
     }
   };
 
@@ -320,7 +320,7 @@ export default function Planner() {
       toast.success(tx({ de: "Post wurde gelöscht", en: "Post deleted", es: "Publicación eliminada" }), { id: loadingToast });
     } catch (error: any) {
       console.error("Unexpected error:", error);
-      toast.error("Unerwarteter Fehler: " + error.message, { id: loadingToast });
+      toast.error(tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error:", es: "Error inesperado:" }) + error.message, { id: loadingToast });
     }
   };
 
@@ -358,7 +358,7 @@ export default function Planner() {
       .map(b => b.id);
 
     if (idsToApprove.length === 0) {
-      toast.info("Keine Posts zum Genehmigen");
+      toast.info(tx({ de: "Keine Posts zum Genehmigen", en: "No posts to approve", es: "No hay publicaciones para aprobar" }));
       return;
     }
 
@@ -437,11 +437,11 @@ export default function Planner() {
           { id: loadingToast }
         );
       } else {
-        toast.info("Keine Content-Items in der Bibliothek gefunden", { id: loadingToast });
+        toast.info(tx({ de: "Keine Content-Items in der Bibliothek gefunden", en: "No content items found in the library", es: "No se encontraron elementos de contenido en la biblioteca." }), { id: loadingToast });
       }
     } catch (error: any) {
       console.error("Unexpected error:", error);
-      toast.error("Unerwarteter Fehler: " + error.message, { id: loadingToast });
+      toast.error(tx({ de: "Unerwarteter Fehler: ", en: "Unexpected error:", es: "Error inesperado:" }) + error.message, { id: loadingToast });
     }
   };
 
@@ -509,7 +509,7 @@ export default function Planner() {
 
   const handleApplyAISlots = (timeline: any[]) => {
     setRecommendations(timeline);
-    toast.success("AI-Empfehlungen geladen - Nutzen Sie Smart Snap beim Verschieben");
+    toast.success(tx({ de: "AI-Empfehlungen geladen - Nutzen Sie Smart Snap beim Verschieben", en: "AI recommendations loaded - Use Smart Snap when moving", es: "Recomendaciones de IA cargadas: use Smart Snap cuando se mueva" }));
   };
 
   const scrollToDate = (date: Date) => {
@@ -562,7 +562,7 @@ export default function Planner() {
   if (!workspaceId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">Kein Workspace gefunden</p>
+        <p className="text-muted-foreground">{tx({ de: "Kein Workspace gefunden", en: "No workspace found", es: "No se encontró ningún espacio de trabajo" })}</p>
         <Button onClick={() => window.location.reload()} variant="outline">
           Neu laden
         </Button>

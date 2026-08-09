@@ -80,15 +80,15 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
       if (data?.success) {
         toast({
           title: "✅ Batch-Generierung gestartet",
-          description: tx({ de: `${variations.length} Varianten werden erstellt. Kosten: ${data.totalCost} Credits`, en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }),
+          description: tx({ de: tx({ de: tx({ de: `${variations.length} Varianten werden erstellt. Kosten: ${data.totalCost} Credits`, en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }), en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }), en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }),
         });
         onOpenChange(false);
       }
     } catch (error) {
       console.error('Batch generation error:', error);
       toast({
-        title: "Fehler",
-        description: "Batch-Generierung fehlgeschlagen.",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
+        description: tx({ de: "Batch-Generierung fehlgeschlagen.", en: "Batch generation failed.", es: "Error en la generación del lote." }),
         variant: "destructive",
       });
     } finally {
@@ -184,7 +184,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
           </div>
 
           <div className="text-xs text-muted-foreground space-y-1">
-            <p>✅ Perfekt für A/B-Testing verschiedener CTAs</p>
+            <p>{tx({ de: "✅ Perfekt für A/B-Testing verschiedener CTAs", en: "✅ Perfect for A/B testing different CTAs", es: "✅ Perfecto para realizar pruebas A/B de diferentes CTA" })}</p>
             <p>✅ Teste mehrere Skript-Varianten parallel</p>
             <p>✅ Vergleiche Performance in Analytics</p>
           </div>

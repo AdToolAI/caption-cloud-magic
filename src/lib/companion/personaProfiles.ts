@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * Companion learning-pace profiles.
  *
@@ -29,7 +30,7 @@ export const PERSONA_PROFILES: Record<LearningPace, PersonaProfile> = {
     id: 'espresso',
     labelDe: 'Espresso',
     labelEn: 'Espresso',
-    descriptionDe: 'Nur das Nötigste. Ein Tipp pro Session, keine Umwege.',
+    descriptionDe: tx({ de: 'Nur das Nötigste. Ein Tipp pro Session, keine Umwege.', en: 'Only the bare essentials. One tip per session, no detours.', es: 'Sólo lo esencial. Un consejo por sesión, sin desvíos.' }),
     descriptionEn: 'Only what matters. One tip per session, no detours.',
     dailyPopupCap: 1,
     minGapSeconds: 60 * 60 * 4,
@@ -53,7 +54,7 @@ export const PERSONA_PROFILES: Record<LearningPace, PersonaProfile> = {
     id: 'guided',
     labelDe: 'Guided Tour',
     labelEn: 'Guided Tour',
-    descriptionDe: 'Schritt für Schritt durch jedes Studio. Für Einsteiger.',
+    descriptionDe: tx({ de: 'Schritt für Schritt durch jedes Studio. Für Einsteiger.', en: 'Step by step through each studio. For beginners.', es: 'Paso a paso por cada estudio. Para principiantes.' }),
     descriptionEn: 'Step-by-step across every studio. For newcomers.',
     dailyPopupCap: 6,
     minGapSeconds: 60 * 5,

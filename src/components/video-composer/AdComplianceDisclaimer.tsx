@@ -13,7 +13,7 @@ interface AdComplianceDisclaimerProps {
 
 const COPY = {
   de: {
-    title: 'Rechtlicher Hinweis — Markenrecht & EU AI Act',
+    title: tx({ de: 'Rechtlicher Hinweis — Markenrecht & EU AI Act', en: 'Legal Notice — Trademark Law & EU AI Act', es: 'Aviso legal: Ley de Marcas y Ley de IA de la UE' }),
     body: tx({ de: 'Du erstellst einen KI-generierten Werbespot. Bitte verwende keine geschützten Markennamen, Logos oder Tonalitäten Dritter (z. B. konkrete Wettbewerbermarken). Inhalte müssen nach EU AI Act Art. 50 als KI-generiert kennzeichenbar sein. Du allein bist für die Veröffentlichung und markenrechtliche Prüfung verantwortlich.', en: 'You are creating an AI-generated commercial. Please do not use protected brand names, logos, or third-party tonalities (e.g., specific competitor brands). Content must be identifiable as AI-generated according to EU AI Act Art. 50. You alone are responsible for publication and trademark review.', es: 'Estás creando un anuncio generado por IA. Por favor, no utilices nombres de marca protegidos, logotipos o tonalidades de terceros (por ejemplo, marcas de la competencia específicas). El contenido debe ser identificable como generado por IA según el Art. 50 de la Ley de IA de la UE. Tú eres el único responsable de la publicación y la revisión de marcas.' }),
     ack: tx({ de: 'Ich verstehe und übernehme die Verantwortung für die Veröffentlichung dieses Inhalts.', en: 'I understand and take responsibility for publishing this content.', es: 'Entiendo y asumo la responsabilidad de publicar este contenido.' }),
   },

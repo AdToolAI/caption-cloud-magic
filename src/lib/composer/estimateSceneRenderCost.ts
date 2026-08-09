@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * estimateSceneRenderCost — pure helper used by the Per-Scene Render
  * Confirm Dialog (Schritt 1). Surfaces a transparent breakdown of what
@@ -138,7 +139,7 @@ export function estimateSceneRenderCost(
       label: 'Voiceover (ElevenLabs)',
       credits: voCredits,
       eur: voCredits / CREDIT_PER_EUR,
-      detail: 'Flat-Rate pro Szene (TTS-Synthese)',
+      detail: tx({ de: 'Flat-Rate pro Szene (TTS-Synthese)', en: 'Flat rate per scene (TTS synthesis)', es: 'Tarifa plana por escena (síntesis TTS)' }),
     });
   }
 

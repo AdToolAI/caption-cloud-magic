@@ -136,7 +136,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
     if (error) {
-      toast.error("Generierung fehlgeschlagen: " + error.message);
+      toast.error(tx({ de: "Generierung fehlgeschlagen: ", en: "Generation failed: ", es: "Error en la generación: " }) + error.message);
       return null;
     }
     return data?.result ?? null;
@@ -244,7 +244,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
 
   const handleSaveDraft = async () => {
     await onPatch({ caption, hashtags, channels, brief, ...(startAt ? { start_at: new Date(startAt).toISOString() } : {}) });
-    toast.success("Entwurf gespeichert");
+    toast.success(tx({ de: "Entwurf gespeichert", en: "Draft saved", es: "Borrador guardado" }));
   };
 
   const hooks: Record<string, string> = useMemo(() => {
@@ -342,7 +342,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
 
         {/* Hooks */}
         {Object.keys(hooks).length > 0 && (
-          <Section title="Hook auswählen" icon={<Sparkles className="h-3.5 w-3.5 text-[hsl(var(--primary))]/70" />}>
+          <Section title={tx({ de: "Hook auswählen", en: "Choose a hook", es: "Elegir un gancho" })} icon={<Sparkles className="h-3.5 w-3.5 text-[hsl(var(--primary))]/70" />}>
             <div className="grid gap-2">
               {Object.entries(hooks).map(([key, value]) => (
                 <button
@@ -377,7 +377,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
             onBlur={() => onUpdate("caption", caption)}
             rows={7}
             className="bg-[#050816]/60 border-white/10 focus:border-[hsl(var(--primary))]/40 font-mono text-sm leading-relaxed"
-            placeholder="Schreibe oder generiere die Caption…"
+            placeholder={tx({ de: "Schreibe oder generiere die Caption…", en: "Write or generate the caption…", es: "Escribe o genera el subtítulo…" })}
           />
           {overLimit && (
             <p className="text-xs text-destructive flex items-center gap-1 mt-2">

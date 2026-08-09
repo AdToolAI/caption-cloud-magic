@@ -153,7 +153,7 @@ export function AIColorGrading({
 
         {/* Reference Image Upload */}
         <div className="space-y-2">
-          <label className="text-xs font-medium">Referenzbild für Color Match</label>
+          <label className="text-xs font-medium">{tx({ de: "Referenzbild für Color Match", en: "Reference image for Color Match", es: "Imagen de referencia para la combinación de colores" })}</label>
           <div className="flex gap-2">
             <div className="flex-1">
               <input
@@ -263,7 +263,7 @@ export function AIColorGrading({
             className="w-full"
             onClick={() => onGradeSelect(null)}
           >
-            {isSceneMode ? 'Szenen-Grading entfernen' : 'Grading entfernen'}
+            {isSceneMode ? tx({ de: 'Szenen-Grading entfernen', en: 'Remove scene grading', es: 'Quitar clasificación de escena' }) : 'Grading entfernen'}
           </Button>
         )}
       </CardContent>

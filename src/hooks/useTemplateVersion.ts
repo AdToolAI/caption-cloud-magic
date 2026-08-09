@@ -91,7 +91,7 @@ export const useTemplateVersion = (templateId?: string) => {
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Version konnte nicht erstellt werden', en: 'Version could not be created', es: 'No se pudo crear la versión' }),
         variant: 'destructive',
       });
@@ -140,7 +140,7 @@ export const useTemplateVersion = (templateId?: string) => {
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Version konnte nicht wiederhergestellt werden', en: 'Version could not be restored', es: 'No se pudo restaurar la versión' }),
         variant: 'destructive',
       });
@@ -166,7 +166,7 @@ export const useTemplateVersion = (templateId?: string) => {
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Version konnte nicht veröffentlicht werden', en: 'Version could not be published', es: 'No se pudo publicar la versión' }),
         variant: 'destructive',
       });

@@ -17,9 +17,9 @@ const copy = {
     sub: tx({ de: "Ein Creator. Ein ganzes Studio. Ab jetzt läuft alles auf deinem Konto — Skript, Stimmen, Charaktere, Schnitt und Export.", en: "One Creator. One entire studio. From now on, everything runs on your account — script, voices, characters, editing, and export.", es: "Un Creador. Un estudio completo. A partir de ahora, todo funciona en tu cuenta — guion, voces, personajes, edición y exportación." }),
     unlocked: "Ab sofort freigeschaltet",
     items: [
-      "Autopilot: von der Idee bis zum fertigen Clip",
-      "Cast & World: eigene Charaktere mit fester Identität",
-      "Lip-Sync in Deutsch, Englisch und Spanisch",
+      tx({ de: "Autopilot: von der Idee bis zum fertigen Clip", en: "Autopilot: from the idea to the finished clip", es: "Piloto automático: de la idea al clip terminado" }),
+      tx({ de: "Cast & World: eigene Charaktere mit fester Identität", en: "Cast & World: own characters with a fixed identity", es: "Cast & World: personajes propios con una identidad fija" }),
+      tx({ de: "Lip-Sync in Deutsch, Englisch und Spanisch", en: "Lip sync in German, English and Spanish", es: "Sincronización labial en alemán, inglés y español." }),
       "Director's Cut: Schnitt, Untertitel, Musik, Export in 1080p",
     ],
     cta: "Ersten Clip bauen",

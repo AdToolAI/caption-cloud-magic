@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -21,9 +22,9 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['J'], label: 'Rückwärts (Shuttle)', category: 'Playback' },
   { keys: ['K'], label: 'Pause', category: 'Playback' },
   { keys: ['L'], label: 'Vorwärts (Shuttle)', category: 'Playback' },
-  { keys: ['←'], label: '1 Frame zurück', category: 'Playback' },
+  { keys: ['←'], label: tx({ de: '1 Frame zurück', en: '1 frame back', es: '1 fotograma atrás' }), category: 'Playback' },
   { keys: ['→'], label: '1 Frame vor', category: 'Playback' },
-  { keys: ['⇧', '←'], label: '1 Sekunde zurück', category: 'Playback' },
+  { keys: ['⇧', '←'], label: tx({ de: '1 Sekunde zurück', en: '1 second back', es: '1 segundo atrás' }), category: 'Playback' },
   { keys: ['⇧', '→'], label: '1 Sekunde vor', category: 'Playback' },
   { keys: ['Home'], label: 'Zum Anfang', category: 'Playback' },
   { keys: ['End'], label: 'Zum Ende', category: 'Playback' },
@@ -39,9 +40,9 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['O'], label: 'Out-Marker setzen', category: 'Editing' },
 
   // Selection
-  { keys: ['⌘', 'A'], label: 'Alles auswählen', category: 'Selection' },
+  { keys: ['⌘', 'A'], label: tx({ de: 'Alles auswählen', en: 'Select everything', es: 'Selecciona todo' }), category: 'Selection' },
   { keys: ['⇧', 'Klick'], label: 'Range-Select', category: 'Selection' },
-  { keys: ['⌘', 'Klick'], label: 'Zur Auswahl hinzufügen', category: 'Selection' },
+  { keys: ['⌘', 'Klick'], label: tx({ de: 'Zur Auswahl hinzufügen', en: 'Add to selection', es: 'Añadir a la selección' }), category: 'Selection' },
   { keys: ['Esc'], label: 'Auswahl aufheben', category: 'Selection' },
 
   // Navigation

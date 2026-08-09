@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EngineComparison as EngineData } from '@/hooks/useContentAnalytics';
@@ -11,7 +12,7 @@ interface Props {
 export function EngineComparison({ engineData }: Props) {
   const comparisonData = [
     {
-      metric: 'Anzahl Renders',
+      metric: tx({ de: 'Anzahl Renders', en: 'Number of renders', es: 'Número de renderizados' }),
       Remotion: engineData.remotion.total_renders,
       Shotstack: engineData.shotstack.total_renders
     },

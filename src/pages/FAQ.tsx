@@ -44,7 +44,7 @@ const FAQ = () => {
     ],
     de: [
       {
-        question: "Welche Zahlungsmethoden werden akzeptiert?",
+        question: tx({ de: "Welche Zahlungsmethoden werden akzeptiert?", en: "Which payment methods are accepted?", es: "¿Qué métodos de pago se aceptan?" }),
         answer: tx({ de: "Wir akzeptieren alle gängigen Kreditkarten (Visa, MasterCard, American Express) und PayPal über Stripes sichere Zahlungsabwicklung.", en: "We accept all major credit cards (Visa, MasterCard, American Express) and PayPal via Stripe's secure payment processing.", es: "Aceptamos todas las principales tarjetas de crédito (Visa, MasterCard, American Express) y PayPal a través del procesamiento de pagos seguro de Stripe." })
       },
       {
@@ -52,11 +52,11 @@ const FAQ = () => {
         answer: tx({ de: "Ja, Sie können Ihr Abonnement jederzeit über Ihr Abrechnungs-Dashboard kündigen. Ihr Zugang bleibt bis zum Ende des aktuellen Abrechnungszeitraums bestehen.", en: "Yes, you can cancel your subscription anytime via your billing dashboard. Your access will remain until the end of the current billing period.", es: "Sí, puedes cancelar tu suscripción en cualquier momento a través de tu panel de facturación. Tu acceso se mantendrá hasta el final del período de facturación actual." })
       },
       {
-        question: "Gibt es eine kostenlose Testversion?",
+        question: tx({ de: "Gibt es eine kostenlose Testversion?", en: "Is there a free trial?", es: "¿Existe una prueba gratuita?" }),
         answer: tx({ de: "Unser kostenloser Plan ist dauerhaft verfügbar und erfordert keine Kreditkarte. Sie können jederzeit auf kostenpflichtige Pläne upgraden.", en: "Our free plan is permanently available and does not require a credit card. You can upgrade to paid plans at any time.", es: "Nuestro plan gratuito está disponible permanentemente y no requiere tarjeta de crédito. Puedes actualizar a planes de pago en cualquier momento." })
       },
       {
-        question: "Wie kann ich auf meine Rechnungen zugreifen?",
+        question: tx({ de: "Wie kann ich auf meine Rechnungen zugreifen?", en: "How can I access my invoices?", es: "¿Cómo puedo acceder a mis facturas?" }),
         answer: tx({ de: "Sie können alle Ihre Rechnungen über die Abrechnungsseite einsehen und herunterladen. Gehen Sie zu Konto > Abrechnung, um Ihren Rechnungsverlauf anzuzeigen.", en: "You can view and download all your invoices from the billing page. Go to Account > Billing to view your invoice history.", es: "Puedes ver y descargar todas tus facturas desde la página de facturación. Ve a Cuenta > Facturación para ver tu historial de facturas." })
       },
       {
@@ -68,11 +68,11 @@ const FAQ = () => {
         answer: tx({ de: "Ja, wir nutzen Stripe für die Zahlungsabwicklung, das PCI-konform ist und Ihre Daten mit modernster Verschlüsselung schützt.", en: "Yes, we use Stripe for payment processing, which is PCI compliant and protects your data with state-of-the-art encryption.", es: "Sí, utilizamos Stripe para el procesamiento de pagos, que cumple con PCI y protege tus datos con cifrado de última generación." })
       },
       {
-        question: "Kann ich eine Rückerstattung erhalten?",
+        question: tx({ de: "Kann ich eine Rückerstattung erhalten?", en: "Can I get a refund?", es: "¿Puedo obtener un reembolso?" }),
         answer: tx({ de: "Rückerstattungen sind innerhalb von 14 Tagen nach dem Kauf möglich, wenn Sie mit unserem Service nicht zufrieden sind. Kontaktieren Sie support@useadtool.ai für Hilfe.", en: "Refunds are possible within 14 days of purchase if you are not satisfied with our service. Contact support@useadtool.ai for assistance.", es: "Los reembolsos son posibles dentro de los 14 días posteriores a la compra si no estás satisfecho con nuestro servicio. Contacta a support@useadtool.ai para obtener ayuda." })
       },
       {
-        question: "Wie werden meine Daten geschützt?",
+        question: tx({ de: "Wie werden meine Daten geschützt?", en: "How is my data protected?", es: "¿Cómo se protegen mis datos?" }),
         answer: tx({ de: "Wir verwenden Unternehmensstandard-Verschlüsselung und sichere Server zum Schutz Ihrer Daten. Wir geben Ihre Informationen niemals ohne Ihre Zustimmung an Dritte weiter.", en: "We use industry-standard encryption and secure servers to protect your data. We never share your information with third parties without your consent.", es: "Utilizamos cifrado estándar de la industria y servidores seguros para proteger tus datos. Nunca compartimos tu información con terceros sin tu consentimiento." })
       }
     ],

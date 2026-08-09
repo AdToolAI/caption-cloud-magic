@@ -25,7 +25,7 @@ const benefits = [
   },
   {
     icon: Percent,
-    title: "20 % auf alle KI-Credits — 24 Monate",
+    title: tx({ de: "20 % auf alle KI-Credits — 24 Monate", en: "20% on all AI credits — 24 months", es: "20 % en todos los créditos de IA: 24 meses" }),
     text: tx({ de: "Als einer der ersten 1.000 Founders bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird an der Kasse automatisch abgezogen — kein Code nötig.", en: "As one of the first 1,000 Founders, you get a 20% discount for 24 months on every purchase of AI credits (video, image, audio). The discount is automatically applied at checkout — no code needed.", es: "Como uno de los primeros 1.000 Founders, obtendrás un 20% de descuento durante 24 meses en cada compra de créditos de IA (video, imagen, audio). El descuento se aplica automáticamente al finalizar la compra, sin necesidad de código." }),
   },
   {
@@ -35,7 +35,7 @@ const benefits = [
   },
   {
     icon: Crown,
-    title: "Direkter Draht zum Team",
+    title: tx({ de: "Direkter Draht zum Team", en: "Direct line to the team", es: "Línea directa al equipo." }),
     text: tx({ de: "Priorisiertes Feedback, Early-Access zu neuen Features und persönlicher Support.", en: "Prioritized feedback, early access to new features, and personal support.", es: "Comentarios priorizados, acceso anticipado a nuevas funciones y soporte personal." }),
   },
 ];
@@ -87,7 +87,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
           <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
           <div className="text-xs text-muted-foreground leading-relaxed">
             <strong className="text-foreground">Wichtig:</strong> Der Founder-Status ist an ein aktives
-            Abo gebunden. Bei <strong className="text-foreground">Kündigung, Pausierung oder Kontolöschung</strong>{" "}
+            Abo gebunden. Bei <strong className="text-foreground">{tx({ de: "Kündigung, Pausierung oder Kontolöschung", en: "Termination, pause or account deletion", es: "Terminación, pausa o eliminación de cuenta" })}</strong>{" "}
             geht dein Founder-Status <strong className="text-foreground">dauerhaft verloren</strong> und der Slot wird
             für neue Nutzer freigegeben. Details in unseren{" "}
             <Link to="/legal/terms#section-8" className="text-primary hover:underline">AGB §8</Link>.
@@ -96,7 +96,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
 
         <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="h-3.5 w-3.5" />
-          <span>Beta-Phase: 26.07.2026 – 26.10.2026 · Founders-Rabatt auf KI-Credits: 24 Monate ab Signup</span>
+          <span>{tx({ de: "Beta-Phase: 26.07.2026 – 26.10.2026 · Founders-Rabatt auf KI-Credits: 24 Monate ab Signup", en: "Beta phase: July 26, 2026 - October 26, 2026 · Founders discount on AI credits: 24 months from signup", es: "Fase Beta: 26 de julio de 2026 - 26 de octubre de 2026 · Descuento para fundadores en créditos de IA: 24 meses desde el registro" })}</span>
         </div>
 
         <DialogFooter className="mt-4 gap-2 sm:gap-2">

@@ -287,13 +287,13 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
     title?: string,
   ): Promise<{ url: string; assetId?: string } | null> => {
     if (!duration) {
-      toast.error('Kein Audio zum Exportieren');
+      toast.error(tx({ de: 'Kein Audio zum Exportieren', en: 'No audio to export', es: 'No hay audio para exportar' }));
       return null;
     }
     setIsExporting(true);
     try {
       const wav = await renderToWav();
-      if (!wav) throw new Error('Render fehlgeschlagen');
+      if (!wav) throw new Error(tx({ de: 'Render fehlgeschlagen', en: 'Render failed', es: 'Error de renderizado' }));
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -339,13 +339,13 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
         console.warn('[useStemMixer] library insert skipped:', err);
       }
 
-      toast.success('Mix gespeichert', {
+      toast.success(tx({ de: 'Mix gespeichert', en: 'Mix saved', es: 'Mezcla guardada' }), {
         description: `${formatDuration(duration)} · in der Bibliothek`,
       });
       return { url: publicUrl, assetId };
     } catch (err: any) {
       console.error('[useStemMixer] export failed:', err);
-      toast.error('Export fehlgeschlagen', { description: err.message });
+      toast.error(tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Error de exportación' }), { description: err.message });
       return null;
     } finally {
       setIsExporting(false);
@@ -355,13 +355,13 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
   // ---- Export single stem (for stem-only download) ----
   const downloadStem = useCallback(async (type: StemType) => {
     if (!buffers[type]) {
-      toast.error(`${STEM_META[type].label} nicht geladen`);
+      toast.error(tx({ de: `${STEM_META[type].label} nicht geladen`, en: `${STEM_META[type].label} not loaded`, es: `${STEM_META[type].label} no cargado` }));
       return;
     }
     setIsExporting(true);
     try {
       const wav = await renderToWav({ onlyType: type });
-      if (!wav) throw new Error('Render fehlgeschlagen');
+      if (!wav) throw new Error(tx({ de: 'Render fehlgeschlagen', en: 'Render failed', es: 'Error de renderizado' }));
       const url = URL.createObjectURL(wav);
       const a = document.createElement('a');
       a.href = url;
@@ -371,7 +371,7 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
       toast.success(`${STEM_META[type].label} heruntergeladen`);
     } catch (err: any) {
       console.error('[useStemMixer] downloadStem failed:', err);
-      toast.error('Download fehlgeschlagen', { description: err.message });
+      toast.error(tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Descarga fallida' }), { description: err.message });
     } finally {
       setIsExporting(false);
     }

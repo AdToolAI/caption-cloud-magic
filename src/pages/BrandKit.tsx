@@ -130,7 +130,7 @@ const BrandKit = () => {
 
     if (file.size > 5 * 1024 * 1024) {
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Datei muss kleiner als 5MB sein", en: "File must be smaller than 5MB", es: "El archivo debe ser menor de 5MB" }),
         variant: "destructive"
       });
@@ -164,7 +164,7 @@ const BrandKit = () => {
 
     if (!data.brandDescription && !data.brandName) {
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Bitte gib mindestens einen Markennamen oder Beschreibung ein", en: "Please enter at least a brand name or description", es: "Introduce al menos un nombre de marca o una descripción" }),
         variant: "destructive"
       });
@@ -257,7 +257,7 @@ const BrandKit = () => {
       }
       
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: errorDetails || errorMessage,
         variant: "destructive",
         duration: 10000,
@@ -269,7 +269,7 @@ const BrandKit = () => {
 
   const handleExportPDF = () => {
     toast({
-      title: "Export wird vorbereitet",
+      title: tx({ de: "Export wird vorbereitet", en: "Export is being prepared", es: "Se está preparando la exportación." }),
       description: "PDF-Export kommt in Kürze"
     });
   };
@@ -312,11 +312,11 @@ const BrandKit = () => {
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
       toast({
         title: "Dupliziert",
-        description: "Brand Kit wurde kopiert"
+        description: tx({ de: "Brand Kit wurde kopiert", en: "Brand Kit has been copied", es: "El kit de marca ha sido copiado." })
       });
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Konnte nicht dupliziert werden", en: "Could not be duplicated", es: "No se pudo duplicar" }),
         variant: "destructive"
       });
@@ -328,7 +328,7 @@ const BrandKit = () => {
     setCopiedText(label);
     setTimeout(() => setCopiedText(""), 2000);
     toast({
-      title: "Kopiert!",
+      title: tx({ de: "Kopiert!", en: "Copied!", es: "¡Copiado!" }),
       description: `${label}: ${text}`
     });
   };
@@ -444,7 +444,7 @@ const BrandKit = () => {
                   className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl overflow-hidden hover:shadow-[0_0_30px_hsla(43,90%,68%,0.08)] transition-all duration-300"
                 >
                   <div className="p-6 border-b border-white/10">
-                    <h3 className="text-xl font-semibold">Neues Marken-Set erstellen</h3>
+                    <h3 className="text-xl font-semibold">{tx({ de: "Neues Marken-Set erstellen", en: "Create a new brand set", es: "Crear un nuevo conjunto de marcas" })}</h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       Fülle die Informationen aus oder nutze den Wizard
                     </p>
@@ -628,7 +628,7 @@ const BrandKit = () => {
                       >
                         <Star className="h-6 w-6 text-primary" />
                       </motion.div>
-                      <h3 className="text-xl font-semibold">Was macht dieses Feature besonders?</h3>
+                      <h3 className="text-xl font-semibold">{tx({ de: "Was macht dieses Feature besonders?", en: "What makes this feature special?", es: "¿Qué hace que esta característica sea especial?" })}</h3>
                     </div>
                   </div>
                   
@@ -639,11 +639,11 @@ const BrandKit = () => {
                     animate="visible"
                   >
                     {[
-                      { emoji: "✨", title: "KI-Markenanalyse", desc: "Automatische Erkennung von Farben, Stilrichtung und Emotionen aus deinem Logo" },
-                      { emoji: "🎨", title: "Visuelles Brandboard", desc: "Sofortige Live-Vorschau mit Farbpalette, Schriften und Beispiel-Posts" },
-                      { emoji: "🔗", title: "Auto-Integration", desc: "Alle Tools nutzen automatisch deine Markenfarben und Tonalität" },
-                      { emoji: "📊", title: "Consistency Score", desc: "Regelmäßige Analyse deiner Content-Konsistenz mit Verbesserungstipps" },
-                      { emoji: "🚀", title: "Multi-Brand-Management", desc: "Verwalte mehrere Marken und wechsle mit einem Klick" },
+                      { emoji: "✨", title: "KI-Markenanalyse", desc: tx({ de: "Automatische Erkennung von Farben, Stilrichtung und Emotionen aus deinem Logo", en: "Automatic recognition of colors, style and emotions from your logo", es: "Reconocimiento automático de colores, estilo y emociones de tu logo." }) },
+                      { emoji: "🎨", title: "Visuelles Brandboard", desc: tx({ de: "Sofortige Live-Vorschau mit Farbpalette, Schriften und Beispiel-Posts", en: "Instant live preview with color palette, fonts and sample posts", es: "Vista previa instantánea en vivo con paleta de colores, fuentes y publicaciones de muestra" }) },
+                      { emoji: "🔗", title: "Auto-Integration", desc: tx({ de: "Alle Tools nutzen automatisch deine Markenfarben und Tonalität", en: "All tools automatically use your brand colors and tonality", es: "Todas las herramientas utilizan automáticamente los colores y la tonalidad de su marca." }) },
+                      { emoji: "📊", title: "Consistency Score", desc: tx({ de: "Regelmäßige Analyse deiner Content-Konsistenz mit Verbesserungstipps", en: "Regular analysis of your content consistency with improvement tips", es: "Análisis periódico de la coherencia de su contenido con consejos de mejora." }) },
+                      { emoji: "🚀", title: "Multi-Brand-Management", desc: tx({ de: "Verwalte mehrere Marken und wechsle mit einem Klick", en: "Manage multiple brands and switch with one click", es: "Administre múltiples marcas y cambie con un solo clic" }) },
                     ].map((feature, idx) => (
                       <motion.div 
                         key={idx}
@@ -931,7 +931,7 @@ const BrandKit = () => {
                             size="sm"
                             className="hover:bg-destructive/20 hover:text-destructive"
                             onClick={() => {
-                              if (confirm("Wirklich löschen?")) {
+                              if (confirm(tx({ de: "Wirklich löschen?", en: "Really delete?", es: "¿Realmente eliminar?" }))) {
                                 deleteMutation.mutate(kit.id);
                               }
                             }}

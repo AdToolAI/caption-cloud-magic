@@ -333,7 +333,7 @@ export default function AdDirectorWizard({
     } catch (err: any) {
       console.error('[AdDirectorWizard] variants failed:', err);
       toast({
-        title: 'Skript-Varianten fehlgeschlagen',
+        title: tx({ de: 'Skript-Varianten fehlgeschlagen', en: 'Script variants failed', es: 'Las variantes de script fallaron' }),
         description: err?.message ?? tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
         variant: 'destructive',
       });
@@ -491,7 +491,7 @@ export default function AdDirectorWizard({
     } catch (err: any) {
       console.error('[AdDirectorWizard] generation failed:', err);
       toast({
-        title: 'Erstellung fehlgeschlagen',
+        title: tx({ de: 'Erstellung fehlgeschlagen', en: 'Creation failed', es: 'La creación falló' }),
         description: err?.message ?? tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
         variant: 'destructive',
       });
@@ -683,7 +683,7 @@ export default function AdDirectorWizard({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="ad-usps">USPs (eine pro Zeile)</Label>
+                    <Label htmlFor="ad-usps">{tx({ de: "USPs (eine pro Zeile)", en: "USPs (one per line)", es: "PVU (uno por línea)" })}</Label>
                     <Textarea
                       id="ad-usps"
                       value={usps}
@@ -725,7 +725,7 @@ export default function AdDirectorWizard({
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {activeBrandKit
-                          ? `Aktives Kit: ${activeBrandKit.brand_name ?? 'Unbenannt'} — Farben & Brand-Name werden in CTA + Hooks gewoben.`
+                          ? tx({ de: `Aktives Kit: ${activeBrandKit.brand_name ?? 'Unbenannt'} — Farben & Brand-Name werden in CTA + Hooks gewoben.`, en: `Active Kit: ${activeBrandKit.brand_name ?? 'Unbenannt'} — Colors & brand name are woven into CTA + hooks.`, es: `Kit activo: ${activeBrandKit.brand_name ?? 'Unbenannt'}: los colores y el nombre de la marca están entretejidos en ganchos CTA +.` })
                           : tx({ de: 'Kein aktives Brand-Kit gefunden. Erstelle eins unter Brand Kit, um es hier nutzen zu können.', en: 'No active Brand Kit found. Create one under Brand Kit to use it here.', es: 'No se encontró ningún Brand Kit activo. Crea uno en Brand Kit para poder usarlo aquí.' })}
                       </p>
                       {activeBrandKit && useBrandKit && (
@@ -889,13 +889,13 @@ export default function AdDirectorWizard({
                   <div className="flex items-start gap-3">
                     <Scissors className="h-4 w-4 mt-0.5 text-primary shrink-0" />
                     <div className="flex-1 space-y-3">
-                      <p className="text-sm font-medium">Cutdowns aus dem Master</p>
+                      <p className="text-sm font-medium">{tx({ de: "Cutdowns aus dem Master", en: "Cutdowns from the master", es: "Reducciones del maestro" })}</p>
                       <div className="flex items-center justify-between gap-3">
-                        <Label htmlFor="cd-15s" className="cursor-pointer text-sm">+ 15-Sekunden-Cutdown</Label>
+                        <Label htmlFor="cd-15s" className="cursor-pointer text-sm">{tx({ de: "+ 15-Sekunden-Cutdown", en: "+ 15 second cutdown", es: "+ Reducción de 15 segundos" })}</Label>
                         <Switch id="cd-15s" checked={cutdown15s} onCheckedChange={setCutdown15s} />
                       </div>
                       <div className="flex items-center justify-between gap-3">
-                        <Label htmlFor="cd-6s" className="cursor-pointer text-sm">+ 6-Sekunden-Hook (Reels)</Label>
+                        <Label htmlFor="cd-6s" className="cursor-pointer text-sm">{tx({ de: "+ 6-Sekunden-Hook (Reels)", en: "+ 6 second hook (reels)", es: "+ 6 segundos de gancho (carretes)" })}</Label>
                         <Switch id="cd-6s" checked={cutdown6sHook} onCheckedChange={setCutdown6sHook} />
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -944,8 +944,8 @@ export default function AdDirectorWizard({
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {activeBrandKit?.logo_url
-                          ? 'Statische Brand-Endcard mit Logo + Tagline. 0 AI-Credits.'
-                          : 'Lade ein Logo in dein Brand-Kit, um dies zu nutzen.'}
+                          ? tx({ de: 'Statische Brand-Endcard mit Logo + Tagline. 0 AI-Credits.', en: 'Static brand end card with logo + tagline. 0 AI credits.', es: 'Tarjeta final de marca estática con logo + eslogan. 0 créditos de IA.' })
+                          : tx({ de: 'Lade ein Logo in dein Brand-Kit, um dies zu nutzen.', en: 'To use this, upload a logo to your brand kit.', es: 'Para utilizar esto, cargue un logotipo en el kit de su marca.' })}
                       </p>
                     </div>
                   </div>
@@ -1009,7 +1009,7 @@ export default function AdDirectorWizard({
                     </li>
                     <li>
                       <span className="text-foreground">A/B-Renders:</span>{' '}
-                      {renderAllVariants ? '✓ Alle 3 Varianten' : '1 Variante'}
+                      {renderAllVariants ? tx({ de: '✓ Alle 3 Varianten', en: '✓ All 3 variants', es: '✓ Las 3 variantes' }) : '1 Variante'}
                     </li>
                     <li>
                       <span className="text-foreground">Cutdowns:</span>{' '}

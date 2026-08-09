@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CostEstimation } from '@/hooks/useRenderCostEstimation';
 import { Info } from 'lucide-react';
@@ -16,17 +17,17 @@ export const CostBreakdown = ({ estimation }: CostBreakdownProps) => {
     {
       label: 'Dauer-Kosten',
       value: `${estimation.breakdown.durationCost} Credits`,
-      description: 'Basierend auf Video-Länge'
+      description: tx({ de: 'Basierend auf Video-Länge', en: 'Based on video length', es: 'Basado en la duración del video' })
     },
     {
       label: 'Auflösungs-Faktor',
       value: `×${estimation.breakdown.resolutionMultiplier}`,
-      description: 'Multiplikator für höhere Auflösung'
+      description: tx({ de: 'Multiplikator für höhere Auflösung', en: 'Multiplier for higher resolution', es: 'Multiplicador para mayor resolución' })
     },
     {
       label: 'Komplexitäts-Faktor',
       value: `×${estimation.breakdown.complexityMultiplier}`,
-      description: 'Multiplikator für Animations-Komplexität'
+      description: tx({ de: 'Multiplikator für Animations-Komplexität', en: 'Animation complexity multiplier', es: 'Multiplicador de complejidad de animación' })
     },
   ];
 

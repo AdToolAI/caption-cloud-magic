@@ -114,7 +114,7 @@ const AllComments = () => {
         if (error) {
           console.error("Error creating project:", error);
           toast({
-            title: "Fehler",
+            title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
             description: tx({ de: "Projekt konnte nicht erstellt werden", en: "Project could not be created", es: "No se pudo crear el proyecto" }),
             variant: "destructive",
           });
@@ -160,7 +160,7 @@ const AllComments = () => {
       } catch (error) {
         console.error("Error fetching comments:", error);
         toast({
-          title: "Fehler",
+          title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
           description: tx({ de: "Kommentare konnten nicht geladen werden", en: "Could not load comments", es: "No se pudieron cargar los comentarios" }),
           variant: "destructive",
         });
@@ -196,7 +196,7 @@ const AllComments = () => {
       if (error) throw error;
 
       toast({
-        title: "Import erfolgreich",
+        title: tx({ de: "Import erfolgreich", en: "Import successful", es: "Importación exitosa" }),
         description: data.message,
       });
 
@@ -207,8 +207,8 @@ const AllComments = () => {
     } catch (error: any) {
       console.error("Import error:", error);
       toast({
-        title: "Import fehlgeschlagen",
-        description: error.message || "Unbekannter Fehler",
+        title: tx({ de: "Import fehlgeschlagen", en: "Import failed", es: "Importación fallida" }),
+        description: error.message || tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
         variant: "destructive",
       });
     }
@@ -231,7 +231,7 @@ const AllComments = () => {
     } catch (error) {
       console.error("Error updating status:", error);
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Status konnte nicht aktualisiert werden", en: "Could not update status", es: "No se pudo actualizar el estado" }),
         variant: "destructive",
       });
@@ -272,7 +272,7 @@ const AllComments = () => {
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Alle Kommentare</h1>
+          <h1 className="text-3xl font-bold">{tx({ de: "Alle Kommentare", en: "All comments", es: "Todos los comentarios" })}</h1>
           <p className="text-muted-foreground">{tx({ de: "Persistente Kommentarverwaltung über alle Plattformen", en: "Persistent comment management across all platforms", es: "Gestión persistente de comentarios en todas las plataformas" })}</p>
         </div>
         <div className="flex gap-2">

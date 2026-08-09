@@ -50,7 +50,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
 
   const handleAnalyze = async () => {
     if (!videoUrl) {
-      toast.error('Kein Video ausgewählt');
+      toast.error(tx({ de: 'Kein Video ausgewählt', en: 'No video selected', es: 'Ningún vídeo seleccionado' }));
       return;
     }
 
@@ -83,7 +83,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
 
         setCuts(formattedCuts);
         onCutsGenerated(formattedCuts);
-        toast.success(`${formattedCuts.length} Schnittpunkte erkannt`, {
+        toast.success(tx({ de: `${formattedCuts.length} Schnittpunkte erkannt`, en: `${formattedCuts.length} Cut points detected`, es: `${formattedCuts.length} Puntos de corte detectados` }), {
           description: `${data.credits_used} Credits verwendet`,
         });
       }
@@ -92,10 +92,10 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
       
       if (error?.context?.status === 402) {
         toast.error('Nicht genügend Credits', {
-          description: `Du benötigst ${CREDITS_COST} Credits für AI Auto-Cut`,
+          description: tx({ de: tx({ de: tx({ de: tx({ de: `Du benötigst ${CREDITS_COST} Credits für AI Auto-Cut`, en: `You need ${CREDITS_COST} credits for AI Auto-Cut`, es: `Necesitas ${CREDITS_COST} créditos para el corte automático con IA` }), en: `You need ${CREDITS_COST} credits for AI Auto-Cut`, es: `Necesitas ${CREDITS_COST} créditos para el corte automático con IA` }), en: `You need ${CREDITS_COST} credits for AI Auto-Cut`, es: `Necesitas ${CREDITS_COST} créditos para el corte automático con IA` }), en: `You need ${CREDITS_COST} credits for AI Auto-Cut`, es: `Necesitas ${CREDITS_COST} créditos para el corte automático con IA` }),
         });
       } else {
-        toast.error('Analyse fehlgeschlagen', {
+        toast.error(tx({ de: 'Analyse fehlgeschlagen', en: 'Analysis failed', es: 'El análisis falló' }), {
           description: error.message || tx({ de: 'Bitte versuche es erneut', en: 'Please try again', es: 'Por favor, inténtalo de nuevo' }),
         });
       }

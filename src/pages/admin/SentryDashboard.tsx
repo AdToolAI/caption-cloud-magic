@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,8 +57,8 @@ export function SentryDashboard() {
       toast.success(`${data?.count ?? 0} Issues von Sentry synchronisiert`);
       await loadCached();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Fehler';
-      toast.error(`Sync fehlgeschlagen: ${msg}`);
+      const msg = e instanceof Error ? e.message : tx({ de: 'Fehler', en: 'Mistake', es: 'Error' });
+      toast.error(tx({ de: tx({ de: tx({ de: `Sync fehlgeschlagen: ${msg}`, en: `Sync failed: ${msg}`, es: `Error de sincronización: ${msg}` }), en: `Sync failed: ${msg}`, es: `Error de sincronización: ${msg}` }), en: `Sync failed: ${msg}`, es: `Error de sincronización: ${msg}` }));
     } finally {
       setSyncing(false);
     }
@@ -72,7 +73,7 @@ export function SentryDashboard() {
       toast.success('Issue als resolved markiert');
       await loadCached();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Fehler';
+      const msg = e instanceof Error ? e.message : tx({ de: 'Fehler', en: 'Mistake', es: 'Error' });
       toast.error(msg);
     }
   };

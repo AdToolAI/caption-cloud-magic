@@ -78,7 +78,7 @@ export default function SceneRenderConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            {title || (multi ? 'Mehrere Szenen rendern?' : 'Szene rendern?')}
+            {title || (multi ? tx({ de: 'Mehrere Szenen rendern?', en: 'Render multiple scenes?', es: '¿Renderizar múltiples escenas?' }) : tx({ de: 'Szene rendern?', en: 'Render scene?', es: '¿Renderizar escena?' }))}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {description ||
@@ -196,7 +196,7 @@ export default function SceneRenderConfirmDialog({
               </div>
               <p className="text-[11.5px] leading-relaxed text-red-100/90">
                 <strong>{providerLabel}</strong> liefert bei Lip-Sync-Szenen
-                {anyMultiSpeaker ? ' mit mehreren Sprechern' : ''} keine
+                {anyMultiSpeaker ? tx({ de: ' mit mehreren Sprechern', en: 'with multiple speakers', es: 'con múltiples parlantes' }) : ''} keine
                 zuverlässigen Ergebnisse. Es kann zu Ghost-Mouthing (Nicht-
                 Sprecher bewegen den Mund), verzerrten Gesichtern und
                 falschen Mundbewegungen kommen.
@@ -271,8 +271,8 @@ export default function SceneRenderConfirmDialog({
             }
           >
             {hasRisk
-              ? `Trotzdem rendern für ${formatCredits(cost.totalCredits)}`
-              : `Rendern für ${formatCredits(cost.totalCredits)}`}
+              ? tx({ de: `Trotzdem rendern für ${formatCredits(cost.totalCredits)}`, en: `Still render for ${formatCredits(cost.totalCredits)}`, es: `Todavía renderizado por ${formatCredits(cost.totalCredits)}` })
+              : tx({ de: `Rendern für ${formatCredits(cost.totalCredits)}`, en: `Rendering for ${formatCredits(cost.totalCredits)}`, es: `Representación para ${formatCredits(cost.totalCredits)}` })}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -122,11 +122,11 @@ export default function LocationEditor({
 
   const handleSave = async () => {
     if (!draft.name.trim()) {
-      toast.error('Name ist erforderlich');
+      toast.error(tx({ de: 'Name ist erforderlich', en: 'Name is required', es: 'El nombre es obligatorio' }));
       return;
     }
     if (!draft.description.trim()) {
-      toast.error('Beschreibung ist erforderlich');
+      toast.error(tx({ de: 'Beschreibung ist erforderlich', en: 'Description is required', es: 'La descripción es obligatoria' }));
       return;
     }
     setSaving(true);

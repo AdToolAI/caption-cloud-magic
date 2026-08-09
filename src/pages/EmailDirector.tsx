@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -69,11 +70,11 @@ export default function EmailDirector() {
 
   async function handleGenerate() {
     if (!briefing.trim() || briefing.trim().length < 10) {
-      toast.error("Briefing zu kurz (min. 10 Zeichen)");
+      toast.error(tx({ de: "Briefing zu kurz (min. 10 Zeichen)", en: "Briefing too short (min. 10 characters)", es: "El briefing es demasiado corto (mín. 10 caracteres)" }));
       return;
     }
     if (!title.trim()) {
-      toast.error("Titel fehlt");
+      toast.error(tx({ de: "Titel fehlt", en: "Title missing", es: "Falta el título" }));
       return;
     }
 
@@ -102,24 +103,24 @@ export default function EmailDirector() {
         .single();
       if (insErr) throw insErr;
 
-      toast.success("Email Kampagne generiert");
+      toast.success(tx({ de: "Email Kampagne generiert", en: "Email campaign generated", es: "Campaña de email generada" }));
       setCampaigns((prev) => [inserted as any, ...prev]);
       setActiveId(inserted!.id);
       setTitle(""); setBriefing("");
     } catch (e: any) {
-      toast.error(e.message || "Generierung fehlgeschlagen");
+      toast.error(e.message || tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Generación fallida" }));
     } finally {
       setGenerating(false);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Kampagne löschen?")) return;
+    if (!confirm(tx({ de: "Kampagne löschen?", en: "Delete campaign?", es: "¿Eliminar campaña?" }))) return;
     const { error } = await supabase.from("email_campaigns").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     setCampaigns((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) setActiveId(null);
-    toast.success("Gelöscht");
+    toast.success(tx({ de: "Gelöscht", en: "Deleted", es: "Eliminado" }));
   }
 
   async function handleTestSend(subjectIndex: number, variantIndex: number) {
@@ -133,7 +134,7 @@ export default function EmailDirector() {
       if (data?.error) throw new Error(data.error);
       toast.success(`Test gesendet an ${data.recipient}`);
     } catch (e: any) {
-      toast.error(e.message || "Versand fehlgeschlagen");
+      toast.error(e.message || tx({ de: "Versand fehlgeschlagen", en: "Sending failed", es: "Envío fallido" }));
     } finally {
       setSending(false);
     }
@@ -236,7 +237,7 @@ export default function EmailDirector() {
                   </button>
                 ))}
                 {!loading && campaigns.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-6">Noch keine Kampagnen</p>
+                  <p className="text-xs text-muted-foreground text-center py-6">{tx({ de: "Noch keine Kampagnen", en: "No campaigns yet", es: "Aún no hay campañas" })}</p>
                 )}
               </div>
             </Card>
@@ -298,7 +299,7 @@ export default function EmailDirector() {
                           className="w-full h-[280px] border border-border rounded-md bg-background"
                         />
                         <div className="mt-3 pt-3 border-t border-border">
-                          <Label className="text-xs mb-2 block">Test-Send mit Subject:</Label>
+                          <Label className="text-xs mb-2 block">{tx({ de: "Test-Send mit Subject:", en: "Test send with subject:", es: "Envío de prueba con asunto:" })}</Label>
                           <div className="flex flex-wrap gap-2">
                             {active.subjects?.map((s, si) => (
                               <Button

@@ -24,7 +24,7 @@ const COPY = {
     title1: "Ein Briefing.",
     title2: "Ein fertiger Clip.",
     briefLabel: "Dein Briefing",
-    brief: "Büroszene, vier Kolleg:innen im Dialog, deutsch gesprochen, 8 Sekunden.",
+    brief: tx({ de: "Büroszene, vier Kolleg:innen im Dialog, deutsch gesprochen, 8 Sekunden.", en: "Office scene, four colleagues in dialogue, German spoken, 8 seconds.", es: "Escena de oficina, cuatro compañeros dialogando, alemán hablado, 8 segundos." }),
     resultLabel: "Das Ergebnis",
     steps: ["Skript & Cast", "Stimmen", "Lip-Sync", "Fertiger Clip"],
     meta: "8s · Deutsch · 4 Sprecher · Lip-Sync",

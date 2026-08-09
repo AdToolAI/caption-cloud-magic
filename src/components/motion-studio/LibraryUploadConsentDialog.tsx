@@ -162,7 +162,7 @@ export default function LibraryUploadConsentDialog({
             disabled={!allChecked || submitting}
             className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
           >
-            {submitting ? 'Wird gespeichert…' : 'Bestätigen und fortfahren'}
+            {submitting ? tx({ de: 'Wird gespeichert…', en: 'Saved...', es: 'Guardado...' }) : tx({ de: 'Bestätigen und fortfahren', en: 'Confirm and continue', es: 'Confirmar y continuar' })}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

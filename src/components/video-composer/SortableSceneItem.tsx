@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { CSS } from '@dnd-kit/utilities';
 import { useSortable } from '@dnd-kit/sortable';
 import { GripVertical } from 'lucide-react';
@@ -50,7 +51,7 @@ export function SortableSceneItem({ id, children, badge, className }: SortableSc
         {badge}
         <button
           type="button"
-          aria-label="Szene per Drag & Drop verschieben"
+          aria-label={tx({ de: "Szene per Drag & Drop verschieben", en: "Move scene using drag & drop", es: "Mover escena usando arrastrar y soltar" })}
           className="flex h-8 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-grab active:cursor-grabbing touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
           {...attributes}
           {...listeners}

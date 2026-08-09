@@ -148,7 +148,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
             {t('uvc.reviewTitle') !== 'uvc.reviewTitle' ? t('uvc.reviewTitle') : 'Konzept prüfen & anpassen'}
           </h3>
           <p className="text-xs text-muted-foreground/70">
-            {t('uvc.reviewSubtitle') !== 'uvc.reviewSubtitle' ? t('uvc.reviewSubtitle') : 'Überprüfe die gesammelten Informationen und passe sie bei Bedarf an.'}
+            {t('uvc.reviewSubtitle') !== 'uvc.reviewSubtitle' ? t('uvc.reviewSubtitle') : tx({ de: 'Überprüfe die gesammelten Informationen und passe sie bei Bedarf an.', en: 'Review the information you\'ve collected and adjust if necessary.', es: 'Revise la información que ha recopilado y ajústela si es necesario.' })}
           </p>
         </div>
       </div>
@@ -196,7 +196,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
             </div>
             <div className="space-y-1.5">
               <FieldLabel>Geschlecht</FieldLabel>
-              <Input value={data.targetAudienceGender || ''} onChange={e => update('targetAudienceGender', e.target.value)} className={fieldClass} placeholder="z.B. Alle" />
+              <Input value={data.targetAudienceGender || ''} onChange={e => update('targetAudienceGender', e.target.value)} className={fieldClass} placeholder={tx({ de: "z.B. Alle", en: "e.g. All", es: "p.ej. Todo" })} />
             </div>
           </div>
         </CollapsibleSection>

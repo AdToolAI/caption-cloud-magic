@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -200,7 +201,7 @@ export function AIToolsSidebarExpanded({
               <Textarea
                 value={voiceText}
                 onChange={(e) => setVoiceText(e.target.value)}
-                placeholder="Text für Voiceover eingeben..."
+                placeholder={tx({ de: "Text für Voiceover eingeben...", en: "Enter text for voiceover...", es: "Ingrese el texto para la voz en off..." })}
                 className="mt-1 min-h-[100px] text-sm"
               />
             </div>
@@ -282,7 +283,7 @@ export function AIToolsSidebarExpanded({
                       {Math.floor(clip.duration / 60)}:{Math.floor(clip.duration % 60).toString().padStart(2, '0')}
                     </div>
                   </div>
-                )) ?? <p className="text-xs text-muted-foreground italic">Noch keine Musik hinzugefügt.</p>}
+                )) ?? <p className="text-xs text-muted-foreground italic">{tx({ de: "Noch keine Musik hinzugefügt.", en: "No music added yet.", es: "Aún no se ha añadido música." })}</p>}
             </div>
           </TabsContent>
 

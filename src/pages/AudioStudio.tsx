@@ -61,7 +61,7 @@ export default function AudioStudio() {
   const handleSendToBeatSync = useCallback((track: { url: string; title?: string }) => {
     setMusicUrl(track.url);
     setActiveTab('beat-sync');
-    toast.success('Track in Beat-Sync geladen', {
+    toast.success(tx({ de: "Track in Beat-Sync geladen", en: "Track loaded into beat sync", es: "Pista cargada en sincronización de ritmo" }), {
       description: track.title ? `"${track.title}" bereit für Beat-Matching` : undefined,
     });
   }, []);
@@ -123,10 +123,10 @@ export default function AudioStudio() {
           .getPublicUrl(fileName);
         
         setStorageAudioUrl(publicUrlData.publicUrl);
-        toast.success('Audio erfolgreich geladen');
+        toast.success(tx({ de: "Audio erfolgreich geladen", en: "Audio loaded successfully", es: "Audio cargado exitosamente" }));
       } catch (error) {
         console.error('Upload error:', error);
-        toast.error('Upload fehlgeschlagen');
+        toast.error(tx({ de: "Upload fehlgeschlagen", en: "Upload failed", es: "Error al subir" }));
       } finally {
         setIsProcessing(false);
       }
@@ -623,7 +623,7 @@ export default function AudioStudio() {
                           onStemsExtracted={(set) => {
                             setStemSet(set);
                             setActiveTab('stems');
-                            toast.success('Stems bereit zum Mixen', {
+                            toast.success(tx({ de: "Stems bereit zum Mixen", en: "Stems ready for mixing", es: "Tallos listos para mezclar" }), {
                               description: `${set.stems.length} Spuren in den Stem-Mixer geladen`,
                             });
                           }}
@@ -670,7 +670,7 @@ export default function AudioStudio() {
                           ]}
                           onMixSaved={() => {
                             setLibraryRefreshKey(k => k + 1);
-                            toast.success('Final Mix gespeichert', { description: 'In Bibliothek verfügbar' });
+                            toast.success(tx({ de: "Final Mix gespeichert", en: "Final mix saved", es: "Mezcla final guardada" }), { description: 'In Bibliothek verfügbar' });
                           }}
                         />
                       </motion.div>

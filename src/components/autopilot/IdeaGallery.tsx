@@ -18,6 +18,7 @@ import { assessIdeaSet, needsChapterMode } from '@/lib/autopilot/ideaFeasibility
 import { estimateProductionCost, formatEuro } from '@/lib/autopilot/costEstimate';
 import type { LauncherOptions } from '@/components/autopilot/AutopilotIdeaLauncher';
 import { cn } from '@/lib/utils';
+import { useTx } from '@/lib/i18nText';
 
 interface Props {
   strategy: AutopilotStrategy;
@@ -27,17 +28,21 @@ interface Props {
   onBack: () => void;
 }
 
-const BEAT_LABEL: Record<string, string> = {
-  hook: 'Aufhänger',
-  problem: 'Problem',
-  reveal: 'Lösung',
-  proof: 'Beweis',
-  benefit: 'Nutzen',
-  emotion: 'Emotion',
-  cta: 'Abbinder',
-};
+function useBeatLabel(tx: ReturnType<typeof useTx>): Record<string, string> {
+  return {
+    hook: tx({ de: 'Aufhänger', en: 'Hook', es: 'Gancho' }),
+    problem: tx({ de: 'Problem', en: 'Problem', es: 'Problema' }),
+    reveal: tx({ de: 'Lösung', en: 'Solution', es: 'Solución' }),
+    proof: tx({ de: 'Beweis', en: 'Proof', es: 'Prueba' }),
+    benefit: tx({ de: 'Nutzen', en: 'Benefit', es: 'Beneficio' }),
+    emotion: tx({ de: 'Emotion', en: 'Emotion', es: 'Emoción' }),
+    cta: tx({ de: 'Abbinder', en: 'Closing', es: 'Cierre' }),
+  };
+}
 
 export function IdeaGallery({ strategy, ideas, options, onSelect, onBack }: Props) {
+  const tx = useTx();
+  const BEAT_LABEL = useBeatLabel(tx);
   const checked = useMemo(
     () =>
       assessIdeaSet(ideas, {
@@ -53,10 +58,10 @@ export function IdeaGallery({ strategy, ideas, options, onSelect, onBack }: Prop
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Briefing ändern
+          <ArrowLeft className="mr-2 h-4 w-4" /> {tx({ de: "Briefing ändern", en: "Change briefing", es: "Cambiar briefing" })}
         </Button>
         <Badge variant="outline" className="border-primary/30">
-          {checked.length} Ideen · alle produzierbar
+          {checked.length} {tx({ de: "Ideen · alle produzierbar", en: "ideas · all producible", es: "ideas · todas viables" })}
         </Badge>
       </div>
 
@@ -67,20 +72,20 @@ export function IdeaGallery({ strategy, ideas, options, onSelect, onBack }: Prop
             <Target className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-serif text-lg">Die Strategie dahinter</h3>
+            <h3 className="font-serif text-lg">{tx({ de: "Die Strategie dahinter", en: "The strategy behind it", es: "La estrategia detrás" })}</h3>
             <p className="text-sm text-muted-foreground">
-              Alle fünf Ideen zahlen auf dieselbe Position ein — nur der Weg dorthin ist verschieden.
+              {tx({ de: "Alle fünf Ideen zahlen auf dieselbe Position ein — nur der Weg dorthin ist verschieden.", en: "All five ideas pay into the same position — only the path there differs.", es: "Las cinco ideas apuntan a la misma posición — solo el camino hacia allí es diferente." })}
             </p>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <StrategyCell label="Zielgruppe" value={strategy.audience} />
-          <StrategyCell label="Der Nutzen" value={strategy.benefit} />
-          <StrategyCell label="Das Kaufhemmnis" value={strategy.objection} />
-          <StrategyCell label="Tonalität" value={strategy.tone} />
-          <StrategyCell label="Nach 3 Sekunden denkt der Zuschauer" value={strategy.threeSecondThought} />
-          <StrategyCell label="Das bleibt hängen" value={strategy.takeaway} />
+          <StrategyCell label={tx({ de: "Zielgruppe", en: "Target audience", es: "Público objetivo" })} value={strategy.audience} />
+          <StrategyCell label={tx({ de: "Der Nutzen", en: "The benefit", es: "El beneficio" })} value={strategy.benefit} />
+          <StrategyCell label={tx({ de: "Das Kaufhemmnis", en: "The purchase objection", es: "La objeción de compra" })} value={strategy.objection} />
+          <StrategyCell label={tx({ de: "Tonalität", en: "Tone", es: "Tono" })} value={strategy.tone} />
+          <StrategyCell label={tx({ de: "Nach 3 Sekunden denkt der Zuschauer", en: "After 3 seconds the viewer thinks", es: "Tras 3 segundos el espectador piensa" })} value={strategy.threeSecondThought} />
+          <StrategyCell label={tx({ de: "Das bleibt hängen", en: "What sticks", es: "Lo que perdura" })} value={strategy.takeaway} />
         </div>
       </Card>
 
@@ -136,11 +141,11 @@ export function IdeaGallery({ strategy, ideas, options, onSelect, onBack }: Prop
 
               <div className="mt-4 rounded-lg bg-background/40 p-3">
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  <span className="font-medium text-foreground">Bildwelt: </span>
+                  <span className="font-medium text-foreground">{tx({ de: "Bildwelt:", en: "Visual world:", es: "Mundo visual:" })} </span>
                   {idea.visualWorld}
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  <span className="font-medium text-foreground">Warum das wirkt: </span>
+                  <span className="font-medium text-foreground">{tx({ de: "Warum das wirkt:", en: "Why it works:", es: "Por qué funciona:" })} </span>
                   {idea.rationale}
                 </p>
               </div>
@@ -158,21 +163,21 @@ export function IdeaGallery({ strategy, ideas, options, onSelect, onBack }: Prop
               <div className="mt-auto pt-5">
                 <div className="mb-3 flex items-center justify-between text-sm">
                   <span className="flex items-center gap-1.5 text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" /> {Math.round(totalSeconds)}s · {idea.beats.length} Szenen
+                    <Clock className="h-3.5 w-3.5" /> {Math.round(totalSeconds)}s · {idea.beats.length} {tx({ de: "Szenen", en: "scenes", es: "escenas" })}
                   </span>
                   <span className="font-medium">
-                    ca. {cost.totalCredits} Cr · {formatEuro(cost.totalEuros)}
+                    {tx({ de: "ca.", en: "approx.", es: "aprox." })} {cost.totalCredits} Cr · {formatEuro(cost.totalEuros)}
                   </span>
                 </div>
 
                 {needsChapterMode(totalSeconds) && (
                   <p className="mb-3 text-[11px] text-amber-500">
-                    Langformat — wir produzieren in Kapiteln und schneiden sie am Ende zusammen.
+                    {tx({ de: "Langformat — wir produzieren in Kapiteln und schneiden sie am Ende zusammen.", en: "Long format — we produce in chapters and cut them together at the end.", es: "Formato largo — producimos en capítulos y los unimos al final." })}
                   </p>
                 )}
 
                 <Button className="w-full" onClick={() => onSelect(idea)}>
-                  <Clapperboard className="mr-2 h-4 w-4" /> Diese Idee umsetzen
+                  <Clapperboard className="mr-2 h-4 w-4" /> {tx({ de: "Diese Idee umsetzen", en: "Realize this idea", es: "Realizar esta idea" })}
                 </Button>
               </div>
             </Card>
@@ -182,7 +187,7 @@ export function IdeaGallery({ strategy, ideas, options, onSelect, onBack }: Prop
 
       <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5" />
-        Nach der Auswahl entsteht das Storyboard. Produziert wird erst, wenn du es freigibst.
+        {tx({ de: "Nach der Auswahl entsteht das Storyboard. Produziert wird erst, wenn du es freigibst.", en: "The storyboard is created after selection. Production only starts once you approve it.", es: "Después de la selección se crea el guion gráfico. La producción solo comienza cuando lo apruebes." })}
       </p>
     </div>
   );
@@ -206,7 +211,7 @@ function FeasibilityBadge({ score }: { score: number }) {
         : 'border-destructive/40 text-destructive';
   return (
     <Badge variant="outline" className={cn('shrink-0 gap-1 whitespace-nowrap', tone)}>
-      <CheckCircle2 className="h-3 w-3" /> {score}% umsetzbar
+      <CheckCircle2 className="h-3 w-3" /> {score}% {useTx()({ de: "umsetzbar", en: "feasible", es: "viable" })}
     </Badge>
   );
 }

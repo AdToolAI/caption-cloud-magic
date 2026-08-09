@@ -180,7 +180,7 @@ export default function PipelineProgressBar({
               </span>
             )}
             <span className={cn('tabular-nums', hasFailure ? 'text-destructive' : 'text-foreground')}>
-              {hasFailure ? 'Fehler' : `${overallPercent}%`}
+              {hasFailure ? tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }) : `${overallPercent}%`}
             </span>
             <span className="text-muted-foreground/70 tabular-nums hidden sm:inline">
               {hasFailure ? 'Lip-Sync abgebrochen' : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}
@@ -210,7 +210,7 @@ function ResetFailedButton({ scenes }: { scenes: ComposerScene[] }) {
       className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[11px] font-medium hover:bg-destructive/20 disabled:opacity-60"
       title={tx({ de: "Storniert offene Jobs, refundiert Credits und startet einen sauberen neuen Versuch.", en: "Cancels open jobs, refunds credits, and starts a clean new attempt.", es: "Cancela trabajos abiertos, reembolsa créditos y comienza un nuevo intento limpio." })}
     >
-      {busy ? 'Setze zurück…' : 'Sauber neu starten'}
+      {busy ? tx({ de: 'Setze zurück…', en: 'Reset…', es: 'Reiniciar…' }) : 'Sauber neu starten'}
     </button>
   );
 }

@@ -83,7 +83,7 @@ export function useNLEExport(projectId?: string) {
       const toastId = toast.loading(
         format === 'bundle'
           ? tx({ de: 'Bundle wird gepackt — kann 30–60 s dauern…', en: 'Bundle is being packaged — may take 30–60 s…', es: 'El paquete se está empaquetando — puede tardar 30–60 s…' })
-          : `${format.toUpperCase()} wird exportiert…`,
+          : tx({ de: `${format.toUpperCase()} wird exportiert…`, en: `${format.toUpperCase()} is exported…`, es: `${format.toUpperCase()} se exporta...` }),
       );
       try {
         const { data, error } = await supabase.functions.invoke<ExportResult>(FN_MAP[format], {
@@ -102,13 +102,13 @@ export function useNLEExport(projectId?: string) {
           {
             id: toastId,
             description:
-              data.warnings.length > 0 ? `${data.warnings.length} Hinweis(e) — siehe Datei` : undefined,
+              data.warnings.length > 0 ? tx({ de: `${data.warnings.length} Hinweis(e) — siehe Datei`, en: `${data.warnings.length} Note(s) — see file`, es: `${data.warnings.length} Nota(s) — ver archivo` }) : undefined,
           },
         );
         await loadHistory();
         return data;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Export fehlgeschlagen';
+        const msg = err instanceof Error ? err.message : tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Error de exportación' });
         console.error('[useNLEExport] error:', err);
         toast.error(msg, { id: toastId });
         return null;
@@ -128,7 +128,7 @@ export function useNLEExport(projectId?: string) {
       const ext = record.format === 'bundle' ? 'zip' : record.format;
       triggerDownload(data.signedUrl, `composer-${record.project_id.slice(0, 8)}.${ext}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Download fehlgeschlagen');
+      toast.error(err instanceof Error ? err.message : tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Descarga fallida' }));
     }
   }, []);
 
@@ -165,7 +165,7 @@ export function useNLEExport(projectId?: string) {
           body: { projectId, fcpxmlContent, apply: true },
         });
         if (error) throw new Error(error.message);
-        if (!data?.success) throw new Error(data?.error || 'Import fehlgeschlagen');
+        if (!data?.success) throw new Error(data?.error || tx({ de: 'Import fehlgeschlagen', en: 'Import failed', es: 'Importación fallida' }));
         const a = data.applied;
         toast.success(
           `Übernommen: ${a?.reordered ?? 0} umsortiert, ${a?.trimmed ?? 0} getrimmt`,
@@ -173,7 +173,7 @@ export function useNLEExport(projectId?: string) {
         );
         return data;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Import fehlgeschlagen';
+        const msg = err instanceof Error ? err.message : tx({ de: 'Import fehlgeschlagen', en: 'Import failed', es: 'Importación fallida' });
         toast.error(msg, { id: toastId });
         return null;
       }

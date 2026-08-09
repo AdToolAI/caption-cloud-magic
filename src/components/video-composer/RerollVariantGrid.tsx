@@ -81,7 +81,7 @@ export default function RerollVariantGrid({
       });
     } catch (err) {
       toast({
-        title: 'Reroll fehlgeschlagen',
+        title: tx({ de: 'Reroll fehlgeschlagen', en: 'Reroll failed', es: 'Error al volver a lanzar' }),
         description: err instanceof Error ? err.message : String(err),
         variant: 'destructive',
       });
@@ -111,7 +111,7 @@ export default function RerollVariantGrid({
       onOpenChange(false);
     } catch (err) {
       toast({
-        title: 'Übernehmen fehlgeschlagen',
+        title: tx({ de: 'Übernehmen fehlgeschlagen', en: 'Apply failed', es: 'No se pudo aplicar' }),
         description: err instanceof Error ? err.message : String(err),
         variant: 'destructive',
       });

@@ -73,7 +73,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
     try {
       const buf = await mixer.renderOffline();
       if (!buf) {
-        toast.error('Keine Quellen zum Messen');
+        toast.error(tx({ de: 'Keine Quellen zum Messen', en: 'No sources to measure', es: 'No hay fuentes para medir' }));
         return;
       }
       const { lufs } = mixer.measureLUFS(buf);
@@ -92,7 +92,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
     try {
       const blob = await mixer.exportMix();
       if (!blob) {
-        toast.error('Export fehlgeschlagen');
+        toast.error(tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Exportación fallida' }));
         return;
       }
 
@@ -109,7 +109,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
       // Save to bibliothek
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error('Bitte einloggen');
+        toast.error(tx({ de: 'Bitte einloggen', en: 'Please log in', es: 'Por favor inicia sesión' }));
         return;
       }
 
@@ -146,13 +146,13 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
       });
       if (insErr) throw insErr;
 
-      toast.success('Final Mix gespeichert', {
-        description: `Normalisiert auf ${mixer.target.label} (${mixer.target.lufs} LUFS)`,
+      toast.success(tx({ de: 'Final Mix gespeichert', en: 'Final mix saved', es: 'Mezcla final guardada' }), {
+        description: tx({ de: `Normalisiert auf ${mixer.target.label} (${mixer.target.lufs} LUFS)`, en: `Normalized to ${mixer.target.label} (${mixer.target.lufs} LUFS)`, es: `Normalizado a ${mixer.target.label} (${mixer.target.lufs} LUFS)` }),
       });
       onMixSaved?.();
     } catch (e: any) {
       console.error('[FinalMix] export error', e);
-      toast.error('Export fehlgeschlagen', { description: e.message });
+      toast.error(tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Exportación fallida' }), { description: e.message });
     } finally {
       setSaving(false);
     }
@@ -218,7 +218,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
         {mixer.sources.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border/40 rounded-xl">
             <FileAudio className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">Noch keine Quellen.</p>
+            <p className="text-sm">{tx({ de: "Noch keine Quellen.", en: "No sources yet.", es: "Aún no hay fuentes." })}</p>
             <p className="text-xs mt-1">{tx({ de: "Füge Voiceover, Music oder Stems aus dem Studio hinzu.", en: "Add voiceover, music, or stems from the studio.", es: "Añade voz en off, música o stems desde el estudio." })}</p>
           </div>
         ) : (

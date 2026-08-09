@@ -80,9 +80,9 @@ const STATUS_ICON: Record<string, any> = {
 const FLOW_NAMES = [
   "Composer Multi-Scene Stitch",
   "Director's Cut Lambda Render",
-  "Auto-Director (Brief → Video)",
+  tx({ de: "Auto-Director (Brief → Video)", en: "Auto-Director (Letter → Video)", es: "Director automático (Carta → Vídeo)" }),
   "Talking Head (HeyGen)",
-  "Universal Video Creator",
+  tx({ de: "Universal Video Creator", en: "Universal Video Creator", es: "Creador de vídeos universal" }),
   "Magic Edit (FLUX Fill)",
 ];
 
@@ -132,7 +132,7 @@ export function DeepSweepTab() {
         body: { cap_eur: 50 },
       });
       if (error) throw error;
-      toast.success(`Deep Sweep gestartet (Run ID: ${(data as any)?.run_id?.slice(0, 8)})`);
+      toast.success(tx({ de: `Deep Sweep gestartet (Run ID: ${(data as any)?.run_id?.slice(0, 8)})`, en: `Deep sweep started (Run ID: ${(data as any)?.run_id?.slice(0, 8)})`, es: `Se inició el barrido profundo (ID de ejecución: ${(data as any)?.run_id?.slice(0, 8)})` }));
       setTimeout(load, 1500);
     } catch (e: any) {
       toast.error(`Sweep failed: ${e?.message || String(e)}`);
@@ -171,7 +171,7 @@ export function DeepSweepTab() {
     try {
       const { error } = await supabase.functions.invoke("qa-live-sweep-bootstrap", {});
       if (error) throw error;
-      toast.success("QA-Test-Assets aktualisiert. Beim nächsten Run sollte Magic Edit grün werden.");
+      toast.success(tx({ de: "QA-Test-Assets aktualisiert. Beim nächsten Run sollte Magic Edit grün werden.", en: "QA testing assets updated. On the next run, Magic Edit should turn green.", es: "Activos de pruebas de control de calidad actualizados. En la siguiente ejecución, Magic Edit debería volverse verde." }));
     } catch (e: any) {
       toast.error(`Bootstrap failed: ${e?.message ?? String(e)}`);
     } finally {
@@ -224,7 +224,7 @@ export function DeepSweepTab() {
                 size="sm"
                 onClick={finalizeStaleRun}
                 disabled={finalizing}
-                title={`Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.`}
+                title={tx({ de: tx({ de: tx({ de: tx({ de: `Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.`, en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` }), en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` }), en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` }), en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` })}
               >
                 {finalizing ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -260,7 +260,7 @@ export function DeepSweepTab() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                  <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={startSweep}
                     className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"

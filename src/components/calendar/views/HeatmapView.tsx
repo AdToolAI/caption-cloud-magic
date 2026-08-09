@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Flame, Sparkles, AlertTriangle, PieChart, ArrowRight, CalendarPlus } from "lucide-react";
@@ -262,7 +263,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                                   <ul className="mt-1 text-muted-foreground text-[10px] truncate">
                                     {bucket.posts.slice(0, 3).map((p) => (
                                       <li key={p.id} className="truncate">
-                                        · {p.title || p.caption || "(ohne Titel)"}
+                                        · {p.title || p.caption || tx({ de: "(ohne Titel)", en: "(without title)", es: "(sin título)" })}
                                       </li>
                                     ))}
                                   </ul>
@@ -334,7 +335,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
               title="Konflikt-Warnung"
               body={
                 conflicts.length > 0
-                  ? `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`
+                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — Reach cannibalizes itself.`, es: `${conflicts.length} Ranura${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones al mismo tiempo: el alcance se canibaliza a sí mismo.` })
                   : "Keine Stau-Slots. Saubere Verteilung."
               }
             />
@@ -348,7 +349,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                       .slice(0, 3)
                       .map((c) => `${c.channel} ${Math.round(c.pct)}%`)
                       .join(" · ")
-                  : "Noch keine Posts geplant."
+                  : tx({ de: "Noch keine Posts geplant.", en: "No posts planned yet.", es: "Aún no hay publicaciones planeadas." })
               }
             />
           </div>

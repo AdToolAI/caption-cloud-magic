@@ -55,9 +55,9 @@ const DeleteAccount = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast({ title: "Export erfolgreich", description: "Ihre Daten wurden heruntergeladen." });
+      toast({ title: tx({ de: "Export erfolgreich", en: "Export successful", es: "Exportación exitosa" }), description: tx({ de: "Ihre Daten wurden heruntergeladen.", en: "Your data has been downloaded.", es: "Tus datos han sido descargados." }) });
     } catch {
-      toast({ title: "Fehler", description: "Export fehlgeschlagen.", variant: "destructive" });
+      toast({ title: tx({ de: "Fehler", en: "Error", es: "Error" }), description: tx({ de: "Export fehlgeschlagen.", en: "Export failed.", es: "Error en la exportación." }), variant: "destructive" });
     }
     setExporting(false);
   };
@@ -73,7 +73,7 @@ const DeleteAccount = () => {
       await signOut();
       navigate("/");
     } catch {
-      toast({ title: "Fehler", description: "Löschung fehlgeschlagen.", variant: "destructive" });
+      toast({ title: tx({ de: "Fehler", en: "Error", es: "Error" }), description: tx({ de: "Löschung fehlgeschlagen.", en: "Deletion failed.", es: "Error en la eliminación." }), variant: "destructive" });
     }
     setLoading(false);
   };

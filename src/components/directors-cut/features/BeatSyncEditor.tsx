@@ -113,10 +113,10 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
       
       if (error?.context?.status === 402) {
         toast.error('Nicht genügend Credits', {
-          description: `Du benötigst ${CREDITS_COST} Credits für Beat-Sync Analyse`,
+          description: tx({ de: `Du benötigst ${CREDITS_COST} Credits für Beat-Sync Analyse`, en: `You need ${CREDITS_COST} credits for beat sync analysis`, es: `Necesitas ${CREDITS_COST} créditos para el análisis de sincronización de ritmos` }),
         });
       } else {
-        toast.error('Analyse fehlgeschlagen', {
+        toast.error(tx({ de: 'Analyse fehlgeschlagen', en: 'Analysis failed', es: 'El análisis falló' }), {
           description: error.message || tx({ de: 'Bitte versuche es erneut', en: 'Please try again', es: 'Por favor, inténtalo de nuevo' }),
         });
       }
@@ -245,7 +245,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
             {settings.enabled && (
               <>
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Schnitte auf Beat</Label>
+                  <Label className="text-xs">{tx({ de: "Schnitte auf Beat", en: "Cuts on beat", es: "Cortes al ritmo" })}</Label>
                   <Switch
                     checked={settings.cutOnBeat}
                     onCheckedChange={(v) => handleSettingChange('cutOnBeat', v)}
@@ -253,7 +253,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Übergänge auf Beat</Label>
+                  <Label className="text-xs">{tx({ de: "Übergänge auf Beat", en: "Transitions on beat", es: "Transiciones al compás" })}</Label>
                   <Switch
                     checked={settings.transitionOnBeat}
                     onCheckedChange={(v) => handleSettingChange('transitionOnBeat', v)}
@@ -261,7 +261,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Effekte auf Beat</Label>
+                  <Label className="text-xs">{tx({ de: "Effekte auf Beat", en: "Effects on beat", es: "Efectos sobre el ritmo" })}</Label>
                   <Switch
                     checked={settings.effectsOnBeat}
                     onCheckedChange={(v) => handleSettingChange('effectsOnBeat', v)}

@@ -36,7 +36,7 @@ const Legal = () => {
   const seoContent = {
     privacy: {
       title: "Datenschutzerklärung | Privacy Policy – AdTool AI",
-      description: "DSGVO-konforme Datenschutzerklärung von AdTool AI. Erfahren Sie, wie wir Ihre Daten schützen und verarbeiten."
+      description: tx({ de: "DSGVO-konforme Datenschutzerklärung von AdTool AI. Erfahren Sie, wie wir Ihre Daten schützen und verarbeiten.", en: "GDPR-compliant data protection declaration from AdTool AI. Find out how we protect and process your data.", es: "Declaración de protección de datos conforme al RGPD de AdTool AI. Descubra cómo protegemos y procesamos sus datos." })
     },
     terms: {
       title: "Nutzungsbedingungen | Terms of Service – AdTool AI", 
@@ -44,11 +44,11 @@ const Legal = () => {
     },
     imprint: {
       title: "Impressum | Legal Notice – AdTool AI",
-      description: "Impressum gemäß § 5 TMG für AdTool AI."
+      description: tx({ de: "Impressum gemäß § 5 TMG für AdTool AI.", en: "Imprint according to § 5 TMG for AdTool AI.", es: "Pie de imprenta según § 5 TMG para AdTool AI." })
     },
     avv: {
       title: "Auftragsverarbeitungsvertrag (AVV) | DPA – AdTool AI",
-      description: "DSGVO-konformer Auftragsverarbeitungsvertrag (Art. 28 DSGVO) für die Nutzung von AdTool AI."
+      description: tx({ de: "DSGVO-konformer Auftragsverarbeitungsvertrag (Art. 28 DSGVO) für die Nutzung von AdTool AI.", en: "GDPR-compliant order processing contract (Art. 28 GDPR) for the use of AdTool AI.", es: "Contrato de procesamiento de pedidos conforme al RGPD (Art. 28 RGPD) para el uso de AdTool AI." })
     }
   };
 
@@ -160,7 +160,7 @@ const Legal = () => {
                     Es besteht genau ein kostenpflichtiges Abomodell zu
                     <strong className="text-foreground"> € 14,99 pro Monat</strong> (inkl. USt., monatlich kündbar).
                     Auf die Abogebühr wird kein Rabatt gewährt. Der Founders-Vorteil bezieht sich
-                    <strong className="text-foreground"> ausschließlich auf den Kauf von KI-Credits</strong>.
+                    <strong className="text-foreground"> {tx({ de: "ausschließlich auf den Kauf von KI-Credits", en: "exclusively on the purchase of AI credits", es: "exclusivamente en la compra de créditos AI" })}</strong>.
                   </p>
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">
                     <li>
@@ -183,7 +183,7 @@ const Legal = () => {
                       Preisänderungen für bestehende Abonnements werden mit angemessener Frist angekündigt; das Sonder­kündigungsrecht bleibt unberührt.
                     </li>
                     <li>
-                      Die Aktion gilt <strong className="text-foreground">ausschließlich für die Dauer des aktiven Betriebs des Dienstes</strong>.
+                      Die Aktion gilt <strong className="text-foreground">{tx({ de: "ausschließlich für die Dauer des aktiven Betriebs des Dienstes", en: "exclusively for the duration of the active operation of the service", es: "exclusivamente durante la duración del funcionamiento activo del servicio" })}</strong>.
                       Wird der Dienst eingestellt, erlischt jeder Anspruch auf den Rabatt. Bereits gezahlte
                       Beträge werden anteilig nach geltendem Recht behandelt.
                     </li>
@@ -247,9 +247,9 @@ const Legal = () => {
                   <p>{tx({ de: 'Dieser Auftragsverarbeitungsvertrag (AVV) gemäß Art. 28 DSGVO wird geschlossen zwischen dem Nutzer der AdTool AI Plattform („Verantwortlicher") und AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau („Auftragsverarbeiter").', en: 'This Data Processing Agreement (DPA) pursuant to Art. 28 GDPR is concluded between the user of the AdTool AI platform ("Controller") and AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau ("Processor").', es: 'Este contrato de encargo de tratamiento de datos (DPA) conforme al art. 28 del RGPD se celebra entre el usuario de la plataforma AdTool AI ("Responsable") y AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau ("Encargado").' })}</p>
                   <p className="font-medium text-foreground">Definitionen:</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li><strong className="text-foreground">Personenbezogene Daten:</strong> Alle Informationen gemäß Art. 4 Nr. 1 DSGVO</li>
+                    <li><strong className="text-foreground">Personenbezogene Daten:</strong> {tx({ de: "Alle Informationen gemäß Art. 4 Nr. 1 DSGVO", en: "All information in accordance with Art. 4 No. 1 GDPR", es: "Toda la información de conformidad con el art. 4 n.º 1 del RGPD" })}</li>
                     <li><strong className="text-foreground">Verarbeitung:</strong> Jeder Vorgang gemäß Art. 4 Nr. 2 DSGVO</li>
-                    <li><strong className="text-foreground">Betroffene Person:</strong> Identifizierte oder identifizierbare natürliche Person</li>
+                    <li><strong className="text-foreground">Betroffene Person:</strong> {tx({ de: "Identifizierte oder identifizierbare natürliche Person", en: "Identified or identifiable natural person", es: "Persona física identificada o identificable" })}</li>
                   </ul>
                 </div>
               </LegalSection>
@@ -266,10 +266,10 @@ const Legal = () => {
                   <p className="font-medium text-foreground">Zweck der Verarbeitung:</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>Bereitstellung der AdTool AI SaaS-Plattform</li>
-                    <li>KI-gestützte Content-Generierung und -Optimierung</li>
-                    <li>Social Media Account-Verbindungen und Posting</li>
-                    <li>Analytics und Performance-Tracking</li>
-                    <li>Nutzer-Authentifizierung und Account-Verwaltung</li>
+                    <li>{tx({ de: "KI-gestützte Content-Generierung und -Optimierung", en: "AI-powered content generation and optimization", es: "Generación y optimización de contenido impulsada por IA" })}</li>
+                    <li>{tx({ de: "Social Media Account-Verbindungen und Posting", en: "Social media account connections and posting", es: "Conexiones y publicaciones de cuentas de redes sociales" })}</li>
+                    <li>{tx({ de: "Analytics und Performance-Tracking", en: "Analytics and performance tracking", es: "Análisis y seguimiento del rendimiento." })}</li>
+                    <li>{tx({ de: "Nutzer-Authentifizierung und Account-Verwaltung", en: "User authentication and account management", es: "Autenticación de usuarios y gestión de cuentas." })}</li>
                   </ul>
                   <p className="font-medium text-foreground mt-4">Art der Verarbeitung:</p>
                   <p className="text-muted-foreground">Erhebung, Speicherung, Nutzung, Übermittlung, Löschung von Daten gemäß den technischen Anforderungen der Plattform.</p>
@@ -281,16 +281,16 @@ const Legal = () => {
                   <p className="font-medium text-foreground">Kategorien betroffener Personen:</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>Nutzer der AdTool AI Plattform</li>
-                    <li>Follower und Kontakte auf verbundenen Social Media Accounts</li>
-                    <li>Personen, die in hochgeladenen Medien dargestellt werden</li>
+                    <li>{tx({ de: "Follower und Kontakte auf verbundenen Social Media Accounts", en: "Followers and contacts on connected social media accounts", es: "Seguidores y contactos en cuentas de redes sociales conectadas" })}</li>
+                    <li>{tx({ de: "Personen, die in hochgeladenen Medien dargestellt werden", en: "People featured in uploaded media", es: "Personas que aparecen en los medios subidos" })}</li>
                   </ul>
                   <p className="font-medium text-foreground mt-4">Kategorien personenbezogener Daten:</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>Kontaktdaten (Name, E-Mail)</li>
                     <li>Account-Daten (Benutzername, Passwort-Hash)</li>
-                    <li>Social Media Account-Tokens und -Metadaten</li>
+                    <li>{tx({ de: "Social Media Account-Tokens und -Metadaten", en: "Social media account tokens and metadata", es: "Tokens y metadatos de cuentas de redes sociales" })}</li>
                     <li>Hochgeladene Medien (Bilder, Videos)</li>
-                    <li>Nutzungsdaten und Analytics</li>
+                    <li>{tx({ de: "Nutzungsdaten und Analytics", en: "Usage data and analytics", es: "Datos de uso y análisis" })}</li>
                   </ul>
                 </div>
               </LegalSection>
@@ -299,10 +299,10 @@ const Legal = () => {
                 <div className="space-y-3">
                   <p>{tx({ de: 'Der Verantwortliche ist für die Rechtmäßigkeit der Datenverarbeitung verantwortlich und hat sicherzustellen, dass:', en: 'The controller is responsible for the lawfulness of data processing and must ensure that:', es: 'El responsable es responsable de la licitud del tratamiento de datos y debe garantizar que:' })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li>Die Verarbeitung auf einer Rechtsgrundlage basiert</li>
-                    <li>Betroffene Personen ordnungsgemäß informiert werden</li>
-                    <li>Anfragen von Betroffenen bearbeitet werden</li>
-                    <li>Hochgeladene Inhalte keine Rechte Dritter verletzen</li>
+                    <li>{tx({ de: "Die Verarbeitung auf einer Rechtsgrundlage basiert", en: "The processing is based on a legal basis", es: "El procesamiento se basa en una base legal." })}</li>
+                    <li>{tx({ de: "Betroffene Personen ordnungsgemäß informiert werden", en: "Those affected are properly informed", es: "Los afectados están debidamente informados" })}</li>
+                    <li>{tx({ de: "Anfragen von Betroffenen bearbeitet werden", en: "Inquiries from those affected are processed", es: "Se tramitan las consultas de los afectados" })}</li>
+                    <li>{tx({ de: "Hochgeladene Inhalte keine Rechte Dritter verletzen", en: "Uploaded content does not violate the rights of third parties", es: "El contenido subido no viola los derechos de terceros." })}</li>
                   </ul>
                 </div>
               </LegalSection>
@@ -313,8 +313,8 @@ const Legal = () => {
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>Daten nur gemäß dokumentierten Weisungen zu verarbeiten</li>
                     <li>Zur Vertraulichkeit verpflichtete Mitarbeiter einzusetzen</li>
-                    <li>Angemessene technische und organisatorische Maßnahmen zu implementieren</li>
-                    <li>Subunternehmer nur mit vorheriger Genehmigung einzusetzen</li>
+                    <li>{tx({ de: "Angemessene technische und organisatorische Maßnahmen zu implementieren", en: "Implement appropriate technical and organizational measures", es: "Implementar medidas técnicas y organizativas apropiadas." })}</li>
+                    <li>{tx({ de: "Subunternehmer nur mit vorheriger Genehmigung einzusetzen", en: "Only use subcontractors with prior approval", es: "Utilice únicamente subcontratistas con aprobación previa." })}</li>
                     <li>Den Verantwortlichen bei Anfragen Betroffener zu unterstützen</li>
                     <li>Datenschutzverletzungen unverzüglich zu melden</li>
                     <li>{tx({ de: 'Nach Beendigung alle Daten zu löschen oder zurückzugeben', en: 'Delete or return all data after termination', es: 'Eliminar o devolver todos los datos tras la finalización' })}</li>
@@ -338,11 +338,11 @@ const Legal = () => {
 
               <LegalSection title={tx({ de: '§ 8 Subunternehmer', en: '§ 8 Subprocessors', es: '§ 8 Subencargados' })} icon="users" index={7}>
                 <div className="space-y-3">
-                  <p>Folgende Subunternehmer werden eingesetzt:</p>
+                  <p>{tx({ de: "Folgende Subunternehmer werden eingesetzt:", en: "The following subcontractors are used:", es: "Se utilizan los siguientes subcontratistas:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li><strong className="text-foreground">Supabase Inc.</strong> – Datenbank, Authentifizierung (EU-Server)</li>
                     <li><strong className="text-foreground">Stripe Inc.</strong> – Zahlungsabwicklung</li>
-                    <li><strong className="text-foreground">OpenAI / Google AI</strong> – KI-Verarbeitung (mit DPA)</li>
+                    <li><strong className="text-foreground">OpenAI / Google AI</strong> {tx({ de: "– KI-Verarbeitung (mit DPA)", en: "– AI processing (with DPA)", es: "– Procesamiento de IA (con DPA)" })}</li>
                     <li><strong className="text-foreground">AWS (Amazon)</strong> – Video-Rendering (EU-Region)</li>
                     <li><strong className="text-foreground">Resend</strong> – E-Mail-Versand</li>
                   </ul>
@@ -361,13 +361,13 @@ const Legal = () => {
                     <li>Datenübertragbarkeit (Art. 20 DSGVO)</li>
                     <li>Widerspruchsrecht (Art. 21 DSGVO)</li>
                   </ul>
-                  <p className="mt-3">Anfragen werden innerhalb von 72 Stunden bearbeitet.</p>
+                  <p className="mt-3">{tx({ de: "Anfragen werden innerhalb von 72 Stunden bearbeitet.", en: "Requests will be processed within 72 hours.", es: "Las solicitudes se procesarán dentro de las 72 horas." })}</p>
                 </div>
               </LegalSection>
 
               <LegalSection title={tx({ de: '§ 10 Beendigung und Löschung', en: '§ 10 Termination and Deletion', es: '§ 10 Finalización y eliminación' })} icon="alert" index={9}>
                 <div className="space-y-3">
-                  <p>Nach Beendigung der Auftragsverarbeitung wird der Auftragsverarbeiter:</p>
+                  <p>{tx({ de: "Nach Beendigung der Auftragsverarbeitung wird der Auftragsverarbeiter:", en: "After completion of order processing, the processor will:", es: "Una vez finalizado el procesamiento del pedido, el procesador:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>{tx({ de: 'Alle personenbezogenen Daten löschen oder zurückgeben (nach Wahl des Verantwortlichen)', en: "Delete or return all personal data (at the controller's discretion)", es: 'Eliminar o devolver todos los datos personales (a elección del responsable)' })}</li>
                     <li>Bestehende Kopien vernichten</li>
@@ -388,7 +388,7 @@ const Legal = () => {
                 <div className="space-y-3">
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>Es gilt deutsches Recht</li>
-                    <li>Gerichtsstand ist München, Deutschland</li>
+                    <li>{tx({ de: "Gerichtsstand ist München, Deutschland", en: "The place of jurisdiction is Munich, Germany", es: "El lugar de jurisdicción es Munich, Alemania." })}</li>
                     <li>Änderungen bedürfen der Schriftform</li>
                     <li>Sollten einzelne Bestimmungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt</li>
                   </ul>

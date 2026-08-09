@@ -113,7 +113,7 @@ export const VideoPreviewComparison = ({
         case 1: errorMessage = 'Download abgebrochen'; break;
         case 2: errorMessage = 'Netzwerkfehler'; break;
         case 3: errorMessage = 'Dekodierungsfehler'; break;
-        case 4: errorMessage = 'Format nicht unterstützt'; break;
+        case 4: errorMessage = tx({ de: 'Format nicht unterstützt', en: 'Format not supported', es: 'Formato no compatible' }); break;
       }
     }
 
@@ -202,7 +202,7 @@ export const VideoPreviewComparison = ({
       return (
         <div className="flex items-center justify-center h-full bg-muted">
           <p className="text-sm text-muted-foreground">
-            {type === 'original' ? 'Kein Original-Video verfügbar' : 'Keine bearbeitete Version verfügbar'}
+            {type === 'original' ? tx({ de: 'Kein Original-Video verfügbar', en: 'No original video available', es: 'No hay vídeo original disponible' }) : tx({ de: 'Keine bearbeitete Version verfügbar', en: 'No edited version available', es: 'No hay versión editada disponible' })}
           </p>
         </div>
       );
@@ -314,7 +314,7 @@ export const VideoPreviewComparison = ({
               {isGenerating ? (
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Generiere neue Version...</p>
+                  <p className="text-sm text-muted-foreground">{tx({ de: "Generiere neue Version...", en: "Generate new version...", es: "Generar nueva versión..." })}</p>
                 </div>
               ) : (
                 renderVideoOrError('edited', editedUrl, editedVideoError, editedVideoLoading, showEditedPlayer, setShowEditedPlayer, editedVideoRef)

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
 // Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
@@ -15,7 +16,7 @@ export const GROK_VIDEO_MODELS = {
     maxDuration: 12,
     allowedDurations: [6, 12] as const,
     description: {
-      EUR: 'Trending AI-Videos mit nativer Audio-Spur ab 2,70€ pro 6 Sekunden',
+      EUR: tx({ de: 'Trending AI-Videos mit nativer Audio-Spur ab 2,70€ pro 6 Sekunden', en: 'Trending AI videos with native audio track from €2.70 per 6 seconds', es: 'Vídeos de IA de tendencia con pista de audio nativa desde 2,70 € por 6 segundos' }),
       USD: 'Trending AI videos with native audio from $2.70 per 6 seconds',
     },
     badge: 'Premium-Engine',

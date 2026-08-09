@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Compare Lab — React Hook for fan-out + polling + judge orchestration
 //
 // Manages a single compare run: triggers compare-lab-generate, polls
@@ -174,8 +175,8 @@ export function useCompareLab() {
       toast.success(`Compare Lab gestartet — ${args.engines.length} Engines parallel`);
       return runId;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unbekannter Fehler';
-      toast.error(`Start fehlgeschlagen: ${msg}`);
+      const msg = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
+      toast.error(tx({ de: `Start fehlgeschlagen: ${msg}`, en: `Startup failed: ${msg}`, es: `Error de inicio: ${msg}` }));
       throw err;
     } finally {
       setIsStarting(false);
@@ -199,7 +200,7 @@ export function useCompareLab() {
       await refreshOutputs(runId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`AI-Judge fehlgeschlagen: ${msg}`);
+      toast.error(tx({ de: `AI-Judge fehlgeschlagen: ${msg}`, en: `AI judge failed: ${msg}`, es: `El juez de IA falló: ${msg}` }));
     } finally {
       setIsJudging(false);
     }

@@ -116,7 +116,7 @@ const TOOLBOX_ITEMS = [
   {
     icon: Zap,
     title: 'Bulk-Generierung',
-    desc: 'Mehrere Szenen parallel rendern – wie ein echtes Studio-Pipeline-Setup.',
+    desc: tx({ de: 'Mehrere Szenen parallel rendern – wie ein echtes Studio-Pipeline-Setup.', en: 'Render multiple scenes in parallel – like a real studio pipeline setup.', es: 'Renderice múltiples escenas en paralelo, como una configuración de canal de estudio real.' }),
   },
 ];
 
@@ -304,7 +304,7 @@ export default function MotionStudioHub() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Letzte Composer-Projekte</h3>
                 <Button asChild variant="ghost" size="sm">
-                  <Link to="/video-composer">Alle anzeigen</Link>
+                  <Link to="/video-composer">{tx({ de: "Alle anzeigen", en: "View all", es: "Ver todo" })}</Link>
                 </Button>
               </div>
               {recentLoading ? (

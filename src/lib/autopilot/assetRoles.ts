@@ -111,8 +111,8 @@ export function describeAssetForBrief(asset: AutopilotAsset): string {
   const spec = ASSET_ROLES[asset.role];
   const parts = [`${spec.label}: ${asset.analysisDescription ?? asset.fileName}`];
   if (asset.userNote.trim()) parts.push(`Kundenwunsch: ${asset.userNote.trim()}`);
-  if (spec.styleOnly) parts.push('Nur Look übernehmen, nicht den Inhalt.');
-  if (spec.useAsOverlay) parts.push('Wird als Einblendung gelegt, nicht generiert.');
+  if (spec.styleOnly) parts.push(tx({ de: 'Nur Look übernehmen, nicht den Inhalt.', en: 'Only adopt the look, not the content.', es: 'Adopte sólo la apariencia, no el contenido.' }));
+  if (spec.useAsOverlay) parts.push(tx({ de: 'Wird als Einblendung gelegt, nicht generiert.', en: 'Is placed as an overlay, not generated.', es: 'Se coloca como una superposición, no se genera.' }));
   return parts.join(' — ');
 }
 

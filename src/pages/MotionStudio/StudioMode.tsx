@@ -45,7 +45,7 @@ import { FounderPriorityChip } from '@/components/render/FounderPriorityChip';
 type StepId = 'cast' | 'location' | 'storyboard' | 'render';
 
 const STEPS: { id: StepId; title: string; subtitle: string; icon: typeof Users }[] = [
-  { id: 'cast', title: 'Cast', subtitle: 'Wer spielt mit?', icon: Users },
+  { id: 'cast', title: 'Cast', subtitle: tx({ de: 'Wer spielt mit?', en: 'Who is playing?', es: '¿Quién está jugando?' }), icon: Users },
   { id: 'location', title: 'Location', subtitle: 'Wo spielt es?', icon: MapPin },
   { id: 'storyboard', title: 'Storyboard', subtitle: 'Was passiert?', icon: Clapperboard },
   { id: 'render', title: 'Render', subtitle: 'Jetzt produzieren', icon: Sparkles },
@@ -266,7 +266,7 @@ export default function StudioMode() {
       toast.success('Studio-Projekt angelegt – willkommen im Composer ✨');
       navigate(`/video-composer?project=${inserted.id}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      const msg = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
       toast.error(msg);
     } finally {
       setCreating(false);
@@ -279,7 +279,7 @@ export default function StudioMode() {
         <title>Studio Mode | Motion Studio</title>
         <meta
           name="description"
-          content="Geführte 4-Schritt KI-Videoproduktion: Cast wählen, Location scouten, Storyboard bauen, in Sekunden rendern."
+          content={tx({ de: "Geführte 4-Schritt KI-Videoproduktion: Cast wählen, Location scouten, Storyboard bauen, in Sekunden rendern.", en: "Guided 4-step AI video production: choose cast, scout location, build storyboard, render in seconds.", es: "Producción de video guiada por IA en 4 pasos: elija el reparto, explore la ubicación, cree el guión gráfico y renderice en segundos." })}
         />
       </Helmet>
 
@@ -511,7 +511,7 @@ function CastStep({
     <section className="space-y-6">
       <StepHeader
         icon={Users}
-        title="Cast deine Charaktere"
+        title={tx({ de: "Cast deine Charaktere", en: "Cast your characters", es: "Elige tus personajes" })}
         subtitle={tx({ de: "Wähle wiederkehrende Figuren aus deiner Library — sie bleiben über alle Szenen visuell konsistent.", en: "Select recurring characters from your library — they will remain visually consistent across all scenes.", es: "Selecciona personajes recurrentes de tu biblioteca; se mantendrán visualmente consistentes en todas las escenas." })}
         action={
           <Button onClick={onAddNew} className="gap-2">
@@ -525,7 +525,7 @@ function CastStep({
       ) : characters.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="Noch keine Charaktere"
+          title={tx({ de: "Noch keine Charaktere", en: "No characters yet", es: "Aún no hay personajes" })}
           desc={tx({ de: "Lege deinen ersten Charakter an — mit Reference-Image und Voice für maximale Konsistenz.", en: "Create your first character — with a reference image and voice for maximum consistency.", es: "Crea tu primer personaje, con una imagen de referencia y voz para una máxima coherencia." })}
           actionLabel="Charakter anlegen"
           onAction={onAddNew}
@@ -617,7 +617,7 @@ function LocationStep({
       ) : locations.length === 0 ? (
         <EmptyState
           icon={MapPin}
-          title="Noch keine Locations"
+          title={tx({ de: "Noch keine Locations", en: "No locations yet", es: "Aún no hay ubicaciones" })}
           desc={tx({ de: "Lege deinen ersten Schauplatz an — mit Reference-Image und Lighting-Notes.", en: "Create your first scene — with a reference image and lighting notes.", es: "Crea tu primera escena, con imagen de referencia y notas de iluminación." })}
           actionLabel="Location anlegen"
           onAction={onAddNew}
@@ -829,7 +829,7 @@ function StoryboardStep({
       </ScrollArea>
 
       <SelectionBar
-        label={`${scenes.filter((s) => s.prompt.trim()).length} Szene${scenes.filter((s) => s.prompt.trim()).length !== 1 ? 'n' : ''} · ${total}s gesamt`}
+        label={tx({ de: `${scenes.filter((s) => s.prompt.trim()).length} Szene${scenes.filter((s) => s.prompt.trim()).length !== 1 ? 'n' : ''} · ${total}s gesamt`, en: `${scenes.filter((s) => s.prompt.trim()).length} Scene${scenes.filter((s) => s.prompt.trim()).length !== 1 ? 'n' : ''} · ${total}s total`, es: `${scenes.filter((s) => s.prompt.trim()).length} Escena${scenes.filter((s) => s.prompt.trim()).length !== 1 ? 'n' : ''} · ${total}s total` })}
       />
     </section>
   );
@@ -859,7 +859,7 @@ function RenderStep({
     <section className="space-y-6">
       <StepHeader
         icon={Sparkles}
-        title="Bereit zum Rendern"
+        title={tx({ de: "Bereit zum Rendern", en: "Ready to render", es: "Listo para renderizar" })}
         subtitle={tx({ de: "Dein Studio-Setup wird als neues Composer-Projekt angelegt — dort wählst du Engine, generierst Clips parallel und exportierst final.", en: "Your studio setup will be created as a new Composer project — there you select the engine, generate clips in parallel, and finally export.", es: "Tu configuración de estudio se creará como un nuevo proyecto de Composer; allí seleccionarás el motor, generarás clips en paralelo y, finalmente, exportarás." })}
       />
 
@@ -896,7 +896,7 @@ function RenderStep({
             )}
           </SummaryRow>
 
-          <SummaryRow icon={Clapperboard} label={`Storyboard · ${scenes.length} Szenen · ${total}s`}>
+          <SummaryRow icon={Clapperboard} label={tx({ de: `Storyboard · ${scenes.length} Szenen · ${total}s`, en: `Storyboard · ${scenes.length} scenes · ${total}s`, es: `Guión gráfico · ${scenes.length} escenas · ${total}s` })}>
             <ol className="space-y-1.5 text-sm w-full">
               {scenes.map((s, i) => (
                 <li

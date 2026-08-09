@@ -17,12 +17,12 @@ interface WelcomeBonusModalProps {
 
 const copy = {
   de: {
-    headline: "Willkommen — dein Startguthaben wartet",
+    headline: tx({ de: "Willkommen — dein Startguthaben wartet", en: "Welcome - your starting credit is waiting", es: "Bienvenido: su crédito inicial está esperando" }),
     subheadline: tx({ de: "Erstelle dein erstes KI-Video in unter 60 Sekunden. Keine Kreditkarte, kein Risiko.", en: "Create your first AI video in under 60 seconds. No credit card, no risk.", es: "Crea tu primer video con IA en menos de 60 segundos. Sin tarjeta de crédito, sin riesgo." }),
     badge1: "6 KI-Modelle (Sora, Kling, Hailuo …)",
     badge2: "Erste Vorschau in ~30 Sek",
     badge3: "Guthaben = ~5–10 Clips gratis",
-    cta: "Jetzt mein erstes Video erstellen",
+    cta: tx({ de: "Jetzt mein erstes Video erstellen", en: "Now create my first video", es: "Ahora crea mi primer video." }),
     later: "Später",
     chip: tx({ de: "Geschenk für dich", en: "Gift for you", es: "Regalo para ti" }),
   },

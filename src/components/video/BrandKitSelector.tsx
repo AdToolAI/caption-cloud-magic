@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Palette } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface BrandKit {
   id: string;
@@ -22,7 +23,7 @@ export function BrandKitSelector({
   value,
   onChange,
   disabled = false,
-  label = 'Brand Kit (optional)'
+  label = tx({ de: 'Brand Kit (optional)', en: 'Brand Kit (optional)', es: 'Brand Kit (opcional)' })
 }: BrandKitSelectorProps) {
   const { data: brandKits, isLoading } = useQuery({
     queryKey: ['brand-kits'],
@@ -49,10 +50,10 @@ export function BrandKitSelector({
         disabled={disabled || isLoading}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Brand Kit auswählen" />
+          <SelectValue placeholder={tx({ de: "Brand Kit auswählen", en: "Select brand kit", es: "Seleccionar brand kit" })} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">Kein Brand Kit</SelectItem>
+          <SelectItem value="none">{tx({ de: "Kein Brand Kit", en: "No brand kit", es: "Sin brand kit" })}</SelectItem>
           {brandKits?.map((kit) => (
             <SelectItem key={kit.id} value={kit.id}>
               <div className="flex items-center gap-2">
@@ -67,7 +68,7 @@ export function BrandKitSelector({
                   className="h-3 w-3 rounded-full border"
                   style={{ backgroundColor: kit.primary_color }}
                 />
-                <span>{kit.brand_name || 'Unbenannt'}</span>
+                <span>{kit.brand_name || tx({ de: 'Unbenannt', en: 'Unnamed', es: 'Sin nombre' })}</span>
               </div>
             </SelectItem>
           ))}

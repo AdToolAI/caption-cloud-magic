@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SceneStripTile — compact 16:9 thumbnail tile for the cinematic filmstrip.
  *
@@ -54,7 +55,7 @@ const STATUS_STYLE: Record<string, { label: string; cls: string; icon: React.Com
     icon: Loader2,
   },
   failed: {
-    label: 'Fehler',
+    label: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
     cls: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
     icon: AlertCircle,
   },
@@ -94,7 +95,7 @@ function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: Sc
   const titleText =
     (scene as any).title ||
     scene.aiPrompt?.slice(0, 64) ||
-    `Szene ${index + 1}`;
+    tx({ de: tx({ de: tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` }), en: `Scene ${index + 1}`, es: `Escena ${índice + 1}` }), en: `Scene ${index + 1}`, es: `Escena ${índice + 1}` });
 
   return (
     <button
