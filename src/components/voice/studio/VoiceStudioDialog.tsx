@@ -27,7 +27,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Mic,
   Square,
-  tx({ de: "Upload", en: "Upload", es: "Carga" }),
+  Upload,
   Trash2,
   Play,
   Pause,
@@ -619,7 +619,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                       <div className="flex-1 min-w-0">
                         <p className="text-sm truncate">{s.fileName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatSec(s.durationSec)} · {s.source === "mic" ? "tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" })" : "tx({ de: "Upload", en: "Upload", es: "Carga" })"}
+                          {formatSec(s.durationSec)} · {s.source === "mic" ? tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" }) : tx({ de: "Upload", en: "Upload", es: "Carga" })}
                         </p>
                       </div>
                       <Badge variant="secondary" className="text-[10px]">
@@ -679,7 +679,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="flex items-center gap-2">
-                    tx({ de: "Rauschen entfernen", en: "Remove noise", es: "Eliminar ruido" })
+                    {tx({ de: "Rauschen entfernen", en: "Remove noise", es: "Eliminar ruido" })}
                     <Switch checked={removeNoise} onCheckedChange={setRemoveNoise} />
                   </Label>
                   <p className="text-xs text-muted-foreground">
@@ -704,8 +704,8 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
               <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
               <div className="text-xs space-y-2">
                 <p>
-                  tx({ de: "Zusammenfassung: ", en: "Summary: ", es: "Resumen: " })<strong>{samples.length}</strong> Sample(s),{" "}
-                  <strong>{formatSec(totalSec)}</strong> tx({ de: " gesamt.", en: " total.", es: " en total." })
+                  {tx({ de: "Zusammenfassung: ", en: "Summary: ", es: "Resumen: " })}<strong>{samples.length}</strong> Sample(s),{" "}
+                  <strong>{formatSec(totalSec)}</strong> {tx({ de: " gesamt.", en: " total.", es: " en total." })}
                 </p>
                 <label className="flex items-start gap-2 cursor-pointer">
                   <Checkbox
@@ -728,7 +728,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
               <Button onClick={handleSubmit} disabled={!canSubmit} className="gap-2">
                 {submitting ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> tx({ de: "Klonen läuft…", en: "Cloning in progress...", es: "Clonación en curso..." })
+                    <Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: "Klonen läuft…", en: "Cloning in progress...", es: "Clonación en curso..." })}
                   </>
                 ) : (
                   <>

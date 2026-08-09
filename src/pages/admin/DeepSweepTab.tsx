@@ -216,7 +216,7 @@ export function DeepSweepTab() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-              Reload
+              tx({ de: 'Neu laden', en: 'Reload', es: 'Recargar' })
             </Button>
             {isStale && (
               <Button
@@ -231,7 +231,7 @@ export function DeepSweepTab() {
                 ) : (
                   <XCircle className="h-4 w-4 mr-1" />
                 )}
-                Run abbrechen ({Math.round(runAgeMinutes)} min)
+                tx({ de: 'Lauf abbrechen', en: 'Cancel run', es: 'Cancelar ejecución' }) ({Math.round(runAgeMinutes)} min)
               </Button>
             )}
             <AlertDialog>
@@ -245,7 +245,7 @@ export function DeepSweepTab() {
                   ) : (
                     <Play className="h-4 w-4 mr-1" />
                   )}
-                  {isRunning ? "Läuft..." : "Run Deep Sweep (50 €)"}
+                  {isRunning ? tx({ de: "Läuft...", en: "Running...", es: "Corriendo..." }) : tx({ de: "Run Deep Sweep (50 €)", en: "Run Deep Sweep (50 €)", es: "Ejecutar barrido profundo (50 €)" })}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -256,7 +256,7 @@ export function DeepSweepTab() {
                     (Replicate, HeyGen, ElevenLabs, AWS Lambda). Erwarteter Verbrauch:
                     ~12 €. Hard-Cap: 50 €. Dauer: 10-12 Minuten.
                     <br /><br />
-                    Hard-Lock: Max 1 Sweep alle 6h.
+                    tx({ de: "Hard-Lock: Max 1 Sweep alle 6h.", en: "Hard-Lock: Max 1 sweep every 6h.", es: "Hard-Lock: Máximo 1 barrido cada 6 h." })
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -265,7 +265,7 @@ export function DeepSweepTab() {
                     onClick={startSweep}
                     className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
                   >
-                    Sweep starten
+                    tx({ de: "Sweep starten", en: "Start sweep", es: "Iniciar barrido" })
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -299,7 +299,7 @@ export function DeepSweepTab() {
       {/* Live Flow Status */}
       <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
         <h4 className="text-sm font-semibold text-slate-300 mb-3">
-          Aktueller Run — 6 Flows
+          tx({ de: "Aktueller Lauf — 6 Flows", en: "Current run — 6 flows", es: "Ejecución actual — 6 flujos" })
         </h4>
         <div className="space-y-2">
           {FLOW_NAMES.map((name, idx) => {
@@ -364,7 +364,7 @@ export function DeepSweepTab() {
                         ) : (
                           <RefreshCw className="h-3 w-3 mr-1" />
                         )}
-                        Portrait neu provisionieren
+                        tx({ de: "Portrait neu provisionieren", en: "Reprovision portrait", es: "Reprovisionar retrato" })
                       </Button>
                     )}
                   {flow?.flow_index === 6 &&
@@ -382,7 +382,7 @@ export function DeepSweepTab() {
                         ) : (
                           <RefreshCw className="h-3 w-3 mr-1" />
                         )}
-                        Bootstrap jetzt ausführen
+                        tx({ de: "Bootstrap jetzt ausführen", en: "Execute bootstrap now", es: "Ejecutar bootstrap ahora" })
                       </Button>
                     )}
                 </div>
@@ -405,7 +405,7 @@ export function DeepSweepTab() {
       {/* History */}
       {history.length > 1 && (
         <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
-          <h4 className="text-sm font-semibold text-slate-300 mb-3">Letzte 10 Runs</h4>
+          <h4 className="text-sm font-semibold text-slate-300 mb-3">tx({ de: "Letzte 10 Läufe", en: "Last 10 runs", es: "Últimas 10 ejecuciones" })</h4>
           <div className="space-y-1.5">
             {history.slice(1).map((r) => {
               const pr = r.flows_total > 0

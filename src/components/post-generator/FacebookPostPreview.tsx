@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -23,7 +24,7 @@ export const FacebookPostPreview = ({
   caption,
   hook,
   hashtags = [],
-  profileName = "Ihr Profil",
+  profileName = tx({ de: "Ihr Profil", en: "Your profile", es: "Tu perfil" }),
   profileImage,
   additionalDescription,
 }: FacebookPostPreviewProps) => {
@@ -64,7 +65,7 @@ export const FacebookPostPreview = ({
                   Gesponsert
                 </Badge>
                 <span>·</span>
-                <span>vor 2 Min.</span>
+                <span>{tx({ de: "vor 2 Min.", en: "2 min ago", es: "hace 2 min." })}</span>
                 <span>·</span>
                 <span>🌍</span>
               </div>
@@ -103,7 +104,7 @@ export const FacebookPostPreview = ({
               onClick={() => setShowFullCaption(!showFullCaption)}
               className="text-muted-foreground hover:underline ml-1"
             >
-              {showFullCaption ? 'Weniger anzeigen' : 'Mehr anzeigen'}
+              {showFullCaption ? tx({ de: 'Weniger anzeigen', en: 'See less', es: 'Ver menos' }) : tx({ de: 'Mehr anzeigen', en: 'See more', es: 'Ver más' })}
             </button>
           )}
         </div>
@@ -148,9 +149,9 @@ export const FacebookPostPreview = ({
             <span className="ml-1">{likes}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span>{comments} Kommentare</span>
+            <span>{comments} {tx({ de: "Kommentare", en: "comments", es: "comentarios" })}</span>
             <span>·</span>
-            <span>{shares} mal geteilt</span>
+            <span>{shares} {tx({ de: "mal geteilt", en: "shares", es: "veces compartido" })}</span>
           </div>
         </div>
       </div>
@@ -161,15 +162,15 @@ export const FacebookPostPreview = ({
       <div className="px-2 py-1 grid grid-cols-3 gap-1">
         <Button variant="ghost" className="flex items-center gap-2 justify-center">
           <ThumbsUp className="h-4 w-4" />
-          <span className="text-sm font-medium">Gefällt mir</span>
+          <span className="text-sm font-medium">{tx({ de: "Gefällt mir", en: "Like", es: "Me gusta" })}</span>
         </Button>
         <Button variant="ghost" className="flex items-center gap-2 justify-center">
           <MessageCircle className="h-4 w-4" />
-          <span className="text-sm font-medium">Kommentieren</span>
+          <span className="text-sm font-medium">{tx({ de: "Kommentieren", en: "Comment", es: "Comentar" })}</span>
         </Button>
         <Button variant="ghost" className="flex items-center gap-2 justify-center">
           <Share2 className="h-4 w-4" />
-          <span className="text-sm font-medium">Teilen</span>
+          <span className="text-sm font-medium">{tx({ de: "Teilen", en: "Share", es: "Compartir" })}</span>
         </Button>
       </div>
     </Card>

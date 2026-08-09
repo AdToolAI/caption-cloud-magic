@@ -48,19 +48,19 @@ interface DialogTakeStripProps {
 
 const T = {
   de: {
-    takes: 'Takes',
-    add: 'Take aufnehmen',
-    addFirst: 'Take A aufnehmen',
-    rerolling: 'Generiere…',
+    takes: tx({ de: 'Takes', en: 'Takes', es: 'Tomas' }),
+    add: tx({ de: 'Take aufnehmen', en: 'Record take', es: 'Grabar toma' }),
+    addFirst: tx({ de: 'Take A aufnehmen', en: 'Record take A', es: 'Grabar toma A' }),
+    rerolling: tx({ de: 'Generiere…', en: 'Generating…', es: 'Generando…' }),
     activeHint: tx({ de: 'Aktiver Take wird beim Rendern verwendet', en: 'Active take used for rendering', es: 'Toma activa utilizada para renderizar' }),
-    setActive: 'Als aktiv markieren',
-    delete: 'Löschen',
+    setActive: tx({ de: 'Als aktiv markieren', en: 'Set as active', es: 'Marcar como activa' }),
+    delete: tx({ de: 'Löschen', en: 'Delete', es: 'Borrar' }),
     noVoice: tx({ de: 'Stimme wählen, dann Take aufnehmen.', en: 'Select voice, then record take.', es: 'Selecciona la voz, luego graba la toma.' }),
     failed: tx({ de: 'Take fehlgeschlagen', en: 'Take failed', es: 'Tomar falló' }),
     full: tx({ de: `Max ${MAX_TAKES_PER_LINE} Takes — lösche einen, um neu aufzunehmen.`, en: `Max ${MAX_TAKES_PER_LINE} takes — delete one to re-record.`, es: `Tomas máximas de ${MAX_TAKES_PER_LINE}: elimina una para volver a grabar.` }),
   },
   en: {
-    takes: 'Takes',
+    takes: tx({ de: 'Takes', en: 'Takes', es: 'Tomas' }),
     add: 'Record take',
     addFirst: 'Record Take A',
     rerolling: 'Generating…',

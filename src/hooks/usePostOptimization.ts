@@ -42,8 +42,8 @@ export function usePostOptimization() {
 
       setOptimization(data);
       toast({
-        title: 'Analyse abgeschlossen',
-        description: `Optimierungs-Score: ${data.score}/100`,
+        title: tx({ de: 'Analyse abgeschlossen', en: 'Analysis completed', es: 'Análisis completado' }),
+        description: tx({ de: `Optimierungs-Score: ${data.score}/100`, en: `Optimization score: ${data.score}/100`, es: `Puntuación de optimización: ${data.score}/100` }),
       });
 
       return data;
@@ -70,8 +70,8 @@ export function usePostOptimization() {
       if (error) throw error;
 
       toast({
-        title: 'Optimierungen angewendet',
-        description: `${data.applied_count} Verbesserungen wurden übernommen`,
+        title: tx({ de: 'Optimierungen angewendet', en: 'Optimizations applied', es: 'Optimizaciones aplicadas' }),
+        description: tx({ de: `${data.applied_count} Verbesserungen wurden übernommen`, en: `${data.applied_count} improvements were adopted`, es: `Se adoptaron ${data.applied_count} mejoras` }),
       });
 
       return data;

@@ -168,7 +168,7 @@ export default function SfxBrowser() {
           />
         </div>
         <Button type="submit" disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Suchen'}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : tx({ de: 'Suchen', en: 'Search', es: 'Buscar' })}
         </Button>
       </form>
 
@@ -188,18 +188,18 @@ export default function SfxBrowser() {
         ))}
         <Button asChild variant="ghost" size="sm" className="h-6 text-[11px] ml-auto">
           <Link to="/sfx-library">
-            Erweiterte SFX-Library <ArrowUpRightFromSquare className="h-3 w-3 ml-1" />
+            tx({ de: 'Erweiterte SFX-Library', en: 'Advanced SFX library', es: 'Biblioteca SFX avanzada' }) <ArrowUpRightFromSquare className="h-3 w-3 ml-1" />
           </Link>
         </Button>
       </div>
 
       {loading && results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /> Lade SFX …
+          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /> tx({ de: 'Lade SFX …', en: 'Loading SFX …', es: 'Cargando SFX …' })
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
-          Keine Treffer.
+          tx({ de: 'Keine Treffer.', en: 'No results.', es: 'Sin resultados.' })
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

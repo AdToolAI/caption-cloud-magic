@@ -112,7 +112,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
       if (orphanCount > 0) {
         finalAlbums.unshift({
           id: ORPHAN_ALBUM_ID,
-          name: 'Ohne Album',
+          name: tx({ de: 'Ohne Album', en: 'Without album', es: 'Sin álbum' }),
           cover_image_url: orphanCover?.image_url || null,
           image_count: orphanCount,
           is_orphan: true,
@@ -199,7 +199,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
               {albums.length === 0 ? (
                 <p className="col-span-full text-center text-muted-foreground py-8">
-                  Keine Alben mit Bildern gefunden
+                  tx({ de: 'Keine Alben mit Bildern gefunden', en: 'No albums with images found', es: 'No se encontraron álbumes con imágenes.' })
                 </p>
               ) : (
                 albums.map((album) => (
@@ -222,7 +222,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
                     )}
                     <div className="p-2">
                       <p className="text-sm font-medium truncate">{album.name}</p>
-                      <p className="text-xs text-muted-foreground">{album.image_count} Bilder</p>
+                      <p className="text-xs text-muted-foreground">tx({ de: `${album.image_count} Bilder`, en: `${album.image_count} images`, es: `${album.image_count} imágenes` })</p>
                     </div>
                   </button>
                 ))
@@ -233,7 +233,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-1">
               {images.length === 0 ? (
                 <p className="col-span-full text-center text-muted-foreground py-8">
-                  Keine Bilder in diesem Album
+                  tx({ de: 'Keine Bilder in diesem Album', en: 'No images in this album', es: 'No hay imágenes en este álbum' })
                 </p>
               ) : (
                 images.map((img) => (

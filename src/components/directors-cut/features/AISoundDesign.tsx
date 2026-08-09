@@ -30,9 +30,9 @@ interface AISoundDesignProps {
 }
 
 const SOUND_CATEGORIES = [
-  { id: 'ambient', name: 'Ambiente', icon: '🌿', description: 'Hintergrundatmosphäre' },
-  { id: 'sfx', name: 'Sound Effects', icon: '💥', description: 'Dynamische Soundeffekte' },
-  { id: 'foley', name: 'Foley', icon: '👣', description: 'Bewegungsgeräusche' },
+  { id: 'ambient', name: tx({ de: 'Ambiente', en: 'Ambience', es: 'Ambiente' }), icon: '🌿', description: tx({ de: 'Hintergrundatmosphäre', en: 'Background atmosphere', es: 'Atmósfera de fondo' }) },
+  { id: 'sfx', name: tx({ de: 'Soundeffekte', en: 'Sound effects', es: 'Efectos de sonido' }), icon: '💥', description: tx({ de: 'Dynamische Soundeffekte', en: 'Dynamic sound effects', es: 'Efectos de sonido dinámicos' }) },
+  { id: 'foley', name: tx({ de: 'Foley', en: 'Foley', es: 'Foley' }), icon: '👣', description: tx({ de: 'Bewegungsgeräusche', en: 'Movement sounds', es: 'Sonidos de movimiento' }) },
 ];
 
 const CREDITS_COST = 5;
@@ -131,7 +131,7 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
         setGeneratedSounds(sounds);
         onSoundsGenerated(sounds);
         toast.success(`${sounds.length} Sounds generiert`, {
-          description: `${data.credits_used} Credits verwendet`,
+          description: tx({ de: `${data.credits_used} Credits verwendet`, en: `${data.credits_used} credits used`, es: `${data.credits_used} créditos utilizados` }),
         });
       }
     } catch (error: any) {
@@ -177,7 +177,7 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
       <CardContent className="space-y-4">
         {/* Category Selection */}
         <div className="space-y-2">
-          <Label className="text-xs">Sound-Kategorien</Label>
+          <Label className="text-xs">{tx({ de: "Sound-Kategorien", en: "Sound categories", es: "Categorías de sonido" })}</Label>
           <div className="grid grid-cols-3 gap-2">
             {SOUND_CATEGORIES.map((cat) => (
               <button
@@ -201,9 +201,9 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
         {/* Auto Volume */}
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-xs">Auto-Lautstärke</Label>
+            <Label className="text-xs">{tx({ de: "Auto-Lautstärke", en: "Auto volume", es: "Volumen automático" })}</Label>
             <p className="text-[10px] text-muted-foreground">
-              Passt Lautstärke an Sprache an
+              tx({ de: "Passt Lautstärke an Sprache an", en: "Adjusts volume to speech", es: "Ajusta el volumen a la voz" })
             </p>
           </div>
           <Switch checked={autoVolume} onCheckedChange={setAutoVolume} />
@@ -218,26 +218,26 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generiere Sounds...
+              tx({ de: "Generiere Sounds...", en: "Generating sounds...", es: "Generando sonidos..." })
             </>
           ) : (
             <>
               <Sparkles className="h-4 w-4 mr-2" />
-              Sounds für {scenes.length} Szenen generieren
+              tx({ de: `Sounds für ${scenes.length} Szenen generieren`, en: `Generate sounds for ${scenes.length} scenes`, es: `Generar sonidos para ${scenes.length} escenas` })
             </>
           )}
         </Button>
 
         {scenes.length === 0 && (
           <p className="text-xs text-muted-foreground text-center">
-            Führe zuerst die Szenenanalyse durch
+            tx({ de: "Führe zuerst die Szenenanalyse durch", en: "Perform scene analysis first", es: "Realizar primero el análisis de la escena." })
           </p>
         )}
 
         {/* Generated Sounds List */}
         {generatedSounds.length > 0 && (
           <div className="space-y-2 pt-3 border-t max-h-64 overflow-y-auto">
-            <Label className="text-xs">{generatedSounds.length} Sounds generiert</Label>
+            <Label className="text-xs">{tx({ de: `${generatedSounds.length} Sounds generiert`, en: `${generatedSounds.length} sounds generated`, es: `${generatedSounds.length} sonidos generados` })}</Label>
             {generatedSounds.map((sound) => (
               <div
                 key={sound.id}

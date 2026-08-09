@@ -106,7 +106,7 @@ function QueueRowCard({
             <Clock className="h-3 w-3" />
             {timeAgo(row.updated_at)}
             <span>·</span>
-            <span className="truncate">tx({ de: "Projekt", en: "Project", es: "Proyecto" }) {row.project_id.slice(0, 8)}</span>
+            <span className="truncate">{tx({ de: "Projekt", en: "Project", es: "Proyecto" })} {row.project_id.slice(0, 8)}</span>
           </div>
         </div>
       </div>
@@ -119,7 +119,7 @@ function QueueRowCard({
             className="h-7 px-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
             onClick={() => onCancel(row)}
             disabled={canceling}
-            title="tx({ de: "Diesen Job abbrechen", en: "Cancel this job", es: "Cancelar este trabajo" })"
+            title={tx({ de: "Diesen Job abbrechen", en: "Cancel this job", es: "Cancelar este trabajo" })}
           >
             {canceling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
           </Button>

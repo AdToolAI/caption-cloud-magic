@@ -29,11 +29,11 @@ const stepLabels: Record<string, Record<ChecklistStep["key"], string>> = {
     brand_kit: "Create your cast & brand look",
   },
   de: {
-    onboarding: "Studio einrichten",
-    first_video: "Erstes Video produzieren",
+    onboarding: tx({ de: "Studio einrichten", en: "Set up your studio", es: "Configurar tu estudio" }),
+    first_video: tx({ de: "Erstes Video produzieren", en: "Produce your first video", es: "Produce tu primer video" }),
     social_connected: tx({ de: "Kanal für die Veröffentlichung verbinden", en: "Connect channel for publishing", es: "Conectar canal para publicar" }),
-    post_planned: "Ersten Release planen",
-    brand_kit: "Cast & Markenlook anlegen",
+    post_planned: tx({ de: "Ersten Release planen", en: "Plan your first release", es: "Planifica tu primer lanzamiento" }),
+    brand_kit: tx({ de: "Cast & Markenlook anlegen", en: "Create cast & brand look", es: "Crear elenco y look de marca" }),
   },
   es: {
     onboarding: "Configura tu estudio",
@@ -51,7 +51,7 @@ const headlines: Record<string, { title: string; subtitle: string; allDone: stri
     allDone: "All steps completed! 🎉",
   },
   de: {
-    title: "Deine erste Produktion",
+    title: tx({ de: "Deine erste Produktion", en: "Your first production", es: "Tu primera producción" }),
     subtitle: tx({ de: "Von der Idee zum veröffentlichten Video – Schritt für Schritt", en: "From idea to published video – step by step", es: "De la idea al video publicado – paso a paso" }),
     allDone: tx({ de: "Alle Schritte abgeschlossen! 🎉", en: "All steps completed! 🎉", es: "¡Todos los pasos completados! 🎉" }),
   },

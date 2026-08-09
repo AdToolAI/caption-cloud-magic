@@ -11,13 +11,13 @@ export interface NewsItem {
 }
 
 const FALLBACK_NEWS: NewsItem[] = [
-  { headline: "📱 Instagram testet neues Creator-Abo-Modell", category: "platform", source: "The Verge" },
+  { headline: tx({ de: "📱 Instagram testet neues Creator-Abo-Modell", en: "📱 Instagram tests new creator subscription model", es: "📱 Instagram prueba un nuevo modelo de suscripción de creador" }), category: "platform", source: "The Verge" },
   { headline: tx({ de: "💰 TikTok Shop expandiert in neue Märkte", en: "💰 TikTok Shop is expanding into new markets", es: "💰 TikTok Shop se está expandiendo a nuevos mercados" }), category: "monetization", source: "TechCrunch" },
-  { headline: "📊 LinkedIn-Algorithmus priorisiert Kommentare", category: "analytics", source: "Social Media Today" },
-  { headline: "🤖 Adobe Firefly bekommt KI-Video-Funktionen", category: "ai_tools", source: "Adobe Blog" },
-  { headline: "💬 Meta verbessert Community-Management-Tools", category: "community", source: "Meta Newsroom" },
-  { headline: "📱 YouTube Shorts Monetarisierung erreicht 2M+ Creator", category: "monetization", source: "YouTube" },
-  { headline: "🤖 Canva launcht KI-Batch-Erstellung", category: "ai_tools", source: "Canva" },
+  { headline: tx({ de: "📊 LinkedIn-Algorithmus priorisiert Kommentare", en: "📊 LinkedIn algorithm prioritizes comments", es: "📊 El algoritmo de LinkedIn prioriza los comentarios" }), category: "analytics", source: "Social Media Today" },
+  { headline: tx({ de: "🤖 Adobe Firefly bekommt KI-Video-Funktionen", en: "🤖 Adobe Firefly gets AI video features", es: "🤖 Adobe Firefly obtiene funciones de vídeo con IA" }), category: "ai_tools", source: "Adobe Blog" },
+  { headline: tx({ de: "💬 Meta verbessert Community-Management-Tools", en: "💬 Meta improves community management tools", es: "💬 Meta mejora las herramientas de gestión comunitaria" }), category: "community", source: "Meta Newsroom" },
+  { headline: tx({ de: "📱 YouTube Shorts Monetarisierung erreicht 2M+ Creator", en: "📱 YouTube Shorts monetization reaches 2M+ creators", es: "📱 La monetización de YouTube Shorts llega a más de 2 millones de creadores" }), category: "monetization", source: "YouTube" },
+  { headline: tx({ de: "🤖 Canva launcht KI-Batch-Erstellung", en: "🤖 Canva launches AI batch creation", es: "🤖 Canva lanza la creación de lotes de IA" }), category: "ai_tools", source: "Canva" },
   { headline: tx({ de: "📊 Kurzvideos: 2,5x mehr Engagement als statische Posts", en: "📊 Short videos: 2.5x more engagement than static posts", es: "📊 Vídeos cortos: 2,5 veces más participación que las publicaciones estáticas" }), category: "analytics", source: "HubSpot" },
 ];
 

@@ -50,7 +50,7 @@ export const LUMA_VIDEO_MODELS = {
     maxDuration: 5,
     allowedDurations: [5] as const,
     description: {
-      EUR: 'Ray 3.2 · neueste Luma-Generation — 0,90€ pro Clip',
+      EUR: tx({ de: 'Ray 3.2 · neueste Luma-Generation — 0,90€ pro Clip', en: 'Ray 3.2 · latest Luma generation — €0.90 per clip', es: 'Ray 3.2 · última generación de Luma — 0,90 € por clip' }),
       USD: 'Ray 3.2 · latest Luma generation — $0.90 per clip',
     },
     badge: tx({ de: 'Neu', en: 'New', es: 'Nuevo' }),
@@ -67,7 +67,7 @@ export const LUMA_VIDEO_MODELS = {
     maxDuration: 10,
     allowedDurations: [10] as const,
     description: {
-      EUR: 'Ray 3.2 · 10s Langclip — 2,70€ pro Clip',
+      EUR: tx({ de: 'Ray 3.2 · 10s Langclip — 2,70€ pro Clip', en: 'Ray 3.2 · 10s long clip — €2.70 per clip', es: 'Ray 3.2 · clip largo de 10 segundos — 2,70 € por clip' }),
       USD: 'Ray 3.2 · 10s long clip — $2.70 per clip',
     },
     badge: tx({ de: 'Neu', en: 'New', es: 'Nuevo' }),
