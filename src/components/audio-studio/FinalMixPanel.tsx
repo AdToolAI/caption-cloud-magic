@@ -73,7 +73,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
     try {
       const buf = await mixer.renderOffline();
       if (!buf) {
-        toast.error('Keine Quellen zum Messen');
+        toast.error(tx({ de: 'Keine Quellen zum Messen', en: 'No sources to measure', es: 'No hay fuentes para medir' }));
         return;
       }
       const { lufs } = mixer.measureLUFS(buf);
@@ -92,7 +92,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
     try {
       const blob = await mixer.exportMix();
       if (!blob) {
-        toast.error('Export fehlgeschlagen');
+        toast.error(tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Exportación fallida' }));
         return;
       }
 
@@ -146,13 +146,13 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
       });
       if (insErr) throw insErr;
 
-      toast.success('Final Mix gespeichert', {
+      toast.success(tx({ de: 'Final Mix gespeichert', en: 'Final mix saved', es: 'Mezcla final guardada' }), {
         description: `Normalisiert auf ${mixer.target.label} (${mixer.target.lufs} LUFS)`,
       });
       onMixSaved?.();
     } catch (e: any) {
       console.error('[FinalMix] export error', e);
-      toast.error('Export fehlgeschlagen', { description: e.message });
+      toast.error(tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Exportación fallida' }), { description: e.message });
     } finally {
       setSaving(false);
     }

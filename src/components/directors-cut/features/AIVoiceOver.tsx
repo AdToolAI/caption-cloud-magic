@@ -133,7 +133,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
   const toggleVoiceLock = () => {
     if (!lockStorageKey) {
-      toast.error('Voice-Lock benötigt ein gespeichertes Projekt');
+      toast.error(tx({ de: 'Voice-Lock benötigt ein gespeichertes Projekt', en: 'Voice lock requires a saved project', es: 'El bloqueo de voz requiere un proyecto guardado' }));
       return;
     }
     if (lockedVoiceId) {
@@ -177,11 +177,11 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       if (data?.voiceover_url) {
         setGeneratedUrl(data.voiceover_url);
         onVoiceOverGenerated?.(data.voiceover_url);
-        toast.success('Voice-Over erfolgreich generiert!');
+        toast.success(tx({ de: 'Voice-Over erfolgreich generiert!', en: 'Voice-over generated successfully!', es: '¡Voz en off generada con éxito!' }));
       }
     } catch (error) {
       console.error('Voice-over generation error:', error);
-      toast.error('Fehler bei der Voice-Over Generierung');
+      toast.error(tx({ de: 'Fehler bei der Voice-Over Generierung', en: 'Error generating voice-over', es: 'Error al generar la voz en off' }));
     } finally {
       setIsGenerating(false);
     }
@@ -451,7 +451,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
               {isGenerating ? (
                 <><Loader2 className="h-4 w-4 animate-spin" />Generiert...</>
               ) : (
-                <><Sparkles className="h-4 w-4" />{generatedUrl ? 'Neu generieren' : 'Voice-Over erstellen'}</>
+                <><Sparkles className="h-4 w-4" />{generatedUrl ? tx({ de: 'Neu generieren', en: 'Regenerate', es: 'Regenerar' }) : tx({ de: 'Voice-Over erstellen', en: 'Create voice-over', es: 'Crear voz en off' })}</>
               )}
             </Button>
           </div>
