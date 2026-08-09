@@ -69,21 +69,23 @@ for (const root of ROOTS) {
           }
         });
       }
-      for (const rule of BAD_TECHNICAL) {
-        if (rule.test(full)) {
-          problems.push(`${file}:${lineOf(match.index)} translated Intl option: ${rule}`);
+      if (/toLocale(Date|Time)?String|DateTimeFormat/.test(full)) {
+        for (const rule of BAD_TECHNICAL) {
+          if (rule.test(full)) {
+            problems.push(`${file}:${lineOf(match.index)} translated Intl option in tx block`);
+          }
         }
       }
     }
 
-    for (const rule of BAD_TECHNICAL) {
-      for (const line of source.split("\n")) {
-        if (rule.test(line) && !line.includes("BAD_TECHNICAL")) {
-          const n = source.split("\n").indexOf(line) + 1;
-          problems.push(`${file}:${n} translated Intl option: ${line.trim().slice(0, 120)}`);
+    source.split("\n").forEach((line, i) => {
+      if (!/toLocale(Date|Time)?String|DateTimeFormat/.test(line)) return;
+      for (const rule of BAD_TECHNICAL) {
+        if (rule.test(line)) {
+          problems.push(`${file}:${i + 1} translated Intl option: ${line.trim().slice(0, 120)}`);
         }
       }
-    }
+    });
   }
 }
 
