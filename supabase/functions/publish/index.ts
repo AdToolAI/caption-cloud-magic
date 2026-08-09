@@ -10,6 +10,7 @@ import {
   xCircuitBreaker,
   facebookCircuitBreaker 
 } from '../_shared/circuit-breaker.ts';
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
