@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * sceneEngineRouter — Pure, side-effect-free UI *recommendation*.
  *
@@ -126,7 +127,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
       engine: 'sync-segments',
       label: speakers >= 2 ? `⚡ Fast Dialog · ${speakers} Sprecher (1-Call)` : '⚡ Fast Dialog · 1-Call',
       reason:
-        'Sync.so Segments API: ein einziger Lipsync-Call über die Action-Plate mit segments[] pro Sprecher-Turn.',
+        tx({ de: 'Sync.so Segments API: ein einziger Lipsync-Call über die Action-Plate mit segments[] pro Sprecher-Turn.', en: 'Sync.so Segments API: a single Lipsync call via the Action-Plate with segments[] per speaker turn.', es: 'API de segmentos de Sync.so: una sola llamada de Lipsync a través de la Action-Plate con segments[] por turno de orador.' }),
       extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
     };
   }
@@ -141,7 +142,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
         engine: 'sync-segments',
         label: `🎬 Action + Lip-Sync · ${speakers} Sprecher`,
         reason:
-          'Sync.so Segments API auf einer Hailuo/HappyHorse-Action-Plate — ein Lipsync-Call mit segments[] pro Sprecher-Turn.',
+          tx({ de: 'Sync.so Segments API auf einer Hailuo/HappyHorse-Action-Plate — ein Lipsync-Call mit segments[] pro Sprecher-Turn.', en: 'Sync.so Segments API on a Hailuo/HappyHorse Action-Plate — a Lipsync call with segments[] per speaker turn.', es: 'API de segmentos de Sync.so en una Action-Plate de Hailuo/HappyHorse — una llamada de Lipsync con segments[] por turno de orador.' }),
         extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
       };
     }
@@ -161,7 +162,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
     reason:
       hasDialog && hasCast
         ? 'Off-Screen-Narration — aktiviere den Lip-Sync-Toggle für echte Mundbewegung.'
-        : 'Off-Screen-Narration — Voiceover läuft über die Szene, keine Lip-Sync nötig.',
+        : tx({ de: 'Off-Screen-Narration — Voiceover läuft über die Szene, keine Lip-Sync nötig.', en: 'Off-Screen Narration — Voiceover plays over the scene, no Lip-Sync needed.', es: 'Narración fuera de pantalla — La voz en off se reproduce sobre la escena, no se necesita sincronización labial.' }),
     extraCostEur: 0,
   };
 }

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Trash2 } from "lucide-react";
@@ -32,7 +33,7 @@ export function TemplateDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
       .order("created_at", { ascending: false })
       .limit(40)
       .then(({ data, error }) => {
-        if (error) toast.error("Vorlagen konnten nicht geladen werden");
+        if (error) toast.error(tx({ de: "Vorlagen konnten nicht geladen werden", en: "Could not load templates", es: "No se pudieron cargar las plantillas" }));
         setItems((data ?? []) as unknown as SavedDesign[]);
         setLoading(false);
       });

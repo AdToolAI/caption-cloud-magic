@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -50,7 +51,7 @@ export const useCreditReservation = () => {
       console.error('Credit reservation failed:', error);
       toast({
         title: 'Nicht genügend Credits',
-        description: 'Bitte kaufen Sie Credits nach, um diese Funktion zu nutzen.',
+        description: tx({ de: 'Bitte kaufen Sie Credits nach, um diese Funktion zu nutzen.', en: 'Please purchase more credits to use this feature.', es: 'Por favor, compra más créditos para usar esta función.' }),
         variant: 'destructive'
       });
       throw error;

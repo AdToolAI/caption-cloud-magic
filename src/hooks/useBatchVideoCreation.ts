@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -67,7 +68,7 @@ export const useBatchVideoCreation = () => {
       console.error('Batch creation error:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Batch konnte nicht erstellt werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Batch konnte nicht erstellt werden', en: 'Could not create batch', es: 'No se pudo crear el lote' }),
         variant: 'destructive'
       });
       return null;

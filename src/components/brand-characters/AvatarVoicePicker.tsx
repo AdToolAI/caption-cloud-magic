@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -96,7 +97,7 @@ export const AvatarVoicePicker = ({
           className="flex-1 justify-start bg-background/60 font-normal h-9 text-xs"
         >
           <Mic className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-          <span className="truncate">{selected ? selected.name : 'Stimme aus Bibliothek wählen…'}</span>
+          <span className="truncate">{selected ? selected.name : tx({ de: 'Stimme aus Bibliothek wählen…', en: 'Select voice from library…', es: 'Seleccionar voz de la biblioteca…' })}</span>
         </Button>
 
         {value && (
@@ -122,7 +123,7 @@ export const AvatarVoicePicker = ({
         onSelect={handleSelect}
         language={targetLanguage}
         currentVoiceId={value ?? undefined}
-        title="Stimme für Charakter wählen"
+        title={tx({ de: "Stimme für Charakter wählen", en: "Select voice for character", es: "Seleccionar voz para el personaje" })}
       />
     </div>
   );

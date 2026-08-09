@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,7 +12,7 @@ export interface FirstVideoPrompt {
 
 const FALLBACK: Record<string, FirstVideoPrompt[]> = {
   de: [
-    { prompt: "Cinematische Drohnenaufnahme über einer modernen Skyline bei Sonnenuntergang", prompt_en: "Cinematic drone shot over a modern skyline at sunset", style_hint: "cinematic" },
+    { prompt: tx({ de: "Cinematische Drohnenaufnahme über einer modernen Skyline bei Sonnenuntergang", en: "Cinematic drone shot over a modern skyline at sunset", es: "Toma cinematográfica de dron sobre un horizonte moderno al atardecer" }), prompt_en: "Cinematic drone shot over a modern skyline at sunset", style_hint: "cinematic" },
     { prompt: "Eleganter Produkt-Shot eines Parfüm-Flakons mit weichem Goldlicht", prompt_en: "Elegant product shot of a perfume bottle with soft gold light", style_hint: "product" },
     { prompt: "Eine entspannte Person auf einer Couch, die in die Kamera lächelt", prompt_en: "A relaxed person on a couch smiling at the camera", style_hint: "lifestyle" },
   ],

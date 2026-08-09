@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout, MessageCircle, Loader2, Video, AlertTriangle, RefreshCw, ArrowLeft, RotateCcw, Palette, Film, Upload } from 'lucide-react';
@@ -341,7 +342,7 @@ export function UniversalVideoWizard() {
       }
     } catch (err: any) {
       console.error('Product image upload error:', err);
-      toast.error(language === 'de' ? 'Fehler beim Hochladen' : 'Upload failed');
+      toast.error(language === 'de' ? tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }) : 'Upload failed');
     } finally {
       setIsUploadingImages(false);
     }
@@ -977,7 +978,7 @@ export function UniversalVideoWizard() {
               </div>
               <h2 className="text-2xl font-bold">{t('uvc.generationFailed')}</h2>
               <p className="text-muted-foreground">
-                {language === 'de' ? 'Das Video konnte nicht geladen werden. Bitte versuche es erneut.' 
+                {language === 'de' ? tx({ de: 'Das Video konnte nicht geladen werden. Bitte versuche es erneut.', en: 'The video could not be loaded. Please try again.', es: 'No se pudo cargar el vídeo. Por favor, inténtalo de nuevo.' }) 
                   : language === 'es' ? 'No se pudo cargar el video. Inténtalo de nuevo.'
                   : 'The video could not be loaded. Please try again.'}
               </p>

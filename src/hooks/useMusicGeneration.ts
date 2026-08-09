@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -85,7 +86,7 @@ export function useMusicGeneration() {
             },
           });
         } else if (code === 'RATE_LIMIT') {
-          toast.error('Rate limit erreicht', { description: 'Bitte kurz warten und erneut versuchen.' });
+          toast.error('Rate limit erreicht', { description: tx({ de: 'Bitte kurz warten und erneut versuchen.', en: 'Please wait briefly and try again.', es: 'Espera un momento y vuelve a intentarlo.' }) });
         } else if (code === 'MISSING_LYRICS') {
           toast.error('Lyrics fehlen', { description: 'Für Vocal-Tracks bitte Songtext eingeben.' });
         } else {

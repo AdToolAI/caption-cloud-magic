@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { SlideRenderer } from "./SlideRenderer";
 import type { PostDesign } from "@/lib/post-design/schema";
@@ -85,7 +86,7 @@ export function VariantGallery({ variants, loading, stage, imagePending, onPick,
           {onShuffle && (
             <button
               type="button"
-              title="Neue Copy für diese Vorlage"
+              title={tx({ de: "Neue Copy für diese Vorlage", en: "New copy for this template", es: "Nueva copia para esta plantilla" })}
               onClick={(e) => {
                 e.stopPropagation();
                 onShuffle(i);

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { Clock, Zap } from 'lucide-react';
@@ -60,7 +61,7 @@ export function RateLimitIndicator({ remainingCalls, maxCalls, resetTime }: Rate
           <p className="text-xs text-muted-foreground">
             {remainingCalls === 0 
               ? `Bitte warte ${countdown} Sekunden für den nächsten Call`
-              : 'Nur noch wenige Calls verfügbar in dieser Minute'}
+              : tx({ de: 'Nur noch wenige Calls verfügbar in dieser Minute', en: 'Only a few calls available this minute', es: 'Solo quedan unas pocas llamadas disponibles este minuto' })}
           </p>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ export function AIRecommendationsOverlay({
       }
     } catch (error: any) {
       console.error("Error loading AI recommendations:", error);
-      toast.error("Fehler beim Laden der AI-Empfehlungen");
+      toast.error(tx({ de: "Fehler beim Laden der AI-Empfehlungen", en: "Error loading AI recommendations", es: "Error al cargar las recomendaciones de IA" }));
     } finally {
       setLoading(false);
     }

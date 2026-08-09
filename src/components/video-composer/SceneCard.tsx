@@ -1470,7 +1470,7 @@ export default function SceneCard({
                             : "Dialog & Lip-Sync";
                       const toggleHint =
                         lang === "de"
-                          ? "HappyHorse, Hailuo, Kling, Wan, Seedance und Luma sind für Sync.so Lip-Sync zertifiziert."
+                          ? tx({ de: "HappyHorse, Hailuo, Kling, Wan, Seedance und Luma sind für Sync.so Lip-Sync zertifiziert.", en: "HappyHorse, Hailuo, Kling, Wan, Seedance, and Luma are certified for Sync.so Lip-Sync.", es: "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so Lip-Sync." })
                           : lang === "es"
                             ? "HappyHorse, Hailuo, Kling, Wan, Seedance y Luma están certificados para Sync.so lip-sync."
                             : "HappyHorse, Hailuo, Kling, Wan, Seedance and Luma are certified for Sync.so lip-sync.";
@@ -1567,7 +1567,7 @@ export default function SceneCard({
                                             : "Switched to HappyHorse 1.0",
                                       description:
                                         lang === "de"
-                                          ? "Lip-Sync läuft nur über HappyHorse (3–15s) oder Hailuo (6/10s Fallback). HappyHorse vorausgewählt."
+                                          ? tx({ de: "Lip-Sync läuft nur über HappyHorse (3–15s) oder Hailuo (6/10s Fallback). HappyHorse vorausgewählt.", en: "Lip-sync only runs via HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse pre-selected.", es: "La sincronización labial solo funciona a través de HappyHorse (3–15s) o Hailuo (6/10s de respaldo). HappyHorse preseleccionado." })
                                           : lang === "es"
                                             ? "Lip-Sync solo con HappyHorse (3–15s) o Hailuo (6/10s alternativa). HappyHorse preseleccionado."
                                             : "Lip-Sync runs only on HappyHorse (3–15s) or Hailuo (6/10s fallback). HappyHorse preselected.",
@@ -2802,7 +2802,7 @@ export default function SceneCard({
                           }}
                           placeholder={
                             lang === "de"
-                              ? "Describe the scene… nutze @charakter und @location aus deiner Library"
+                              ? tx({ de: "Describe the scene… nutze @charakter und @location aus deiner Library", en: "Describe the scene… use @character and @location from your Library", es: "Describe la escena… usa @personaje y @ubicación de tu biblioteca" })
                               : lang === "es"
                                 ? "Describe la escena… usa @personaje y @ubicación de tu biblioteca"
                                 : "Describe the scene visually… use @character and @location from your library"
@@ -3123,7 +3123,7 @@ export default function SceneCard({
                           ? "Imagen de referencia opcional — la IA se basa en ella (Image-to-Video)."
                           : "Optional reference image — the AI uses it as visual guide (image-to-video)."
                       : lang === "de"
-                        ? "Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet."
+                        ? tx({ de: "Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet.", en: "Optional reference image — used for continuity, brand-character sync, and future AI transitions.", es: "Imagen de referencia opcional — utilizada para continuidad, sincronización de personajes de marca y futuras transiciones de IA." })
                         : lang === "es"
                           ? "Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA."
                           : "Optional reference image — used for continuity, brand-character sync and later AI transitions."}
@@ -3374,7 +3374,7 @@ export default function SceneCard({
             </DialogTitle>
             <DialogDescription>
               {lang === "de"
-                ? "Vergleiche denselben Prompt parallel auf bis zu 6 KI-Video-Engines. Wähle einen Sieger und übernimm ihn in deine Szene."
+                ? tx({ de: "Vergleiche denselben Prompt parallel auf bis zu 6 KI-Video-Engines. Wähle einen Sieger und übernimm ihn in deine Szene.", en: "Compare the same prompt in parallel on up to 6 AI video engines. Choose a winner and apply it to your scene.", es: "Compara el mismo prompt en paralelo en hasta 6 motores de vídeo de IA. Elige un ganador y aplícalo a tu escena." })
                 : lang === "es"
                   ? "Compara el mismo prompt en hasta 6 motores de vídeo IA en paralelo. Elige un ganador y aplícalo a tu escena."
                   : "Compare the same prompt across up to 6 AI video engines in parallel. Pick a winner and apply it to your scene."}

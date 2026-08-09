@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -79,7 +80,7 @@ export function useCalendarApprovals() {
 
       toast({
         title: '🚫 Freigabe abgelehnt',
-        description: 'Event wurde zur Überarbeitung zurückgeschickt',
+        description: tx({ de: 'Event wurde zur Überarbeitung zurückgeschickt', en: 'Event sent back for revision', es: 'El evento fue devuelto para revisión' }),
       });
 
       return true;

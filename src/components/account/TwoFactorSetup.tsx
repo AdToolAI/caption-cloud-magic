@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -61,10 +62,10 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
       }
     } catch (err: any) {
       console.error('MFA enroll error:', err);
-      setError(err.message || 'Fehler beim Einrichten der 2FA');
+      setError(err.message || tx({ de: 'Fehler beim Einrichten der 2FA', en: 'Error setting up 2FA', es: 'Error al configurar la 2FA' }));
       toast({
         title: "Fehler",
-        description: err.message || 'Fehler beim Einrichten der 2FA',
+        description: err.message || tx({ de: 'Fehler beim Einrichten der 2FA', en: 'Error setting up 2FA', es: 'Error al configurar la 2FA' }),
         variant: "destructive"
       });
     } finally {
@@ -74,7 +75,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
 
   const handleVerify = async () => {
     if (verifyCode.length !== 6) {
-      setError("Bitte gib einen 6-stelligen Code ein");
+      setError(tx({ de: "Bitte gib einen 6-stelligen Code ein", en: "Please enter a 6-digit code", es: "Por favor, introduce un código de 6 dígitos" }));
       return;
     }
 
@@ -255,7 +256,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                   className="w-full h-11 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-[0_8px_30px_-5px_hsl(var(--primary)/0.3)] hover:shadow-[0_12px_40px_-5px_hsl(var(--primary)/0.4)] transition-all duration-300 relative overflow-hidden group"
                 >
                   <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                  <span className="relative">Weiter zur Verifizierung</span>
+                  <span className="relative">{tx({ de: "Weiter zur Verifizierung", en: "Continue to verification", es: "Continuar con la verificación" })}</span>
                 </Button>
               </motion.div>
             )}

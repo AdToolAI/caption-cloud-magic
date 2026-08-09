@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -96,7 +97,7 @@ export function AppSidebar() {
                           onClick={() => {
                             if (comingSoon) {
                               toast.info(`${t(hub.titleKey)} — Coming Soon`, {
-                                description: 'Wir benachrichtigen dich, sobald dieser Bereich live geht.',
+                                description: tx({ de: 'Wir benachrichtigen dich, sobald dieser Bereich live geht.', en: 'We will notify you as soon as this area goes live.', es: 'Te avisaremos tan pronto como esta área esté disponible.' }),
                               });
                               return;
                             }

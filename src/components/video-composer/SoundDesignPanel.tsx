@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,7 +66,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
 
   const generateMix = async () => {
     if (!projectId) {
-      toast({ title: 'Projekt zuerst speichern', variant: 'destructive' });
+      toast({ title: tx({ de: 'Projekt zuerst speichern', en: 'Save project first', es: 'Guardar proyecto primero' }), variant: 'destructive' });
       return;
     }
     if (!scenes.length) {

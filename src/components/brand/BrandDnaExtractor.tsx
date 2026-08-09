@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Globe, Image as ImageIcon, Loader2, Check } from "lucide-react";
@@ -20,7 +21,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
 
   const handleExtract = () => {
     if (!url.trim()) {
-      toast({ title: "URL fehlt", description: "Bitte gib eine Website-URL ein.", variant: "destructive" });
+      toast({ title: "URL fehlt", description: tx({ de: "Bitte gib eine Website-URL ein.", en: "Please enter a website URL.", es: "Por favor, introduce una URL de sitio web." }), variant: "destructive" });
       return;
     }
     let safeUrl = url.trim();
@@ -39,7 +40,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
         onError: (e) => {
           toast({
             title: "Extraktion fehlgeschlagen",
-            description: e.message ?? "Bitte versuche es erneut.",
+            description: e.message ?? tx({ de: "Bitte versuche es erneut.", en: "Please try again.", es: "Por favor, inténtalo de nuevo." }),
             variant: "destructive",
           });
         },

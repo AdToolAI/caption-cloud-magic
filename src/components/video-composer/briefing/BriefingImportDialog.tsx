@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * BriefingImportDialog — Stage 1 + 3 of the Briefing pipeline UI.
  *
@@ -124,7 +125,7 @@ export default function BriefingImportDialog({
     } catch (e: any) {
       const msg = e?.message ?? 'Parsing fehlgeschlagen';
       toast({
-        title: 'Briefing konnte nicht gelesen werden',
+        title: tx({ de: 'Briefing konnte nicht gelesen werden', en: 'Could not read briefing', es: 'No se pudo leer el briefing' }),
         description: msg.includes('402') ? 'Keine AI-Credits mehr.'
           : msg.includes('429') ? 'Zu viele Anfragen — bitte kurz warten.' : msg,
         variant: 'destructive',

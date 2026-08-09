@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,7 @@ export function AIFrameInterpolation({
     if (!videoUrl) {
       toast({
         title: 'Kein Video ausgewählt',
-        description: 'Bitte wähle zuerst ein Video aus.',
+        description: tx({ de: 'Bitte wähle zuerst ein Video aus.', en: 'Please select a video first.', es: 'Por favor, selecciona un video primero.' }),
         variant: 'destructive'
       });
       return;
@@ -79,7 +80,7 @@ export function AIFrameInterpolation({
       setError(err instanceof Error ? err.message : 'Interpolation fehlgeschlagen');
       toast({
         title: 'Fehler bei Frame Interpolation',
-        description: 'Bitte versuche es später erneut.',
+        description: tx({ de: 'Bitte versuche es später erneut.', en: 'Please try again later.', es: 'Por favor, inténtalo de nuevo más tarde.' }),
         variant: 'destructive'
       });
     } finally {

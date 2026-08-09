@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,7 +55,7 @@ export function usePushNotifications() {
       setStatus(permission as PushStatus);
 
       if (permission !== "granted") {
-        toast.error("Push-Benachrichtigungen wurden blockiert. Bitte erlaube sie in den Browser-Einstellungen.");
+        toast.error(tx({ de: "Push-Benachrichtigungen wurden blockiert. Bitte erlaube sie in den Browser-Einstellungen.", en: "Push notifications were blocked. Please allow them in your browser settings.", es: "Las notificaciones push fueron bloqueadas. Por favor, permítelas en la configuración de tu navegador." }));
         setLoading(false);
         return;
       }
@@ -81,7 +82,7 @@ export function usePushNotifications() {
 
       const vapidKey = vapidData?.vapid_public_key || VAPID_PUBLIC_KEY;
       if (!vapidKey) {
-        toast.error("Push-Konfiguration nicht verfügbar");
+        toast.error(tx({ de: "Push-Konfiguration nicht verfügbar", en: "Push configuration not available", es: "Configuración de push no disponible" }));
         setLoading(false);
         return;
       }
@@ -109,7 +110,7 @@ export function usePushNotifications() {
       toast.success("Push-Benachrichtigungen aktiviert! 🔔");
     } catch (err: any) {
       console.error("Push subscription error:", err);
-      toast.error("Fehler beim Aktivieren der Push-Benachrichtigungen");
+      toast.error(tx({ de: "Fehler beim Aktivieren der Push-Benachrichtigungen", en: "Error activating push notifications", es: "Error al activar las notificaciones push" }));
     } finally {
       setLoading(false);
     }
@@ -141,7 +142,7 @@ export function usePushNotifications() {
       toast.success("Push-Benachrichtigungen deaktiviert");
     } catch (err: any) {
       console.error("Push unsubscribe error:", err);
-      toast.error("Fehler beim Deaktivieren");
+      toast.error(tx({ de: "Fehler beim Deaktivieren", en: "Error deactivating", es: "Error al desactivar" }));
     } finally {
       setLoading(false);
     }

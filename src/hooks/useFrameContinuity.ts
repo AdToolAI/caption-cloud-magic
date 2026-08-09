@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -51,7 +52,7 @@ export function useFrameContinuity() {
         await new Promise<void>((resolve, reject) => {
           const onMeta = () => resolve();
           const onErr = () =>
-            reject(new Error('Video konnte nicht geladen werden (CORS?)'));
+            reject(new Error(tx({ de: 'Video konnte nicht geladen werden (CORS?)', en: 'Video could not be loaded (CORS?)', es: 'No se pudo cargar el video (¿CORS?)' })));
           video!.addEventListener('loadedmetadata', onMeta, { once: true });
           video!.addEventListener('error', onErr, { once: true });
           setTimeout(
@@ -89,7 +90,7 @@ export function useFrameContinuity() {
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Canvas 2D Context nicht verfügbar');
+        if (!ctx) throw new Error(tx({ de: 'Canvas 2D Context nicht verfügbar', en: 'Canvas 2D context not available', es: 'Contexto 2D del lienzo no disponible' }));
         ctx.drawImage(video, 0, 0, w, h);
 
         const blob: Blob = await new Promise((resolve, reject) =>

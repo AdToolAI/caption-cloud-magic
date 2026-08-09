@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
@@ -53,13 +54,13 @@ export function VoiceInput({ onTranscription, onListeningChange, disabled }: Voi
       if (event.error === 'not-allowed') {
         toast({
           title: 'Mikrofon-Zugriff verweigert',
-          description: 'Bitte erlaube den Zugriff auf dein Mikrofon in den Browser-Einstellungen.',
+          description: tx({ de: 'Bitte erlaube den Zugriff auf dein Mikrofon in den Browser-Einstellungen.', en: 'Please allow microphone access in your browser settings.', es: 'Por favor, permite el acceso al micrófono en la configuración de tu navegador.' }),
           variant: 'destructive',
         });
       } else if (event.error !== 'aborted') {
         toast({
           title: 'Spracherkennung fehlgeschlagen',
-          description: 'Bitte versuche es erneut.',
+          description: tx({ de: 'Bitte versuche es erneut.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
           variant: 'destructive',
         });
       }
@@ -99,7 +100,7 @@ export function VoiceInput({ onTranscription, onListeningChange, disabled }: Voi
     if (!SpeechRecognition) {
       toast({
         title: 'Nicht unterstützt',
-        description: 'Dein Browser unterstützt keine Spracherkennung. Bitte verwende Chrome oder Edge.',
+        description: tx({ de: 'Dein Browser unterstützt keine Spracherkennung. Bitte verwende Chrome oder Edge.', en: 'Your browser does not support speech recognition. Please use Chrome or Edge.', es: 'Tu navegador no es compatible con el reconocimiento de voz. Por favor, usa Chrome o Edge.' }),
         variant: 'destructive',
       });
       return;

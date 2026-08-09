@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw } from 'lucide-react';
@@ -27,7 +28,7 @@ export const TokenExpiryBadge = ({ provider }: TokenExpiryBadgeProps) => {
 
   const handleRefresh = async () => {
     if (provider !== 'x') {
-      toast.error('Token-Refresh nur für X verfügbar');
+      toast.error(tx({ de: 'Token-Refresh nur für X verfügbar', en: 'Token refresh available for X only', es: 'Actualización de token disponible solo para X' }));
       return;
     }
 

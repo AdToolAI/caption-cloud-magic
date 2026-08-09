@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -116,7 +117,7 @@ export function ProfileEditorDialog({
       });
       toast({
         title: 'Erfolg',
-        description: profile ? 'Profil wurde aktualisiert.' : 'Profil wurde erstellt.'
+        description: profile ? 'Profil wurde aktualisiert.' : tx({ de: 'Profil wurde erstellt.', en: 'Profile created.', es: 'Perfil creado.' })
       });
       onOpenChange(false);
     } catch (error) {

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -112,7 +113,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
 
   const callGenerator = async (overrides: Record<string, any> = {}) => {
     if (!brief?.trim()) {
-      toast.error("Bitte zuerst ein Briefing eingeben");
+      toast.error(tx({ de: "Bitte zuerst ein Briefing eingeben", en: "Please enter a briefing first", es: "Por favor, introduce primero un briefing" }));
       return null;
     }
     const { data: { session } } = await supabase.auth.getSession();
@@ -212,7 +213,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
       return;
     }
     if (channels.length === 0) {
-      toast.error("Mindestens eine Plattform auswählen");
+      toast.error(tx({ de: "Mindestens eine Plattform auswählen", en: "Select at least one platform", es: "Selecciona al menos una plataforma" }));
       return;
     }
     if (!startAt) {

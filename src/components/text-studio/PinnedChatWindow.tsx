@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -185,8 +186,8 @@ export default function PinnedChatWindow() {
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         if (resp.status === 402) toast.error(err.error || "Wallet leer – bitte Credits aufladen.");
-        else if (resp.status === 429) toast.error("Rate limit – kurz warten und erneut probieren.");
-        else toast.error(err.error || "Fehler beim Senden");
+        else if (resp.status === 429) toast.error(tx({ de: "Rate limit – kurz warten und erneut probieren.", en: "Rate limit – please wait a moment and try again.", es: "Límite de peticiones – por favor, espera un momento e inténtalo de nuevo." }));
+        else toast.error(err.error || tx({ de: "Fehler beim Senden", en: "Error sending", es: "Error al enviar" }));
         setMessages(next);
         setStreaming(false);
         return;

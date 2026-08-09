@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -358,7 +359,7 @@ export function SpeedRamping({
             <Gauge className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-xs">
               {selectedSceneId 
-                ? 'Füge Keyframes für diese Szene hinzu'
+                ? tx({ de: 'Füge Keyframes für diese Szene hinzu', en: 'Add keyframes for this scene', es: 'Añadir fotogramas clave para esta escena' })
                 : 'Füge globale Keyframes hinzu um Speed Ramping zu nutzen'
               }
             </p>

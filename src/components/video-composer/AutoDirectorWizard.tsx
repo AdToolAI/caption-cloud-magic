@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -170,7 +171,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
                 id="idea"
                 value={idea}
                 onChange={(e) => setIdea(e.target.value)}
-                placeholder="z.B. Ein Sneaker-Werbespot mit dynamischen City-Aufnahmen und einem coolen Athleten der durch die Straßen läuft."
+                placeholder={tx({ de: "z.B. Ein Sneaker-Werbespot mit dynamischen City-Aufnahmen und einem coolen Athleten der durch die Straßen läuft.", en: "e.g. A sneaker commercial with dynamic city shots and a cool athlete running through the streets.", es: "p. ej. Un anuncio de zapatillas con tomas dinámicas de la ciudad y un atleta genial corriendo por las calles." })}
                 rows={4}
                 className="mt-2"
                 maxLength={500}

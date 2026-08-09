@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -185,7 +186,7 @@ export default function StockMediaBrowser({
       queryClient.invalidateQueries({ queryKey: ['user-media-library'] });
       toast({ title: t('videoComposer.stock.saved') || 'Gespeichert in deiner Bibliothek' });
     },
-    onError: (err) => toast({ title: 'Fehler beim Speichern', description: String(err), variant: 'destructive' }),
+    onError: (err) => toast({ title: tx({ de: 'Fehler beim Speichern', en: 'Error saving', es: 'Error al guardar' }), description: String(err), variant: 'destructive' }),
   });
 
   const items = tab === 'library'
@@ -298,14 +299,14 @@ export default function StockMediaBrowser({
               {!isLoading && tab !== 'library' && !debouncedQuery && (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm">
                   <Search className="h-8 w-8 mb-2 opacity-40" />
-                  {t('videoComposer.stock.startSearchHint') || 'Wähle eine Kategorie oder suche oben…'}
+                  {t('videoComposer.stock.startSearchHint') || tx({ de: 'Wähle eine Kategorie oder suche oben…', en: 'Select a category or search above…', es: 'Selecciona una categoría o busca arriba…' })}
                 </div>
               )}
 
               {!isLoading && tab === 'library' && filteredItems.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm">
                   <Library className="h-8 w-8 mb-2 opacity-40" />
-                  {t('videoComposer.stock.libraryEmpty') || 'Deine Bibliothek ist leer. Speichere Favoriten mit dem Stern.'}
+                  {t('videoComposer.stock.libraryEmpty') || tx({ de: 'Deine Bibliothek ist leer. Speichere Favoriten mit dem Stern.', en: 'Your library is empty. Save favorites with the star.', es: 'Tu biblioteca está vacía. Guarda tus favoritos con la estrella.' })}
                 </div>
               )}
 

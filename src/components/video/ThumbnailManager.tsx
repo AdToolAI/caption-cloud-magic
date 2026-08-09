@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,7 @@ export const ThumbnailManager = ({
 
       toast({
         title: 'Thumbnail generiert',
-        description: 'Das Thumbnail wurde erfolgreich erstellt',
+        description: tx({ de: 'Das Thumbnail wurde erfolgreich erstellt', en: 'The thumbnail was created successfully', es: 'La miniatura se creó correctamente' }),
       });
 
       onThumbnailUpdated?.();
@@ -47,7 +48,7 @@ export const ThumbnailManager = ({
       console.error('Error regenerating thumbnail:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Thumbnail konnte nicht generiert werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Thumbnail konnte nicht generiert werden', en: 'Thumbnail could not be generated', es: 'No se pudo generar la miniatura' }),
         variant: 'destructive',
       });
     } finally {
@@ -84,7 +85,7 @@ export const ThumbnailManager = ({
 
       toast({
         title: 'Thumbnail hochgeladen',
-        description: 'Ihr benutzerdefiniertes Thumbnail wurde gespeichert',
+        description: tx({ de: 'Ihr benutzerdefiniertes Thumbnail wurde gespeichert', en: 'Your custom thumbnail has been saved', es: 'Tu miniatura personalizada ha sido guardada' }),
       });
 
       onThumbnailUpdated?.();
@@ -92,7 +93,7 @@ export const ThumbnailManager = ({
       console.error('Error uploading thumbnail:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Thumbnail konnte nicht hochgeladen werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Thumbnail konnte nicht hochgeladen werden', en: 'Thumbnail could not be uploaded', es: 'No se pudo subir la miniatura' }),
         variant: 'destructive',
       });
     } finally {

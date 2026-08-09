@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { AIVideoUpscaling } from '../features/AIVideoUpscaling';
 import { AIFrameInterpolation } from '../features/AIFrameInterpolation';
@@ -88,7 +89,7 @@ export function QualityEnhancementStep({
       transitions={transitions}
       audio={audio}
       title="KI-Qualität"
-      description="Verbessere Auflösung, Framerate und Bildqualität mit KI"
+      description={tx({ de: "Verbessere Auflösung, Framerate und Bildqualität mit KI", en: "Improve resolution, framerate and image quality with AI", es: "Mejora la resolución, la velocidad de fotogramas y la calidad de imagen con IA" })}
       icon={Sparkles}
       showSceneSelector={false}
       colorGrading={colorGrading}

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import {
   Dialog,
@@ -37,9 +38,9 @@ const copy: Record<Lang, {
     ],
     warnTitle: "Dein Gründer-Vorteil verfällt",
     warnBody:
-      "Mit der Kündigung verlierst du deinen dauerhaften Gründer-Rabatt von 20 %. Bei einer späteren Rückkehr gilt der reguläre Preis.",
+      tx({ de: "Mit der Kündigung verlierst du deinen dauerhaften Gründer-Rabatt von 20 %. Bei einer späteren Rückkehr gilt der reguläre Preis.", en: "By canceling, you will lose your permanent founder discount of 20%. If you return later, the regular price will apply.", es: "Al cancelar, perderás tu descuento permanente de fundador del 20%. Si regresas más tarde, se aplicará el precio regular." }),
     stay: "Doch bleiben",
-    proceed: "Weiter zur Kündigung",
+    proceed: tx({ de: "Weiter zur Kündigung", en: "Continue to cancellation", es: "Continuar con la cancelación" }),
   },
   en: {
     title: "Before you cancel",

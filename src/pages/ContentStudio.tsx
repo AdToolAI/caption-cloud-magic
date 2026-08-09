@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useSearchParams } from "react-router-dom";
@@ -158,10 +159,10 @@ export default function ContentStudio() {
   const helmet = useMemo(
     () => (
       <Helmet>
-        <title>Content Studio — vom Briefing zum fertigen Beitrag</title>
+        <title>{tx({ de: "Content Studio — vom Briefing zum fertigen Beitrag", en: "Content Studio — from briefing to finished post", es: "Content Studio — del briefing a la publicación final" })}</title>
         <meta
           name="description"
-          content="Briefing, Copy, KI-Motiv, Layout und Veröffentlichung in einem Ablauf. Einzelpost oder ganze Serie — inklusive Coach-Feedback und Vorlagen."
+          content={tx({ de: "Briefing, Copy, KI-Motiv, Layout und Veröffentlichung in einem Ablauf. Einzelpost oder ganze Serie — inklusive Coach-Feedback und Vorlagen.", en: "Briefing, copy, AI motif, layout, and publishing in one workflow. Single post or entire series — including coach feedback and templates.", es: "Briefing, copy, motivo de IA, diseño y publicación en un solo flujo de trabajo. Publicación individual o serie completa, incluyendo comentarios del coach y plantillas." })}
         />
       </Helmet>
     ),

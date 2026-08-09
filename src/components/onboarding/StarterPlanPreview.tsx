@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
@@ -31,7 +32,7 @@ export function StarterPlanPreview({ plans, loading, error, onComplete, onRetry 
           <Sparkles className="h-12 w-12 text-primary animate-pulse" />
           <Loader2 className="h-6 w-6 text-primary animate-spin absolute -bottom-1 -right-1" />
         </div>
-        <h3 className="text-xl font-semibold">Dein Produktionsplan wird erstellt...</h3>
+        <h3 className="text-xl font-semibold">{tx({ de: "Dein Produktionsplan wird erstellt...", en: "Your production plan is being created...", es: "Tu plan de producción se está creando..." })}</h3>
         <p className="text-sm text-muted-foreground text-center max-w-md">
           Unsere KI analysiert deine Nische und baut deinen ersten Wochenplan – Videoideen inklusive optimaler Veröffentlichungszeiten.
         </p>

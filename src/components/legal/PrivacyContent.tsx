@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { LegalSection } from "./LegalSection";
 import { ContactBox } from "./ContactBox";
 
@@ -63,7 +64,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
           <ul className="list-disc list-inside space-y-2">
             <li><strong className="text-foreground">Art. 6 Abs. 1 lit. a DSGVO:</strong> Einwilligung für Social Media API-Zugriff</li>
             <li><strong className="text-foreground">Art. 6 Abs. 1 lit. b DSGVO:</strong> Vertragserfüllung (Bereitstellung unserer Services)</li>
-            <li><strong className="text-foreground">Art. 6 Abs. 1 lit. f DSGVO:</strong> Berechtigtes Interesse für Analytics und Sicherheit</li>
+            <li><strong className="text-foreground">Art. 6 Abs. 1 lit. f DSGVO:</strong> {tx({ de: "Berechtigtes Interesse für Analytics und Sicherheit", en: "Legitimate interest for analytics and security", es: "Interés legítimo para análisis y seguridad" })}</li>
           </ul>
         </LegalSection>
 
@@ -128,7 +129,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
             </div>
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Löschungsrecht (Art. 17)</h4>
-              <p className="text-sm">Konto jederzeit unter <a href="/delete-data" className="text-cyan-400 hover:text-cyan-300">/delete-data</a> löschen</p>
+              <p className="text-sm">{tx({ de: "Konto jederzeit unter", en: "Account at any time under", es: "Cuenta en cualquier momento en" })} <a href="/delete-data" className="text-cyan-400 hover:text-cyan-300">/delete-data</a> löschen</p>
             </div>
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Datenübertragbarkeit (Art. 20)</h4>
@@ -164,7 +165,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
 
         <LegalSection title="9. Datensicherheit" icon="lock" index={8}>
           <ul className="list-disc list-inside space-y-2">
-            <li><strong className="text-foreground">Verschlüsselung:</strong> TLS 1.3 für alle Übertragungen</li>
+            <li><strong className="text-foreground">Verschlüsselung:</strong> {tx({ de: "TLS 1.3 für alle Übertragungen", en: "TLS 1.3 for all transmissions", es: "TLS 1.3 para todas las transmisiones" })}</li>
             <li><strong className="text-foreground">Passwörter:</strong> Bcrypt-Hash mit Salt</li>
             <li><strong className="text-foreground">API-Token:</strong> Verschlüsselt in EU-Datenbank</li>
             <li><strong className="text-foreground">Zugriffskontrolle:</strong> Row Level Security (RLS)</li>
@@ -182,11 +183,11 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
         </LegalSection>
 
         <LegalSection title="11. Kinder unter 16 Jahren" icon="users" index={10}>
-          <p>Unser Service richtet sich nicht an Personen unter 16 Jahren. Sollten wir feststellen, dass ein Minderjähriger ohne elterliche Zustimmung ein Konto erstellt hat, löschen wir dieses unverzüglich.</p>
+          <p>{tx({ de: "Unser Service richtet sich nicht an Personen unter 16 Jahren. Sollten wir feststellen, dass ein Minderjähriger ohne elterliche Zustimmung ein Konto erstellt hat, löschen wir dieses unverzüglich.", en: "Our service is not intended for persons under 16 years of age. Should we discover that a minor has created an account without parental consent, we will delete it immediately.", es: "Nuestro servicio no está dirigido a personas menores de 16 años. Si descubrimos que un menor ha creado una cuenta sin el consentimiento de sus padres, la eliminaremos de inmediato." })}</p>
         </LegalSection>
 
         <LegalSection title="12. Änderungen der Datenschutzerklärung" icon="alert" index={11}>
-          <p>Wir behalten uns vor, diese Datenschutzerklärung anzupassen. Wesentliche Änderungen werden Ihnen per E-Mail mitgeteilt.</p>
+          <p>{tx({ de: "Wir behalten uns vor, diese Datenschutzerklärung anzupassen. Wesentliche Änderungen werden Ihnen per E-Mail mitgeteilt.", en: "We reserve the right to amend this privacy policy. Significant changes will be communicated to you via email.", es: "Nos reservamos el derecho de modificar esta política de privacidad. Los cambios significativos se le comunicarán por correo electrónico." })}</p>
         </LegalSection>
 
         <ContactBox lang="de" />

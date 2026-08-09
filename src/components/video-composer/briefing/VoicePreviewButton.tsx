@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * VoicePreviewButton — plays a short ElevenLabs sample of the given
  * voice so users can verify voice assignments before applying a plan.
@@ -10,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 const DEFAULT_PREVIEW_TEXT =
-  'Hallo, dies ist eine kurze Sprachprobe für deinen Charakter.';
+  tx({ de: 'Hallo, dies ist eine kurze Sprachprobe für deinen Charakter.', en: 'Hello, this is a short voice sample for your character.', es: 'Hola, esta es una breve muestra de voz para tu personaje.' });
 
 type Props = {
   voiceId: string | null | undefined;
@@ -33,7 +34,7 @@ export function VoicePreviewButton({ voiceId, text, label }: Props) {
 
   const play = async () => {
     if (!voiceId) {
-      toast({ title: 'Keine Stimme zugeordnet', description: 'Wende den Plan an — die Stimme wird beim Anwenden automatisch vergeben.', variant: 'default' });
+      toast({ title: 'Keine Stimme zugeordnet', description: tx({ de: 'Wende den Plan an — die Stimme wird beim Anwenden automatisch vergeben.', en: 'Apply the plan — the voice will be automatically assigned upon application.', es: 'Aplica el plan — la voz se asignará automáticamente al aplicarlo.' }), variant: 'default' });
       return;
     }
     if (state === 'playing') { stop(); return; }

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -81,7 +82,7 @@ export function useNLEExport(projectId?: string) {
       setExporting(format);
       const toastId = toast.loading(
         format === 'bundle'
-          ? 'Bundle wird gepackt — kann 30–60 s dauern…'
+          ? tx({ de: 'Bundle wird gepackt — kann 30–60 s dauern…', en: 'Bundle is being packaged — may take 30–60 s…', es: 'El paquete se está empaquetando — puede tardar 30–60 s…' })
           : `${format.toUpperCase()} wird exportiert…`,
       );
       try {
@@ -123,7 +124,7 @@ export function useNLEExport(projectId?: string) {
       const { data, error } = await supabase.storage
         .from('composer-nle-exports')
         .createSignedUrl(record.storage_path, 3600);
-      if (error || !data?.signedUrl) throw new Error('Datei nicht mehr verfügbar');
+      if (error || !data?.signedUrl) throw new Error(tx({ de: 'Datei nicht mehr verfügbar', en: 'File no longer available', es: 'Archivo no disponible' }));
       const ext = record.format === 'bundle' ? 'zip' : record.format;
       triggerDownload(data.signedUrl, `composer-${record.project_id.slice(0, 8)}.${ext}`);
     } catch (err) {
@@ -157,7 +158,7 @@ export function useNLEExport(projectId?: string) {
   const applyImport = useCallback(
     async (file: File) => {
       if (!projectId) return null;
-      const toastId = toast.loading('Änderungen werden übernommen…');
+      const toastId = toast.loading(tx({ de: 'Änderungen werden übernommen…', en: 'Changes are being applied…', es: 'Se están aplicando los cambios…' }));
       try {
         const fcpxmlContent = await file.text();
         const { data, error } = await supabase.functions.invoke('composer-import-fcpxml', {

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,7 +48,7 @@ export const BatchVideoUpload = ({ templateId, requiredFields }: BatchVideoUploa
       },
       error: (error) => {
         toast({
-          title: 'Fehler beim Lesen',
+          title: tx({ de: 'Fehler beim Lesen', en: 'Error reading', es: 'Error de lectura' }),
           description: error.message,
           variant: 'destructive'
         });

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -41,7 +42,7 @@ export const useRenderQueue = () => {
       return data;
     } catch (error: any) {
       console.error('Error adding to queue:', error);
-      toast.error(error.message || 'Fehler beim Hinzufügen zur Queue');
+      toast.error(error.message || tx({ de: 'Fehler beim Hinzufügen zur Queue', en: 'Error adding to queue', es: 'Error al añadir a la cola' }));
       throw error;
     } finally {
       setLoading(false);
@@ -61,7 +62,7 @@ export const useRenderQueue = () => {
       return true;
     } catch (error: any) {
       console.error('Error cancelling job:', error);
-      toast.error(error.message || 'Fehler beim Abbrechen des Jobs');
+      toast.error(error.message || tx({ de: 'Fehler beim Abbrechen des Jobs', en: 'Error canceling job', es: 'Error al cancelar el trabajo' }));
       return false;
     } finally {
       setLoading(false);

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import {
   Dialog,
@@ -222,8 +223,8 @@ export default function SceneSnippetPicker({
               ) : visible.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border/60 p-6 text-center text-[11px] text-muted-foreground">
                   {snippets.length === 0
-                    ? 'Noch keine eigenen Snippets — lege dein erstes wiederverwendbares Snippet an.'
-                    : 'Kein Treffer für deinen Filter.'}
+                    ? tx({ de: 'Noch keine eigenen Snippets — lege dein erstes wiederverwendbares Snippet an.', en: 'No snippets of your own yet — create your first reusable snippet.', es: 'Aún no tienes snippets propios — crea tu primer snippet reutilizable.' })
+                    : tx({ de: 'Kein Treffer für deinen Filter.', en: 'No match for your filter.', es: 'Ninguna coincidencia para tu filtro.' })}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

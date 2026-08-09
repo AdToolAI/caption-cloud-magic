@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,7 @@ export function BrandAssetFactory({ brandKitId }: { brandKitId: string | null })
   if (!brandKitId) {
     return (
       <Card className="p-6 bg-card/60 border-white/10">
-        <p className="text-sm text-muted-foreground">Wähle zuerst ein aktives Brand-Set.</p>
+        <p className="text-sm text-muted-foreground">{tx({ de: "Wähle zuerst ein aktives Brand-Set.", en: "Please select an active Brand Set first.", es: "Por favor, selecciona primero un Brand Set activo." })}</p>
       </Card>
     );
   }
@@ -54,7 +55,7 @@ export function BrandAssetFactory({ brandKitId }: { brandKitId: string | null })
       ) : assets.length === 0 ? (
         <Card className="p-8 bg-card/40 border-dashed border-white/10 text-center">
           <Package className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-          <p className="text-sm text-muted-foreground">Noch keine Assets. Starte oben dein erstes Brand-Pack.</p>
+          <p className="text-sm text-muted-foreground">{tx({ de: "Noch keine Assets. Starte oben dein erstes Brand-Pack.", en: "No assets yet. Start your first Brand Pack above.", es: "Aún no hay activos. Empieza tu primer Brand Pack arriba." })}</p>
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">

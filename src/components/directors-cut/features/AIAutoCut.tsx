@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -95,7 +96,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
         });
       } else {
         toast.error('Analyse fehlgeschlagen', {
-          description: error.message || 'Bitte versuche es erneut',
+          description: error.message || tx({ de: 'Bitte versuche es erneut', en: 'Please try again', es: 'Por favor, inténtalo de nuevo' }),
         });
       }
     } finally {

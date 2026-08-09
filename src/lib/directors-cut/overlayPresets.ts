@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Overlay-Bibliothek des Director's Cut (v407).
  * Fertige, markenfähige Bausteine: Lower Thirds, Banner, Störer,
@@ -57,7 +58,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'lt-bar',
     name: 'Lower Third — Balken',
     category: 'Lower Third',
-    description: 'Name und Rolle mit Akzentkante',
+    description: tx({ de: 'Name und Rolle mit Akzentkante', en: 'Name and role with accent border', es: 'Nombre y rol con borde de acento' }),
     kind: 'lowerThird',
     build: () =>
       base(
@@ -177,7 +178,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'card-info',
     name: 'Schild — Info',
     category: 'Schild',
-    description: 'Karte mit Titel und Unterzeile',
+    description: tx({ de: 'Karte mit Titel und Unterzeile', en: 'Card with title and subtitle', es: 'Tarjeta con título y subtítulo' }),
     kind: 'card',
     build: () =>
       base(
@@ -300,7 +301,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     build: () =>
       base(
         'quote',
-        'Das spart uns jede Woche einen ganzen Drehtag.',
+        tx({ de: 'Das spart uns jede Woche einen ganzen Drehtag.', en: 'This saves us a whole day of shooting every week.', es: 'Esto nos ahorra un día entero de rodaje cada semana.' }),
         { fontSizeRel: 0.05, fontWeight: 600, align: 'center' },
         { animation: 'stagger', slots: { subtitle: 'Lena, Agenturinhaberin' } },
       ),

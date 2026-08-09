@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -84,7 +85,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
         })));
       } catch (error) {
         console.error('Error fetching sounds:', error);
-        toast.error('Fehler beim Laden der Sound-Bibliothek');
+        toast.error(tx({ de: 'Fehler beim Laden der Sound-Bibliothek', en: 'Error loading sound library', es: 'Error al cargar la biblioteca de sonidos' }));
       } finally {
         setIsLoading(false);
       }
@@ -324,7 +325,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
             >
               <FileAudio className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
               <p className="text-muted-foreground">
-                {searchQuery ? 'Keine Ergebnisse gefunden' : 'Noch keine Sounds gespeichert'}
+                {searchQuery ? 'Keine Ergebnisse gefunden' : tx({ de: 'Noch keine Sounds gespeichert', en: 'No sounds saved yet', es: 'Aún no hay sonidos guardados' })}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Optimiere Audio und speichere es in der Bibliothek

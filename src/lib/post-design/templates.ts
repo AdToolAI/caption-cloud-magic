@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import type { PostDesign, PostSlide } from "./schema";
 import { DEFAULT_FONTS, DEFAULT_PALETTE, uid } from "./schema";
 import { INTENT_FAMILY_BIAS, type PostIntent } from "./intent";
@@ -164,7 +165,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
             shape({ y: 0.52, h: 0.48, color: P.surface }),
             badge("Angebot", { y: 0.57 }),
             text("Produktname", { y: 0.66, size: 0.075, weight: 700 }),
-            text("Der Nutzen in einem klaren Satz — ohne Floskeln.", { y: 0.77, size: 0.03, weight: 400, font: "body", h: 0.1, lineHeight: 1.35 }),
+            text(tx({ de: "Der Nutzen in einem klaren Satz — ohne Floskeln.", en: "The benefit in a clear sentence — no platitudes.", es: "El beneficio en una frase clara, sin rodeos." }), { y: 0.77, size: 0.03, weight: 400, font: "body", h: 0.1, lineHeight: 1.35 }),
             logo({ y: 0.9 }),
           ],
         }],
@@ -217,7 +218,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
           id: uid("s"), background: P.background,
           layers: [
             img(image, 0.5, "bottom"),
-            badge("Nur diese Woche"),
+            badge(tx({ de: "Nur diese Woche", en: "Only this week", es: "Solo esta semana" })),
             text("-20%", { y: 0.42, size: 0.19, weight: 800, x: 0.08, w: 0.84, h: 0.22, color: P.accent }),
             text("auf alle Pakete", { y: 0.66, size: 0.05, weight: 600 , h: 0.09 }),
             { ...badge("Jetzt sichern", { y: 0.82, w: 0.46, size: 0.032 }), h: 0.09 },
@@ -276,7 +277,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
             img(image, 0.45, "bottom"),
             text("JETZT LIVE", { y: 0.1, size: 0.028, weight: 700, font: "mono", uppercase: true, letterSpacing: 0.34, align: "center", x: 0.1, w: 0.8, h: 0.05, color: P.accent }),
             text("Das neue Kapitel", { y: 0.6, size: 0.088, weight: 700, align: "center", x: 0.08, w: 0.84 }),
-            text("Ab heute verfügbar", { y: 0.76, size: 0.032, weight: 400, font: "body", align: "center", x: 0.08, w: 0.84, h: 0.06 }),
+            text(tx({ de: "Ab heute verfügbar", en: "Available from today", es: "Disponible desde hoy" }), { y: 0.76, size: 0.032, weight: 400, font: "body", align: "center", x: 0.08, w: 0.84, h: 0.06 }),
             logo({ x: 0.41, y: 0.88, w: 0.18 }),
           ],
         }],

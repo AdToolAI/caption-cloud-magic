@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * ScenePerformancePanel — Phase 2 Performance Layer UI.
  *
@@ -58,7 +59,7 @@ const T = {
     gesture: 'Gestik',
     gaze: 'Blick',
     energy: 'Energie',
-    none: 'Kein Cast in dieser Szene — weise zuerst im Cast-Tab Charaktere zu.',
+    none: tx({ de: 'Kein Cast in dieser Szene — weise zuerst im Cast-Tab Charaktere zu.', en: 'No cast in this scene — assign characters in the Cast tab first.', es: 'No hay elenco en esta escena; asigna personajes en la pestaña Elenco primero.' }),
     clear: 'Leeren',
     placeholder: '—',
   },

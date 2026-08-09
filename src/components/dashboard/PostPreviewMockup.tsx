@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, ThumbsUp, Share2, Repeat2, Play } from "lucide-react";
 import { Instagram, Facebook, Linkedin, Youtube, Twitter, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -88,7 +89,7 @@ export function PostPreviewMockup({ platform, caption, hashtags, mediaUrl, media
           </div>
           <p className="text-sm leading-snug whitespace-pre-wrap">
             <span className="font-semibold mr-1">{username}</span>
-            {caption || <span className="text-muted-foreground italic">Caption wird hier erscheinen…</span>}
+            {caption || <span className="text-muted-foreground italic">{tx({ de: "Caption wird hier erscheinen…", en: "Caption will appear here…", es: "El pie de foto aparecerá aquí…" })}</span>}
           </p>
           <HashtagsLine hashtags={hashtags} />
         </div>
@@ -112,7 +113,7 @@ export function PostPreviewMockup({ platform, caption, hashtags, mediaUrl, media
         </div>
         <div className="px-3 pb-2">
           <p className="text-sm leading-snug whitespace-pre-wrap">
-            {caption || <span className="text-muted-foreground italic">Caption wird hier erscheinen…</span>}
+            {caption || <span className="text-muted-foreground italic">{tx({ de: "Caption wird hier erscheinen…", en: "Caption will appear here…", es: "El pie de foto aparecerá aquí…" })}</span>}
           </p>
           <HashtagsLine hashtags={hashtags} />
         </div>
@@ -137,7 +138,7 @@ export function PostPreviewMockup({ platform, caption, hashtags, mediaUrl, media
         </div>
         <div className="px-3 pb-2">
           <p className="text-sm leading-snug whitespace-pre-wrap">
-            {caption || <span className="text-muted-foreground italic">Caption wird hier erscheinen…</span>}
+            {caption || <span className="text-muted-foreground italic">{tx({ de: "Caption wird hier erscheinen…", en: "Caption will appear here…", es: "El pie de foto aparecerá aquí…" })}</span>}
           </p>
           <HashtagsLine hashtags={hashtags} />
         </div>

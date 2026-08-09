@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -54,7 +55,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
         .eq('id', slot.id);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ['autopilot-queue'] });
-      toast({ title: 'Slot aktualisiert', description: 'Änderungen gespeichert.' });
+      toast({ title: 'Slot aktualisiert', description: tx({ de: 'Änderungen gespeichert.', en: 'Changes saved.', es: 'Cambios guardados.' }) });
     } catch (e: unknown) {
       toast({
         title: 'Speichern fehlgeschlagen',
@@ -75,7 +76,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
     } catch {
       toast({
         title: 'Edge Function nicht erreichbar',
-        description: 'Bitte später erneut versuchen.',
+        description: tx({ de: 'Bitte später erneut versuchen.', en: 'Please try again later.', es: 'Por favor, inténtalo de nuevo más tarde.' }),
         variant: 'destructive',
       });
     }
@@ -131,7 +132,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
               ) : (
                 <div className="text-center text-muted-foreground p-6">
                   <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                  <div className="text-sm">{slot.status === 'generating' ? 'Wird generiert…' : 'Noch kein Asset erstellt'}</div>
+                  <div className="text-sm">{slot.status === 'generating' ? 'Wird generiert…' : tx({ de: 'Noch kein Asset erstellt', en: 'No asset created yet', es: 'Aún no se ha creado ningún activo' })}</div>
                 </div>
               )}
             </Card>

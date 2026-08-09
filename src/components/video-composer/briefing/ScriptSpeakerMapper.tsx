@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -112,7 +113,7 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
       </div>
       <p className="text-xs text-muted-foreground">
         {t(
-          'Wir haben ein Skript mit Sprecher-Labels erkannt. Weise jedes Label einer Cast-Rolle zu — sonst rät die KI per Namens-Match.',
+          tx({ de: 'Wir haben ein Skript mit Sprecher-Labels erkannt. Weise jedes Label einer Cast-Rolle zu — sonst rät die KI per Namens-Match.', en: 'We detected a script with speaker labels. Assign each label to a cast role — otherwise, the AI will guess by name match.', es: 'Hemos detectado un guion con etiquetas de orador. Asigna cada etiqueta a un rol del elenco — de lo contrario, la IA adivinará por coincidencia de nombre.' }),
           'We detected a script with speaker labels. Assign each label to a cast member — otherwise the AI falls back to name matching.',
           'Detectamos un guion con etiquetas de hablante. Asigna cada etiqueta a un miembro del reparto — de lo contrario la IA usa coincidencia por nombre.',
         )}
@@ -165,7 +166,7 @@ export default function ScriptSpeakerMapper({ briefing, language, onUpdateBriefi
       {cleanLabels.some((l) => !(speakerMap[l] ?? autoMatch(l, characters))) && (
         <p className="text-[11px] text-destructive/80">
           {t(
-            '⚠ Manche Labels haben keine Zuordnung — die KI wird sie erraten.',
+            tx({ de: '⚠ Manche Labels haben keine Zuordnung — die KI wird sie erraten.', en: '⚠ Some labels have no assignment — the AI will guess them.', es: '⚠ Algunas etiquetas no tienen asignación — la IA las adivinará.' }),
             '⚠ Some labels have no mapping — the AI will guess.',
             '⚠ Algunas etiquetas no están asignadas — la IA las adivinará.',
           )}

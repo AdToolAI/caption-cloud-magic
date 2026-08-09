@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * useStoryboardTransition
  *
@@ -815,7 +816,7 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
       field: 'auto-director',
       reason: hints.length
         ? `Auto-Analyse offline — ${hints.length} Szene(n) wurden direkt aus deinem Briefing-Text extrahiert. Vor Render prüfen.`
-        : 'AI-Director offline — deterministischer Plan erstellt. Bitte vor dem Rendern prüfen.',
+        : tx({ de: 'AI-Director offline — deterministischer Plan erstellt. Bitte vor dem Rendern prüfen.', en: 'AI Director offline — deterministic plan created. Please check before rendering.', es: 'AI Director sin conexión — plan determinista creado. Por favor, verifica antes de renderizar.' }),
       severity: 'warn',
     }],
     _meta: {
@@ -1128,8 +1129,8 @@ export function useStoryboardTransition({
     if (!isUuid(activeProjectId)) {
       if (!ensureProjectId) {
         toast({
-          title: 'Projekt noch nicht gespeichert',
-          description: 'Bitte kurz speichern und erneut versuchen.',
+          title: tx({ de: 'Projekt noch nicht gespeichert', en: 'Project not yet saved', es: 'Proyecto aún no guardado' }),
+          description: tx({ de: 'Bitte kurz speichern und erneut versuchen.', en: 'Please save briefly and try again.', es: 'Por favor, guarda brevemente e inténtalo de nuevo.' }),
           variant: 'destructive',
         });
         return { handled: true };
@@ -1138,7 +1139,7 @@ export function useStoryboardTransition({
         activeProjectId = await ensureProjectId();
       } catch (err: any) {
         toast({
-          title: 'Projekt konnte nicht vorbereitet werden',
+          title: tx({ de: 'Projekt konnte nicht vorbereitet werden', en: 'Could not prepare project', es: 'No se pudo preparar el proyecto' }),
           description: err?.message ?? String(err),
           variant: 'destructive',
         });
@@ -1147,7 +1148,7 @@ export function useStoryboardTransition({
       if (!isUuid(activeProjectId)) {
         toast({
           title: 'Projekt-ID fehlt',
-          description: 'Die Analyse wurde gestoppt, damit kein unverbundener Plan entsteht.',
+          description: tx({ de: 'Die Analyse wurde gestoppt, damit kein unverbundener Plan entsteht.', en: 'Analysis was stopped to avoid an unconnected plan.', es: 'El análisis se detuvo para evitar un plan desconectado.' }),
           variant: 'destructive',
         });
         return { handled: true };
@@ -1446,8 +1447,8 @@ export function useStoryboardTransition({
       if (status === 402 || status === 429 || status === 413) {
         toast({
           title: 'Briefing-Analyse fehlgeschlagen',
-          description: status === 402 ? 'Keine AI-Credits mehr — bitte aufladen.'
-            : status === 429 ? 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.'
+          description: status === 402 ? tx({ de: 'Keine AI-Credits mehr — bitte aufladen.', en: 'No AI credits left — please top up.', es: 'No quedan créditos de IA — por favor, recarga.' })
+            : status === 429 ? tx({ de: 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.', en: 'Too many requests — please wait briefly and try again.', es: 'Demasiadas solicitudes — por favor, espera brevemente e inténtalo de nuevo.' })
             : 'Briefing zu lang — bitte kürzen.',
           variant: 'destructive',
         });
@@ -1525,7 +1526,7 @@ export function useStoryboardTransition({
           if (rescued) {
             toast({
               title: '✨ Analyse-Ergebnis wiederhergestellt',
-              description: 'Die Verbindung war instabil, der Plan war serverseitig aber fertig — dein Briefing wurde vollständig übernommen.',
+              description: tx({ de: 'Die Verbindung war instabil, der Plan war serverseitig aber fertig — dein Briefing wurde vollständig übernommen.', en: 'The connection was unstable, but the plan was ready server-side — your briefing was fully adopted.', es: 'La conexión fue inestable, pero el plan estaba listo en el servidor — tu briefing fue adoptado por completo.' }),
             });
             setState({
               warRoomOpen: false,
@@ -1546,7 +1547,7 @@ export function useStoryboardTransition({
           toast({
             title: isNetwork ? 'Basis-Plan bereit' : 'Basis-Plan bereit',
             description: isNetwork
-              ? 'Verbindung war kurz instabil — wir haben einen Basis-Plan vorbereitet. Du kannst ihn wie gewohnt anpassen oder die Analyse erneut starten.'
+              ? tx({ de: 'Verbindung war kurz instabil — wir haben einen Basis-Plan vorbereitet. Du kannst ihn wie gewohnt anpassen oder die Analyse erneut starten.', en: 'Connection was briefly unstable — we have prepared a basic plan. You can adjust it as usual or restart the analysis.', es: 'La conexión fue brevemente inestable — hemos preparado un plan básico. Puedes ajustarlo como de costumbre o reiniciar el análisis.' })
               : 'Analyse übersprungen — Basis-Plan als Startpunkt eingeblendet. Passe Werte an oder starte die Analyse neu.',
             // v238 — neutral, not destructive: fallback is a valid path.
           });
@@ -1610,11 +1611,11 @@ export function useStoryboardTransition({
                 const sheetWasClosed = !s.planSheetOpen;
                 toast({
                   title: sheetWasClosed
-                    ? '✨ Vollständiger Plan nachgeladen — bitte erneut anwenden'
+                    ? tx({ de: '✨ Vollständiger Plan nachgeladen — bitte erneut anwenden', en: '✨ Full plan reloaded — please apply again', es: '✨ Plan completo recargado — por favor, aplica de nuevo' })
                     : '✨ Vollständiger Plan nachgeladen',
                   description: sheetWasClosed
                     ? 'Dein Briefing wurde im Hintergrund analysiert. Klicke „Plan anwenden", um Fallback-Szenen zu ersetzen.'
-                    : 'Der AI-generierte Plan ist jetzt verfügbar.',
+                    : tx({ de: 'Der AI-generierte Plan ist jetzt verfügbar.', en: 'The AI-generated plan is now available.', es: 'El plan generado por IA ya está disponible.' }),
                 });
                 return { ...s, planSheetOpen: true, initialPlan: latePlan, activeProjectId };
               });

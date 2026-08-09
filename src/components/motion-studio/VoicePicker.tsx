@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo, useState } from 'react';
 import { Loader2, Mic, Play, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -69,7 +70,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
 
   const handlePreview = async () => {
     if (!value) {
-      toast.error('Bitte zuerst eine Voice auswählen');
+      toast.error(tx({ de: 'Bitte zuerst eine Voice auswählen', en: 'Please select a voice first', es: 'Por favor, selecciona una voz primero' }));
       return;
     }
     setPreviewing(true);
@@ -173,7 +174,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
         onSelect={handlePickerSelect}
         language="all"
         currentVoiceId={value ?? undefined}
-        title="Stimme für Charakter wählen"
+        title={tx({ de: "Stimme für Charakter wählen", en: "Select voice for character", es: "Seleccionar voz para el personaje" })}
       />
     </div>
   );

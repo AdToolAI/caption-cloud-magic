@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * PhotoBrowser — Stock-Photos search tab inside Creator Library.
  * Uses existing `search-stock-images` edge function (Pexels + Pixabay,
@@ -53,7 +54,7 @@ export default function PhotoBrowser() {
 
   async function toggleFavorite(img: StockImage) {
     if (!user) {
-      toast({ title: 'Login nötig', description: 'Bitte einloggen, um zu speichern.' });
+      toast({ title: 'Login nötig', description: tx({ de: 'Bitte einloggen, um zu speichern.', en: 'Please log in to save.', es: 'Por favor, inicia sesión para guardar.' }) });
       return;
     }
     const key = `${img.source}-${img.id}`;
@@ -72,7 +73,7 @@ export default function PhotoBrowser() {
     if (quota.exceeded) {
       toast({
         title: 'Monatslimit erreicht',
-        description: 'Upgrade auf einen Paid-Plan für unbegrenzte Downloads.',
+        description: tx({ de: 'Upgrade auf einen Paid-Plan für unbegrenzte Downloads.', en: 'Upgrade to a paid plan for unlimited downloads.', es: 'Actualiza a un plan de pago para descargas ilimitadas.' }),
         variant: 'destructive',
       });
       return;
@@ -97,7 +98,7 @@ export default function PhotoBrowser() {
     }
     setFavorites(new Set([...favorites, key]));
     quota.refresh();
-    toast({ title: 'Zur Library hinzugefügt', description: 'Lizenz-Zertifikat kann jetzt erzeugt werden.' });
+    toast({ title: 'Zur Library hinzugefügt', description: tx({ de: 'Lizenz-Zertifikat kann jetzt erzeugt werden.', en: 'License certificate can now be generated.', es: 'Ahora se puede generar el certificado de licencia.' }) });
   }
 
   function useInPictureStudio(img: StockImage) {

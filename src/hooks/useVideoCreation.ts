@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,7 +45,7 @@ export const useVideoCreation = () => {
 
       toast({
         title: 'Video-Rendering gestartet',
-        description: 'Dein Video wird erstellt. Das dauert ca. 30-60 Sekunden.'
+        description: tx({ de: 'Dein Video wird erstellt. Das dauert ca. 30-60 Sekunden.', en: 'Your video is being created. This takes approx. 30-60 seconds.', es: 'Tu video se está creando. Esto toma aproximadamente 30-60 segundos.' })
       });
 
       return {
@@ -55,7 +56,7 @@ export const useVideoCreation = () => {
       console.error('Video creation error:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Video konnte nicht erstellt werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Video konnte nicht erstellt werden', en: 'Video could not be created', es: 'No se pudo crear el video' }),
         variant: 'destructive'
       });
       return null;
@@ -99,7 +100,7 @@ export const useVideoCreation = () => {
       
       if (!result) {
         setPolling(false);
-        onError?.('Fehler beim Status-Check');
+        onError?.(tx({ de: 'Fehler beim Status-Check', en: 'Error during status check', es: 'Error durante la verificación de estado' }));
         return;
       }
 
@@ -111,7 +112,7 @@ export const useVideoCreation = () => {
         
         toast({
           title: 'Video fertig!',
-          description: 'Dein Werbevideo wurde erfolgreich erstellt.'
+          description: tx({ de: 'Dein Werbevideo wurde erfolgreich erstellt.', en: 'Your promotional video has been successfully created.', es: 'Tu video promocional ha sido creado exitosamente.' })
         });
         onComplete(result.output_url);
         return;
@@ -121,7 +122,7 @@ export const useVideoCreation = () => {
         setPolling(false);
         toast({
           title: 'Video-Rendering fehlgeschlagen',
-          description: result.error_message || 'Ein Fehler ist aufgetreten',
+          description: result.error_message || tx({ de: 'Ein Fehler ist aufgetreten', en: 'An error occurred', es: 'Ha ocurrido un error' }),
           variant: 'destructive'
         });
         onError?.(result.error_message || 'Unknown error');
@@ -133,7 +134,7 @@ export const useVideoCreation = () => {
         setPolling(false);
         toast({
           title: 'Timeout',
-          description: 'Video-Rendering dauert länger als erwartet. Bitte später erneut prüfen.',
+          description: tx({ de: 'Video-Rendering dauert länger als erwartet. Bitte später erneut prüfen.', en: 'Video rendering takes longer than expected. Please check again later.', es: 'La renderización del video está tardando más de lo esperado. Por favor, inténtalo de nuevo más tarde.' }),
           variant: 'destructive'
         });
         return;

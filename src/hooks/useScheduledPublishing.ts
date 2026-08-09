@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -66,7 +67,7 @@ export function useScheduledPublishing() {
     } catch (error: any) {
       console.error('Schedule publication error:', error);
       toast({
-        title: 'Fehler beim Planen',
+        title: tx({ de: 'Fehler beim Planen', en: 'Error scheduling', es: 'Error al programar' }),
         description: error.message,
         variant: 'destructive',
       });

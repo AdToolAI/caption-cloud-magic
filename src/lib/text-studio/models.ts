@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // AI Text Studio - Model Registry
 // Auswahl in zwei Schritten: Anbieter -> Qualitätsstufe.
 // Preise in EUR pro 1k Tokens (Endkundenpreis inkl. Marge).
@@ -54,9 +55,9 @@ export const TIER_LABELS: Record<TextTier, string> = {
 };
 
 export const TIER_DESCRIPTIONS: Record<TextTier, string> = {
-  fast: "Sekundenschnell, günstig – ideal für kurze Texte und viele Varianten",
-  balanced: "Bestes Verhältnis aus Qualität, Tempo und Preis",
-  max: "Höchste Qualität für komplexe Analysen und lange Texte",
+  fast: tx({ de: "Sekundenschnell, günstig – ideal für kurze Texte und viele Varianten", en: "Lightning fast, affordable – ideal for short texts and many variations", es: "Rapidísimo, económico – ideal para textos cortos y muchas variaciones" }),
+  balanced: tx({ de: "Bestes Verhältnis aus Qualität, Tempo und Preis", en: "Best balance of quality, speed, and price", es: "Mejor relación calidad, velocidad y precio" }),
+  max: tx({ de: "Höchste Qualität für komplexe Analysen und lange Texte", en: "Highest quality for complex analyses and long texts", es: "Máxima calidad para análisis complejos y textos largos" }),
 };
 
 export const TEXT_MODELS: Record<TextModelId, TextModel> = {
@@ -68,7 +69,7 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
     providerKey: "openai",
     tier: "fast",
     apiModel: "openai/gpt-5.6-luna",
-    description: "Schnell & günstig für kurze Texte, Varianten und Umschreibungen",
+    description: tx({ de: "Schnell & günstig für kurze Texte, Varianten und Umschreibungen", en: "Fast & affordable for short texts, variations, and rephrasing", es: "Rápido y económico para textos cortos, variaciones y reformulaciones" }),
     inputPricePer1k: 0.0004,
     outputPricePer1k: 0.0026,
     strengths: ["Schnell", "Günstig", "Varianten"],
@@ -96,7 +97,7 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
     providerKey: "openai",
     tier: "max",
     apiModel: "openai/gpt-5.6-sol",
-    description: "Flaggschiff für die härtesten Reasoning- und Strategieaufgaben",
+    description: tx({ de: "Flaggschiff für die härtesten Reasoning- und Strategieaufgaben", en: "Flagship for the toughest reasoning and strategy tasks", es: "Modelo insignia para las tareas de razonamiento y estrategia más difíciles" }),
     inputPricePer1k: 0.0195,
     outputPricePer1k: 0.0975,
     strengths: ["Reasoning", "Strategie", "Premium"],
@@ -112,7 +113,7 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
     providerKey: "google",
     tier: "fast",
     apiModel: "google/gemini-3.1-flash-lite",
-    description: "Günstigstes Modell – perfekt für Massen-Text und Zusammenfassungen",
+    description: tx({ de: "Günstigstes Modell – perfekt für Massen-Text und Zusammenfassungen", en: "Most affordable model – perfect for bulk text and summaries", es: "El modelo más económico – perfecto para textos masivos y resúmenes" }),
     inputPricePer1k: 0.00013,
     outputPricePer1k: 0.0005,
     strengths: ["Sehr günstig", "Schnell", "Zusammenfassen"],

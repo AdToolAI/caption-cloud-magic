@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Heuristische Bewertung, wie gut Motiv und Text zusammenpassen.
  * Läuft komplett lokal — keine zusätzlichen Kosten, kein KI-Call.
@@ -52,7 +53,7 @@ export function scorePairing(input: {
     return {
       score: 55,
       label: "Nicht bewertbar",
-      hint: "Zu wenig Text für eine Einschätzung.",
+      hint: tx({ de: "Zu wenig Text für eine Einschätzung.", en: "Too little text for an assessment.", es: "Muy poco texto para una evaluación." }),
       tone: "ok",
     };
   }
@@ -80,7 +81,7 @@ export function scorePairing(input: {
   return {
     score,
     label: "Schwache Paarung",
-    hint: "Motiv und Text laufen auseinander — Motiv neu denken oder Copy schärfen.",
+    hint: tx({ de: "Motiv und Text laufen auseinander — Motiv neu denken oder Copy schärfen.", en: "Visual and text diverge — rethink visual or sharpen copy.", es: "El visual y el texto divergen — replantea el visual o afina el copy." }),
     tone: "weak",
   };
 }

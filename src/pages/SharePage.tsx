@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +33,7 @@ export default function SharePage() {
         .single();
 
       if (shareLinkError || !shareLink) {
-        setError('Link nicht gefunden oder ungültig');
+        setError(tx({ de: 'Link nicht gefunden oder ungültig', en: 'Link not found or invalid', es: 'Enlace no encontrado o inválido' }));
         return;
       }
 
@@ -57,7 +58,7 @@ export default function SharePage() {
       setShareData(shareLink);
     } catch (error) {
       console.error('Load shared project error:', error);
-      setError('Fehler beim Laden des Projekts');
+      setError(tx({ de: 'Fehler beim Laden des Projekts', en: 'Error loading project', es: 'Error al cargar el proyecto' }));
     } finally {
       setLoading(false);
     }

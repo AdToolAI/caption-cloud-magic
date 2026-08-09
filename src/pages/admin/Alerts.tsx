@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,7 +60,7 @@ export default function Alerts() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              <b className="text-foreground">Health-Alerter</b> läuft alle <b>10 Minuten</b> und prüft 5 Schwellen.
+              <b className="text-foreground">Health-Alerter</b> {tx({ de: "läuft alle", en: "runs all", es: "ejecuta todo" })} <b>10 Minuten</b> und prüft 5 Schwellen.
               Ist eine überschritten und die Cooldown abgelaufen, geht eine Email raus.
             </p>
             <p>

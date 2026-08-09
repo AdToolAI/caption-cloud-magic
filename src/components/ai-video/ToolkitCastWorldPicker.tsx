@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * ToolkitCastWorldPicker
  * --------------------------------------------------------------
@@ -314,7 +315,7 @@ export function ToolkitCastWorldPicker({
                   `Referencias de personaje y mundo se componen automáticamente en el fotograma inicial (${info.mode}).`,
                 )
               : t(
-                  'Dieses Modell akzeptiert keinen Startframe — nur die Beschreibungen werden in den Prompt injiziert. Für maximale Konsistenz → Kling / Hailuo.',
+                  tx({ de: 'Dieses Modell akzeptiert keinen Startframe — nur die Beschreibungen werden in den Prompt injiziert. Für maximale Konsistenz → Kling / Hailuo.', en: 'This model does not accept a start frame — only the descriptions are injected into the prompt. For maximum consistency → Kling / Hailuo.', es: 'Este modelo no acepta un fotograma inicial; solo las descripciones se inyectan en el prompt. Para una máxima coherencia → Kling / Hailuo.' }),
                   'This model does not accept a first frame — only descriptions are injected into the prompt. For maximum consistency, switch to Kling / Hailuo.',
                   'Este modelo no acepta fotograma inicial — solo se inyectan las descripciones. Para máxima consistencia usa Kling / Hailuo.',
                 )}

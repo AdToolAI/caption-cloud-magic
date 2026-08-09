@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * PipelineProgressBar — globaler, gewichteter Fortschrittsbalken für den
  * gesamten Composer-Workflow (Briefing → Clips → Voiceover → Lipsync →
@@ -170,7 +171,7 @@ export default function PipelineProgressBar({
                 )}
                 title={
                   syncsoSlots >= SYNCSO_MAX_SLOTS
-                    ? 'Alle 3 Sync.so-Slots belegt — weitere Szenen werden eingereiht und automatisch nachgezogen.'
+                    ? tx({ de: 'Alle 3 Sync.so-Slots belegt — weitere Szenen werden eingereiht und automatisch nachgezogen.', en: 'All 3 Sync.so slots occupied — additional scenes will be queued and automatically processed.', es: 'Los 3 slots de Sync.so están ocupados — las escenas adicionales se pondrán en cola y se procesarán automáticamente.' })
                     : `${syncsoSlots} von ${SYNCSO_MAX_SLOTS} Sync.so-Slots aktiv (parallele Lipsync-Jobs).`
                 }
               >
@@ -207,7 +208,7 @@ function ResetFailedButton({ scenes }: { scenes: ComposerScene[] }) {
       onClick={() => reset(failed.id)}
       disabled={busy}
       className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[11px] font-medium hover:bg-destructive/20 disabled:opacity-60"
-      title="Storniert offene Jobs, refundiert Credits und startet einen sauberen neuen Versuch."
+      title={tx({ de: "Storniert offene Jobs, refundiert Credits und startet einen sauberen neuen Versuch.", en: "Cancels open jobs, refunds credits, and starts a clean new attempt.", es: "Cancela trabajos abiertos, reembolsa créditos y comienza un nuevo intento limpio." })}
     >
       {busy ? 'Setze zurück…' : 'Sauber neu starten'}
     </button>

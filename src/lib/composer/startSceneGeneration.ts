@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * startSceneGeneration — Adapter auf den Baseline-Pfad vom 27.07.2026.
  *
@@ -38,7 +39,7 @@ function requireIds(sceneIds: string[]): string[] {
   if (ids.length === 0) {
     throw new SceneGenerationStartError(
       'no_persisted_scene',
-      'Die Szene wurde noch nicht gespeichert.',
+      tx({ de: 'Die Szene wurde noch nicht gespeichert.', en: 'The scene has not been saved yet.', es: 'La escena aún no ha sido guardada.' }),
     );
   }
   return ids;
@@ -60,7 +61,7 @@ export async function startSceneGeneration(params: {
   if (error) {
     throw new SceneGenerationStartError(
       'dispatch_failed',
-      error.message || 'Der Render konnte nicht gestartet werden.',
+      error.message || tx({ de: 'Der Render konnte nicht gestartet werden.', en: 'The render could not be started.', es: 'No se pudo iniciar el renderizado.' }),
     );
   }
 

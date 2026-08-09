@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
@@ -156,7 +157,7 @@ interface StudioDraft {
 
 export function useContentStudio(): ContentStudioValue {
   const value = useContext(Ctx);
-  if (!value) throw new Error("useContentStudio muss innerhalb von ContentStudioProvider genutzt werden");
+  if (!value) throw new Error(tx({ de: "useContentStudio muss innerhalb von ContentStudioProvider genutzt werden", en: "useContentStudio must be used within ContentStudioProvider", es: "useContentStudio debe usarse dentro de ContentStudioProvider" }));
   return value;
 }
 

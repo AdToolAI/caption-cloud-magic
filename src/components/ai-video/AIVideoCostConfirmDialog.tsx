@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * AIVideoCostConfirmDialog — Kosten-Übersicht vor der Generierung.
  *
@@ -88,7 +89,7 @@ export default function AIVideoCostConfirmDialog({
           </AlertDialogTitle>
           <AlertDialogDescription>
             {description ??
-              'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein Guthaben wird belastet.'}
+              tx({ de: 'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein Guthaben wird belastet.', en: 'Overview of your costs — once you confirm, generation will start and your credit will be charged.', es: 'Resumen de tus costos — una vez que confirmes, la generación comenzará y se cargará a tu crédito.' })}
           </AlertDialogDescription>
         </AlertDialogHeader>
 

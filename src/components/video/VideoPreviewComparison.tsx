@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Maximize2, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -103,7 +104,7 @@ export const VideoPreviewComparison = ({
   const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement>, type: 'original' | 'edited') => {
     const video = e.currentTarget;
     const error = video.error;
-    let errorMessage = 'Video konnte nicht geladen werden';
+    let errorMessage = tx({ de: 'Video konnte nicht geladen werden', en: 'Video could not be loaded', es: 'No se pudo cargar el video' });
     
     console.error(`[VideoPreview] ${type} video error:`, error);
     
@@ -211,7 +212,7 @@ export const VideoPreviewComparison = ({
       return (
         <div className="flex flex-col items-center justify-center h-full p-4 bg-muted gap-2">
           <AlertCircle className="h-8 w-8 text-destructive" />
-          <p className="text-sm font-medium text-destructive">Video konnte nicht geladen werden</p>
+          <p className="text-sm font-medium text-destructive">{tx({ de: "Video konnte nicht geladen werden", en: "Video could not be loaded", es: "No se pudo cargar el video" })}</p>
           <p className="text-xs text-muted-foreground">{error}</p>
           <a
             href={url}

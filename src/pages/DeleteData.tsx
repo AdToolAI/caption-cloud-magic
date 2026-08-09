@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -27,17 +28,17 @@ const DeleteData = () => {
     de: {
       title: "Datenlöschung",
       subtitle: "So löschst du deine AdTool AI-Daten",
-      intro: "Wenn du deine bei AdTool AI gespeicherten Daten löschen möchtest, hast du zwei Möglichkeiten:",
+      intro: tx({ de: "Wenn du deine bei AdTool AI gespeicherten Daten löschen möchtest, hast du zwei Möglichkeiten:", en: "If you want to delete your data stored with AdTool AI, you have two options:", es: "Si deseas eliminar tus datos almacenados en AdTool AI, tienes dos opciones:" }),
       option1Title: "E-Mail senden",
       option1Desc: "Sende eine E-Mail an",
       option1Email: "support@useadtool.ai",
       option1Subject: "mit dem Betreff \"Datenlöschung\"",
       option2Title: "In der App löschen",
-      option2Desc: "Du kannst dein Benutzerkonto direkt in deinen Account-Einstellungen löschen",
-      timeline: "Wir werden alle personenbezogenen Daten innerhalb von 30 Tagen nach Eingang deiner Anfrage entfernen.",
+      option2Desc: tx({ de: "Du kannst dein Benutzerkonto direkt in deinen Account-Einstellungen löschen", en: "You can delete your user account directly in your account settings", es: "Puedes eliminar tu cuenta de usuario directamente en la configuración de tu cuenta" }),
+      timeline: tx({ de: "Wir werden alle personenbezogenen Daten innerhalb von 30 Tagen nach Eingang deiner Anfrage entfernen.", en: "We will remove all personal data within 30 days of receiving your request.", es: "Eliminaremos todos los datos personales en un plazo de 30 días a partir de la recepción de tu solicitud." }),
       support: "Für Rückfragen:",
       metaNote: "Daten-Löschungsanweisungen für Instagram-Integration",
-      metaDesc: "Wenn du dein Instagram-Konto über unsere Meta App-Integration verbunden hast, werden durch diesen Löschprozess auch alle Daten dieser Verbindung entfernt."
+      metaDesc: tx({ de: "Wenn du dein Instagram-Konto über unsere Meta App-Integration verbunden hast, werden durch diesen Löschprozess auch alle Daten dieser Verbindung entfernt.", en: "If you have connected your Instagram account via our Meta App integration, this deletion process will also remove all data from that connection.", es: "Si has conectado tu cuenta de Instagram a través de nuestra integración con la aplicación de Meta, este proceso de eliminación también eliminará todos los datos de esa conexión." })
     },
     es: {
       title: "Eliminación de datos",

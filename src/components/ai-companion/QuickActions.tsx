@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -20,7 +21,7 @@ interface QuickActionsProps {
 
 const PAGE_ACTIONS: Record<string, QuickAction[]> = {
   '/': [
-    { label: 'Was kann AdTool?', icon: <HelpCircle className="w-3 h-3" />, prompt: 'Was sind die wichtigsten Features von AdTool und wie kann ich loslegen?' },
+    { label: 'Was kann AdTool?', icon: <HelpCircle className="w-3 h-3" />, prompt: tx({ de: 'Was sind die wichtigsten Features von AdTool und wie kann ich loslegen?', en: 'What are the key features of AdTool and how do I get started?', es: '¿Cuáles son las características clave de AdTool y cómo puedo empezar?' }) },
     { label: 'Quick Start', icon: <Zap className="w-3 h-3" />, prompt: 'Führe mich durch die ersten Schritte in AdTool.' },
     { label: 'Social verbinden', icon: <Link2 className="w-3 h-3" />, prompt: 'Wie verbinde ich meinen Instagram oder TikTok Account?' },
     { label: 'Erstes Video', icon: <Video className="w-3 h-3" />, prompt: 'Wie erstelle ich mein erstes Video mit AdTool?' },
@@ -32,17 +33,17 @@ const PAGE_ACTIONS: Record<string, QuickAction[]> = {
     { label: 'Performance Tipps', icon: <Sparkles className="w-3 h-3" />, prompt: 'Gib mir Tipps wie ich meine Performance verbessern kann.' },
     { label: 'Beste Posting-Zeit', icon: <Calendar className="w-3 h-3" />, prompt: 'Wann ist die beste Zeit um auf meinen Social Media Kanälen zu posten?' },
     { label: 'Trends erkennen', icon: <TrendingUp className="w-3 h-3" />, prompt: 'Welche Trends erkennst du in meinen Dashboard-Daten?' },
-    { label: 'Zielgruppe', icon: <Users className="w-3 h-3" />, prompt: 'Was kann ich über meine Zielgruppe aus den Daten lernen?' },
+    { label: 'Zielgruppe', icon: <Users className="w-3 h-3" />, prompt: tx({ de: 'Was kann ich über meine Zielgruppe aus den Daten lernen?', en: 'What can I learn about my target audience from the data?', es: '¿Qué puedo aprender sobre mi público objetivo a partir de los datos?' }) },
   ],
   '/directors-cut': [
     { label: 'Workflow erklären', icon: <Video className="w-3 h-3" />, prompt: 'Erkläre mir den Director\'s Cut Workflow Schritt für Schritt.' },
     { label: 'AI Auto-Cut', icon: <Wand2 className="w-3 h-3" />, prompt: 'Wie funktioniert der AI Auto-Cut und wann sollte ich ihn nutzen?' },
     { label: 'Export Optionen', icon: <Settings className="w-3 h-3" />, prompt: 'Welche Export-Formate und Qualitätsoptionen gibt es?' },
-    { label: 'Effekte hinzufügen', icon: <Sparkles className="w-3 h-3" />, prompt: 'Welche visuellen Effekte kann ich meinem Video hinzufügen?' },
-    { label: 'Renderzeit', icon: <Clock className="w-3 h-3" />, prompt: 'Wie lange dauert das Rendering und wie kann ich es beschleunigen?' },
+    { label: 'Effekte hinzufügen', icon: <Sparkles className="w-3 h-3" />, prompt: tx({ de: 'Welche visuellen Effekte kann ich meinem Video hinzufügen?', en: 'What visual effects can I add to my video?', es: '¿Qué efectos visuales puedo añadir a mi vídeo?' }) },
+    { label: 'Renderzeit', icon: <Clock className="w-3 h-3" />, prompt: tx({ de: 'Wie lange dauert das Rendering und wie kann ich es beschleunigen?', en: 'How long does rendering take and how can I speed it up?', es: '¿Cuánto tiempo tarda el renderizado y cómo puedo acelerarlo?' }) },
   ],
   '/universal-creator': [
-    { label: 'Video erstellen', icon: <Video className="w-3 h-3" />, prompt: 'Wie erstelle ich ein neues Video mit dem Universal Creator?' },
+    { label: 'Video erstellen', icon: <Video className="w-3 h-3" />, prompt: tx({ de: 'Wie erstelle ich ein neues Video mit dem Universal Creator?', en: 'How do I create a new video with the Universal Creator?', es: '¿Cómo creo un nuevo vídeo con el Universal Creator?' }) },
     { label: 'Templates nutzen', icon: <Sparkles className="w-3 h-3" />, prompt: 'Wie kann ich Templates effektiv nutzen?' },
     { label: 'KI Features', icon: <Wand2 className="w-3 h-3" />, prompt: 'Welche KI-Features hat der Universal Creator?' },
     { label: 'Szenen bearbeiten', icon: <Layout className="w-3 h-3" />, prompt: 'Wie kann ich Szenen im Universal Creator anpassen?' },
@@ -56,14 +57,14 @@ const PAGE_ACTIONS: Record<string, QuickAction[]> = {
     { label: 'Event bearbeiten', icon: <PenTool className="w-3 h-3" />, prompt: 'Wie bearbeite ich einen geplanten Post im Kalender?' },
   ],
   '/media-library': [
-    { label: 'Upload Tipps', icon: <Upload className="w-3 h-3" />, prompt: 'Welche Dateiformate und Größen werden unterstützt?' },
+    { label: 'Upload Tipps', icon: <Upload className="w-3 h-3" />, prompt: tx({ de: 'Welche Dateiformate und Größen werden unterstützt?', en: 'What file formats and sizes are supported?', es: '¿Qué formatos y tamaños de archivo son compatibles?' }) },
     { label: 'Speicherlimit', icon: <Settings className="w-3 h-3" />, prompt: 'Wie viel Speicher habe ich und was passiert bei Überschreitung?' },
     { label: 'Medien organisieren', icon: <Sparkles className="w-3 h-3" />, prompt: 'Wie kann ich meine Medien am besten organisieren?' },
-    { label: 'Video zu Projekt', icon: <Video className="w-3 h-3" />, prompt: 'Wie verwende ich ein Video aus der Library in einem Projekt?' },
+    { label: 'Video zu Projekt', icon: <Video className="w-3 h-3" />, prompt: tx({ de: 'Wie verwende ich ein Video aus der Library in einem Projekt?', en: 'How do I use a video from the Library in a project?', es: '¿Cómo utilizo un vídeo de la Biblioteca en un proyecto?' }) },
   ],
   '/ai-text-studio': [
     { label: 'Caption erstellen', icon: <Wand2 className="w-3 h-3" />, prompt: 'Wie erstelle ich die beste Caption mit dem KI-Generator?' },
-    { label: 'Tone auswählen', icon: <Sparkles className="w-3 h-3" />, prompt: 'Welcher Ton ist für welche Plattform am besten?' },
+    { label: 'Tone auswählen', icon: <Sparkles className="w-3 h-3" />, prompt: tx({ de: 'Welcher Ton ist für welche Plattform am besten?', en: 'Which tone is best for which platform?', es: '¿Qué tono es el mejor para cada plataforma?' }) },
     { label: 'Hashtag Strategie', icon: <HelpCircle className="w-3 h-3" />, prompt: 'Wie viele Hashtags sollte ich nutzen und welche?' },
     { label: 'Viral Hooks', icon: <Target className="w-3 h-3" />, prompt: 'Wie erstelle ich virale Hooks für meine Posts?' },
   ],
@@ -74,7 +75,7 @@ const PAGE_ACTIONS: Record<string, QuickAction[]> = {
     { label: 'Benachrichtigungen', icon: <Settings className="w-3 h-3" />, prompt: 'Wie stelle ich meine E-Mail-Benachrichtigungen ein?' },
   ],
   '/credits': [
-    { label: 'Credits kaufen', icon: <Coins className="w-3 h-3" />, prompt: 'Wie kann ich mehr Credits kaufen?' },
+    { label: 'Credits kaufen', icon: <Coins className="w-3 h-3" />, prompt: tx({ de: 'Wie kann ich mehr Credits kaufen?', en: 'How can I buy more credits?', es: '¿Cómo puedo comprar más créditos?' }) },
     { label: 'Verbrauch', icon: <BarChart3 className="w-3 h-3" />, prompt: 'Wofür werden meine Credits verwendet?' },
     { label: 'Preise', icon: <HelpCircle className="w-3 h-3" />, prompt: 'Was kosten die verschiedenen Credit-Pakete?' },
   ],
@@ -84,7 +85,7 @@ const PAGE_ACTIONS: Record<string, QuickAction[]> = {
     { label: 'Template anpassen', icon: <Palette className="w-3 h-3" />, prompt: 'Wie kann ich ein Template an meine Brand anpassen?' },
   ],
   '/campaign-wizard': [
-    { label: 'Kampagne starten', icon: <Target className="w-3 h-3" />, prompt: 'Wie starte ich eine neue Kampagne im Wizard?' },
+    { label: 'Kampagne starten', icon: <Target className="w-3 h-3" />, prompt: tx({ de: 'Wie starte ich eine neue Kampagne im Wizard?', en: 'How do I start a new campaign in the Wizard?', es: '¿Cómo inicio una nueva campaña en el Asistente?' }) },
     { label: 'Media zuweisen', icon: <Upload className="w-3 h-3" />, prompt: 'Wie weise ich Medien zu einzelnen Posts zu?' },
     { label: 'Vorschau', icon: <Video className="w-3 h-3" />, prompt: 'Wie sehe ich eine Vorschau meiner Kampagne?' },
     { label: 'Veröffentlichen', icon: <Zap className="w-3 h-3" />, prompt: 'Wie veröffentliche ich meine Kampagne?' },
@@ -107,7 +108,7 @@ const PAGE_ACTIONS: Record<string, QuickAction[]> = {
 };
 
 const DEFAULT_ACTIONS: QuickAction[] = [
-  { label: 'Hilfe starten', icon: <HelpCircle className="w-3 h-3" />, prompt: 'Was kann ich mit AdTool alles machen?' },
+  { label: 'Hilfe starten', icon: <HelpCircle className="w-3 h-3" />, prompt: tx({ de: 'Was kann ich mit AdTool alles machen?', en: 'What all can I do with AdTool?', es: '¿Qué puedo hacer con AdTool?' }) },
   { label: 'Onboarding', icon: <Zap className="w-3 h-3" />, prompt: 'Führe mich durch die ersten Schritte.' },
   { label: 'Feature finden', icon: <Sparkles className="w-3 h-3" />, prompt: 'Ich suche ein bestimmtes Feature...' },
   { label: 'Account Status', icon: <Shield className="w-3 h-3" />, prompt: '/status' },

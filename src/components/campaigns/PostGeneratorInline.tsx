@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Loader2, Copy, Check } from "lucide-react";
@@ -57,7 +58,7 @@ export const PostGeneratorInline = ({
 
   const handleGenerate = async () => {
     if (!brief.trim()) {
-      toast.error("Bitte gib eine Kurzbeschreibung ein");
+      toast.error(tx({ de: "Bitte gib eine Kurzbeschreibung ein", en: "Please enter a short description", es: "Por favor, introduce una descripción corta" }));
       return;
     }
 
@@ -101,11 +102,11 @@ export const PostGeneratorInline = ({
     } catch (error: any) {
       console.error("Error generating content:", error);
       if (error.message?.includes("429")) {
-        toast.error("Rate-Limit erreicht. Bitte warte einen Moment.");
+        toast.error(tx({ de: "Rate-Limit erreicht. Bitte warte einen Moment.", en: "Rate limit reached. Please wait a moment.", es: "Límite de tasa alcanzado. Por favor, espera un momento." }));
       } else if (error.message?.includes("402")) {
         toast.error("AI Credits aufgebraucht. Bitte Credits aufladen.");
       } else {
-        toast.error("Fehler beim Generieren. Bitte erneut versuchen.");
+        toast.error(tx({ de: "Fehler beim Generieren. Bitte erneut versuchen.", en: "Error generating. Please try again.", es: "Error al generar. Por favor, inténtalo de nuevo." }));
       }
     } finally {
       setIsGenerating(false);

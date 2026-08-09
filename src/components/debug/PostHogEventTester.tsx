@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
@@ -252,7 +253,7 @@ export function PostHogEventTester() {
     
     toast({
       title: 'Dashboard Events werden generiert',
-      description: 'Events für alle Plans (basic, pro, enterprise) werden gesendet...',
+      description: tx({ de: 'Events für alle Plans (basic, pro, enterprise) werden gesendet...', en: 'Events for all plans (basic, pro, enterprise) are sent...', es: 'Se envían eventos para todos los planes (básico, pro, enterprise)...' }),
     });
     
     let successCount = 0;
@@ -364,7 +365,7 @@ export function PostHogEventTester() {
       console.error('Error creating test jobs:', error);
       toast({
         title: 'Fehler',
-        description: error.message || 'Konnte Test-Jobs nicht erstellen',
+        description: error.message || tx({ de: 'Konnte Test-Jobs nicht erstellen', en: 'Could not create test jobs', es: 'No se pudieron crear los trabajos de prueba' }),
         variant: 'destructive',
       });
     } finally {
@@ -383,7 +384,7 @@ export function PostHogEventTester() {
       
       toast({
         title: 'Jobs gelöscht',
-        description: 'Alle Test-Jobs wurden aus der Datenbank entfernt',
+        description: tx({ de: 'Alle Test-Jobs wurden aus der Datenbank entfernt', en: 'All test jobs have been removed from the database', es: 'Todos los trabajos de prueba han sido eliminados de la base de datos' }),
       });
       
       await fetchJobCounts();
@@ -391,7 +392,7 @@ export function PostHogEventTester() {
       console.error('Error deleting jobs:', error);
       toast({
         title: 'Fehler',
-        description: error.message || 'Konnte Jobs nicht löschen',
+        description: error.message || tx({ de: 'Konnte Jobs nicht löschen', en: 'Could not delete jobs', es: 'No se pudieron eliminar los trabajos' }),
         variant: 'destructive',
       });
     } finally {

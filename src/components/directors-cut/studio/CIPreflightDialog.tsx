@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,7 @@ export function CIPreflightDialog({
           </DialogTitle>
           <DialogDescription>
             {allClean
-              ? 'Alle Consistency-Checks bestanden — bereit für den Render.'
+              ? tx({ de: 'Alle Consistency-Checks bestanden — bereit für den Render.', en: 'All consistency checks passed — ready for render.', es: 'Todas las comprobaciones de consistencia pasaron — listo para renderizar.' })
               : hasBlockers
               ? 'Blocker gefunden — bitte behebe die kritischen Punkte vor dem Render.'
               : 'Nicht-blockierende Hinweise — du kannst trotzdem rendern.'}

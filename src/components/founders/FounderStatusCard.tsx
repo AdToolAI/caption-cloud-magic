@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * FounderStatusCard — personal Founders Circle card for dashboard / welcome page.
  *
@@ -17,7 +18,7 @@ const copy = {
   de: {
     eyebrow: "Founders Circle",
     title: "Du gehörst zum Founders Circle.",
-    sub: "Ein Kreis, der nur einmal geöffnet wird. Dein Vorteil läuft still im Hintergrund mit.",
+    sub: tx({ de: "Ein Kreis, der nur einmal geöffnet wird. Dein Vorteil läuft still im Hintergrund mit.", en: "A circle that only opens once. Your benefit runs silently in the background.", es: "Un círculo que solo se abre una vez. Tu beneficio funciona silenciosamente en segundo plano." }),
     discount: `${FOUNDERS_CREDIT_DISCOUNT_PERCENT} % auf jeden Credit-Kauf`,
     discountSub: "Automatisch im Checkout abgezogen",
     priority: "Priority-Rendering",

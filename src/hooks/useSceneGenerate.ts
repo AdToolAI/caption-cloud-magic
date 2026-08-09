@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * useSceneGenerate — Stage 18: in-place scene generation from the storyboard
  * inline player.
@@ -90,8 +91,8 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
             emitPipelineEvent({ type: 'clips:end' });
             setGenerating((prev) => ({ ...prev, [scene.id]: false }));
             toast({
-              title: 'Projekt konnte nicht gespeichert werden',
-              description: persistErr?.message || 'Bitte erneut versuchen.',
+              title: tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' }),
+              description: persistErr?.message || tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
               variant: 'destructive',
             });
             return;
@@ -101,8 +102,8 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
             emitPipelineEvent({ type: 'clips:end' });
             setGenerating((prev) => ({ ...prev, [scene.id]: false }));
             toast({
-              title: 'Projekt konnte nicht gespeichert werden',
-              description: 'Bitte erneut versuchen.',
+              title: tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' }),
+              description: tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
               variant: 'destructive',
             });
             return;
@@ -233,7 +234,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         const realMsg = await extractFunctionsError(err);
         toast({
           title: 'Generierung fehlgeschlagen',
-          description: realMsg || err?.message || 'Bitte erneut versuchen.',
+          description: realMsg || err?.message || tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
           variant: 'destructive',
         });
         emitPipelineEvent({ type: 'clips:end' });

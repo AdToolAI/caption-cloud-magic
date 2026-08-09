@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 export interface CompressionProfile {
   id: string;
   label: string;
@@ -16,7 +17,7 @@ export const COMPRESSION_PROFILES: CompressionProfile[] = [
     bitrate: '20000k',
     fps: 30,
     codec: 'h264',
-    description: 'Höchste Qualität für große Bildschirme und professionelle Anwendungen'
+    description: tx({ de: 'Höchste Qualität für große Bildschirme und professionelle Anwendungen', en: 'Highest quality for large screens and professional applications', es: 'Máxima calidad para pantallas grandes y aplicaciones profesionales' })
   },
   {
     id: '1080p',
@@ -25,7 +26,7 @@ export const COMPRESSION_PROFILES: CompressionProfile[] = [
     bitrate: '8000k',
     fps: 30,
     codec: 'h264',
-    description: 'Optimales Gleichgewicht zwischen Qualität und Dateigröße'
+    description: tx({ de: 'Optimales Gleichgewicht zwischen Qualität und Dateigröße', en: 'Optimal balance between quality and file size', es: 'Equilibrio óptimo entre calidad y tamaño de archivo' })
   },
   {
     id: '720p',
@@ -43,7 +44,7 @@ export const COMPRESSION_PROFILES: CompressionProfile[] = [
     bitrate: '2000k',
     fps: 30,
     codec: 'h264',
-    description: 'Kompakte Dateigröße für mobile Geräte und langsame Verbindungen'
+    description: tx({ de: 'Kompakte Dateigröße für mobile Geräte und langsame Verbindungen', en: 'Compact file size for mobile devices and slow connections', es: 'Tamaño de archivo compacto para dispositivos móviles y conexiones lentas' })
   }
 ];
 
@@ -79,7 +80,7 @@ export const FORMAT_PROFILES: FormatProfile[] = [
     extension: 'gif',
     mimeType: 'image/gif',
     codec: 'gif',
-    description: 'Animiert, ideal für kurze Loops und Vorschau'
+    description: tx({ de: 'Animiert, ideal für kurze Loops und Vorschau', en: 'Animated, ideal for short loops and preview', es: 'Animado, ideal para bucles cortos y vista previa' })
   }
 ];
 
@@ -101,7 +102,7 @@ export const ASPECT_RATIO_PROFILES: AspectRatioProfile[] = [
     width: 1080,
     height: 1920,
     platforms: ['Instagram Stories', 'TikTok', 'Reels', 'YouTube Shorts'],
-    description: 'Perfekt für mobile Stories und Shorts'
+    description: tx({ de: 'Perfekt für mobile Stories und Shorts', en: 'Perfect for mobile stories and shorts', es: 'Perfecto para historias móviles y cortos' })
   },
   {
     id: '16:9',
@@ -110,7 +111,7 @@ export const ASPECT_RATIO_PROFILES: AspectRatioProfile[] = [
     width: 1920,
     height: 1080,
     platforms: ['YouTube', 'Facebook', 'LinkedIn'],
-    description: 'Standard für Desktop und TV'
+    description: tx({ de: 'Standard für Desktop und TV', en: 'Standard for desktop and TV', es: 'Estándar para escritorio y TV' })
   },
   {
     id: '1:1',

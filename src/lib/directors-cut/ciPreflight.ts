@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // W4.2 CI-Preflight: consistency & brand-integrity checks before Lambda render.
 // Pure client-side checks — no network calls. Returns findings the CIPreflightDialog renders.
 
@@ -136,7 +137,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       severity: 'warn',
       title: 'Voice-Lock weicht ab',
       detail: `Projekt ist auf Voice "${lock.voiceId}" gelockt, Voice-Over nutzt "${input.currentVoiceId}".`,
-      hint: 'Entsperre den Lock oder generiere das Voice-Over mit der gelockten Stimme neu.',
+      hint: tx({ de: 'Entsperre den Lock oder generiere das Voice-Over mit der gelockten Stimme neu.', en: 'Unlock the lock or regenerate the voice-over with the locked voice.', es: 'Desbloquea el candado o regenera la voz en off con la voz bloqueada.' }),
     });
   }
 
@@ -145,7 +146,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'vo-missing',
       severity: 'fail',
-      title: 'Voice-Over aktiv, aber nicht generiert',
+      title: tx({ de: 'Voice-Over aktiv, aber nicht generiert', en: 'Voice-over active, but not generated', es: 'Voz en off activa, pero no generada' }),
       hint: 'Öffne den Voice-Over-Tab und generiere die Datei vor dem Render.',
     });
   }
@@ -176,7 +177,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
         id: 'subtitle-contrast',
         severity: 'warn',
         title: `${bad.length} Untertitel mit schwachem Kontrast`,
-        detail: 'Kontrast unter 3:1 → schwer lesbar (WCAG AA erfordert 4.5:1 für Text).',
+        detail: tx({ de: 'Kontrast unter 3:1 → schwer lesbar (WCAG AA erfordert 4.5:1 für Text).', en: 'Contrast below 3:1 → hard to read (WCAG AA requires 4.5:1 for text).', es: 'Contraste inferior a 3:1 → difícil de leer (WCAG AA requiere 4.5:1 para texto).' }),
       });
     }
 
@@ -187,7 +188,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
         id: 'subtitle-empty',
         severity: 'info',
         title: `${empty.length} leere Untertitel-Clips`,
-        hint: 'Diese werden beim Export automatisch entfernt.',
+        hint: tx({ de: 'Diese werden beim Export automatisch entfernt.', en: 'These will be automatically removed upon export.', es: 'Estos se eliminarán automáticamente al exportar.' }),
       });
     }
   }
@@ -208,7 +209,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'music-no-vo',
       severity: 'info',
       title: 'Musik ohne Voice-Over',
-      hint: 'Ducking wird nicht angewendet — Musik läuft auf voller (gedämpfter) Lautstärke.',
+      hint: tx({ de: 'Ducking wird nicht angewendet — Musik läuft auf voller (gedämpfter) Lautstärke.', en: 'Ducking not applied — music plays at full (attenuated) volume.', es: 'Ducking no aplicado — la música se reproduce a volumen completo (atenuado).' }),
     });
   }
 
@@ -299,7 +300,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       severity: 'warn',
       title: `${missingThumbs.length} Szene${missingThumbs.length > 1 ? 'n' : ''} ohne geladenes Asset`,
       detail: 'Ohne Thumbnail fehlt beim Render eventuell das zugrundeliegende Video.',
-      hint: 'Öffne die Szene und lade das Asset neu oder ersetze es.',
+      hint: tx({ de: 'Öffne die Szene und lade das Asset neu oder ersetze es.', en: 'Open the scene and reload or replace the asset.', es: 'Abre la escena y recarga o reemplaza el recurso.' }),
     });
   }
 
@@ -319,7 +320,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'consecutive-blackscreens',
       severity: 'info',
       title: `${blackRunMax} Blackscreens in Folge`,
-      hint: 'Meist ein Restartefakt vom Schneiden — zusammenfassen oder entfernen.',
+      hint: tx({ de: 'Meist ein Restartefakt vom Schneiden — zusammenfassen oder entfernen.', en: 'Mostly a leftover artifact from cutting — merge or remove.', es: 'Principalmente un artefacto sobrante del corte — fusionar o eliminar.' }),
     });
   }
 

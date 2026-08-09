@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * FaceMapReviewDialog (v274)
  *
@@ -229,7 +230,7 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
 
       toast({
         title: "Face-Map gespeichert",
-        description: "Der Clip wird jetzt mit der korrigierten Sprecher-Zuordnung neu gerendert.",
+        description: tx({ de: "Der Clip wird jetzt mit der korrigierten Sprecher-Zuordnung neu gerendert.", en: "The clip will now be re-rendered with the corrected speaker assignment.", es: "El clip se volverá a renderizar con la asignación de orador corregida." }),
       });
       onOpenChange(false);
     } catch (err) {
@@ -293,7 +294,7 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
               })}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground italic">Anker-Bild nicht verfügbar.</div>
+            <div className="text-sm text-muted-foreground italic">{tx({ de: "Anker-Bild nicht verfügbar.", en: "Anchor image not available.", es: "Imagen de anclaje no disponible." })}</div>
           )}
 
           <div className="space-y-2">

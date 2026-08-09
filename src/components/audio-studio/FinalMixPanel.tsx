@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -84,7 +85,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
 
   const handleExport = async () => {
     if (mixer.sources.length === 0) {
-      toast.error('Mindestens eine Quelle hinzufügen');
+      toast.error(tx({ de: 'Mindestens eine Quelle hinzufügen', en: 'Add at least one source', es: 'Añadir al menos una fuente' }));
       return;
     }
     setSaving(true);
@@ -218,7 +219,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
           <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border/40 rounded-xl">
             <FileAudio className="w-10 h-10 mx-auto mb-2 opacity-40" />
             <p className="text-sm">Noch keine Quellen.</p>
-            <p className="text-xs mt-1">Füge Voiceover, Music oder Stems aus dem Studio hinzu.</p>
+            <p className="text-xs mt-1">{tx({ de: "Füge Voiceover, Music oder Stems aus dem Studio hinzu.", en: "Add voiceover, music, or stems from the studio.", es: "Añade voz en off, música o stems desde el estudio." })}</p>
           </div>
         ) : (
           <div className="space-y-3">

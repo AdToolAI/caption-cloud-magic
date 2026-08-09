@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * The strategy layer.
  *
@@ -30,7 +31,7 @@ export const NARRATIVE_ANGLES: AngleSpec[] = [
     id: 'problem_solution',
     label: 'Problem → Lösung',
     mechanism:
-      'Zeige zuerst den konkreten Ärger im Alltag der Zielgruppe, dann die Lösung als sichtbare Erleichterung. Kein Text erklärt das Problem — man sieht es.',
+      tx({ de: 'Zeige zuerst den konkreten Ärger im Alltag der Zielgruppe, dann die Lösung als sichtbare Erleichterung. Kein Text erklärt das Problem — man sieht es.', en: 'First, show the specific annoyance in the target group\'s daily life, then the solution as a visible relief. No text explains the problem — you see it.', es: 'Primero, muestra la molestia concreta en la vida diaria del grupo objetivo, luego la solución como un alivio visible. Ningún texto explica el problema — se ve.' }),
     beats: ['hook', 'problem', 'reveal', 'proof', 'cta'],
     wantsSpeaker: false,
   },
@@ -38,7 +39,7 @@ export const NARRATIVE_ANGLES: AngleSpec[] = [
     id: 'testimonial',
     label: 'Testimonial',
     mechanism:
-      'Ein Mensch erzählt in eigenen Worten, was sich für ihn verändert hat. Ehrlich, unpoliert, nah am Gesicht. Die Aussage trägt den Film, nicht die Bilder.',
+      tx({ de: 'Ein Mensch erzählt in eigenen Worten, was sich für ihn verändert hat. Ehrlich, unpoliert, nah am Gesicht. Die Aussage trägt den Film, nicht die Bilder.', en: 'A person tells in their own words what has changed for them. Honest, unpolished, close to the face. The statement carries the film, not the images.', es: 'Una persona cuenta con sus propias palabras lo que ha cambiado para ella. Honesto, sin pulir, cerca de la cara. La declaración es el eje de la película, no las imágenes.' }),
     beats: ['hook', 'emotion', 'proof', 'benefit', 'cta'],
     wantsSpeaker: true,
   },
@@ -46,7 +47,7 @@ export const NARRATIVE_ANGLES: AngleSpec[] = [
     id: 'visual_metaphor',
     label: 'Visuelle Metapher',
     mechanism:
-      'Übersetze den Nutzen in ein einziges starkes Bild, das man nicht erklären muss. Die Metapher trägt den ganzen Film und löst sich am Ende im Produkt auf.',
+      tx({ de: 'Übersetze den Nutzen in ein einziges starkes Bild, das man nicht erklären muss. Die Metapher trägt den ganzen Film und löst sich am Ende im Produkt auf.', en: 'Translate the benefit into a single strong image that doesn\'t need explanation. The metaphor carries the entire film and resolves into the product at the end.', es: 'Traduce el beneficio en una única imagen potente que no necesite explicación. La metáfora sostiene toda la película y se resuelve en el producto al final.' }),
     beats: ['hook', 'reveal', 'benefit', 'cta'],
     wantsSpeaker: false,
   },
@@ -54,7 +55,7 @@ export const NARRATIVE_ANGLES: AngleSpec[] = [
     id: 'micro_story',
     label: 'Mikro-Story mit Wendung',
     mechanism:
-      'Eine winzige Geschichte mit Anfang, Kippmoment und Auflösung. Der Zuschauer glaubt zuerst etwas anderes zu sehen — die Wendung macht das Produkt zur Pointe.',
+      tx({ de: 'Eine winzige Geschichte mit Anfang, Kippmoment und Auflösung. Der Zuschauer glaubt zuerst etwas anderes zu sehen — die Wendung macht das Produkt zur Pointe.', en: 'A tiny story with a beginning, a turning point, and a resolution. The viewer initially believes they are seeing something else — the twist makes the product the punchline.', es: 'Una pequeña historia con un principio, un punto de inflexión y una resolución. El espectador cree al principio que está viendo otra cosa — el giro convierte el producto en el remate.' }),
     beats: ['hook', 'problem', 'emotion', 'reveal', 'cta'],
     wantsSpeaker: false,
   },

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -191,8 +192,8 @@ export function useContentAnalytics(dateRange?: { start: string; end: string }) 
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
       toast({
-        title: 'Fehler beim Laden',
-        description: 'Analytics konnten nicht geladen werden',
+        title: tx({ de: 'Fehler beim Laden', en: 'Error loading', es: 'Error al cargar' }),
+        description: tx({ de: 'Analytics konnten nicht geladen werden', en: 'Analytics could not be loaded', es: 'No se pudieron cargar los análisis' }),
         variant: 'destructive'
       });
     } finally {

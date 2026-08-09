@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * validateSceneForCinematicSync — Frontend-only preflight hint.
  *
@@ -80,7 +81,7 @@ export function validateSceneForCinematicSync(
       code: 'no_cast_no_dialog_lipsync_pointless',
       level: 'warning',
       message:
-        'Lip-Sync gewählt, aber weder Cast noch Dialog-Skript. Render fällt automatisch auf reine B-Roll-Plate zurück.',
+        tx({ de: 'Lip-Sync gewählt, aber weder Cast noch Dialog-Skript. Render fällt automatisch auf reine B-Roll-Plate zurück.', en: 'Lip-Sync selected, but neither Cast nor Dialog Script. Render automatically falls back to pure B-Roll Plate.', es: 'Sincronización labial seleccionada, pero sin elenco ni guion de diálogo. La renderización vuelve automáticamente a una placa de B-Roll pura.' }),
     });
   }
 
@@ -89,7 +90,7 @@ export function validateSceneForCinematicSync(
       code: 'cast_missing_portrait',
       level: 'warning',
       message:
-        'Cast vorhanden, aber kein Charakter-Portrait aufgelöst. Scene-Anchor (Nano Banana 2) kann scheitern — dann erfolgt automatisch eine Migration auf Hailuo ohne Lip-Sync auf dem Avatar.',
+        tx({ de: 'Cast vorhanden, aber kein Charakter-Portrait aufgelöst. Scene-Anchor (Nano Banana 2) kann scheitern — dann erfolgt automatisch eine Migration auf Hailuo ohne Lip-Sync auf dem Avatar.', en: 'Cast available, but no character portrait resolved. Scene-Anchor (Nano Banana 2) may fail — then an automatic migration to Hailuo without Lip-Sync on the avatar occurs.', es: 'Elenco disponible, pero no se resolvió ningún retrato de personaje. Scene-Anchor (Nano Banana 2) puede fallar — entonces se produce una migración automática a Hailuo sin sincronización labial en el avatar.' }),
     });
   }
 
@@ -128,7 +129,7 @@ export function validateSceneForCinematicSync(
       code: 'happyhorse_multispeaker_beta',
       level: 'info',
       message:
-        'HappyHorse mit mehreren Sprechern (Beta) — falls die Plate Sync.so-Face-Detection nicht besteht, werden die Credits automatisch refundiert.',
+        tx({ de: 'HappyHorse mit mehreren Sprechern (Beta) — falls die Plate Sync.so-Face-Detection nicht besteht, werden die Credits automatisch refundiert.', en: 'HappyHorse with multiple speakers (Beta) — if the Plate fails Sync.so face detection, credits will be automatically refunded.', es: 'HappyHorse con varios oradores (Beta) — si la placa falla la detección facial de Sync.so, los créditos se reembolsarán automáticamente.' }),
     });
   }
 

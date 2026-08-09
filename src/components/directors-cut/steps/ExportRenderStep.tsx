@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { ExportActionBar } from '@/components/publishing/ExportActionBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -343,7 +344,7 @@ export function ExportRenderStep({
       return;
     }
     if (!Number.isFinite(Number(videoDuration)) || Number(videoDuration) <= 0) {
-      toast.error('Video-Dauer ist ungültig. Bitte Quellvideo neu laden.');
+      toast.error(tx({ de: 'Video-Dauer ist ungültig. Bitte Quellvideo neu laden.', en: 'Video duration is invalid. Please reload source video.', es: 'La duración del video no es válida. Por favor, recarga el video de origen.' }));
       return;
     }
 
@@ -476,7 +477,7 @@ export function ExportRenderStep({
         // Check for AWS Rate Exceeded error
         const errorMessage = error.message || '';
         if (errorMessage.includes('Rate Exceeded') || errorMessage.includes('TooManyRequestsException')) {
-          toast.error('AWS Lambda ist überlastet. Bitte versuche es in 30 Sekunden erneut.', {
+          toast.error(tx({ de: 'AWS Lambda ist überlastet. Bitte versuche es in 30 Sekunden erneut.', en: 'AWS Lambda is overloaded. Please try again in 30 seconds.', es: 'AWS Lambda está sobrecargado. Por favor, inténtalo de nuevo en 30 segundos.' }), {
             duration: 10000,
           });
           setIsRendering(false);
@@ -504,7 +505,7 @@ export function ExportRenderStep({
       }
     } catch (error) {
       console.error('Render error:', error);
-      toast.error('Fehler beim Starten des Renderings');
+      toast.error(tx({ de: 'Fehler beim Starten des Renderings', en: 'Error starting render', es: 'Error al iniciar el renderizado' }));
       setIsRendering(false);
     }
   };

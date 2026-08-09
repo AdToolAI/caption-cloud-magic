@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,7 +136,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           {step === 2 && (
             <div className="space-y-4 animate-fade-in">
               <div>
-                <Label htmlFor="audience">Wer ist deine Zielgruppe? *</Label>
+                <Label htmlFor="audience">{tx({ de: "Wer ist deine Zielgruppe? *", en: "Who is your target audience? *", es: "¿Quién es tu público objetivo? *" })}</Label>
                 <Textarea
                   id="audience"
                   value={data.targetAudience}

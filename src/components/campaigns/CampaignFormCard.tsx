@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
@@ -293,7 +294,7 @@ export const CampaignFormCard = ({
         {/* Post Types */}
         <div className="space-y-3">
           <Label className="text-sm font-medium text-foreground">Post-Typen definieren</Label>
-          <p className="text-xs text-muted-foreground">Bestimme, welche Art von Posts erstellt werden sollen</p>
+          <p className="text-xs text-muted-foreground">{tx({ de: "Bestimme, welche Art von Posts erstellt werden sollen", en: "Determine what kind of posts should be created", es: "Determina qué tipo de publicaciones deben crearse" })}</p>
           
           <div className="space-y-2">
             {postTypes.map((pt, index) => (

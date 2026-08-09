@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -93,7 +94,7 @@ const ResetPassword = () => {
                 </div>
                 <CardTitle className="text-2xl">Link ungültig</CardTitle>
                 <CardDescription>
-                  {error || "Der Passwort-Reset-Link ist ungültig oder abgelaufen."}
+                  {error || tx({ de: "Der Passwort-Reset-Link ist ungültig oder abgelaufen.", en: "The password reset link is invalid or has expired.", es: "El enlace para restablecer la contraseña no es válido o ha caducado." })}
                 </CardDescription>
               </CardHeader>
               <CardContent>

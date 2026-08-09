@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,7 +115,7 @@ const AllComments = () => {
           console.error("Error creating project:", error);
           toast({
             title: "Fehler",
-            description: "Projekt konnte nicht erstellt werden",
+            description: tx({ de: "Projekt konnte nicht erstellt werden", en: "Project could not be created", es: "No se pudo crear el proyecto" }),
             variant: "destructive",
           });
         } else {
@@ -160,7 +161,7 @@ const AllComments = () => {
         console.error("Error fetching comments:", error);
         toast({
           title: "Fehler",
-          description: "Kommentare konnten nicht geladen werden",
+          description: tx({ de: "Kommentare konnten nicht geladen werden", en: "Could not load comments", es: "No se pudieron cargar los comentarios" }),
           variant: "destructive",
         });
       } finally {
@@ -231,7 +232,7 @@ const AllComments = () => {
       console.error("Error updating status:", error);
       toast({
         title: "Fehler",
-        description: "Status konnte nicht aktualisiert werden",
+        description: tx({ de: "Status konnte nicht aktualisiert werden", en: "Could not update status", es: "No se pudo actualizar el estado" }),
         variant: "destructive",
       });
     }
@@ -272,7 +273,7 @@ const AllComments = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Alle Kommentare</h1>
-          <p className="text-muted-foreground">Persistente Kommentarverwaltung über alle Plattformen</p>
+          <p className="text-muted-foreground">{tx({ de: "Persistente Kommentarverwaltung über alle Plattformen", en: "Persistent comment management across all platforms", es: "Gestión persistente de comentarios en todas las plataformas" })}</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>

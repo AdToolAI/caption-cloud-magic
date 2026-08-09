@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -78,7 +79,7 @@ export function usePostOptimization() {
       console.error('Error applying optimizations:', error);
       toast({
         title: 'Fehler',
-        description: 'Optimierungen konnten nicht angewendet werden',
+        description: tx({ de: 'Optimierungen konnten nicht angewendet werden', en: 'Optimizations could not be applied', es: 'No se pudieron aplicar las optimizaciones' }),
         variant: 'destructive',
       });
       return null;

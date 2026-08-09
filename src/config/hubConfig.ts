@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import {
   Home, Calendar,
   Sparkles, Bot, ImagePlus,
@@ -111,7 +112,7 @@ export const hubDefinitions: HubDefinition[] = [
       {
         route: "/content-studio",
         titleKey: "Content Studio",
-        descKey: "Ein Ablauf vom Briefing bis zum fertigen Beitrag: Copy, KI-Motiv, Layout, Serie & Veröffentlichung.",
+        descKey: tx({ de: "Ein Ablauf vom Briefing bis zum fertigen Beitrag: Copy, KI-Motiv, Layout, Serie & Veröffentlichung.", en: "A workflow from briefing to finished post: copy, AI visual, layout, series & publishing.", es: "Un flujo de trabajo desde el briefing hasta la publicación final: copy, imagen de IA, diseño, serie y publicación." }),
         icon: Sparkles,
         cover: coverOptAiPost,
         wide: true,
@@ -136,7 +137,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/analytics/posthog", titleKey: "PostHog Dashboard", descKey: "hubItemDesc.posthog", icon: BarChart3, cover: coverAnalyticsPosthog },
       { route: "/analytics/usage-reports", titleKey: "Usage Reports", descKey: "hubItemDesc.usageReports", icon: Coins, cover: coverAnalyticsUsage },
       { route: "/trend-radar", titleKey: "nav.trendRadar", descKey: "hubItemDesc.trendRadar", icon: Radar, cover: coverAnalyticsTrendRadar },
-      { route: "/ai-text-studio", titleKey: "AI Text Studio", descKey: "OpenAI, Google und Claude in drei Qualitätsstufen — ein Reasoning-Hub für alle Texte", icon: Sparkles, cover: coverAnalyticsAiText },
+      { route: "/ai-text-studio", titleKey: "AI Text Studio", descKey: tx({ de: "OpenAI, Google und Claude in drei Qualitätsstufen — ein Reasoning-Hub für alle Texte", en: "OpenAI, Google and Claude in three quality levels — a reasoning hub for all texts", es: "OpenAI, Google y Claude en tres niveles de calidad — un centro de razonamiento para todos los textos" }), icon: Sparkles, cover: coverAnalyticsAiText },
     ],
   },
   {
@@ -156,13 +157,13 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/ai-video-studio", titleKey: "AI Video Studio", descKey: "hubItemDesc.aiVideoStudio", icon: Sparkles, cover: coverErstAiVideoStudio },
       { route: "/video-composer", titleKey: "videoComposer.title", descKey: "hubItemDesc.videoComposer", icon: Scissors, cover: coverErstVideoComposer },
       { route: "/queue", titleKey: "Render-Queue", descKey: "Live-Status aller Motion-Studio-Renderjobs", icon: Activity, cover: coverErstQueue },
-      { route: "/library", titleKey: "Cast & World Library", descKey: "Avatare, Locations, Buildings & Props — alles in einer Bibliothek, mit @-Mention überall einsetzbar", icon: Users, cover: coverErstLibrary },
+      { route: "/library", titleKey: "Cast & World Library", descKey: tx({ de: "Avatare, Locations, Buildings & Props — alles in einer Bibliothek, mit @-Mention überall einsetzbar", en: "Avatars, locations, buildings & props — all in one library, usable anywhere with @-mention", es: "Avatares, ubicaciones, edificios y accesorios — todo en una biblioteca, utilizable en cualquier lugar con @-mención" }), icon: Users, cover: coverErstLibrary },
       { route: "/creator-library", titleKey: "Creator Library", descKey: "Videos · Photos · Music · SFX — royalty-free Bundle, inklusive in allen Paid-Plans", icon: Library, cover: coverErstCreatorLibrary },
       
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers, cover: coverErstPictureStudio },
       { route: "/marketplace", titleKey: "Template Marketplace", descKey: "Community-Templates entdecken & kaufen", icon: Store, cover: coverErstMarketplace },
       { route: "/creator-studio", titleKey: "Creator Studio", descKey: "Eigene Templates verkaufen & Earnings tracken", icon: CoinsIcon, cover: coverErstCreatorStudio },
-      { route: "/my-licenses", titleKey: "My Licenses", descKey: "PDF-Lizenz-Zertifikate für alle deine Assets — wie Envato/Artlist", icon: FileBadge2, cover: coverErstMyLicenses },
+      { route: "/my-licenses", titleKey: "My Licenses", descKey: tx({ de: "PDF-Lizenz-Zertifikate für alle deine Assets — wie Envato/Artlist", en: "PDF license certificates for all your assets — like Envato/Artlist", es: "Certificados de licencia en PDF para todos tus activos — como Envato/Artlist" }), icon: FileBadge2, cover: coverErstMyLicenses },
     ],
   },
   {

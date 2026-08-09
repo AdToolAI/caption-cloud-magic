@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { AlertTriangle, Info, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,7 +71,7 @@ export function PreflightCheck({
     const fastModel = PICTURE_MODELS.fast;
     tips.push({
       icon: 'info',
-      text: 'Hinweis: „Ultra" (Nano Banana) hat strikte Inhaltsfilter. Bei Menschenmengen, religiösen, politischen oder gewaltvollen Referenzbildern wird oft blockiert. „Fast" (Seedream 4) hat tolerantere Filter und ist bei i2i meist die sichere Wahl.',
+      text: tx({ de: 'Hinweis: „Ultra" (Nano Banana) hat strikte Inhaltsfilter. Bei Menschenmengen, religiösen, politischen oder gewaltvollen Referenzbildern wird oft blockiert. „Fast" (Seedream 4) hat tolerantere Filter und ist bei i2i meist die sichere Wahl.', en: 'Note: "Ultra" (Nano Banana) has strict content filters. It often blocks crowd, religious, political, or violent reference images. "Fast" (Seedream 4) has more tolerant filters and is usually the safer choice for i2i.', es: 'Nota: "Ultra" (Nano Banana) tiene filtros de contenido estrictos. A menudo bloquea imágenes de referencia de multitudes, religiosas, políticas o violentas. "Fast" (Seedream 4) tiene filtros más tolerantes y suele ser la opción más segura para i2i.' }),
       action: {
         label: `Auf ${fastModel.label} wechseln (${currencySymbol}${(fastModel.cost * variantsCount).toFixed(2)})`,
         run: () => onSwitchTier('fast'),

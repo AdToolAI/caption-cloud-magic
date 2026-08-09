@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Voice-cloning training scripts (~60–90s spoken).
  * Phonetically balanced: statements, question, exclamation, numbers,
@@ -17,7 +18,7 @@ export const VOICE_TRAINING_SCRIPTS: Record<
 > = {
   de: {
     title: "Deutsches Trainingsskript",
-    hint: "Sprich in normalem Tempo, natürlich und ruhig. Ziel: 60–90 Sekunden. Ersetze {NAME} durch deinen eigenen Namen.",
+    hint: tx({ de: "Sprich in normalem Tempo, natürlich und ruhig. Ziel: 60–90 Sekunden. Ersetze {NAME} durch deinen eigenen Namen.", en: "Speak at a normal pace, naturally and calmly. Goal: 60–90 seconds. Replace {NAME} with your own name.", es: "Habla a un ritmo normal, de forma natural y tranquila. Objetivo: 60-90 segundos. Reemplaza {NAME} con tu propio nombre." }),
     text: `Hallo, mein Name ist {NAME} und ich nehme diese Aufnahme auf, um meine eigene Stimme zu klonen.
 
 Heute ist ein sonniger Tag, und ich sitze in einem ruhigen Raum ohne Hintergrundgeräusche. Ich spreche gleichmäßig, deutlich und in meinem natürlichen Tonfall.

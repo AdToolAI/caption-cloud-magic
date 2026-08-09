@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ export function BrandVoiceLibrary({ brandKitId }: { brandKitId: string | null })
   if (!brandKitId) {
     return (
       <Card className="p-6 bg-card/60 border-white/10">
-        <p className="text-sm text-muted-foreground">Wähle zuerst ein aktives Brand-Set.</p>
+        <p className="text-sm text-muted-foreground">{tx({ de: "Wähle zuerst ein aktives Brand-Set.", en: "Please select an active Brand Set first.", es: "Por favor, selecciona primero un Brand Set activo." })}</p>
       </Card>
     );
   }

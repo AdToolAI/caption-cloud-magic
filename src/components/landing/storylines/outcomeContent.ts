@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import type { ComponentType } from "react";
 import type { Language } from "@/lib/translations";
 import {
@@ -54,7 +55,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 01 · Heatmap", "Step 01 · Heatmap", "Paso 01 · Heatmap"],
           ["Der Monat baut sich als Heatmap.", "Your month builds itself as a heatmap.", "Tu mes se construye como heatmap."],
           [
-            "Signale aus TikTok, Meta, YouTube und X fließen in eine Wochen-Heatmap. Du siehst sofort, wann deine Zielgruppe wirklich zuschaut — kein Bauchgefühl mehr.",
+            tx({ de: "Signale aus TikTok, Meta, YouTube und X fließen in eine Wochen-Heatmap. Du siehst sofort, wann deine Zielgruppe wirklich zuschaut — kein Bauchgefühl mehr.", en: "Signals from TikTok, Meta, YouTube, and X flow into a weekly heatmap. You instantly see when your target audience is truly watching — no more guesswork.", es: "Las señales de TikTok, Meta, YouTube y X se integran en un mapa de calor semanal. Verás al instante cuándo tu público objetivo está realmente viendo, sin conjeturas." }),
             "Signals from TikTok, Meta, YouTube and X flow into a weekly heatmap. You instantly see when your audience actually watches — no more gut feeling.",
             "Las señales de TikTok, Meta, YouTube y X fluyen a un heatmap semanal. Ves al instante cuándo mira tu audiencia — sin corazonadas.",
           ],
@@ -67,7 +68,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 02 · Slot-Auto-Pick", "Step 02 · Slot Auto-Pick", "Paso 02 · Auto-Slot"],
           ["Die besten Slots werden vorgeschlagen.", "The strongest slots get pre-picked.", "Los mejores slots se preseleccionan."],
           [
-            "AdTool AI rankt jeden Zeitslot nach Reach-Potenzial und pickt die stärksten automatisch — du bestätigst mit einem Klick.",
+            tx({ de: "AdTool AI rankt jeden Zeitslot nach Reach-Potenzial und pickt die stärksten automatisch — du bestätigst mit einem Klick.", en: "AdTool AI ranks each time slot by reach potential and automatically picks the strongest ones — you confirm with a click.", es: "AdTool AI clasifica cada franja horaria por potencial de alcance y selecciona automáticamente las más fuertes; tú confirmas con un clic." }),
             "AdTool AI ranks every time-slot by reach potential and auto-picks the strongest — you confirm with one click.",
             "AdTool AI clasifica cada franja por potencial de alcance y elige las mejores — confirmas con un clic.",
           ],
@@ -93,7 +94,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 04 · Wiederholung", "Step 04 · Recurrence", "Paso 04 · Recurrencia"],
           ["Serien laufen wie ein Uhrwerk.", "Series run like clockwork.", "Series como reloj suizo."],
           [
-            "Wöchentlich, zweiwöchentlich, saisonal — Serien laufen automatisch weiter. Ein neues Skript reicht, der Slot ist schon reserviert.",
+            tx({ de: "Wöchentlich, zweiwöchentlich, saisonal — Serien laufen automatisch weiter. Ein neues Skript reicht, der Slot ist schon reserviert.", en: "Weekly, bi-weekly, seasonally — series continue automatically. A new script is enough, the slot is already reserved.", es: "Semanal, quincenal, estacional: las series continúan automáticamente. Basta con un nuevo guion, la franja ya está reservada." }),
             "Weekly, bi-weekly, seasonal — series just keep running. Drop a new script, the slot is already booked.",
             "Semanal, quincenal, estacional — las series siguen solas. Nuevo guion, el slot ya está reservado.",
           ],
@@ -106,7 +107,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 05 · Monat fixiert", "Step 05 · Month locked", "Paso 05 · Mes fijado"],
           ["28 Slots. Ein Klick. Fertig.", "28 slots. One click. Done.", "28 slots. Un clic. Listo."],
           [
-            "Ein Klick — der Monat ist fixiert. Alle Formate, alle Kanäle, alle Wiederholungen sind eingeplant. Du kannst dich wieder auf Content konzentrieren.",
+            tx({ de: "Ein Klick — der Monat ist fixiert. Alle Formate, alle Kanäle, alle Wiederholungen sind eingeplant. Du kannst dich wieder auf Content konzentrieren.", en: "One click — the month is fixed. All formats, all channels, all repetitions are scheduled. You can focus on content again.", es: "Un clic y el mes está fijado. Todos los formatos, todos los canales, todas las repeticiones están programados. Puedes volver a concentrarte en el contenido." }),
             "One click — the month is locked. Every format, every channel, every recurrence is scheduled. Back to creating.",
             "Un clic — el mes queda fijado. Todos los formatos, canales y recurrencias planificados. A crear.",
           ],
@@ -123,9 +124,9 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
         durationMs: 4800,
         copy: S(
           ["Schritt 01 · Live-Signal", "Step 01 · Live signal", "Paso 01 · Señal en vivo"],
-          ["Alle Signale in einem Strom.", "Every signal in one stream.", "Todas las señales en un flujo."],
+          [tx({ de: "Alle Signale in einem Strom.", en: "All signals in one stream.", es: "Todas las señales en una sola transmisión." }), "Every signal in one stream.", "Todas las señales en un flujo."],
           [
-            "Views, Watch-Time, CTR, Saves, Shares — alle Kanäle streamen live in ein einziges Cockpit. Kein Tab-Wechsel mehr.",
+            tx({ de: "Views, Watch-Time, CTR, Saves, Shares — alle Kanäle streamen live in ein einziges Cockpit. Kein Tab-Wechsel mehr.", en: "Views, Watch-Time, CTR, Saves, Shares — all channels stream live into a single cockpit. No more tab switching.", es: "Vistas, tiempo de visualización, CTR, guardados, compartidos: todos los canales transmiten en vivo a una única cabina. Se acabó el cambio de pestañas." }),
             "Views, watch-time, CTR, saves, shares — every channel streams into one cockpit. No more tab-hopping.",
             "Views, watch-time, CTR, saves, shares — todos los canales fluyen a un mismo cockpit.",
           ],
@@ -164,7 +165,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 04 · A/B Duel", "Step 04 · A/B duel", "Paso 04 · Duelo A/B"],
           ["A gegen B — ohne Ratespiel.", "A vs. B — no guesswork.", "A contra B — sin adivinar."],
           [
-            "Zwei Cuts starten parallel, das schwächere Video wird automatisch stumm geschaltet. Nur der Gewinner bekommt Budget.",
+            tx({ de: "Zwei Cuts starten parallel, das schwächere Video wird automatisch stumm geschaltet. Nur der Gewinner bekommt Budget.", en: "Two cuts start in parallel, the weaker video is automatically muted. Only the winner gets the budget.", es: "Dos cortes se inician en paralelo, el vídeo más débil se silencia automáticamente. Solo el ganador recibe el presupuesto." }),
             "Two cuts launch in parallel, the weaker one is auto-muted. Only the winner gets more budget.",
             "Dos cuts se lanzan en paralelo, el más débil se silencia automáticamente. Solo el ganador recibe presupuesto.",
           ],
@@ -196,7 +197,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 01 · Channel-Rings", "Step 01 · Channel rings", "Paso 01 · Anillos de canal"],
           ["Vier Kanäle. Ein Blick.", "Four channels. One glance.", "Cuatro canales. Una mirada."],
           [
-            "TikTok, Meta, YouTube und X — die Ringe zeigen live, wie voll deine Publish-Pipeline auf jedem Kanal ist.",
+            tx({ de: "TikTok, Meta, YouTube und X — die Ringe zeigen live, wie voll deine Publish-Pipeline auf jedem Kanal ist.", en: "TikTok, Meta, YouTube, and X — the rings show live how full your publish pipeline is on each channel.", es: "TikTok, Meta, YouTube y X: los anillos muestran en vivo cuán llena está tu pipeline de publicación en cada canal." }),
             "TikTok, Meta, YouTube and X — the rings show live how full your publish pipeline is on each channel.",
             "TikTok, Meta, YouTube y X — los anillos muestran en vivo la cola de publicación en cada canal.",
           ],
@@ -222,7 +223,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 03 · Clone × N", "Step 03 · Clone × N", "Paso 03 · Clonar × N"],
           ["Ein Master. Acht Varianten.", "One master. Eight variants.", "Un master. Ocho variantes."],
           [
-            "Ein Master-Cut wird in Sekunden zu acht Varianten: andere Hooks, andere CTAs, andere Sprachen. Perfekt für Multi-Market-Rollouts.",
+            tx({ de: "Ein Master-Cut wird in Sekunden zu acht Varianten: andere Hooks, andere CTAs, andere Sprachen. Perfekt für Multi-Market-Rollouts.", en: "A master cut becomes eight variants in seconds: different hooks, different CTAs, different languages. Perfect for multi-market rollouts.", es: "Un corte maestro se convierte en ocho variantes en segundos: diferentes ganchos, diferentes CTA, diferentes idiomas. Perfecto para lanzamientos en múltiples mercados." }),
             "One master cut becomes eight variants in seconds: different hooks, CTAs, languages. Perfect for multi-market rollouts.",
             "Un master se convierte en ocho variantes en segundos: hooks, CTAs, idiomas distintos. Ideal para multi-mercado.",
           ],
@@ -235,7 +236,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 04 · Queue → Live", "Step 04 · Queue → live", "Paso 04 · Cola → en vivo"],
           ["Von Draft bis Live in einer Bahn.", "Draft to live in one lane.", "De borrador a live en una vía."],
           [
-            "Draft, Review, Live — jede Kampagne läuft eine transparente Bahn. Kein Ticket-Ping-Pong, keine verlorenen Cuts.",
+            tx({ de: "Draft, Review, Live — jede Kampagne läuft eine transparente Bahn. Kein Ticket-Ping-Pong, keine verlorenen Cuts.", en: "Draft, Review, Live — every campaign follows a transparent path. No ticket ping-pong, no lost cuts.", es: "Borrador, Revisión, En vivo: cada campaña sigue un camino transparente. Sin ping-pong de tickets, sin cortes perdidos." }),
             "Draft, review, live — every campaign runs one transparent lane. No ticket ping-pong, no lost cuts.",
             "Borrador, revisión, live — cada campaña sigue una vía transparente. Sin tickets perdidos.",
           ],
@@ -248,7 +249,7 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 05 · Global Reach", "Step 05 · Global reach", "Paso 05 · Alcance global"],
           ["Deine Marke, überall gleichzeitig.", "Your brand, everywhere at once.", "Tu marca, en todas partes a la vez."],
           [
-            "DE, EN, ES — dieselbe Kampagne, drei Sprachen, ein Klick. Deine Reichweite wächst, ohne dass dein Team wächst.",
+            tx({ de: "DE, EN, ES — dieselbe Kampagne, drei Sprachen, ein Klick. Deine Reichweite wächst, ohne dass dein Team wächst.", en: "DE, EN, ES — the same campaign, three languages, one click. Your reach grows without your team growing.", es: "DE, EN, ES: la misma campaña, tres idiomas, un clic. Tu alcance crece sin que tu equipo crezca." }),
             "DE, EN, ES — same campaign, three languages, one click. Your reach scales without your team scaling.",
             "DE, EN, ES — misma campaña, tres idiomas, un clic. Tu alcance escala sin que crezca el equipo.",
           ],

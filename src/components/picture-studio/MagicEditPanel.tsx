@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ export function MagicEditPanel() {
   // ── File upload ──
   const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      toast.error('Bitte ein Bild auswählen');
+      toast.error(tx({ de: 'Bitte ein Bild auswählen', en: 'Please select an image', es: 'Por favor, selecciona una imagen' }));
       return;
     }
     setSourceFile(file);
@@ -155,7 +156,7 @@ export function MagicEditPanel() {
       return;
     }
     if (mode === 'inpaint' && !hasMaskPainted()) {
-      toast.error('Bitte den zu bearbeitenden Bereich mit dem Pinsel markieren');
+      toast.error(tx({ de: 'Bitte den zu bearbeitenden Bereich mit dem Pinsel markieren', en: 'Please mark the area to be edited with the brush', es: 'Por favor, marca el área a editar con el pincel' }));
       return;
     }
 

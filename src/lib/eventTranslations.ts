@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Event system translations - Separated for clarity
 export const eventTranslations = {
   de: {
@@ -13,9 +14,9 @@ export const eventTranslations = {
     autoRepliesSent: "Auto-Antworten gesendet",
     recentActivity: "Letzte Aktivitäten",
     recentActivityDesc: "Deine neuesten Content-Erstellungsaktivitäten",
-    noActivity: "Noch keine Aktivität. Beginne mit dem Erstellen, um deinen Feed zu sehen!",
+    noActivity: tx({ de: "Noch keine Aktivität. Beginne mit dem Erstellen, um deinen Feed zu sehen!", en: "No activity yet. Start creating to see your feed!", es: "Aún no hay actividad. ¡Empieza a crear para ver tu feed!" }),
     activitiesToday: "Aktivitäten heute",
-    startCreating: "Beginne mit dem Erstellen, um deine Aktivität zu sehen",
+    startCreating: tx({ de: "Beginne mit dem Erstellen, um deine Aktivität zu sehen", en: "Start creating to see your activity", es: "Empieza a crear para ver tu actividad" }),
     goalCreated: "Ziel erstellt",
     brandkitCreated: "Brand Kit erstellt",
     performanceSynced: "Performance synchronisiert",

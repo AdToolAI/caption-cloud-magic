@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * AnchorPreviewGate — v263 Anchor-Preview-Gate
  *
@@ -101,7 +102,7 @@ export function AnchorPreviewGate({
     } catch (e: any) {
       setPhase("error");
       setErrMsg(
-        e?.message || "Der vorherige Lauf dieser Szene konnte nicht beendet werden.",
+        e?.message || tx({ de: "Der vorherige Lauf dieser Szene konnte nicht beendet werden.", en: "The previous run of this scene could not be completed.", es: "La ejecución anterior de esta escena no pudo completarse." }),
       );
       return;
     }
@@ -127,7 +128,7 @@ export function AnchorPreviewGate({
       });
     } catch (error: any) {
       setPhase("error");
-      setErrMsg(error.message || "Preview konnte nicht gestartet werden.");
+      setErrMsg(error.message || tx({ de: "Preview konnte nicht gestartet werden.", en: "Preview could not be started.", es: "No se pudo iniciar la vista previa." }));
       return;
     }
 
@@ -146,7 +147,7 @@ export function AnchorPreviewGate({
       if (!row) continue;
       if (row.clip_status === "failed") {
         setPhase("error");
-        setErrMsg(row.clip_error || "Anchor konnte nicht komponiert werden.");
+        setErrMsg(row.clip_error || tx({ de: "Anchor konnte nicht komponiert werden.", en: "Anchor could not be composed.", es: "No se pudo componer el ancla." }));
         return;
       }
       if (row.preview_anchor_url) {
@@ -170,7 +171,7 @@ export function AnchorPreviewGate({
       // Ohne übernommenen Run darf hier nichts starten — genau dieser Pfad
       // hat früher am harten Neustart vorbei gerendert.
       setPhase("error");
-      setErrMsg("Kein aktiver Lauf für diese Szene. Bitte Vorschau neu erstellen.");
+      setErrMsg(tx({ de: "Kein aktiver Lauf für diese Szene. Bitte Vorschau neu erstellen.", en: "No active run for this scene. Please regenerate preview.", es: "No hay ninguna ejecución activa para esta escena. Por favor, regenera la vista previa." }));
       return;
     }
     setPhase("confirming");
@@ -197,7 +198,7 @@ export function AnchorPreviewGate({
       onOpenChange(false);
     } catch (e: any) {
       setPhase("error");
-      setErrMsg(e?.message || "Render konnte nicht gestartet werden.");
+      setErrMsg(e?.message || tx({ de: "Render konnte nicht gestartet werden.", en: "Render could not be started.", es: "No se pudo iniciar el renderizado." }));
     }
   };
 

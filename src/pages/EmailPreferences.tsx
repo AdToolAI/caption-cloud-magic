@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,18 +35,18 @@ const COPY: Record<Lang, {
   de: {
     title: "E-Mail-Einstellungen",
     desc: "Verwalte, welche E-Mails du von AdTool erhältst.",
-    loading: "Einstellungen werden geladen…",
-    invalid: "Dieser Abmelde-Link ist ungültig oder abgelaufen.",
+    loading: tx({ de: "Einstellungen werden geladen…", en: "Settings are loading…", es: "Cargando configuración…" }),
+    invalid: tx({ de: "Dieser Abmelde-Link ist ungültig oder abgelaufen.", en: "This unsubscribe link is invalid or has expired.", es: "Este enlace para cancelar la suscripción no es válido o ha caducado." }),
     back: "Zur Startseite",
     toggleLabel: "Onboarding-Erinnerungs-E-Mails",
-    toggleDesc: "Hilfreiche Tipps und Fortschritts-Erinnerungen in deiner ersten Woche.",
+    toggleDesc: tx({ de: "Hilfreiche Tipps und Fortschritts-Erinnerungen in deiner ersten Woche.", en: "Helpful tips and progress reminders in your first week.", es: "Consejos útiles y recordatorios de progreso en tu primera semana." }),
     saved: "Einstellungen aktualisiert",
-    error: "Einstellungen konnten nicht aktualisiert werden",
+    error: tx({ de: "Einstellungen konnten nicht aktualisiert werden", en: "Could not update settings", es: "No se pudieron actualizar los ajustes" }),
     unsubscribed: "Du wurdest abgemeldet.",
     resubscribed: "Du bist wieder angemeldet.",
     quickUnsub: "Von allen Erinnerungen abmelden",
     pushLabel: "Browser-Push-Erinnerungen",
-    pushDesc: "Kurze Browser-Benachrichtigungen in deiner ersten Woche (Berechtigung erforderlich).",
+    pushDesc: tx({ de: "Kurze Browser-Benachrichtigungen in deiner ersten Woche (Berechtigung erforderlich).", en: "Short browser notifications in your first week (permission required).", es: "Notificaciones breves del navegador en tu primera semana (se requiere permiso)." }),
   },
   es: {
     title: "Preferencias de correo",

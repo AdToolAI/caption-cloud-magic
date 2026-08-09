@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * The Autopilot flow: briefing → five ideas → storyboard → production.
  *
@@ -40,7 +41,7 @@ function briefFromIdea(round: Round, idea: AutopilotIdea): string {
     .map((asset) => {
       const spec = ASSET_ROLES[asset.role];
       const handling = spec.useAsOverlay
-        ? 'wird als saubere Einblendung gelegt, nicht generieren'
+        ? tx({ de: 'wird als saubere Einblendung gelegt, nicht generieren', en: 'is placed as a clean fade-in, do not generate', es: 'se coloca como una entrada limpia, no generar' })
         : spec.styleOnly
           ? 'nur Look übernehmen, nicht den Inhalt'
           : 'als Bildreferenz verwenden';

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
 import posthog from "posthog-js";
@@ -86,7 +87,7 @@ const ErrorFallback = ({ error }: { error?: unknown }) => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background p-4">
       <div className="max-w-md w-full bg-card border border-border rounded-lg p-6 shadow-lg">
-        <h2 className="text-xl font-semibold text-foreground mb-2">Ein Fehler ist aufgetreten</h2>
+        <h2 className="text-xl font-semibold text-foreground mb-2">{tx({ de: "Ein Fehler ist aufgetreten", en: "An error occurred", es: "Ha ocurrido un error" })}</h2>
         <p className="text-muted-foreground mb-4">
           Die Seite konnte nicht geladen werden. Bitte lade die Seite neu.
         </p>

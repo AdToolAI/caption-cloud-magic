@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Crown, Zap, Sparkles, Lock, ArrowRight } from "lucide-react";
@@ -246,7 +247,7 @@ const Pricing = () => {
                   <Check className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
                   <span>
                     {language === "de"
-                      ? "Ein Preis für das ganze Studio: Skript, Stimmen, Charaktere, Lip-Sync, Schnitt und Export."
+                      ? tx({ de: "Ein Preis für das ganze Studio: Skript, Stimmen, Charaktere, Lip-Sync, Schnitt und Export.", en: "One price for the whole studio: script, voices, characters, lip-sync, editing, and export.", es: "Un precio para todo el estudio: guion, voces, personajes, sincronización labial, edición y exportación." })
                       : language === "es"
                       ? "Un precio para todo el estudio: guion, voces, personajes, lip-sync, montaje y exportación."
                       : "One price for the whole studio: script, voices, characters, lip-sync, edit and export."}
@@ -265,7 +266,7 @@ const Pricing = () => {
               </ul>
               <Button onClick={handleProCheckout} disabled={proLoading} className="font-semibold">
                 {language === "de"
-                  ? "Zurück zum Checkout"
+                  ? tx({ de: "Zurück zum Checkout", en: "Back to checkout", es: "Volver a la caja" })
                   : language === "es"
                   ? "Volver al pago"
                   : "Back to checkout"}

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Volume2, RotateCcw, ChevronRight, ChevronLeft, Save, Check, Loader2 } from 'lucide-react';
@@ -71,7 +72,7 @@ export function AudioBeforeAfterComparison({
   // Save to library
   const handleSaveToLibrary = async () => {
     if (!user?.id) {
-      toast.error('Bitte melde dich an');
+      toast.error(tx({ de: 'Bitte melde dich an', en: 'Please log in', es: 'Por favor, inicia sesión' }));
       return;
     }
 
@@ -385,7 +386,7 @@ export function AudioBeforeAfterComparison({
                 </div>
                 <div>
                   <h3 className="font-semibold">Vorher/Nachher Vergleich</h3>
-                  <p className="text-xs text-muted-foreground">Drücke A (Original) oder B (Optimiert) zum schnellen Wechseln</p>
+                  <p className="text-xs text-muted-foreground">{tx({ de: "Drücke A (Original) oder B (Optimiert) zum schnellen Wechseln", en: "Press A (Original) or B (Optimized) to switch quickly", es: "Pulsa A (Original) o B (Optimizado) para cambiar rápidamente" })}</p>
                 </div>
               </div>
               

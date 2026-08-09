@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface SeriesOptions {
@@ -37,7 +38,7 @@ export async function generateSeries(options: SeriesOptions): Promise<SeriesResu
 
   if (error) throw error;
   if (!data?.success || !data?.campaign) {
-    throw new Error(data?.error || "Serie konnte nicht erzeugt werden");
+    throw new Error(data?.error || tx({ de: "Serie konnte nicht erzeugt werden", en: "Series could not be created", es: "No se pudo crear la serie" }));
   }
 
   return {

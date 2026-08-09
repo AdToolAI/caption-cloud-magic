@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -249,7 +250,7 @@ export function DeepSweepTab() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Deep Sweep mit echten Renders starten?</AlertDialogTitle>
+                  <AlertDialogTitle>{tx({ de: "Deep Sweep mit echten Renders starten?", en: "Start Deep Sweep with real renders?", es: "¿Iniciar Deep Sweep con renders reales?" })}</AlertDialogTitle>
                   <AlertDialogDescription>
                     Diese Aktion löst <strong>echte bezahlte API-Calls</strong> aus
                     (Replicate, HeyGen, ElevenLabs, AWS Lambda). Erwarteter Verbrauch:
@@ -321,7 +322,7 @@ export function DeepSweepTab() {
                         className={STATUS_STYLES[status] ?? STATUS_STYLES.pending}
                         title={
                           status === "timeout"
-                            ? "Transientes Infrastruktur-Limit (z.B. AWS Lambda Concurrency) — kein Code-Bug. Wird beim nächsten Sweep i.d.R. automatisch grün."
+                            ? tx({ de: "Transientes Infrastruktur-Limit (z.B. AWS Lambda Concurrency) — kein Code-Bug. Wird beim nächsten Sweep i.d.R. automatisch grün.", en: "Transient infrastructure limit (e.g. AWS Lambda Concurrency) — no code bug. Usually turns green automatically on next sweep.", es: "Límite de infraestructura transitorio (por ejemplo, concurrencia de AWS Lambda) — no es un error de código. Generalmente se vuelve verde automáticamente en el siguiente barrido." })
                             : undefined
                         }
                       >

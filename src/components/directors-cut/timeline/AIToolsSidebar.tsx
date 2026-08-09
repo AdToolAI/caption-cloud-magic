@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -76,7 +77,7 @@ export function AIToolsSidebar({
     if (!voiceoverText.trim()) {
       toast({
         title: 'Fehler',
-        description: 'Bitte gib einen Text ein',
+        description: tx({ de: 'Bitte gib einen Text ein', en: 'Please enter some text', es: 'Por favor, introduce un texto' }),
         variant: 'destructive',
       });
       return;
@@ -111,7 +112,7 @@ export function AIToolsSidebar({
       
       toast({
         title: 'Voice-Over erstellt',
-        description: 'Audio wurde zur Timeline hinzugefügt',
+        description: tx({ de: 'Audio wurde zur Timeline hinzugefügt', en: 'Audio added to timeline', es: 'Audio añadido a la línea de tiempo' }),
       });
       
       setVoiceoverText('');
@@ -119,7 +120,7 @@ export function AIToolsSidebar({
       console.error('Voiceover generation error:', error);
       toast({
         title: 'Fehler',
-        description: 'Voice-Over konnte nicht erstellt werden',
+        description: tx({ de: 'Voice-Over konnte nicht erstellt werden', en: 'Voice-over could not be created', es: 'No se pudo crear la voz en off' }),
         variant: 'destructive',
       });
     } finally {
@@ -187,7 +188,7 @@ export function AIToolsSidebar({
       
       toast({
         title: 'Sound Effect erstellt',
-        description: 'Audio wurde zur Timeline hinzugefügt',
+        description: tx({ de: 'Audio wurde zur Timeline hinzugefügt', en: 'Audio added to timeline', es: 'Audio añadido a la línea de tiempo' }),
       });
       
       setSfxPrompt('');
@@ -195,7 +196,7 @@ export function AIToolsSidebar({
       console.error('SFX generation error:', error);
       toast({
         title: 'Fehler',
-        description: 'Sound Effect konnte nicht erstellt werden',
+        description: tx({ de: 'Sound Effect konnte nicht erstellt werden', en: 'Sound effect could not be created', es: 'No se pudo crear el efecto de sonido' }),
         variant: 'destructive',
       });
     } finally {

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -43,7 +44,7 @@ export function useSaveSceneToLibrary() {
       if (!scene.clipUrl) {
         toast({
           title: 'Kein Clip vorhanden',
-          description: 'Diese Szene hat noch kein gerendertes Video.',
+          description: tx({ de: 'Diese Szene hat noch kein gerendertes Video.', en: 'This scene does not have a rendered video yet.', es: 'Esta escena aún no tiene un video renderizado.' }),
           variant: 'destructive',
         });
         return false;
@@ -76,7 +77,7 @@ export function useSaveSceneToLibrary() {
 
         toast({
           title: data.already ? 'Bereits in Mediathek' : 'In Mediathek gespeichert',
-          description: 'Die Szene ist jetzt als eigenständiger Clip verfügbar.',
+          description: tx({ de: 'Die Szene ist jetzt als eigenständiger Clip verfügbar.', en: 'The scene is now available as a standalone clip.', es: 'La escena ya está disponible como un clip independiente.' }),
         });
         return true;
       } catch (e) {

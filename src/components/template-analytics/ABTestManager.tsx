@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
     if (!testName) {
       toast({
         title: "Fehler",
-        description: "Bitte geben Sie einen Test-Namen ein",
+        description: tx({ de: "Bitte geben Sie einen Test-Namen ein", en: "Please enter a test name", es: "Por favor, introduce un nombre para la prueba" }),
         variant: "destructive",
       });
       return;
@@ -53,7 +54,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
     if (result) {
       toast({
         title: "Test erstellt",
-        description: "A/B Test wurde erfolgreich erstellt",
+        description: tx({ de: "A/B Test wurde erfolgreich erstellt", en: "A/B test successfully created", es: "Prueba A/B creada con éxito" }),
       });
       setShowCreateDialog(false);
       resetForm();
@@ -117,7 +118,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>A/B Testing Manager</CardTitle>
-              <CardDescription>Erstelle und verwalte A/B Tests für deine Templates</CardDescription>
+              <CardDescription>{tx({ de: "Erstelle und verwalte A/B Tests für deine Templates", en: "Create and manage A/B tests for your templates", es: "Crea y gestiona pruebas A/B para tus plantillas" })}</CardDescription>
             </div>
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>

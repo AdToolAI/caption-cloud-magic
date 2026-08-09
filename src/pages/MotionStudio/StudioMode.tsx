@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
@@ -110,7 +111,7 @@ export default function StudioMode() {
   const goNext = () => {
     if (!canAdvance) {
       if (step === 'storyboard')
-        toast.error('Mindestens eine Szene mit Prompt benötigt');
+        toast.error(tx({ de: 'Mindestens eine Szene mit Prompt benötigt', en: 'At least one scene with prompt required', es: 'Se requiere al menos una escena con prompt' }));
       return;
     }
     const next = STEPS[Math.min(stepIndex + 1, STEPS.length - 1)];
@@ -135,7 +136,7 @@ export default function StudioMode() {
     // (Setting it on a specific Location/Character should happen via the editors;
     // here we just confirm so the asset isn't lost.)
     if (isReferenceOnly && snippet.reference_image_url) {
-      toast.success('Reference gespeichert — wende sie in der Location oder Cast an');
+      toast.success(tx({ de: 'Reference gespeichert — wende sie in der Location oder Cast an', en: 'Reference saved — apply it to the Location or Cast', es: 'Referencia guardada — aplícala a la ubicación o al elenco' }));
       return;
     }
 
@@ -160,7 +161,7 @@ export default function StudioMode() {
 
   const launchInComposer = async () => {
     if (!user) {
-      toast.error('Bitte zuerst anmelden');
+      toast.error(tx({ de: 'Bitte zuerst anmelden', en: 'Please log in first', es: 'Por favor, inicia sesión primero' }));
       return;
     }
     const cleanScenes = scenes.filter((s) => s.prompt.trim().length > 0);
@@ -234,7 +235,7 @@ export default function StudioMode() {
         .single();
 
       if (insErr || !inserted) {
-        throw new Error(insErr?.message || 'Projekt konnte nicht erstellt werden');
+        throw new Error(insErr?.message || tx({ de: 'Projekt konnte nicht erstellt werden', en: 'Project could not be created', es: 'No se pudo crear el proyecto' }));
       }
 
       // Insert scenes — ID-only: character_shots carries per-character outfit binding.
@@ -511,7 +512,7 @@ function CastStep({
       <StepHeader
         icon={Users}
         title="Cast deine Charaktere"
-        subtitle="Wähle wiederkehrende Figuren aus deiner Library — sie bleiben über alle Szenen visuell konsistent."
+        subtitle={tx({ de: "Wähle wiederkehrende Figuren aus deiner Library — sie bleiben über alle Szenen visuell konsistent.", en: "Select recurring characters from your library — they will remain visually consistent across all scenes.", es: "Selecciona personajes recurrentes de tu biblioteca; se mantendrán visualmente consistentes en todas las escenas." })}
         action={
           <Button onClick={onAddNew} className="gap-2">
             <Plus className="h-4 w-4" /> Neuer Charakter
@@ -525,7 +526,7 @@ function CastStep({
         <EmptyState
           icon={Users}
           title="Noch keine Charaktere"
-          desc="Lege deinen ersten Charakter an — mit Reference-Image und Voice für maximale Konsistenz."
+          desc={tx({ de: "Lege deinen ersten Charakter an — mit Reference-Image und Voice für maximale Konsistenz.", en: "Create your first character — with a reference image and voice for maximum consistency.", es: "Crea tu primer personaje, con una imagen de referencia y voz para una máxima coherencia." })}
           actionLabel="Charakter anlegen"
           onAction={onAddNew}
         />
@@ -603,7 +604,7 @@ function LocationStep({
       <StepHeader
         icon={MapPin}
         title="Location scouten"
-        subtitle="Wähle einen Schauplatz aus deiner Library oder lege einen neuen an. Lighting-Varianten generierst du im Editor."
+        subtitle={tx({ de: "Wähle einen Schauplatz aus deiner Library oder lege einen neuen an. Lighting-Varianten generierst du im Editor.", en: "Select a location from your library or create a new one. Generate lighting variations in the editor.", es: "Selecciona una ubicación de tu biblioteca o crea una nueva. Genera variaciones de iluminación en el editor." })}
         action={
           <Button onClick={onAddNew} className="gap-2">
             <Plus className="h-4 w-4" /> Neue Location
@@ -617,7 +618,7 @@ function LocationStep({
         <EmptyState
           icon={MapPin}
           title="Noch keine Locations"
-          desc="Lege deinen ersten Schauplatz an — mit Reference-Image und Lighting-Notes."
+          desc={tx({ de: "Lege deinen ersten Schauplatz an — mit Reference-Image und Lighting-Notes.", en: "Create your first scene — with a reference image and lighting notes.", es: "Crea tu primera escena, con imagen de referencia y notas de iluminación." })}
           actionLabel="Location anlegen"
           onAction={onAddNew}
         />
@@ -703,7 +704,7 @@ function StoryboardStep({
       <StepHeader
         icon={Clapperboard}
         title="Storyboard skizzieren"
-        subtitle="Beschreibe Szene für Szene was passiert. Cast & Location werden automatisch in jeden Prompt eingewoben."
+        subtitle={tx({ de: "Beschreibe Szene für Szene was passiert. Cast & Location werden automatisch in jeden Prompt eingewoben.", en: "Describe scene by scene what happens. Cast & Location are automatically woven into each prompt.", es: "Describe escena por escena lo que sucede. El elenco y la ubicación se incorporan automáticamente en cada prompt." })}
         action={
           <div className="flex gap-2">
             <Button
@@ -859,7 +860,7 @@ function RenderStep({
       <StepHeader
         icon={Sparkles}
         title="Bereit zum Rendern"
-        subtitle="Dein Studio-Setup wird als neues Composer-Projekt angelegt — dort wählst du Engine, generierst Clips parallel und exportierst final."
+        subtitle={tx({ de: "Dein Studio-Setup wird als neues Composer-Projekt angelegt — dort wählst du Engine, generierst Clips parallel und exportierst final.", en: "Your studio setup will be created as a new Composer project — there you select the engine, generate clips in parallel, and finally export.", es: "Tu configuración de estudio se creará como un nuevo proyecto de Composer; allí seleccionarás el motor, generarás clips en paralelo y, finalmente, exportarás." })}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

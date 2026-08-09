@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { Gift, ArrowRight, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -11,8 +12,8 @@ import { useFirstVideoPrompts } from "@/hooks/useFirstVideoPrompts";
 
 const copy = {
   de: {
-    title: "Du hast Startguthaben — perfekt für dein erstes Video",
-    body: "Klick einfach auf eine Inspiration unten oder wähle ein Modell. Wir empfehlen Hailuo 2.3 für die schnellste & zuverlässigste erste Erfahrung.",
+    title: tx({ de: "Du hast Startguthaben — perfekt für dein erstes Video", en: "You have starting credit — perfect for your first video", es: "Tienes crédito inicial, perfecto para tu primer vídeo" }),
+    body: tx({ de: "Klick einfach auf eine Inspiration unten oder wähle ein Modell. Wir empfehlen Hailuo 2.3 für die schnellste & zuverlässigste erste Erfahrung.", en: "Just click on an inspiration below or choose a model. We recommend Hailuo 2.3 for the fastest & most reliable first experience.", es: "Simplemente haz clic en una inspiración a continuación o elige un modelo. Recomendamos Hailuo 2.3 para la experiencia más rápida y fiable." }),
     suggestionsTitle: "Inspiration zum Starten",
     personalizedTitle: "Auf dich zugeschnitten",
     recommended: "Empfohlen",

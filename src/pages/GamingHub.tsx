@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { SEO } from "@/components/SEO";
@@ -20,25 +21,25 @@ export default function GamingHub() {
     <ComingSoonScreen
       eyebrow="Gaming Hub"
       title="Stream. Clip. Wachsen."
-      subtitle="Verbinde Twitch, YouTube Live und Discord — die KI verwandelt deine Streams in virale Shorts, moderiert den Chat und liefert Wachstums-Analytics. Vollständig integriert in den useadtool-Workflow."
-      reason="Wir feinjustieren noch die Echtzeit-Stream-Integration mit Twitch und YouTube Live, damit alles ohne Lag läuft."
+      subtitle={tx({ de: "Verbinde Twitch, YouTube Live und Discord — die KI verwandelt deine Streams in virale Shorts, moderiert den Chat und liefert Wachstums-Analytics. Vollständig integriert in den useadtool-Workflow.", en: "Connect Twitch, YouTube Live, and Discord — the AI transforms your streams into viral shorts, moderates chat, and provides growth analytics. Fully integrated into the useadtool workflow.", es: "Conecta Twitch, YouTube Live y Discord — la IA transforma tus transmisiones en cortos virales, modera el chat y proporciona análisis de crecimiento. Totalmente integrado en el flujo de trabajo de useadtool." })}
+      reason={tx({ de: "Wir feinjustieren noch die Echtzeit-Stream-Integration mit Twitch und YouTube Live, damit alles ohne Lag läuft.", en: "We are still fine-tuning the real-time stream integration with Twitch and YouTube Live to ensure everything runs without lag.", es: "Todavía estamos ajustando la integración de transmisiones en tiempo real con Twitch y YouTube Live para asegurar que todo funcione sin demoras." })}
       backHref="/home"
       adminPreview={<GamingHubReal />}
       features={[
         {
           icon: <Radio className="h-5 w-5" />,
           title: 'Live Stream Dashboard',
-          description: 'Multi-Plattform-Dashboard für Twitch, YouTube Live und Discord — Viewer, Chat und Alerts in einem Cockpit.',
+          description: tx({ de: 'Multi-Plattform-Dashboard für Twitch, YouTube Live und Discord — Viewer, Chat und Alerts in einem Cockpit.', en: 'Multi-platform dashboard for Twitch, YouTube Live, and Discord — viewers, chat, and alerts in one cockpit.', es: 'Panel multiplataforma para Twitch, YouTube Live y Discord — espectadores, chat y alertas en una sola cabina.' }),
         },
         {
           icon: <Scissors className="h-5 w-5" />,
           title: 'AI Clip Creator',
-          description: 'Highlights aus deinen Streams werden automatisch erkannt und als Shorts, Reels und TikToks veröffentlicht.',
+          description: tx({ de: 'Highlights aus deinen Streams werden automatisch erkannt und als Shorts, Reels und TikToks veröffentlicht.', en: 'Highlights from your streams are automatically detected and published as Shorts, Reels, and TikToks.', es: 'Los momentos destacados de tus transmisiones se detectan automáticamente y se publican como Shorts, Reels y TikToks.' }),
         },
         {
           icon: <BarChart3 className="h-5 w-5" />,
           title: 'Growth Analytics',
-          description: 'Welche Spiele bringen Follower? Welche Clips gehen viral? Daten-getriebene Empfehlungen für deinen Channel.',
+          description: tx({ de: 'Welche Spiele bringen Follower? Welche Clips gehen viral? Daten-getriebene Empfehlungen für deinen Channel.', en: 'Which games attract followers? Which clips go viral? Data-driven recommendations for your channel.', es: '¿Qué juegos atraen seguidores? ¿Qué clips se vuelven virales? Recomendaciones basadas en datos para tu canal.' }),
         },
       ]}
     />

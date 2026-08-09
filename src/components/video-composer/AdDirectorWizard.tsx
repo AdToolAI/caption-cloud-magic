@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
@@ -314,8 +315,8 @@ export default function AdDirectorWizard({
       const okVariants = vs.filter((v) => v.lines.length > 0);
       if (!okVariants.length) {
         toast({
-          title: 'Skript-Generator nicht verfügbar',
-          description: 'Du kannst den Spot ohne Voiceover-Text fortsetzen.',
+          title: tx({ de: 'Skript-Generator nicht verfügbar', en: 'Script generator not available', es: 'Generador de guiones no disponible' }),
+          description: tx({ de: 'Du kannst den Spot ohne Voiceover-Text fortsetzen.', en: 'You can continue the spot without voiceover text.', es: 'Puedes continuar el spot sin texto de voz en off.' }),
         });
         // Synthetic empty variant so the flow continues.
         const fallback: ScriptVariant = {
@@ -333,7 +334,7 @@ export default function AdDirectorWizard({
       console.error('[AdDirectorWizard] variants failed:', err);
       toast({
         title: 'Skript-Varianten fehlgeschlagen',
-        description: err?.message ?? 'Bitte erneut versuchen.',
+        description: err?.message ?? tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
         variant: 'destructive',
       });
       const fallback: ScriptVariant = { id: 'manual', label: 'Manuell', lines: [] };
@@ -436,9 +437,9 @@ export default function AdDirectorWizard({
         } catch (voErr: any) {
           console.warn('[AdDirectorWizard] voiceover synth failed:', voErr);
           toast({
-            title: 'Voiceover nicht erstellt',
+            title: tx({ de: 'Voiceover nicht erstellt', en: 'Voiceover not created', es: 'Voz en off no creada' }),
             description:
-              'Die Szenen wurden erzeugt — du kannst den Voiceover im Studio nachträglich generieren.',
+              tx({ de: 'Die Szenen wurden erzeugt — du kannst den Voiceover im Studio nachträglich generieren.', en: 'The scenes have been generated — you can generate the voiceover in the studio later.', es: 'Las escenas han sido generadas — puedes generar la voz en off en el estudio más tarde.' }),
           });
         }
       }
@@ -491,7 +492,7 @@ export default function AdDirectorWizard({
       console.error('[AdDirectorWizard] generation failed:', err);
       toast({
         title: 'Erstellung fehlgeschlagen',
-        description: err?.message ?? 'Bitte erneut versuchen.',
+        description: err?.message ?? tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
         variant: 'destructive',
       });
     } finally {
@@ -677,7 +678,7 @@ export default function AdDirectorWizard({
                       id="ad-product-desc"
                       value={productDescription}
                       onChange={(e) => setProductDescription(e.target.value)}
-                      placeholder="Was ist es, für wen, was macht es besonders?"
+                      placeholder={tx({ de: "Was ist es, für wen, was macht es besonders?", en: "What is it, who is it for, what makes it special?", es: "¿Qué es, para quién es, qué lo hace especial?" })}
                       rows={3}
                     />
                   </div>
@@ -725,7 +726,7 @@ export default function AdDirectorWizard({
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {activeBrandKit
                           ? `Aktives Kit: ${activeBrandKit.brand_name ?? 'Unbenannt'} — Farben & Brand-Name werden in CTA + Hooks gewoben.`
-                          : 'Kein aktives Brand-Kit gefunden. Erstelle eins unter Brand Kit, um es hier nutzen zu können.'}
+                          : tx({ de: 'Kein aktives Brand-Kit gefunden. Erstelle eins unter Brand Kit, um es hier nutzen zu können.', en: 'No active Brand Kit found. Create one under Brand Kit to use it here.', es: 'No se encontró ningún Brand Kit activo. Crea uno en Brand Kit para poder usarlo aquí.' })}
                       </p>
                       {activeBrandKit && useBrandKit && (
                         <div className="flex items-center gap-1.5 mt-2">

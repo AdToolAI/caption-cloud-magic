@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -457,7 +458,7 @@ export default function BriefingTab({
             : 'AI service is temporarily overloaded')
           : t('videoComposer.storyboardError'),
         description: isRetryable
-          ? (language === 'de' ? 'Bitte in ca. 30 Sekunden erneut auf „Storyboard generieren" klicken.'
+          ? (language === 'de' ? tx({ de: 'Bitte in ca. 30 Sekunden erneut auf „Storyboard generieren" klicken.', en: 'Please click "Generate Storyboard" again in about 30 seconds.', es: 'Por favor, haz clic en "Generar Storyboard" de nuevo en unos 30 segundos.' })
             : language === 'es' ? 'Por favor, vuelve a pulsar «Generar storyboard» en unos 30 segundos.'
             : 'Please click "Generate storyboard" again in about 30 seconds.')
           : (err?.message || t('videoComposer.tryAgain')),
@@ -813,7 +814,7 @@ export default function BriefingTab({
           {/* Default Quality Tier — Direct & Studio only */}
           {showDirect && (
             <div className="space-y-1.5">
-              <Label className="text-xs">KI-Qualität (Standard für alle Szenen)</Label>
+              <Label className="text-xs">{tx({ de: "KI-Qualität (Standard für alle Szenen)", en: "AI Quality (Default for all scenes)", es: "Calidad de IA (predeterminado para todas las escenas)" })}</Label>
               <div className="grid grid-cols-2 gap-2">
                 {([
                   { q: 'standard' as ClipQuality, title: 'Standard', desc: '768p / 720p — günstiger', rate: '€0.15/s' },
@@ -880,7 +881,7 @@ export default function BriefingTab({
       {showDirect && (
         <DirectorsNote>
           {language === 'de'
-            ? 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek.'
+            ? tx({ de: 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek.', en: 'Describe distinctive clothing & objects in detail (coat, crown, weapon). The AI repeats these much more reliably than faces — the viewer recognizes the person by them. For true facial consistency, use an avatar from the library.', es: 'Describe la ropa y los objetos distintivos en detalle (abrigo, corona, arma). La IA los repite de forma mucho más fiable que los rostros; el espectador reconoce a la persona por ellos. Para una verdadera consistencia facial, utiliza un avatar de la biblioteca.' })
             : language === 'es'
               ? 'Describe ropa y objetos distintivos en detalle (abrigo, corona, arma). La IA los repite con mucha más fiabilidad que las caras — el espectador reconoce al personaje por ellos. Para consistencia facial real, usa un avatar de la biblioteca.'
               : 'Describe distinctive clothing & props in detail (coat, crown, weapon). The AI repeats those far more reliably than faces — your audience recognises the character by them. For true face consistency, use an avatar from the library.'}
@@ -903,7 +904,7 @@ export default function BriefingTab({
         >
           <p className="text-xs text-muted-foreground mb-3">
             {language === 'de'
-              ? 'Wird auf alle KI-generierten Szenen angewendet — sorgt für einheitlichen Look.'
+              ? tx({ de: 'Wird auf alle KI-generierten Szenen angewendet — sorgt für einheitlichen Look.', en: 'Applied to all AI-generated scenes — ensures a consistent look.', es: 'Se aplica a todas las escenas generadas por IA, lo que garantiza un aspecto uniforme.' })
               : language === 'es'
                 ? 'Se aplica a todas las escenas generadas por IA — garantiza un aspecto uniforme.'
                 : 'Applied to every AI-generated scene — ensures a consistent look.'}

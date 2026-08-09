@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState } from 'react';
 import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2, Scissors, RotateCcw, UserCheck } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
@@ -90,7 +91,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const triggerFastPreview = async () => {
     if (busy) return;
     if (!hasPrompt) {
-      toast({ title: 'Prompt fehlt', description: 'Bitte zuerst einen Prompt schreiben.', variant: 'destructive' });
+      toast({ title: 'Prompt fehlt', description: tx({ de: 'Bitte zuerst einen Prompt schreiben.', en: 'Please write a prompt first.', es: 'Por favor, escribe un prompt primero.' }), variant: 'destructive' });
       return;
     }
     setBusy(true);
@@ -177,11 +178,11 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       });
       const invokeData = started.compose;
       if (invokeData && (invokeData as any).ok === false) {
-        throw new Error((invokeData as any).error || (invokeData as any).message || 'Render konnte nicht gestartet werden.');
+        throw new Error((invokeData as any).error || (invokeData as any).message || tx({ de: 'Render konnte nicht gestartet werden.', en: 'Render could not be started.', es: 'No se pudo iniciar el renderizado.' }));
       }
       toast({
         title: 'Renderpfad neu gestartet',
-        description: 'Die Szene läuft jetzt über HappyHorse/Hailuo + Sync.so.',
+        description: tx({ de: 'Die Szene läuft jetzt über HappyHorse/Hailuo + Sync.so.', en: 'The scene is now running via HappyHorse/Hailuo + Sync.so.', es: 'La escena se está ejecutando ahora a través de HappyHorse/Hailuo + Sync.so.' }),
       });
     } catch (err) {
       toast({

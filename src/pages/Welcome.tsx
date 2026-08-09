@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -13,7 +14,7 @@ const copy = {
   de: {
     eyebrow: "Zahlung bestätigt",
     title: "Willkommen in deinem Studio",
-    sub: "Ein Creator. Ein ganzes Studio. Ab jetzt läuft alles auf deinem Konto — Skript, Stimmen, Charaktere, Schnitt und Export.",
+    sub: tx({ de: "Ein Creator. Ein ganzes Studio. Ab jetzt läuft alles auf deinem Konto — Skript, Stimmen, Charaktere, Schnitt und Export.", en: "One Creator. One entire studio. From now on, everything runs on your account — script, voices, characters, editing, and export.", es: "Un Creador. Un estudio completo. A partir de ahora, todo funciona en tu cuenta — guion, voces, personajes, edición y exportación." }),
     unlocked: "Ab sofort freigeschaltet",
     items: [
       "Autopilot: von der Idee bis zum fertigen Clip",
@@ -23,7 +24,7 @@ const copy = {
     ],
     cta: "Ersten Clip bauen",
     secondary: "Abo & Rechnungen ansehen",
-    note: "Deine Rechnung liegt in deinem Postfach und jederzeit unter Abrechnung bereit.",
+    note: tx({ de: "Deine Rechnung liegt in deinem Postfach und jederzeit unter Abrechnung bereit.", en: "Your invoice is in your inbox and available anytime under Billing.", es: "Tu factura está en tu bandeja de entrada y disponible en cualquier momento en Facturación." }),
   },
   en: {
     eyebrow: "Payment confirmed",
@@ -78,7 +79,7 @@ const Welcome = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <SEO
         title="Willkommen in deinem Studio"
-        description="Dein Studio ist freigeschaltet. Starte jetzt deine erste Produktion."
+        description={tx({ de: "Dein Studio ist freigeschaltet. Starte jetzt deine erste Produktion.", en: "Your studio is activated. Start your first production now.", es: "Tu estudio está activado. Comienza tu primera producción ahora." })}
         canonical="/willkommen"
         lang={language}
         noindex

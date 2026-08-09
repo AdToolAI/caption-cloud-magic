@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   DndContext,
@@ -245,7 +246,7 @@ export function KanbanView({
       const post = posts.find((p) => p.id === id);
       if (!post || post.status === newStatus) return;
       if (post.status === "published" && newStatus !== "published") {
-        if (!window.confirm(t("calendar.kanban.confirmUnpublish") as string || "Dieser Post ist bereits veröffentlicht. Wirklich zurücksetzen?")) return;
+        if (!window.confirm(t("calendar.kanban.confirmUnpublish") as string || tx({ de: "Dieser Post ist bereits veröffentlicht. Wirklich zurücksetzen?", en: "This post has already been published. Really reset?", es: "Esta publicación ya ha sido publicada. ¿Realmente quieres restablecerla?" }))) return;
       }
       const limit = settings.limits[newStatus];
       const count = grouped[newStatus]?.length ?? 0;

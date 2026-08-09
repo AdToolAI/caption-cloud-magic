@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
@@ -93,15 +94,15 @@ const T = {
     // Cast
     castLabel: 'Hauptdarsteller (AI-Engine)',
     castOff: 'Im Off',
-    castOffTitle: 'Dieser Darsteller spielt in dieser Szene-Art nicht mit.',
+    castOffTitle: tx({ de: 'Dieser Darsteller spielt in dieser Szene-Art nicht mit.', en: 'This actor does not play in this scene type.', es: 'Este actor no participa en este tipo de escena.' }),
     // Crew hints
-    prequelOnlyCrew: '🎭 Für Prequels brauchen wir Kling oder Luma — sie können rückwärts denken.',
-    crossfadeOnlyCrew: '🎭 Für Crossfades brauchen wir Kling oder Luma — sie kennen Anfang und Ende.',
-    crossfadeStory: 'Crossfade morpht Frame für Frame von dieser Szene in die Ziel-Szene.',
-    styleEchoStory: 'Style-Echo nutzt den letzten Frame als Stil-Anker für eine komplett neue Szene.',
+    prequelOnlyCrew: tx({ de: '🎭 Für Prequels brauchen wir Kling oder Luma — sie können rückwärts denken.', en: '🎭 For prequels, we need Kling or Luma — they can think backwards.', es: '🎭 Para precuelas, necesitamos a Kling o Luma — pueden pensar al revés.' }),
+    crossfadeOnlyCrew: tx({ de: '🎭 Für Crossfades brauchen wir Kling oder Luma — sie kennen Anfang und Ende.', en: '🎭 For crossfades, we need Kling or Luma — they know beginning and end.', es: '🎭 Para transiciones, necesitamos a Kling o Luma — conocen el principio y el final.' }),
+    crossfadeStory: tx({ de: 'Crossfade morpht Frame für Frame von dieser Szene in die Ziel-Szene.', en: 'Crossfade morphs frame by frame from this scene to the target scene.', es: 'La transición se transforma fotograma a fotograma de esta escena a la escena de destino.' }),
+    styleEchoStory: tx({ de: 'Style-Echo nutzt den letzten Frame als Stil-Anker für eine komplett neue Szene.', en: 'Style Echo uses the last frame as a style anchor for a completely new scene.', es: 'Style Echo utiliza el último fotograma como ancla de estilo para una escena completamente nueva.' }),
     // Bridge target
     targetScene: 'Ziel-Szene',
-    targetPlaceholder: 'Wähle die Szene, in die übergeleitet wird …',
+    targetPlaceholder: tx({ de: 'Wähle die Szene, in die übergeleitet wird …', en: 'Select the scene to transition into…', es: 'Selecciona la escena a la que se hará la transición…' }),
     noTargets: 'Keine weiteren fertigen Szenen verfügbar.',
     // Direct
     quality: 'Qualität',

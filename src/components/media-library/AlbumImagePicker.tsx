@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -56,7 +57,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
 
       if (albumsError) {
         console.error('[AlbumImagePicker] albums query error:', albumsError);
-        toast.error('Fehler beim Laden der Alben', { description: albumsError.message });
+        toast.error(tx({ de: 'Fehler beim Laden der Alben', en: 'Error loading albums', es: 'Error al cargar los álbumes' }), { description: albumsError.message });
         return;
       }
 
@@ -148,7 +149,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
       const { data, error } = await query;
       if (error) {
         console.error('[AlbumImagePicker] loadImages error:', error);
-        toast.error('Album konnte nicht geöffnet werden', { description: error.message });
+        toast.error(tx({ de: 'Album konnte nicht geöffnet werden', en: 'Could not open album', es: 'No se pudo abrir el álbum' }), { description: error.message });
         setImages([]);
         return;
       }
@@ -184,7 +185,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            {selectedAlbumId ? selectedAlbumName : 'Bild aus Alben wählen'}
+            {selectedAlbumId ? selectedAlbumName : tx({ de: 'Bild aus Alben wählen', en: 'Select image from albums', es: 'Seleccionar imagen de los álbumes' })}
           </DialogTitle>
         </DialogHeader>
 

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Link } from "react-router-dom";
 import { Crown, ShieldCheck, Percent, Clock, AlertTriangle, Sparkles } from "lucide-react";
 import {
@@ -20,22 +21,22 @@ const benefits = [
   {
     icon: ShieldCheck,
     title: "Ein Abo. 14,99 € im Monat.",
-    text: "Es gibt genau ein Modell: 14,99 € pro Monat für den kompletten Studio-Zugang. Keine Tarifstufen, keine Upsells, keine versteckten Gebühren.",
+    text: tx({ de: "Es gibt genau ein Modell: 14,99 € pro Monat für den kompletten Studio-Zugang. Keine Tarifstufen, keine Upsells, keine versteckten Gebühren.", en: "There is exactly one model: €14.99 per month for complete Studio access. No tiers, no upsells, no hidden fees.", es: "Solo hay un modelo: 14,99 € al mes para acceso completo al Studio. Sin niveles, sin ventas adicionales, sin tarifas ocultas." }),
   },
   {
     icon: Percent,
     title: "20 % auf alle KI-Credits — 24 Monate",
-    text: "Als einer der ersten 1.000 Founders bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird an der Kasse automatisch abgezogen — kein Code nötig.",
+    text: tx({ de: "Als einer der ersten 1.000 Founders bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird an der Kasse automatisch abgezogen — kein Code nötig.", en: "As one of the first 1,000 Founders, you get a 20% discount for 24 months on every purchase of AI credits (video, image, audio). The discount is automatically applied at checkout — no code needed.", es: "Como uno de los primeros 1.000 Founders, obtendrás un 20% de descuento durante 24 meses en cada compra de créditos de IA (video, imagen, audio). El descuento se aplica automáticamente al finalizar la compra, sin necesidad de código." }),
   },
   {
     icon: Sparkles,
     title: "Voller Studio-Zugang während der Beta",
-    text: "Der komplette Produktionsworkflow ist freigeschaltet: führende KI-Modelle, Stimmen, Multi-Speaker-Lip-Sync und Schnitt — in einem System statt in fünf Abos.",
+    text: tx({ de: "Der komplette Produktionsworkflow ist freigeschaltet: führende KI-Modelle, Stimmen, Multi-Speaker-Lip-Sync und Schnitt — in einem System statt in fünf Abos.", en: "The complete production workflow is unlocked: leading AI models, voices, multi-speaker lip-sync, and editing — in one system instead of five subscriptions.", es: "El flujo de trabajo de producción completo está desbloqueado: modelos de IA líderes, voces, sincronización labial de múltiples oradores y edición, todo en un solo sistema en lugar de cinco suscripciones." }),
   },
   {
     icon: Crown,
     title: "Direkter Draht zum Team",
-    text: "Priorisiertes Feedback, Early-Access zu neuen Features und persönlicher Support.",
+    text: tx({ de: "Priorisiertes Feedback, Early-Access zu neuen Features und persönlicher Support.", en: "Prioritized feedback, early access to new features, and personal support.", es: "Comentarios priorizados, acceso anticipado a nuevas funciones y soporte personal." }),
   },
 ];
 

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
@@ -78,7 +79,7 @@ export default function MotionStudioLibrary() {
         <title>Motion Studio Library | Charaktere & Locations</title>
         <meta
           name="description"
-          content="Wiederverwendbare Charaktere und Locations für deine AI-Video-Projekte. Konsistenz über alle Szenen hinweg."
+          content={tx({ de: "Wiederverwendbare Charaktere und Locations für deine AI-Video-Projekte. Konsistenz über alle Szenen hinweg.", en: "Reusable characters and locations for your AI video projects. Consistency across all scenes.", es: "Personajes y ubicaciones reutilizables para tus proyectos de video con IA. Consistencia en todas las escenas." })}
         />
       </Helmet>
 
@@ -408,8 +409,8 @@ function EmptyState({ kind, onCreate }: { kind: 'characters' | 'locations'; onCr
       </h3>
       <p className="text-sm text-muted-foreground max-w-md mb-5">
         {isChars
-          ? 'Lege wiederverwendbare Charaktere mit Reference-Image an, damit deine KI-Videos über alle Szenen hinweg konsistent bleiben.'
-          : 'Speichere Schauplätze einmal mit Foto-Referenz und nutze sie in jedem Motion-Studio-Projekt.'}
+          ? tx({ de: 'Lege wiederverwendbare Charaktere mit Reference-Image an, damit deine KI-Videos über alle Szenen hinweg konsistent bleiben.', en: 'Create reusable characters with a reference image to keep your AI videos consistent across all scenes.', es: 'Crea personajes reutilizables con una imagen de referencia para mantener la coherencia de tus videos de IA en todas las escenas.' })
+          : tx({ de: 'Speichere Schauplätze einmal mit Foto-Referenz und nutze sie in jedem Motion-Studio-Projekt.', en: 'Save locations once with a photo reference and use them in every Motion Studio project.', es: 'Guarda las ubicaciones una vez con una referencia fotográfica y úsalas en cada proyecto de Motion Studio.' })}
       </p>
       <Button onClick={onCreate} className="gap-2">
         <Plus className="h-4 w-4" />

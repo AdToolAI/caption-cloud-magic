@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dialog,
@@ -196,7 +197,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       tick();
     } catch (err) {
       console.error("[VoiceStudio] mic error:", err);
-      toast.error("Mikrofonzugriff wurde abgelehnt oder ist nicht verfügbar.");
+      toast.error(tx({ de: "Mikrofonzugriff wurde abgelehnt oder ist nicht verfügbar.", en: "Microphone access denied or unavailable.", es: "Acceso al micrófono denegado o no disponible." }));
     }
   }, []);
 
@@ -375,7 +376,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
 
       if (result) {
         toast.success('Stimme erfolgreich geklont', {
-          description: 'Du findest sie jetzt unter „Meine Stimmen".',
+          description: tx({ de: 'Du findest sie jetzt unter „Meine Stimmen".', en: 'You can now find them under "My Voices".', es: 'Ahora puedes encontrarlas en "Mis voces".' }),
         });
         onOpenChange(false);
         // Sanft zur Sektion scrollen (falls im Audio Studio geöffnet)

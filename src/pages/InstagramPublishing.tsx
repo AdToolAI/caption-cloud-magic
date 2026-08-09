@@ -958,7 +958,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
                       <div>
-                        <p className="font-medium">Wähle deine App</p>
+                        <p className="font-medium">{tx({ de: "Wähle deine App", en: "Choose your app", es: "Elige tu aplicación" })}</p>
                         <p className="text-muted-foreground">Oben rechts im Dropdown: <strong>AdTool AI Integration</strong></p>
                       </div>
                     </li>
@@ -972,8 +972,8 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">4</span>
                       <div>
-                        <p className="font-medium">Wähle deine Facebook-Seite</p>
-                        <p className="text-muted-foreground">Die Seite, die mit deinem Instagram Business Account verknüpft ist</p>
+                        <p className="font-medium">{tx({ de: "Wähle deine Facebook-Seite", en: "Choose your Facebook page", es: "Elige tu página de Facebook" })}</p>
+                        <p className="text-muted-foreground">{tx({ de: "Die Seite, die mit deinem Instagram Business Account verknüpft ist", en: "The page linked to your Instagram Business Account", es: "La página vinculada a tu cuenta de Instagram Business" })}</p>
                       </div>
                     </li>
                     <li className="flex gap-3">
@@ -1020,7 +1020,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
                       <div>
-                        <p className="font-medium">Wähle deine App</p>
+                        <p className="font-medium">{tx({ de: "Wähle deine App", en: "Choose your app", es: "Elige tu aplicación" })}</p>
                         <p className="text-muted-foreground">Oben rechts: <strong>AdTool AI Integration</strong></p>
                       </div>
                     </li>
@@ -1034,7 +1034,7 @@ export default function InstagramPublishing() {
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">4</span>
                       <div>
-                        <p className="font-medium">Wähle ALLE Berechtigungen aus:</p>
+                        <p className="font-medium">{tx({ de: "Wähle ALLE Berechtigungen aus:", en: "Select ALL permissions:", es: "Selecciona TODOS los permisos:" })}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           <Badge variant="secondary" className="text-xs">instagram_basic</Badge>
                           <Badge variant="secondary" className="text-xs">instagram_content_publish</Badge>
@@ -1056,7 +1056,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">6</span>
                       <div>
                         <p className="font-medium">Kopiere den generierten Token</p>
-                        <p className="text-muted-foreground">Beginnt mit "EAAG…" oder "EAABsb…"</p>
+                        <p className="text-muted-foreground">{tx({ de: "Beginnt mit \"EAAG…\" oder \"EAABsb…\"", en: "Starts with \"EAAG…\" or \"EAABsb…\"", es: "Comienza con \"EAAG…\" o \"EAABsb…\"" })}</p>
                       </div>
                     </li>
                   </ol>
@@ -1097,7 +1097,7 @@ export default function InstagramPublishing() {
               size="lg"
             >
               {renewLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {renewLoading ? "Token wird geprüft und erneuert..." : `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"} Token prüfen und speichern`}
+              {renewLoading ? tx({ de: "Token wird geprüft und erneuert...", en: "Token is being checked and renewed...", es: "El token se está verificando y renovando..." }) : `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"} Token prüfen und speichern`}
             </Button>
 
             {/* Success Result */}
@@ -1153,7 +1153,7 @@ export default function InstagramPublishing() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-sm">
                       <strong>⚠️ Short-Lived Token!</strong>
-                      <p className="mt-1">Dieser Token läuft nach ~2 Stunden ab. Falls du einen Page Token eingegeben hast, probiere es nochmal mit der Option "Get Page Access Token" im Graph API Explorer.</p>
+                      <p className="mt-1">{tx({ de: "Dieser Token läuft nach ~2 Stunden ab. Falls du einen Page Token eingegeben hast, probiere es nochmal mit der Option \"Get Page Access Token\" im Graph API Explorer.", en: "This token expires after ~2 hours. If you entered a Page Token, please try again with the option \"Get Page Access Token\" in the Graph API Explorer.", es: "Este token caduca después de ~2 horas. Si ingresaste un token de página, inténtalo de nuevo con la opción \"Get Page Access Token\" en el Graph API Explorer." })}</p>
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1202,7 +1202,7 @@ export default function InstagramPublishing() {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>❌ Token konnte nicht validiert werden.</strong>
+                  <strong>{tx({ de: "❌ Token konnte nicht validiert werden.", en: "❌ Token could not be validated.", es: "❌ No se pudo validar el token." })}</strong>
                   <p className="mt-1 text-sm">{error}</p>
                   <p className="mt-2 text-sm">
                     Bitte prüfe:
@@ -1219,7 +1219,7 @@ export default function InstagramPublishing() {
                     <Alert className="mt-3 border-orange-500">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription className="text-xs">
-                        <strong>💡 Tipp:</strong> Dieser Fehler tritt oft auf, wenn <code>pages_show_list</code> fehlt. Verwende stattdessen einen <strong>Page Token</strong> (Option 1 oben) - das ist einfacher!
+                        <strong>💡 Tipp:</strong> {tx({ de: "Dieser Fehler tritt oft auf, wenn", en: "This error often occurs when", es: "Este error ocurre a menudo cuando" })} <code>pages_show_list</code> fehlt. Verwende stattdessen einen <strong>Page Token</strong> (Option 1 oben) - das ist einfacher!
                       </AlertDescription>
                     </Alert>
                   )}

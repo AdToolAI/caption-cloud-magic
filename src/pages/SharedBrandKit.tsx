@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,8 +35,8 @@ export default function SharedBrandKit() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050816] text-white">
         <div className="text-center">
-          <p className="text-2xl font-semibold">Link nicht verfügbar</p>
-          <p className="text-sm text-muted-foreground mt-2">Der Share-Token ist abgelaufen oder ungültig.</p>
+          <p className="text-2xl font-semibold">{tx({ de: "Link nicht verfügbar", en: "Link not available", es: "Enlace no disponible" })}</p>
+          <p className="text-sm text-muted-foreground mt-2">{tx({ de: "Der Share-Token ist abgelaufen oder ungültig.", en: "Share token expired or invalid.", es: "El token compartido ha caducado o no es válido." })}</p>
         </div>
       </div>
     );

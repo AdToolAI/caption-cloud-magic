@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -140,7 +141,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
 
   const handleBatchExport = async () => {
     if (!masterReady) {
-      toast({ title: 'Bitte zuerst rendern', description: 'Erstelle erst dein Hauptvideo.', variant: 'destructive' });
+      toast({ title: tx({ de: 'Bitte zuerst rendern', en: 'Please render first', es: 'Por favor, renderiza primero' }), description: 'Erstelle erst dein Hauptvideo.', variant: 'destructive' });
       return;
     }
     if (selectedKeys.size === 0) return;
@@ -199,7 +200,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
 
   const handleExport = async (preset: PresetDef) => {
     if (!masterReady) {
-      toast({ title: 'Bitte zuerst rendern', description: 'Erstelle erst dein Hauptvideo.', variant: 'destructive' });
+      toast({ title: tx({ de: 'Bitte zuerst rendern', en: 'Please render first', es: 'Por favor, renderiza primero' }), description: 'Erstelle erst dein Hauptvideo.', variant: 'destructive' });
       return;
     }
     setActiveKey(preset.key);
@@ -222,7 +223,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
         })
         .select('id')
         .single();
-      if (insertErr || !row) throw new Error(insertErr?.message || 'Export konnte nicht angelegt werden');
+      if (insertErr || !row) throw new Error(insertErr?.message || tx({ de: 'Export konnte nicht angelegt werden', en: 'Export could not be created', es: 'No se pudo crear la exportación' }));
 
       const { data, error } = await supabase.functions.invoke('compose-video-assemble', {
         body: { projectId, aspectOverride: preset.aspect, exportId: row.id },
@@ -237,7 +238,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
 
       toast({
         title: `${preset.label} wird gerendert 🎬`,
-        description: 'Du wirst benachrichtigt, sobald das Video fertig ist.',
+        description: tx({ de: 'Du wirst benachrichtigt, sobald das Video fertig ist.', en: 'You will be notified once the video is ready.', es: 'Se te notificará cuando el video esté listo.' }),
       });
     } catch (err: any) {
       toast({ title: 'Export fehlgeschlagen', description: err.message, variant: 'destructive' });
@@ -275,7 +276,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
               onClick={selectedKeys.size === PRESETS.length ? clearAll : selectAll}
               disabled={!masterReady}
             >
-              {selectedKeys.size === PRESETS.length ? 'Auswahl löschen' : 'Alle auswählen'}
+              {selectedKeys.size === PRESETS.length ? 'Auswahl löschen' : tx({ de: 'Alle auswählen', en: 'Select all', es: 'Seleccionar todo' })}
             </Button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -356,7 +357,7 @@ const Carousel = () => {
                   <Label htmlFor="text">Dein Thema oder Stichpunkte</Label>
                   <Textarea
                     id="text"
-                    placeholder="🪄 Tipp: Gib 3 Stichpunkte ein – wir bauen die Story für dich."
+                    placeholder={tx({ de: "🪄 Tipp: Gib 3 Stichpunkte ein – wir bauen die Story für dich.", en: "🪄 Tip: Enter 3 bullet points – we'll build the story for you.", es: "🪄 Consejo: Introduce 3 puntos clave y nosotros crearemos la historia por ti." })}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     className="min-h-[200px] mt-2"

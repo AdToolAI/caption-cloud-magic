@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,7 +115,7 @@ export default function SfxLibrary() {
 
   async function toggleFavorite(item: SfxItem) {
     if (!user) {
-      toast({ title: "Login nötig", description: "Bitte einloggen, um Favoriten zu speichern." });
+      toast({ title: "Login nötig", description: tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }) });
       return;
     }
     const fav = isFavorite(item);
@@ -177,7 +178,7 @@ export default function SfxLibrary() {
         tags: item.tags,
       })
     );
-    toast({ title: "Im Composer geladen", description: "SFX wird beim Öffnen automatisch hinzugefügt." });
+    toast({ title: "Im Composer geladen", description: tx({ de: "SFX wird beim Öffnen automatisch hinzugefügt.", en: "SFX is automatically added when opened.", es: "SFX se añade automáticamente al abrir." }) });
     navigate("/video-composer");
   }
 
@@ -364,7 +365,7 @@ export default function SfxLibrary() {
                 <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
               </div>
             ) : (
-              renderGrid(favorites, user ? "Noch keine Favoriten — klicke das Herz auf einem Sound." : "Bitte einloggen, um Favoriten zu speichern.")
+              renderGrid(favorites, user ? tx({ de: "Noch keine Favoriten — klicke das Herz auf einem Sound.", en: "No favorites yet — click the heart on a sound.", es: "Aún no hay favoritos — haz clic en el corazón de un sonido." }) : tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }))
             )}
           </TabsContent>
         </Tabs>

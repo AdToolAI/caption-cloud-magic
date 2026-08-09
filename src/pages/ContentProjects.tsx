@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,7 @@ export default function ContentProjects() {
       toast.success("Video wird heruntergeladen");
     } catch (error) {
       console.error("Download error:", error);
-      toast.error("Fehler beim Herunterladen");
+      toast.error(tx({ de: "Fehler beim Herunterladen", en: "Error downloading", es: "Error al descargar" }));
     }
   };
 
@@ -95,7 +96,7 @@ export default function ContentProjects() {
     <>
       <SEO 
         title="Meine Videos | Content Studio"
-        description="Verwalte deine erstellten Video-Projekte aus dem Content Studio"
+        description={tx({ de: "Verwalte deine erstellten Video-Projekte aus dem Content Studio", en: "Manage your created video projects from the Content Studio", es: "Gestiona tus proyectos de vídeo creados desde el Content Studio" })}
       />
       <div className="container max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
@@ -207,7 +208,7 @@ export default function ContentProjects() {
                         {project.status === "rendering" && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
                             <RefreshCw className="h-4 w-4 animate-spin" />
-                            <span>Video wird erstellt...</span>
+                            <span>{tx({ de: "Video wird erstellt...", en: "Video is being created...", es: "El video se está creando..." })}</span>
                           </div>
                         )}
                       </CardContent>

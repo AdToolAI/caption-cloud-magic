@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Camera, Sun, Move, Crop, RotateCcw, Check, Aperture, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -125,7 +126,7 @@ export function ShotDirectorPanel({ value, onChange, basePrompt = '' }: Props) {
           </Label>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             {lang === 'de'
-              ? 'Klick die Cinematografie zusammen — wird automatisch in deinen Prompt integriert.'
+              ? tx({ de: 'Klick die Cinematografie zusammen — wird automatisch in deinen Prompt integriert.', en: 'Assemble the cinematography — it will be automatically integrated into your prompt.', es: 'Crea la cinematografía, se integrará automáticamente en tu prompt.' })
               : lang === 'es'
                 ? 'Selecciona la cinematografía — se añade automáticamente a tu prompt.'
                 : 'Click the cinematography — auto-injected into your prompt.'}

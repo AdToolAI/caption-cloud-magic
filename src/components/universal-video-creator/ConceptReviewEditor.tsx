@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -383,7 +384,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
           className="flex-1 border-white/10 hover:border-gold/30 hover:bg-gold/5"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          {t('uvc.reviewBackToInterview') !== 'uvc.reviewBackToInterview' ? t('uvc.reviewBackToInterview') : 'Zurück zum Interview'}
+          {t('uvc.reviewBackToInterview') !== 'uvc.reviewBackToInterview' ? t('uvc.reviewBackToInterview') : tx({ de: 'Zurück zum Interview', en: 'Back to interview', es: 'Volver a la entrevista' })}
         </Button>
         <Button
           onClick={handleConfirm}

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -276,7 +277,7 @@ export default function ContinuityGuardianStrip({
 
   const repairPair = async (pair: PairState) => {
     if (!onRepairScene) {
-      toast.info('Repair-Handler nicht verfügbar');
+      toast.info(tx({ de: 'Repair-Handler nicht verfügbar', en: 'Repair handler not available', es: 'Controlador de reparación no disponible' }));
       return;
     }
     // Lock previous last-frame as reference image of the next scene

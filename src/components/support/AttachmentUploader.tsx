@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Upload, X, Paperclip, Image as ImageIcon, FileText, Film, Video, Square, Zap } from "lucide-react";
@@ -55,12 +56,12 @@ const STRINGS = {
     quickHint: "Drop a screenshot, paste with ⌘V, record a clip — or skip and add later.",
   },
   de: {
-    badge: "Tickets mit Medien werden",
+    badge: tx({ de: "Tickets mit Medien werden", en: "Tickets with media are", es: "Los tickets con medios son" }),
     badgeBold: "60% schneller gelöst",
     recordScreen: "Bildschirm aufnehmen",
     stop: "Stopp",
     dropTitle: "Dateien hier ablegen",
-    dropHint: "mit ⌘V einfügen oder klicken zum Durchsuchen",
+    dropHint: tx({ de: "mit ⌘V einfügen oder klicken zum Durchsuchen", en: "paste with ⌘V or click to browse", es: "pega con ⌘V o haz clic para buscar" }),
     dropMeta: (max: number, mb: number) => `Bilder, Videos (MP4/MOV/WebM), PDF · max ${max} Dateien · bis ${mb} MB`,
     choose: "Dateien wählen",
     max: "Maximum erreicht",
@@ -71,7 +72,7 @@ const STRINGS = {
     failed: "Upload fehlgeschlagen",
     recAdded: "Aufnahme angehängt",
     quickTitle: "Schnell-Beweis",
-    quickHint: "Screenshot ablegen, mit ⌘V einfügen, Clip aufnehmen — oder später hinzufügen.",
+    quickHint: tx({ de: "Screenshot ablegen, mit ⌘V einfügen, Clip aufnehmen — oder später hinzufügen.", en: "Drop screenshot, paste with ⌘V, record clip — or add later.", es: "Arrastra una captura de pantalla, pega con ⌘V, graba un clip — o añádelo más tarde." }),
   },
   es: {
     badge: "Los tickets con medios se resuelven",

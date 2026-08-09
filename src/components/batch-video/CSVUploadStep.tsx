@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
 
     toast({
       title: 'Template heruntergeladen',
-      description: 'Fülle die CSV-Datei mit deinen Daten und lade sie wieder hoch.'
+      description: tx({ de: 'Fülle die CSV-Datei mit deinen Daten und lade sie wieder hoch.', en: 'Fill the CSV file with your data and upload it again.', es: 'Rellena el archivo CSV con tus datos y súbelo de nuevo.' })
     });
   };
 
@@ -98,7 +99,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
     } else {
       toast({
         title: 'Ungültiges Dateiformat',
-        description: 'Bitte lade eine CSV-Datei hoch.',
+        description: tx({ de: 'Bitte lade eine CSV-Datei hoch.', en: 'Please upload a CSV file.', es: 'Por favor, sube un archivo CSV.' }),
         variant: 'destructive'
       });
     }

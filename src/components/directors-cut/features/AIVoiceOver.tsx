@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -84,7 +85,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       setVoices(sorted);
     } catch (err) {
       console.error('Failed to load voices:', err);
-      toast.error('Stimmen konnten nicht geladen werden');
+      toast.error(tx({ de: 'Stimmen konnten nicht geladen werden', en: 'Could not load voices', es: 'No se pudieron cargar las voces' }));
     } finally {
       setLoadingVoices(false);
     }
@@ -154,7 +155,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
   const handleGenerate = async () => {
     if (!settings.scriptText.trim()) {
-      toast.error('Bitte gib einen Text für das Voice-Over ein');
+      toast.error(tx({ de: 'Bitte gib einen Text für das Voice-Over ein', en: 'Please enter text for the voice-over', es: 'Por favor, introduce el texto para la voz en off' }));
       return;
     }
     setIsGenerating(true);
@@ -229,7 +230,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             size="sm"
             onClick={toggleVoiceLock}
             className="h-7 px-2 text-xs gap-1"
-            title={lockedVoiceId ? 'Voice-Lock entfernen' : 'Aktuelle Stimme für dieses Projekt sperren'}
+            title={lockedVoiceId ? 'Voice-Lock entfernen' : tx({ de: 'Aktuelle Stimme für dieses Projekt sperren', en: 'Lock current voice for this project', es: 'Bloquear voz actual para este proyecto' })}
           >
             {lockedVoiceId ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
             {lockedVoiceId ? 'Entsperren' : 'Sperren'}
@@ -248,7 +249,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             <Textarea
               value={settings.scriptText}
               onChange={(e) => { onSettingsChange({ ...settings, scriptText: e.target.value }); setGeneratedUrl(null); }}
-              placeholder="Gib hier deinen Voice-Over Text ein..."
+              placeholder={tx({ de: "Gib hier deinen Voice-Over Text ein...", en: "Enter your voice-over text here...", es: "Introduce tu texto de voz en off aquí..." })}
               rows={4}
             />
             <p className="text-xs text-muted-foreground text-right">

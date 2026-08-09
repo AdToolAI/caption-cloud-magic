@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import {
   AlertDialog,
@@ -55,7 +56,7 @@ export default function LibraryUploadConsentDialog({
     });
     setSubmitting(false);
     if (!ok) {
-      toast.error('Einwilligung konnte nicht gespeichert werden. Bitte erneut versuchen.');
+      toast.error(tx({ de: 'Einwilligung konnte nicht gespeichert werden. Bitte erneut versuchen.', en: 'Could not save consent. Please try again.', es: 'No se pudo guardar el consentimiento. Por favor, inténtalo de nuevo.' }));
       return;
     }
     // reset for next session

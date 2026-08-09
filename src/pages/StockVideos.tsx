@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
@@ -93,7 +94,7 @@ export default function StockVideos() {
 
   async function toggleFavorite(v: StockVideo) {
     if (!user) {
-      toast({ title: "Login nötig", description: "Bitte einloggen, um Favoriten zu speichern." });
+      toast({ title: "Login nötig", description: tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }) });
       return;
     }
     if (favoriteIds.has(v.id)) {
@@ -248,7 +249,7 @@ export default function StockVideos() {
                   <Loader2 className="h-7 w-7 animate-spin text-yellow-400" />
                 </div>
               ) : (
-                renderGrid(results, "Keine Treffer — versuche eine andere Suche oder Collection.")
+                renderGrid(results, tx({ de: "Keine Treffer — versuche eine andere Suche oder Collection.", en: "No matches — try a different search or collection.", es: "No hay coincidencias — prueba otra búsqueda o colección." }))
               )}
             </TabsContent>
 
@@ -261,8 +262,8 @@ export default function StockVideos() {
                 renderGrid(
                   favorites,
                   user
-                    ? "Noch keine Favoriten — klicke das Herz auf einem Clip."
-                    : "Bitte einloggen, um Favoriten zu speichern.",
+                    ? tx({ de: "Noch keine Favoriten — klicke das Herz auf einem Clip.", en: "No favorites yet — click the heart on a clip.", es: "Aún no hay favoritos — haz clic en el corazón de un clip." })
+                    : tx({ de: "Bitte einloggen, um Favoriten zu speichern.", en: "Please log in to save favorites.", es: "Por favor, inicia sesión para guardar favoritos." }),
                 )
               )}
             </TabsContent>

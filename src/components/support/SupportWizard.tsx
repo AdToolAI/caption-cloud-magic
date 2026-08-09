@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,12 +130,12 @@ const TEXT = {
     extra: "Sonstiges?",
     extraPh: "Zusätzlicher Kontext, Links oder Notizen.",
     s3Title: "Beweise & Absenden",
-    s3Sub: "Lade einen Screenshot oder Screen-Recording hoch — das spart uns Stunden.",
+    s3Sub: tx({ de: "Lade einen Screenshot oder Screen-Recording hoch — das spart uns Stunden.", en: "Upload a screenshot or screen recording — it saves us hours.", es: "Sube una captura de pantalla o una grabación de pantalla — nos ahorra horas." }),
     autoCtx: "Diagnose-Kontext (automatisch erfasst)",
-    autoCtxHint: "Wir hängen das an, um den Fehler reproduzieren zu können. Es werden keine Passwörter gesendet.",
+    autoCtxHint: tx({ de: "Wir hängen das an, um den Fehler reproduzieren zu können. Es werden keine Passwörter gesendet.", en: "We'll attach this to reproduce the error. No passwords will be sent.", es: "Adjuntaremos esto para reproducir el error. No se enviarán contraseñas." }),
     success: "Ticket gesendet",
     successDesc: "Wir melden uns so schnell wie möglich.",
-    error: "Konnte nicht gesendet werden",
+    error: tx({ de: "Konnte nicht gesendet werden", en: "Could not be sent", es: "No se pudo enviar" }),
     severityLabels: {
       low: "Niedrig",
       normal: "Normal",
@@ -145,7 +146,7 @@ const TEXT = {
       low: "Frage oder kleine Unannehmlichkeit",
       normal: "Bug, aber Workaround existiert",
       high: "Wichtiges Feature funktioniert nicht",
-      blocking: "Ich kann das Produkt nicht nutzen",
+      blocking: tx({ de: "Ich kann das Produkt nicht nutzen", en: "I cannot use the product", es: "No puedo usar el producto" }),
     },
     categoryLabels: {
       bug: "Bug",
@@ -161,13 +162,13 @@ const TEXT = {
     pastedTitle: "Screenshot angehängt",
     pastedDesc: "Aus Zwischenablage übernommen ✓",
     coachTitle: "Ohne Screenshot senden?",
-    coachDesc: "Tickets mit Screenshot oder kurzem Recording werden im Schnitt 60 % schneller gelöst. Möchtest du noch eins anhängen?",
+    coachDesc: tx({ de: "Tickets mit Screenshot oder kurzem Recording werden im Schnitt 60 % schneller gelöst. Möchtest du noch eins anhängen?", en: "Tickets with a screenshot or short recording are resolved 60% faster on average. Would you like to attach another one?", es: "Los tickets con una captura de pantalla o una grabación corta se resuelven un 60% más rápido en promedio. ¿Quieres adjuntar otro?" }),
     coachAddMedia: "Screenshot / Recording hinzufügen",
     coachSendAnyway: "Trotzdem senden",
-    coachBlockingNote: "Für blockierende Fälle empfehlen wir dringend ein Recording — das spart meist einen ganzen Tag Hin und Her.",
+    coachBlockingNote: tx({ de: "Für blockierende Fälle empfehlen wir dringend ein Recording — das spart meist einen ganzen Tag Hin und Her.", en: "For blocking cases, we strongly recommend a recording — it usually saves a whole day of back and forth.", es: "Para casos bloqueantes, recomendamos encarecidamente una grabación — suele ahorrar un día entero de idas y venidas." }),
     mediaHelperTitle: "Warum Medien helfen",
     mediaHelperItems: ["Screenshot zeigt den exakten UI-Zustand","Recording zeigt den exakten Klickpfad","Konsolen-Errors werden automatisch mitgeschickt"],
-    requiredHint: "Bitte Betreff und Kategorie ausfüllen.",
+    requiredHint: tx({ de: "Bitte Betreff und Kategorie ausfüllen.", en: "Please fill in subject and category.", es: "Por favor, rellena el asunto y la categoría." }),
   },
   es: {
     step: "Paso",

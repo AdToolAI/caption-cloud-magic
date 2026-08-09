@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -96,7 +97,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
     if (completedVideos.length === 0) {
       toast({
         title: 'Keine fertigen Videos',
-        description: 'Es gibt noch keine abgeschlossenen Videos zum Herunterladen.',
+        description: tx({ de: 'Es gibt noch keine abgeschlossenen Videos zum Herunterladen.', en: 'There are no finished videos to download yet.', es: 'Aún no hay videos terminados para descargar.' }),
         variant: 'destructive'
       });
       return;

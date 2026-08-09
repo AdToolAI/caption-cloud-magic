@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, CheckCircle, AlertTriangle, TrendingUp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,7 +33,7 @@ export function CalendarKPICards({ data, loading }: CalendarKPICardsProps) {
       title: "Veröffentlicht",
       value: data.published,
       icon: CheckCircle,
-      tooltip: "Bereits veröffentlichte Posts diese Woche.",
+      tooltip: tx({ de: "Bereits veröffentlichte Posts diese Woche.", en: "Posts already published this week.", es: "Publicaciones ya publicadas esta semana." }),
       color: "text-success",
       bgColor: "bg-success/10",
     },
