@@ -141,7 +141,7 @@ export default function SnippetBuilderDialog({
           .createSignedUrl(path, 60 * 60 * 24 * 365);
         if (signed?.signedUrl) {
           setThumbnailUrl(signed.signedUrl);
-          toast.success('Vorschau gesetzt');
+          toast.success(tx({ de: "Vorschau gesetzt", en: "Preview set", es: "Vista previa establecida" }));
         }
       } catch (e: any) {
         toast.error(tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? e}` }));
@@ -243,7 +243,7 @@ export default function SnippetBuilderDialog({
               <div className="h-24 w-40 rounded-md border border-border/60 bg-background/60 overflow-hidden flex items-center justify-center">
                 {thumbnailUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={thumbnailUrl} alt="Vorschau" className="h-full w-full object-cover" />
+                  <img src={thumbnailUrl} alt={tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })} className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-[10px] text-muted-foreground">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</span>
                 )}
