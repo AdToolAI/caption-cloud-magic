@@ -79,10 +79,10 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowUpDown className="h-5 w-5 text-primary" />
-            FCPXML Roundtrip — Änderungen prüfen
+            {tx({ de: "FCPXML Roundtrip — Änderungen prüfen", en: "FCPXML roundtrip — review changes", es: "Ida y vuelta FCPXML — revisar cambios" })}
           </DialogTitle>
           <DialogDescription>
-            Vergleich der hochgeladenen Sequenz mit deinen aktuellen Composer-Szenen.
+            {tx({ de: "Vergleich der hochgeladenen Sequenz mit deinen aktuellen Composer-Szenen.", en: "Comparison of the uploaded sequence with your current composer scenes.", es: "Comparación de la secuencia cargada con tus escenas actuales del compositor." })}
           </DialogDescription>
         </DialogHeader>
 
@@ -97,25 +97,25 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <SummaryCard
                   icon={<ArrowUpDown className="h-3.5 w-3.5" />}
-                  label="Umsortiert"
+                  label={tx({ de: "Umsortiert", en: "Reordered", es: "Reordenado" })}
                   value={diff.reordered.length}
                   tone={diff.reordered.length > 0 ? 'primary' : 'muted'}
                 />
                 <SummaryCard
                   icon={<Scissors className="h-3.5 w-3.5" />}
-                  label="Getrimmt"
+                  label={tx({ de: "Getrimmt", en: "Trimmed", es: "Recortado" })}
                   value={diff.trimmed.length}
                   tone={diff.trimmed.length > 0 ? 'primary' : 'muted'}
                 />
                 <SummaryCard
                   icon={<Trash2 className="h-3.5 w-3.5" />}
-                  label="Fehlend"
+                  label={tx({ de: "Fehlend", en: "Missing", es: "Faltante" })}
                   value={diff.deleted.length}
                   tone={diff.deleted.length > 0 ? 'warning' : 'muted'}
                 />
                 <SummaryCard
                   icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                  label="Unverändert"
+                  label={tx({ de: "Unverändert", en: "Unchanged", es: "Sin cambios" })}
                   value={diff.unchanged.length}
                   tone="muted"
                 />
@@ -124,7 +124,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {/* Reordered */}
               {diff.reordered.length > 0 && (
                 <Section
-                  title="Umsortiert"
+                  title={tx({ de: "Umsortiert", en: "Reordered", es: "Reordenado" })}
                   icon={<ArrowUpDown className="h-4 w-4" />}
                 >
                   {diff.reordered.map((d) => (
@@ -132,8 +132,8 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
                       key={`re-${d.sceneId}`}
                       sceneId={d.sceneId}
                       url={d.matchedAssetUrl}
-                      left={`Position ${d.oldOrderIndex + 1}`}
-                      right={`Position ${d.newOrderIndex + 1}`}
+                      left={tx({ de: `Position ${d.oldOrderIndex + 1}`, en: `Position ${d.oldOrderIndex + 1}`, es: `Posición ${d.oldOrderIndex + 1}` })}
+                      right={tx({ de: `Position ${d.newOrderIndex + 1}`, en: `Position ${d.newOrderIndex + 1}`, es: `Posición ${d.newOrderIndex + 1}` })}
                     />
                   ))}
                 </Section>
@@ -141,7 +141,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
 
               {/* Trimmed */}
               {diff.trimmed.length > 0 && (
-                <Section title="Getrimmt" icon={<Scissors className="h-4 w-4" />}>
+                <Section title={tx({ de: "Getrimmt", en: "Trimmed", es: "Recortado" })} icon={<Scissors className="h-4 w-4" />}>
                   {diff.trimmed.map((d) => (
                     <DiffRow
                       key={`tr-${d.sceneId}`}
@@ -162,14 +162,14 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
                   tone="warning"
                 >
                   <p className="text-xs text-muted-foreground mb-2">
-                    Diese Szenen sind nicht in der hochgeladenen Datei enthalten. Aus Sicherheitsgründen werden sie nicht automatisch entfernt.
+                    {tx({ de: "Diese Szenen sind nicht in der hochgeladenen Datei enthalten. Aus Sicherheitsgründen werden sie nicht automatisch entfernt.", en: "These scenes are not included in the uploaded file. For safety reasons, they are not removed automatically.", es: "Estas escenas no están incluidas en el archivo cargado. Por seguridad, no se eliminan automáticamente." })}
                   </p>
                   {diff.deleted.map((d) => (
                     <div
                       key={`del-${d.sceneId}`}
                       className="text-xs px-2 py-1.5 rounded bg-muted/50 font-mono"
                     >
-                      Szene {d.orderIndex + 1} · {shortId(d.sceneId)} · {shortUrl(d.clipUrl)}
+                      {tx({ de: 'Szene', en: 'Scene', es: 'Escena' })} {d.orderIndex + 1} · {shortId(d.sceneId)} · {shortUrl(d.clipUrl)}
                     </div>
                   ))}
                 </Section>
@@ -183,14 +183,14 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
                   tone="warning"
                 >
                   <p className="text-xs text-muted-foreground mb-2">
-                    Diese Clips referenzieren Dateien, die nicht zu deinem Projekt gehören (z. B. extern hinzugefügt). Sie werden ignoriert.
+                    {tx({ de: "Diese Clips referenzieren Dateien, die nicht zu deinem Projekt gehören (z. B. extern hinzugefügt). Sie werden ignoriert.", en: "These clips reference files that don\u2019t belong to your project (e.g. added externally). They are ignored.", es: "Estos clips hacen referencia a archivos que no pertenecen a tu proyecto (por ejemplo, añadidos externamente). Se ignoran." })}
                   </p>
                   {diff.unknownAssets.map((u, i) => (
                     <div
                       key={`unk-${i}`}
                       className="text-xs px-2 py-1.5 rounded bg-muted/50 font-mono"
                     >
-                      Spine #{u.spineOrder + 1} · {shortUrl(u.url)}
+                      {tx({ de: 'Spine', en: 'Spine', es: 'Spine' })} #{u.spineOrder + 1} · {shortUrl(u.url)}
                     </div>
                   ))}
                 </Section>
@@ -199,7 +199,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {/* Warnings */}
               {diff.warnings.length > 0 && (
                 <Section
-                  title="Hinweise"
+                  title={tx({ de: "Hinweise", en: "Notices", es: "Avisos" })}
                   icon={<AlertTriangle className="h-4 w-4 text-warning" />}
                   tone="warning"
                 >
