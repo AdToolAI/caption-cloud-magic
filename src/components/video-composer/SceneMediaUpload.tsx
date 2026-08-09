@@ -53,7 +53,7 @@ export default function SceneMediaUpload({
       }
       if (file.size > MAX_VIDEO_BYTES) {
         toast.error(
-          `Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximal 200 MB erlaubt.`
+          tx({ de: `Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximal 200 MB erlaubt.`, en: `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum 200 MB allowed.`, es: `Archivo demasiado grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Máximo 200 MB permitido.` })
         );
         return;
       }
