@@ -40,7 +40,7 @@ const Legal = () => {
     },
     terms: {
       title: "Nutzungsbedingungen | Terms of Service – AdTool AI", 
-      description: "{tx({ de: 'Allgemeine Nutzungsbedingungen für AdTool AI. Rechtssicher und transparent.', en: 'General Terms of Service for AdTool AI. Legally sound and transparent.', es: 'Términos y condiciones generales de AdTool AI. Legalmente sólidos y transparentes.' })}"
+      description: tx({ de: "Allgemeine Nutzungsbedingungen für AdTool AI. Rechtssicher und transparent.", en: "General Terms of Service for AdTool AI. Legally sound and transparent.", es: "Términos y condiciones generales de AdTool AI. Legalmente sólidos y transparentes." })
     },
     imprint: {
       title: "Impressum | Legal Notice – AdTool AI",
