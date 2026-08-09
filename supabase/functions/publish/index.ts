@@ -5,7 +5,6 @@ import { generateContentHash } from '../_shared/content-hash.ts';
 import { withTimeout } from '../_shared/timeout.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { 
-import { tl, withLang } from "../_shared/i18n.ts";
   instagramCircuitBreaker, 
   linkedinCircuitBreaker, 
   xCircuitBreaker,

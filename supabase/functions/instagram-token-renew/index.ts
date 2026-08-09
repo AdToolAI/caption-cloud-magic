@@ -127,7 +127,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       // MODE 2: User Token → Page Token Conversion
       console.log('Mode: User Token → Page Token Conversion');
       
-      // 1)(req))) Exchange short-lived user token for long-lived user token
+      // 1) Exchange short-lived user token for long-lived user token
       console.log('Step 1: Exchanging short-lived User Token for long-lived...');
       const llTokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${APP_ID}&client_secret=${APP_SECRET}&fb_exchange_token=${encodeURIComponent(shortUserToken)}`;
       
@@ -350,7 +350,7 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
       }
     }, 500);
   }
-});
+})(req)));
 
 function json(payload: any, status = 200) {
   return new Response(payload ? JSON.stringify(payload) : null, {
