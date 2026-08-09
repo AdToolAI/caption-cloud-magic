@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -148,7 +149,7 @@ export function WeekPostEditor({ open, onOpenChange, post, date, workspaceId, on
             .update({ status: "scheduled" })
             .eq("id", post.sourceId);
         }
-        toast.success("Post erstellt und geplant!");
+        toast.success(tx({ de: "Post erstellt und geplant!", en: "Post created and scheduled!", es: "¡Publicación creada y programada!" }));
       }
 
       onSaved();

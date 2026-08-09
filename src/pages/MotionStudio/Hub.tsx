@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
@@ -64,7 +65,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'Character & Location Library',
-    desc: 'Wiederkehrende Figuren und Schauplätze für visuelle Konsistenz',
+    desc: tx({ de: 'Wiederkehrende Figuren und Schauplätze für visuelle Konsistenz', en: 'Recurring characters and locations for visual consistency', es: 'Personajes y ubicaciones recurrentes para consistencia visual' }),
     icon: Users,
     href: '/motion-studio/library',
     accent: 'from-secondary/30 to-secondary/5',
@@ -72,7 +73,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'Voice Library',
-    desc: 'Eigene Stimmen klonen und für Voiceovers nutzen',
+    desc: tx({ de: 'Eigene Stimmen klonen und für Voiceovers nutzen', en: 'Clone your own voices and use them for voiceovers', es: 'Clona tus propias voces y úsalas para locuciones' }),
     icon: Mic,
     href: '/audio-studio',
     accent: 'from-accent/30 to-accent/5',
@@ -100,7 +101,7 @@ const TOOLBOX_ITEMS = [
   {
     icon: Camera,
     title: 'Director Presets',
-    desc: '25+ Camera-, Lens-, Lighting- und Film-Stock-Modifier in jeder Szene.',
+    desc: tx({ de: '25+ Camera-, Lens-, Lighting- und Film-Stock-Modifier in jeder Szene.', en: '25+ Camera, Lens, Lighting, and Film Stock modifiers in every scene.', es: 'Más de 25 modificadores de cámara, lente, iluminación y tipo de película en cada escena.' }),
   },
   {
     icon: Layers,
@@ -110,7 +111,7 @@ const TOOLBOX_ITEMS = [
   {
     icon: Wand2,
     title: '@-Tag Mention Editor',
-    desc: 'Tagge `@charakter` und `@location` direkt im Prompt – Library wird automatisch aufgelöst.',
+    desc: tx({ de: 'Tagge `@charakter` und `@location` direkt im Prompt – Library wird automatisch aufgelöst.', en: 'Tag `@character` and `@location` directly in the prompt – Library will be resolved automatically.', es: 'Etiqueta `@character` y `@location` directamente en el prompt – La biblioteca se resolverá automáticamente.' }),
   },
   {
     icon: Zap,
@@ -188,7 +189,7 @@ export default function MotionStudioHub() {
         <title>Motion Studio Hub | AdTool</title>
         <meta
           name="description"
-          content="Zentrales Cockpit für KI-Videoproduktion: Composer, Character & Location Library, Voice Cloning und alle AI Video Studios."
+          content={tx({ de: "Zentrales Cockpit für KI-Videoproduktion: Composer, Character & Location Library, Voice Cloning und alle AI Video Studios.", en: "Central cockpit for AI video production: Composer, Character & Location Library, Voice Cloning, and all AI Video Studios.", es: "Cockpit central para la producción de video con IA: Composer, biblioteca de personajes y ubicaciones, clonación de voz y todos los estudios de video con IA." })}
         />
       </Helmet>
 
@@ -315,7 +316,7 @@ export default function MotionStudioHub() {
               ) : recent.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Clapperboard className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">Noch keine Projekte. Starte dein erstes Video.</p>
+                  <p className="text-sm">{tx({ de: "Noch keine Projekte. Starte dein erstes Video.", en: "No projects yet. Start your first video.", es: "Aún no hay proyectos. Empieza tu primer video." })}</p>
                   <Button asChild className="mt-4 gap-2">
                     <Link to="/video-composer">
                       <Plus className="h-4 w-4" />

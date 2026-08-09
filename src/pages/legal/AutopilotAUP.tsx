@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -14,7 +15,7 @@ export default function AutopilotAUP() {
     <>
       <Helmet>
         <title>Autopilot Acceptable Use Policy | useadtool</title>
-        <meta name="description" content="Verbindliche Nutzungsregeln für den Autopilot-Modus. Anti-Deepfake, Anti-Copyright und Anti-Missbrauchs-Regeln mit Konsequenzen bis zur fristlosen Account-Löschung." />
+        <meta name="description" content={tx({ de: "Verbindliche Nutzungsregeln für den Autopilot-Modus. Anti-Deepfake, Anti-Copyright und Anti-Missbrauchs-Regeln mit Konsequenzen bis zur fristlosen Account-Löschung.", en: "Binding terms of use for Autopilot mode. Anti-deepfake, anti-copyright, and anti-abuse rules with consequences up to immediate account deletion.", es: "Términos de uso vinculantes para el modo Autopilot. Reglas anti-deepfake, anti-copyright y anti-abuso con consecuencias que pueden llegar hasta la eliminación inmediata de la cuenta." })} />
       </Helmet>
 
       <div className="min-h-screen bg-background">
@@ -50,8 +51,8 @@ export default function AutopilotAUP() {
             Verboten ist insbesondere die Generierung, Speicherung oder Veröffentlichung von Inhalten, die:
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li>reale, identifizierbare Personen ohne deren ausdrückliche schriftliche Einwilligung darstellen (Politiker, Prominente, Privatpersonen, Kollegen, Kunden, etc.);</li>
-              <li>den Eindruck erwecken, eine reale Person habe etwas gesagt oder getan, was sie nicht gesagt oder getan hat;</li>
-              <li>Stimmen realer Personen ohne nachweisbare Lizenz klonen oder imitieren;</li>
+              <li>{tx({ de: "den Eindruck erwecken, eine reale Person habe etwas gesagt oder getan, was sie nicht gesagt oder getan hat;", en: "give the impression that a real person said or did something they did not say or do;", es: "dar la impresión de que una persona real dijo o hizo algo que no dijo o hizo;" })}</li>
+              <li>{tx({ de: "Stimmen realer Personen ohne nachweisbare Lizenz klonen oder imitieren;", en: "clone or imitate voices of real persons without verifiable license;", es: "clonar o imitar voces de personas reales sin una licencia verificable;" })}</li>
               <li>Minderjährige darstellen oder darstellen könnten — ausnahmslos.</li>
             </ul>
             <p className="mt-2">
@@ -64,9 +65,9 @@ export default function AutopilotAUP() {
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li>geschützte Marken, Logos, Maskottchen oder Brand-Assets fremder Unternehmen abbilden oder imitieren (z.B. Disney, Marvel, Nintendo, Apple, Nike, Coca-Cola etc.);</li>
               <li>geschützte Charaktere, Comic-Figuren, Anime-/Game-Charaktere oder Filmfiguren darstellen;</li>
-              <li>Musik, Soundtracks oder Tonaufnahmen Dritter ohne nachweisbare Lizenz enthalten;</li>
-              <li>fremden Stockfoto-Watermarks, Newsroom-Logos oder Wasserzeichen enthalten oder diese entfernen;</li>
-              <li>Texte oder Captions enthalten, die fremde Werke nicht-trivial reproduzieren.</li>
+              <li>{tx({ de: "Musik, Soundtracks oder Tonaufnahmen Dritter ohne nachweisbare Lizenz enthalten;", en: "contain third-party music, soundtracks, or audio recordings without verifiable license;", es: "contener música, bandas sonoras o grabaciones de audio de terceros sin una licencia verificable;" })}</li>
+              <li>{tx({ de: "fremden Stockfoto-Watermarks, Newsroom-Logos oder Wasserzeichen enthalten oder diese entfernen;", en: "contain or remove third-party stock photo watermarks, newsroom logos, or watermarks;", es: "contener o eliminar marcas de agua de fotos de stock de terceros, logotipos de salas de prensa o marcas de agua;" })}</li>
+              <li>{tx({ de: "Texte oder Captions enthalten, die fremde Werke nicht-trivial reproduzieren.", en: "contain texts or captions that non-trivially reproduce third-party works.", es: "contener textos o subtítulos que reproduzcan obras de terceros de forma no trivial." })}</li>
             </ul>
           </Section>
 
@@ -74,10 +75,10 @@ export default function AutopilotAUP() {
             Generell verboten — unabhängig von Aufmachung — sind:
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li>Hassrede, Aufruf zur Gewalt, Diskriminierung jeglicher Art;</li>
-              <li>medizinische, juristische oder finanzielle Beratung mit Wirkungs-/Heilungsversprechen;</li>
+              <li>{tx({ de: "medizinische, juristische oder finanzielle Beratung mit Wirkungs-/Heilungsversprechen;", en: "medical, legal, or financial advice with promises of effect/cure;", es: "asesoramiento médico, legal o financiero con promesas de efecto/curación;" })}</li>
               <li>politische Wahlkampf- oder Propagandainhalte;</li>
               <li>Glücksspiel-, Krypto-Spam-, Pyramidenschema-, MLM-Inhalte;</li>
-              <li>sexuelle/pornografische Inhalte oder solche, die als jugendgefährdend einzustufen sind;</li>
+              <li>{tx({ de: "sexuelle/pornografische Inhalte oder solche, die als jugendgefährdend einzustufen sind;", en: "sexual/pornographic content or content that is to be classified as harmful to minors;", es: "contenido sexual/pornográfico o contenido que deba clasificarse como perjudicial para menores;" })}</li>
               <li>Engagement-Bait, Spam-Hashtag-Cluster, künstliche Reichweiten-Manipulation;</li>
               <li>Identitätstäuschung in Captions („Ich bin Arzt/Anwalt/CEO von …" ohne Wahrheit).</li>
             </ul>
@@ -99,9 +100,9 @@ export default function AutopilotAUP() {
 
           <Section title="§6 Strike-System &amp; Sanktionen">
             <div className="space-y-2">
-              <p><strong>Soft-Strike</strong> (Eingabe oder Caption blockiert) — Hinweis im Cockpit, keine weiteren Folgen.</p>
+              <p><strong>Soft-Strike</strong> {tx({ de: "(Eingabe oder Caption blockiert) — Hinweis im Cockpit, keine weiteren Folgen.", en: "(Input or caption blocked) — Note in cockpit, no further consequences.", es: "(Entrada o subtítulo bloqueado) — Nota en el cockpit, sin más consecuencias." })}</p>
               <p><strong>Hard-Strike</strong> (Generierungs- oder Render-Block: Deepfake-Hint, Copyright-Hint, prominente Person, geschützte IP) — zählt im Strike-Counter.</p>
-              <p><strong>Critical-Strike</strong> (Manipulationsversuch: Watermark-Removal, Filter-Bypass, gefälschte Origin-Daten, modifizierte API-Payloads, mehrfacher Hard-Strike-Wiederholung) — zählt doppelt und kann zur sofortigen Termination führen (siehe §7).</p>
+              <p><strong>Critical-Strike</strong> {tx({ de: "(Manipulationsversuch: Watermark-Removal, Filter-Bypass, gefälschte Origin-Daten, modifizierte API-Payloads, mehrfacher Hard-Strike-Wiederholung) — zählt doppelt und kann zur sofortigen Termination führen (siehe §7).", en: "(Attempted manipulation: watermark removal, filter bypass, fake origin data, modified API payloads, multiple hard-strike repetitions) — counts double and may lead to immediate termination (see §7).", es: "(Intento de manipulación: eliminación de marca de agua, bypass de filtro, datos de origen falsos, cargas útiles de API modificadas, repetición múltiple de infracciones graves) — cuenta doble y puede llevar a la terminación inmediata (ver §7)." })}</p>
             </div>
             <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm space-y-1">
               <p>Strike 1 → Schriftliche Warnung per Mail.</p>
@@ -119,12 +120,12 @@ export default function AutopilotAUP() {
                     Folgende Verstöße führen zur sofortigen, fristlosen Löschung des gesamten Accounts ohne Anspruch auf Rückerstattung von Credits, laufenden Abonnements oder anderen Guthaben:
                   </p>
                   <ul className="list-disc pl-5 space-y-1">
-                    <li>Versuch, ein Deepfake einer realen Person zu generieren (auch erfolgloser Versuch);</li>
+                    <li>{tx({ de: "Versuch, ein Deepfake einer realen Person zu generieren (auch erfolgloser Versuch);", en: "Attempt to generate a deepfake of a real person (even unsuccessful attempt);", es: "Intento de generar un deepfake de una persona real (incluso intento fallido);" })}</li>
                     <li>Mehrfacher Versuch, denselben blockierten Prompt nach Block zu wiederholen;</li>
-                    <li>Manipulation an unseren Systemen oder unautorisierte direkte API-Aufrufe mit modifizierten Payloads;</li>
+                    <li>{tx({ de: "Manipulation an unseren Systemen oder unautorisierte direkte API-Aufrufe mit modifizierten Payloads;", en: "Manipulation of our systems or unauthorized direct API calls with modified payloads;", es: "Manipulación de nuestros sistemas o llamadas directas no autorizadas a la API con cargas útiles modificadas;" })}</li>
                     <li>Einreichung von Assets mit gefälschten Origin-Daten (z.B. fremde Person als „Self-Portrait" deklariert);</li>
-                    <li>Veröffentlichungen, die nachweislich auf Plattformen wegen Copyright-Verletzung oder Identitätstäuschung gesperrt werden (DMCA-Eingang);</li>
-                    <li>Nutzung des Autopilots zur Verbreitung von Hass, illegalen Inhalten oder zur Schädigung Dritter.</li>
+                    <li>{tx({ de: "Veröffentlichungen, die nachweislich auf Plattformen wegen Copyright-Verletzung oder Identitätstäuschung gesperrt werden (DMCA-Eingang);", en: "Publications that are demonstrably blocked on platforms due to copyright infringement or identity deception (DMCA receipt);", es: "Publicaciones que son demostrablemente bloqueadas en plataformas debido a infracción de derechos de autor o suplantación de identidad (recepción DMCA);" })}</li>
+                    <li>{tx({ de: "Nutzung des Autopilots zur Verbreitung von Hass, illegalen Inhalten oder zur Schädigung Dritter.", en: "Use of Autopilot to spread hate, illegal content, or to harm third parties.", es: "Uso de Autopilot para difundir odio, contenido ilegal o para dañar a terceros." })}</li>
                   </ul>
                 </div>
               </div>

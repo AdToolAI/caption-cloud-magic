@@ -142,7 +142,7 @@ const Billing = () => {
       invoicesDesc: "Laden Sie Ihre Rechnungen und Zahlungshistorie herunter",
       noInvoices: "Keine Rechnungen",
       noCustomer: "Kein aktives Abo",
-      upgradeMsg: "Sie haben noch kein aktives Abonnement. Wählen Sie einen Plan!",
+      upgradeMsg: tx({ de: "Sie haben noch kein aktives Abonnement. Wählen Sie einen Plan!", en: "You do not have an active subscription yet. Choose a plan!", es: "Aún no tienes una suscripción activa. ¡Elige un plan!" }),
       upgradeCta: "Pläne anzeigen",
       number: "Rechnung",
       date: "Datum",

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -211,7 +212,7 @@ export function HolidaySuggestionsDialog({
               <p className="text-lg font-medium">{t("calendar.holidays.noHolidays")}</p>
               <p className="text-sm mt-2">
                 {language === 'de' 
-                  ? 'Wähle einen anderen Monat oder eine andere Region' 
+                  ? tx({ de: 'Wähle einen anderen Monat oder eine andere Region', en: 'Choose a different month or region', es: 'Elige un mes o una región diferente' }) 
                   : language === 'es'
                   ? 'Selecciona otro mes u otra región'
                   : 'Try selecting a different month or region'}
