@@ -35,7 +35,20 @@ export const useTranslationState = () => {
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('adtool-ai-lang', lang);
+    // Persist for server-side copy (emails, cron jobs) — best effort.
+    void (async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data } = await supabase.auth.getUser();
+        if (data.user) {
+          await supabase.from('profiles').update({ language: lang }).eq('id', data.user.id);
+        }
+      } catch {
+        /* offline or signed out — localStorage is enough */
+      }
+    })();
   };
+
 
   const t = (key: string, params?: Record<string, string | number>): any => {
     const keys = key.split('.') as any;
