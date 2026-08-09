@@ -83,7 +83,29 @@ const ASPECT_SUPPORT: Record<string, string[]> = {
   fast: ['1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
   pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
   ultra: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
+  gptimage: ['1:1', '3:2', '2:3'],
+  flux: ['1:1', '16:9', '3:2', '2:3', '4:5', '5:4', '9:16', '21:9'],
+  ideogram: ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'],
+  recraft: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+  qwen: ['1:1', '16:9', '9:16', '4:3', '3:4'],
 };
+
+/** GPT-Image-2 works with fixed pixel sizes instead of ratio strings. */
+const GPT_IMAGE_SIZES: Record<string, string> = {
+  '1:1': '1024x1024',
+  '3:2': '1536x1024',
+  '2:3': '1024x1536',
+};
+
+/** Recraft v3 works with fixed pixel sizes instead of ratio strings. */
+const RECRAFT_SIZES: Record<string, string> = {
+  '1:1': '1024x1024',
+  '4:3': '1365x1024',
+  '3:4': '1024x1365',
+  '16:9': '1820x1024',
+  '9:16': '1024x1820',
+};
+
 
 /** Maps an unsupported ratio to the closest supported one for that model. */
 function mapAspectRatio(tier: string, requested: string): string {
