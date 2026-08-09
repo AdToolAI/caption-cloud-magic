@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import {
+import { useTx } from '@/lib/i18nText';
   ArrowRight,
   Scissors,
   ArrowUpDown,
@@ -62,6 +63,8 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
   onConfirm,
   applying,
 }) => {
+  const tr = useTx();
+
   const totalChanges = diff
     ? diff.reordered.length + diff.trimmed.length
     : 0;
@@ -153,7 +156,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {/* Deleted (warning, not applied) */}
               {diff.deleted.length > 0 && (
                 <Section
-                  title="Fehlend in FCPXML — werden NICHT gelöscht"
+                  title={tr({ de: "Fehlend in FCPXML — werden NICHT gelöscht", en: "Missing in FCPXML — will NOT be deleted", es: "Falta en FCPXML — NO se eliminará" })}
                   icon={<Trash2 className="h-4 w-4 text-warning" />}
                   tone="warning"
                 >

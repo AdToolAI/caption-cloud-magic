@@ -14,11 +14,11 @@ import LibraryUploadConsentDialog from '@/components/motion-studio/LibraryUpload
 import { VoicePicker } from '@/components/motion-studio/VoicePicker';
 import CastingVibeGrid from '@/components/motion-studio/CastingVibeGrid';
 import {
-import { tx } from "@/lib/i18nText";
   EMPTY_CHARACTER_DRAFT,
   type CharacterDraft,
   type MotionStudioCharacter,
 } from '@/types/motion-studio';
+import { tx } from "@/lib/i18nText";
 
 interface CharacterEditorProps {
   open: boolean;

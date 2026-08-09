@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { Activity, Loader2, Play, AlertTriangle, CheckCircle2, ShieldCheck, ExternalLink, Bell } from "lucide-react";
+import { useTx } from '@/lib/i18nText';
 
 function ageSec(iso: string | null | undefined): number {
   if (!iso) return Number.POSITIVE_INFINITY;
@@ -29,6 +30,8 @@ export function WatchdogTab() {
   const queryClient = useQueryClient();
 
   const heartbeats = useQuery({
+  const tr = useTx();
+
     queryKey: ["cron-heartbeats"],
     queryFn: async () => {
       const { data } = await supabase
@@ -142,7 +145,7 @@ export function WatchdogTab() {
                   const stale = m.exists && m.status === "missed_checkin";
                   const lastSub = m.last_check_in
                     ? `zuletzt vor ${formatDistanceToNow(new Date(m.last_check_in))}`
-                    : m.exists ? "noch kein Check-in" : "Monitor noch nicht angelegt";
+                    : m.exists ? tr({ de: "noch kein Check-in", en: "no check-in yet", es: "aún sin check-in" }) : tr({ de: "Monitor noch nicht angelegt", en: "Monitor not set up yet", es: "Monitor aún no configurado" });
                   return (
                     <a
                       key={m.slug}

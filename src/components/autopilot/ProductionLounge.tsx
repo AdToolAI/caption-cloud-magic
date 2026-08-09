@@ -20,6 +20,7 @@ import type {
   ProductionRow,
   ProductionSceneRow,
 } from '@/hooks/useAutopilotProduction';
+import { tx } from "@/lib/i18nText";
 
 interface Props {
   production: ProductionRow;
@@ -57,9 +58,9 @@ export function ProductionLounge({ production, scenes, log, language = 'de' }: P
     if (production.status !== 'completed' || notified.current) return;
     notified.current = true;
     document.title = '(fertig) AdTool AI';
-    toast({ title: 'Dein Film ist fertig', description: 'Der Clip wartet in der Produktion.' });
+    toast({ title: tx({ de: 'Dein Film ist fertig', en: 'Your film is ready', es: 'Tu película está lista' }), description: tx({ de: 'Der Clip wartet in der Produktion.', en: 'The clip is waiting in the production.', es: 'El clip está esperando en la producción.' }) });
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification('AdTool AI', { body: 'Dein Film ist fertig.' });
+      new Notification('AdTool AI', { body: tx({ de: 'Dein Film ist fertig.', en: 'Your film is ready.', es: 'Tu película está lista.' }) });
     }
   }, [production.status, toast]);
 

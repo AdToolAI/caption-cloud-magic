@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CancelIntentDialog } from "@/components/billing/CancelIntentDialog";
+import { tx } from "@/lib/i18nText";
 
 interface Invoice {
   id: string;
@@ -100,7 +101,7 @@ const Billing = () => {
     } catch (error: any) {
       toast({
         title: language === "de" ? "Fehler" : "Error",
-        description: error.message || (language === "de" ? "Portal konnte nicht geöffnet werden" : "Failed to open portal"),
+        description: error.message || tx({ de: "Portal konnte nicht geöffnet werden", en: "Failed to open portal", es: "No se pudo abrir el portal" }),
         variant: "destructive"
       });
     } finally {
