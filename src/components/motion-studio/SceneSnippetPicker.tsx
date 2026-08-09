@@ -253,7 +253,7 @@ export default function SceneSnippetPicker({
                             variant="ghost"
                             className="h-6 w-6 p-0 hover:bg-primary/20"
                             onClick={() => openBuilder(s)}
-                            aria-label=Bearbeiten
+                            aria-label="Bearbeiten"
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
@@ -262,7 +262,7 @@ export default function SceneSnippetPicker({
                             variant="ghost"
                             className="h-6 w-6 p-0 text-destructive hover:bg-destructive/20"
                             onClick={() => handleDelete(s.id)}
-                            aria-label=Löschen
+                            aria-label="Löschen"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>

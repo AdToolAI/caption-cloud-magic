@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { tx({ de: "Download", en: "Download", es: "Descargar" }), Play, RefreshCw, Loader2, Film, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Download, Play, RefreshCw, Loader2, Film, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -41,8 +41,8 @@ export default function ContentProjects() {
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      draft: { variant: "secondary" as const, icon: Clock, label: tx({ de: "Entwurf", en: "Draft", es: "Borrador" }), className: "" },
-      rendering: { variant: "default" as const, icon: RefreshCw, label: tx({ de: "Wird gerendert...", en: "Rendering...", es: "Renderizando..." }), className: "" },
+      draft: { variant: "secondary" as const, icon: Clock, label: "Entwurf", className: "" },
+      rendering: { variant: "default" as const, icon: RefreshCw, label: "Wird gerendert...", className: "" },
       completed: { variant: "outline" as const, icon: CheckCircle2, label: tx({ de: "Fertig", en: "Ready", es: "Listo" }), className: "border-green-500 text-green-700" },
       failed: { variant: "destructive" as const, icon: XCircle, label: tx({ de: "Fehler", en: "Mistake", es: "Error" }), className: "" },
     };
@@ -96,7 +96,7 @@ export default function ContentProjects() {
     <>
       <SEO 
         title="Meine Videos | Content Studio"
-        description=Verwalte deine erstellten Video-Projekte aus dem Content Studio
+        description={tx({ de: "Verwalte deine erstellten Video-Projekte aus dem Content Studio", en: "Manage your created video projects from the Content Studio", es: "Gestiona tus proyectos de vídeo creados desde el Content Studio" })}
       />
       <div className="container max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
@@ -117,7 +117,7 @@ export default function ContentProjects() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Fertig</CardDescription>
+              <CardDescription>{tx({ de: "Fertig", en: "Ready", es: "Listo" })}</CardDescription>
               <CardTitle className="text-3xl text-green-600">{statusCounts.completed}</CardTitle>
             </CardHeader>
           </Card>
@@ -208,7 +208,7 @@ export default function ContentProjects() {
                         {project.status === "rendering" && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
                             <RefreshCw className="h-4 w-4 animate-spin" />
-                            <span>Video wird erstellt...</span>
+                            <span>{tx({ de: "Video wird erstellt...", en: "Video is being created...", es: "El video se está creando..." })}</span>
                           </div>
                         )}
                       </CardContent>
@@ -220,7 +220,7 @@ export default function ContentProjects() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Film className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <CardTitle className="mb-2">Keine Videos gefunden</CardTitle>
+                  <CardTitle className="mb-2">{tx({ de: "Keine Videos gefunden", en: "No videos found", es: "No se encontraron vídeos" })}</CardTitle>
                   <CardDescription>
                     {selectedStatus === "all"
                       ? tx({ de: "Erstelle dein erstes Video im Content Studio", en: "Create your first video in Content Studio", es: "Crea tu primer vídeo en Content Studio" })

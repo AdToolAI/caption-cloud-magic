@@ -75,11 +75,11 @@ const LANGUAGES = [
 ];
 
 const TREATMENT_PHASES = [
-  Briefing wird gelesen …,
-  Konzept und Dramaturgie …,
-  Szenen werden gebaut …,
-  Dialoge und Besetzung …,
-  Letzter Feinschliff …,
+  tx({ de: 'Briefing wird gelesen …', en: 'Reading briefing…', es: 'Leyendo el briefing…' }),
+  tx({ de: 'Konzept und Dramaturgie …', en: 'Concept and dramaturgy…', es: 'Concepto y dramaturgia…' }),
+  tx({ de: 'Szenen werden gebaut …', en: 'Building scenes…', es: 'Creando escenas…' }),
+  tx({ de: 'Dialoge und Besetzung …', en: 'Dialogues and casting…', es: 'Diálogos y reparto…' }),
+  tx({ de: 'Letzter Feinschliff …', en: 'Final touches…', es: 'Toques finales…' }),
 ];
 
 const BEAT_LABEL: Record<string, string> = {
@@ -490,13 +490,13 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
       setApproved(true);
       toast({
-        title: tr({ de: tx({ de: 'Produktion läuft', en: 'Production running', es: 'Producción en curso' }), en: 'Production running', es: 'Producción en curso' }),
+        title: tr({ de: 'Produktion läuft', en: 'Production running', es: 'Producción en curso' }),
         description:
-          tr({ de: tx({ de: 'Jede Szene wird erst als Standbild geprüft und nur dann animiert — du kannst live zuschauen.', en: 'Each scene is first checked as a still image and only then animated — you can watch live.', es: 'Cada escena se verifica primero como una imagen fija y luego se anima; puedes verla en vivo.' }), en: 'Each scene is first reviewed as a still frame and only then animated — you can watch live.', es: 'Cada escena se revisa primero como fotograma fijo y solo después se anima — puedes verlo en vivo.' }),
+          tr({ de: 'Jede Szene wird erst als Standbild geprüft und nur dann animiert — du kannst live zuschauen.', en: 'Each scene is first reviewed as a still frame and only then animated — you can watch live.', es: 'Cada escena se revisa primero como fotograma fijo y solo después se anima — puedes verlo en vivo.' }),
       });
     } catch (err) {
       toast({
-        title: tr({ de: tx({ de: 'Produktion konnte nicht starten', en: 'Production could not start', es: 'La producción no pudo comenzar' }), en: 'Production could not start', es: 'La producción no pudo iniciarse' }),
+        title: tr({ de: 'Produktion konnte nicht starten', en: 'Production could not start', es: 'La producción no pudo iniciarse' }),
         description: err instanceof Error ? err.message : tr({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: 'destructive',
       });
@@ -646,7 +646,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
           {castingBusy && (
             <div className="mt-4">
-              <StageProgressBar label={tr({ de: tx({ de: 'Besetzung und Stimmen werden zugeordnet …', en: 'Casting and voices are being assigned…', es: 'Se están asignando el reparto y las voces…' }), en: "Assigning cast and voices …", es: "Asignando reparto y voces …" })} />
+              <StageProgressBar label={tr({ de: "Besetzung und Stimmen werden zugeordnet …", en: "Assigning cast and voices …", es: "Asignando reparto y voces …" })} />
             </div>
           )}
 
@@ -751,7 +751,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             </Button>
           </div>
 
-          {starting && <StageProgressBar label=Produktion wird gestartet … />}
+          {starting && <StageProgressBar label={tx({ de: "Produktion wird gestartet …", en: "Starting production…", es: "Iniciando producción…" })} />}
 
         </Card>
       )}
@@ -792,14 +792,14 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                   )}
                 >
                   Guthaben: {formatEuro(walletEuros)}
-                  {walletEuros < cost.totalEuros && tr({ de: ' + ' ' + tx({ de: '— reicht nicht für den kompletten Film.', en: '— not enough for the full film.', es: '— no es suficiente para la película completa.' })', en: ' — not enough for the complete film.', es: ' — no alcanza para la película completa.' })}
+                  {walletEuros < cost.totalEuros && tr({ de: ' — reicht nicht für den kompletten Film.', en: ' — not enough for the complete film.', es: ' — no alcanza para la película completa.' })}
                 </p>
               )}
             </div>
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setConfirmOpen(false);

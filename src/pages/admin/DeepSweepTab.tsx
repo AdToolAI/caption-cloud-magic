@@ -80,9 +80,9 @@ const STATUS_ICON: Record<string, any> = {
 const FLOW_NAMES = [
   "Composer Multi-Scene Stitch",
   "Director's Cut Lambda Render",
-  Auto-Director (Brief → Video),
+  tx({ de: "Auto-Director (Brief → Video)", en: "Auto-Director (Letter → Video)", es: "Director automático (Carta → Vídeo)" }),
   "Talking Head (HeyGen)",
-  Universal Video Creator,
+  tx({ de: "Universal Video Creator", en: "Universal Video Creator", es: "Creador de vídeos universal" }),
   "Magic Edit (FLUX Fill)",
 ];
 
@@ -216,7 +216,7 @@ export function DeepSweepTab() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-              Neu laden
+              Reload
             </Button>
             {isStale && (
               <Button
@@ -224,14 +224,14 @@ export function DeepSweepTab() {
                 size="sm"
                 onClick={finalizeStaleRun}
                 disabled={finalizing}
-                title=Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.
+                title={tx({ de: `Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.`, en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` })}
               >
                 {finalizing ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                 ) : (
                   <XCircle className="h-4 w-4 mr-1" />
                 )}
-                Lauf abbrechen ({Math.round(runAgeMinutes)} min)
+                Run abbrechen ({Math.round(runAgeMinutes)} min)
               </Button>
             )}
             <AlertDialog>
@@ -245,12 +245,12 @@ export function DeepSweepTab() {
                   ) : (
                     <Play className="h-4 w-4 mr-1" />
                   )}
-                  {isRunning ? tx({ de: "Läuft...", en: "Running...", es: "Corriendo..." }) : tx({ de: "Run Deep Sweep (50 €)", en: "Run Deep Sweep (50 €)", es: "Ejecutar barrido profundo (50 €)" })}
+                  {isRunning ? "Läuft..." : "Run Deep Sweep (50 €)"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Deep Sweep mit echten Renders starten?</AlertDialogTitle>
+                  <AlertDialogTitle>{tx({ de: "Deep Sweep mit echten Renders starten?", en: "Start Deep Sweep with real renders?", es: "¿Iniciar Deep Sweep con renders reales?" })}</AlertDialogTitle>
                   <AlertDialogDescription>
                     Diese Aktion löst <strong>echte bezahlte API-Calls</strong> aus
                     (Replicate, HeyGen, ElevenLabs, AWS Lambda). Erwarteter Verbrauch:
@@ -260,7 +260,7 @@ export function DeepSweepTab() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                  <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={startSweep}
                     className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
@@ -299,7 +299,7 @@ export function DeepSweepTab() {
       {/* Live Flow Status */}
       <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
         <h4 className="text-sm font-semibold text-slate-300 mb-3">
-          Aktueller Lauf — 6 Flows
+          Aktueller Run — 6 Flows
         </h4>
         <div className="space-y-2">
           {FLOW_NAMES.map((name, idx) => {
@@ -405,7 +405,7 @@ export function DeepSweepTab() {
       {/* History */}
       {history.length > 1 && (
         <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
-          <h4 className="text-sm font-semibold text-slate-300 mb-3">Letzte 10 Läufe</h4>
+          <h4 className="text-sm font-semibold text-slate-300 mb-3">Letzte 10 Runs</h4>
           <div className="space-y-1.5">
             {history.slice(1).map((r) => {
               const pr = r.flows_total > 0

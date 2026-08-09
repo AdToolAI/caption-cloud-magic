@@ -1,4 +1,3 @@
-import { tx } from "@/lib/i18nText";
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X, ArrowRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -54,8 +53,8 @@ export function ProactiveAlertBanner() {
             <div className="flex items-center gap-2 mb-1">
               <h4 className="font-semibold text-foreground">
                 {errorCount > 0 
-                  ? `${errorCount} kritische${{errorCount > 1 ? tx({ de: ' Probleme', en: ' problems', es: ' problemas' }) : tx({ de: 's Problem', en: ' problem', es: ' problema' })}} erkannt`
-                  : `${warningCount} Warnung${{warningCount > 1 ? tx({ de: 'en', en: 's', es: 's' }) : ''}}`
+                  ? `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'} erkannt`
+                  : `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}`
                 }
               </h4>
               {isLoading && (
@@ -102,7 +101,7 @@ export function ProactiveAlertBanner() {
                   className="gap-1"
                   onClick={() => navigate(criticalIssue.action!)}
                 >
-                  {criticalIssue.actionLabel || tx({ de: 'Jetzt beheben', en: 'Fix now', es: 'Corregir ahora' })}
+                  {criticalIssue.actionLabel || 'Jetzt beheben'}
                   <ArrowRight className="w-3 h-3" />
                 </Button>
               )}

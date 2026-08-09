@@ -53,25 +53,25 @@ const PRESETS = [
   },
   { 
     id: 'pan-left', 
-    name: tx({ de: 'Pan Links', en: 'Pan left', es: 'Panorámica a la izquierda' }), 
+    name: 'Pan Links', 
     icon: ArrowLeft,
     config: { startZoom: 1.2, endZoom: 1.2, startX: 15, startY: 0, endX: -15, endY: 0 }
   },
   { 
     id: 'pan-right', 
-    name: tx({ de: 'Pan Rechts', en: 'Pan right', es: 'Panorámica a la derecha' }), 
+    name: 'Pan Rechts', 
     icon: ArrowRight,
     config: { startZoom: 1.2, endZoom: 1.2, startX: -15, startY: 0, endX: 15, endY: 0 }
   },
   { 
     id: 'pan-up', 
-    name: tx({ de: 'Tilt Hoch', en: 'Tilt up', es: 'Inclinación hacia arriba' }), 
+    name: 'Tilt Hoch', 
     icon: ArrowUp,
     config: { startZoom: 1.2, endZoom: 1.2, startX: 0, startY: 15, endX: 0, endY: -15 }
   },
   { 
     id: 'pan-down', 
-    name: tx({ de: 'Tilt Runter', en: 'Tilt down', es: 'Inclinación hacia abajo' }), 
+    name: 'Tilt Runter', 
     icon: ArrowDown,
     config: { startZoom: 1.2, endZoom: 1.2, startX: 0, startY: -15, endX: 0, endY: 15 }
   },
@@ -161,8 +161,9 @@ export function KenBurnsEffect({
     <Card className="bg-background/40 backdrop-blur-xl border-border/50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">Move className="h-4 w-4 text-primary" /> Ken Burns Effekt
-            Move className="h-4 w-4 text-primary" /> Ken Burns Effekt
+          <CardTitle className="text-base flex items-center gap-2">
+            <Move className="h-4 w-4 text-primary" />
+            Ken Burns Effekt
           </CardTitle>
           <div className="flex items-center gap-2">
             {hasEffect && (
@@ -397,7 +398,7 @@ export function KenBurnsEffect({
         {!hasEffect && (
           <div className="text-center py-4 text-muted-foreground">
             <Move className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-xs">Wähle ein Preset um den Move className="h-4 w-4 text-primary" /> Ken Burns Effekt zu aktivieren</p>
+            <p className="text-xs">Wähle ein Preset um den Ken Burns Effekt zu aktivieren</p>
           </div>
         )}
       </CardContent>

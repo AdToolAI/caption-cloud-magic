@@ -42,7 +42,7 @@ export function VideoProviderMarginCard() {
       {lowCount > 0 && (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
           <AlertTriangle className="h-3.5 w-3.5" />
-          {lowCount} {lowCount === 1 ? '{tx({ de: lowCount === 1 ? 'Provider liegt' : 'Provider liegen', en: lowCount === 1 ? 'provider is' : 'providers are', es: lowCount === 1 ? 'proveedor está' : 'proveedores están' })} unter dem 60%-Marge-Boden.
+          {lowCount} {lowCount === 1 ? 'Provider liegt' : 'Provider liegen'} unter dem 60%-Marge-Boden.
         </div>
       )}
 
@@ -67,7 +67,7 @@ export function VideoProviderMarginCard() {
                       {r.tier === 'premium-engine' && (
                         <span
                           className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-400/5 px-1.5 py-0.5 text-[9px] font-medium text-amber-300"
-                          title=Premium-Engine: echte Provider-Kosten an User durchgereicht
+                          title="Premium-Engine: echte Provider-Kosten an User durchgereicht"
                         >
                           <Crown className="h-2.5 w-2.5" />
                           Premium
@@ -75,7 +75,7 @@ export function VideoProviderMarginCard() {
                       )}
                     </div>
                     <div className="text-[10px] text-muted-foreground">
-                      {r.unit === 'per-second' ? '{tx({ de: r.unit === 'per-second' ? '€/Sekunde' : '€/Clip (5s flat)', en: r.unit === 'per-second' ? '€/second' : '€/clip (5s flat)', es: r.unit === 'per-second' ? '€/segundo' : '€/clip (5s flat)' })}
+                      {r.unit === 'per-second' ? '€/Sekunde' : '€/Clip (5s flat)'}
                     </div>
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{eur(r.sellEUR)}</td>

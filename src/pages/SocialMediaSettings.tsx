@@ -40,7 +40,7 @@ const platformConfig = [
     icon: Youtube,
     color: 'text-red-600',
     setupUrl: 'https://console.cloud.google.com',
-    description: tx({ de: 'Aktiviere YouTube Data API v3 in der Google Cloud Console.', en: 'Enable YouTube Data API v3 in the Google Cloud Console.', es: 'Habilita la API de datos de YouTube v3 en Google Cloud Console.' }),
+    description: 'Aktiviere YouTube Data API v3 in der Google Cloud Console.',
   },
   {
     id: 'facebook' as Platform,
@@ -85,8 +85,8 @@ export default function SocialMediaSettings() {
           // Show toast
           toast.info(
             reconnectPlatform 
-              ? `${targetPlatform} $Token erneuern` 
-              : `${targetPlatform} $verbinden`,
+              ? `${targetPlatform} Token erneuern` 
+              : `${targetPlatform} verbinden`,
             { 
               description: reconnectPlatform 
                 ? tx({ de: 'Klicke auf den Developer Portal Button um dein Token zu erneuern.', en: 'Click on the Developer Portal button to renew your token.', es: 'Haga clic en el botón Portal de desarrollador para renovar su token.' })
@@ -185,7 +185,7 @@ export default function SocialMediaSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor={`toggle-${platform.id}`} className="text-sm">
-                      {connected ? tx({ de: 'Aktiv', en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
+                      {connected ? 'Aktiv' : 'Inaktiv'}
                     </Label>
                     <Switch
                       id={`toggle-${platform.id}`}
@@ -205,16 +205,16 @@ export default function SocialMediaSettings() {
         <h3 className="text-lg font-semibold mb-4">Setup-Anleitung</h3>
         <div className="space-y-3 text-sm text-muted-foreground">
           <p>
-            <strong><strong>Schritt 1:</strong> Erstelle Developer Apps auf den jeweiligen Plattformen
+            <strong>Schritt 1:</strong> Erstelle Developer Apps auf den jeweiligen Plattformen
           </p>
           <p>
-            <strong><strong>Schritt 2:</strong> Generiere Access Tokens mit den benötigten Permissions
+            <strong>Schritt 2:</strong> Generiere Access Tokens mit den benötigten Permissions
           </p>
           <p>
-            <strong><strong>Schritt 3:</strong> Füge die Tokens als Secrets hinzu (z.B. INSTAGRAM_ACCESS_TOKEN)
+            <strong>Schritt 3:</strong> Füge die Tokens als Secrets hinzu (z.B. INSTAGRAM_ACCESS_TOKEN)
           </p>
           <p>
-            <strong><strong>Schritt 4:</strong> Aktiviere die Verbindung hier im Dashboard
+            <strong>Schritt 4:</strong> Aktiviere die Verbindung hier im Dashboard
           </p>
         </div>
       </Card>

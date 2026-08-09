@@ -404,7 +404,7 @@ export function SceneAnalysisStep({
     
     // Pass empty effects for this scene to clear it
     onApplySuggestions({}, { [sceneId]: {} });
-    toast.info(tx({ de: 'Szeneneffekte zurückgesetzt', en: 'Scene effects reset', es: 'Efectos de escena restablecidos' }));
+    toast.info('Szeneneffekte zurückgesetzt');
   };
 
   // Check if scene has effects applied
@@ -705,7 +705,7 @@ export function SceneAnalysisStep({
                         <div
                           className={`${colors[index % colors.length]} rounded-l ${index === scenes.length - 1 ? 'rounded-r' : ''} cursor-pointer 
                             transition-all relative group flex-1 ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
-                          title=Szene ${index + 1}: ${scene.description}
+                          title={tx({ de: `Szene ${index + 1}: ${scene.description}`, en: `Scene ${index + 1}: ${scene.description}`, es: `Escena ${index + 1}: ${scene.description}` })}
                         >
                           {hasEffects && (
                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white z-10" />
@@ -798,7 +798,7 @@ export function SceneAnalysisStep({
           {isAnalyzing ? (
             <div className="space-y-4">
               <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
-              <h3 className="text-lg font-semibold">KI analysiert dein Video...</h3>
+              <h3 className="text-lg font-semibold">{tx({ de: "KI analysiert dein Video...", en: "AI analyzes your video...", es: "La IA analiza tu vídeo..." })}</h3>
               <p className="text-muted-foreground">
                 Die KI erkennt Szenen und erstellt Verbesserungsvorschläge
               </p>

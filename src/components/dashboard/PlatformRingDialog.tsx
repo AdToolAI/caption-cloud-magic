@@ -39,11 +39,11 @@ const platformMeta: Record<string, { icon: typeof Instagram; label: string; colo
 };
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  pending: { label: tx({ de: 'Geplant', en: 'Scheduled', es: 'Programado' }), cls: "border-border" },
-  rescheduled: { label: tx({ de: 'Neu geplant', en: 'Rescheduled', es: 'Reprogramado' }), cls: "border-primary/40 text-primary" },
-  completed: { label: tx({ de: 'Veröffentlicht', en: 'Published', es: 'Publicado' }), cls: "border-success/40 text-success" },
-  missed: { label: tx({ de: 'Verpasst', en: 'Missed', es: 'Perdido' }), cls: "border-destructive/40 text-destructive" },
-  dismissed: { label: tx({ de: 'Verworfen', en: 'Dismissed', es: 'Descartado' }), cls: "border-muted-foreground/30 text-muted-foreground" },
+  pending: { label: "Geplant", cls: "border-border" },
+  rescheduled: { label: "Neu geplant", cls: "border-primary/40 text-primary" },
+  completed: { label: "Veröffentlicht", cls: "border-success/40 text-success" },
+  missed: { label: "Verpasst", cls: "border-destructive/40 text-destructive" },
+  dismissed: { label: "Verworfen", cls: "border-muted-foreground/30 text-muted-foreground" },
 };
 
 export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
@@ -104,7 +104,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
   const meta = platformMeta[post.platform.toLowerCase()] || platformMeta.instagram;
   const Icon = meta.icon;
   const status = STATUS_LABEL[post.status] || STATUS_LABEL.pending;
-  const dateLabel = format(new Date(post.scheduled_at), "EEEE, d. MMM um + ' ' + 'HH:mm'");
+  const dateLabel = format(new Date(post.scheduled_at), "EEEE, d. MMM 'um' HH:mm");
 
   const tagsArr = hashtags.split(/[\s,]+/).map((h) => h.replace(/^#/, "")).filter(Boolean);
 
@@ -138,7 +138,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
   };
 
   const handleAIGenerate = () => {
-    toast.info(tx({ de: 'Öffne KI Post Generator…', en: 'Opening AI Post Generator…', es: 'Abriendo el generador de publicaciones de IA…' }));
+    toast.info("Öffne KI Post Generator…");
     navigate("/content-studio", { state: { prefill: { topic: post.content_idea, platform: post.platform } } });
   };
 
@@ -185,7 +185,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
 
             <div className="space-y-3 pt-2 border-t border-border/40">
               <div>
-                <Label className="text-xs mb-1.5 block">Medien (Bild oder Video)</Label>
+                <Label className="text-xs mb-1.5 block">{tx({ de: "Medien (Bild oder Video)", en: "Media (image or video)", es: "Medios (imagen o video)" })}</Label>
                 <PostMediaUploader
                   mediaUrl={mediaUrl}
                   mediaType={mediaType}
@@ -216,7 +216,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   rows={5}
-                  placeholder=Schreibe deinen Post …
+                  placeholder="Schreibe deinen Post …"
                   className="resize-none"
                 />
               </div>
@@ -273,7 +273,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                       <div className="font-semibold text-warning">Suboptimale Zeit (Score {evalResult.score})</div>
                       <div className="text-muted-foreground">
                         Empfohlen: <span className="font-medium text-foreground">{String(evalResult.bestHour).padStart(2, "0")}:00</span> (Score {evalResult.bestScore})
-                        {original !== null original !== null && ` · KI-Vorschlag war Score ${original}`original !== null && ` · KI-Vorschlag war Score ${original}` ' · ' + tx({ de: 'KI-Vorschlag war Score', en: 'AI suggestion was score', es: 'La sugerencia de IA fue la puntuación' }) + ' ' + original}
+                        {original !== null && ` · KI-Vorschlag war Score ${original}`}
                       </div>
                     </div>
                   </div>
@@ -317,7 +317,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
           </Button>
           <Button size="sm" onClick={handleSubmitToCalendar} disabled={isSubmittingToCalendar}>
             <CalendarPlus className="h-4 w-4 mr-1" />
-            {autoPublish ? tx({ de: 'Speichern autoPublish ? "Speichern & Auto-Publish" : "In Kalender übernehmen" Auto-Publish', en: 'Save autoPublish ? "Speichern & Auto-Publish" : "In Kalender übernehmen" Auto-Publish', es: 'Guardar y publicar automáticamente' }) : tx({ de: 'In Kalender übernehmen', en: 'Add to calendar', es: 'Añadir al calendario' })}
+            {autoPublish ? "Speichern & Auto-Publish" : "In Kalender übernehmen"}
           </Button>
         </DialogFooter>
       </DialogContent>

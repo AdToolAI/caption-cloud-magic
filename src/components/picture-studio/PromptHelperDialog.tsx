@@ -40,7 +40,7 @@ const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime',
 const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
 const ENHANCE_DEFAULT_TEXT =
-  Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.;
+  tx({ de: "Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.", en: "Adopt this image 1:1 and improve quality, realism, light consistency, and detail — keep all people, clothing, composition, and background exactly as is.", es: "Adopta esta imagen 1:1 y mejora la calidad, el realismo, la consistencia de la luz y el detalle — mantén a todas las personas, la ropa, la composición y el fondo exactamente como están." });
 
 export function PromptHelperDialog({
   open, onOpenChange, initialUserText = '',
@@ -80,7 +80,7 @@ export function PromptHelperDialog({
       setResult(data as PromptHelperResult);
     } catch (err: any) {
       console.error('[PromptHelper] error', err);
-      toast.error(err?.message || tx({ de: 'Prompt-Helfer', en: 'Prompt Helper', es: 'Ayudante de prompts' }));
+      toast.error(err?.message || tx({ de: "Prompt-Helfer konnte nicht antworten.", en: "Prompt helper couldn't respond.", es: "El ayudante de prompts no pudo responder." }));
     } finally {
       setLoading(false);
     }
@@ -152,11 +152,11 @@ export function PromptHelperDialog({
             )}
 
             <div className="space-y-2">
-              <Label className="text-xs">Was willst du? (beliebige Sprache)</Label>
+              <Label className="text-xs">{tx({ de: "Was willst du? (beliebige Sprache)", en: "What do you want? (any language)", es: "¿Qué deseas? (cualquier idioma)" })}</Label>
               <Textarea
                 value={userText}
                 onChange={(e) => setUserText(e.target.value)}
-                placeholder=z. B. Mach das Bild realistisch und detailliert, behalte alle Personen
+                placeholder={tx({ de: "z. B. Mach das Bild realistisch und detailliert, behalte alle Personen", en: "e.g. Make the image realistic and detailed, keep all people", es: "ej. Haz la imagen realista y detallada, mantén a todas las personas" })}
                 rows={3}
                 className="resize-none bg-background/50"
               />
@@ -205,7 +205,7 @@ export function PromptHelperDialog({
 
                 {/* Master prompt */}
                 <PromptCard
-                  label=Master-Prompt (empfohlen)
+                  label="Master-Prompt (empfohlen)"
                   prompt={result.masterPrompt}
                   highlight
                   onUse={() => handleApply(result.masterPrompt)}
@@ -214,7 +214,7 @@ export function PromptHelperDialog({
                 {result.alternatives.map((alt, i) => (
                   <PromptCard
                     key={i}
-                    label=Kurz-Variante ${i + 1}
+                    label={`Kurz-Variante ${i + 1}`}
                     prompt={alt}
                     onUse={() => handleApply(alt)}
                   />

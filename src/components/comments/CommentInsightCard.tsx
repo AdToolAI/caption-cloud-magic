@@ -1,4 +1,3 @@
-import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ interface CommentInsightCardProps {
   evidence: string;
   interpretation: string;
   action: string;
-  impact: tx({ de: "hoch", en: "high", es: "alto" }) | tx({ de: "mittel", en: "medium", es: "medio" }) | tx({ de: "niedrig", en: "low", es: "bajo" });
+  impact: 'hoch' | 'mittel' | 'niedrig';
 }
 
 export function CommentInsightCard({ 

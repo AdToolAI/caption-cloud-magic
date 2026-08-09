@@ -30,7 +30,7 @@ export function CalendarAlerts({
           color: "text-destructive",
           bgColor: "bg-destructive/10",
           priority: "high",
-          action: tx({ de: "Konflikt lösen", en: "Resolve conflict", es: "Resolver conflicto" }),
+          action: "Konflikt lösen",
           onAction: onResolveConflict,
         };
       case 'overdue':
@@ -39,7 +39,7 @@ export function CalendarAlerts({
           color: "text-warning",
           bgColor: "bg-warning/10",
           priority: "medium",
-          action: tx({ de: "Jetzt veröffentlichen", en: "Publish now", es: "Publicar ahora" }),
+          action: "Jetzt veröffentlichen",
         };
       case 'empty':
         return {
@@ -47,7 +47,7 @@ export function CalendarAlerts({
           color: "text-primary",
           bgColor: "bg-primary/10",
           priority: "low",
-          action: tx({ de: "Auto-Planung starten", en: "Start auto-scheduling", es: "Iniciar programación automática" }),
+          action: "Auto-Planung starten",
           onAction: onAutoSchedule,
         };
       default:
@@ -62,9 +62,9 @@ export function CalendarAlerts({
 
   const getPriorityBadge = (priority: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
-      high: { variant: "destructive", label: tx({ de: "Hoch", en: "High", es: "Alto" }) },
-      medium: { variant: "default", label: tx({ de: "Mittel", en: "Medium", es: "Medio" }) },
-      low: { variant: "secondary", label: tx({ de: "Niedrig", en: "Low", es: "Bajo" }) },
+      high: { variant: "destructive", label: "Hoch" },
+      medium: { variant: "default", label: "Mittel" },
+      low: { variant: "secondary", label: "Niedrig" },
     };
     const config = variants[priority] || variants.low;
     return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -126,9 +126,9 @@ export function CalendarAlerts({
                       <div className="flex items-center gap-2 mb-2">
                         {getPriorityBadge(config.priority)}
                         <span className={`text-sm font-medium ${config.color}`}>
-                          {alert.type === 'conflict' ? 'Konflikt erkannt' : tx({ de: 'Konflikt erkannt', en: 'Conflict detected', es: 'Conflicto detectado' }) : 
-                           alert.type === 'overdue' ? 'Überfällig' : tx({ de: 'Überfällig', en: 'Overdue', es: 'Vencido' }) : 
-                           Leere Tage
+                          {alert.type === 'conflict' ? 'Konflikt erkannt' : 
+                           alert.type === 'overdue' ? 'Überfällig' : 
+                           'Leere Tage'}
                         </span>
                       </div>
                       <p className="text-sm text-foreground mb-3">{alert.message}</p>

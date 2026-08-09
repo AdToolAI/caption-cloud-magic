@@ -35,7 +35,7 @@ interface HeatmapViewProps {
 }
 
 const CHANNELS = [
-  { id: "all", label: tx({ de: "Alle", en: "All", es: "Todos" }) },
+  { id: "all", label: "Alle" },
   { id: "instagram", label: "Instagram" },
   { id: "tiktok", label: "TikTok" },
   { id: "linkedin", label: "LinkedIn" },
@@ -259,7 +259,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                               )}
                               {hasPosts && (
                                 <div className="text-[11px] text-primary border-t border-white/10 pt-1.5">
-                                  {bucket.count} {bucket.count} {tx({ de: bucket.count > 1 ? 'Posts geplant' : 'Post geplant', en: bucket.count > 1 ? 'Posts planned' : 'Post planned', es: bucket.count > 1 ? 'Publicaciones planificadas' : 'Publicación planificada' })}
+                                  {bucket.count} Post{bucket.count > 1 ? "s" : ""} geplant
                                   <ul className="mt-1 text-muted-foreground text-[10px] truncate">
                                     {bucket.posts.slice(0, 3).map((p) => (
                                       <li key={p.id} className="truncate">
@@ -314,7 +314,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<Sparkles className="w-4 h-4" />}
               tone="gold"
-              title=Goldene Lücke
+              title="Goldene Lücke"
               body={
                 goldenGap
                   ? `${DAY_LABELS_LONG_DE[goldenGap.day]} ${String(goldenGap.hour).padStart(2, "0")}:00 — Score ${goldenGap.score}, kein Post geplant.`
@@ -323,7 +323,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
               cta={
                 goldenGap
                   ? {
-                      label: tx({ de: "Slot nutzen", en: "Use slot", es: "Usar slot" }),
+                      label: "Slot nutzen",
                       onClick: () => onDateClick?.(nextDateFor(goldenGap.day, goldenGap.hour)),
                     }
                   : undefined
@@ -332,7 +332,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<AlertTriangle className="w-4 h-4" />}
               tone={conflicts.length > 0 ? "red" : "muted"}
-              title=Konflikt-Warnung
+              title="Konflikt-Warnung"
               body={
                 conflicts.length > 0
                   ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — reach cannibalizes itself.`, es: `${conflicts.length} franja${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones a la vez: el alcance se canibaliza.` })
@@ -342,7 +342,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<PieChart className="w-4 h-4" />}
               tone="cyan"
-              title=Channel-Balance
+              title="Channel-Balance"
               body={
                 channelDist.length > 0
                   ? channelDist

@@ -197,7 +197,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       tick();
     } catch (err) {
       console.error("[VoiceStudio] mic error:", err);
-      toast.error(tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" }));
+      toast.error(tx({ de: "Mikrofonzugriff wurde abgelehnt oder ist nicht verfügbar.", en: "Microphone access denied or unavailable.", es: "Acceso al micrófono denegado o no disponible." }));
     }
   }, []);
 
@@ -228,7 +228,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
 
       if (silent) return;
       if (chunks.length === 0) {
-        toast.error(tx({ de: "Aufnahme war leer.", en: "Recording was empty.", es: "La grabación estaba vacía." }));
+        toast.error("Aufnahme war leer.");
         setRecElapsed(0);
         return;
       }
@@ -240,7 +240,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
         return;
       }
       if (samples.length >= MAX_SAMPLES) {
-        toast.error(tx({ de: `Maximal ${MAX_SAMPLES} Samples.`, en: `Maximum ${MAX_SAMPLES} samples.`, es: `Máximo ${MAX_SAMPLES} muestras.` }));
+        toast.error(`Maximal ${MAX_SAMPLES} Samples.`);
         return;
       }
       const id = crypto.randomUUID();
@@ -266,7 +266,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
     const accepted: Sample[] = [];
     for (const f of Array.from(files)) {
       if (samples.length + accepted.length >= MAX_SAMPLES) {
-        toast.error(tx({ de: `Maximal ${MAX_SAMPLES} Samples.`, en: `Maximum ${MAX_SAMPLES} samples.`, es: `Máximo ${MAX_SAMPLES} muestras.` }));
+        toast.error(`Maximal ${MAX_SAMPLES} Samples.`);
         break;
       }
       const type = (f.type || "").toLowerCase();
@@ -293,7 +293,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
     }
     if (accepted.length) {
       setSamples((prev) => [...prev, ...accepted]);
-      toast.success(tx({ de: `${accepted.length} Sample(s) hinzugefügt`, en: `${accepted.length} sample(s) added`, es: `${accepted.length} muestra(s) añadida(s)` }));
+      toast.success(`${accepted.length} Sample(s) hinzugefügt`);
     }
   };
 
@@ -348,7 +348,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) {
-        toast.error(tx({ de: "Nicht angemeldet.", en: "Not logged in.", es: "No has iniciado sesión." }));
+        toast.error("Nicht angemeldet.");
         return;
       }
 
@@ -425,7 +425,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 {n}
               </div>
               <span className={`text-xs ${step === n ? "font-semibold" : "text-muted-foreground"}`}>
-                {n === 1 ? tx({ de: "Skript", en: "Script", es: "Guion" }) : n === 2 ? tx({ de: "Aufnehmen", en: "Record", es: "Grabar" }) : tx({ de: "Klonen", en: "Clone", es: "Clonar" })}
+                {n === 1 ? "Skript" : n === 2 ? "Aufnehmen" : "Klonen"}
               </span>
               {n < 3 && <div className="flex-1 h-px bg-border" />}
             </div>
@@ -461,7 +461,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 id="speaker-name"
                 value={speakerName}
                 onChange={(e) => setSpeakerName(e.target.value)}
-                placeholder=z. B. Max
+                placeholder="z. B. Max"
                 maxLength={40}
               />
               <p className="text-xs text-muted-foreground">
@@ -534,7 +534,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">
-                        {isRecording ? tx({ de: "Aufnahme läuft…", en: "Recording in progress...", es: "Grabación en curso..." }) : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
+                        {isRecording ? "Aufnahme läuft…" : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Ziel: 60–90 Sekunden pro Aufnahme, in ruhiger Umgebung.
@@ -619,7 +619,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                       <div className="flex-1 min-w-0">
                         <p className="text-sm truncate">{s.fileName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatSec(s.durationSec)} · {s.source === "mic" ? tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" }) : tx({ de: "Upload", en: "Upload", es: "Carga" })}
+                          {formatSec(s.durationSec)} · {s.source === "mic" ? "Mikrofon" : "Upload"}
                         </p>
                       </div>
                       <Badge variant="secondary" className="text-[10px]">
@@ -629,7 +629,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                         size="icon"
                         variant="ghost"
                         onClick={() => removeSample(s.id)}
-                        aria-label=Löschen
+                        aria-label={tx({ de: "Löschen", en: "Delete", es: "Borrar" })}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -659,7 +659,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                   id="voice-name"
                   value={voiceName}
                   onChange={(e) => setVoiceName(e.target.value)}
-                  placeholder=z. B. Mein Voiceover
+                  placeholder="z. B. Mein Voiceover"
                   maxLength={40}
                 />
               </div>
@@ -705,7 +705,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
               <div className="text-xs space-y-2">
                 <p>
                   Zusammenfassung: <strong>{samples.length}</strong> Sample(s),{" "}
-                  <strong>{formatSec(totalSec)}</strong>  gesamt.
+                  <strong>{formatSec(totalSec)}</strong> gesamt.
                 </p>
                 <label className="flex items-start gap-2 cursor-pointer">
                   <Checkbox

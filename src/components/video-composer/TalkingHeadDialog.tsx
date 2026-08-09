@@ -131,7 +131,7 @@ export default function TalkingHeadDialog({
   const pickCastCharacter = (c: ComposerCharacter) => {
     if (!c.referenceImageUrl) {
       toast({
-        title: tx({ de: "Charakter", en: "Character", es: "Personaje" }),
+        title: tx({ de: 'Charakter ohne Foto', en: 'Character without photo', es: 'Personaje sin foto' }),
         description: tx({ de: `"${c.name}" hat noch kein Referenzbild. Lege eines im Briefing an oder importiere ihn aus der Avatar-Bibliothek.`, en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }),
         variant: 'destructive',
       });
@@ -307,7 +307,7 @@ export default function TalkingHeadDialog({
               <Sparkles className="h-4 w-4 mr-2" /> Skript & Stimme
             </TabsTrigger>
             <TabsTrigger value="dialog" disabled={cast.length < 2}>
-              <User className="h-4 w-4 mr-2" /> Dialog (${cast.length})
+              <User className="h-4 w-4 mr-2" /> Dialog ({cast.length})
             </TabsTrigger>
           </TabsList>
 
@@ -386,7 +386,7 @@ export default function TalkingHeadDialog({
                     onClick={() => { setShowLibrary((v) => !v); setShowNewForm(false); }}
                   >
                     <Library className="h-4 w-4 mr-1.5" />
-                    Aus Avatar-Bibliothek importieren (${unlinkedLibraryAvatars.length})
+                    Aus Avatar-Bibliothek importieren ({unlinkedLibraryAvatars.length})
                   </Button>
                 )}
               </div>
@@ -404,7 +404,7 @@ export default function TalkingHeadDialog({
                     <Label htmlFor="new-char-name" className="text-xs">Name</Label>
                     <Input
                       id="new-char-name"
-                      value={newName
+                      value={newName}
                       onChange={(e) => setNewName(e.target.value)}
                       placeholder="z. B. Sarah"
                       className="mt-1"
@@ -479,7 +479,7 @@ export default function TalkingHeadDialog({
                 <div className="flex items-start gap-3">
                   <img src={imageUrl} alt="Selected" className="w-20 h-20 rounded-md object-cover border border-border/40" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{selectedCharName || tx({ de: "Charakter", en: "Character", es: "Personaje" })}</div>
+                    <div className="text-sm font-medium">{selectedCharName || 'Charakter'}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       Bereit für Lip-Sync — wechsle in den Tab „Skript & Stimme".
                     </div>
@@ -507,7 +507,7 @@ export default function TalkingHeadDialog({
                 id="script"
                 value={script}
                 onChange={(e) => setScript(e.target.value)}
-                placeholder=Hi, ich bin dein neuer KI-Avatar. Hier kommt mein Text...
+                placeholder={tx({ de: "Hi, ich bin dein neuer KI-Avatar. Hier kommt mein Text...", en: "Hi, I am your new AI avatar. Here comes my text...", es: "Hola, soy tu nuevo avatar de IA. Aquí viene mi texto..." })}
                 rows={5}
                 className="mt-1"
               />
@@ -520,7 +520,7 @@ export default function TalkingHeadDialog({
               <Label>Stimme</Label>
               <VoiceSlot
                 voiceId={voiceId}
-                voiceName={voiceName
+                voiceName={voiceName}
                 language={voiceLanguage}
                 category="characters"
                 onChange={({ voiceId: id, voiceName: name, language: lang }) => {
@@ -562,7 +562,7 @@ export default function TalkingHeadDialog({
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Nur in Media Library</SelectItem>
-                    <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">An Szene anhängen</div>
+                    <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">{tx({ de: "An Szene anhängen", en: "Attach to scene", es: "Adjuntar a la escena" })}</div>
                     {availableScenes.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
                     ))}
@@ -808,7 +808,7 @@ function DialogModeTab({
   return (
     <div className="space-y-4">
       <Card className="p-3 bg-primary/5 border-primary/30">
-        <div className="text-sm font-medium mb-1">Drehbuch-Modus für Multi-Speaker-Szenen</div>
+        <div className="text-sm font-medium mb-1">{tx({ de: "Drehbuch-Modus für Multi-Speaker-Szenen", en: "Script mode for multi-speaker scenes", es: "Modo guion para escenas con varios oradores" })}</div>
         <p className="text-xs text-muted-foreground">
           Schreibe einen Dialog wie ein Drehbuch — pro Sprecher entsteht ein
           eigener Talking-Head-Clip. Im Director's Cut werden sie als
@@ -833,7 +833,7 @@ function DialogModeTab({
 
       {speakers.length > 0 && (
         <div className="space-y-2">
-          <Label>Stimme pro Sprecher</Label>
+          <Label>{tx({ de: "Stimme pro Sprecher", en: "Voice per speaker", es: "Voz por orador" })}</Label>
           <div className="space-y-2">
             {speakers.map((sp) => (
               <div key={sp.id} className="flex items-center gap-3 p-2 rounded-md border border-border/40 bg-muted/20">
@@ -844,7 +844,7 @@ function DialogModeTab({
                   onValueChange={(v) => setVoicePerSpeaker((prev) => ({ ...prev, [sp.id]: v }))}
                 >
                   <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder=Stimme wählen />
+                    <SelectValue placeholder={tx({ de: "Stimme wählen", en: "Select voice", es: "Seleccionar voz" })} />
                   </SelectTrigger>
                   <SelectContent>
                     {voices.map((v) => (

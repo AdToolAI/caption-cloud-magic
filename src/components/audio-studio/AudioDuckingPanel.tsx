@@ -69,7 +69,7 @@ export function AudioDuckingPanel({
     return (
       <Card className="p-8 backdrop-blur-xl bg-card/60 border-border/50 text-center">
         <AudioLines className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-        <h3 className="text-lg font-semibold mb-2">Sprache + Musik benötigt</h3>
+        <h3 className="text-lg font-semibold mb-2">{tx({ de: "Sprache + Musik benötigt", en: "Voice + music required", es: "Se requiere voz + música" })}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           Lade ein Voiceover hoch <span className="text-primary">und</span> wähle einen
           Musik-Track (über AI Music, Beat-Sync oder die Bibliothek), um Audio Ducking zu nutzen.
@@ -95,11 +95,11 @@ export function AudioDuckingPanel({
               <div className="flex items-center gap-2 mb-0.5">
                 <h3 className="text-lg font-bold">Audio Ducking</h3>
                 <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
-                  {usingTranscript ? tx({ de: 'Transkript-präzise', en: 'Transcript-precise', es: 'Preciso según transcripción' }) : tx({ de: 'RMS-Erkennung', en: 'RMS detection', es: 'Detección de RMS' })}
+                  {usingTranscript ? 'Transkript-präzise' : 'RMS-Erkennung'}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Musik wird automatisch leiser, wenn " " + tx({ de: 'Sprache', en: 'speech', es: 'habla' }) erkannt wird
+                Musik wird automatisch leiser, wenn Sprache erkannt wird
               </p>
             </div>
           </div>
@@ -112,7 +112,7 @@ export function AudioDuckingPanel({
               className="border-primary/40"
             >
               {isPlaying ? <Pause className="w-5 h-5 mr-2" /> : <Play className="w-5 h-5 mr-2" />}
-              {isPlaying ? 'Pause' : tx({ de: 'Live-Mix abspielen', en: 'Play live mix', es: 'Reproducir mezcla en vivo' })}
+              {isPlaying ? 'Pause' : 'Live-Mix abspielen'}
             </Button>
             <Button
               size="lg"
@@ -144,7 +144,7 @@ export function AudioDuckingPanel({
                   {speechLabel}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {intervals.length} Sprach-Block${intervals.length === 1 ? '' : 'e'} + " ·" {speechCoverage.toFixed(0)}% " " + tx({ de: 'Sprache', en: 'speech', es: 'habla' })
+                  {intervals.length} Sprach-Block{intervals.length === 1 ? '' : 'e'} · {speechCoverage.toFixed(0)}% Sprache
                 </span>
               </div>
               <div className="relative h-20 rounded-lg bg-muted/30 border border-border/50 overflow-hidden cursor-pointer"
@@ -194,7 +194,7 @@ export function AudioDuckingPanel({
                   <Music className="w-4 h-4 text-primary" />
                   {musicLabel}
                   <Badge variant="secondary" className="text-[10px]">
-                    -{settings.reductionDb} dB " " + tx({ de: 'beim Sprechen', en: 'while speaking', es: 'mientras habla' })
+                    -{settings.reductionDb} dB beim Sprechen
                   </Badge>
                 </div>
                 <span className="text-xs text-muted-foreground tabular-nums">
@@ -227,10 +227,10 @@ export function AudioDuckingPanel({
         <Label className="text-sm font-medium mb-3 block">Preset</Label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {([
-            { key: 'subtle', label: tx({ de: 'Subtil', en: 'Subtle', es: 'Sutil' }), sub: '-6 dB', icon: Sparkles },
-            { key: 'standard', label: tx({ de: 'Standard', en: 'Standard', es: 'Estándar' }), sub: '-12 dB', icon: Volume2 },
-            { key: 'aggressive', label: tx({ de: 'Aggressiv', en: 'Aggressive', es: 'Agresivo' }), sub: '-18 dB', icon: AudioLines },
-            { key: 'custom', label: tx({ de: 'Custom', en: 'Custom', es: 'Personalizado' }), sub: tx({ de: 'Manuell', en: 'Manual', es: 'Manual' }), icon: Sparkles },
+            { key: 'subtle', label: 'Subtil', sub: '-6 dB', icon: Sparkles },
+            { key: 'standard', label: 'Standard', sub: '-12 dB', icon: Volume2 },
+            { key: 'aggressive', label: 'Aggressiv', sub: '-18 dB', icon: AudioLines },
+            { key: 'custom', label: 'Custom', sub: 'Manuell', icon: Sparkles },
           ] as const).map(p => (
             <button
               key={p.key}

@@ -36,11 +36,11 @@ interface AIVoiceOverProps {
 }
 
 const EMOTIONAL_TONES = [
-  { id: 'neutral', name: tx({ de: 'Neutral', en: 'Neutral', es: 'Neutral' }) },
-  { id: 'enthusiastic', name: tx({ de: 'Enthusiastisch', en: 'Enthusiastic', es: 'Entusiasta' }) },
-  { id: 'calm', name: tx({ de: 'Ruhig', en: 'Calm', es: 'Calma' }) },
-  { id: 'serious', name: tx({ de: 'Seriös', en: 'Serious', es: 'Serio' }) },
-  { id: 'friendly', name: tx({ de: 'Freundlich', en: 'Friendly', es: 'Amable' }) },
+  { id: 'neutral', name: 'Neutral' },
+  { id: 'enthusiastic', name: 'Enthusiastisch' },
+  { id: 'calm', name: 'Ruhig' },
+  { id: 'serious', name: 'Seriös' },
+  { id: 'friendly', name: 'Freundlich' },
 ];
 
 const TIPS: Record<string, string> = {
@@ -139,7 +139,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
     if (lockedVoiceId) {
       localStorage.removeItem(lockStorageKey);
       setLockedVoiceId(null);
-      toast.success(tx({ de: 'Voice-Lock entfernt', en: 'Voice lock removed', es: 'Bloqueo de voz eliminado' }));
+      toast.success('Voice-Lock entfernt');
     } else {
       const payload = {
         voiceId: settings.voiceId,
@@ -149,7 +149,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       localStorage.setItem(lockStorageKey, JSON.stringify(payload));
       setLockedVoiceId(settings.voiceId);
       const voice = voices.find((v) => v.id === settings.voiceId);
-      toast.success(`$Voice-Lock aktiv: ${voice?.name ?? settings.voiceId}`);
+      toast.success(`Voice-Lock aktiv: ${voice?.name ?? settings.voiceId}`);
     }
   };
 
@@ -198,7 +198,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
   const handleVoiceSelect = (voiceId: string) => {
     if (lockedVoiceId && voiceId !== lockedVoiceId) {
-      toast.warning(tx({ de: 'Voice-Lock aktiv – entsperre zuerst, um die Stimme zu wechseln', en: 'Voice lock active – unlock first to change voice', es: 'Bloqueo de voz activo: desbloquea primero para cambiar la voz' }), { id: 'udc-voice-lock-warn' });
+      toast.warning('Voice-Lock aktiv – entsperre zuerst, um die Stimme zu wechseln', { id: 'udc-voice-lock-warn' });
       return;
     }
     const voice = voices.find((v) => v.id === voiceId);
@@ -230,10 +230,10 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             size="sm"
             onClick={toggleVoiceLock}
             className="h-7 px-2 text-xs gap-1"
-            title={lockedVoiceId ? tx({ de: 'Voice-Lock entfernen', en: 'Remove voice lock', es: 'Eliminar bloqueo de voz' }) : tx({ de: 'Aktuelle Stimme für dieses Projekt sperren', en: 'Lock current voice for this project', es: 'Bloquear voz actual para este proyecto' })}
+            title={lockedVoiceId ? 'Voice-Lock entfernen' : tx({ de: 'Aktuelle Stimme für dieses Projekt sperren', en: 'Lock current voice for this project', es: 'Bloquear voz actual para este proyecto' })}
           >
             {lockedVoiceId ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-            {lockedVoiceId ? tx({ de: 'Entsperren', en: 'Unlock', es: 'Desbloquear' }) : tx({ de: 'Sperren', en: 'Lock', es: 'Bloquear' })}
+            {lockedVoiceId ? 'Entsperren' : 'Sperren'}
           </Button>
           <Switch
             checked={settings.enabled}
@@ -249,11 +249,11 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             <Textarea
               value={settings.scriptText}
               onChange={(e) => { onSettingsChange({ ...settings, scriptText: e.target.value }); setGeneratedUrl(null); }}
-              placeholder=Gib hier deinen Voice-Over Text ein...
+              placeholder={tx({ de: "Gib hier deinen Voice-Over Text ein...", en: "Enter your voice-over text here...", es: "Introduce tu texto de voz en off aquí..." })}
               rows={4}
             />
             <p className="text-xs text-muted-foreground text-right">
-              {settings.scriptText.length} {tx({ de: 'Zeichen', en: 'characters', es: 'caracteres' }) + " • ~"{estimatedDuration} {tx({ de: 'Sekunden', en: 'seconds', es: 'segundos' })
+              {settings.scriptText.length} Zeichen • ~{estimatedDuration} Sekunden
             </p>
           </div>
 
@@ -265,7 +265,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <Label>Sprache & Stimme</Label>
+              <Label>{tx({ de: "Sprache & Stimme", en: "Language & Voice", es: "Idioma y Voz" })}</Label>
               <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
@@ -353,7 +353,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                         <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lade Stimmen…
                       </div>
                     ) : langVoices.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-6">Keine Stimmen verfügbar</p>
+                      <p className="text-sm text-muted-foreground text-center py-6">{tx({ de: "Keine Stimmen verfügbar", en: "No voices available", es: "No hay voces disponibles" })}</p>
                     ) : (
                       <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                         {cloned.length > 0 && (

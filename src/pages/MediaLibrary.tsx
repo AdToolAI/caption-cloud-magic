@@ -166,7 +166,7 @@ export default function MediaLibrary() {
           scheduleReload();
           if (payload.eventType === 'INSERT') {
             toast({
-              title: tx({ de: "🎉 Neue Medien hinzugefügt!", en: "🎉 New media added!", es: "🎉 ¡Nuevos medios añadidos!" }),
+              title: "🎉 Neue Medien hinzugefügt!",
               description: tx({ de: "Deine Media Library wurde aktualisiert", en: "Your media library has been updated", es: "Su biblioteca multimedia ha sido actualizada" }),
             });
           }
@@ -222,7 +222,7 @@ export default function MediaLibrary() {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          // Log, payload);
+          console.log('🎥 Neues Video hinzugefügt:', payload);
           scheduleReload();
           toast({
             title: tx({ de: "🎬 Neues AI-Video verfügbar!", en: "🎬 New AI video available!", es: "🎬 ¡Nuevo vídeo de IA disponible!" }),
@@ -385,11 +385,11 @@ export default function MediaLibrary() {
                     ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                     : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
           caption: isSoraAI 
-            ? tx({ de: `Sora 2 ${metadata?.model === "sora-2-pro" ? "Pro" : "Standard"} · ${metadata?.duration_seconds}s`, en: `Sora 2 ${metadata?.model === "sora-2-pro" ? "Pro" : "Standard"} · ${metadata?.duration_seconds}s`, es: `Sora 2 ${metadata?.model === "sora-2-pro" ? "Pro" : "Standard"} · ${metadata?.duration_seconds}s` })
+            ? `Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
             : isDirectorCutEnhancement
-              ? tx({ de: `Director's Cut · Sora 2 ${metadata?.model === "sora-2-pro" ? "Pro" : "Standard"} · ${metadata?.duration_seconds}s`, en: `Director's Cut · Sora 2 ${metadata?.model === "sora-2-pro" ? "Pro" : "Standard"} · ${metadata?.duration_seconds}s`, es: `Director's Cut · Sora 2 ${metadata?.model === "sora-2-pro" ? "Pro" : "Standard"} · ${metadata?.duration_seconds}s` })
+              ? `Director's Cut · Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
               : isDirectorsCut
-                ? tx({ de: "Exportiert mit Universal Director's Cut", en: "Exported with Universal Director's Cut", es: "Exportado con Universal Director's Cut" })
+                ? 'Exportiert mit Universal Director\'s Cut'
                 : isMotionStudioClip
                   ? `${motionModel} · ${metadata?.duration_seconds ?? '?'}s${metadata?.prompt ? ` · ${String(metadata.prompt).slice(0, 50)}…` : ''}`
                   : isUniversalCreator
@@ -424,7 +424,7 @@ export default function MediaLibrary() {
           source: 'video-creator' as const,
           type: 'video' as const,
           title: 'Demo Video — Universal Creator',
-          caption: tx({ de: "Dein erstes Video könnte so aussehen", en: "Your first video could look like this", es: "Tu primer vídeo podría verse así" }),
+          caption: 'Dein erstes Video könnte so aussehen',
           url: DEMO_VIDEO.output_url,
           thumbUrl: DEMO_VIDEO.output_url,
           createdAt: DEMO_VIDEO.created_at,
@@ -547,8 +547,8 @@ export default function MediaLibrary() {
       if (error) throw error;
       
       toast({
-        title: tx({ de: "Import erfolgreich", en: "Import successful", es: "Importación exitosa" }),
-        description: tx({ de: "Medien von URL importiert", en: "Media imported from URL", es: "Medios importados de URL" }),
+        title: 'Import successful',
+        description: 'Media imported from URL',
       });
       
       setImportUrl("");
@@ -556,7 +556,7 @@ export default function MediaLibrary() {
       loadStorageQuota();
     } catch (error: any) {
       toast({
-        title: tx({ de: "Import fehlgeschlagen", en: "Import failed", es: "Importación fallida" }),
+        title: 'Import failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -585,13 +585,13 @@ export default function MediaLibrary() {
     if (decision.blocked) {
       if (decision.blockReason === 'cloud_offload_required') {
         toast({
-          title: tx({ de: "Speicher-Limit erreicht", en: "Storage limit reached", es: "Límite de almacenamiento alcanzado" }),
+          title: 'Speicher-Limit erreicht',
           description: tx({ de: 'Bitte lagere ältere Medien in deine verbundene Google Drive aus, um Platz zu schaffen.', en: 'Please offload older media to your connected Google Drive to free up space.', es: 'Traslada medios antiguos a tu Google Drive conectado para liberar espacio.' }),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: tx({ de: "Limit erreicht", en: "Limit reached", es: "Límite alcanzado" }),
+          title: 'Limit erreicht',
           description: tx({ de: 'Keine alten Medien zum Freigeben gefunden. Bitte manuell löschen oder Google Drive verbinden.', en: 'No older media found to free up. Please delete manually or connect Google Drive.', es: 'No se encontraron medios antiguos. Elimina manualmente o conecta Google Drive.' }),
           variant: 'destructive',
         });
@@ -607,7 +607,7 @@ export default function MediaLibrary() {
           await deleteMediaItem(item);
         }
         toast({
-          title: tx({ de: "Platz geschaffen", en: "Space created", es: "Espacio creado" }),
+          title: 'Platz geschaffen',
           description: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }),
         });
       } catch (cleanupErr: any) {
@@ -652,7 +652,7 @@ export default function MediaLibrary() {
 
       toast({
         title: tx({ de: 'Upload successful', en: 'Upload successful', es: 'Subida exitosa' }),
-        description: tx({ de: "Medien erfolgreich hochgeladen", en: "Media uploaded successfully", es: "Medios subidos con éxito" }),
+        description: 'Media uploaded successfully',
       });
 
       loadMedia();
@@ -715,7 +715,7 @@ export default function MediaLibrary() {
       }
 
       toast({
-        title: tx({ de: "Gelöscht", en: "Deleted", es: "Eliminado" }),
+        title: 'Gelöscht',
         description: tx({ de: 'Medium erfolgreich gelöscht', en: 'Media deleted successfully', es: 'Medios eliminados correctamente' }),
       });
 
@@ -759,7 +759,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: tx({ de: "✉️ Medien gesendet", en: "✉️ Media sent", es: "✉️ Medios enviados" }),
+      title: "✉️ Media gesendet",
       description: tx({ de: "Wird im Composer geladen...", en: "Loading in composer...", es: "Cargando en compositor..." }),
     });
     
@@ -778,7 +778,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: tx({ de: "📅 Medien gesendet", en: "📅 Media sent", es: "📅 Medios enviados" }),
+      title: "📅 Media gesendet",
       description: tx({ de: "Wird im Kalender geladen...", en: "Loading in calendar...", es: "Cargando en calendario..." }),
     });
     
@@ -803,7 +803,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: tx({ de: "🎨 Medien gesendet", en: "🎨 Media sent", es: "🎨 Medios enviados" }),
+      title: "🎨 Media gesendet",
       description: tx({ de: "Wird in Smart Background geladen...", en: "Loading in Smart Background...", es: "Cargando en Fondo inteligente..." }),
     });
     
@@ -851,7 +851,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: tx({ de: "📸 Medien gesendet", en: "📸 Media sent", es: "📸 Medios enviados" }),
+      title: "📸 Media gesendet",
       description: tx({ de: `Erstes Medium wird im KI-Post-Generator geladen...`, en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }),
     });
     
@@ -877,7 +877,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: tx({ de: "📅 Medien gesendet", en: "📅 Media sent", es: "📅 Medios enviados" }),
+      title: "📅 Media gesendet",
       description: tx({ de: `Erstes Medium wird im Kalender geladen...`, en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }),
     });
     
@@ -908,7 +908,7 @@ export default function MediaLibrary() {
     }));
     
     toast({
-      title: tx({ de: "🎨 Medien gesendet", en: "🎨 Media sent", es: "🎨 Medios enviados" }),
+      title: "🎨 Media gesendet",
       description: tx({ de: `Erstes Bild wird in Smart Background geladen...`, en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }),
     });
     
@@ -1082,27 +1082,27 @@ export default function MediaLibrary() {
         <CardContent className="pt-6">
           <div className="flex gap-4 flex-wrap items-end">
             <div className="flex-1 min-w-[200px]">
-              <Label>Suche</Label>
+              <Label>Search</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder=Medien suchen...
+                  placeholder="Search media..."
                   className="pl-10"
                 />
               </div>
             </div>
 
             <div>
-              <Label>Dateityp</Label>
+              <Label>File Type</Label>
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Alle Typen</SelectItem>
-                  <SelectItem value="image">Bilder</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="image">Images</SelectItem>
                   <SelectItem value="video">Videos</SelectItem>
                 </SelectContent>
               </Select>
@@ -1236,7 +1236,7 @@ export default function MediaLibrary() {
                   <div className="flex flex-col items-center gap-2">
                     {getFileIcon(item.type)}
                     <span className="text-sm text-center px-2 break-words">
-                      {item.title || item.storagePath?.split('/').pop() || tx({ de: "Unbenannt", en: "Untitled", es: "Sin título" })}
+                      {item.title || item.storagePath?.split('/').pop() || 'Unbenannt'}
                     </span>
                   </div>
                 )}
@@ -1339,7 +1339,7 @@ export default function MediaLibrary() {
                           <FolderPlus className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>In Album speichern</TooltipContent>
+                      <TooltipContent>{tx({ de: "In Album speichern", en: "Save to album", es: "Guardar en álbum" })}</TooltipContent>
                     </Tooltip>
 
                     <Tooltip>
@@ -1377,7 +1377,7 @@ export default function MediaLibrary() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Löschen</TooltipContent>
+                      <TooltipContent>{tx({ de: "Löschen", en: "Delete", es: "Borrar" })}</TooltipContent>
                     </Tooltip>
                   </>
 
@@ -1385,7 +1385,7 @@ export default function MediaLibrary() {
               </div>
               <CardContent className="p-3">
                 <p className="text-sm font-medium truncate">
-                  {item.title || item.storagePath?.split('/').pop() || tx({ de: "Unbenannt", en: "Untitled", es: "Sin título" })}
+                  {item.title || item.storagePath?.split('/').pop() || 'Unbenannt'}
                 </p>
                 {item.caption && (
                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.caption}</p>
@@ -1428,7 +1428,7 @@ export default function MediaLibrary() {
         <Card className="p-12">
           <div className="text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg font-medium mb-2">Keine Medien gefunden</p>
+            <p className="text-lg font-medium mb-2">{tx({ de: "Keine Medien gefunden", en: "No media found", es: "No se encontraron medios" })}</p>
             <p className="text-sm text-muted-foreground mb-4">Laden Sie Ihre ersten Dateien hoch</p>
             <Button asChild>
               <label htmlFor="file-upload" className="cursor-pointer">

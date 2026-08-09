@@ -77,9 +77,9 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
   };
 
   const quick = [
-    Ist die Headline stark genug?,
-    Passt der Ton zur Plattform?,
-    Wie mache ich den CTA konkreter?,
+    "Ist die Headline stark genug?",
+    "Passt der Ton zur Plattform?",
+    "Wie mache ich den CTA konkreter?",
   ];
 
   return (
@@ -89,7 +89,7 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
           <SheetTitle className="flex items-center gap-2 font-display">
             <MessageSquare className="h-4 w-4 text-primary" /> Coach
           </SheetTitle>
-          <SheetDescription>Feedback zu genau dem Entwurf, der gerade offen ist.</SheetDescription>
+          <SheetDescription>{tx({ de: "Feedback zu genau dem Entwurf, der gerade offen ist.", en: "Feedback on the exact draft that is currently open.", es: "Comentarios sobre el borrador exacto que está abierto actualmente." })}</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="mt-4 flex-1 pr-3">
@@ -135,7 +135,7 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
             send(input);
           }}
         >
-          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder=Frag den Coach … />
+          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Frag den Coach …" />
           <Button type="submit" size="icon" disabled={busy}>
             <Send className="h-4 w-4" />
           </Button>

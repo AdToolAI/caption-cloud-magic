@@ -82,7 +82,7 @@ export default function CharacterEditor({
         const url = await uploadLibraryImage(file, 'character', tmpId);
         if (url) {
           setDraft((d) => ({ ...d, reference_image_url: url }));
-          toast.success(tx({ de: 'Referenzbild hochgeladen', en: 'Reference image uploaded', es: 'Imagen de referencia subida' }));
+          toast.success('Referenzbild hochgeladen');
         }
       } finally {
         setUploading(false);
@@ -153,7 +153,7 @@ export default function CharacterEditor({
             reference_image_url: url,
             reference_image_seed: data.styleSeed ?? d.reference_image_seed,
           }));
-          toast.success(tx({ de: 'Character Sheet generiert ✨', en: 'Character sheet generated ✨', es: 'Hoja de personaje generada ✨' }));
+          toast.success('Character Sheet generiert ✨');
           return;
         }
       } catch (uploadErr) {
@@ -166,7 +166,7 @@ export default function CharacterEditor({
         reference_image_url: data.imageUrl,
         reference_image_seed: data.styleSeed ?? d.reference_image_seed,
       }));
-      toast.success(tx({ de: 'Character Sheet generiert ✨', en: 'Character sheet generated ✨', es: 'Hoja de personaje generada ✨' }));
+      toast.success('Character Sheet generiert ✨');
     } catch (err) {
       const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });
       toast.error(msg);
@@ -192,7 +192,7 @@ export default function CharacterEditor({
       return;
     }
     if (!draft.description.trim()) {
-      toast.error(tx({ de: 'Beschreibung ist erforderlich', en: 'Description is required', es: 'La descripción es obligatoria' }));
+      toast.error(tx({ de: 'Beschreibung ist erforderlich', en: 'Description is required', es: 'Se requiere descripción' }));
       return;
     }
     setSaving(true);
@@ -221,7 +221,7 @@ export default function CharacterEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            {character ? tx({ de: character ? 'Charakter bearbeiten' : 'Neuen Charakter anlegen', en: character ? 'Edit character' : 'Create new character', es: character ? 'Editar personaje' : 'Crear nuevo personaje' })}
+            {character ? 'Charakter bearbeiten' : 'Neuen Charakter anlegen'}
           </DialogTitle>
           <DialogDescription>
             Speichere wiederverwendbare Charaktere mit Reference-Image für visuelle Konsistenz
@@ -421,7 +421,7 @@ export default function CharacterEditor({
 
         <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Abbrechen
+            {tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}

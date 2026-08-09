@@ -78,7 +78,7 @@ function TimelineSegment({
         </button>
         <div className="flex-1 overflow-hidden">
           <div className="text-xs font-medium text-primary-foreground truncate">
-            {segment.text || tx({ de: 'Leeres Segment', en: 'Empty segment', es: 'Segmento vacío' })}
+            {segment.text || 'Leeres Segment'}
           </div>
           <div className="text-[10px] text-primary-foreground/70">
             {segment.startTime.toFixed(1)}s - {(segment.startTime + segment.duration).toFixed(1)}s
@@ -134,8 +134,8 @@ export const TimelineScriptEditor = ({
     setSelectedSegmentId(newSegment.id);
     
     toast({
-      title: tx({ de: "Segment", en: "Segment", es: "Segmento" }),
-      description: tx({ de: "Neues Segment zur Timeline hinzugefügt", en: "New segment added to the timeline", es: "Nuevo segmento añadido a la línea de tiempo" })
+      title: "Segment hinzugefügt",
+      description: "Neues Segment zur Timeline hinzugefügt"
     });
   };
 
@@ -208,7 +208,7 @@ export const TimelineScriptEditor = ({
     } catch (error) {
       console.error('Auto-Sync error:', error);
       toast({
-        title: tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" }),
+        title: tx({ de: "Auto-Sync fehlgeschlagen", en: "Auto-sync failed", es: "Sincronización automática fallida" }),
         description: error instanceof Error ? error.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: "destructive"
       });
@@ -270,7 +270,7 @@ export const TimelineScriptEditor = ({
       onSegmentsChange(newSegments);
       
       toast({
-        title: tx({ de: "✓ Text in Segmente aufgeteilt", en: "✓ Text split into segments", es: "✓ Texto dividido en segmentos" }),
+        title: "✓ Text in Segmente aufgeteilt",
         description: `${newSegments.length} intelligente Segmente erstellt`
       });
     } catch (error) {
@@ -313,8 +313,8 @@ export const TimelineScriptEditor = ({
     }
     
     toast({
-      title: tx({ de: "Segment", en: "Segment", es: "Segmento" }),
-      description: tx({ de: "Segment", en: "Segment", es: "Segmento" })
+      title: "Segment gelöscht",
+      description: "Segment von der Timeline entfernt"
     });
   };
 
@@ -365,7 +365,7 @@ export const TimelineScriptEditor = ({
                 size="sm" 
                 variant="outline"
                 disabled={isAutoSyncing || segments.length === 0}
-                title=Text intelligent in mehrere Segmente aufteilen
+                title="Text intelligent in mehrere Segmente aufteilen"
               >
                 {isAutoSyncing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -378,7 +378,7 @@ export const TimelineScriptEditor = ({
                 size="sm" 
                 variant="secondary"
                 disabled={isAutoSyncing || segments.length === 0}
-                title=Segment
+                title={tx({ de: "Segmente mit präzisem Timing und Untertiteln synchronisieren", en: "Sync segments with precise timing and subtitles", es: "Sincronizar segmentos con temporización precisa y subtítulos" })}
               >
                 {isAutoSyncing ? (
                   <>
@@ -392,7 +392,7 @@ export const TimelineScriptEditor = ({
                   </>
                 )}
               </Button>
-              <Button onClick={addSegment size="sm">
+              <Button onClick={addSegment} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Segment
               </Button>
@@ -402,7 +402,7 @@ export const TimelineScriptEditor = ({
         <CardContent className="space-y-6">
           {/* Timeline Ruler */}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Zeitachse (Gesamt: ${totalDuration}s)</Label>
+            <Label className="text-xs text-muted-foreground">Zeitachse (Gesamt: {totalDuration}s)</Label>
             <div className="relative border rounded-lg p-4 bg-muted/30 min-h-32">
               {/* Time marks */}
               <div className="absolute top-0 left-0 right-0 h-6 border-b flex items-end">
@@ -432,13 +432,13 @@ export const TimelineScriptEditor = ({
                       totalDuration={totalDuration}
                       isSelected={selectedSegmentId === segment.id}
                       onClick={() => setSelectedSegmentId(segment.id)}
-                      onUpdate={updateSegment
+                      onUpdate={updateSegment}
                     />
                   ))}
                   
                   {segments.length === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                      Klicke "Segment hinzufügen" um zu starten
+                      {tx({ de: 'Klicke "Segment hinzufügen" um zu starten', en: 'Click "Add segment" to start', es: 'Haz clic en "Agregar segmento" para comenzar' })}
                     </div>
                   )}
                 </div>
@@ -451,7 +451,7 @@ export const TimelineScriptEditor = ({
             <Card className="border-primary/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">Segment</CardTitle>
+                  <CardTitle className="text-base">{tx({ de: "Segment Details", en: "Segment details", es: "Detalles del segmento" })}</CardTitle>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
@@ -522,16 +522,16 @@ export const TimelineScriptEditor = ({
 
                 {mediaUrls.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Bild während Segment</Label>
+                    <Label>{tx({ de: "Bild während Segment", en: "Image during segment", es: "Imagen durante el segmento" })}</Label>
                     <Select
                       value={selectedSegment.imageIndex?.toString() || ''}
                       onValueChange={(value) => updateSegment(selectedSegment.id, { imageIndex: parseInt(value) })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder=Kein Bild ausgewählt />
+                        <SelectValue placeholder={tx({ de: "Kein Bild ausgewählt", en: "No image selected", es: "Ninguna imagen seleccionada" })} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="-1">Kein Bild</SelectItem>
+                        <SelectItem value="-1">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</SelectItem>
                         {mediaUrls.map((url, index) => (
                           <SelectItem key={index} value={index.toString()}>
                             Bild {index + 1}
@@ -543,9 +543,9 @@ export const TimelineScriptEditor = ({
                 )}
 
                 <div className="pt-2 text-xs text-muted-foreground space-y-1">
-                  <div>💡 <strong>Tipp:</strong> Ziehe Segmente auf der Timeline um die Position zu ändern</div>
-                  <div>✨ <strong>Auto-Split:</strong> Teilt Text intelligent in mehrere Segmente auf</div>
-                  <div>🎯 <strong>Auto-Sync:</strong> Optimiert Timing und generiert word-by-word Untertitel</div>
+                  <div>💡 <strong>Tipp:</strong> {tx({ de: "Ziehe Segmente auf der Timeline um die Position zu ändern", en: "Drag segments on the timeline to change positions", es: "Arrastre segmentos en la línea de tiempo para cambiar de posición" })}</div>
+                  <div>✨ <strong>Auto-Split:</strong> {tx({ de: "Teilt Text intelligent in mehrere Segmente auf", en: "Intelligently splits text into multiple segments", es: "Divide inteligentemente el texto en múltiples segmentos" })}</div>
+                  <div>🎯 <strong>Auto-Sync:</strong> {tx({ de: "Optimiert Timing und generiert word-by-word Untertitel", en: "Optimizes timing and generates word-by-word subtitles", es: "Optimiza el tiempo y genera subtítulos palabra por palabra." })}</div>
                 </div>
               </CardContent>
             </Card>

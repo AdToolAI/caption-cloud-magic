@@ -155,7 +155,7 @@ export function CrossPostMagicPanel({
               Klicke <span className="font-semibold text-[#F5C76A]">Generate</span>, um für jede Plattform eine optimierte Caption zu erstellen.
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              ${activeChannels.length} Kanäle ausgewählt · Sprache: ${(language ?? "en").toUpperCase()}
+              {activeChannels.length} Kanäle ausgewählt · Sprache: {(language ?? "en").toUpperCase()}
             </p>
           </div>
         ) : (
@@ -227,7 +227,7 @@ export function CrossPostMagicPanel({
                     />
                     {over && (
                       <div className="mt-1 flex items-center gap-1 text-[11px] text-red-400">
-                        <AlertTriangle className="h-3 w-3" /> Zu lang für ${CHANNEL_META[c].name} (max ${rule.captionMax}).
+                        <AlertTriangle className="h-3 w-3" /> Zu lang für {CHANNEL_META[c].name} (max {rule.captionMax}).
                       </div>
                     )}
                   </div>
@@ -279,7 +279,7 @@ export function CrossPostMagicPanel({
       {hasAnyDraft && (
         <div className="flex items-center justify-between border-t border-white/5 bg-black/30 p-4">
           <div className="text-xs text-muted-foreground">
-            {allReady ? tx({ de: "Alle Kanäle bereit", en: "All channels ready", es: "Todos los canales listos" }) : tx({ de: `${activeChannels.filter((c) => drafts[c]).length}/${activeChannels.length} Drafts bereit`}
+            {allReady ? "Alle Kanäle bereit" : `${activeChannels.filter((c) => drafts[c]).length}/${activeChannels.length} Drafts bereit`}
           </div>
           <Button
             onClick={handlePublish}

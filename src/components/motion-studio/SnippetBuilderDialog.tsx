@@ -107,7 +107,7 @@ export default function SnippetBuilderDialog({
     if (!t) return;
     if (tags.includes(t)) return;
     if (tags.length >= 8) {
-      toast.error(tx({ de: 'Max. 8 Tags', en: 'Max. 8 tags', es: 'Máx. 8 etiquetas' }));
+      toast.error('Max. 8 Tags');
       return;
     }
     setTags((prev) => [...prev, t]);
@@ -141,7 +141,7 @@ export default function SnippetBuilderDialog({
           .createSignedUrl(path, 60 * 60 * 24 * 365);
         if (signed?.signedUrl) {
           setThumbnailUrl(signed.signedUrl);
-          toast.success(tx({ de: 'Vorschau gesetzt', en: 'Preview set', es: 'Vista previa establecida' }));
+          toast.success('Vorschau gesetzt');
         }
       } catch (e: any) {
         toast.error(tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? e}` }));
@@ -154,11 +154,11 @@ export default function SnippetBuilderDialog({
 
   const handleSave = useCallback(async () => {
     if (name.trim().length < MIN_NAME) {
-      toast.error(tx({ de: `Name min. ${MIN_NAME} Zeichen`, en: `Name at least ${MIN_NAME} characters`, es: `Nombre al menos ${MIN_NAME} caracteres` }));
+      toast.error(`Name min. ${MIN_NAME} Zeichen`);
       return;
     }
     if (prompt.trim().length < MIN_PROMPT) {
-      toast.error(tx({ de: `Prompt min. ${MIN_PROMPT} Zeichen`, en: `Prompt at least ${MIN_PROMPT} characters`, es: `Prompt al menos ${MIN_PROMPT} caracteres` }));
+      toast.error(`Prompt min. ${MIN_PROMPT} Zeichen`);
       return;
     }
     if (isPublic && !thumbnailUrl) {
@@ -228,7 +228,7 @@ export default function SnippetBuilderDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            {isEdit ? tx({ de: 'Snippet bearbeiten', en: 'Edit snippet', es: 'Editar fragmento' }) : tx({ de: 'Neues Snippet', en: 'New snippet', es: 'Nuevo fragmento' })}
+            {isEdit ? 'Snippet bearbeiten' : 'Neues Snippet'}
           </DialogTitle>
           <DialogDescription>
             Speichere wiederverwendbare Szenen-Bausteine — optional teilbar mit der Community.
@@ -238,14 +238,14 @@ export default function SnippetBuilderDialog({
         <div className="space-y-4">
           {/* Thumbnail */}
           <div>
-            <Label className="text-xs">Vorschaubild + "</Label>"
+            <Label className="text-xs">Vorschaubild</Label>
             <div className="mt-1 flex items-center gap-3">
               <div className="h-24 w-40 rounded-md border border-border/60 bg-background/60 overflow-hidden flex items-center justify-center">
                 {thumbnailUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={thumbnailUrl} alt="Vorschau" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-[10px] text-muted-foreground">Kein Bild</span>
+                  <span className="text-[10px] text-muted-foreground">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</span>
                 )}
               </div>
               <div className="flex flex-col gap-1.5">
@@ -286,7 +286,7 @@ export default function SnippetBuilderDialog({
 
           {/* Name */}
           <div>
-            <Label className="text-xs">Name + "</Label>"
+            <Label className="text-xs">Name</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -297,7 +297,7 @@ export default function SnippetBuilderDialog({
 
           {/* Category */}
           <div>
-            <Label className="text-xs">Kategorie + "</Label>"
+            <Label className="text-xs">Kategorie</Label>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="bg-background/60 mt-1">
                 <SelectValue />
@@ -314,18 +314,18 @@ export default function SnippetBuilderDialog({
 
           {/* Description */}
           <div>
-            <Label className="text-xs">Beschreibung (optional) + "</Label>"
+            <Label className="text-xs">Beschreibung (optional)</Label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder=Kurzbeschreibung für die Library-Karte
+              placeholder={tx({ de: "Kurzbeschreibung für die Library-Karte", en: "Short description for the library card", es: "Breve descripción de la tarjeta de la biblioteca" })}
               className="bg-background/60 mt-1"
             />
           </div>
 
           {/* Prompt */}
           <div>
-            <Label className="text-xs">Prompt + "</Label>"
+            <Label className="text-xs">Prompt</Label>
             <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -333,12 +333,12 @@ export default function SnippetBuilderDialog({
               placeholder="Cinematic shot description, camera move, lighting, mood..."
               className="bg-background/60 mt-1 font-mono text-xs"
             />
-            <p className="text-[10px] text-muted-foreground mt-1">{prompt.trim().length}/{MIN_PROMPT}+ tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' }) + "</p>"
+            <p className="text-[10px] text-muted-foreground mt-1">{prompt.trim().length}/{MIN_PROMPT}+ Zeichen</p>
           </div>
 
           {/* Duration */}
           <div>
-            <Label className="text-xs">Dauer (Sekunden, optional)</Label>
+            <Label className="text-xs">{tx({ de: "Dauer (Sekunden, optional)", en: "Duration (seconds, optional)", es: "Duración (segundos, opcional)" })}</Label>
             <Input
               type="number"
               min={1}
@@ -352,7 +352,7 @@ export default function SnippetBuilderDialog({
 
           {/* Tags */}
           <div>
-            <Label className="text-xs">Tags + "</Label>"
+            <Label className="text-xs">Tags</Label>
             <div className="flex gap-1.5 mt-1">
               <Input
                 value={tagDraft}
@@ -389,11 +389,12 @@ export default function SnippetBuilderDialog({
             <Globe2 className="h-4 w-4 text-primary mt-0.5" />
             <div className="flex-1">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-semibold">Mit Community teilen + "</Label>"
+                <Label className="text-xs font-semibold">Mit Community teilen</Label>
                 <Switch checked={isPublic} onCheckedChange={setIsPublic} disabled={!canPublish && !isPublic} />
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Öffentliche Snippets erscheinen in der Community-Library. Andere User können liken und klonen — Cast & Location bleiben privat.
+                Öffentliche Snippets erscheinen in der Community-Library. Andere User können liken und klonen
+                — Cast & Location bleiben privat.
               </p>
               {!canPublish && (
                 <p className="text-[10px] text-amber-500 mt-1">
@@ -410,7 +411,7 @@ export default function SnippetBuilderDialog({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            {isEdit ? tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' }) : tx({ de: 'Snippet anlegen', en: 'Create snippet', es: 'Crear fragmento' })}
+            {isEdit ? tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' }) : 'Snippet anlegen'}
           </Button>
         </DialogFooter>
       </DialogContent>

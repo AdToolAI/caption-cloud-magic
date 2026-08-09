@@ -227,7 +227,7 @@ const AllComments = () => {
         prev.map(c => (c.id === commentId ? { ...c, status: newStatus } : c))
       );
 
-      toast({ title: tx({ de: "Status aktualisiert", en: "Status updated", es: "Estado actualizado" }) });
+      toast({ title: "Status aktualisiert" });
     } catch (error) {
       console.error("Error updating status:", error);
       toast({
@@ -272,8 +272,8 @@ const AllComments = () => {
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Alle Kommentare</h1>
-          <p className="text-muted-foreground">Persistente Kommentarverwaltung über alle Plattformen</p>
+          <h1 className="text-3xl font-bold">{tx({ de: "Alle Kommentare", en: "All comments", es: "Todos los comentarios" })}</h1>
+          <p className="text-muted-foreground">{tx({ de: "Persistente Kommentarverwaltung über alle Plattformen", en: "Persistent comment management across all platforms", es: "Gestión persistente de comentarios en todas las plataformas" })}</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
@@ -285,7 +285,7 @@ const AllComments = () => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Kommentare importieren + "</DialogTitle>"
+                <DialogTitle>Kommentare importieren</DialogTitle>
               </DialogHeader>
               <Textarea
                 placeholder="Ein Kommentar pro Zeile..."
@@ -293,7 +293,7 @@ const AllComments = () => {
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
               />
-              <Button onClick={handleImport}>Import starten + "</Button>"
+              <Button onClick={handleImport}>Import starten</Button>
             </DialogContent>
           </Dialog>
           <Button variant="outline">
@@ -306,23 +306,23 @@ const AllComments = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-5 gap-4">
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">" + tx({ de: 'Gesamt', en: 'Total', es: 'Total' }) + "</div>
+          <div className="text-sm text-muted-foreground">Gesamt</div>
           <div className="text-2xl font-bold">{kpiData.total}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">" + tx({ de: 'Neu (24h)', en: 'New (24h)', es: 'Nuevo (24h)' }) + "</div>
+          <div className="text-sm text-muted-foreground">Neu (24h)</div>
           <div className="text-2xl font-bold">{kpiData.new24h}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">" + tx({ de: 'Offene Fragen', en: 'Open questions', es: 'Preguntas abiertas' }) + "</div>
+          <div className="text-sm text-muted-foreground">Offene Fragen</div>
           <div className="text-2xl font-bold">{kpiData.openQuestions}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">" + tx({ de: 'Leads', en: 'Leads', es: 'Leads' }) + "</div>
+          <div className="text-sm text-muted-foreground">Leads</div>
           <div className="text-2xl font-bold">{kpiData.leads}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">" + tx({ de: 'Toxisch', en: 'Toxic', es: 'Tóxico' }) + "</div>
+          <div className="text-sm text-muted-foreground">Toxisch</div>
           <div className="text-2xl font-bold">{kpiData.toxicCount}</div>
         </Card>
       </div>
@@ -340,7 +340,7 @@ const AllComments = () => {
         </div>
         <Select value={filterPlatform} onValueChange={setFilterPlatform}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder=Plattform />
+            <SelectValue placeholder="Plattform" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">Alle</SelectItem>
@@ -351,7 +351,7 @@ const AllComments = () => {
         </Select>
         <Select value={filterSentiment} onValueChange={setFilterSentiment}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder=Sentiment />
+            <SelectValue placeholder="Sentiment" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">Alle</SelectItem>
@@ -438,13 +438,13 @@ const AllComments = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" title=Antwort kopieren>
+                        <Button variant="ghost" size="sm" title="Antwort kopieren">
                           <Copy className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title=Als erledigt markieren>
+                        <Button variant="ghost" size="sm" title="Als erledigt markieren">
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title=Flaggen>
+                        <Button variant="ghost" size="sm" title="Flaggen">
                           <Flag className="h-4 w-4" />
                         </Button>
                       </div>
