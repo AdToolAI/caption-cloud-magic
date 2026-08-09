@@ -88,7 +88,7 @@ export default function LocationEditor({
         return;
       }
       if (file.size > MAX_BYTES) {
-        toast.error(`Datei zu groß (max 20 MB).`);
+        toast.error(tx({ de: 'Datei zu groß (max 20 MB).', en: 'File too large (max 20 MB).', es: 'Archivo demasiado grande (máx. 20 MB).' }));
         return;
       }
       if (!hasConsent) {

@@ -195,32 +195,30 @@ export default function SceneRenderConfirmDialog({
                 </span>
               </div>
               <p className="text-[11.5px] leading-relaxed text-red-100/90">
+                <strong>{providerLabel}</strong>{' '}
                 {tx({
-                  de: <>Liefert bei Lip-Sync-Szenen{anyMultiSpeaker ? ' mit mehreren Sprechern' : ''} keine zuverlässigen Ergebnisse. Es kann zu Ghost-Mouthing (Nicht-Sprecher bewegen den Mund), verzerrten Gesichtern und falschen Mundbewegungen kommen.</>,
-                  en: <>Does not deliver reliable results for lip-sync scenes{anyMultiSpeaker ? ' with multiple speakers' : ''}. This can lead to ghost-mouthing (non-speakers moving their mouth), distorted faces and incorrect mouth movements.</>,
-                  es: <>No ofrece resultados fiables en escenas de lip-sync{anyMultiSpeaker ? ' con múltiples parlantes' : ''}. Puede provocar ghost-mouthing (personas que no hablan mueven la boca), rostros distorsionados y movimientos de boca incorrectos.</>,
+                  de: <>liefert bei Lip-Sync-Szenen{anyMultiSpeaker ? ' mit mehreren Sprechern' : ''} keine zuverlässigen Ergebnisse. Es kann zu Ghost-Mouthing (Nicht-Sprecher bewegen den Mund), verzerrten Gesichtern und falschen Mundbewegungen kommen.</>,
+                  en: <>does not deliver reliable results for lip-sync scenes{anyMultiSpeaker ? ' with multiple speakers' : ''}. This can lead to ghost-mouthing (non-speakers moving their mouth), distorted faces and incorrect mouth movements.</>,
+                  es: <>no ofrece resultados fiables en escenas de lip-sync{anyMultiSpeaker ? ' con múltiples parlantes' : ''}. Puede provocar ghost-mouthing (personas que no hablan mueven la boca), rostros distorsionados y movimientos de boca incorrectos.</>,
                 })}
               </p>
               <p className="text-[11.5px] leading-relaxed text-red-100/90">
-                Für stabile Lip-Sync-Renderings empfehlen wir{' '}
-                <strong>Hailuo</strong> oder <strong>HappyHorse</strong>.
+                {tx({ de: 'Für stabile Lip-Sync-Renderings empfehlen wir', en: 'For stable lip-sync renderings we recommend', es: 'Para renderizados de lip-sync estables recomendamos' })}{' '}
+                <strong>Hailuo</strong> {tx({ de: 'oder', en: 'or', es: 'o' })} <strong>HappyHorse</strong>.
               </p>
               <div className="text-[11px] leading-relaxed text-red-100/80 space-y-1 pt-1 border-t border-red-500/30">
                 <div className="font-medium text-red-200">
-                  Wenn du trotzdem fortfährst:
+                  {tx({ de: 'Wenn du trotzdem fortfährst:', en: 'If you continue anyway:', es: 'Si continúas de todos modos:' })}
                 </div>
                 <ul className="space-y-0.5 pl-3.5 list-disc marker:text-red-400">
                   <li>
-                    Die Plattform übernimmt keine Haftung für Lip-Sync-
-                    bezogene Bildfehler.
+                    {tx({ de: 'Die Plattform übernimmt keine Haftung für Lip-Sync-bezogene Bildfehler.', en: 'The platform assumes no liability for lip-sync related image errors.', es: 'La plataforma no asume responsabilidad por errores de imagen relacionados con lip-sync.' })}
                   </li>
                   <li>
-                    Eine Rückerstattung der Credits für Lip-Sync-Artefakte
-                    ist in diesem Fall ausgeschlossen.
+                    {tx({ de: 'Eine Rückerstattung der Credits für Lip-Sync-Artefakte ist in diesem Fall ausgeschlossen.', en: 'A refund of credits for lip-sync artifacts is excluded in this case.', es: 'Se excluye el reembolso de créditos por artefactos de lip-sync en este caso.' })}
                   </li>
                   <li>
-                    Andere Fehlerarten (Timeouts, Systemausfälle) bleiben
-                    weiter refundfähig.
+                    {tx({ de: 'Andere Fehlerarten (Timeouts, Systemausfälle) bleiben weiter refundfähig.', en: 'Other error types (timeouts, system failures) remain eligible for refund.', es: 'Otros tipos de errores (tiempos de espera, fallos del sistema) siguen siendo elegibles para reembolso.' })}
                   </li>
                 </ul>
               </div>
@@ -235,8 +233,7 @@ export default function SceneRenderConfirmDialog({
                   className="mt-0.5 border-red-400/60 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
                 />
                 <span className="text-[11.5px] leading-tight text-red-100 group-hover:text-red-50 select-none">
-                  Ich habe die Risiken verstanden und möchte trotzdem
-                  fortfahren.
+                  {tx({ de: 'Ich habe die Risiken verstanden und möchte trotzdem fortfahren.', en: 'I understand the risks and want to continue anyway.', es: 'Entiendo los riesgos y quiero continuar de todos modos.' })}
                 </span>
               </label>
             </div>
@@ -253,14 +250,14 @@ export default function SceneRenderConfirmDialog({
               htmlFor="suppress-confirm"
               className={`text-[11px] cursor-pointer ${hasRisk ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}
             >
-              30 Minuten lang nicht mehr fragen
+              {tx({ de: '30 Minuten lang nicht mehr fragen', en: "Don't ask again for 30 minutes", es: 'No preguntar de nuevo durante 30 minutos' })}
               {hasRisk && tx({ de: ' (nicht verfügbar bei Provider-Risiko)', en: ' (not available with provider risk)', es: ' (no disponible con riesgo de proveedor)' })}
             </Label>
           </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Abbrechen</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             disabled={confirmDisabled}

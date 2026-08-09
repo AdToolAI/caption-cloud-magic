@@ -76,7 +76,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://deine-marke.com"
+              placeholder={tx({ de: "https://deine-marke.com", en: "https://your-brand.com", es: "https://tu-marca.com" })}
               className="pl-9 bg-background/50"
               onKeyDown={(e) => e.key === "Enter" && handleExtract()}
             />

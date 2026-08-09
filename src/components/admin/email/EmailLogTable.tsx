@@ -13,6 +13,7 @@ import {
 import { Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { tx } from '@/lib/i18nText';
 
 type Row = {
   id: string;
@@ -108,24 +109,24 @@ export function EmailLogTable({ range }: Props) {
     <Card className="p-5 bg-card/60 backdrop-blur">
       <div className="flex flex-col md:flex-row gap-3 mb-4">
         <Input
-          placeholder="Empfänger suchen…"
+          placeholder={tx({ de: "Empfänger suchen…", en: "Search recipient…", es: "Buscar destinatario…" })}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="md:max-w-xs"
         />
         <Select value={templateFilter} onValueChange={setTemplateFilter}>
-          <SelectTrigger className="md:w-56"><SelectValue placeholder="Template" /></SelectTrigger>
+          <SelectTrigger className="md:w-56"><SelectValue placeholder={tx({ de: "Vorlage", en: "Template", es: "Plantilla" })} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Alle Templates</SelectItem>
+            <SelectItem value="all">{tx({ de: "Alle Vorlagen", en: "All templates", es: "Todas las plantillas" })}</SelectItem>
             {templates.map((t) => (
               <SelectItem key={t} value={t}>{t}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="md:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="md:w-44"><SelectValue placeholder={tx({ de: "Status", en: "Status", es: "Estado" })} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Alle Status</SelectItem>
+            <SelectItem value="all">{tx({ de: "Alle Status", en: "All statuses", es: "Todos los estados" })}</SelectItem>
             <SelectItem value="sent">Sent</SelectItem>
             <SelectItem value="suppressed">Suppressed</SelectItem>
             <SelectItem value="failed">Failed</SelectItem>
@@ -140,7 +141,7 @@ export function EmailLogTable({ range }: Props) {
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <AlertCircle className="h-6 w-6 mb-2" />
-          Keine Einträge im gewählten Zeitraum.
+          {tx({ de: "Keine Einträge im gewählten Zeitraum.", en: "No entries in the selected time range.", es: "No hay entradas en el período seleccionado." })}
         </div>
       ) : (
         <>
@@ -148,12 +149,12 @@ export function EmailLogTable({ range }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[160px]">Zeitpunkt</TableHead>
-                  <TableHead>Template</TableHead>
-                  <TableHead>Empfänger</TableHead>
-                  <TableHead>Betreff</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead>Fehler / Resend-ID</TableHead>
+                  <TableHead className="w-[160px]">{tx({ de: "Zeitpunkt", en: "Timestamp", es: "Fecha y hora" })}</TableHead>
+                  <TableHead>{tx({ de: "Vorlage", en: "Template", es: "Plantilla" })}</TableHead>
+                  <TableHead>{tx({ de: "Empfänger", en: "Recipient", es: "Destinatario" })}</TableHead>
+                  <TableHead>{tx({ de: "Betreff", en: "Subject", es: "Asunto" })}</TableHead>
+                  <TableHead className="w-[120px]">{tx({ de: "Status", en: "Status", es: "Estado" })}</TableHead>
+                  <TableHead>{tx({ de: "Fehler / Resend-ID", en: "Error / Resend ID", es: "Error / ID de Resend" })}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -176,10 +177,10 @@ export function EmailLogTable({ range }: Props) {
           </div>
 
           <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
-            <span>{total.toLocaleString('de-DE')} Einträge · Seite {page + 1} / {totalPages}</span>
+            <span>{tx({ de: `${total.toLocaleString('de-DE')} Einträge · Seite ${page + 1} / ${totalPages}`, en: `${total.toLocaleString('en-US')} entries · page ${page + 1} / ${totalPages}`, es: `${total.toLocaleString('es-ES')} entradas · página ${page + 1} / ${totalPages}` })}</span>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Zurück</Button>
-              <Button size="sm" variant="outline" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>Weiter</Button>
+              <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
+              <Button size="sm" variant="outline" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>{tx({ de: "Weiter", en: "Next", es: "Siguiente" })}</Button>
             </div>
           </div>
         </>
