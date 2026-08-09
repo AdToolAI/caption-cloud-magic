@@ -1,4 +1,3 @@
-import { tx } from "@/lib/i18nText";
 import { useMemo } from "react";
 import { Joyride, EVENTS, STATUS, type Step, type EventData } from "react-joyride";
 import { useProductTour } from "@/hooks/useProductTour";
@@ -54,29 +53,29 @@ const tourCopy: Record<
     last: "Verstanden",
     steps: [
       {
-        title: tx({ de: "Willkommen in deinem Command-Center 🎬", en: "Welcome to your command center 🎬", es: "Bienvenido a tu centro de mando 🎬" }),
+        title: "Willkommen in deinem Command-Center 🎬",
         content:
-          tx({ de: "Diese Hub-Icons sind dein Shortcut zu allen Tools — Studios, Social, Kalender, Analytics. Hover über jedes Icon, um zu sehen, was dahintersteckt.", en: "These Hub icons are your shortcut to all tools — Studios, Social, Calendar, Analytics. Hover over each icon to see what's behind it.", es: "Estos iconos de Hub son tu atajo a todas las herramientas — Estudios, Social, Calendario, Analíticas. Pasa el ratón por cada icono para ver qué hay detrás." }),
+          "Diese Hub-Icons sind dein Shortcut zu allen Tools — Studios, Social, Kalender, Analytics. Hover über jedes Icon, um zu sehen, was dahintersteckt.",
       },
       {
-        title: tx({ de: "Live News & Trends", en: "Live News & Trends", es: "Noticias y tendencias en vivo" }),
+        title: "Live News & Trends",
         content:
-          tx({ de: "Dein Dashboard zeigt dir Echtzeit-Branchen-News und virale Hooks — du weißt immer, was als nächstes zu posten ist.", en: "Your Dashboard shows you real-time industry news and viral hooks — you'll always know what to post next.", es: "Tu Dashboard te muestra noticias de la industria en tiempo real y ganchos virales — siempre sabrás qué publicar a continuación." }),
+          "Dein Dashboard zeigt dir Echtzeit-Branchen-News und virale Hooks — du weißt immer, was als nächstes zu posten ist.",
       },
       {
-        title: tx({ de: "Erstes Video in 90 Sekunden", en: "First video in 90 seconds", es: "Primer vídeo en 90 segundos." }),
+        title: "Erstes Video in 90 Sekunden",
         content:
-          tx({ de: "Nutze einen der personalisierten Prompts hier, um dein erstes KI-Video mit Hailuo 2.3 zu erstellen. Der Brief ist bereits vorausgefüllt.", en: "Use one of the personalized prompts here to create your first AI video with Hailuo 2.3. The brief is already pre-filled.", es: "Usa una de las indicaciones personalizadas aquí para crear tu primer video de IA con Hailuo 2.3. El brief ya está prellenado." }),
+          "Nutze einen der personalisierten Prompts hier, um dein erstes KI-Video mit Hailuo 2.3 zu erstellen. Der Brief ist bereits vorausgefüllt.",
       },
       {
-        title: tx({ de: "Verfolge deinen Fortschritt", en: "Track your progress", es: "Sigue tu progreso" }),
+        title: "Verfolge deinen Fortschritt",
         content:
-          tx({ de: "Diese Checkliste zeigt die 5 Meilensteine, um die Plattform voll auszuschöpfen. Klicke einen offenen Schritt, um direkt zum passenden Tool zu springen.", en: "This checklist shows the 5 milestones to fully leverage the platform. Click an open step to jump directly to the corresponding tool.", es: "Esta lista de verificación muestra los 5 hitos para aprovechar al máximo la plataforma. Haz clic en un paso abierto para ir directamente a la herramienta correspondiente." }),
+          "Diese Checkliste zeigt die 5 Meilensteine, um die Plattform voll auszuschöpfen. Klicke einen offenen Schritt, um direkt zum passenden Tool zu springen.",
       },
       {
-        title: tx({ de: "Plane & poste auf Autopilot", en: "Plan & post on autopilot", es: "Planificar y publicar en piloto automático" }),
+        title: "Plane & poste auf Autopilot",
         content:
-          tx({ de: "Sobald dein Post fertig ist, plane ihn im Kalender — Auto-Publishing übernimmt den Rest. Du bist startklar!", en: "Once your post is ready, schedule it in the calendar — Auto-Publishing does the rest. You're good to go!", es: "Una vez que tu publicación esté lista, prográmala en el calendario — la publicación automática hace el resto. ¡Estás listo para empezar!" }),
+          "Sobald dein Post fertig ist, plane ihn im Kalender — Auto-Publishing übernimmt den Rest. Du bist startklar!",
       },
     ],
   },
