@@ -347,7 +347,7 @@ export function useAudioDucking({
       }
 
       toast.success(tx({ de: 'Mix gespeichert', en: 'Mix saved', es: 'Mezcla guardada' }), {
-        description: `${formatDuration(rendered.duration)} · in der Bibliothek`,
+        description: tx({ de: `${formatDuration(rendered.duration)} · in der Bibliothek`, en: `${formatDuration(rendered.duration)} · in the library`, es: `${formatDuration(rendered.duration)} · en la biblioteca` }),
       });
       return { url: publicUrl, assetId };
     } catch (err: any) {

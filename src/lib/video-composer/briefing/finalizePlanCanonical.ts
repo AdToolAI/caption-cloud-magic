@@ -440,7 +440,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   } else if (Number.isFinite(projectTotal) && Math.abs(projectTotal - target) >= 0.5) {
     repairLog.push({
       kind: 'project-total-corrected',
-      label: `Gesamtdauer an die Szenensumme angeglichen: ${projectTotal}s → ${target}s.`,
+      label: tx({ de: `Gesamtdauer an die Szenensumme angeglichen: ${projectTotal}s → ${target}s.`, en: `Total duration aligned to scene sum: ${projectTotal}s → ${target}s.`, es: `Duración total alineada con la suma de escenas: ${projectTotal}s → ${target}s.` }),
       before: projectTotal,
       after: target,
     });
@@ -448,7 +448,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   if (redistributed.changed) {
     repairLog.push({
       kind: 'scenes-redistributed',
-      label: `Szenendauern proportional neu verteilt (${currentSum}s → ${target}s).`,
+      label: tx({ de: `Szenendauern proportional neu verteilt (${currentSum}s → ${target}s).`, en: `Scene durations redistributed proportionally (${currentSum}s → ${target}s).`, es: `Duraciones de escena redistribuidas proporcionalmente (${currentSum}s → ${target}s).` }),
       before: currentSum,
       after: target,
     });

@@ -220,7 +220,7 @@ export function LiveSweepTab() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="text-sm text-[#F5C76A] font-medium uppercase tracking-wider">
-              Live Sweep — Hard Cap (pro Run)
+              {tx({ de: "Live Sweep — Hard Cap (pro Run)", en: "Live sweep — hard cap (per run)", es: "Barrido en vivo — límite máximo (por ejecución)" })}
             </div>
             <div className="mt-1 text-3xl font-bold text-white">
               {spent.toFixed(2)} <span className="text-base text-slate-400">/ {cap.toFixed(2)} €</span>
@@ -245,7 +245,7 @@ export function LiveSweepTab() {
               ) : (
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
               )}
-              Bootstrap Assets
+              {tx({ de: "Bootstrap Assets", en: "Bootstrap assets", es: "Inicializar activos" })}
             </Button>
             <Button
               variant="outline"
@@ -255,7 +255,7 @@ export function LiveSweepTab() {
               className="border-slate-500/30"
             >
               <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-              Reload
+              {tx({ de: "Reload", en: "Reload", es: "Recargar" })}
             </Button>
           </div>
         </div>
@@ -378,7 +378,7 @@ export function LiveSweepTab() {
       {Object.keys(sweeps).length === 0 && !loading && (
         <Card className="bg-[#0A0F1F]/40 border-[#F5C76A]/10 p-8 text-center">
           <div className="text-slate-400">
-            Noch keine Live-Sweeps. Klicke "Bootstrap Assets" und dann "Run Live Sweep".
+            {tx({ de: 'Noch keine Live-Sweeps. Klicke "Bootstrap Assets" und dann "Run Live Sweep".', en: 'No live sweeps yet. Click "Bootstrap Assets" and then "Run Live Sweep".', es: 'Aún no hay barridos en vivo. Haz clic en "Bootstrap Assets" y luego en "Run Live Sweep".' })}
           </div>
         </Card>
       )}

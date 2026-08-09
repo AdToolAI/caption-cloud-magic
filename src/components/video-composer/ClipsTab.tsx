@@ -1088,7 +1088,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           <Lightbulb className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1 text-[11px] text-foreground/90 leading-relaxed">
             <span className="font-semibold text-amber-300">{tx({ de: 'Nicht zufrieden mit einer Szene?', en: 'Not happy with a scene?', es: '¿No te convence una escena?' })}</span>{' '}
-            Klicke auf <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium"><RefreshCw className="h-2.5 w-2.5" />Neu generieren</span> bei einer fertigen Szene, um sie erneut zu erstellen — jeder Re-Roll kostet erneut Credits, aber du kannst Stil, Prompt oder Charakter-Shot vorher anpassen.
+            {tx({ de: "Klicke auf", en: "Click on", es: "Haz clic en" })} <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium"><RefreshCw className="h-2.5 w-2.5" />{tx({ de: "Neu generieren", en: "Regenerate", es: "Regenerar" })}</span> {tx({ de: "bei einer fertigen Szene, um sie erneut zu erstellen — jeder Re-Roll kostet erneut Credits, aber du kannst Stil, Prompt oder Charakter-Shot vorher anpassen.", en: "on a finished scene to recreate it — every re-roll costs credits again, but you can adjust style, prompt or character shot beforehand.", es: "en una escena terminada para recrearla — cada nueva tirada vuelve a costar créditos, pero puedes ajustar antes el estilo, el prompt o el plano del personaje." })}
           </div>
           <button
             onClick={dismissRerollHint}
@@ -1105,18 +1105,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="text-xs font-medium">
-              {readyCount}/{scenes.length} Clips fertig
+              {readyCount}/{scenes.length} {tx({ de: "Clips fertig", en: "clips ready", es: "clips listos" })}
             </div>
             {generatingCount > 0 && (
               <div className="flex items-center gap-1.5 text-xs text-accent">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                {generatingCount} werden generiert…
+                {generatingCount} {tx({ de: "werden generiert…", en: "generating…", es: "generándose…" })}
               </div>
             )}
             {remainingCost > 0 && (
               <div className="flex items-center gap-1 text-xs text-amber-400">
                 <DollarSign className="h-3 w-3" />
-                €{remainingCost.toFixed(2)} verbleibend
+                €{remainingCost.toFixed(2)} {tx({ de: "verbleibend", en: "remaining", es: "restante" })}
               </div>
             )}
           </div>
@@ -1139,13 +1139,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
               disabled={!allReady && readyCount === 0}
               className="gap-1 text-xs"
             >
-              Weiter zu Voiceover & Untertitel <ArrowRight className="h-3.5 w-3.5" />
+              {tx({ de: "Weiter zu Voiceover & Untertitel", en: "Continue to voiceover & subtitles", es: "Continuar a voz en off y subtítulos" })} <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
         <Progress value={progressPercent} className="h-1.5" />
         <p className="text-[10px] text-muted-foreground/70 italic">
-          Credits werden pro Generierung abgezogen — Re-Rolls kosten erneut.
+          {tx({ de: "Credits werden pro Generierung abgezogen — Re-Rolls kosten erneut.", en: "Credits are deducted per generation — re-rolls cost again.", es: "Los créditos se descuentan por cada generación — las nuevas tiradas vuelven a costar." })}
         </p>
       </div>
 

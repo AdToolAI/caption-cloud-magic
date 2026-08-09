@@ -206,7 +206,7 @@ export default function QACockpit() {
         });
       } else {
         toast.info(tx({ de: `Test-User existiert bereits: ${data?.email}`, en: `Test user already exists: ${data?.email}`, es: `El usuario de prueba ya existe: ${data?.email}` }), {
-          description: tx({ de: "Klick auf 'tx({ de: "Passwort zurücksetzen", en: "Reset password", es: "Restablecer contraseña" })' um neue Zugangsdaten zu erzeugen.", en: "Click on 'Reset password' to generate new access data.", es: "Haga clic en 'Restablecer contraseña' para generar nuevos datos de acceso." }),
+          description: tx({ de: "Klick auf 'Passwort zurücksetzen' um neue Zugangsdaten zu erzeugen.", en: "Click on 'Reset password' to generate new access data.", es: "Haga clic en 'Restablecer contraseña' para generar nuevos datos de acceso." }),
         });
       }
     },
@@ -273,7 +273,7 @@ export default function QACockpit() {
               disabled={setupTestUser.isPending}
             >
               <KeyRound className="h-4 w-4 mr-2" />
-              Passwort zurücksetzen
+              {tx({ de: "Passwort zurücksetzen", en: "Reset password", es: "Restablecer contraseña" })}
             </Button>
             <Button
               onClick={() => triggerMission.mutate(undefined)}
@@ -285,7 +285,7 @@ export default function QACockpit() {
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              tx({ de: "Nächste Mission starten", en: "Start next mission", es: "Iniciar próxima misión" })
+              {tx({ de: "Nächste Mission starten", en: "Start next mission", es: "Iniciar próxima misión" })}
             </Button>
           </div>
         </div>
@@ -740,7 +740,7 @@ export default function QACockpit() {
         <DialogContent className="bg-[#0A0F1F] border-[#F5C76A]/30 text-foreground sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-[#F5C76A] flex items-center gap-2">
-              <KeyRound className="h-5 w-5" /> tx({ de: "Test-User-Zugangsdaten", en: "Test user credentials", es: "Credenciales de usuario de prueba" })
+              <KeyRound className="h-5 w-5" /> {tx({ de: "Test-User-Zugangsdaten", en: "Test user credentials", es: "Credenciales de usuario de prueba" })}
             </DialogTitle>
             <DialogDescription className="text-amber-300/90 flex items-start gap-2 mt-2">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -799,7 +799,7 @@ export default function QACockpit() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={closeCredentials}>
-              tx({ de: "Schließen (Passwort verwerfen)", en: "Close (discard password)", es: "Cerrar (descartar contraseña)" })
+              {tx({ de: "Schließen (Passwort verwerfen)", en: "Close (discard password)", es: "Cerrar (descartar contraseña)" })}
             </Button>
             <Button
               className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
