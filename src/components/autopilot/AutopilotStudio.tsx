@@ -43,7 +43,7 @@ function briefFromIdea(round: Round, idea: AutopilotIdea): string {
       const handling = spec.useAsOverlay
         ? tx({ de: 'wird als saubere Einblendung gelegt, nicht generieren', en: 'is placed as a clean fade-in, do not generate', es: 'se coloca como una entrada limpia, no generar' })
         : spec.styleOnly
-          ? 'nur Look übernehmen, nicht den Inhalt'
+          ? tx({ de: 'nur Look übernehmen, nicht den Inhalt', en: 'only adopt the look, not the content', es: 'Adopta solo la apariencia, no el contenido.' })
           : 'als Bildreferenz verwenden';
       return `- ${spec.label}: ${asset.description ?? asset.fileName} (${handling})${
         asset.note ? ` — Wunsch: ${asset.note}` : ''
@@ -63,7 +63,7 @@ function briefFromIdea(round: Round, idea: AutopilotIdea): string {
     '',
     `Zielgruppe: ${round.strategy.audience}`,
     `Nutzen: ${round.strategy.benefit}`,
-    `Kaufhemmnis, das entkräftet wird: ${round.strategy.objection}`,
+    tx({ de: `Kaufhemmnis, das entkräftet wird: ${round.strategy.objection}`, en: `Purchase barrier that is being refuted: ${round.strategy.objection}`, es: `Barrera de compra que se está refutando: ${round.strategy.objection}` }),
     `Tonalität: ${round.strategy.tone}`,
     round.options.lipSync
       ? `Bis zu ${round.options.lipSyncSpeakers} Person(en) sprechen sichtbar in die Kamera.`

@@ -82,7 +82,7 @@ export function MultiReferenceUploader({
 
   const uploadFile = async (file: File, role: ViduReferenceRole) => {
     if (!user) {
-      toast.error(language === 'de' ? 'Bitte einloggen.' : 'Please sign in.');
+      toast.error(language === 'de' ? tx({ de: 'Bitte einloggen.', en: 'Please log in.', es: 'Por favor inicia sesión.' }) : 'Please sign in.');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -102,7 +102,7 @@ export function MultiReferenceUploader({
         .getPublicUrl(path);
       onChange([...slots, { url: publicUrl, role }]);
     } catch (err: any) {
-      toast.error(err?.message ?? (language === 'de' ? 'Upload fehlgeschlagen.' : 'Upload failed.'));
+      toast.error(err?.message ?? (language === 'de' ? tx({ de: 'Upload fehlgeschlagen.', en: 'Upload failed.', es: 'La carga falló.' }) : 'Upload failed.'));
     } finally {
       setUploadingIndex(null);
     }

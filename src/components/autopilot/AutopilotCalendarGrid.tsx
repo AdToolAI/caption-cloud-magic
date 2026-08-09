@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +77,7 @@ export function AutopilotCalendarGrid({ queue, hasBrief, onSelectSlot }: Props) 
         <SummaryPill label="Slots gesamt" value={total} />
         <SummaryPill label="Live" value={posted} tone="success" />
         <SummaryPill label="Review nötig" value={review} tone="warn" highlight={review > 0} />
-        <SummaryPill label="Blockiert / Fehler" value={blocked} tone="danger" highlight={blocked > 0} />
+        <SummaryPill label={tx({ de: "Blockiert / Fehler", en: "Blocked / Error", es: "Bloqueado/Error" })} value={blocked} tone="danger" highlight={blocked > 0} />
       </div>
 
       {/* Two-week grid: 7 cols × 2 rows */}

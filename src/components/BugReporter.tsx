@@ -88,12 +88,12 @@ export function BugReporter() {
 
       if (error) throw error;
 
-      toast.success('Bug-Report erfolgreich übermittelt — danke!');
+      toast.success(tx({ de: 'Bug-Report erfolgreich übermittelt — danke!', en: 'Bug report submitted successfully — thank you!', es: 'Informe de error enviado correctamente: ¡gracias!' }));
       reset();
       setOpen(false);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
-      toast.error(`Fehler: ${msg}`);
+      const msg = e instanceof Error ? e.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
+      toast.error(tx({ de: `Fehler: ${msg}`, en: `Error: ${msg}`, es: `Error: ${mensaje}` }));
     } finally {
       setSubmitting(false);
     }
@@ -129,7 +129,7 @@ export function BugReporter() {
                 id="bug-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="z.B. Speichern-Button funktioniert nicht"
+                placeholder={tx({ de: "z.B. Speichern-Button funktioniert nicht", en: "e.g. Save button doesn't work", es: "p.ej. El botón guardar no funciona" })}
                 maxLength={150}
               />
             </div>

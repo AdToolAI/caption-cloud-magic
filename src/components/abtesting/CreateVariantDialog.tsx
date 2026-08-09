@@ -82,7 +82,7 @@ export function CreateVariantDialog({ testId, onCreateVariant }: Props) {
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Test-Variante erstellen</DialogTitle>
+          <DialogTitle>{tx({ de: "Test-Variante erstellen", en: "Create test variant", es: "Crear variante de prueba" })}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

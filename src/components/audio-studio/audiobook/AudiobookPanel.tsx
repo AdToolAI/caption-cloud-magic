@@ -174,7 +174,7 @@ export function AudiobookPanel() {
           <Textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder={'Text einfügen…\n\nÜberschriften („Kapitel 1" oder „# Titel") werden automatisch als Kapitel erkannt.'}
+            placeholder={'Text einfügen…\n\nÜberschriften („Kapitel 1tx({ de: " oder „# Titel", en: "or “#Title", es: "o “#Título" })) werden automatisch als Kapitel erkannt.'}
             className="min-h-[180px] text-sm bg-background/40"
           />
           <div className="flex gap-2 flex-wrap">

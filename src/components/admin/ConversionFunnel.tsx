@@ -134,7 +134,7 @@ export function ConversionFunnel() {
   }
 
   if (!data) {
-    return <Card className="p-6"><p className="text-muted-foreground">Keine Daten verfügbar.</p></Card>;
+    return <Card className="p-6"><p className="text-muted-foreground">{tx({ de: "Keine Daten verfügbar.", en: "No data available.", es: "No hay datos disponibles." })}</p></Card>;
   }
 
   const verifyRate = data.signups > 0 ? (data.verified / data.signups) * 100 : 0;

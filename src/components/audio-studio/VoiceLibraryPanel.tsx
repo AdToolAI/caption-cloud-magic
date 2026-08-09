@@ -18,7 +18,7 @@ export function VoiceLibraryPanel() {
   const [testTexts, setTestTexts] = useState<Record<string, string>>({});
 
   const handleDelete = async (voice_id: string) => {
-    if (confirm('Voice wirklich löschen?')) {
+    if (confirm(tx({ de: 'Voice wirklich löschen?', en: 'Really delete voice?', es: '¿Realmente borrar la voz?' }))) {
       await deleteVoice(voice_id);
     }
   };
@@ -41,7 +41,7 @@ export function VoiceLibraryPanel() {
       await audio.play();
     } catch (err) {
       console.error('[VoiceLibraryPanel] test failed:', err);
-      toast.error('Test-Synthese fehlgeschlagen');
+      toast.error(tx({ de: 'Test-Synthese fehlgeschlagen', en: 'Test synthesis failed', es: 'La síntesis de la prueba falló' }));
     } finally {
       setTestingId(null);
     }

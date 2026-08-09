@@ -89,7 +89,7 @@ export function SuppressionManager() {
       if ((data as any)?.error) throw new Error((data as any).error);
       return data;
     } catch (e: any) {
-      toast.error(e?.message ?? 'Aktion fehlgeschlagen');
+      toast.error(e?.message ?? tx({ de: 'Aktion fehlgeschlagen', en: 'Action failed', es: 'La acción falló' }));
       return null;
     } finally { setBusy(false); }
   };
@@ -108,7 +108,7 @@ export function SuppressionManager() {
     if (!removeTarget) return;
     const ok = await callManage({ action: 'remove', email: removeTarget });
     if (ok) {
-      toast.success(`${removeTarget} wurde entfernt`);
+      toast.success(tx({ de: `${removeTarget} wurde entfernt`, en: `${removeTarget} has been removed`, es: `${removeTarget} ha sido eliminado` }));
       setRemoveTarget(null);
       load();
     }
@@ -161,7 +161,7 @@ export function SuppressionManager() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Alle Gründe</SelectItem>
+              <SelectItem value="all">{tx({ de: "Alle Gründe", en: "All reasons", es: "Todas las razones" })}</SelectItem>
               <SelectItem value="bounce">Bounce</SelectItem>
               <SelectItem value="complaint">Complaint</SelectItem>
               <SelectItem value="unsubscribe">Unsubscribe</SelectItem>
@@ -324,7 +324,7 @@ export function SuppressionManager() {
       <AlertDialog open={bulkConfirm} onOpenChange={setBulkConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Alle Test-Adressen entfernen?</AlertDialogTitle>
+            <AlertDialogTitle>{tx({ de: "Alle Test-Adressen entfernen?", en: "Remove all test addresses?", es: "¿Eliminar todas las direcciones de prueba?" })}</AlertDialogTitle>
             <AlertDialogDescription>
               Es werden alle Resend-Test-Adressen (<span className="font-mono">*@resend.dev</span>) aus der
               Suppression-Liste gelöscht. Echte Bounces bleiben erhalten.

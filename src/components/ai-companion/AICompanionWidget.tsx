@@ -44,9 +44,9 @@ const DEFAULT_PREFERENCES: CompanionPreferences = {
 
 // Keywords that trigger support escalation offer
 const ESCALATION_KEYWORDS = [
-  'bug', 'fehler', 'funktioniert nicht', 'kaputt', 'problem', 'error',
+  'bug', 'fehler', tx({ de: 'funktioniert nicht', en: 'doesn\'t work', es: 'no funciona' }), 'kaputt', 'problem', 'error',
   'hilfe', 'help', 'support', 'broken', 'crash', 'absturz', 'hängt',
-  'lädt nicht', 'geht nicht', 'defekt', 'falsch', 'failed',
+  tx({ de: 'lädt nicht', en: 'doesn\'t load', es: 'no se carga' }), tx({ de: 'geht nicht', en: 'it does not work', es: 'no funciona' }), 'defekt', 'falsch', 'failed',
   'not working', 'won\'t load', 'doesn\'t work',
   'no funciona', 'no carga', 'no va',
 ];
@@ -270,7 +270,7 @@ export function AICompanionWidget() {
         setMessages(prev => [...prev, {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          content: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" gestartet! Folge den Schritten auf dem Bildschirm.`,
+          content: tx({ de: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" gestartet! Folge den Schritten auf dem Bildschirm.`, en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }),
           timestamp: new Date()
         }]);
       }

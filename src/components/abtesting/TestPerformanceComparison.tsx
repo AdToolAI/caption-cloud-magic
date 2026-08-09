@@ -79,7 +79,7 @@ export function TestPerformanceComparison({ variants, targetMetric }: Props) {
             </p>
           </div>
           <Badge variant={hasSignificantData ? 'default' : 'secondary'}>
-            {hasSignificantData ? 'Statistisch signifikant' : 'Benötigt mehr Daten'}
+            {hasSignificantData ? 'Statistisch signifikant' : tx({ de: 'Benötigt mehr Daten', en: 'Needs more data', es: 'Necesita más datos' })}
           </Badge>
         </div>
 

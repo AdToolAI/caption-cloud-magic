@@ -100,7 +100,7 @@ export function LoungePanel({ brandKitId, language }: Props) {
             ))}
           </div>
 
-          <Suspense fallback={<StageProgressBar label="Spiel wird geladen" />}>
+          <Suspense fallback={<StageProgressBar label={tx({ de: "Spiel wird geladen", en: "Game is loading", es: "El juego se está cargando." })} />}>
             {game === 'solitaire' && <Solitaire />}
             {game === 'chess' && <ChessGame />}
             {game === '2048' && <Game2048 />}

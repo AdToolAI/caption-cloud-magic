@@ -70,7 +70,7 @@ export function SupportTicketModal({
       // Create subject
       const categoryLabel = categories.find(c => c.id === category)?.label || category;
       const subject = detectedError 
-        ? `[Auto] Fehler erkannt: ${detectedError.message.slice(0, 50)}...`
+        ? tx({ de: `[Auto] Fehler erkannt: ${detectedError.message.slice(0, 50)}...`, en: `[Auto] Error detected: ${detectedError.message.slice(0, 50)}...`, es: `[Auto] Error detectado: ${detectedError.message.slice(0, 50)}....` })
         : `${categoryLabel}: ${description.slice(0, 50)}${description.length > 50 ? '...' : ''}`;
 
       // Insert ticket using RPC or direct insert
@@ -162,15 +162,15 @@ export function SupportTicketModal({
                   <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
                     <CheckCircle className="w-8 h-8 text-green-500" />
                   </div>
-                  <p className="text-foreground font-medium">Ticket erfolgreich erstellt!</p>
-                  <p className="text-sm text-muted-foreground">Wir melden uns so schnell wie möglich.</p>
+                  <p className="text-foreground font-medium">{tx({ de: "Ticket erfolgreich erstellt!", en: "Ticket created successfully!", es: "Boleto creado exitosamente!" })}</p>
+                  <p className="text-sm text-muted-foreground">{tx({ de: "Wir melden uns so schnell wie möglich.", en: "We will get back to you as soon as possible.", es: "Nos comunicaremos con usted lo antes posible." })}</p>
                 </motion.div>
               ) : (
                 <>
                   {/* Detected Error Banner */}
                   {detectedError && (
                     <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                      <p className="text-sm text-red-400 font-medium">Fehler erkannt:</p>
+                      <p className="text-sm text-red-400 font-medium">{tx({ de: "Fehler erkannt:", en: "Error detected:", es: "Error detectado:" })}</p>
                       <p className="text-xs text-red-300/80 mt-1 font-mono truncate">
                         {detectedError.message}
                       </p>
@@ -208,7 +208,7 @@ export function SupportTicketModal({
                     <Textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Beschreibe dein Anliegen..."
+                      placeholder={tx({ de: "Beschreibe dein Anliegen...", en: "Describe your request...", es: "Describa su solicitud..." })}
                       rows={4}
                       className="bg-muted/20 border-white/10 focus:border-primary/60 resize-none"
                     />
@@ -217,7 +217,7 @@ export function SupportTicketModal({
                   {/* Conversation Context */}
                   {conversationSummary && (
                     <div className="p-3 rounded-lg bg-muted/20 border border-white/5">
-                      <p className="text-xs text-muted-foreground mb-1">Chat-Verlauf wird angehängt:</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tx({ de: "Chat-Verlauf wird angehängt:", en: "Chat history is attached:", es: "Se adjunta el historial de chat:" })}</p>
                       <p className="text-sm text-foreground/80 line-clamp-2">{conversationSummary}</p>
                     </div>
                   )}

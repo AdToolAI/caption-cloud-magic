@@ -410,7 +410,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!canAfford) {
       toast.error(
         language === 'de'
-          ? 'Nicht genügend Credits. Bitte Credits aufladen.'
+          ? tx({ de: 'Nicht genügend Credits. Bitte Credits aufladen.', en: 'Not enough credits. Please top up credits.', es: 'No hay suficientes créditos. Por favor recarga créditos.' })
           : 'Not enough credits. Please top up.',
       );
       return;
@@ -771,7 +771,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
       toast.success(
         language === 'de'
-          ? `Video wird generiert (${model.name}). Kosten: ${symbol}${cost.toFixed(2)}`
+          ? tx({ de: `Video wird generiert (${model.name}). Kosten: ${symbol}${cost.toFixed(2)}`, en: `Video is generated (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`, es: `Se genera el vídeo (${model.name}). Costo: ${symbol}${cost.toFixed(2)}` })
           : `Video generation started (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`,
       );
       refetchWallet();
@@ -792,7 +792,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!canAfford) {
       toast.error(
         language === 'de'
-          ? 'Nicht genügend Credits. Bitte Credits aufladen.'
+          ? tx({ de: 'Nicht genügend Credits. Bitte Credits aufladen.', en: 'Not enough credits. Please top up credits.', es: 'No hay suficientes créditos. Por favor recarga créditos.' })
           : 'Not enough credits. Please top up.',
       );
       return;
@@ -1406,7 +1406,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                                 const usedElsewhere = omniLines.some((r, i) => i !== idx && r.characterId === ch.id);
                                 return (
                                   <SelectItem key={ch.id} value={ch.id} disabled={usedElsewhere}>
-                                    {ch.name}{usedElsewhere ? (language === 'de' ? ' · bereits zugewiesen' : ' · already assigned') : ''}
+                                    {ch.name}{usedElsewhere ? (language === 'de' ? tx({ de: ' · bereits zugewiesen', en: '· already assigned', es: '· ya asignado' }) : ' · already assigned') : ''}
                                   </SelectItem>
                                 );
                               })}

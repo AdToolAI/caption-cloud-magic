@@ -52,7 +52,7 @@ export function AnalyticsExport({ data, dateRange }: Props) {
       });
     } catch (error) {
       toast({
-        title: 'Export fehlgeschlagen',
+        title: tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Error de exportación' }),
         description: tx({ de: 'CSV konnte nicht erstellt werden', en: 'CSV could not be created', es: 'No se pudo crear el CSV' }),
         variant: 'destructive'
       });
@@ -85,7 +85,7 @@ export function AnalyticsExport({ data, dateRange }: Props) {
       });
     } catch (error) {
       toast({
-        title: 'Export fehlgeschlagen',
+        title: tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Error de exportación' }),
         description: tx({ de: 'JSON konnte nicht erstellt werden', en: 'JSON could not be created', es: 'No se pudo crear el JSON' }),
         variant: 'destructive'
       });

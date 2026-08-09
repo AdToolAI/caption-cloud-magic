@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Check, Sparkles } from 'lucide-react';
@@ -42,8 +43,8 @@ export function StudioSoundButton({ audioUrl, onEnhanced }: StudioSoundButtonPro
       onEnhanced(enhancedUrl);
       setIsComplete(true);
       
-      toast.success("Audio erfolgreich verbessert!", {
-        description: "Studio Sound wurde angewendet"
+      toast.success(tx({ de: "Audio erfolgreich verbessert!", en: "Audio successfully improved!", es: "¡Audio mejorado con éxito!" }), {
+        description: tx({ de: "Studio Sound wurde angewendet", en: "Studio Sound has been applied", es: "Se ha aplicado sonido de estudio." })
       });
       
       // Reset complete state after animation
@@ -51,8 +52,8 @@ export function StudioSoundButton({ audioUrl, onEnhanced }: StudioSoundButtonPro
       
     } catch (error) {
       console.error('Error enhancing audio:', error);
-      toast.error("Fehler bei der Audioverbesserung", {
-        description: error instanceof Error ? error.message : "Unbekannter Fehler"
+      toast.error(tx({ de: "Fehler bei der Audioverbesserung", en: "Audio enhancement error", es: "Error de mejora de audio" }), {
+        description: error instanceof Error ? error.message : tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" })
       });
     } finally {
       setIsProcessing(false);

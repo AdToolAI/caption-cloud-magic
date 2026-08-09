@@ -116,7 +116,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
                     <div className="absolute inset-0 rounded-full border-2 border-fuchsia-500/30 border-t-fuchsia-500 animate-spin" />
                     <Sparkles className="absolute inset-0 m-auto h-5 w-5 text-fuchsia-500" />
                   </div>
-                  <div className="text-sm font-medium">Video wird gerendert…</div>
+                  <div className="text-sm font-medium">{tx({ de: "Video wird gerendert…", en: "Video is rendering...", es: "El vídeo se está reproduciendo..." })}</div>
                   <div className="text-xs text-muted-foreground mt-1">
                     Provider: <span className="capitalize">{slot.video_provider ?? '—'}</span>
                   </div>

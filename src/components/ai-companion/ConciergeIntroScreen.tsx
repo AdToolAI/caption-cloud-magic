@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * ConciergeIntroScreen — one-shot cinematic first-login concierge.
  *
@@ -21,9 +22,9 @@ import { PersonaSignature } from './PersonaSignature';
 import { cn } from '@/lib/utils';
 
 const GOALS: Array<{ id: string; labelDe: string; hintDe: string }> = [
-  { id: 'quick_spot', labelDe: 'Schneller Spot', hintDe: 'Ein einzelnes Video, so schnell wie möglich.' },
+  { id: 'quick_spot', labelDe: 'Schneller Spot', hintDe: tx({ de: 'Ein einzelnes Video, so schnell wie möglich.', en: 'A single video, as quickly as possible.', es: 'Un solo vídeo, lo más rápido posible.' }) },
   { id: 'ensemble', labelDe: 'Ensemble & Serie', hintDe: 'Wiederkehrende Charaktere, konsistente Welt.' },
-  { id: 'explore', labelDe: 'Erstmal erkunden', hintDe: 'Nur schauen, was die Plattform kann.' },
+  { id: 'explore', labelDe: 'Erstmal erkunden', hintDe: tx({ de: 'Nur schauen, was die Plattform kann.', en: 'Just see what the platform can do.', es: 'Solo vea lo que la plataforma puede hacer.' }) },
 ];
 
 export function ConciergeIntroScreen() {

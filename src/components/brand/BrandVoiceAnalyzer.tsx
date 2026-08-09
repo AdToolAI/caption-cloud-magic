@@ -43,8 +43,8 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
     
     if (validSamples.length < 2) {
       toast({
-        title: "Mindestens 2 Text-Samples benötigt",
-        description: "Jeder Text sollte mindestens 20 Zeichen lang sein",
+        title: tx({ de: "Mindestens 2 Text-Samples benötigt", en: "At least 2 text samples required", es: "Se requieren al menos 2 muestras de texto" }),
+        description: tx({ de: "Jeder Text sollte mindestens 20 Zeichen lang sein", en: "Each text should be at least 20 characters long", es: "Cada texto debe tener al menos 20 caracteres." }),
         variant: "destructive"
       });
       return;
@@ -72,8 +72,8 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
     } catch (error: any) {
       console.error('Voice analysis error:', error);
       toast({
-        title: "Analyse fehlgeschlagen",
-        description: error.message || "Konnte Voice nicht analysieren",
+        title: tx({ de: "Analyse fehlgeschlagen", en: "Analysis failed", es: "El análisis falló" }),
+        description: error.message || tx({ de: "Konnte Voice nicht analysieren", en: "Couldn't analyze voice", es: "No se pudo analizar la voz" }),
         variant: "destructive"
       });
     } finally {

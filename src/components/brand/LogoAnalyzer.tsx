@@ -76,15 +76,15 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
 
       toast({
         title: "Logo analysiert! 🎨",
-        description: "KI hat dein Logo ausgewertet",
+        description: tx({ de: "KI hat dein Logo ausgewertet", en: "AI has evaluated your logo", es: "La IA ha evaluado tu logo" }),
         duration: 4000
       });
 
     } catch (error: any) {
       console.error('Logo analysis error:', error);
       toast({
-        title: "Analyse fehlgeschlagen",
-        description: error.message || "Konnte Logo nicht analysieren",
+        title: tx({ de: "Analyse fehlgeschlagen", en: "Analysis failed", es: "El análisis falló" }),
+        description: error.message || tx({ de: "Konnte Logo nicht analysieren", en: "Couldn't parse logo", es: "No se pudo analizar el logotipo" }),
         variant: "destructive"
       });
     } finally {
