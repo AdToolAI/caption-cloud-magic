@@ -26,9 +26,13 @@ import { PreflightCheck } from "./PreflightCheck";
 import AIVideoCostConfirmDialog from "@/components/ai-video/AIVideoCostConfirmDialog";
 import {
   PICTURE_MODES,
+  PICTURE_MODELS,
+  aspectRatiosForTier,
+  closestAspectRatio,
   type PictureMode,
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
+
 
 interface GeneratedImage {
   id?: string;
