@@ -99,10 +99,10 @@ export function SpeechDurationHint({ text, targetDurationSec, language = 'de' }:
       message = `Passt zu ${targetDurationSec}s Gesamtdauer.`;
     } else if (ratio <= 1.4) {
       tone = 'warn';
-      message = `Etwas eng für ${targetDurationSec}s — Dauer wird evtl. auto-verlängert.`;
+      message = tx({ de: `Etwas eng für ${targetDurationSec}s — Dauer wird evtl. auto-verlängert.`, en: `A bit tight for ${targetDurationSec}s — duration may be auto-extended.`, es: `Un poco ajustado para ${targetDurationSec}s — la duración podría extenderse automáticamente.` });
     } else {
       tone = 'danger';
-      message = `Skript ist deutlich länger als ${targetDurationSec}s — Dauer bitte erhöhen oder Skript kürzen.`;
+      message = tx({ de: `Skript ist deutlich länger als ${targetDurationSec}s — Dauer bitte erhöhen oder Skript kürzen.`, en: `Script is significantly longer than ${targetDurationSec}s — please increase duration or shorten script.`, es: `El guion es significativamente más largo que ${targetDurationSec}s — por favor, aumenta la duración o acorta el guion.` });
     }
     return { words, seconds, tone, message, suppress };
   }, [text, targetDurationSec, language]);

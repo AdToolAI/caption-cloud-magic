@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -132,7 +133,7 @@ export function AutoScheduleDialog({
     } catch (error: any) {
       console.error("Failed to apply schedule:", error);
       const errorMessage = error.message || "Failed to update events";
-      toast.error(`Fehler beim Anwenden: ${errorMessage}`);
+      toast.error(tx({ de: `Fehler beim Anwenden: ${errorMessage}`, en: `Error applying: ${errorMessage}`, es: `Error al aplicar: ${errorMessage}` }));
     } finally {
       setApplying(false);
     }

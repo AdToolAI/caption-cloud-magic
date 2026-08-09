@@ -113,12 +113,12 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
       onSettingsChange(settings);
       toast({
         title: tx({ de: 'Einstellungen gespeichert', en: 'Settings saved', es: 'Ajustes guardados' }),
-        description: `${settings.bot_name} ist jetzt konfiguriert.`,
+        description: tx({ de: `${settings.bot_name} ist jetzt konfiguriert.`, en: `${settings.bot_name} is now configured.`, es: `${settings.bot_name} ya está configurado.` }),
       });
       onClose();
       toast({
         title: tx({ de: 'Einstellungen gespeichert', en: 'Settings saved', es: 'Ajustes guardados' }),
-        description: `${settings.bot_name} ist jetzt konfiguriert.`,
+        description: tx({ de: `${settings.bot_name} ist jetzt konfiguriert.`, en: `${settings.bot_name} is now configured.`, es: `${settings.bot_name} ya está configurado.` }),
       });
       onClose();
     } catch (error) {

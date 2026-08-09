@@ -228,7 +228,7 @@ export function LiveSweepTab() {
             <Progress value={pct} className="mt-3 h-2" />
             <div className="mt-2 text-xs text-slate-400">
               {budget?.last_run_at
-                ? `Letzter Run: ${new Date(budget.last_run_at).toLocaleString()} · Cap wird beim nächsten Sweep auf 0 € zurückgesetzt`
+                ? tx({ de: `Letzter Run: ${new Date(budget.last_run_at).toLocaleString()} · Cap wird beim nächsten Sweep auf 0 € zurückgesetzt`, en: `Last run: ${new Date(budget.last_run_at).toLocaleString()} · Cap will be reset to 0 € on next sweep`, es: `Última ejecución: ${new Date(budget.last_run_at).toLocaleString()} · El límite se restablecerá a 0 € en el próximo barrido` })
                 : "Noch nie ausgeführt."}
             </div>
           </div>

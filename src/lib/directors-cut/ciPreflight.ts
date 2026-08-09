@@ -228,7 +228,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'aspect-mismatch',
       severity: 'warn',
       title: `${mismatched.length} Szene${mismatched.length > 1 ? 'n' : ''} mit abweichendem Seitenverhältnis`,
-      detail: `Projekt rendert in ${targetLabel} — betroffene Szenen werden beschnitten oder mit Letterbox versehen.`,
+      detail: tx({ de: `Projekt rendert in ${targetLabel} — betroffene Szenen werden beschnitten oder mit Letterbox versehen.`, en: `Project renders in ${targetLabel} — affected scenes will be cropped or letterboxed.`, es: `El proyecto se renderiza en ${targetLabel} — las escenas afectadas se recortarán o se les añadirá letterbox.` }),
       hint: 'Ersetze Assets oder ändere das Export-Seitenverhältnis passend.',
     });
   }
@@ -243,7 +243,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
         id: 'endcard-short',
         severity: 'info',
         title: 'Endcard sehr kurz',
-        detail: `Letzte Szene ${lastDur.toFixed(2)}s — für Logo, CTA oder Call-out werden 1.5–3s empfohlen.`,
+        detail: tx({ de: `Letzte Szene ${lastDur.toFixed(2)}s — für Logo, CTA oder Call-out werden 1.5–3s empfohlen.`, en: `Last scene ${lastDur.toFixed(2)}s — 1.5–3s recommended for logo, CTA or call-out.`, es: `Última escena ${lastDur.toFixed(2)}s — se recomiendan 1.5–3s para el logo, CTA o llamada a la acción.` }),
       });
     }
   }
@@ -273,7 +273,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'loudness-music',
       severity: 'info',
       title: 'Musik sehr laut',
-      detail: `Musik-Bett auf ${musicVol}% — ohne Ducking kann das im Feed unangenehm knallen.`,
+      detail: tx({ de: `Musik-Bett auf ${musicVol}% — ohne Ducking kann das im Feed unangenehm knallen.`, en: `Music bed at ${musicVol}% — without ducking, this can be unpleasantly loud in the feed.`, es: `Música de fondo al ${musicVol}% — sin atenuación, esto puede ser desagradablemente ruidoso en el feed.` }),
     });
   }
 

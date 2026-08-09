@@ -118,7 +118,7 @@ export function FaceMapReviewDialog({ open, onOpenChange, scene }: FaceMapReview
     if (unresolvedCount > 0) {
       toast({
         title: "Zuordnung unvollständig",
-        description: `${unresolvedCount} Sprecher haben noch keinen Face-Slot.`,
+        description: tx({ de: `${unresolvedCount} Sprecher haben noch keinen Face-Slot.`, en: `${unresolvedCount} speakers do not have a face slot yet.`, es: `${unresolvedCount} oradores aún no tienen un espacio facial.` }),
         variant: "destructive",
       });
       return;

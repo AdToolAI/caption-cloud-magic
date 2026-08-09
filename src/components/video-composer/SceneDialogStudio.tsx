@@ -238,7 +238,7 @@ const T = {
     speakers: (n: number) => `${n} Sprecher`,
     sec: (n: number) => `~${n}s`,
     needCast: 'Mindestens 1 Charakter im Cast nötig.',
-    voiceMissing: (name: string) => `Wähle eine Stimme für „${name}".`,
+    voiceMissing: (name: string) => tx({ de: `Wähle eine Stimme für „${name}".`, en: `Choose a voice for "${name}".`, es: `Elige una voz para "${name}".` }),
     parseEmpty: 'Kein gültiges Skript. Format: "Sarah: Hallo!"',
     success: (n: number) => `${n} Lip-Sync-Clip${n === 1 ? '' : 's'} werden generiert (1–3 Min).`,
     successInline: (n: number) => `${n} Voiceover-Block${n === 1 ? '' : 'blöcke'} an diese Szene gehängt.`,
@@ -1339,7 +1339,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 : 'Same voice on two speakers',
             description:
               language === 'de'
-                ? `${other} und ${sp.name} nutzen dieselbe Stimme. Bitte unterschiedliche Stimmen wählen.`
+                ? tx({ de: `${other} und ${sp.name} nutzen dieselbe Stimme. Bitte unterschiedliche Stimmen wählen.`, en: `${other} and ${sp.name} use the same voice. Please choose different voices.`, es: `${other} y ${sp.name} usan la misma voz. Por favor, elige voces diferentes.` })
                 : language === 'es'
                 ? `${other} y ${sp.name} usan la misma voz. Elige voces distintas.`
                 : `${other} and ${sp.name} share the same voice. Please pick different voices.`,
@@ -1439,7 +1439,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : `No portrait for ${name}`,
         description:
           language === 'de'
-            ? `Weise ${name} im Cast einen Brand-Character mit Portrait zu — sonst ist kein Lip-Sync möglich.`
+            ? tx({ de: `Weise ${name} im Cast einen Brand-Character mit Portrait zu — sonst ist kein Lip-Sync möglich.`, en: `Assign a brand character with a portrait to ${name} in the cast — otherwise, lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${name} en el elenco; de lo contrario, no es posible la sincronización labial.` })
             : language === 'es'
             ? `Asigna a ${name} un Brand-Character con retrato; sin él no hay lip-sync real.`
             : `Assign ${name} a Brand-Character with a portrait — without it, real lip-sync is impossible.`,
@@ -1474,7 +1474,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               : `No portrait for ${missingPortrait.name}`,
           description:
             language === 'de'
-              ? `Weise ${missingPortrait.name} im Cast einen Brand-Character mit Portrait zu — sonst kein echtes Lip-Sync möglich.`
+              ? tx({ de: `Weise ${missingPortrait.name} im Cast einen Brand-Character mit Portrait zu — sonst kein echtes Lip-Sync möglich.`, en: `Assign a brand character with a portrait to ${missingPortrait.name} in the cast — otherwise, real lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${missingPortrait.name} en el elenco; de lo contrario, no es posible una sincronización labial real.` })
               : language === 'es'
               ? `Asigna a ${missingPortrait.name} un Brand-Character con retrato; sin él no hay lip-sync real.`
               : `Assign ${missingPortrait.name} a Brand-Character with a portrait — without it, real lip-sync is impossible.`,
@@ -1527,7 +1527,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         if (!c.referenceImageUrl) {
           throw new Error(
             language === 'de'
-              ? `${c.name} hat kein Portrait — bitte im Cast einen Brand-Character mit Portrait zuweisen.`
+              ? tx({ de: `${c.name} hat kein Portrait — bitte im Cast einen Brand-Character mit Portrait zuweisen.`, en: `${c.name} has no portrait — please assign a brand character with a portrait in the cast.`, es: `${c.name} no tiene retrato; por favor, asigna un personaje de marca con un retrato en el elenco.` })
               : language === 'es'
               ? `${c.name} no tiene retrato — asigna un Brand-Character con retrato.`
               : `${c.name} has no portrait — assign a cast Brand-Character with a portrait.`,
@@ -1763,7 +1763,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             title: 'Dialog länger als Szene',
             description:
               language === 'de'
-                ? `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`
+                ? tx({ de: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts at the end (cut_off). To get full dialogue, increase scene duration or choose a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} es de ${masterDuration}s. Sync.so corta al final (cut_off). Para obtener el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` })
                 : language === 'es'
                 ? `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} dura ${masterDuration}s. Sync.so recorta el final (cut_off). Para el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.`
                 : `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts off the end (cut_off). For the full dialog, increase scene duration or pick a provider with a larger duration window.`,
@@ -1875,7 +1875,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           title: language === 'de' ? 'Dialog-Shots werden gerendert' : language === 'es' ? 'Renderizando Dialog-Shots' : 'Rendering Dialog Shots',
           description:
             language === 'de'
-              ? `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`
+              ? tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `For each speaker turn, a separate shot (Hailuo + Sync.so Lip-Sync) is rendered and then stitched together into a ${masterDuration}s scene. Live progress in the clip card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Sync.so Lip-Sync) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` })
               : language === 'es'
               ? `Por cada turno se renderiza un shot dedicado (Hailuo + Sync.so) y al final se concatena a una escena de ${masterDuration}s. Progreso en vivo en la tarjeta del clip.`
               : `One dedicated shot (Hailuo + Sync.so lip-sync) per speaker turn, concatenated into a ${masterDuration}s scene at the end. Live progress in the clip-card overlay.`,
@@ -2015,7 +2015,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                     title: language === 'de' ? '✨ Coverage erzeugt' : language === 'es' ? '✨ Coverage creada' : '✨ Coverage created',
                     description:
                       language === 'de'
-                        ? `${partials.length} Szenen nach dieser Szene eingefügt.`
+                        ? tx({ de: `${partials.length} Szenen nach dieser Szene eingefügt.`, en: `${partials.length} scenes inserted after this scene.`, es: `Se insertaron ${partials.length} escenas después de esta escena.` })
                         : language === 'es'
                         ? `${partials.length} escenas insertadas.`
                         : `${partials.length} scenes inserted.`,
@@ -2143,7 +2143,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         {(!script || script.trim().length === 0) && sceneCast.length > 0 && (
           <p className="mt-1.5 text-[10px] text-muted-foreground italic">
             {language === 'de'
-              ? `Skript eintragen — ${sceneCast.length} Sprecher-Slot${sceneCast.length === 1 ? '' : 's'} und Timing sind für dich vorbereitet.`
+              ? tx({ de: `Skript eintragen — ${sceneCast.length} Sprecher-Slot${sceneCast.length === 1 ? '' : 's'} und Timing sind für dich vorbereitet.`, en: `Script entered — ${sceneCast.length} speaker slot${sceneCast.length === 1 ? '' : 's'} and timing are prepared for you.`, es: `Guion introducido: ${sceneCast.length} espacio${sceneCast.length === 1 ? '' : 's'} para orador${sceneCast.length === 1 ? '' : 'es'} y el timing están preparados para ti.` })
               : language === 'es'
               ? `Escribe el guion — ${sceneCast.length} slot${sceneCast.length === 1 ? '' : 's'} de hablante y el ritmo están listos.`
               : `Write the script — ${sceneCast.length} speaker slot${sceneCast.length === 1 ? '' : 's'} and timing are prepared for you.`}
@@ -2425,7 +2425,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         if (isMulti && missing) {
           tone = 'amber';
           label = language === 'de'
-            ? `⚠️ ${missing.name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst kein echter Lip-Sync möglich.`
+            ? tx({ de: `⚠️ ${missing.name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst kein echter Lip-Sync möglich.`, en: `⚠️ ${missing.name} has no portrait — please assign a cast character, otherwise real lip-sync is not possible.`, es: `⚠️ ${missing.name} no tiene retrato; asigna un personaje del elenco, de lo contrario no será posible una sincronización labial real.` })
             : language === 'es'
             ? `⚠️ ${missing.name} no tiene retrato — asigna un Brand-Character, si no, no hay lip-sync real.`
             : `⚠️ ${missing.name} has no portrait — assign a cast character or real lip-sync is impossible.`;
@@ -2465,7 +2465,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-400 leading-relaxed">
             🎭 <strong>Dialog-Shot Pipeline:</strong>{' '}
             {language === 'de'
-              ? `Pro Sprecher-Turn ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. ${blocks.length} Shots werden am Ende zu einer Szene gestitcht.`
+              ? tx({ de: `Pro Sprecher-Turn ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. ${blocks.length} Shots werden am Ende zu einer Szene gestitcht.`, en: `Each speaker turn gets its own Hailuo plate + dedicated Sync.so lip-sync. ${blocks.length} shots will be stitched into one scene at the end.`, es: `Cada turno de orador obtiene su propia placa Hailuo + sincronización labial dedicada de Sync.so. ${blocks.length} tomas se unirán en una escena al final.` })
               : language === 'es'
               ? `Un plate Hailuo + lip-sync Sync.so dedicado por turno. ${blocks.length} shots se concatenan al final.`
               : `One dedicated Hailuo plate + Sync.so lip-sync per speaker turn. ${blocks.length} shots concatenated into a single scene.`}

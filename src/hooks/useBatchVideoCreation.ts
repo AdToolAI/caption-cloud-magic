@@ -53,8 +53,8 @@ export const useBatchVideoCreation = () => {
       }
 
       toast({
-        title: 'Batch-Job gestartet!',
-        description: `${data.queued_videos}/${csvData.length} Videos werden erstellt.${data.failed_videos > 0 ? ` ${data.failed_videos} Videos sind fehlgeschlagen.` : ''}`
+        title: tx({ de: 'Batch-Job gestartet!', en: 'Batch job started!', es: '¡Trabajo por lotes iniciado!' }),
+        description: tx({ de: `${data.queued_videos}/${csvData.length} Videos werden erstellt.${data.failed_videos > 0 ? ` ${data.failed_videos} Videos sind fehlgeschlagen.` : ''}`, en: `${data.queued_videos}/${csvData.length} videos are being created.${data.failed_videos > 0 ? ` ${data.failed_videos} videos failed.` : ''}`, es: `Se están creando ${data.queued_videos}/${csvData.length} vídeos.${data.failed_videos > 0 ? ` ${data.failed_videos} vídeos fallaron.` : ''}` })
       });
 
       return {

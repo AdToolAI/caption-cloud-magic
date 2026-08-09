@@ -109,7 +109,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
 
       toast({
         title: 'Varianten werden generiert',
-        description: `${formats.length} Varianten werden erstellt`,
+        description: tx({ de: `${formats.length} Varianten werden erstellt`, en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }),
       });
 
       return data;

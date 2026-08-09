@@ -145,7 +145,7 @@ export function AIToolsSidebar({
     setMusicBrowserOpen(false);
     toast({
       title: 'Musik hinzugefügt',
-      description: `"${track.title}" wurde zur Timeline hinzugefügt`,
+      description: tx({ de: `"${track.title}" wurde zur Timeline hinzugefügt`, en: `"${track.title}" added to timeline`, es: `"${track.title}" añadido a la línea de tiempo` }),
     });
   };
 

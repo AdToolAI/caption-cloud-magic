@@ -106,7 +106,7 @@ export default function RerollVariantGrid({
       if (error) throw error;
       toast({
         title: '✓ Take übernommen',
-        description: `Seed ${v.seed} ist jetzt der Master für die HQ-Generierung.`,
+        description: tx({ de: `Seed ${v.seed} ist jetzt der Master für die HQ-Generierung.`, en: `Seed ${v.seed} is now the master for HQ generation.`, es: `La semilla ${v.seed} es ahora la maestra para la generación de alta calidad.` }),
       });
       onOpenChange(false);
     } catch (err) {

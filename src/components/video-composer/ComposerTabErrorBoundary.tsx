@@ -53,7 +53,7 @@ export class ComposerTabErrorBoundary extends Component<Props, State> {
             <div className="text-sm leading-snug">
               <div className="font-medium">
                 {this.props.label
-                  ? `${this.props.label} konnte nicht gerendert werden`
+                  ? tx({ de: `${this.props.label} konnte nicht gerendert werden`, en: `${this.props.label} could not be rendered`, es: `${this.props.label} no pudo ser renderizado` })
                   : tx({ de: 'Beim Rendern ist ein Fehler aufgetreten', en: 'An error occurred during rendering', es: 'Se produjo un error durante el renderizado' })}
               </div>
               {this.state.error?.message && (

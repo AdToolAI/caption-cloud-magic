@@ -817,7 +817,7 @@ export default function VideoComposerDashboard() {
 
     toast({
       title: 'Template übernommen',
-      description: `"${tpl.name}" mit ${newScenes.length} Szenen geladen. Vervollständige jetzt das Briefing.`,
+      description: tx({ de: `"${tpl.name}" mit ${newScenes.length} Szenen geladen. Vervollständige jetzt das Briefing.`, en: `"${tpl.name}" loaded with ${newScenes.length} scenes. Complete the briefing now.`, es: `"${tpl.name}" cargado con ${newScenes.length} escenas. Completa el briefing ahora.` }),
     });
   }, [incrementTemplateUsage]);
 
@@ -1806,7 +1806,7 @@ export default function VideoComposerDashboard() {
                       const hasCutdowns = spawned.some(s => s.kind === 'cutdown');
                       toast({
                         title: 'Kampagne erweitert 🎬',
-                        description: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`,
+                        description: tx({ de: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, en: `${spawned.length} variant(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns without VO — please re-synthesize in the child.' : ''}`, es: `${spawned.length} variante(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns sin VO — por favor, vuelve a sintetizar en el hijo.' : ''}` }),
                       });
                       setActiveTab('campaign');
                     }

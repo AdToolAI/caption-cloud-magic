@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * describeRenderAdmissionError — parses a 429 `RENDER_SLOT_BUSY` response from
  * `render-with-remotion` / `render-directors-cut` and returns a user-friendly
@@ -28,7 +29,7 @@ export function describeRenderAdmissionError(raw: unknown): RenderAdmissionInfo 
   const message =
     reason === 'founder_reserve'
       ? `Render-Slots gerade voll. Bitte ~${wait} warten — Founders erhalten Vorrang.`
-      : `Alle Render-Slots sind gerade belegt. Bitte in ~${wait} noch einmal versuchen.`;
+      : tx({ de: `Alle Render-Slots sind gerade belegt. Bitte in ~${wait} noch einmal versuchen.`, en: `All render slots are currently occupied. Please try again in ~${wait}.`, es: `Todas las ranuras de renderizado están ocupadas actualmente. Por favor, inténtalo de nuevo en ~${wait}.` });
 
   return { message, reason, retryAfterSeconds: retry, foundersOnly };
 }

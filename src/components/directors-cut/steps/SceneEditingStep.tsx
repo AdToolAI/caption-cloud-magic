@@ -669,7 +669,7 @@ export function SceneEditingStep({
     
     toast({
       title: 'Medien hinzugefügt',
-      description: `${media.type === 'video' ? 'Video' : 'Bild'} wurde als neue Szene hinzugefügt`,
+      description: tx({ de: `${media.type === 'video' ? 'Video' : 'Bild'} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Image'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Imagen'} añadida como nueva escena` }),
     });
   }, [scenes, onScenesUpdate, toast]);
 
@@ -739,7 +739,7 @@ export function SceneEditingStep({
     
     toast({
       title: `Template "${template.name}" angewendet`,
-      description: `${newTransitions.length} Übergänge und Effekte wurden angewendet`,
+      description: tx({ de: `${newTransitions.length} Übergänge und Effekte wurden angewendet`, en: `${newTransitions.length} transitions and effects applied`, es: `Se aplicaron ${newTransitions.length} transiciones y efectos` }),
     });
   }, [scenes, onTransitionsChange, toast]);
 

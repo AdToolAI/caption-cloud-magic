@@ -51,7 +51,7 @@ export function PreflightCheck({
   if (variantsCount === 4 && cost >= 0.30) {
     tips.push({
       icon: 'info',
-      text: `4 Varianten = ${currencySymbol}${cost.toFixed(2)}. Lieber mit 1× starten und nur skalieren wenn das Ergebnis stimmt.`,
+      text: tx({ de: `4 Varianten = ${currencySymbol}${cost.toFixed(2)}. Lieber mit 1× starten und nur skalieren wenn das Ergebnis stimmt.`, en: `4 variants = ${currencySymbol}${cost.toFixed(2)}. Better to start with 1× and only scale if the result is good.`, es: `4 variantes = ${currencySymbol}${cost.toFixed(2)}. Mejor empezar con 1× y escalar solo si el resultado es bueno.` }),
       action: { label: 'Auf 1× setzen', run: () => onSetVariants(1) },
     });
   }
@@ -61,8 +61,8 @@ export function PreflightCheck({
   if (wordCount > 0 && wordCount < 8) {
     tips.push({
       icon: 'info',
-      text: `Dein Prompt ist sehr kurz (${wordCount} Wörter). Der Prompt-Helfer baut daraus einen ausführlichen Master-Prompt.`,
-      action: { label: 'Prompt-Helfer öffnen', run: onOpenHelper },
+      text: tx({ de: `Dein Prompt ist sehr kurz (${wordCount} Wörter). Der Prompt-Helfer baut daraus einen ausführlichen Master-Prompt.`, en: `Your prompt is very short (${wordCount} words). The prompt helper will turn it into a detailed master prompt.`, es: `Tu prompt es muy corto (${wordCount} palabras). El asistente de prompts creará un master prompt detallado.` }),
+      action: { label: tx({ de: 'Prompt-Helfer öffnen', en: 'Open prompt helper', es: 'Abrir asistente de prompts' }), run: onOpenHelper },
     });
   }
 

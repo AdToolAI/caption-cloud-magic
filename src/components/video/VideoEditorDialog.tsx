@@ -249,7 +249,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
       },
     });
     if (result) {
-      toast({ title: "Video wird generiert", description: `Version ${result.version_number} wird erstellt.` });
+      toast({ title: "Video wird generiert", description: tx({ de: `Version ${result.version_number} wird erstellt.`, en: `Version ${result.version_number} is being created.`, es: `Se está creando la versión ${result.version_number}.` }) });
       onOpenChange(false);
     }
   };

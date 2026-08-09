@@ -815,7 +815,7 @@ function buildLocalFallbackPlan(briefing: ComposerBriefing, briefingText: string
     unresolved: [{
       field: 'auto-director',
       reason: hints.length
-        ? `Auto-Analyse offline — ${hints.length} Szene(n) wurden direkt aus deinem Briefing-Text extrahiert. Vor Render prüfen.`
+        ? tx({ de: `Auto-Analyse offline — ${hints.length} Szene(n) wurden direkt aus deinem Briefing-Text extrahiert. Vor Render prüfen.`, en: `Auto-analysis offline — ${hints.length} scene(s) were extracted directly from your briefing text. Check before rendering.`, es: `Análisis automático sin conexión: se extrajeron ${hints.length} escena(s) directamente de tu texto de briefing. Comprueba antes de renderizar.` })
         : tx({ de: 'AI-Director offline — deterministischer Plan erstellt. Bitte vor dem Rendern prüfen.', en: 'AI Director offline — deterministic plan created. Please check before rendering.', es: 'AI Director sin conexión — plan determinista creado. Por favor, verifica antes de renderizar.' }),
       severity: 'warn',
     }],
@@ -1407,7 +1407,7 @@ export function useStoryboardTransition({
       if (dropped > 0) {
         toast({
           title: 'Plan teilweise übernommen',
-          description: `${dropped} Szene(n) konnten nicht validiert werden und wurden übersprungen.`,
+          description: tx({ de: `${dropped} Szene(n) konnten nicht validiert werden und wurden übersprungen.`, en: `${dropped} scene(s) could not be validated and were skipped.`, es: `No se pudieron validar ${dropped} escena(s) y se omitieron.` }),
         });
       }
 

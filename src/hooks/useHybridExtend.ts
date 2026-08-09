@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -56,14 +57,14 @@ export function useHybridExtend() {
           !HYBRID_BACKWARD_CAPABLE.includes(params.engine)
         ) {
           toast.error(
-            `Backward Extend ist nur mit ${HYBRID_BACKWARD_CAPABLE.join(', ')} möglich.`
+            tx({ de: `Backward Extend ist nur mit ${HYBRID_BACKWARD_CAPABLE.join(', ')} möglich.`, en: `Backward Extend is only possible with ${HYBRID_BACKWARD_CAPABLE.join(', ')}.`, es: `La extensión hacia atrás solo es posible con ${HYBRID_BACKWARD_CAPABLE.join(', ')}.` })
           );
           return null;
         }
         if (params.mode === 'bridge') {
           if (!HYBRID_BRIDGE_CAPABLE.includes(params.engine)) {
             toast.error(
-              `Bridge ist nur mit ${HYBRID_BRIDGE_CAPABLE.join(', ')} möglich.`
+              tx({ de: `Bridge ist nur mit ${HYBRID_BRIDGE_CAPABLE.join(', ')} möglich.`, en: `Bridge is only possible with ${HYBRID_BRIDGE_CAPABLE.join(', ')}.`, es: `El puente solo es posible con ${HYBRID_BRIDGE_CAPABLE.join(', ')}.` })
             );
             return null;
           }

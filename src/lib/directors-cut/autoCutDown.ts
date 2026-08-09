@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import type { SceneAnalysis } from '@/types/directors-cut';
 
 /**
@@ -59,7 +60,7 @@ export function computeCutDown(
       droppedIndexes: [],
       shrinkRatio: 1,
       feasible: true,
-      reason: `Master ist bereits ≤ ${target}s (${currentTotal.toFixed(1)}s) — kein Cut-Down nötig.`,
+      reason: tx({ de: `Master ist bereits ≤ ${target}s (${currentTotal.toFixed(1)}s) — kein Cut-Down nötig.`, en: `Master is already ≤ ${target}s (${currentTotal.toFixed(1)}s) — no cut-down needed.`, es: `El máster ya es ≤ ${target}s (${currentTotal.toFixed(1)}s) — no es necesario recortar.` }),
     };
   }
 

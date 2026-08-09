@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -149,7 +150,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
       ? `Script will be tuned to your ${scenes!.length} scene${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). Hook lands in scene 1, CTA in the last scene.`
       : language === 'es'
       ? `El guion se ajustará a tus ${scenes!.length} escena${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). El gancho va en la escena 1, el CTA en la última.`
-      : `Skript wird auf deine ${scenes!.length} Szene${scenes!.length === 1 ? '' : 'n'} (Σ ${sceneTotalDuration.toFixed(1)}s) abgestimmt. Hook in Szene 1, CTA in der letzten Szene.`
+      : tx({ de: `Skript wird auf deine ${scenes!.length} Szene${scenes!.length === 1 ? '' : 'n'} (Σ ${sceneTotalDuration.toFixed(1)}s) abgestimmt. Hook in Szene 1, CTA in der letzten Szene.`, en: `Script will be matched to your ${scenes!.length} scene${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). Hook in scene 1, CTA in the last scene.`, es: `El guion se ajustará a tus ${scenes!.length} escena${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). Gancho en la escena 1, CTA en la última escena.` })
     : '';
 
   return (
@@ -237,7 +238,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
                         ? `The generated script is only ~${estimatedDuration}s, but your target is ${targetDuration}s. Regenerate for a fuller voice-over.`
                         : language === 'es'
                         ? `El guión generado dura solo ~${estimatedDuration}s, pero tu objetivo es ${targetDuration}s. Vuelve a generar para un voice-over más completo.`
-                        : `Das Skript ist nur ~${estimatedDuration}s lang, Ziel sind ${targetDuration}s. Erneut generieren für einen volleren Voiceover.`}
+                        : tx({ de: `Das Skript ist nur ~${estimatedDuration}s lang, Ziel sind ${targetDuration}s. Erneut generieren für einen volleren Voiceover.`, en: `The script is only ~${estimatedDuration}s long, target is ${targetDuration}s. Regenerate for a fuller voiceover.`, es: `El guion solo dura ~${estimatedDuration}s, el objetivo es ${targetDuration}s. Regenera para una voz en off más completa.` })}
                     </p>
                     <Button size="sm" variant="outline" onClick={handleGenerate} disabled={isGenerating}>
                       {isGenerating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}

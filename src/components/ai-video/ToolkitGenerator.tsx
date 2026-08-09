@@ -324,7 +324,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       setReferencePlacement('start');
       toast.info(
         language === 'de'
-          ? `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Endframe.`
+          ? tx({ de: `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Endframe.`, en: `Placement was reset to "At the beginning" — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a "Al principio" — ${model.name} no admite un fotograma final.` })
           : `Placement reset to "At start" — ${model.name} does not support end-frame.`,
       );
     }
@@ -332,7 +332,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       setReferencePlacement('start');
       toast.info(
         language === 'de'
-          ? `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`
+          ? tx({ de: `Placement wurde auf „Am Anfang" zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`, en: `Placement was reset to "At the beginning" — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principio" — ${model.name} no admite el modo ancla.` })
           : `Placement reset to "At start" — ${model.name} does not support anchor mode.`,
       );
     }
@@ -636,7 +636,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       if (referencePlacement === 'end' && !model.capabilities.endFrame) {
         toast.error(
           language === 'de'
-            ? `${model.name} unterstützt keinen Endframe. Bitte Luma Ray 2 wählen.`
+            ? tx({ de: `${model.name} unterstützt keinen Endframe. Bitte Luma Ray 2 wählen.`, en: `${model.name} does not support an end frame. Please select Luma Ray 2.`, es: `${model.name} no admite un fotograma final. Por favor, selecciona Luma Ray 2.` })
             : `${model.name} does not support end-frame. Please switch to Luma Ray 2.`,
         );
         setGenerating(false);
@@ -940,7 +940,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             {language === 'de'
-              ? `${model.name} akzeptiert keine Bild-Referenz — die gewählten Charaktere werden nur textlich beschrieben. Für garantierte Charakter-Treue wähle ein Modell mit Bild-Anker (Kling, Veo, Hailuo, HappyHorse …).`
+              ? tx({ de: `${model.name} akzeptiert keine Bild-Referenz — die gewählten Charaktere werden nur textlich beschrieben. Für garantierte Charakter-Treue wähle ein Modell mit Bild-Anker (Kling, Veo, Hailuo, HappyHorse …).`, en: `${model.name} does not accept an image reference — the selected characters are only described textually. For guaranteed character fidelity, choose a model with image anchor (Kling, Veo, Hailuo, HappyHorse...).`, es: `${model.name} no acepta una referencia de imagen — los personajes seleccionados solo se describen textualmente. Para una fidelidad garantizada del personaje, elige un modelo con ancla de imagen (Kling, Veo, Hailuo, HappyHorse...).` })
               : language === 'es'
               ? `${model.name} no acepta imagen de referencia — los personajes se describen sólo por texto. Para fidelidad garantizada usa un modelo con anclaje de imagen (Kling, Veo, Hailuo, HappyHorse …).`
               : `${model.name} does not accept a reference image — the selected characters will only be described in text. For guaranteed character fidelity pick an image-anchor model (Kling, Veo, Hailuo, HappyHorse …).`}
@@ -1489,7 +1489,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                               return (
                                 <p className="text-[10px] text-muted-foreground italic">
                                   {language === 'de'
-                                    ? `Hinweis: Cast-Stimme hinterlegt — wird in Motion Studio / Voiceover verwendet. Kling Omni nutzt hier eigene Presets.`
+                                    ? tx({ de: `Hinweis: Cast-Stimme hinterlegt — wird in Motion Studio / Voiceover verwendet. Kling Omni nutzt hier eigene Presets.`, en: `Note: Cast voice stored — will be used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`, es: `Nota: Voz del elenco guardada — se usará en Motion Studio / Voiceover. Kling Omni usa sus propios preajustes aquí.` })
                                     : `Note: Cast voice saved — used in Motion Studio / Voiceover. Kling Omni uses its own presets here.`}
                                 </p>
                               );
@@ -1617,10 +1617,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <AlertDialogDescription>
               {pendingPlacement?.placement === 'end'
                 ? (language === 'de'
-                    ? `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Ende" aktiv ist, sind andere Modelle im Picker ausgegraut.`
+                    ? tx({ de: `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Ende" aktiv ist, sind andere Modelle im Picker ausgegraut.`, en: `The end frame function is only available with Luma Ray 2. Do you want to switch to ${pendingPlacement?.targetModelName} now? As long as "At the end" is active, other models in the picker are grayed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Quieres cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras "Al final" esté activo, otros modelos en el selector estarán deshabilitados.` })
                     : `The end-frame option is exclusive to Luma Ray 2. Switch to ${pendingPlacement?.targetModelName} now? While "At end" is active, other models will be greyed out.`)
                 : (language === 'de'
-                    ? `Der Anker-Modus (Referenzbild ohne festen Frame) ist nur mit Vidu Q2 oder Kling 3 verfügbar. Zu ${pendingPlacement?.targetModelName} wechseln?`
+                    ? tx({ de: `Der Anker-Modus (Referenzbild ohne festen Frame) ist nur mit Vidu Q2 oder Kling 3 verfügbar. Zu ${pendingPlacement?.targetModelName} wechseln?`, en: `Anchor mode (reference image without fixed frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`, es: `El modo ancla (imagen de referencia sin fotograma fijo) solo está disponible con Vidu Q2 o Kling 3. ¿Cambiar a ${pendingPlacement?.targetModelName}?` })
                     : `Anchor mode (reference image without a forced frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`)}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1679,9 +1679,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
       {/* Discreet hint about alternative models */}
       <p className="text-center text-[11px] text-muted-foreground">
-        {language === 'de'
-          ? `${AI_VIDEO_TOOLKIT_MODELS.length} Modelle verfügbar — wechsle oben das Modell, dein Prompt bleibt erhalten.`
-          : `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch the model above, your prompt is preserved.`}
+        {tx({
+          de: `${AI_VIDEO_TOOLKIT_MODELS.length} Modelle verfügbar — wechsle oben das Modell, dein Prompt bleibt erhalten.`,
+          en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch the model above, your prompt is preserved.`,
+          es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se conserva.`,
+        })}
       </p>
     </motion.div>
   );

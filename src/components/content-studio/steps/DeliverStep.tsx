@@ -133,7 +133,7 @@ export function DeliverStep() {
         weeks,
         postsPerWeek: perWeek,
       });
-      toast.success(`Serie "${result.title}" mit ${result.postsCreated} Beiträgen erstellt`);
+      toast.success(tx({ de: `Serie "${result.title}" mit ${result.postsCreated} Beiträgen erstellt`, en: `Series "${result.title}" created with ${result.postsCreated} posts`, es: `Serie "${result.title}" creada con ${result.postsCreated} publicaciones` }));
       const workspaceId = await resolveWorkspaceId(user.id);
       if (workspaceId) {
         const events = await seriesToCalendar(result.campaignId, workspaceId);
