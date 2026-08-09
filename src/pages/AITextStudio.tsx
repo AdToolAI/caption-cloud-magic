@@ -490,7 +490,7 @@ export default function AITextStudio() {
                 <Select value={personaId} onValueChange={setPersonaId}>
                   <SelectTrigger><SelectValue placeholder="(keine)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">— Keine —</SelectItem>
+                    <SelectItem value="none">{tx({ de: "— Keine —", en: "- No -", es: "- No -" })}</SelectItem>
                     {personas.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}

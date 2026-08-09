@@ -52,7 +52,7 @@ export function SmartCropping({
 
   const handleAutoDetect = async () => {
     if (!videoUrl) {
-      toast.error('Kein Video ausgewählt');
+      toast.error(tx({ de: 'Kein Video ausgewählt', en: 'No video selected', es: 'Ningún vídeo seleccionado' }));
       return;
     }
 
@@ -103,7 +103,7 @@ export function SmartCropping({
         });
 
         onVariantsChange(updatedVariants);
-        toast.success('Subjekte erkannt', {
+        toast.success(tx({ de: 'Subjekte erkannt', en: 'Subjects recognized', es: 'Materias reconocidas' }), {
           description: `${subjects.length} Elemente • ${data.credits_used} Credits`,
         });
       }
@@ -112,7 +112,7 @@ export function SmartCropping({
       
       if (error?.context?.status === 402) {
         toast.error(tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'Créditos insuficientes' }), {
-          description: tx({ de: tx({ de: tx({ de: `Du benötigst ${CREDITS_COST} Credits für Smart Cropping`, en: `You need ${CREDITS_COST} credits for Smart Cropping`, es: `Necesitas ${CREDITS_COST} créditos para el recorte inteligente` }), en: `You need ${CREDITS_COST} credits for Smart Cropping`, es: `Necesitas ${CREDITS_COST} créditos para el recorte inteligente` }), en: `You need ${CREDITS_COST} credits for smart cropping`, es: `Necesitas ${CREDITS_COST} créditos para el recorte inteligente` }),
+          description: tx({ de: tx({ de: tx({ de: tx({ de: `Du benötigst ${CREDITS_COST} Credits für Smart Cropping`, en: `You need ${CREDITS_COST} credits for Smart Cropping`, es: `Necesitas ${CREDITS_COST} créditos para el recorte inteligente` }), en: `You need ${CREDITS_COST} credits for Smart Cropping`, es: `Necesitas ${CREDITS_COST} créditos para el recorte inteligente` }), en: `You need ${CREDITS_COST} credits for Smart Cropping`, es: `Necesitas ${CREDITS_COST} créditos para el recorte inteligente` }), en: `You need ${CREDITS_COST} credits for smart cropping`, es: `Necesitas ${CREDITS_COST} créditos para el recorte inteligente` }),
         });
       } else {
         toast.error(tx({ de: 'Erkennung fehlgeschlagen', en: 'Detection failed', es: 'Error en la detección' }), {

@@ -32,7 +32,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   ad_spot: {
     id: 'ad_spot',
     label: 'Werbespot',
-    description: 'Klassischer Spot: Problem sichtbar machen, Lösung zeigen, Beweis liefern, Handlungsaufruf.',
+    description: tx({ de: 'Klassischer Spot: Problem sichtbar machen, Lösung zeigen, Beweis liefern, Handlungsaufruf.', en: 'Classic spot: Make the problem visible, show the solution, provide evidence, call to action.', es: 'Spot clásico: Visibilizar el problema, mostrar la solución, aportar evidencia, llamado a la acción.' }),
     beats: ['hook', 'problem', 'reveal', 'proof', 'benefit', 'cta'],
     shotLadder: ['close_up', 'medium', 'wide', 'insert', 'medium_close', 'medium'],
     defaultMoves: ['handheld', 'slow_push_in', 'slow_pull_out', 'static', 'rack_focus', 'static'],

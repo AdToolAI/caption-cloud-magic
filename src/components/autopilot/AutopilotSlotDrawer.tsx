@@ -71,7 +71,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
     if (!slot) return;
     try {
       await supabase.functions.invoke('autopilot-generate-slot', { body: { slot_id: slot.id, force: true } });
-      toast({ title: 'Neugenerierung gestartet', description: 'Die KI erstellt diesen Slot frisch.' });
+      toast({ title: tx({ de: 'Neugenerierung gestartet', en: 'Regeneration started', es: 'La regeneración comenzó' }), description: 'Die KI erstellt diesen Slot frisch.' });
       qc.invalidateQueries({ queryKey: ['autopilot-queue'] });
     } catch {
       toast({
@@ -201,7 +201,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
                   {findingsArr.map((f, i) => <li key={i}>{f}</li>)}
                 </ul>
               ) : (
-                <div className="text-xs text-muted-foreground">Keine Auffälligkeiten erkannt.</div>
+                <div className="text-xs text-muted-foreground">{tx({ de: "Keine Auffälligkeiten erkannt.", en: "No abnormalities detected.", es: "No se detectaron anomalías." })}</div>
               )}
             </Card>
           )}

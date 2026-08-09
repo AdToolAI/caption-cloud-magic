@@ -349,12 +349,12 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
   {
     category: 'custom',
     name: 'Freier Editor',
-    description: 'Volle Kontrolle — erstelle jedes beliebige Video',
+    description: tx({ de: 'Volle Kontrolle — erstelle jedes beliebige Video', en: 'Full control — create any video you want', es: 'Control total: crea cualquier vídeo que quieras' }),
     icon: '✨',
     color: 'from-violet-500 to-purple-600',
     recommendedDuration: 'Flexibel',
     exampleUseCase: 'Tutorial, Erklärvideo, Social Content, Event, Promo',
-    features: ['Volle Flexibilität', 'Individuelle Struktur', 'Kreative Freiheit']
+    features: [tx({ de: 'Volle Flexibilität', en: 'Full flexibility', es: 'Flexibilidad total' }), 'Individuelle Struktur', 'Kreative Freiheit']
   }
 ];
 

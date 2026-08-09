@@ -90,7 +90,7 @@ export const CreditHistory = () => {
       'bio_optimize': 'Bio optimieren',
       'post_schedule': 'Post planen',
       'trend_fetch': 'Trend abrufen',
-      'image_process': 'Bild verarbeiten',
+      'image_process': tx({ de: 'Bild verarbeiten', en: 'Process image', es: 'Imagen de proceso' }),
       'comment_analyze': 'Kommentar analysieren',
       'background_generate': 'Hintergrund generieren',
       'coach_chat': 'Coach Chat',

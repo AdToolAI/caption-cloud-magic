@@ -46,7 +46,7 @@ const EFFECT_GROUPS: EffectGroup[] = [
       { key: 'highPassFilter', label: 'Hochpass', shortLabel: 'HP 120Hz', description: 'Entfernt tiefes Rumpeln' },
       { key: 'lowPassFilter', label: 'Tiefpass', shortLabel: 'LP 10kHz', description: 'Entfernt Zischen' },
       { key: 'notchFilter', label: 'Notch', shortLabel: '50/60Hz', description: 'Entfernt Netzbrummen' },
-      { key: 'noiseGate', label: 'Gate', shortLabel: '-40dB', description: 'Schaltet Stille stumm' },
+      { key: 'noiseGate', label: 'Gate', shortLabel: '-40dB', description: tx({ de: 'Schaltet Stille stumm', en: 'Mutes silence', es: 'Silencia el silencio' }) },
     ]
   },
   {
@@ -77,7 +77,7 @@ const EFFECT_GROUPS: EffectGroup[] = [
     label: 'Stereo & Output',
     icon: Music,
     effects: [
-      { key: 'stereoWidener', label: 'Stereo Widener', shortLabel: '15ms Haas', description: 'Stereo-Bild verbreitern' },
+      { key: 'stereoWidener', label: 'Stereo Widener', shortLabel: '15ms Haas', description: tx({ de: 'Stereo-Bild verbreitern', en: 'Widen stereo image', es: 'Ampliar imagen estéreo' }) },
       { key: 'normalize', label: 'Normalize', shortLabel: '-1dB Peak', description: 'Lautstärke normalisieren' },
     ]
   }
@@ -254,7 +254,7 @@ export function EffectControlPanel({
       
       {/* Info */}
       <p className="text-[10px] text-muted-foreground text-center">
-        Klicke auf einzelne Effekte um sie ein/auszuschalten, dann "Neu verarbeiten"
+        Klicke auf einzelne Effekte um sie ein/auszuschalten, dann tx({ de: "Neu verarbeiten", en: "Reprocess", es: "reprocesar" })
       </p>
     </div>
   );

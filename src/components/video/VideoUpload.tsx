@@ -34,7 +34,7 @@ export function VideoUpload({
 
     const maxSize = maxSizeMB * 1024 * 1024;
     if (file.size > maxSize) {
-      toast.error(`Video zu groß. Maximal ${maxSizeMB}MB erlaubt`);
+      toast.error(tx({ de: `Video zu groß. Maximal ${maxSizeMB}MB erlaubt`, en: `Video too big. Maximum ${maxSizeMB}MB allowed`, es: `Vídeo demasiado grande. Máximo de ${maxSizeMB}MB permitido` }));
       return;
     }
 

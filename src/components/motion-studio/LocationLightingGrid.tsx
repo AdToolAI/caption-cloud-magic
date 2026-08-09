@@ -74,7 +74,7 @@ export default function LocationLightingGrid({
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        if (!data?.imageUrl) throw new Error('Kein Bild generiert');
+        if (!data?.imageUrl) throw new Error(tx({ de: 'Kein Bild generiert', en: 'No image generated', es: 'No se genera ninguna imagen' }));
 
         const persisted =
           (await persistRemoteImage(data.imageUrl, 'location', location.id)) ?? data.imageUrl;

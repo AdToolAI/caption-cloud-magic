@@ -437,7 +437,7 @@ export default function Planner() {
           { id: loadingToast }
         );
       } else {
-        toast.info("Keine Content-Items in der Bibliothek gefunden", { id: loadingToast });
+        toast.info(tx({ de: "Keine Content-Items in der Bibliothek gefunden", en: "No content items found in the library", es: "No se encontraron elementos de contenido en la biblioteca." }), { id: loadingToast });
       }
     } catch (error: any) {
       console.error("Unexpected error:", error);
@@ -562,7 +562,7 @@ export default function Planner() {
   if (!workspaceId) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">Kein Workspace gefunden</p>
+        <p className="text-muted-foreground">{tx({ de: "Kein Workspace gefunden", en: "No workspace found", es: "No se encontró ningún espacio de trabajo" })}</p>
         <Button onClick={() => window.location.reload()} variant="outline">
           Neu laden
         </Button>

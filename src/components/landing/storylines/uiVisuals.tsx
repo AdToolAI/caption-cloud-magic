@@ -382,7 +382,7 @@ export const VoiceCloneVisual = () => (
       {[
         "Sprecher 1: Willkommen bei AdTool AI.",
         tx({ de: "Sprecher 2: Vier Stimmen, eine Szene.", en: "Speaker 2: Four voices, one scene.", es: "Orador 2: Cuatro voces, una escena." }),
-        "Sprecher 3: Kein Lip-Sync verrutscht.",
+        tx({ de: "Sprecher 3: Kein Lip-Sync verrutscht.", en: "Speaker 3: No lip sync slips.", es: "Orador 3: Sin errores de sincronización de labios." }),
         "Sprecher 4: Willkommen in der Beta.",
       ].map((line, i) => (
         <motion.div

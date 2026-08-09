@@ -86,7 +86,7 @@ export function MultiReferenceUploader({
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error(language === 'de' ? 'Bild zu groß (max. 10 MB).' : 'Image too large (max 10 MB).');
+      toast.error(language === 'de' ? tx({ de: 'Bild zu groß (max. 10 MB).', en: 'Image too large (max. 10 MB).', es: 'Imagen demasiado grande (máx. 10 MB).' }) : 'Image too large (max 10 MB).');
       return;
     }
     setUploadingIndex(slots.length);
@@ -150,7 +150,7 @@ export function MultiReferenceUploader({
           <ImagePlus className="h-4 w-4 text-primary" />
           <Label className="text-sm font-medium">
             {language === 'de'
-              ? `Multi-Reference (${rangeLabel} Bilder${required ? '' : ', optional'})`
+              ? tx({ de: `Multi-Reference (${rangeLabel} Bilder${required ? '' : ', optional'})`, en: `Multi-Reference (${rangeLabel} images${required ? '' : ', optional'})`, es: `Referencia múltiple (${rangeLabel} imágenes${obligatoria? '' : ', opcional'})` })
               : language === 'es'
               ? `Multi-Referencia (${rangeLabel} imágenes${required ? '' : ', opcional'})`
               : `Multi-Reference (${rangeLabel} images${required ? '' : ', optional'})`}
@@ -180,7 +180,7 @@ export function MultiReferenceUploader({
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         {language === 'de'
-          ? tx({ de: tx({ de: `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : tx({ de: ' Ohne Bild wird rein aus dem Text generiert.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, en: `Load character, product, setting and style — ${engine} combines them into one scene.${required ? '' : tx({ de: ' Without an image, generation is purely text-based.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, es: `Cargue carácter, producto, entorno y estilo: ${engine} los combina en una sola escena.${required ? '' : tx({ de: ' Sin una imagen, la generación se basa puramente en texto.', en: ' Sin una imagen, la generación se basa puramente en texto.', es: ' Sin imagen, la generación se basa puramente en texto.' })}` }), en: `Load character, product, setting and style — ${engine} combines them into one scene.${required ? '' : tx({ de: ' Without an image, generation is purely text-based.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, es: `Cargue carácter, producto, entorno y estilo: ${engine} los combina en una sola escena.${required ? '' : tx({ de: ' Sin una imagen, la generación se basa puramente en texto.', en: ' Sin una imagen, la generación se basa puramente en texto.', es: ' Sin imagen, la generación se basa puramente en texto.' })}` })
+          ? tx({ de: tx({ de: tx({ de: `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : tx({ de: ' Ohne Bild wird rein aus dem Text generiert.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, en: `Load character, product, setting and style — ${engine} combines them into one scene.${required ? '' : tx({ de: ' Without an image, generation is purely text-based.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, es: `Cargue carácter, producto, entorno y estilo: ${engine} los combina en una sola escena.${required ? '' : tx({ de: ' Sin una imagen, la generación se basa puramente en texto.', en: ' Sin una imagen, la generación se basa puramente en texto.', es: ' Sin imagen, la generación se basa puramente en texto.' })}` }), en: `Load character, product, setting and style — ${engine} combines them into one scene.${required ? '' : tx({ de: ' Without an image, generation is purely text-based.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, es: `Cargue carácter, producto, entorno y estilo: ${engine} los combina en una sola escena.${required ? '' : tx({ de: ' Sin una imagen, la generación se basa puramente en texto.', en: ' Sin una imagen, la generación se basa puramente en texto.', es: ' Sin imagen, la generación se basa puramente en texto.' })}` }), en: `Load character, product, setting and style — ${engine} combines them into one scene.${required ? '' : tx({ de: ' Without an image, generation is purely text-based.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, es: `Cargue carácter, producto, entorno y estilo: ${engine} los combina en una sola escena.${required ? '' : tx({ de: ' Sin una imagen, la generación se basa puramente en texto.', en: ' Sin una imagen, la generación se basa puramente en texto.', es: ' Sin imagen, la generación se basa puramente en texto.' })}` })
           : language === 'es'
           ? `Sube personaje, producto, ubicación y estilo — ${engine} los combina en una escena.${required ? '' : ' Sin imagen se genera solo a partir del texto.'}`
           : `Upload character, product, location and style — ${engine} blends them into one scene.${required ? '' : ' Without an image it generates from text only.'}`}
@@ -273,7 +273,7 @@ export function MultiReferenceUploader({
         <p className={`text-[10px] ${required ? 'text-amber-500/80' : 'text-muted-foreground'}`}>
           {required
             ? language === 'de'
-              ? '⚠️ Mindestens 1 Bild erforderlich.'
+              ? tx({ de: '⚠️ Mindestens 1 Bild erforderlich.', en: '⚠️ At least 1 image required.', es: '⚠️ Se requiere al menos 1 imagen.' })
               : language === 'es'
               ? '⚠️ Se requiere al menos 1 imagen.'
               : '⚠️ At least 1 image required.'

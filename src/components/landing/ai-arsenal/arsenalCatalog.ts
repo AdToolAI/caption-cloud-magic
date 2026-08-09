@@ -354,7 +354,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Nano Banana 2", "Nano Banana 2", "Nano Banana 2"],
     [
       "Fast Gemini image generation & precise editing.",
-      "Schnelle Gemini-Bild-Generation & präzises Editing.",
+      tx({ de: "Schnelle Gemini-Bild-Generation & präzises Editing.", en: "Fast Gemini image generation & precise editing.", es: "Generación rápida de imágenes Gemini y edición precisa." }),
       "Generación rápida y edición precisa con Gemini.",
     ],
     [T2I, EDIT, FAST],
@@ -364,7 +364,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Gemini 3.1 Flash Image", "Gemini 3.1 Flash Image", "Gemini 3.1 Flash Image"],
     [
       "Ultra-fast image editing at pro quality.",
-      "Ultraschnelles Bild-Editing in Pro-Qualität.",
+      tx({ de: "Ultraschnelles Bild-Editing in Pro-Qualität.", en: "Ultra-fast, pro-quality image editing.", es: "Edición de imágenes ultrarrápida y de calidad profesional." }),
       "Edición de imágenes ultrarrápida a calidad pro.",
     ],
     [T2I, EDIT, FAST],

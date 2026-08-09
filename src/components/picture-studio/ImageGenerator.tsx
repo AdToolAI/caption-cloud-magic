@@ -294,7 +294,7 @@ export function ImageGenerator() {
     }
 
     if (hasInsufficientCredits) {
-      toast.error(tx({ de: tx({ de: tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
+      toast.error(tx({ de: tx({ de: tx({ de: tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
       navigate('/ai-video-purchase-credits');
       return;
     }
@@ -363,7 +363,7 @@ export function ImageGenerator() {
     // Free tier (Gemini/Standard "Gratis im Abo") skips confirm.
     if (cost <= 0) { void runGenerate(); return; }
     if (hasInsufficientCredits) {
-      toast.error(tx({ de: tx({ de: tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
+      toast.error(tx({ de: tx({ de: tx({ de: tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
       navigate('/ai-video-purchase-credits');
       return;
     }
@@ -407,7 +407,7 @@ export function ImageGenerator() {
             const key = imageId || imgUrl;
             setCiScores(prev => ({ ...prev, [key]: score }));
             if (score < 60) {
-              toast.warning(tx({ de: tx({ de: tx({ de: `CI-Match nur ${score}% — Bild weicht vom Markenstil ab`, en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }), en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }), en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }));
+              toast.warning(tx({ de: tx({ de: tx({ de: tx({ de: `CI-Match nur ${score}% — Bild weicht vom Markenstil ab`, en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }), en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }), en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }), en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }));
             }
           })
           .catch(() => { /* silent */ });
@@ -892,14 +892,14 @@ export function ImageGenerator() {
       <AIVideoCostConfirmDialog
         open={costDialogOpen}
         payload={{
-          title: 'Bild generieren?',
+          title: tx({ de: 'Bild generieren?', en: 'Generate image?', es: '¿Generar imagen?' }),
           description:
             tx({ de: 'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein AI-Guthaben wird belastet.', en: 'Overview of your costs — once you confirm, generation will start and your AI credit will be charged.', es: 'Resumen de tus costes: una vez que confirmes, la generación comenzará y se cargará tu crédito de IA.' }),
           modelName: tier === 'fast' ? 'Fast (Seedream 4)' : tier === 'pro' ? 'Pro (SDXL)' : tier === 'ultra' ? 'Ultra (Flux Pro)' : 'Standard',
           modelBadge: tier.toUpperCase(),
           lines: [
             {
-              label: variantsCount > 1 ? `${variantsCount} Varianten × Preis` : 'Preis pro Bild',
+              label: variantsCount > 1 ? `${variantsCount} Varianten × Preis` : tx({ de: 'Preis pro Bild', en: 'Price per image', es: 'Precio por imagen' }),
               value: `${variantsCount} × ${currencySymbol}${baseCost.toFixed(2)}`,
               detail: `${aspectRatio} · ${style}`,
             },

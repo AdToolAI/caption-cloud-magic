@@ -71,7 +71,7 @@ export function useCalendarVideos() {
       if (error) throw error;
 
       toast({
-        title: '🎬 Rendering gestartet',
+        title: tx({ de: '🎬 Rendering gestartet', en: '🎬 Rendering started', es: '🎬 Se inició el renderizado' }),
         description: tx({ de: "Video wird gerendert", en: "Video is rendering", es: "El vídeo se está renderizando." }),
       });
 

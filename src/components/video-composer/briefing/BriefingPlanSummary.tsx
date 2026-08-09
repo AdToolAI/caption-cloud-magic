@@ -185,7 +185,7 @@ export default function BriefingPlanSummary({ plan }: Props) {
                 <div className="font-medium mb-1">Briefing-Dauer gewinnt</div>
                 <div className="text-muted-foreground">
                   Die Gesamtdauer wurde direkt aus dem Briefing gelesen und vor dem Board-Wert angewendet.
-                  {canonicalTiming?.sceneCount ? tx({ de: tx({ de: tx({ de: ` Erkannte Struktur: ${canonicalTiming.sceneCount} Szenen.`, en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }), en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }), en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }) : ''}
+                  {canonicalTiming?.sceneCount ? tx({ de: tx({ de: tx({ de: tx({ de: ` Erkannte Struktur: ${canonicalTiming.sceneCount} Szenen.`, en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }), en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }), en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }), en: `Detected structure: ${canonicalTiming.sceneCount} Scenes.`, es: `Estructura detectada: ${canonicalTiming.sceneCount} Escenas.` }) : ''}
                 </div>
               </HoverCardContent>
             </HoverCard>

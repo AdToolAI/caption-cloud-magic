@@ -44,7 +44,7 @@ export const useVideoCreation = () => {
       }
 
       toast({
-        title: 'Video-Rendering gestartet',
+        title: tx({ de: 'Video-Rendering gestartet', en: 'Video rendering started', es: 'Se inició la renderización de vídeo.' }),
         description: tx({ de: 'Dein Video wird erstellt. Das dauert ca. 30-60 Sekunden.', en: 'Your video is being created. This takes approx. 30-60 seconds.', es: 'Tu video se está creando. Esto toma aproximadamente 30-60 segundos.' })
       });
 

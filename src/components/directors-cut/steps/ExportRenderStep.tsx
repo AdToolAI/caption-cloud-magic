@@ -340,7 +340,7 @@ export function ExportRenderStep({
       return !Number.isFinite(start) || !Number.isFinite(end);
     });
     if (badScene >= 0) {
-      toast.error(tx({ de: tx({ de: tx({ de: `Scene ${badScene + 1} hat ungültige Zeit-Angaben. Bitte erneut analysieren.`, en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }), en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }), en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }));
+      toast.error(tx({ de: tx({ de: tx({ de: tx({ de: `Scene ${badScene + 1} hat ungültige Zeit-Angaben. Bitte erneut analysieren.`, en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }), en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }), en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }), en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }));
       return;
     }
     if (!Number.isFinite(Number(videoDuration)) || Number(videoDuration) <= 0) {
@@ -501,7 +501,7 @@ export function ExportRenderStep({
 
       if (data?.render_id) {
         setCurrentRenderId(data.render_id);
-        toast.success('Rendering gestartet!');
+        toast.success(tx({ de: 'Rendering gestartet!', en: 'Rendering started!', es: '¡Comenzó el renderizado!' }));
       }
     } catch (error) {
       console.error('Render error:', error);
@@ -524,7 +524,7 @@ export function ExportRenderStep({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast.success('Download gestartet');
+      toast.success(tx({ de: 'Download gestartet', en: 'Download started', es: 'Descarga iniciada' }));
     } catch (error) {
       console.error('Download error:', error);
       toast.error(tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Error al descargar' }));

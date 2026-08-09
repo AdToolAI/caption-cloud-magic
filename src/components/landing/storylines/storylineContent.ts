@@ -248,7 +248,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       UIComponent: MotionOneTakeVisual,
       copy: S(
         ["Ein-Take statt Schnitt", "One take, not cuts", "Un take, no cortes"],
-        ["Kein Schnitt. Kein Morph. Kein Bruch.", "No cut. No morph. No break.", "Sin corte. Sin morph. Sin ruptura."],
+        [tx({ de: "Kein Schnitt. Kein Morph. Kein Bruch.", en: "No cut. No morph. No break.", es: "Sin corte. Sin transformación. Sin descanso." }), "No cut. No morph. No break.", "Sin corte. Sin morph. Sin ruptura."],
         [
           tx({ de: "Andere Tools schneiden zwischen Sprechern und verlieren Kontinuität. Motion Studio bleibt in einer Einstellung — Blickachsen, Licht und Identität halten von Anfang bis Ende.", en: "Other tools cut between speakers and lose continuity. Motion Studio stays in one shot — eye lines, light, and identity hold from beginning to end.", es: "Otras herramientas cortan entre oradores y pierden continuidad. Motion Studio se mantiene en una sola toma — las líneas de mirada, la luz y la identidad se mantienen de principio a fin." }),
           "Other tools cut between speakers and lose continuity. Motion Studio holds one shot — eyelines, light and identity survive from start to end.",

@@ -85,11 +85,11 @@ const T = {
   },
 
   de: {
-    subject: { pass: 'Cast gesetzt', warn: 'Cast unklar', fail: 'Kein Cast' },
-    action: { pass: 'Aktion konkret', warn: 'Aktion vage', fail: 'Keine Aktion' },
-    shot: { pass: 'Shot definiert', warn: 'Shot generisch', fail: 'Kein Shot' },
+    subject: { pass: 'Cast gesetzt', warn: 'Cast unklar', fail: tx({ de: 'Kein Cast', en: 'No cast', es: 'Sin yeso' }) },
+    action: { pass: 'Aktion konkret', warn: 'Aktion vage', fail: tx({ de: 'Keine Aktion', en: 'No action', es: 'Ninguna acción' }) },
+    shot: { pass: 'Shot definiert', warn: 'Shot generisch', fail: tx({ de: 'Kein Shot', en: 'No shot', es: 'sin tiro' }) },
     dialog: { pass: 'Dialog gelockt', warn: 'Dialog Entwurf', fail: 'Voiceover-Timing fehlt' },
-    negative: { pass: 'Negative gesetzt', warn: 'Negative schwach', fail: 'Kein Negative' },
+    negative: { pass: 'Negative gesetzt', warn: 'Negative schwach', fail: tx({ de: 'Kein Negative', en: 'No negative', es: 'No negativo' }) },
     length: { pass: 'Länge passt', warn: 'Länge knapp', fail: 'Länge daneben' },
     consistency: { pass: 'Kohärent', warn: 'Gemischte Cues', fail: 'Konflikt' },
     hints: {

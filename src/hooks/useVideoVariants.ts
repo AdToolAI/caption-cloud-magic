@@ -109,7 +109,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
 
       toast({
         title: tx({ de: 'Varianten werden generiert', en: 'Variants are generated', es: 'Se generan variantes' }),
-        description: tx({ de: tx({ de: tx({ de: `${formats.length} Varianten werden erstellt`, en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }), en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }), en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }),
+        description: tx({ de: tx({ de: tx({ de: tx({ de: `${formats.length} Varianten werden erstellt`, en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }), en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }), en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }), en: `${formats.length} variants are being created`, es: `Se están creando ${formats.length} variantes` }),
       });
 
       return data;

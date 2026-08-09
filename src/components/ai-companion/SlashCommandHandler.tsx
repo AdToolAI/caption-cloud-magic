@@ -25,7 +25,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     command: '/status',
     label: 'Account Status',
-    description: 'Zeigt vollständige Account-Übersicht',
+    description: tx({ de: 'Zeigt vollständige Account-Übersicht', en: 'Shows complete account overview', es: 'Muestra una descripción general completa de la cuenta.' }),
     icon: <BarChart3 className="w-4 h-4" />,
     category: 'status'
   },
@@ -39,7 +39,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     command: '/render',
     label: 'Render-Status',
-    description: 'Zeigt aktive Video-Renderings',
+    description: tx({ de: 'Zeigt aktive Video-Renderings', en: 'Shows active video renderings', es: 'Muestra representaciones de vídeo activas.' }),
     icon: <Video className="w-4 h-4" />,
     category: 'status'
   },
@@ -60,7 +60,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     command: '/tips',
     label: 'Tipps anzeigen',
-    description: 'Zeigt personalisierte Tipps',
+    description: tx({ de: 'Zeigt personalisierte Tipps', en: 'Shows personalized tips', es: 'Muestra consejos personalizados' }),
     icon: <Sparkles className="w-4 h-4" />,
     category: 'help'
   },

@@ -56,7 +56,7 @@ export const useVideoEditor = () => {
 
       toast({
         title: tx({ de: 'Neue Version wird erstellt', en: 'New version is being created', es: 'Se está creando una nueva versión' }),
-        description: tx({ de: tx({ de: tx({ de: `Version ${newVersionNumber} wird jetzt gerendert. Das dauert einige Minuten.`, en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` }), en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` }), en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` })
+        description: tx({ de: tx({ de: tx({ de: tx({ de: `Version ${newVersionNumber} wird jetzt gerendert. Das dauert einige Minuten.`, en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` }), en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` }), en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` }), en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` })
       });
 
       // Invalidate queries to refresh the list

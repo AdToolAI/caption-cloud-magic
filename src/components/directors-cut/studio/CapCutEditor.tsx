@@ -2275,7 +2275,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             onClick={() => setAnchorRefreshOpen(true)}
             title={
               anchorDriftCount > 0
-                ? tx({ de: tx({ de: tx({ de: `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`, en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` }), en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` }), en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` })
+                ? tx({ de: tx({ de: tx({ de: tx({ de: `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`, en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` }), en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` }), en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` }), en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` })
                 : 'Anchor-Refresh — Character Consistency prüfen'
             }
           >
@@ -2663,7 +2663,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   <SlidersHorizontal className="h-3.5 w-3.5 text-[#F5C76A]" />
                   <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold">Inspector</span>
                   <span className="ml-auto text-[10px] text-white/50">
-                    {selectedSubtitle ? 'Untertitel' : selectedClip ? 'Audio-Clip' : selectedSceneId ? 'Szene' : 'Nichts ausgewählt'}
+                    {selectedSubtitle ? 'Untertitel' : selectedClip ? 'Audio-Clip' : selectedSceneId ? 'Szene' : tx({ de: 'Nichts ausgewählt', en: 'Nothing selected', es: 'Nada seleccionado' })}
                   </span>
                 </div>
                 <div className="flex-1 min-h-0">

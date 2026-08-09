@@ -125,7 +125,7 @@ export default function SnippetBuilderDialog({
         return;
       }
       if (!file.type.startsWith('image/')) {
-        toast.error('Nur Bilder erlaubt');
+        toast.error(tx({ de: 'Nur Bilder erlaubt', en: 'Only pictures allowed', es: 'Sólo se permiten fotografías' }));
         return;
       }
       setUploading(true);
@@ -144,7 +144,7 @@ export default function SnippetBuilderDialog({
           toast.success('Vorschau gesetzt');
         }
       } catch (e: any) {
-        toast.error(tx({ de: tx({ de: tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }));
+        toast.error(tx({ de: tx({ de: tx({ de: tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }));
       } finally {
         setUploading(false);
       }
@@ -245,7 +245,7 @@ export default function SnippetBuilderDialog({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={thumbnailUrl} alt="Vorschau" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-[10px] text-muted-foreground">Kein Bild</span>
+                  <span className="text-[10px] text-muted-foreground">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</span>
                 )}
               </div>
               <div className="flex flex-col gap-1.5">

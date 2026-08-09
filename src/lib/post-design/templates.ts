@@ -349,7 +349,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
           id: uid("s"), background: P.surface,
           layers: [
             { ...img(image, 0, "bottom"), x: 0.07, y: 0.07, w: 0.86, h: 0.68, radius: 24 },
-            text("Ein Bild. Ein Satz.", { y: 0.79, size: 0.055, weight: 600, align: "center", x: 0.08, w: 0.84, h: 0.09, shadow: false }),
+            text(tx({ de: "Ein Bild. Ein Satz.", en: "A picture. Mission.", es: "Una foto. Misión." }), { y: 0.79, size: 0.055, weight: 600, align: "center", x: 0.08, w: 0.84, h: 0.09, shadow: false }),
             text(tx({ de: "Mehr braucht es nicht.", en: "Nothing more is needed.", es: "No se necesita nada más." }), { y: 0.885, size: 0.026, weight: 400, font: "body", align: "center", x: 0.08, w: 0.84, h: 0.05, shadow: false, color: P.accent }),
           ],
         }],

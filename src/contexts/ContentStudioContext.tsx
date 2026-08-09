@@ -374,7 +374,7 @@ export function ContentStudioProvider({
     if (error) throw error;
     if (data?.ok === false || data?.error) throw new Error(data.error || tx({ de: "Bildgenerierung fehlgeschlagen", en: "Image generation failed", es: "Error al generar la imagen" }));
     const url: string | undefined = data?.image?.url ?? data?.image;
-    if (!url) throw new Error("Kein Bild erhalten");
+    if (!url) throw new Error(tx({ de: "Kein Bild erhalten", en: "No picture received", es: "No se recibió ninguna foto" }));
     return url;
   }, []);
 

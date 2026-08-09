@@ -10,8 +10,8 @@ import { tx } from '@/lib/i18nText';
 
 const MODES = [
   { id: "ai" as const, label: "KI-Motiv", hint: "Aus dem Briefing" },
-  { id: "own" as const, label: "Eigenes Bild", hint: "Upload / Mediathek / Stock" },
-  { id: "none" as const, label: "Ohne Bild", hint: "Reine Typografie" },
+  { id: "own" as const, label: tx({ de: "Eigenes Bild", en: "Own picture", es: "Foto propia" }), hint: "Upload / Mediathek / Stock" },
+  { id: "none" as const, label: tx({ de: "Ohne Bild", en: "Without picture", es: "Sin foto" }), hint: "Reine Typografie" },
 ];
 
 export function MotifStep() {

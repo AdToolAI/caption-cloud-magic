@@ -129,7 +129,7 @@ export function useMultiSceneRender(opts: Options) {
         if (invErr) throw invErr;
         if (!data?.success) throw new Error(data?.error || tx({ de: 'Stitching fehlgeschlagen', en: 'Stitching failed', es: 'La costura falló' }));
         setRenderId(data.renderId);
-        toast.success(tx({ de: tx({ de: tx({ de: `Stitching gestartet — ${data.scenesCount} Szenen`, en: `Stitching started — ${data.scenesCount} scenes`, es: `Unión iniciada — ${data.scenesCount} escenas` }), en: `Stitching started — ${data.scenesCount} scenes`, es: `Unión iniciada — ${data.scenesCount} escenas` }), en: `Stitching started — ${data.scenesCount} scenes`, es: `Unión iniciada — ${data.scenesCount} escenas` }));
+        toast.success(tx({ de: tx({ de: tx({ de: tx({ de: `Stitching gestartet — ${data.scenesCount} Szenen`, en: `Stitching started — ${data.scenesCount} scenes`, es: `Unión iniciada — ${data.scenesCount} escenas` }), en: `Stitching started — ${data.scenesCount} scenes`, es: `Unión iniciada — ${data.scenesCount} escenas` }), en: `Stitching started — ${data.scenesCount} scenes`, es: `Unión iniciada — ${data.scenesCount} escenas` }), en: `Stitching started — ${data.scenesCount} scenes`, es: `Unión iniciada — ${data.scenesCount} escenas` }));
       } catch (e: any) {
         console.error('[useMultiSceneRender] stitch failed', e);
         const msg = e?.message || tx({ de: 'Stitching fehlgeschlagen', en: 'Stitching failed', es: 'La costura falló' });

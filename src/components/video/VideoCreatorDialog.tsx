@@ -139,11 +139,11 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       }
 
       handleFieldChange(key, JSON.stringify(uploadedUrls));
-      toast.success(`${uploadedUrls.length} Bild(er) hochgeladen`);
+      toast.success(tx({ de: `${uploadedUrls.length} Bild(er) hochgeladen`, en: `${uploadedUrls.length} Image(s) uploaded`, es: `${uploadedUrls.length} Imagen(es) cargada(s)` }));
     } catch (error) {
       console.error('Upload error:', error);
       if (error instanceof Error) {
-        toast.error(tx({ de: tx({ de: tx({ de: `Bild-Upload fehlgeschlagen: ${error.message}`, en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }));
+        toast.error(tx({ de: tx({ de: tx({ de: tx({ de: `Bild-Upload fehlgeschlagen: ${error.message}`, en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }));
       } else {
         toast.error(tx({ de: 'Bild-Upload fehlgeschlagen', en: 'Image upload failed', es: 'Error al subir la imagen' }));
       }
@@ -474,7 +474,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             )}
             <Video className="h-5 w-5" />
             {step === 'gallery' && tx({ de: "Template auswählen", en: "Select template", es: "Seleccionar plantilla" })}
-            {step === 'customize' && tx({ de: tx({ de: tx({ de: `Video erstellen: ${selectedTemplate?.name}`, en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` })}
+            {step === 'customize' && tx({ de: tx({ de: tx({ de: tx({ de: `Video erstellen: ${selectedTemplate?.name}`, en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` })}
             {step === 'rendering' && tx({ de: 'Video wird erstellt...', en: 'Video is being created...', es: 'El video se está creando...' })}
           </DialogTitle>
         </DialogHeader>
@@ -635,7 +635,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                 <TabsContent value="ai-music" className="mt-4">
                   <AIMusicSuggester
                     onSelect={(music) => {
-                      toast.success(`Musik ausgewählt: ${music.name}`);
+                      toast.success(tx({ de: `Musik ausgewählt: ${music.name}`, en: `Music selected: ${music.name}`, es: `Música seleccionada: ${music.name}` }));
                       // Handle music selection
                     }}
                   />

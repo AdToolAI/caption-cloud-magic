@@ -157,7 +157,7 @@ export const ThumbnailManager = ({
 
         {/* Upload Custom Thumbnail */}
         <div className="space-y-2">
-          <Label htmlFor="thumbnail-upload">Eigenes Thumbnail hochladen</Label>
+          <Label htmlFor="thumbnail-upload">{tx({ de: "Eigenes Thumbnail hochladen", en: "Upload your own thumbnail", es: "Sube tu propia miniatura" })}</Label>
           <div className="flex gap-2">
             <Input
               id="thumbnail-upload"

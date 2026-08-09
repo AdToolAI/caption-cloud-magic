@@ -220,11 +220,11 @@ export default function ContentProjects() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Film className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <CardTitle className="mb-2">Keine Videos gefunden</CardTitle>
+                  <CardTitle className="mb-2">{tx({ de: "Keine Videos gefunden", en: "No videos found", es: "No se encontraron vídeos" })}</CardTitle>
                   <CardDescription>
                     {selectedStatus === "all"
                       ? tx({ de: "Erstelle dein erstes Video im Content Studio", en: "Create your first video in Content Studio", es: "Crea tu primer vídeo en Content Studio" })
-                      : tx({ de: tx({ de: tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
+                      : tx({ de: tx({ de: tx({ de: tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>
                     Zum Content Studio

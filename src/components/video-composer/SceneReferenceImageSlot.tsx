@@ -36,7 +36,7 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Datei zu groß (max. 10 MB).');
+      toast.error(tx({ de: 'Datei zu groß (max. 10 MB).', en: 'File too large (max. 10 MB).', es: 'Archivo demasiado grande (máx. 10 MB).' }));
       return;
     }
     setUploading(true);

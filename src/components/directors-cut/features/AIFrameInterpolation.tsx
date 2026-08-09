@@ -37,7 +37,7 @@ export function AIFrameInterpolation({
   const handleInterpolate = async () => {
     if (!videoUrl) {
       toast({
-        title: 'Kein Video ausgewählt',
+        title: tx({ de: 'Kein Video ausgewählt', en: 'No video selected', es: 'Ningún vídeo seleccionado' }),
         description: tx({ de: 'Bitte wähle zuerst ein Video aus.', en: 'Please select a video first.', es: 'Por favor, selecciona un video primero.' }),
         variant: 'destructive'
       });
@@ -70,7 +70,7 @@ export function AIFrameInterpolation({
 
       if (data?.success) {
         toast({
-          title: 'Frame Interpolation gestartet',
+          title: tx({ de: 'Frame Interpolation gestartet', en: 'Frame interpolation started', es: 'Se inició la interpolación de cuadros.' }),
           description: `${sourceFps}fps → ${settings.targetFps}fps. ${data.credits_required} Credits reserviert.`
         });
         onInterpolationComplete?.(data);

@@ -59,7 +59,7 @@ const FALLBACKS: Record<string, string> = {
   renderStarted: tx({ de: 'Video-Rendering gestartet! 🎬', en: 'Video rendering started! 🎬', es: '¡Renderizado de video iniciado! 🎬' }),
   renderVideo: tx({ de: 'Video rendern', en: 'Render video', es: 'Renderizar video' }),
   backgroundMusic: 'Hintergrundmusik',
-  musicSelectedFallback: 'Track ausgewählt',
+  musicSelectedFallback: tx({ de: 'Track ausgewählt', en: 'Track selected', es: 'Pista seleccionada' }),
   musicWillBeMixed: tx({ de: 'Wird im finalen Export mit der unten gewählten Lautstärke gemischt.', en: 'Will be mixed into the final export with the volume selected below.', es: 'Se mezclará en la exportación final con el volumen seleccionado abajo.' }),
   musicVolume: 'Lautstärke',
   editInAudioTab: 'Im Audio-Tab ändern',

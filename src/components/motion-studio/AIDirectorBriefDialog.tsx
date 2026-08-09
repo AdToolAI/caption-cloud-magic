@@ -82,7 +82,7 @@ export default function AIDirectorBriefDialog({
         }
       );
       if (error) throw error;
-      if (!data?.plan) throw new Error('Kein Plan zurückgegeben');
+      if (!data?.plan) throw new Error(tx({ de: 'Kein Plan zurückgegeben', en: 'No plan returned', es: 'No se devolvió ningún plan' }));
       setPlan(data.plan as DirectorPlan);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Director-Fehler';
@@ -99,7 +99,7 @@ export default function AIDirectorBriefDialog({
     onOpenChange(false);
     setBrief('');
     setPlan(null);
-    toast.success(tx({ de: tx({ de: tx({ de: `Storyboard "${plan.title}" geladen — ${plan.scenes.length} Szenen ✨`, en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }));
+    toast.success(tx({ de: tx({ de: tx({ de: tx({ de: `Storyboard "${plan.title}" geladen — ${plan.scenes.length} Szenen ✨`, en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }));
   };
 
   return (

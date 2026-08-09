@@ -40,7 +40,7 @@ export function AIVideoRestoration({
   const handleRestore = async () => {
     if (!videoUrl) {
       toast({
-        title: 'Kein Video ausgewählt',
+        title: tx({ de: 'Kein Video ausgewählt', en: 'No video selected', es: 'Ningún vídeo seleccionado' }),
         description: tx({ de: 'Bitte wähle zuerst ein Video aus.', en: 'Please select a video first.', es: 'Por favor, selecciona un video primero.' }),
         variant: 'destructive'
       });
@@ -81,7 +81,7 @@ export function AIVideoRestoration({
 
       if (data?.success) {
         toast({
-          title: 'Video-Restaurierung gestartet',
+          title: tx({ de: 'Video-Restaurierung gestartet', en: 'Video restoration started', es: 'Restauración de vídeo iniciada' }),
           description: `${data.active_features} Features aktiv. ${data.credits_required} Credits reserviert.`
         });
         onRestorationComplete?.(data);
