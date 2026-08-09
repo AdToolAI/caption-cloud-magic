@@ -800,7 +800,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 border border-cyan-500/30 transition-colors"
             >
               <Scissors className="h-3 w-3" />
-              Split
+              {tx({ de: 'Split', en: 'Split', es: 'Dividir' })}
               <kbd className="hidden sm:inline ml-1 text-[9px] text-cyan-300/60 border border-cyan-500/30 rounded px-1">S</kbd>
             </button>
           )}
@@ -814,7 +814,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-[#F5C76A]/15 text-[#F5C76A] hover:bg-[#F5C76A]/25 border border-[#F5C76A]/40 transition-colors"
                 >
                   <PlusCircle className="h-3 w-3" />
-                  {t('dc.addNewScene') || 'Szene'}
+                  {t('dc.addNewScene') || tx({ de: 'Szene', en: 'Scene', es: 'Escena' })}
                   <ChevronDown className="h-2.5 w-2.5 opacity-70" />
                 </button>
               </DropdownMenuTrigger>

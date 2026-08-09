@@ -126,7 +126,7 @@ const TEXT = {
     actual: tx({ de: "Was ist stattdessen passiert?", en: "What happened instead?", es: "¿Qué pasó en su lugar?" }),
     actualPh: "z. B. Der Render bleibt bei 20% hängen.",
     repro: tx({ de: "Schritte zum Reproduzieren (optional)", en: "Steps to reproduce (optional)", es: "Pasos para reproducir (opcional)" }),
-    reproPh: "1. /video-composer öffnen\n2. 3 Szenen hinzufügen\n3. „Alle rendern“ klicken",
+    reproPh: tx({ de: "1. /video-composer öffnen\n2. 3 Szenen hinzufügen\n3. „Alle rendern“ klicken", en: "1. Open /video-composer\n2. Add 3 scenes\n3. Click \"Render all\"", es: "1. Abrir /video-composer\n2. Añadir 3 escenas\n3. Hacer clic en \"Renderizar todo\"" }),
     extra: "Sonstiges?",
     extraPh: tx({ de: "Zusätzlicher Kontext, Links oder Notizen.", en: "Additional context, links or notes.", es: "Contexto adicional, enlaces o notas." }),
     s3Title: "Beweise & Absenden",

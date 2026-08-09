@@ -100,23 +100,23 @@ export default function SceneSnippetPicker({
               Scene Library
             </DialogTitle>
             <DialogDescription>
-              Wiederverwendbare Szenen-Bausteine — Kuratiert, Eigene, Community oder Stock Live.
+              {tx({ de: "Wiederverwendbare Szenen-Bausteine — Kuratiert, Eigene, Community oder Stock Live.", en: "Reusable scene building blocks — Curated, Own, Community, or Stock Live.", es: "Bloques de escena reutilizables — Curados, propios, comunidad o stock en vivo." })}
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="curated" className="w-full">
             <TabsList className="grid grid-cols-4 w-full max-w-xl">
               <TabsTrigger value="curated" className="gap-1.5 text-xs">
-                <Sparkles className="h-3.5 w-3.5" /> Kuratiert
+                <Sparkles className="h-3.5 w-3.5" /> {tx({ de: "Kuratiert", en: "Curated", es: "Curados" })}
               </TabsTrigger>
               <TabsTrigger value="mine" className="gap-1.5 text-xs">
-                <Library className="h-3.5 w-3.5" /> Meine
+                <Library className="h-3.5 w-3.5" /> {tx({ de: "Meine", en: "Mine", es: "Míos" })}
               </TabsTrigger>
               <TabsTrigger value="community" className="gap-1.5 text-xs">
-                <Globe2 className="h-3.5 w-3.5" /> Community
+                <Globe2 className="h-3.5 w-3.5" /> {tx({ de: "Community", en: "Community", es: "Comunidad" })}
               </TabsTrigger>
               <TabsTrigger value="stock" className="gap-1.5 text-xs">
-                <Globe className="h-3.5 w-3.5" /> Stock
+                <Globe className="h-3.5 w-3.5" /> {tx({ de: "Stock", en: "Stock", es: "Stock" })}
               </TabsTrigger>
             </TabsList>
 
@@ -203,7 +203,7 @@ export default function SceneSnippetPicker({
                   <Input
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    placeholder="Snippets durchsuchen..."
+                    placeholder={tx({ de: "Snippets durchsuchen...", en: "Search snippets...", es: "Buscar snippets..." })}
                     className="pl-8 h-8 text-sm bg-background/60"
                   />
                 </div>
@@ -212,13 +212,13 @@ export default function SceneSnippetPicker({
                   onClick={() => openBuilder(null)}
                   className="h-8 gap-1.5 text-[11px]"
                 >
-                  <Plus className="h-3.5 w-3.5" /> Neues Snippet
+                  <Plus className="h-3.5 w-3.5" /> {tx({ de: "Neues Snippet", en: "New snippet", es: "Nuevo snippet" })}
                 </Button>
               </div>
 
               {loading ? (
                 <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lädt Snippets...
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> {tx({ de: "Lädt Snippets...", en: "Loading snippets...", es: "Cargando snippets..." })}
                 </div>
               ) : visible.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border/60 p-6 text-center text-[11px] text-muted-foreground">
@@ -253,7 +253,7 @@ export default function SceneSnippetPicker({
                             variant="ghost"
                             className="h-6 w-6 p-0 hover:bg-primary/20"
                             onClick={() => openBuilder(s)}
-                            aria-label="Bearbeiten"
+                            aria-label={tx({ de: "Bearbeiten", en: "Edit", es: "Editar" })}
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
@@ -262,7 +262,7 @@ export default function SceneSnippetPicker({
                             variant="ghost"
                             className="h-6 w-6 p-0 text-destructive hover:bg-destructive/20"
                             onClick={() => handleDelete(s.id)}
-                            aria-label="Löschen"
+                            aria-label={tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -308,7 +308,7 @@ export default function SceneSnippetPicker({
                             onOpenChange(false);
                           }}
                         >
-                          Einfügen
+                          {tx({ de: "Einfügen", en: "Insert", es: "Insertar" })}
                         </Button>
                       </div>
                     </div>

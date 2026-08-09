@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
+import { tx } from "@/lib/i18nText";
 
 // Purely decorative: 7 columns (weekdays) x 4 rows (weeks).
 // Highlighted "optimal" slots pulse in gold; the rest breathe softly.
@@ -11,7 +12,7 @@ export const PlanCockpit = () => {
   return (
     <div
       role="img"
-      aria-label="Content-Planungs-Heatmap Vorschau"
+      aria-label={tx({ de: "Content-Planungs-Heatmap Vorschau", en: "Content planning heatmap preview", es: "Vista previa del mapa de calor de planificación de contenido" })}
       className="relative h-[170px] w-full rounded-xl border border-border/40 bg-gradient-to-br from-background/40 to-card/20 p-3 overflow-hidden"
     >
       {/* Weekday header dots */}

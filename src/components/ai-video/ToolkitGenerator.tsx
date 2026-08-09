@@ -1247,7 +1247,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   : <VolumeX className="h-4 w-4 text-muted-foreground" />
                 }
                 <Label className="text-sm cursor-pointer" htmlFor="audio-switch">
-                  {language === 'de' ? 'Native Audio generieren' : 'Generate native audio'}
+                  {language === 'de' ? 'Native Audio generieren' : language === 'es' ? 'Generar audio nativo' : 'Generate native audio'}
                 </Label>
               </div>
               <Switch

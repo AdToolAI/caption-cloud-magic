@@ -31,7 +31,7 @@ function MediaSlot({ mediaUrl, mediaType, aspect }: { mediaUrl?: string; mediaTy
           aspect,
         )}
       >
-        Noch keine Medien · im Editor unten hochladen
+        {tx({ de: "Noch keine Medien · im Editor unten hochladen", en: "No media yet · upload below in the editor", es: "Aún no hay medios · sube en el editor de abajo" })}
       </div>
     );
   }
@@ -49,7 +49,7 @@ function MediaSlot({ mediaUrl, mediaType, aspect }: { mediaUrl?: string; mediaTy
   }
   return (
     <div className={cn("w-full overflow-hidden", aspect)}>
-      <img src={mediaUrl} alt="Vorschau" className="w-full h-full object-cover" />
+      <img src={mediaUrl} alt={tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })} className="w-full h-full object-cover" />
     </div>
   );
 }
@@ -106,7 +106,7 @@ export function PostPreviewMockup({ platform, caption, hashtags, mediaUrl, media
             <div className="h-9 w-9 rounded-full bg-blue-500" />
             <div>
               <div className="text-sm font-semibold">{username}</div>
-              <div className="text-[10px] text-muted-foreground">Gerade eben · 🌍</div>
+              <div className="text-[10px] text-muted-foreground">{tx({ de: "Gerade eben · 🌍", en: "Just now · 🌍", es: "Justo ahora · 🌍" })}</div>
             </div>
           </div>
           <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
@@ -133,7 +133,7 @@ export function PostPreviewMockup({ platform, caption, hashtags, mediaUrl, media
           <div className="h-10 w-10 rounded-full bg-green-600" />
           <div>
             <div className="text-sm font-semibold">{username}</div>
-            <div className="text-[10px] text-muted-foreground">Creator · Jetzt · 🌍</div>
+            <div className="text-[10px] text-muted-foreground">{tx({ de: "Creator · Jetzt · 🌍", en: "Creator · Now · 🌍", es: "Creador · Ahora · 🌍" })}</div>
           </div>
         </div>
         <div className="px-3 pb-2">
@@ -144,9 +144,9 @@ export function PostPreviewMockup({ platform, caption, hashtags, mediaUrl, media
         </div>
         <MediaSlot mediaUrl={mediaUrl} mediaType={mediaType} aspect="aspect-[16/9]" />
         <div className="px-3 py-2 flex items-center gap-4 border-t border-border/40 text-muted-foreground text-xs">
-          <span className="flex items-center gap-1"><ThumbsUp className="h-3.5 w-3.5" /> Mögen</span>
-          <span className="flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> Kommentieren</span>
-          <span className="flex items-center gap-1"><Repeat2 className="h-3.5 w-3.5" /> Teilen</span>
+          <span className="flex items-center gap-1"><ThumbsUp className="h-3.5 w-3.5" /> {tx({ de: "Mögen", en: "Like", es: "Me gusta" })}</span>
+          <span className="flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> {tx({ de: "Kommentieren", en: "Comment", es: "Comentar" })}</span>
+          <span className="flex items-center gap-1"><Repeat2 className="h-3.5 w-3.5" /> {tx({ de: "Teilen", en: "Share", es: "Compartir" })}</span>
         </div>
       </div>
     );
@@ -159,11 +159,11 @@ export function PostPreviewMockup({ platform, caption, hashtags, mediaUrl, media
         <MediaSlot mediaUrl={mediaUrl} mediaType={mediaType || "video"} aspect="aspect-video" />
         <div className="px-3 py-2 space-y-1">
           <p className="text-sm font-semibold leading-snug">
-            {caption?.split("\n")[0] || <span className="text-muted-foreground italic">Titel/Caption…</span>}
+            {caption?.split("\n")[0] || <span className="text-muted-foreground italic">{tx({ de: "Titel/Caption…", en: "Title/Caption…", es: "Título/Pie de foto…" })}</span>}
           </p>
           <div className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-full bg-red-600" />
-            <span className="text-xs text-muted-foreground">{username} · gerade eben</span>
+            <span className="text-xs text-muted-foreground">{username} · {tx({ de: "gerade eben", en: "just now", es: "justo ahora" })}</span>
           </div>
           <HashtagsLine hashtags={hashtags} />
         </div>
@@ -179,10 +179,10 @@ export function PostPreviewMockup({ platform, caption, hashtags, mediaUrl, media
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1 text-sm">
             <span className="font-semibold">{username}</span>
-            <span className="text-muted-foreground">@{username} · jetzt</span>
+            <span className="text-muted-foreground">@{username} · {tx({ de: "jetzt", en: "now", es: "ahora" })}</span>
           </div>
           <p className="text-sm whitespace-pre-wrap mt-0.5">
-            {caption || <span className="text-muted-foreground italic">Was passiert?</span>}
+            {caption || <span className="text-muted-foreground italic">{tx({ de: "Was passiert?", en: "What's happening?", es: "¿Qué está pasando?" })}</span>}
           </p>
           <HashtagsLine hashtags={hashtags} />
           {mediaUrl && (

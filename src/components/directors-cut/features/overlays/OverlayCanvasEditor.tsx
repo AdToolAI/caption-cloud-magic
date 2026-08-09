@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TextOverlay } from '@/types/directors-cut';
 import { OverlayGraphic } from '@/remotion/components/OverlayGraphic';
 import { clampBox } from '@/lib/directors-cut/overlayModel';
+import { tx } from '@/lib/i18nText';
 
 interface OverlayCanvasEditorProps {
   videoUrl?: string;
@@ -153,7 +154,7 @@ export function OverlayCanvasEditor({
       {videoUrl ? (
         <video ref={videoRef} src={videoUrl} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-contain" />
       ) : (
-        <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">Kein Video geladen</div>
+        <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">{tx({ de: 'Kein Video geladen', en: 'No video loaded', es: 'No hay video cargado' })}</div>
       )}
 
       {/* Sicherheitszonen */}
