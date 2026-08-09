@@ -79,6 +79,13 @@ for (const root of ROOTS) {
     }
 
     source.split("\n").forEach((line, i) => {
+      // Collapsed translation entries: an automated pass once merged several
+      // keys into one string value ("Title', otherKey: 'Value"), which leaks
+      // raw keys into the UI. Flag any value containing `', someKey: '`.
+      const collapsed = line.match(/^\s*[A-Za-z0-9_]+:\s*"[^"]*',\s*[A-Za-z0-9_]+:\s*'/);
+      if (collapsed) {
+        problems.push(`${file}:${i + 1} collapsed translation entry: ${line.trim().slice(0, 120)}`);
+      }
       if (!/toLocale(Date|Time)?String|DateTimeFormat/.test(line)) return;
       for (const rule of BAD_TECHNICAL) {
         if (rule.test(line)) {
