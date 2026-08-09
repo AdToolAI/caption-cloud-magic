@@ -335,7 +335,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
               title="Konflikt-Warnung"
               body={
                 conflicts.length > 0
-                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — Reach cannibalizes itself.`, es: `${conflicts.length} Ranura${conflicts.length === 1? "" : "s"} con ≥3 publicaciones al mismo tiempo: el alcance se canibaliza a sí mismo.` })
+                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — Reach cannibalizes itself.`, es: `${conflicts.length} Ranura${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones al mismo tiempo: el alcance se canibaliza a sí mismo.` })
                   : "Keine Stau-Slots. Saubere Verteilung."
               }
             />

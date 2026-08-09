@@ -36,7 +36,7 @@ function humanize(seconds: number): string {
   if (minutes >= 45) return tx({ de: 'noch ca. 45+ Min.', en: 'about 45+ minutes left', es: 'quedan unos 45+ minutos' });
   // Auf 5 Minuten runden — suggeriert keine Scheingenauigkeit.
   const rounded = Math.max(5, Math.round(minutes / 5) * 5);
-  return tx({ de: `noch ca. ${rounded} Min.`, en: `still approx. ${rounded} min.`, es: `todavía aprox. ${redondeado} mín.` });
+  return tx({ de: `noch ca. ${rounded} Min.`, en: `still approx. ${rounded} min.`, es: `todavía aprox. ${rounded} mín.` });
 }
 
 export function estimateRemaining(

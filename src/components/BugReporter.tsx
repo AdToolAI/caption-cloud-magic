@@ -93,7 +93,7 @@ export function BugReporter() {
       setOpen(false);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
-      toast.error(tx({ de: `Fehler: ${msg}`, en: `Error: ${msg}`, es: `Error: ${mensaje}` }));
+      toast.error(tx({ de: `Fehler: ${msg}`, en: `Error: ${msg}`, es: `Error: ${msg}` }));
     } finally {
       setSubmitting(false);
     }

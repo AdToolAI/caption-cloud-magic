@@ -355,7 +355,7 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
   // ---- Export single stem (for stem-only download) ----
   const downloadStem = useCallback(async (type: StemType) => {
     if (!buffers[type]) {
-      toast.error(tx({ de: `${STEM_META[type].label} nicht geladen`, en: `${STEM_META[type].label} not loaded`, es: `${STEM_META[tipo].label} no cargado` }));
+      toast.error(tx({ de: `${STEM_META[type].label} nicht geladen`, en: `${STEM_META[type].label} not loaded`, es: `${STEM_META[type].label} no cargado` }));
       return;
     }
     setIsExporting(true);

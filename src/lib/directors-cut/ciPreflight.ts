@@ -160,7 +160,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'short-scenes',
       severity: 'warn',
-      title: tx({ de: `${shortScenes.length} sehr kurze Szene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`, en: `${shortScenes.length} very short scene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`, es: `${shortScenes.length} escena muy corta${shortScenes.length > 1? 'n' : ''} (<0,2s)` }),
+      title: tx({ de: `${shortScenes.length} sehr kurze Szene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`, en: `${shortScenes.length} very short scene${shortScenes.length > 1 ? 'n' : ''} (<0.2s)`, es: `${shortScenes.length} escena muy corta${shortScenes.length > 1 ? 'n' : ''} (<0,2s)` }),
       detail: tx({ de: 'Unter 0.2s wird die Szene im finalen Render kaum sichtbar.', en: 'Below 0.2s, the scene will be barely visible in the final render.', es: 'Por debajo de 0.2s, la escena apenas será visible en el render final.' }),
     });
   }
@@ -227,7 +227,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'aspect-mismatch',
       severity: 'warn',
-      title: tx({ de: `${mismatched.length} Szene${mismatched.length > 1 ? 'n' : ''} mit abweichendem Seitenverhältnis`, en: `${mismatched.length} scene${mismatched.length > 1 ? 's' : ''} with mismatched aspect ratio`, es: `${mismatched.length} escena${mismatched.length > 1 ? 's' : ''} con relación de aspecto no coincidente` }),
+      title: tx({ de: `${mismatched.length} Szene${mismatched.length > 1 ? 'n' : ''} mit abweichendem Seitenverhältnis`, en: `${mismatched.length} scene${mismatched.length > 1 ? 'n' : ''} with mismatched aspect ratio`, es: `${mismatched.length} escena${mismatched.length > 1 ? 'n' : ''} con relación de aspecto no coincidente` }),
       detail: tx({ de: `Projekt rendert in ${targetLabel} — betroffene Szenen werden beschnitten oder mit Letterbox versehen.`, en: `Project renders in ${targetLabel} — affected scenes will be cropped or letterboxed.`, es: `El proyecto se renderiza en ${targetLabel} — las escenas afectadas se recortarán o se les añadirá letterbox.` }),
       hint: tx({ de: "Ersetze Assets oder ändere das Export-Seitenverhältnis passend.", en: "Replace assets or change the export aspect ratio appropriately.", es: "Reemplace los activos o cambie la relación de aspecto de exportación de manera adecuada." }),
     });
@@ -298,7 +298,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'missing-thumbnails',
       severity: 'warn',
-      title: tx({ de: `${missingThumbs.length} Szene${missingThumbs.length > 1 ? 'n' : ''} ohne geladenes Asset`, en: `${missingThumbs.length} scene${missingThumbs.length > 1 ? 's' : ''} without loaded asset`, es: `${missingThumbs.length} escena${missingThumbs.length > 1 ? 's' : ''} sin recurso cargado` }),
+      title: tx({ de: `${missingThumbs.length} Szene${missingThumbs.length > 1 ? 'n' : ''} ohne geladenes Asset`, en: `${missingThumbs.length} scene${missingThumbs.length > 1 ? 'n' : ''} without loaded asset`, es: `${missingThumbs.length} escena${missingThumbs.length > 1 ? 'n' : ''} sin recurso cargado` }),
       detail: tx({ de: "Ohne Thumbnail fehlt beim Render eventuell das zugrundeliegende Video.", en: "Without a thumbnail, the underlying video may be missing from the render.", es: "Sin una miniatura, es posible que el vídeo subyacente no aparezca en el renderizado." }),
       hint: tx({ de: 'Öffne die Szene und lade das Asset neu oder ersetze es.', en: 'Open the scene and reload or replace the asset.', es: 'Abre la escena y recarga o reemplaza el recurso.' }),
     });

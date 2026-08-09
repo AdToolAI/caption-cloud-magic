@@ -1806,7 +1806,7 @@ export default function VideoComposerDashboard() {
                       const hasCutdowns = spawned.some(s => s.kind === 'cutdown');
                       toast({
                         title: 'Kampagne erweitert 🎬',
-                        description: tx({ de: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, en: `${spawned.length} variant(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns without VO — please re-synthesize in the child.' : ''}`, es: `${spawned.length} variante(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns sin VO — por favor, vuelve a sintetizar en el hijo.' : ''}` }),
+                        description: tx({ de: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, en: `${spawned.length} variant(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, es: `${spawned.length} variante(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}` }),
                       });
                       setActiveTab('campaign');
                     }

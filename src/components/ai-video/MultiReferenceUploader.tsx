@@ -150,7 +150,7 @@ export function MultiReferenceUploader({
           <ImagePlus className="h-4 w-4 text-primary" />
           <Label className="text-sm font-medium">
             {language === 'de'
-              ? tx({ de: `Multi-Reference (${rangeLabel} Bilder${required ? '' : ', optional'})`, en: `Multi-Reference (${rangeLabel} images${required ? '' : ', optional'})`, es: `Referencia múltiple (${rangeLabel} imágenes${obligatoria? '' : ', opcional'})` })
+              ? tx({ de: `Multi-Reference (${rangeLabel} Bilder${required ? '' : ', optional'})`, en: `Multi-Reference (${rangeLabel} images${required ? '' : ', optional'})`, es: `Referencia múltiple (${rangeLabel} imágenes${required ? '' : ', optional'})` })
               : language === 'es'
               ? `Multi-Referencia (${rangeLabel} imágenes${required ? '' : ', opcional'})`
               : `Multi-Reference (${rangeLabel} images${required ? '' : ', optional'})`}

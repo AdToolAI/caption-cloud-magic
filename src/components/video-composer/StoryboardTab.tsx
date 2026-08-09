@@ -377,7 +377,7 @@ export default function StoryboardTab({
     if (changed === 0) return;
     onUpdateScenes(next);
     import('sonner').then(({ toast }) => {
-      toast.success(tx({ de: `Engine auf ${changed} Szene${changed === 1 ? '' : 'n'} übertragen`, en: `Engine on ${changed} Scene${changed === 1 ? '' : 'n'} transferred`, es: `Motor en ${changed} Escena${changed === 1? '' : 'n'} transferido` }));
+      toast.success(tx({ de: `Engine auf ${changed} Szene${changed === 1 ? '' : 'n'} übertragen`, en: `Engine on ${changed} Scene${changed === 1 ? '' : 'n'} transferred`, es: `Motor en ${changed} Escena${changed === 1 ? '' : 'n'} transferido` }));
     });
   };
 

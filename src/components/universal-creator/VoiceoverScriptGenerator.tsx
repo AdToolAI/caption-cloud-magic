@@ -150,7 +150,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
       ? `Script will be tuned to your ${scenes!.length} scene${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). Hook lands in scene 1, CTA in the last scene.`
       : language === 'es'
       ? `El guion se ajustará a tus ${scenes!.length} escena${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). El gancho va en la escena 1, el CTA en la última.`
-      : tx({ de: `Skript wird auf deine ${scenes!.length} Szene${scenes!.length === 1 ? '' : 'n'} (Σ ${sceneTotalDuration.toFixed(1)}s) abgestimmt. Hook in Szene 1, CTA in der letzten Szene.`, en: `Script will be matched to your ${scenes!.length} scene${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). Hook in scene 1, CTA in the last scene.`, es: `El guion se ajustará a tus ${scenes!.length} escena${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). Gancho en la escena 1, CTA en la última escena.` })
+      : tx({ de: `Skript wird auf deine ${scenes!.length} Szene${scenes!.length === 1 ? '' : 'n'} (Σ ${sceneTotalDuration.toFixed(1)}s) abgestimmt. Hook in Szene 1, CTA in der letzten Szene.`, en: `Script will be matched to your ${scenes!.length} scene${scenes!.length === 1 ? '' : 'n'} (Σ ${sceneTotalDuration.toFixed(1)}s). Hook in scene 1, CTA in the last scene.`, es: `El guion se ajustará a tus ${scenes!.length} escena${scenes!.length === 1 ? '' : 'n'} (Σ ${sceneTotalDuration.toFixed(1)}s). Gancho en la escena 1, CTA en la última escena.` })
     : '';
 
   return (

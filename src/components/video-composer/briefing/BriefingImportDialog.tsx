@@ -146,7 +146,7 @@ export default function BriefingImportDialog({
     });
     toast({
       title: 'Briefing übernommen',
-      description: tx({ de: `${result.scenesApplied} Szenen · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`, en: `${result.scenesApplied} Scenes · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`, es: `${result.scenesApplied} Escenas · ${result.voiceApplied? 'Voz ✓ · ' : ''}${result.captionsApplied ? 'Subtítulos ✓' : ''}` }),
+      description: tx({ de: `${result.scenesApplied} Szenen · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`, en: `${result.scenesApplied} Scenes · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}`, es: `${result.scenesApplied} Escenas · ${result.voiceApplied ? 'Voice ✓ · ' : ''}${result.captionsApplied ? 'Captions ✓' : ''}` }),
     });
     handleClose(false);
   };

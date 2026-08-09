@@ -725,7 +725,7 @@ export default function AdDirectorWizard({
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {activeBrandKit
-                          ? tx({ de: `Aktives Kit: ${activeBrandKit.brand_name ?? 'Unbenannt'} — Farben & Brand-Name werden in CTA + Hooks gewoben.`, en: `Active Kit: ${activeBrandKit.brand_name ?? 'Unnamed'} — Colors & brand name are woven into CTA + hooks.`, es: `Kit activo: ${activeBrandKit.brand_name ?? 'Sin nombre'}: los colores y el nombre de la marca están entretejidos en ganchos CTA +.` })
+                          ? tx({ de: `Aktives Kit: ${activeBrandKit.brand_name ?? 'Unbenannt'} — Farben & Brand-Name werden in CTA + Hooks gewoben.`, en: `Active Kit: ${activeBrandKit.brand_name ?? 'Unbenannt'} — Colors & brand name are woven into CTA + hooks.`, es: `Kit activo: ${activeBrandKit.brand_name ?? 'Unbenannt'}: los colores y el nombre de la marca están entretejidos en ganchos CTA +.` })
                           : tx({ de: 'Kein aktives Brand-Kit gefunden. Erstelle eins unter Brand Kit, um es hier nutzen zu können.', en: 'No active Brand Kit found. Create one under Brand Kit to use it here.', es: 'No se encontró ningún Brand Kit activo. Crea uno en Brand Kit para poder usarlo aquí.' })}
                       </p>
                       {activeBrandKit && useBrandKit && (

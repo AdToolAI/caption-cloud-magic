@@ -102,7 +102,7 @@ export default function QACockpit() {
       queryClient.invalidateQueries({ queryKey: ["qa-bugs"] });
       setSelectedBug(null);
     },
-    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(s)}`, es: `Error: ${e?.mensaje ?? Instrumentos de cuerda)}` })),
+    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(e)}`, es: `Error: ${e?.message ?? String(e)}` })),
   });
 
   const mutePattern = useMutation({
@@ -116,7 +116,7 @@ export default function QACockpit() {
       toast.success("Pattern stummgeschaltet — zukünftige Runs ignorieren ihn");
       queryClient.invalidateQueries({ queryKey: ["qa-muted-patterns"] });
     },
-    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(s)}`, es: `Error: ${e?.mensaje ?? Instrumentos de cuerda)}` })),
+    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(e)}`, es: `Error: ${e?.message ?? String(e)}` })),
   });
 
   const unmutePattern = useMutation({
@@ -185,7 +185,7 @@ export default function QACockpit() {
         toast.warning(`Übersprungen: ${data?.reason ?? "unbekannt"}`);
       }
     },
-    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(s)}`, es: `Error: ${e?.mensaje ?? Instrumentos de cuerda)}` })),
+    onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(e)}`, es: `Error: ${e?.message ?? String(e)}` })),
   });
 
   const setupTestUser = useMutation({
@@ -210,7 +210,7 @@ export default function QACockpit() {
         });
       }
     },
-    onError: (e: any) => toast.error(tx({ de: `Setup fehlgeschlagen: ${e?.message ?? String(e)}`, en: `Setup failed: ${e?.message ?? String(s)}`, es: `Error de configuración: ${e?.message ?? Instrumentos de cuerda)}` })),
+    onError: (e: any) => toast.error(tx({ de: `Setup fehlgeschlagen: ${e?.message ?? String(e)}`, en: `Setup failed: ${e?.message ?? String(e)}`, es: `Error de configuración: ${e?.message ?? String(e)}` })),
   });
 
   const handleCopy = async () => {

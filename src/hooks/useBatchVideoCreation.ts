@@ -44,7 +44,7 @@ export const useBatchVideoCreation = () => {
         if (data.error === 'VALIDATION_ERROR') {
           toast({
             title: 'CSV Validierungsfehler',
-            description: tx({ de: tx({ de: tx({ de: `${data.message}. Erste Fehler: ${data.details?.join(', ')}`, en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${datos.mensaje}. Primer error: ${data.details?.join(', ')}` }), en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${datos.mensaje}. Primer error: ${data.details?.join(', ')}` }), en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${datos.mensaje}. Primer error: ${data.details?.join(', ')}` }),
+            description: tx({ de: tx({ de: tx({ de: `${data.message}. Erste Fehler: ${data.details?.join(', ')}`, en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${data.message}. Primer error: ${data.details?.join(', ')}` }), en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${datos.mensaje}. Primer error: ${data.details?.join(', ')}` }), en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${datos.mensaje}. Primer error: ${data.details?.join(', ')}` }),
             variant: 'destructive'
           });
           return null;

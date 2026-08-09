@@ -1308,7 +1308,7 @@ export function useStoryboardTransition({
       }
       const issues = parsed.error.issues.slice(0, 2)
         .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`).join(' · ');
-      return { plan: null, dropped, error: tx({ de: `Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}`, en: `Plan validation failed — ${issues || 'unknown error'}`, es: `Error en la validación del plan — ${issues || 'error desconocido'}` }) };
+      return { plan: null, dropped, error: tx({ de: `Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}`, en: `Plan validation failed — ${issues || 'unbekannter Fehler'}`, es: `Error en la validación del plan — ${issues || 'unbekannter Fehler'}` }) };
     };
 
     try {
