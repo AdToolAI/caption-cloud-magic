@@ -80,7 +80,7 @@ export function PromptHelperDialog({
       setResult(data as PromptHelperResult);
     } catch (err: any) {
       console.error('[PromptHelper] error', err);
-      toast.error(err?.message || "Prompt-Helfer konnte nicht antworten.");
+      toast.error(err?.message || tx({ de: "Prompt-Helfer konnte nicht antworten.", en: "Prompt helper couldn't respond.", es: "El ayudante de prompts no pudo responder." }));
     } finally {
       setLoading(false);
     }
@@ -145,7 +145,7 @@ export function PromptHelperDialog({
                 <span>
                   {autoEnhance
                     ? tx({ de: 'Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.', en: 'Adopt & enhance image — model, mode, and strength are set automatically.', es: 'Adoptar y mejorar imagen — el modelo, modo y fuerza se configuran automáticamente.' })
-                    : 'Dein Referenzbild wird mitanalysiert.'}
+                    : tx({ de: 'Dein Referenzbild wird mitanalysiert.', en: 'Your reference image will be analyzed too.', es: 'Tu imagen de referencia también se analizará.' })}
                 </span>
                 <img src={referenceImageUrl} alt="ref" className="ml-auto h-10 w-10 object-cover rounded" />
               </div>

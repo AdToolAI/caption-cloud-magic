@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Inbox, Sparkles, Send, CheckCircle2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { useTx } from "@/lib/i18nText";
 
 const SEV: Record<string, string> = {
   blocking: "bg-red-500/20 text-red-300 border-red-500/40",
@@ -24,6 +25,7 @@ const STATUS: Record<string, string> = {
 };
 
 export function SupportInboxTab() {
+  const tx = useTx();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<"open" | "in_progress" | "resolved" | "all">("open");
   const [selected, setSelected] = useState<any | null>(null);
@@ -52,10 +54,10 @@ export function SupportInboxTab() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("KI-Triage neu gestartet");
+      toast.success(tx({ de: "KI-Triage neu gestartet", en: "AI triage restarted", es: "Triaje de IA reiniciado" }));
       qc.invalidateQueries({ queryKey: ["support-tickets"] });
     },
-    onError: (e: any) => toast.error(`Fehler: ${e?.message ?? String(e)}`),
+    onError: (e: any) => toast.error(`${tx({ de: "Fehler", en: "Error", es: "Error" })}: ${e?.message ?? String(e)}`),
   });
 
   const updateStatus = useMutation({
@@ -69,13 +71,13 @@ export function SupportInboxTab() {
     onSuccess: (_d, vars) => {
       toast.success(
         vars.status === "resolved"
-          ? "Ticket auf 'resolved' gesetzt — Kunde wird automatisch benachrichtigt"
-          : `Status: ${vars.status}`
+          ? tx({ de: "Ticket auf 'resolved' gesetzt — Kunde wird automatisch benachrichtigt", en: "Ticket set to 'resolved' — customer is notified automatically", es: "Ticket marcado como 'resuelto' — el cliente será notificado automáticamente" })
+          : `${tx({ de: "Status", en: "Status", es: "Estado" })}: ${vars.status}`
       );
       qc.invalidateQueries({ queryKey: ["support-tickets"] });
       if (selected?.id === vars.id) setSelected({ ...selected, status: vars.status });
     },
-    onError: (e: any) => toast.error(`Fehler: ${e?.message ?? String(e)}`),
+    onError: (e: any) => toast.error(`${tx({ de: "Fehler", en: "Error", es: "Error" })}: ${e?.message ?? String(e)}`),
   });
 
   const counts = (tickets.data ?? []).reduce(
@@ -94,9 +96,9 @@ export function SupportInboxTab() {
       <div className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
           <Inbox className="h-4 w-4 text-[#F5C76A]" />
-          <h3 className="font-semibold text-[#F5C76A]">Support Inbox</h3>
+          <h3 className="font-semibold text-[#F5C76A]">{tx({ de: "Support Inbox", en: "Support inbox", es: "Bandeja de soporte" })}</h3>
           <Badge variant="outline" className="ml-auto text-xs">
-            {counts.open} offen · {counts.triaged} triagiert
+            {counts.open} {tx({ de: "offen", en: "open", es: "abiertos" })} · {counts.triaged} {tx({ de: "triagiert", en: "triaged", es: "triados" })}
           </Badge>
         </div>
         <div className="flex gap-1 flex-wrap">
@@ -171,7 +173,7 @@ export function SupportInboxTab() {
           })}
           {tickets.data?.length === 0 && (
             <p className="text-xs text-muted-foreground py-8 text-center">
-              Keine Tickets in "{filter}"
+              {tx({ de: "Keine Tickets in", en: "No tickets in", es: "Sin tickets en" })} "{filter}"
             </p>
           )}
         </div>
@@ -182,7 +184,7 @@ export function SupportInboxTab() {
         <CardContent className="pt-4">
           {!selected ? (
             <p className="text-sm text-muted-foreground text-center py-16">
-              Wähle ein Ticket aus der Liste
+              {tx({ de: "Wähle ein Ticket aus der Liste", en: "Select a ticket from the list", es: "Selecciona un ticket de la lista" })}
             </p>
           ) : (
             <div className="space-y-4">
@@ -205,20 +207,20 @@ export function SupportInboxTab() {
                   ) : (
                     <RefreshCw className="h-3.5 w-3.5 mr-1" />
                   )}
-                  Re-Triage
+                  {tx({ de: "Re-Triage", en: "Re-triage", es: "Retriaje" })}
                 </Button>
               </div>
 
               {selected.ai_analyzed_at ? (
                 <>
                   <div className="grid grid-cols-3 gap-2 text-xs">
-                    <Field label="Kategorie" value={selected.ai_category} />
+                    <Field label={tx({ de: "Kategorie", en: "Category", es: "Categoría" })} value={selected.ai_category} />
                     <Field label="Severity" value={selected.ai_severity} />
                     <Field label="ETA" value={`${selected.ai_eta_hours}h`} />
                   </div>
                   <div>
                     <div className="text-[10px] uppercase text-muted-foreground mb-1">
-                      Root-Cause-Hypothese (AI)
+                      {tx({ de: "Root-Cause-Hypothese (AI)", en: "Root-cause hypothesis (AI)", es: "Hipótesis de causa raíz (IA)" })}
                     </div>
                     <div className="text-sm bg-black/40 border border-[#F5C76A]/10 rounded p-3 whitespace-pre-wrap">
                       {selected.ai_root_cause}
@@ -227,7 +229,7 @@ export function SupportInboxTab() {
                   <div>
                     <div className="text-[10px] uppercase text-muted-foreground mb-1 flex items-center gap-2">
                       <Sparkles className="h-3 w-3" />
-                      Vorgeschlagene Antwort ({selected.ai_language ?? "en"})
+                      {tx({ de: "Vorgeschlagene Antwort", en: "Suggested reply", es: "Respuesta sugerida" })} ({selected.ai_language ?? "en"})
                     </div>
                     <Textarea
                       value={replyDraft}
@@ -240,10 +242,10 @@ export function SupportInboxTab() {
                         variant="outline"
                         onClick={() => {
                           navigator.clipboard.writeText(replyDraft);
-                          toast.success("In Zwischenablage kopiert");
+                          toast.success(tx({ de: "In Zwischenablage kopiert", en: "Copied to clipboard", es: "Copiado al portapapeles" }));
                         }}
                       >
-                        Kopieren
+                        {tx({ de: "Kopieren", en: "Copy", es: "Copiar" })}
                       </Button>
                       <a
                         href={`mailto:${selected.contact_email}?subject=${encodeURIComponent(
@@ -251,7 +253,7 @@ export function SupportInboxTab() {
                         )}&body=${encodeURIComponent(replyDraft)}`}
                       >
                         <Button size="sm" variant="default">
-                          <Send className="h-3.5 w-3.5 mr-1" /> Im Mailclient öffnen
+                          <Send className="h-3.5 w-3.5 mr-1" /> {tx({ de: "Im Mailclient öffnen", en: "Open in mail client", es: "Abrir en el cliente de correo" })}
                         </Button>
                       </a>
                     </div>
@@ -260,13 +262,13 @@ export function SupportInboxTab() {
               ) : (
                 <div className="text-xs text-muted-foreground bg-black/30 p-3 rounded">
                   <Loader2 className="h-3 w-3 animate-spin inline mr-2" />
-                  KI-Triage läuft noch… (~10–20s nach Ticket-Erstellung)
+                  {tx({ de: "KI-Triage läuft noch… (~10–20s nach Ticket-Erstellung)", en: "AI triage still running… (~10–20s after ticket creation)", es: "El triaje de IA sigue en curso… (~10–20s tras la creación del ticket)" })}
                 </div>
               )}
 
               <div>
                 <div className="text-[10px] uppercase text-muted-foreground mb-1">
-                  Original-Beschreibung
+                  {tx({ de: "Original-Beschreibung", en: "Original description", es: "Descripción original" })}
                 </div>
                 <div className="text-sm bg-black/30 border border-white/5 rounded p-3 whitespace-pre-wrap max-h-60 overflow-y-auto">
                   {selected.description ?? "—"}
@@ -282,7 +284,7 @@ export function SupportInboxTab() {
                       updateStatus.mutate({ id: selected.id, status: "in_progress" })
                     }
                   >
-                    In Bearbeitung
+                    {tx({ de: "In Bearbeitung", en: "In progress", es: "En proceso" })}
                   </Button>
                 )}
                 {selected.status !== "resolved" && (
@@ -294,12 +296,12 @@ export function SupportInboxTab() {
                     }
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                    Als gelöst markieren (Kunde wird informiert)
+                    {tx({ de: "Als gelöst markieren (Kunde wird informiert)", en: "Mark as resolved (customer will be notified)", es: "Marcar como resuelto (se notificará al cliente)" })}
                   </Button>
                 )}
                 {selected.resolved_notification_sent_at && (
                   <Badge variant="outline" className="text-emerald-300 text-xs">
-                    ✓ Resolved-Mail gesendet
+                    ✓ {tx({ de: "Resolved-Mail gesendet", en: "Resolved email sent", es: "Correo de resolución enviado" })}
                   </Badge>
                 )}
               </div>
