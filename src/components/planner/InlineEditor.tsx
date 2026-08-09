@@ -86,7 +86,7 @@ export function InlineEditor({ block, onSave, onCancel }: InlineEditorProps) {
     >
       {/* Title */}
       <div>
-        <Label className="text-xs">Titel</Label>
+        <Label className="text-xs">{tx({ de: "Titel", en: "Title", es: "Título" })}</Label>
         <Input
           ref={titleRef}
           value={title}
@@ -102,7 +102,7 @@ export function InlineEditor({ block, onSave, onCancel }: InlineEditorProps) {
       {/* Time & Duration */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <Label className="text-xs">Zeit</Label>
+          <Label className="text-xs">{tx({ de: "Zeit", en: "Time", es: "Hora" })}</Label>
           <Input
             type="time"
             value={startTime}
@@ -111,7 +111,7 @@ export function InlineEditor({ block, onSave, onCancel }: InlineEditorProps) {
           />
         </div>
         <div>
-          <Label className="text-xs">Dauer (s)</Label>
+          <Label className="text-xs">{tx({ de: "Dauer (s)", en: "Duration (s)", es: "Duración (s)" })}</Label>
           <Input
             type="number"
             value={duration}
@@ -125,7 +125,7 @@ export function InlineEditor({ block, onSave, onCancel }: InlineEditorProps) {
 
       {/* Platforms */}
       <div>
-        <Label className="text-xs">Plattform</Label>
+        <Label className="text-xs">{tx({ de: "Plattform", en: "Platform", es: "Plataforma" })}</Label>
         <div className="flex flex-wrap gap-1 mt-1">
           {platforms.map((p) => (
             <Badge
@@ -144,17 +144,17 @@ export function InlineEditor({ block, onSave, onCancel }: InlineEditorProps) {
       <div className="flex gap-2 pt-2 border-t">
         <Button size="sm" onClick={handleSave} className="flex-1 h-8">
           <Check className="h-3 w-3 mr-1" />
-          Speichern
+          {tx({ de: "Speichern", en: "Save", es: "Guardar" })}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel} className="h-8">
           <X className="h-3 w-3 mr-1" />
-          Abbrechen
+          {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
         </Button>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Enter</kbd> Speichern ·{" "}
-        <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Esc</kbd> Abbrechen
+        <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Enter</kbd> {tx({ de: "Speichern", en: "Save", es: "Guardar" })} ·{" "}
+        <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Esc</kbd> {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
       </p>
     </div>
   );

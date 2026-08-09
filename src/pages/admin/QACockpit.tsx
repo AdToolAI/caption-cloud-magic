@@ -113,7 +113,7 @@ export default function QACockpit() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Pattern stummgeschaltet — zukünftige Runs ignorieren ihn");
+      toast.success(tx({ de: "Pattern stummgeschaltet — zukünftige Runs ignorieren ihn", en: "Pattern muted — future runs will ignore it", es: "Patrón silenciado — las próximas ejecuciones lo ignorarán" }));
       queryClient.invalidateQueries({ queryKey: ["qa-muted-patterns"] });
     },
     onError: (e: any) => toast.error(tx({ de: `Fehler: ${e?.message ?? String(e)}`, en: `Error: ${e?.message ?? String(e)}`, es: `Error: ${e?.message ?? String(e)}` })),
@@ -206,7 +206,7 @@ export default function QACockpit() {
         });
       } else {
         toast.info(tx({ de: `Test-User existiert bereits: ${data?.email}`, en: `Test user already exists: ${data?.email}`, es: `El usuario de prueba ya existe: ${data?.email}` }), {
-          description: tx({ de: "Klick auf 'Passwort zurücksetzen' um neue Zugangsdaten zu erzeugen.", en: "Click on 'Reset password' to generate new access data.", es: "Haga clic en 'Restablecer contraseña' para generar nuevos datos de acceso." }),
+          description: tx({ de: "Klick auf 'tx({ de: "Passwort zurücksetzen", en: "Reset password", es: "Restablecer contraseña" })' um neue Zugangsdaten zu erzeugen.", en: "Click on 'Reset password' to generate new access data.", es: "Haga clic en 'Restablecer contraseña' para generar nuevos datos de acceso." }),
         });
       }
     },
@@ -285,7 +285,7 @@ export default function QACockpit() {
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              Nächste Mission starten
+              tx({ de: "Nächste Mission starten", en: "Start next mission", es: "Iniciar próxima misión" })
             </Button>
           </div>
         </div>
@@ -471,7 +471,7 @@ export default function QACockpit() {
                     )}
                     {r.metadata?.result?.targetUrl && (
                       <p className="text-[11px] text-muted-foreground/70 mt-1 font-mono truncate" title={r.metadata.result.targetUrl}>
-                        Ziel: {r.metadata.result.targetUrl}
+                        {tx({ de: "Ziel", en: "Target", es: "Objetivo" })}: {r.metadata.result.targetUrl}
                       </p>
                     )}
                     {r.metadata?.result?.error && (
@@ -740,7 +740,7 @@ export default function QACockpit() {
         <DialogContent className="bg-[#0A0F1F] border-[#F5C76A]/30 text-foreground sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-[#F5C76A] flex items-center gap-2">
-              <KeyRound className="h-5 w-5" /> Test-User-Zugangsdaten
+              <KeyRound className="h-5 w-5" /> tx({ de: "Test-User-Zugangsdaten", en: "Test user credentials", es: "Credenciales de usuario de prueba" })
             </DialogTitle>
             <DialogDescription className="text-amber-300/90 flex items-start gap-2 mt-2">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -764,7 +764,7 @@ export default function QACockpit() {
               </div>
 
               <div>
-                <Label className="text-xs text-muted-foreground">Passwort (vollständig)</Label>
+                <Label className="text-xs text-muted-foreground">{tx({ de: "Passwort (vollständig)", en: "Password (full)", es: "Contraseña (completa)" })}</Label>
                 <div className="flex gap-2 mt-1">
                   <Input
                     readOnly
@@ -791,7 +791,7 @@ export default function QACockpit() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Länge: {credentials.password.length} Zeichen
+                  {tx({ de: `Länge: ${credentials.password.length} Zeichen`, en: `Length: ${credentials.password.length} characters`, es: `Longitud: ${credentials.password.length} caracteres` })}
                 </p>
               </div>
             </div>
@@ -799,7 +799,7 @@ export default function QACockpit() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={closeCredentials}>
-              Schließen (Passwort verwerfen)
+              tx({ de: "Schließen (Passwort verwerfen)", en: "Close (discard password)", es: "Cerrar (descartar contraseña)" })
             </Button>
             <Button
               className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
@@ -890,7 +890,7 @@ export default function QACockpit() {
                       />
                     </a>
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      Was Browserless auf <code>/auth</code> tatsächlich gesehen hat, bevor der Login fehlschlug.
+                      {tx({ de: "Was Browserless auf ", en: "What Browserless actually saw on ", es: "Lo que Browserless realmente vio en " })}<code>/auth</code>{tx({ de: " tatsächlich gesehen hat, bevor der Login fehlschlug.", en: " before the login failed.", es: " antes de que fallara el inicio de sesión." })}
                     </p>
                   </Section>
                 )}

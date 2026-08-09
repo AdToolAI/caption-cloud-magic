@@ -11,6 +11,7 @@ import { CostTrendChart } from '@/components/admin/cost/CostTrendChart';
 import { CostAlertsCard } from '@/components/admin/cost/CostAlertsCard';
 import { VideoProviderMarginCard } from '@/components/admin/cost/VideoProviderMarginCard';
 import { toast } from 'sonner';
+import { tx } from "@/lib/i18nText";
 
 interface Snapshot {
   timestamp: string;
@@ -61,7 +62,7 @@ export function CostMonitor() {
           <div>
             <h2 className="text-2xl font-bold">Cost Monitor</h2>
             <p className="text-sm text-muted-foreground">
-              Live-Schätzung der Cloud-, AI- und Lambda-Kosten · alle Werte „Estimated"
+              {tx({ de: 'Live-Schätzung der Cloud-, AI- und Lambda-Kosten · alle Werte „Estimated"', en: 'Live estimate of cloud, AI, and Lambda costs · all values "Estimated"', es: 'Estimación en vivo de costos de nube, IA y Lambda · todos los valores "Estimated"' })}
             </p>
           </div>
         </div>
@@ -69,10 +70,10 @@ export function CostMonitor() {
           <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
             <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">Letzte 24h</SelectItem>
-              <SelectItem value="7">7 Tage</SelectItem>
-              <SelectItem value="30">30 Tage</SelectItem>
-              <SelectItem value="90">90 Tage</SelectItem>
+              <SelectItem value="1">{tx({ de: "Letzte 24h", en: "Last 24h", es: "Últimas 24h" })}</SelectItem>
+              <SelectItem value="7">{tx({ de: "7 Tage", en: "7 days", es: "7 días" })}</SelectItem>
+              <SelectItem value="30">{tx({ de: "30 Tage", en: "30 days", es: "30 días" })}</SelectItem>
+              <SelectItem value="90">{tx({ de: "90 Tage", en: "90 days", es: "90 días" })}</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm" onClick={() => load(days)} disabled={loading}>
@@ -99,7 +100,7 @@ export function CostMonitor() {
           <CostTrendChart trend={data.trend} />
 
           <p className="text-xs text-muted-foreground text-center pt-2">
-            Letzte Aktualisierung: {new Date(data.timestamp).toLocaleString('de-DE')} · Schätzungen basieren auf dokumentierten Stückpreisen × gezähltem Call-Volumen
+            {tx({ de: "Letzte Aktualisierung:", en: "Last updated:", es: "Última actualización:" })} {new Date(data.timestamp).toLocaleString('de-DE')} · {tx({ de: "Schätzungen basieren auf dokumentierten Stückpreisen × gezähltem Call-Volumen", en: "Estimates are based on documented unit prices × counted call volume", es: "Las estimaciones se basan en precios unitarios documentados × volumen de llamadas contado" })}
           </p>
         </>
       )}

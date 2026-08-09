@@ -665,7 +665,7 @@ export const VideoQuickPreview = ({
         )}
         {currentSegment?.subtitleSettings?.wordTiming && (
           <div className="text-xs text-primary">
-            ✨ Word-by-word Timing aktiv ({currentSegment.subtitleSettings.wordTiming.length} Wörter)
+            {tx({ de: `✨ Word-by-word Timing aktiv (${currentSegment.subtitleSettings.wordTiming.length} Wörter)`, en: `✨ Word-by-word timing active (${currentSegment.subtitleSettings.wordTiming.length} words)`, es: `✨ Sincronización palabra por palabra activa (${currentSegment.subtitleSettings.wordTiming.length} palabras)` })}
           </div>
         )}
       </div>
