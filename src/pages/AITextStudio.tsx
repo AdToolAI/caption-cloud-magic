@@ -604,7 +604,7 @@ export default function AITextStudio() {
                 if (!conversationId) return;
                 if (pinned?.conversationId === conversationId) {
                   unpin();
-                  toast.success("Chat losgelöst");
+                  toast.success(tx({ de: "Chat losgelöst", en: "Chat unpinned", es: "Chat desanclado" }));
                 } else {
                   pin({
                     conversationId,
@@ -615,7 +615,7 @@ export default function AITextStudio() {
                     isPrivate,
                     title: currentConv?.title,
                   });
-                  toast.success("Chat angeheftet — sichtbar in allen Modulen");
+                  toast.success(tx({ de: "Chat angeheftet — sichtbar in allen Modulen", en: "Chat pinned — visible in all modules", es: "Chat fijado — visible en todos los módulos" }));
                 }
               }}
             >

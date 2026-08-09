@@ -70,7 +70,7 @@ export function SentryDashboard() {
         body: { issueId },
       });
       if (error) throw error;
-      toast.success('Issue als resolved markiert');
+      toast.success(tx({ de: 'Issue als resolved markiert', en: 'Issue marked as resolved', es: 'Incidencia marcada como resuelta' }));
       await loadCached();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : tx({ de: 'Fehler', en: 'Mistake', es: 'Error' });
@@ -107,7 +107,7 @@ export function SentryDashboard() {
         ) : issues.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-green-500" />
-            <p className="font-medium">Keine Errors gecacht</p>
+            <p className="font-medium">{tx({ de: "Keine Errors gecacht", en: "No errors cached", es: "No hay errores en caché" })}</p>
             <p className="text-sm mt-1">Klicke „Sync von Sentry" um die neuesten Errors zu laden.</p>
           </div>
         ) : (

@@ -78,7 +78,7 @@ export function DeliverStep() {
 
   const resolvePublishHandoff = async (): Promise<PublishHandoff | null> => {
     try {
-      if (!user) throw new Error("Nicht angemeldet");
+      if (!user) throw new Error(tx({ de: "Nicht angemeldet", en: "Not logged in", es: "No has iniciado sesión" }));
       const blob = await renderSlideToBlob(0);
       const path = `${user.id}/content-studio/${safeFileName(s.design.title)}-${Date.now()}.png`;
       const { error } = await supabase.storage

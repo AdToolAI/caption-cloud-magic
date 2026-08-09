@@ -48,11 +48,11 @@ function statusBadge(status: string) {
 
 function timeAgo(iso: string): string {
   const sec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (sec < 60) return `vor ${sec}s`;
+  if (sec < 60) return tx({ de: `vor ${sec}s`, en: `${sec}s ago`, es: `hace ${sec}s` });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `vor ${min}m`;
+  if (min < 60) return tx({ de: `vor ${min}m`, en: `${min}m ago`, es: `hace ${min}m` });
   const h = Math.floor(min / 60);
-  return `vor ${h}h`;
+  return tx({ de: `vor ${h}h`, en: `${h}h ago`, es: `hace ${h}h` });
 }
 
 async function cancelScenes(ids: string[]): Promise<number> {
@@ -153,7 +153,7 @@ export default function RenderQueue() {
     setBusy(busyKey);
     try {
       const n = await cancelScenes(ids);
-      toast.success(`${n} Job${n === 1 ? '' : 's'} abgebrochen · ${label}`);
+      toast.success(tx({ de: `${n} Job${n === 1 ? '' : 's'} abgebrochen · ${label}`, en: `${n} job${n === 1 ? '' : 's'} canceled · ${label}`, es: `${n} trabajo${n === 1 ? '' : 's'} cancelado(s) · ${label}` }));
       await refresh();
     } catch (e: any) {
       toast.error(e?.message ?? tx({ de: 'Abbruch fehlgeschlagen', en: 'Abort failed', es: 'Abortar falló' }));
@@ -171,7 +171,7 @@ export default function RenderQueue() {
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />
-            Render-Queue
+            {tx({ de: "Render-Queue", en: "Render queue", es: "Cola de renderizado" })}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {tx({ de: "Live-Status aller Motion-Studio-Renderjobs. Aktualisiert sich automatisch alle 5 Sekunden.", en: "Live status of all Motion Studio render jobs. Updates automatically every 5 seconds.", es: "Estado en vivo de todos los trabajos de renderizado de Motion Studio. Se actualiza automáticamente cada 5 segundos." })}
@@ -180,7 +180,7 @@ export default function RenderQueue() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
-            Aktualisieren
+            {tx({ de: "Aktualisieren", en: "Refresh", es: "Actualizar" })}
           </Button>
           <Button
             variant="destructive"
@@ -199,7 +199,7 @@ export default function RenderQueue() {
             ) : (
               <Ban className="h-3.5 w-3.5 mr-1.5" />
             )}
-            Alle abbrechen
+            {tx({ de: "Alle abbrechen", en: "Cancel all", es: "Cancelar todo" })}
           </Button>
         </div>
       </div>
@@ -207,7 +207,7 @@ export default function RenderQueue() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-muted-foreground">
-            Aktiv {rows.length > 0 && <span className="tabular-nums">({rows.length})</span>}
+            {tx({ de: "Aktiv", en: "Active", es: "Activo" })} {rows.length > 0 && <span className="tabular-nums">({rows.length})</span>}
           </h2>
         </div>
 
@@ -215,9 +215,7 @@ export default function RenderQueue() {
           <Card className="p-3 flex items-center gap-3 border-amber-500/30 bg-amber-500/5">
             <Loader2 className="h-4 w-4 text-amber-400 animate-spin shrink-0" />
             <div className="text-xs text-amber-200/90">
-              <span className="font-medium">{zombieCount}</span> ältere Jobs (&gt; 24 h) werden vom System
-              automatisch bereinigt. Du musst nichts tun — der Watchdog bricht sie ab und erstattet
-              verbrauchte Credits zurück.
+              <span className="font-medium">{zombieCount}</span> {tx({ de: "ältere Jobs (> 24 h) werden vom System automatisch bereinigt. Du musst nichts tun — der Watchdog bricht sie ab und erstattet verbrauchte Credits zurück.", en: "older jobs (> 24 h) are automatically cleaned up by the system. You don\u2019t need to do anything — the watchdog cancels them and refunds spent credits.", es: "trabajos más antiguos (> 24 h) se limpian automáticamente. No tienes que hacer nada; el watchdog los cancela y reembolsa los créditos gastados." })}
             </div>
           </Card>
         )}
@@ -226,11 +224,11 @@ export default function RenderQueue() {
         {loading && rows.length === 0 ? (
           <Card className="p-8 text-center text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-            Lade Queue …
+            {tx({ de: "Lade Queue …", en: "Loading queue …", es: "Cargando cola …" })}
           </Card>
         ) : rows.length === 0 ? (
           <Card className="p-8 text-center text-sm text-muted-foreground">
-            Keine aktiven Render-Jobs.
+            {tx({ de: "Keine aktiven Render-Jobs.", en: "No active render jobs.", es: "Sin trabajos de renderizado activos." })}
           </Card>
         ) : (
           <div className="space-y-4">
@@ -265,7 +263,7 @@ export default function RenderQueue() {
                       ) : (
                         <Ban className="h-3 w-3 mr-1" />
                       )}
-                      Alle "{STATUS_META[s]?.label ?? s}" abbrechen
+                      {tx({ de: "Alle", en: "Cancel all", es: "Cancelar todo" })} "{STATUS_META[s]?.label ?? s}"{tx({ de: " abbrechen", en: "", es: "" })}
                     </Button>
                   </div>
                   <div className="space-y-2">
@@ -293,10 +291,10 @@ export default function RenderQueue() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Zuletzt abgeschlossen</h2>
+        <h2 className="text-sm font-medium text-muted-foreground">{tx({ de: "Zuletzt abgeschlossen", en: "Recently completed", es: "Completado recientemente" })}</h2>
         {recent.length === 0 ? (
           <Card className="p-6 text-center text-xs text-muted-foreground">
-            Noch keine kürzlich abgeschlossenen Jobs.
+            {tx({ de: "Noch keine kürzlich abgeschlossenen Jobs.", en: "No recently completed jobs yet.", es: "Aún no hay trabajos completados recientemente." })}
           </Card>
         ) : (
           <div className="space-y-2">
@@ -310,20 +308,17 @@ export default function RenderQueue() {
       <AlertDialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Jobs wirklich abbrechen?</AlertDialogTitle>
+            <AlertDialogTitle>{tx({ de: "Jobs wirklich abbrechen?", en: "Really cancel jobs?", es: "¿Cancelar trabajos realmente?" })}</AlertDialogTitle>
             <AlertDialogDescription>
               {confirm && (
                 <>
-                  <span className="font-medium text-foreground">{confirm.ids.length}</span> Job
-                  {confirm.ids.length === 1 ? '' : 's'} werden gestoppt ({confirm.label}). Laufende
-                  Provider-Anfragen (Replicate, Sync.so) werden best-effort abgebrochen. Diese Aktion
-                  kann nicht rückgängig gemacht werden.
+                  <span className="font-medium text-foreground">{confirm.ids.length}</span> {tx({ de: `Job${confirm.ids.length === 1 ? '' : 's'} werden gestoppt (${confirm.label}). Laufende Provider-Anfragen (Replicate, Sync.so) werden best-effort abgebrochen. Diese Aktion kann nicht rückgängig gemacht werden.`, en: `job${confirm.ids.length === 1 ? '' : 's'} will be stopped (${confirm.label}). Ongoing provider requests (Replicate, Sync.so) will be canceled on a best-effort basis. This action cannot be undone.`, es: `trabajo${confirm.ids.length === 1 ? '' : 's'} se detendrán (${confirm.label}). Las solicitudes en curso a proveedores (Replicate, Sync.so) se cancelarán de forma best-effort. Esta acción no se puede deshacer.` })}
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy !== null}>Zurück</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy !== null}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (!confirm) return;

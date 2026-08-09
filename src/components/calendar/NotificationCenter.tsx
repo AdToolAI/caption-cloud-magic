@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -78,7 +79,7 @@ export function NotificationCenter({ open, onClose }: NotificationCenterProps) {
             {!isLoading && notifications.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Keine Benachrichtigungen</p>
+                <p>{tx({ de: "Keine Benachrichtigungen", en: "No notifications", es: "Sin notificaciones" })}</p>
               </div>
             )}
 

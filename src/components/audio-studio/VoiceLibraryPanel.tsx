@@ -163,14 +163,13 @@ export function VoiceLibraryPanel() {
         {voices.length === 0 && !loading && (
           <div className="col-span-full p-12 text-center">
             <Mic className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Keine Custom Voices</h3>
+            <h3 className="text-lg font-semibold mb-2">{tx({ de: "Keine Custom Voices", en: "No custom voices", es: "Sin voces personalizadas" })}</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Lies das geführte Skript vor oder lade eine WhatsApp-Sprachnachricht hoch. Die Stimme
-              wird bereinigt und danach in deinen Voiceover-Tools verfügbar.
+              {tx({ de: "Lies das geführte Skript vor oder lade eine WhatsApp-Sprachnachricht hoch. Die Stimme wird bereinigt und danach in deinen Voiceover-Tools verfügbar.", en: "Read the guided script aloud or upload a WhatsApp voice message. The voice will be cleaned up and then available in your voiceover tools.", es: "Lee el guion guiado en voz alta o sube un mensaje de voz de WhatsApp. La voz se limpiará y estará disponible en tus herramientas de voz en off." })}
             </p>
             <Button onClick={() => setShowCloneDialog(true)} className="gap-2">
               <Plus className="h-4 w-4" />
-              Erste Voice erstellen
+              {tx({ de: "Erste Voice erstellen", en: "Create first voice", es: "Crear primera voz" })}
             </Button>
           </div>
         )}

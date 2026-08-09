@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -110,8 +111,8 @@ export function CostComparisonWidget() {
               <TrendingDown className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold leading-tight">Preisvorteil</h3>
-              <p className="text-xs text-muted-foreground">Letzte 30 Tage · Pay-per-Use</p>
+              <h3 className="text-lg font-semibold leading-tight">{tx({ de: 'Preisvorteil', en: 'Price advantage', es: 'Ventaja de precio' })}</h3>
+              <p className="text-xs text-muted-foreground">{tx({ de: 'Letzte 30 Tage · Pay-per-Use', en: 'Last 30 days · pay-per-use', es: 'Últimos 30 días · pago por uso' })}</p>
             </div>
           </div>
           <TooltipProvider>
@@ -120,16 +121,16 @@ export function CostComparisonWidget() {
                 <button
                   type="button"
                   className="text-muted-foreground/70 hover:text-foreground transition-colors"
-                  aria-label="Berechnungs-Info"
+                  aria-label={tx({ de: 'Berechnungs-Info', en: 'Calculation info', es: 'Información del cálculo' })}
                 >
                   <Info className="h-4 w-4" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="left" className="max-w-xs text-xs">
-                Vergleich gegen einen typischen Mid-Tier Markt-Wert von ca.{' '}
+                {tx({ de: 'Vergleich gegen einen typischen Mid-Tier Markt-Wert von ca.', en: 'Compared against a typical mid-tier market value of about', es: 'Comparado con un valor de mercado típico de gama media de aprox.' })}{' '}
                 {symbol}
-                {MARKET_REFERENCE_EUR_PER_MONTH}/Monat für vergleichbare KI-Video-Suiten.
-                Du zahlst nur, was du wirklich generierst – kein Abo, keine Mindestlaufzeit.
+                {MARKET_REFERENCE_EUR_PER_MONTH}
+                {tx({ de: '/Monat für vergleichbare KI-Video-Suiten. Du zahlst nur, was du wirklich generierst – kein Abo, keine Mindestlaufzeit.', en: '/month for comparable AI video suites. You only pay for what you actually generate – no subscription, no minimum term.', es: '/mes para suites de video con IA comparables. Solo pagas por lo que generas realmente: sin suscripción ni permanencia.' })}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -145,7 +146,7 @@ export function CostComparisonWidget() {
                 {fmt(savings)}
               </span>
               <Badge variant="secondary" className="text-[10px]">
-                gespart
+                {tx({ de: 'gespart', en: 'saved', es: 'ahorrado' })}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -161,7 +162,7 @@ export function CostComparisonWidget() {
               <div className="flex items-center justify-between text-xs mb-1.5">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                  Markt-Subscription Ø
+                  {tx({ de: 'Markt-Subscription Ø', en: 'Market subscription avg.', es: 'Suscripción de mercado prom.' })}
                 </span>
                 <span className="tabular-nums text-muted-foreground">
                   {fmt(MARKET_REFERENCE_EUR_PER_MONTH)}
@@ -174,7 +175,7 @@ export function CostComparisonWidget() {
               <div className="flex items-center justify-between text-xs mb-1.5">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-primary" />
-                  Dein tatsächlicher Spend
+                  {tx({ de: 'Dein tatsächlicher Spend', en: 'Your actual spend', es: 'Tu gasto real' })}
                 </span>
                 <span className="tabular-nums font-medium">{fmt(stats.spentLast30)}</span>
               </div>
@@ -198,13 +199,13 @@ export function CostComparisonWidget() {
                 {multiplier > 0 ? `${multiplier.toFixed(1)}×` : '—'}
               </div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                günstiger
+                {tx({ de: 'günstiger', en: 'cheaper', es: 'más barato' })}
               </div>
             </div>
             <div>
               <div className="text-lg font-semibold tabular-nums">{stats.generations}</div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                Generationen
+                {tx({ de: 'Generationen', en: 'generations', es: 'generaciones' })}
               </div>
             </div>
             <div>
@@ -212,7 +213,7 @@ export function CostComparisonWidget() {
                 {stats.avgPerGeneration > 0 ? fmt(stats.avgPerGeneration) : '—'}
               </div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                Ø / Video
+                {tx({ de: 'Ø / Video', en: 'avg. / video', es: 'prom. / video' })}
               </div>
             </div>
           </div>
@@ -223,8 +224,7 @@ export function CostComparisonWidget() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-md p-3">
             <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
             <span>
-              Noch keine Generationen in den letzten 30 Tagen – starte ein Projekt, um deine
-              Ersparnis live zu sehen.
+              {tx({ de: 'Noch keine Generationen in den letzten 30 Tagen – starte ein Projekt, um deine Ersparnis live zu sehen.', en: 'No generations in the last 30 days yet – start a project to see your savings live.', es: 'Aún no hay generaciones en los últimos 30 días: inicia un proyecto para ver tu ahorro en vivo.' })}
             </span>
           </div>
         )}
@@ -232,7 +232,7 @@ export function CostComparisonWidget() {
         {/* Savings percent visual */}
         {!isLoading && savingsPercent > 0 && (
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Ersparnis-Quote</span>
+            <span>{tx({ de: 'Ersparnis-Quote', en: 'Savings rate', es: 'Tasa de ahorro' })}</span>
             <span className="font-medium text-primary">{savingsPercent.toFixed(0)}%</span>
           </div>
         )}

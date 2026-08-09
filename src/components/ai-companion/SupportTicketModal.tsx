@@ -50,7 +50,7 @@ export function SupportTicketModal({
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Nicht eingeloggt');
+      if (!user) throw new Error(tx({ de: 'Nicht eingeloggt', en: 'Not logged in', es: 'No has iniciado sesión' }));
 
       // Build metadata
       const ticketMetadata: Record<string, unknown> = {

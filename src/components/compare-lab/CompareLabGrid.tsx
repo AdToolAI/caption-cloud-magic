@@ -366,7 +366,7 @@ function OutputCard({
             disabled={!output.video_url || isWinner}
             className="h-7 text-xs"
           >
-            {isWinner ? <><CheckCircle2 className="h-3 w-3 mr-1" /> Winner</> : 'Wählen'}
+            {isWinner ? <><CheckCircle2 className="h-3 w-3 mr-1" /> Winner</> : tx({ de: 'Wählen', en: 'Select', es: 'Elegir' })}
           </Button>
         </div>
       </CardContent>

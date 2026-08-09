@@ -2461,7 +2461,7 @@ export default function SceneCard({
                           🎙️ Lip-Sync zum Voiceover
                           <span
                             className="px-1 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[8px] font-bold ring-1 ring-amber-400/30"
-                            title="Sync.so lipsync-2-pro — Artlist-grade fidelity, identity-locked, kein Face-Morph"
+                            title={tx({ de: "Sync.so lipsync-2-pro — Artlist-grade fidelity, identity-locked, kein Face-Morph", en: "Sync.so lipsync-2-pro — Artlist-grade fidelity, identity-locked, no face morph", es: "Sync.so lipsync-2-pro — fidelidad de nivel Artlist, identidad bloqueada, sin transformación facial" })}
                           >
                             PRO
                           </span>

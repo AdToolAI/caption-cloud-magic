@@ -348,7 +348,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) {
-        toast.error("Nicht angemeldet.");
+        toast.error(tx({ de: "Nicht angemeldet.", en: "Not signed in.", es: "No has iniciado sesión." }));
         return;
       }
 

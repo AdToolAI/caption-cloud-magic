@@ -596,10 +596,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                   <div className="flex flex-col items-center gap-2 py-6">
                     <Library className="h-10 w-10 text-muted-foreground" />
                     <p className="text-sm font-medium">
-                      {t('uc.chooseFromLibrary') || 'Aus Mediathek wählen'}
+                      {t('uc.chooseFromLibrary') || tx({ de: 'Aus Mediathek wählen', en: 'Choose from library', es: 'Elegir de la biblioteca' })}
                     </p>
                     <p className="text-xs text-muted-foreground text-center">
-                      {t('uc.chooseFromLibraryDesc') || 'Bereits erstellte Videos wiederverwenden'}
+                      {t('uc.chooseFromLibraryDesc') || tx({ de: 'Bereits erstellte Videos wiederverwenden', en: 'Reuse videos you already created', es: 'Reutilizar vídeos ya creados' })}
                     </p>
                   </div>
                 </Card>
@@ -910,7 +910,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
             {loadingLibrary ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                {t('uc.loading') || 'Lädt…'}
+                {t('uc.loading') || tx({ de: 'Lädt…', en: 'Loading…', es: 'Cargando…' })}
               </div>
             ) : libraryVideos.length === 0 ? (
               <div className="py-12 text-center text-sm text-muted-foreground">

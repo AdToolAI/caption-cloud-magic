@@ -49,7 +49,7 @@ const FALLBACKS: Record<string, string> = {
   savedToLibrary: tx({ de: 'In Mediathek gespeichert', en: 'Saved to media library', es: 'Guardado en la biblioteca de medios' }),
   savedToLibraryDesc: tx({ de: 'Du findest dieses Video jetzt in der Mediathek.', en: 'You can now find this video in the media library.', es: 'Ahora puedes encontrar este video en la biblioteca de medios.' }),
   viewInLibrary: 'Mediathek öffnen',
-  takingLonger: 'Dauert länger als üblich',
+  takingLonger: tx({ de: 'Dauert länger als üblich', en: 'Taking longer than usual', es: 'Está tardando más de lo habitual' }),
   checkLaterDesc: tx({ de: 'Du kannst die Seite verlassen und später wieder öffnen — der Status wird aus der Datenbank geladen.', en: 'You can leave the page and open it again later — the status will be loaded from the database.', es: 'Puedes salir de la página y volver a abrirla más tarde — el estado se cargará desde la base de datos.' }),
   renderFailed: tx({ de: 'Rendering fehlgeschlagen', en: 'Rendering failed', es: 'Error en el renderizado' }),
   error: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),

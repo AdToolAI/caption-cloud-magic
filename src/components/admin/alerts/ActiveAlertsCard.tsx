@@ -56,16 +56,16 @@ export function ActiveAlertsCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <AlertTriangle className="h-5 w-5 text-destructive" />
-          Aktive Alerts
+          {tx({ de: 'Aktive Alerts', en: 'Active alerts', es: 'Alertas activas' })}
         </CardTitle>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Lade…</p>
+          <p className="text-sm text-muted-foreground">{tx({ de: 'Lade…', en: 'Loading…', es: 'Cargando…' })}</p>
         ) : alerts.length === 0 ? (
           <div className="flex items-center gap-2 text-green-500 py-4">
             <CheckCircle2 className="h-5 w-5" />
-            <span>Keine aktiven Alerts — alles im grünen Bereich.</span>
+            <span>{tx({ de: 'Keine aktiven Alerts — alles im grünen Bereich.', en: 'No active alerts — all green.', es: 'No hay alertas activas — todo en verde.' })}</span>
           </div>
         ) : (
           <div className="space-y-2">

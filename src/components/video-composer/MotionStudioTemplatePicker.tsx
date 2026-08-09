@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import {
   Dialog,
@@ -54,10 +55,10 @@ export default function MotionStudioTemplatePicker({
         <DialogHeader className="px-6 pt-6 pb-3 border-b border-border/40">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            <DialogTitle className="text-xl">Template wählen</DialogTitle>
+            <DialogTitle className="text-xl">{tx({ de: "Template wählen", en: "Choose template", es: "Elegir plantilla" })}</DialogTitle>
           </div>
           <DialogDescription>
-            Starte mit einer kuratierten Vorlage oder mit einem leeren Projekt.
+            {tx({ de: "Starte mit einer kuratierten Vorlage oder mit einem leeren Projekt.", en: "Start with a curated template or with a blank project.", es: "Empieza con una plantilla seleccionada o con un proyecto en blanco." })}
           </DialogDescription>
         </DialogHeader>
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { tx } from '@/lib/i18nText';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +40,7 @@ export const AIVideoCreditPurchase = () => {
       {founder.isActive && (
         <div className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
           <Crown className="h-4 w-4" />
-          <span className="font-medium">Gründer-Vorteil aktiv: −20 % auf alle Video-Credits (24 Monate).</span>
+          <span className="font-medium">{tx({ de: "Gründer-Vorteil aktiv: −20 % auf alle Video-Credits (24 Monate).", en: "Founder benefit active: −20% on all video credits (24 months).", es: "Beneficio de fundador activo: −20% en todos los créditos de video (24 meses)." })}</span>
         </div>
       )}
       {currency === 'EUR' && (

@@ -48,7 +48,7 @@ const FAQ = () => {
         answer: tx({ de: "Wir akzeptieren alle gängigen Kreditkarten (Visa, MasterCard, American Express) und PayPal über Stripes sichere Zahlungsabwicklung.", en: "We accept all major credit cards (Visa, MasterCard, American Express) and PayPal via Stripe's secure payment processing.", es: "Aceptamos todas las principales tarjetas de crédito (Visa, MasterCard, American Express) y PayPal a través del procesamiento de pagos seguro de Stripe." })
       },
       {
-        question: "Kann ich jederzeit kündigen?",
+        question: tx({ de: "Kann ich jederzeit kündigen?", en: "Can I cancel anytime?", es: "¿Puedo cancelar en cualquier momento?" }),
         answer: tx({ de: "Ja, Sie können Ihr Abonnement jederzeit über Ihr Abrechnungs-Dashboard kündigen. Ihr Zugang bleibt bis zum Ende des aktuellen Abrechnungszeitraums bestehen.", en: "Yes, you can cancel your subscription anytime via your billing dashboard. Your access will remain until the end of the current billing period.", es: "Sí, puedes cancelar tu suscripción en cualquier momento a través de tu panel de facturación. Tu acceso se mantendrá hasta el final del período de facturación actual." })
       },
       {

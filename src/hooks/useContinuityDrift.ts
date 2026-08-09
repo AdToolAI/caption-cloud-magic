@@ -54,7 +54,7 @@ export function useContinuityDrift() {
         );
         if (error) throw error;
         if (typeof data?.driftScore !== 'number') {
-          throw new Error('Kein gültiger Drift-Score');
+          throw new Error(tx({ de: 'Kein gültiger Drift-Score', en: 'No valid drift score', es: 'Sin puntuación de deriva válida' }));
         }
         return {
           driftScore: data.driftScore,

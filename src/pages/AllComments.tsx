@@ -288,7 +288,7 @@ const AllComments = () => {
                 <DialogTitle>Kommentare importieren</DialogTitle>
               </DialogHeader>
               <Textarea
-                placeholder="Ein Kommentar pro Zeile..."
+                placeholder={tx({ de: "Ein Kommentar pro Zeile...", en: "One comment per line...", es: "Un comentario por línea..." })}
                 rows={10}
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
@@ -332,7 +332,7 @@ const AllComments = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Suche nach Text, Username, Labels..."
+            placeholder={tx({ de: "Suche nach Text, Username, Labels...", en: "Search by text, username, labels...", es: "Buscar por texto, usuario, etiquetas..." })}
             className="pl-9"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -375,7 +375,7 @@ const AllComments = () => {
 
         <TabsContent value={selectedTab} className="mt-6">
           {loading ? (
-            <div className="text-center py-12">Lädt...</div>
+            <div className="text-center py-12">{tx({ de: "Lädt...", en: "Loading...", es: "Cargando..." })}</div>
           ) : comments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.
@@ -441,7 +441,7 @@ const AllComments = () => {
                         <Button variant="ghost" size="sm" title="Antwort kopieren">
                           <Copy className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title="Als erledigt markieren">
+                        <Button variant="ghost" size="sm" title={tx({ de: "Als erledigt markieren", en: "Mark as done", es: "Marcar como hecho" })}>
                           <Check className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" title="Flaggen">

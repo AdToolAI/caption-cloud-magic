@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { tx } from '@/lib/i18nText';
 import { usePendingMarketplaceTemplates, useReviewTemplate } from '@/hooks/useMarketplace';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,12 +17,12 @@ export function MarketplaceReviewPanel() {
   }
 
   if (pending.length === 0) {
-    return <Card className="p-8 text-center text-muted-foreground">Keine Templates warten aktuell auf Freigabe. ✨</Card>;
+    return <Card className="p-8 text-center text-muted-foreground">{tx({ de: 'Keine Templates warten aktuell auf Freigabe. ✨', en: 'No templates currently awaiting approval. ✨', es: 'No hay plantillas esperando aprobación actualmente. ✨' })}</Card>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-muted-foreground">{pending.length} Template(s) warten auf Review</div>
+      <div className="text-sm text-muted-foreground">{tx({ de: `${pending.length} Template(s) warten auf Review`, en: `${pending.length} template(s) awaiting review`, es: `${pending.length} plantilla(s) esperando revisión` })}</div>
 
       {pending.map(t => (
         <Card key={t.id} className="p-4">

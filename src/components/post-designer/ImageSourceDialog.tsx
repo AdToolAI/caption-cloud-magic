@@ -144,11 +144,11 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
               rows={4}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="z. B. Espressotasse auf dunklem Marmor, warmes Seitenlicht, minimalistisch"
+              placeholder={tx({ de: "z. B. Espressotasse auf dunklem Marmor, warmes Seitenlicht, minimalistisch", en: "e.g. espresso cup on dark marble, warm side light, minimalist", es: "p. ej. taza de espresso sobre mármol oscuro, luz lateral cálida, minimalista" })}
             />
             <Button onClick={handleGenerate} disabled={generating} className="w-full">
               {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              Bild generieren
+              {tx({ de: "Bild generieren", en: "Generate image", es: "Generar imagen" })}
             </Button>
           </TabsContent>
 

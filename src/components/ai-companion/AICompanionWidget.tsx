@@ -335,7 +335,7 @@ export function AICompanionWidget() {
   const formatRenderResponse = (data: any) => {
     const activeRenders = data?.diagnostics?.filter((d: any) => d.category === 'rendering' && d.status !== 'ok') || [];
     if (activeRenders.length === 0) {
-      return '🎬 **Keine aktiven Renderings**\n\nAlle Video-Renderings sind abgeschlossen.';
+      return tx({ de: '🎬 **Keine aktiven Renderings**\n\nAlle Video-Renderings sind abgeschlossen.', en: '🎬 **No active renders**\n\nAll video renders are done.', es: '🎬 **Sin renderizados activos**\n\nTodos los renderizados de video están terminados.' });
     }
     let response = tx({ de: `🎬 **Aktive Renderings:** ${activeRenders.length}\n\n`, en: `🎬 **Active Renderings:** ${activeRenders.length}\n\n`, es: `🎬 **Renderizados activos:** ${activeRenders.length}\n\n` }); // ${activeRenders.length}\n\n`;
     activeRenders.forEach((r: any) => { response += `• ${r.message}\n`; });
@@ -347,7 +347,7 @@ export function AICompanionWidget() {
     const issues = diagnostics.filter((d: any) => d.status !== 'ok');
     
     if (issues.length === 0) {
-      return '✨ **Alles bestens!**\n\nDein Account ist optimal eingerichtet. Keine Probleme erkannt.';
+      return tx({ de: '✨ **Alles bestens!**\n\nDein Account ist optimal eingerichtet. Keine Probleme erkannt.', en: '✨ **All good!**\n\nYour account is set up optimally. No issues detected.', es: '✨ **¡Todo bien!**\n\nTu cuenta está configurada de forma óptima. No se detectaron problemas.' });
     }
     
     let tips = '💡 **Personalisierte Tipps:**\n\n';
@@ -631,7 +631,7 @@ export function AICompanionWidget() {
                 <div>
                   <h3 className="font-semibold text-foreground">{preferences.bot_name}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {isListening ? 'Höre zu...' : isSpeaking ? 'Spricht...' : 'Dein persönlicher Assistent'}
+                    {isListening ? tx({ de: 'Höre zu...', en: 'Listening...', es: 'Escuchando...' }) : isSpeaking ? tx({ de: 'Spricht...', en: 'Speaking...', es: 'Hablando...' }) : tx({ de: 'Dein persönlicher Assistent', en: 'Your personal assistant', es: 'Tu asistente personal' })}
                   </p>
                 </div>
               </div>

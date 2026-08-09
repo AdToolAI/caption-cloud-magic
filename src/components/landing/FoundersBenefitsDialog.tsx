@@ -20,7 +20,7 @@ interface Props {
 const benefits = [
   {
     icon: ShieldCheck,
-    title: "Ein Abo. 14,99 € im Monat.",
+    title: tx({ de: "Ein Abo. 14,99 € im Monat.", en: "One plan. €14.99 per month.", es: "Un plan. 14,99 € al mes." }),
     text: tx({ de: "Es gibt genau ein Modell: 14,99 € pro Monat für den kompletten Studio-Zugang. Keine Tarifstufen, keine Upsells, keine versteckten Gebühren.", en: "There is exactly one model: €14.99 per month for complete Studio access. No tiers, no upsells, no hidden fees.", es: "Solo hay un modelo: 14,99 € al mes para acceso completo al Studio. Sin niveles, sin ventas adicionales, sin tarifas ocultas." }),
   },
   {
@@ -30,7 +30,7 @@ const benefits = [
   },
   {
     icon: Sparkles,
-    title: "Voller Studio-Zugang während der Beta",
+    title: tx({ de: "Voller Studio-Zugang während der Beta", en: "Full Studio access during beta", es: "Acceso completo al Studio durante la beta" }),
     text: tx({ de: "Der komplette Produktionsworkflow ist freigeschaltet: führende KI-Modelle, Stimmen, Multi-Speaker-Lip-Sync und Schnitt — in einem System statt in fünf Abos.", en: "The complete production workflow is unlocked: leading AI models, voices, multi-speaker lip-sync, and editing — in one system instead of five subscriptions.", es: "El flujo de trabajo de producción completo está desbloqueado: modelos de IA líderes, voces, sincronización labial de múltiples oradores y edición, todo en un solo sistema en lugar de cinco suscripciones." }),
   },
   {
@@ -50,15 +50,14 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
               <Crown className="h-6 w-6 text-primary" />
             </div>
             <DialogTitle className="text-2xl font-bold tracking-tight">
-              Founders-Programm — Deine Vorteile
+              {tx({ de: "Founders-Programm — Deine Vorteile", en: "Founders Program — Your Benefits", es: "Programa Founders — Tus ventajas" })}
             </DialogTitle>
           </div>
           <DialogDescription className="text-base leading-relaxed">
-            Ein Creator. Ein ganzes Studio. Wir starten am{" "}
-            <strong className="text-foreground">26.07.2026</strong> in eine öffentliche{" "}
-            <strong className="text-foreground">3-Monats-Beta</strong>. {tx({ de: 'Als einer der ersten', en: 'As one of the first', es: 'Como uno de los primeros' })}{" "}
-            <strong className="text-foreground">1.000 Founders</strong> sicherst du dir dauerhaften
-            Zugang zum kompletten Produktionsworkflow — und hilfst uns, ihn gemeinsam großartig zu machen.
+            {tx({ de: 'Ein Creator. Ein ganzes Studio. Wir starten am', en: 'One creator. An entire studio. We launch on', es: 'Un creador. Un estudio completo. Lanzamos el' })}{" "}
+            <strong className="text-foreground">26.07.2026</strong> {tx({ de: 'in eine öffentliche', en: 'into a public', es: 'en una beta pública de' })}{" "}
+            <strong className="text-foreground">{tx({ de: '3-Monats-Beta', en: '3-month beta', es: '3 meses' })}</strong>. {tx({ de: 'Als einer der ersten', en: 'As one of the first', es: 'Como uno de los primeros' })}{" "}
+            <strong className="text-foreground">1.000 Founders</strong> {tx({ de: 'sicherst du dir dauerhaften Zugang zum kompletten Produktionsworkflow — und hilfst uns, ihn gemeinsam großartig zu machen.', en: 'you secure permanent access to the complete production workflow — and help us make it great together.', es: 'aseguras acceso permanente al flujo de trabajo de producción completo — y nos ayudas a hacerlo genial juntos.' })}
           </DialogDescription>
         </DialogHeader>
 
@@ -86,11 +85,9 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
         <div className="mt-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 flex gap-3">
           <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
           <div className="text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-foreground">Wichtig:</strong> Der Founder-Status ist an ein aktives
-            Abo gebunden. Bei <strong className="text-foreground">{tx({ de: "Kündigung, Pausierung oder Kontolöschung", en: "Termination, pause or account deletion", es: "Terminación, pausa o eliminación de cuenta" })}</strong>{" "}
-            geht dein Founder-Status <strong className="text-foreground">dauerhaft verloren</strong> und der Slot wird
-            für neue Nutzer freigegeben. Details in unseren{" "}
-            <Link to="/legal/terms#section-8" className="text-primary hover:underline">AGB §8</Link>.
+            <strong className="text-foreground">{tx({ de: "Wichtig:", en: "Important:", es: "Importante:" })}</strong> {tx({ de: "Der Founder-Status ist an ein aktives Abo gebunden. Bei", en: "The founder status is tied to an active subscription. In case of", es: "El estatus de fundador está ligado a una suscripción activa. En caso de" })} <strong className="text-foreground">{tx({ de: "Kündigung, Pausierung oder Kontolöschung", en: "Termination, pause or account deletion", es: "Terminación, pausa o eliminación de cuenta" })}</strong>{" "}
+            {tx({ de: "geht dein Founder-Status", en: "your founder status is", es: "tu estatus de fundador se" })} <strong className="text-foreground">{tx({ de: "dauerhaft verloren", en: "permanently lost", es: "pierde permanentemente" })}</strong> {tx({ de: "und der Slot wird für neue Nutzer freigegeben. Details in unseren", en: "and the slot is released for new users. Details in our", es: "y el cupo se libera para nuevos usuarios. Detalles en nuestros" })}{" "}
+            <Link to="/legal/terms#section-8" className="text-primary hover:underline">{tx({ de: "AGB §8", en: "Terms §8", es: "Términos §8" })}</Link>.
           </div>
         </div>
 
@@ -101,12 +98,12 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
 
         <DialogFooter className="mt-4 gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Später
+            {tx({ de: "Später", en: "Later", es: "Más tarde" })}
           </Button>
           <Button asChild className="bg-primary hover:bg-primary/90">
             <Link to="/pricing" onClick={() => onOpenChange(false)}>
               <Crown className="h-4 w-4 mr-2" />
-              Jetzt Founder werden
+              {tx({ de: "Jetzt Founder werden", en: "Become a Founder now", es: "Hazte Founder ahora" })}
             </Link>
           </Button>
         </DialogFooter>

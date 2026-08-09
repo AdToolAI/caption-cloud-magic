@@ -319,7 +319,7 @@ export function KanbanView({
             {channelFilter.length > 0 && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setChannelFilter([])}>Zurücksetzen</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setChannelFilter([])}>{tx({ de: 'Zurücksetzen', en: 'Reset', es: 'Restablecer' })}</DropdownMenuItem>
               </>
             )}
           </DropdownMenuContent>

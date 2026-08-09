@@ -532,10 +532,12 @@ export default function StoryboardTab({
         && briefingTargetDurationSec > 0
         && totalDuration > briefingTargetDurationSec + 0.5 && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-200">
-          <span className="font-medium">Skript länger als geplant:</span>{' '}
-          Dein Skript benötigt {totalDuration}s, das Briefing sah {briefingTargetDurationSec}s vor.
-          Das Video wird automatisch auf {totalDuration}s verlängert
-          (+{Math.round(totalDuration - briefingTargetDurationSec)}s). Der Preis unten ist bereits angepasst.
+          <span className="font-medium">{tx({ de: 'Skript länger als geplant:', en: 'Script longer than planned:', es: 'Guión más largo de lo previsto:' })}</span>{' '}
+          {tx({
+            de: `Dein Skript benötigt ${totalDuration}s, das Briefing sah ${briefingTargetDurationSec}s vor. Das Video wird automatisch auf ${totalDuration}s verlängert (+${Math.round(totalDuration - briefingTargetDurationSec)}s). Der Preis unten ist bereits angepasst.`,
+            en: `Your script needs ${totalDuration}s, the briefing planned for ${briefingTargetDurationSec}s. The video will automatically be extended to ${totalDuration}s (+${Math.round(totalDuration - briefingTargetDurationSec)}s). The price below is already adjusted.`,
+            es: `Tu guión necesita ${totalDuration}s, el briefing preveía ${briefingTargetDurationSec}s. El vídeo se extenderá automáticamente a ${totalDuration}s (+${Math.round(totalDuration - briefingTargetDurationSec)}s). El precio de abajo ya está ajustado.`,
+          })}
         </div>
       )}
 

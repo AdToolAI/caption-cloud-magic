@@ -14,7 +14,7 @@ export default function UpgradeEnterprise() {
 
   const handleUpgrade = async () => {
     if (!user?.email) {
-      toast.error("Nicht angemeldet");
+      toast.error(tx({ de: "Nicht angemeldet", en: "Not logged in", es: "No has iniciado sesión" }));
       return;
     }
 

@@ -287,7 +287,7 @@ export default function VoiceSubtitlesTab({
     emitPipelineEvent({ type: 'voiceover:start' });
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Nicht eingeloggt');
+      if (!user) throw new Error(tx({ de: 'Nicht eingeloggt', en: 'Not logged in', es: 'No has iniciado sesión' }));
 
       // ── Multi-Speaker branch (Voice Studio 2.0) ─────────────────
       if (isMultiSpeakerScript(voiceover.script) && voiceover.speakerMap) {

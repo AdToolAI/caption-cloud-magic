@@ -298,7 +298,7 @@ export default function BriefingImportDialog({
                   )}
                   {mentionPreview.missing.length > 0 && (
                     <div className="space-y-1">
-                      <div className="text-amber-400 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Nicht in deiner Library:</div>
+                      <div className="text-amber-400 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {tx({ de: "Nicht in deiner Library:", en: "Not in your library:", es: "No está en tu biblioteca:" })}</div>
                       <div className="flex flex-wrap gap-1">
                         {mentionPreview.missing.map((m) => (
                           <Badge key={m} variant="outline" className="text-[10px] border-amber-400/40 text-amber-300">{m}</Badge>
@@ -341,7 +341,7 @@ export default function BriefingImportDialog({
           )}
           {step === 'review' && (
             <>
-              <Button variant="ghost" onClick={() => setStep('paste')}>Zurück</Button>
+              <Button variant="ghost" onClick={() => setStep('paste')}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
               <Button onClick={handleApply} className="bg-amber-400 text-black hover:bg-amber-300">
                 <CheckCircle2 className="h-4 w-4 mr-2" />Alles übernehmen
               </Button>

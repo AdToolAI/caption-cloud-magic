@@ -41,7 +41,7 @@ interface RecentProject {
 const QUICK_ACTIONS = [
   {
     title: 'Studio Mode',
-    desc: 'Geführter 4-Schritt-Flow: Cast → Location → Storyboard → Render',
+    desc: tx({ de: 'Geführter 4-Schritt-Flow: Cast → Location → Storyboard → Render', en: 'Guided 4-step flow: Cast → Location → Storyboard → Render', es: 'Flujo guiado de 4 pasos: Cast → Ubicación → Storyboard → Render' }),
     icon: Wand2,
     href: '/motion-studio/studio',
     accent: 'from-primary/40 to-accent/15',
@@ -81,7 +81,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'AI Video Studios',
-    desc: 'Sora, Kling, Luma, Wan, Hailuo & Seedance direkt ansprechen',
+    desc: tx({ de: 'Sora, Kling, Luma, Wan, Hailuo & Seedance direkt ansprechen', en: 'Access Sora, Kling, Luma, Wan, Hailuo & Seedance directly', es: 'Acceder directamente a Sora, Kling, Luma, Wan, Hailuo y Seedance' }),
     icon: Sparkles,
     href: '/ai-video-studio',
     accent: 'from-primary/20 to-accent/10',
@@ -89,7 +89,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'Compare Lab',
-    desc: 'Ein Prompt — bis zu 6 Engines parallel. AI-Judge wählt den Sieger.',
+    desc: tx({ de: 'Ein Prompt — bis zu 6 Engines parallel. AI-Judge wählt den Sieger.', en: 'One prompt — up to 6 engines in parallel. AI judge picks the winner.', es: 'Un prompt — hasta 6 motores en paralelo. El juez de IA elige al ganador.' }),
     icon: Sparkles,
     href: '/compare-lab',
     accent: 'from-accent/30 to-primary/10',
@@ -204,11 +204,10 @@ export default function MotionStudioHub() {
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-                  Dein <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Director's Cockpit</span>
+                  {tx({ de: 'Dein', en: 'Your', es: 'Tu' })} <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Director's Cockpit</span>
                 </h1>
                 <p className="text-muted-foreground mt-2 max-w-2xl">
-                  Alles, was du für professionelle KI-Videoproduktion brauchst – Library, Voices, Composer
-                  und alle Generierungs-Engines an einem Ort. Studio-Power mit transparenter Pay-per-Use-Preisgestaltung.
+                  {tx({ de: 'Alles, was du für professionelle KI-Videoproduktion brauchst – Library, Voices, Composer und alle Generierungs-Engines an einem Ort. Studio-Power mit transparenter Pay-per-Use-Preisgestaltung.', en: 'Everything you need for professional AI video production – library, voices, composer and every generation engine in one place. Studio power with transparent pay-per-use pricing.', es: 'Todo lo que necesitas para la producción profesional de video con IA: biblioteca, voces, composer y todos los motores de generación en un solo lugar. Potencia de estudio con precios transparentes de pago por uso.' })}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">

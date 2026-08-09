@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Camera, Sun, Move, Crop, RotateCcw, Check, Aperture, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -109,7 +110,7 @@ export default function SceneShotDirectorPanel({ value, onChange, language, layo
                   </div>
                   <div className="px-1.5 py-1">
                     <span className={`block text-[10px] leading-tight w-full truncate ${selected ? 'text-primary font-medium' : 'text-foreground/60'}`}>
-                      {selected ? selected.label[lang] : lang === 'de' ? 'Wählen…' : lang === 'es' ? 'Elegir…' : 'Choose…'}
+                      {selected ? selected.label[lang] : tx({ de: 'Wählen…', en: 'Choose…', es: 'Elegir…' })}
                     </span>
                   </div>
                 </Button>
@@ -201,7 +202,7 @@ function MasterDetail({ value, onChange, lang, count, setCategory }: MasterDetai
                     {meta.title[lang]}
                   </div>
                   <div className={`text-[11px] leading-tight truncate mt-0.5 ${sel ? 'font-medium' : 'text-foreground/50'}`}>
-                    {sel ? sel.label[lang] : lang === 'de' ? 'Wählen…' : lang === 'es' ? 'Elegir…' : 'Choose…'}
+                    {sel ? sel.label[lang] : tx({ de: 'Wählen…', en: 'Choose…', es: 'Elegir…' })}
                   </div>
                 </div>
                 {sel && <Check className="h-3 w-3 text-primary shrink-0" />}

@@ -172,7 +172,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       {/* Pillars */}
       <Card className="p-5 space-y-3">
         <div>
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Themen-Pillars</Label>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">{tx({ de: "Themen-Pillars", en: "Topic pillars", es: "Pilares temáticos" })}</Label>
           <p className="text-[11px] text-muted-foreground mt-1">{tx({ de: "Kernthemen, um die sich dein Content drehen soll.", en: "Core topics that your content should revolve around.", es: "Temas centrales en torno a los cuales debe girar su contenido." })}</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -184,7 +184,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
               </button>
             </Badge>
           ))}
-          {pillars.length === 0 && <span className="text-xs text-muted-foreground">Keine Pillars definiert.</span>}
+          {pillars.length === 0 && <span className="text-xs text-muted-foreground">{tx({ de: "Keine Pillars definiert.", en: "No pillars defined.", es: "No hay pilares definidos." })}</span>}
         </div>
         <div className="flex gap-2">
           <Input
@@ -195,7 +195,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
             className="text-sm"
           />
           <Button onClick={addPillar} size="sm" variant="outline" className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Hinzufügen
+            <Plus className="h-3.5 w-3.5" /> {tx({ de: "Hinzufügen", en: "Add", es: "Añadir" })}
           </Button>
         </div>
       </Card>
@@ -203,9 +203,9 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       {/* Forbidden topics */}
       <Card className="p-5 space-y-3 border-destructive/30">
         <div>
-          <Label className="text-xs uppercase tracking-widest text-destructive">Verbotene Themen</Label>
+          <Label className="text-xs uppercase tracking-widest text-destructive">{tx({ de: "Verbotene Themen", en: "Forbidden topics", es: "Temas prohibidos" })}</Label>
           <p className="text-[11px] text-muted-foreground mt-1">
-            Hard-Block: Diese Themen werden nie generiert oder gepostet.
+            {tx({ de: "Hard-Block: Diese Themen werden nie generiert oder gepostet.", en: "Hard block: These topics will never be generated or posted.", es: "Bloqueo estricto: estos temas nunca se generarán ni se publicarán." })}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -217,7 +217,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
               </button>
             </Badge>
           ))}
-          {forbidden.length === 0 && <span className="text-xs text-muted-foreground">Keine Verbote.</span>}
+          {forbidden.length === 0 && <span className="text-xs text-muted-foreground">{tx({ de: "Keine Verbote.", en: "No prohibitions.", es: "Sin prohibiciones." })}</span>}
         </div>
         <div className="flex gap-2">
           <Input

@@ -684,7 +684,7 @@ export function ImageGenerator() {
                   onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
                 >
                   <Upload className="h-3.5 w-3.5 mr-1.5" />
-                  Bild hochladen
+                  {tx({ de: 'Bild hochladen', en: 'Upload image', es: 'Subir imagen' })}
                 </Button>
               )}
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
@@ -694,7 +694,7 @@ export function ImageGenerator() {
               {mode === 'transform' && referenceImage && (
                 <div className="pt-2 space-y-1.5">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground">Stärke der Veränderung</span>
+                    <span className="text-muted-foreground">{tx({ de: 'Stärke der Veränderung', en: 'Strength of change', es: 'Intensidad del cambio' })}</span>
                     <span className="font-mono">{strength}%</span>
                   </div>
                   <Slider

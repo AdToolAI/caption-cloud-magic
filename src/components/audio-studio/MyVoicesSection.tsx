@@ -51,7 +51,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
       });
       if (error) throw error;
       const audioB64 = data?.audioBase64 || data?.audio || data?.audioContent;
-      if (!audioB64) throw new Error('Keine Audio-Daten erhalten');
+      if (!audioB64) throw new Error(tx({ de: 'Keine Audio-Daten erhalten', en: 'No audio data received', es: 'No se recibieron datos de audio' }));
       const audio = new Audio(`data:audio/mpeg;base64,${audioB64}`);
       await audio.play();
     } catch (err) {
@@ -84,10 +84,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
           <Mic className="w-6 h-6 text-primary" />
         </div>
         <h3 className="text-lg font-semibold mb-1">{tx({ de: "Noch keine eigenen Stimmen", en: "No custom voices yet", es: "Aún no hay voces propias" })}</h3>
-        <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">{tx({ de: 'Klone deine erste Stimme über das Voice Studio — Skript vorlesen, Mikrofon oder WhatsApp-Sprachnachricht.', en: 'Clone your first voice via the Voice Studio — read a script, use the microphone, or send a WhatsApp voice message.', es: 'Clona tu primera voz a través del Voice Studio: lee un guion, usa el micrófono o envía un mensaje de voz de WhatsApp.' })}
-          Klone deine erste Stimme über das Voice Studio — Skript vorlesen, Mikrofon oder
-          WhatsApp-Sprachnachricht.
-        </p>
+        <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">{tx({ de: 'Klone deine erste Stimme über das Voice Studio — Skript vorlesen, Mikrofon oder WhatsApp-Sprachnachricht.', en: 'Clone your first voice via the Voice Studio — read a script, use the microphone, or send a WhatsApp voice message.', es: 'Clona tu primera voz a través del Voice Studio: lee un guion, usa el micrófono o envía un mensaje de voz de WhatsApp.' })}</p>
         {onCreate && (
           <Button
             onClick={onCreate}

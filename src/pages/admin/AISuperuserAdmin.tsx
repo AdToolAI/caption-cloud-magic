@@ -322,7 +322,7 @@ export function AISuperuserAdmin() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground" title="Summe der Latenzen aller Szenarien im letzten Komplett-Test">{tx({ de: "Letzter Run (gesamt)", en: "Last Run (Total)", es: "Última ejecución (Total)" })}</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground" title={tx({ de: "Summe der Latenzen aller Szenarien im letzten Komplett-Test", en: "Sum of latencies of all scenarios in the last full test", es: "Suma de latencias de todos los escenarios en la última prueba completa" })}>{tx({ de: "Letzter Run (gesamt)", en: "Last Run (Total)", es: "Última ejecución (Total)" })}</CardTitle>
           </CardHeader>
           <CardContent>
             {(() => {

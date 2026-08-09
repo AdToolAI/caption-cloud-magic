@@ -72,7 +72,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
       if (data?.error) throw new Error(data.error);
       const incoming: Array<{ vibe: string; imageUrl: string; seed?: string }> =
         data?.variants ?? [];
-      if (incoming.length === 0) throw new Error('Keine Varianten erhalten');
+      if (incoming.length === 0) throw new Error(tx({ de: 'Keine Varianten erhalten', en: 'No variants received', es: 'No se recibieron variantes' }));
 
       // Persist each (URL → bucket) and insert DB row in parallel
       await Promise.all(

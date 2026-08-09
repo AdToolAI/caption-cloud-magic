@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { History } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Row {
@@ -67,7 +68,7 @@ export function AlertHistoryTable() {
         {loading ? (
           <p className="text-sm text-muted-foreground">Lade…</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">Keine Einträge.</p>
+          <p className="text-sm text-muted-foreground py-4">{tx({ de: "Keine Einträge.", en: "No entries.", es: "Sin entradas." })}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

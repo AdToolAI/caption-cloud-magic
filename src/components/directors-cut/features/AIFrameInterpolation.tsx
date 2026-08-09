@@ -61,7 +61,7 @@ export function AIFrameInterpolation({
 
       if (data?.error === 'INSUFFICIENT_CREDITS') {
         toast({
-          title: 'Nicht genügend Credits',
+          title: tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'Créditos insuficientes' }),
           description: data.message,
           variant: 'destructive'
         });

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -37,12 +38,12 @@ export function PublishNowButton({ block, onPublished }: PublishNowButtonProps) 
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="gap-2">
           <Send className="h-4 w-4" />
-          Jetzt veröffentlichen
+          {tx({ de: 'Jetzt veröffentlichen', en: 'Publish now', es: 'Publicar ahora' })}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Auf Social Media veröffentlichen</DialogTitle>
+          <DialogTitle>{tx({ de: 'Auf Social Media veröffentlichen', en: 'Publish to social media', es: 'Publicar en redes sociales' })}</DialogTitle>
         </DialogHeader>
         <PublishToSocialTab
           videoUrl={videoUrl}

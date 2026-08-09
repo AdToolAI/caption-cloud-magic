@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Flame } from 'lucide-react';
@@ -16,12 +17,12 @@ export function TopExpensiveFunctionsCard({ endpoints }: { endpoints: EndpointRo
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Flame className="h-5 w-5 text-orange-500" />
-          Top 5 teuerste Endpoints
+          {tx({ de: "Top 5 teuerste Endpoints", en: "Top 5 most expensive endpoints", es: "Top 5 endpoints más caros" })}
         </CardTitle>
       </CardHeader>
       <CardContent>
         {endpoints.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Keine Daten im Zeitraum.</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">{tx({ de: "Keine Daten im Zeitraum.", en: "No data in this period.", es: "No hay datos en este período." })}</p>
         ) : (
           <Table>
             <TableHeader>

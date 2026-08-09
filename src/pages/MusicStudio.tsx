@@ -253,7 +253,7 @@ export default function MusicStudio() {
               <Card className="p-5 bg-background/40 backdrop-blur-md border-primary/15">
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">Engine wählen</Label>
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-2 block">{tx({ de: "Engine wählen", en: "Choose engine", es: "Elegir motor" })}</Label>
                     <ProviderSelector value={engineId} onChange={setEngineId} currencySymbol={currencySymbol} disabled={loading} />
                   </div>
                   <Button

@@ -135,7 +135,7 @@ export function ShotDirectorPanel({ value, onChange, basePrompt = '' }: Props) {
         {count > 0 && (
           <Button variant="ghost" size="sm" onClick={reset} className="text-muted-foreground hover:text-foreground">
             <RotateCcw className="h-3.5 w-3.5 mr-1" />
-            {lang === 'de' ? 'Zurücksetzen' : lang === 'es' ? 'Restablecer' : 'Reset'}
+            {tx({ de: 'Zurücksetzen', en: 'Reset', es: 'Restablecer' })}
           </Button>
         )}
       </div>
@@ -178,7 +178,7 @@ export function ShotDirectorPanel({ value, onChange, basePrompt = '' }: Props) {
                   </div>
                   <div className="px-2 py-1.5">
                     <span className={`block text-xs font-medium leading-tight truncate ${selected ? 'text-primary' : 'text-foreground/70'}`}>
-                      {selected ? selected.label[lang] : lang === 'de' ? 'Wählen…' : lang === 'es' ? 'Elegir…' : 'Choose…'}
+                      {selected ? selected.label[lang] : tx({ de: 'Wählen…', en: 'Choose…', es: 'Elegir…' })}
                     </span>
                   </div>
                 </Button>

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { motion } from "framer-motion";
 import { FolderOpen, Upload, HardDrive, AlertTriangle, Film, Cloud, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -81,10 +82,10 @@ export const MediaLibraryHeroHeader = ({
               <div>
                 <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary via-primary to-cyan-400 
                                bg-clip-text text-transparent">
-                  Deine Mediathek
+                  {tx({ de: 'Deine Mediathek', en: 'Your media library', es: 'Tu mediateca' })}
                 </h1>
                 <p className="text-muted-foreground">
-                  Alle deine Videos, Bilder & KI-Posts an einem Ort
+                  {tx({ de: 'Alle deine Videos, Bilder & KI-Posts an einem Ort', en: 'All your videos, images & AI posts in one place', es: 'Todos tus videos, imágenes y publicaciones de IA en un solo lugar' })}
                 </p>
               </div>
             </motion.div>

@@ -32,7 +32,7 @@ export function useResetLipSync() {
         });
       } else {
         toast({
-          title: 'Lip-Sync zurückgesetzt',
+          title: tx({ de: 'Lip-Sync zurückgesetzt', en: 'Lip-sync reset', es: 'Sincronización labial restablecida' }),
           description: tx({ de: 'Die Szene startet gleich automatisch einen sauberen neuen Versuch.', en: 'The scene will automatically start a clean new attempt shortly.', es: 'La escena iniciará automáticamente un nuevo intento en breve.' }),
         });
       }
