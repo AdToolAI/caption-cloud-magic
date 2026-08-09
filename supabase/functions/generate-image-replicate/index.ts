@@ -17,17 +17,27 @@ const IMAGE_PRICING: Record<string, Record<string, number>> = {
   fast: { EUR: 0.04, USD: 0.04 },
   pro: { EUR: 0.08, USD: 0.08 },
   ultra: { EUR: 0.20, USD: 0.20 },
+  gptimage: { EUR: 0.08, USD: 0.08 },
+  flux: { EUR: 0.10, USD: 0.10 },
+  ideogram: { EUR: 0.06, USD: 0.06 },
+  recraft: { EUR: 0.06, USD: 0.06 },
+  qwen: { EUR: 0.03, USD: 0.03 },
 };
 
 const REPLICATE_MODELS: Record<string, `${string}/${string}` | `${string}/${string}:${string}`> = {
   fast: 'bytedance/seedream-4',
   pro: 'google/imagen-4-ultra',
   ultra: 'google/nano-banana',
+  flux: 'black-forest-labs/flux-1.1-pro-ultra',
+  ideogram: 'ideogram-ai/ideogram-v3-turbo',
+  recraft: 'recraft-ai/recraft-v3',
+  qwen: 'qwen/qwen-image',
 };
 
 interface GenerateRequest {
   prompt: string;
-  tier: 'fast' | 'pro' | 'ultra';
+  tier: 'fast' | 'pro' | 'ultra' | 'gptimage' | 'flux' | 'ideogram' | 'recraft' | 'qwen';
+
   aspectRatio?: string;
   referenceImageUrl?: string;     // Subject reference (image-to-image)
   styleReferenceUrl?: string;     // Style reference (Phase C)
