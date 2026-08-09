@@ -118,10 +118,10 @@ export function describeAssetForBrief(asset: AutopilotAsset): string {
 
 export function validateAssetFile(file: File): string | null {
   if (!ACCEPTED_ASSET_TYPES.includes(file.type)) {
-    return `${file.name}: nur PNG, JPG oder WebP.`;
+    return `${file.name}: ${tx({ de: 'nur PNG, JPG oder WebP.', en: 'only PNG, JPG or WebP.', es: 'solo PNG, JPG o WebP.' })}`;
   }
   if (file.size > MAX_ASSET_BYTES) {
-    return `${file.name}: größer als 10 MB.`;
+    return `${file.name}: ${tx({ de: 'größer als 10 MB.', en: 'larger than 10 MB.', es: 'más grande que 10 MB.' })}`;
   }
   return null;
 }
