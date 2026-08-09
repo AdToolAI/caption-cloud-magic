@@ -2,6 +2,7 @@ import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { ShieldCheck, CheckCircle2, XCircle, RefreshCcw, LifeBuoy, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { tx } from "@/lib/i18nText";
 
 export const AI_VIDEO_REFUND_POLICY_VERSION = 'v1.0-2026-07-28';
 
@@ -16,7 +17,7 @@ export default function AIVideoRefundPolicy() {
         <title>KI-Video Rückerstattung | AdTool AI</title>
         <meta
           name="description"
-          content="Wann werden Credits für KI-Video-Renderings automatisch erstattet und wann nicht — transparente Refund-Regeln nach dem Preview-Gate-Prinzip."
+          content={tx({ de: "Wann werden Credits für KI-Video-Renderings automatisch erstattet und wann nicht — transparente Refund-Regeln nach dem Preview-Gate-Prinzip.", en: "When are credits for AI video renderings automatically refunded and when not — transparent refund rules based on the preview-gate principle.", es: "Cuándo se reembolsan automáticamente los créditos de renderizados de video con IA y cuándo no: reglas de reembolso transparentes según el principio de puerta de vista previa." })}
         />
       </Helmet>
 
@@ -61,7 +62,7 @@ export default function AIVideoRefundPolicy() {
             <ul className="list-disc pl-6 space-y-1.5 text-sm text-foreground/90">
               <li>Timeout eines Providers (Hailuo, Kling, Seedance, Sync.so, HeyGen …)</li>
               <li>HTTP 5xx / Server-Fehler eines Providers</li>
-              <li>Sync.so Mux- oder Stitch-Fehler, Watchdog-Kill, Lambda-Crash</li>
+              <li>{tx({ de: "Sync.so Mux- oder Stitch-Fehler, Watchdog-Kill, Lambda-Crash", en: "Sync.so mux or stitch errors, watchdog kill, Lambda crash", es: "Errores de mux o stitch de Sync.so, watchdog kill, fallo de Lambda" })}</li>
               <li>Content-Filter des Providers, der <em>nach</em> deiner Bestätigung greift</li>
               <li>
                 Jeder Fehler, der intern mit einem der folgenden Codes klassifiziert wird:
@@ -100,7 +101,7 @@ export default function AIVideoRefundPolicy() {
                 Ästhetische Re-Rolls: Licht, Framing, Interpretation der Aktion, Style,
                 Farb-Grading.
               </li>
-              <li>Erfolgreich gerenderte Clips, die dir subjektiv nicht gefallen.</li>
+              <li>{tx({ de: "Erfolgreich gerenderte Clips, die dir subjektiv nicht gefallen.", en: "Successfully rendered clips that you subjectively dislike.", es: "Clips renderizados con éxito que subjetivamente no te gustan." })}</li>
             </ul>
             <Card className="mt-4 p-4 bg-muted/30 border-border/50 flex gap-3">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
@@ -136,7 +137,7 @@ export default function AIVideoRefundPolicy() {
                 der Preview-Credits.
               </li>
               <li>
-                <strong>Technischer Fehler nach Bestätigung:</strong> volle automatische
+                <strong>{tx({ de: "Technischer Fehler nach Bestätigung:", en: "Technical error after confirmation:", es: "Error técnico tras la confirmación:" })}</strong> volle automatische
                 Rückerstattung aller Render-Credits.
               </li>
             </ul>
@@ -176,7 +177,7 @@ export default function AIVideoRefundPolicy() {
 
           {/* 6. Was NICHT abgedeckt ist */}
           <section className="mb-10">
-            <h2 className="font-serif text-2xl mb-3">6. Was nicht abgedeckt ist</h2>
+            <h2 className="font-serif text-2xl mb-3">{tx({ de: "6. Was nicht abgedeckt ist", en: "6. What is not covered", es: "6. Lo que no está cubierto" })}</h2>
             <ul className="list-disc pl-6 space-y-1.5 text-sm text-foreground/90">
               <li>
                 Verbrauchte Credits aus Preview-Compose-Schritten (~1 Credit) — repräsentieren
