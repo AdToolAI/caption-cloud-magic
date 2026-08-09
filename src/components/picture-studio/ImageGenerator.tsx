@@ -358,6 +358,7 @@ export function ImageGenerator() {
 
       let successCount = 0;
       let safetyFilteredMsg: string | null = null;
+      let firstErrorMsg: string | null = null;
       for (const r of results) {
         if (r.status === 'fulfilled' && r.value) {
           await handleGenerationSuccess(r.value);
@@ -372,6 +373,7 @@ export function ImageGenerator() {
           if ((r.reason as any)?.code === 'SAFETY_FILTERED') {
             safetyFilteredMsg = r.reason.message;
           }
+          if (!firstErrorMsg) firstErrorMsg = (r.reason as any)?.message ?? null;
           console.error('[ImageGenerator] variant failed:', r.reason);
         }
       }
@@ -391,7 +393,12 @@ export function ImageGenerator() {
             } : undefined,
           });
         } else {
-          toast.error(tx({ de: 'Bildgenerierung fehlgeschlagen', en: 'Image generation failed', es: 'Error al generar la imagen' }));
+          toast.error(tx({ de: 'Bildgenerierung fehlgeschlagen', en: 'Image generation failed', es: 'Error al generar la imagen' }), {
+            description: firstErrorMsg ?? undefined,
+            duration: 12000,
+          });
+        }
+      } else if (variantsCount > 1) {
         }
       } else if (variantsCount > 1) {
         toast.success(tx({ de: `${successCount} von ${variantsCount} Varianten generiert`, en: `${successCount} of ${variantsCount} variants generated`, es: `${successCount} de ${variantsCount} variantes generadas` }));
