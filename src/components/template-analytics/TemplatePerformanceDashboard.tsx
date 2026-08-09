@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTemplateAnalytics } from "@/hooks/useTemplateAnalytics";
 import { TrendingUp, Eye, MousePointer, FileText, Share2 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { tx } from "@/lib/i18nText";
 
 interface TemplatePerformanceDashboardProps {
   templateId: string;
@@ -221,9 +222,9 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Aktive A/B Tests
+              {tx({ de: "Aktive A/B Tests", en: "Active A/B tests", es: "Pruebas A/B activas" })}
             </CardTitle>
-            <CardDescription>Laufende Tests für dieses Template</CardDescription>
+            <CardDescription>{tx({ de: "Laufende Tests für dieses Template", en: "Running tests for this template", es: "Pruebas en curso para esta plantilla" })}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

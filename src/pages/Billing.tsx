@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CancelIntentDialog } from "@/components/billing/CancelIntentDialog";
+import { tx } from "@/lib/i18nText";
 
 interface Invoice {
   id: string;
@@ -100,7 +101,7 @@ const Billing = () => {
     } catch (error: any) {
       toast({
         title: language === "de" ? "Fehler" : "Error",
-        description: error.message || (language === "de" ? "Portal konnte nicht geöffnet werden" : "Failed to open portal"),
+        description: error.message || tx({ de: "Portal konnte nicht geöffnet werden", en: "Failed to open portal", es: "No se pudo abrir el portal" }),
         variant: "destructive"
       });
     } finally {
@@ -141,7 +142,7 @@ const Billing = () => {
       invoicesDesc: "Laden Sie Ihre Rechnungen und Zahlungshistorie herunter",
       noInvoices: "Keine Rechnungen",
       noCustomer: "Kein aktives Abo",
-      upgradeMsg: "Sie haben noch kein aktives Abonnement. Wählen Sie einen Plan!",
+      upgradeMsg: tx({ de: "Sie haben noch kein aktives Abonnement. Wählen Sie einen Plan!", en: "You do not have an active subscription yet. Choose a plan!", es: "Aún no tienes una suscripción activa. ¡Elige un plan!" }),
       upgradeCta: "Pläne anzeigen",
       number: "Rechnung",
       date: "Datum",

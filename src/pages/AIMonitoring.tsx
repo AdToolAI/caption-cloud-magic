@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { Footer } from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,7 +85,7 @@ export default function AIMonitoring() {
       setRecentCalls(events?.slice(0, 10) || []);
     } catch (error: any) {
       console.error('Error fetching usage stats:', error);
-      toast.error('Fehler beim Laden der Statistiken');
+      toast.error(tx({ de: 'Fehler beim Laden der Statistiken', en: 'Error loading statistics', es: 'Error al cargar las estadísticas' }));
     } finally {
       setLoading(false);
     }
@@ -114,7 +115,7 @@ export default function AIMonitoring() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">AI Usage Monitoring</h1>
-          <p className="text-muted-foreground">Überwache deine Lovable AI Nutzung und Kosten</p>
+          <p className="text-muted-foreground">{tx({ de: "Überwache deine Lovable AI Nutzung und Kosten", en: "Monitor your Lovable AI usage and costs", es: "Supervisa tu uso y costes de Lovable AI" })}</p>
         </div>
 
         {/* Stats Grid */}

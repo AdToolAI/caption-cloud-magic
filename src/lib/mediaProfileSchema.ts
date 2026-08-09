@@ -1,32 +1,33 @@
 import { z } from 'zod';
+import { tx } from '@/lib/i18nText';
 
 // Base Schema
 export const mediaProfileConfigSchema = z.object({
   // Required fields
   aspect: z.string()
-    .regex(/^\d+:\d+$/, 'Format muss "width:height" sein (z.B. 16:9)'),
+    .regex(/^\d+:\d+$/, tx({ de: 'Format muss "width:height" sein (z.B. 16:9)', en: 'Format must be "width:height" (e.g. 16:9)', es: 'El formato debe ser "width:height" (p. ej. 16:9)' })),
   width: z.number()
-    .int('Breite muss eine Ganzzahl sein')
-    .min(100, 'Breite muss mindestens 100px sein')
-    .max(8192, 'Breite darf maximal 8192px sein'),
+    .int(tx({ de: 'Breite muss eine Ganzzahl sein', en: 'Width must be an integer', es: 'El ancho debe ser un número entero' }))
+    .min(100, tx({ de: 'Breite muss mindestens 100px sein', en: 'Width must be at least 100px', es: 'El ancho debe ser de al menos 100px' }))
+    .max(8192, tx({ de: 'Breite darf maximal 8192px sein', en: 'Width may be at most 8192px', es: 'El ancho puede ser de máximo 8192px' })),
   height: z.number()
-    .int('Höhe muss eine Ganzzahl sein')
-    .min(100, 'Höhe muss mindestens 100px sein')
-    .max(8192, 'Höhe darf maximal 8192px sein'),
+    .int(tx({ de: 'Höhe muss eine Ganzzahl sein', en: 'Height must be an integer', es: 'La altura debe ser un número entero' }))
+    .min(100, tx({ de: 'Höhe muss mindestens 100px sein', en: 'Height must be at least 100px', es: 'La altura debe ser de al menos 100px' }))
+    .max(8192, tx({ de: 'Höhe darf maximal 8192px sein', en: 'Height may be at most 8192px', es: 'La altura puede ser de máximo 8192px' })),
   fitMode: z.enum({cover: 'cover', contain: 'contain', pad: 'pad', smart: 'smart'}, {
-    error: 'FitMode muss cover, contain, pad oder smart sein'
+    error: tx({ de: 'FitMode muss cover, contain, pad oder smart sein', en: 'FitMode must be cover, contain, pad or smart', es: 'FitMode debe ser cover, contain, pad o smart' })
   }),
   sizeLimitMb: z.number()
-    .int('Größenlimit muss eine Ganzzahl sein')
-    .min(1, 'Größenlimit muss mindestens 1 MB sein')
-    .max(4000, 'Größenlimit darf maximal 4000 MB sein'),
+    .int(tx({ de: 'Größenlimit muss eine Ganzzahl sein', en: 'Size limit must be an integer', es: 'El límite de tamaño debe ser un número entero' }))
+    .min(1, tx({ de: 'Größenlimit muss mindestens 1 MB sein', en: 'Size limit must be at least 1 MB', es: 'El límite de tamaño debe ser de al menos 1 MB' }))
+    .max(4000, tx({ de: 'Größenlimit darf maximal 4000 MB sein', en: 'Size limit may be at most 4000 MB', es: 'El límite de tamaño puede ser de máximo 4000 MB' })),
   type: z.enum({image: 'image', video: 'video'}, {
-    error: 'Typ muss image oder video sein'
+    error: tx({ de: 'Typ muss image oder video sein', en: 'Type must be image or video', es: 'El tipo debe ser image o video' })
   }),
 
   // Optional fields
   background: z.string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, 'Hintergrund muss ein HEX-Farbcode sein (z.B. #000000)')
+    .regex(/^#[0-9A-Fa-f]{6}$/, tx({ de: 'Hintergrund muss ein HEX-Farbcode sein (z.B. #000000)', en: 'Background must be a HEX color code (e.g. #000000)', es: 'El fondo debe ser un código de color HEX (p. ej. #000000)' }))
     .optional(),
   
   safeMargins: z.object({
@@ -66,7 +67,7 @@ export const mediaProfileConfigSchema = z.object({
     return Math.abs(calculatedRatio - expectedRatio) <= tolerance;
   },
   {
-    message: 'Aspect Ratio stimmt nicht mit width:height überein (Toleranz: ±1px)',
+    message: tx({ de: 'Aspect Ratio stimmt nicht mit width:height überein (Toleranz: ±1px)', en: 'Aspect ratio does not match width:height (tolerance: ±1px)', es: 'La relación de aspecto no coincide con width:height (tolerancia: ±1px)' }),
     path: ['aspect']
   }
 ).refine(
@@ -78,7 +79,7 @@ export const mediaProfileConfigSchema = z.object({
     return true;
   },
   {
-    message: 'Video-Typ benötigt video-Konfiguration',
+    message: tx({ de: 'Video-Typ benötigt video-Konfiguration', en: 'Video type requires video configuration', es: 'El tipo video requiere configuración de video' }),
     path: ['video']
   }
 );
@@ -94,8 +95,8 @@ export const mediaProfileSchema = z.object({
   id: z.string().uuid().optional(),
   workspace_id: z.string().uuid(),
   name: z.string()
-    .min(1, 'Name ist erforderlich')
-    .max(100, 'Name darf maximal 100 Zeichen haben'),
+    .min(1, tx({ de: 'Name ist erforderlich', en: 'Name is required', es: 'El nombre es obligatorio' }))
+    .max(100, tx({ de: 'Name darf maximal 100 Zeichen haben', en: 'Name may be at most 100 characters', es: 'El nombre puede tener máximo 100 caracteres' })),
   platform: z.enum(['instagram', 'tiktok', 'youtube', 'x', 'facebook', 'linkedin']),
   type: z.enum(['image', 'video']),
   config: mediaProfileConfigSchema,

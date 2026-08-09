@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
 const ACCEPTED_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm'];
@@ -42,12 +43,12 @@ export default function SceneMediaUpload({
       // Reject images explicitly — they belong in the AI reference image slot
       if (isImage) {
         toast.error(
-          'Bitte Video-Datei wählen — Bilder gehören zur KI-Referenz (im KI-Tab unter dem Prompt).'
+          tx({ de: 'Bitte Video-Datei wählen — Bilder gehören zur KI-Referenz (im KI-Tab unter dem Prompt).', en: 'Please select a video file — images belong in the AI reference slot (in the AI tab under the prompt).', es: 'Selecciona un archivo de video — las imágenes van en la referencia de IA (en la pestaña IA, debajo del prompt).' })
         );
         return;
       }
       if (!isVideo) {
-        toast.error('Nicht unterstütztes Format. Bitte MP4, MOV oder WEBM wählen.');
+        toast.error(tx({ de: 'Nicht unterstütztes Format. Bitte MP4, MOV oder WEBM wählen.', en: 'Unsupported format. Please choose MP4, MOV, or WEBM.', es: 'Formato no compatible. Elige MP4, MOV o WEBM.' }));
         return;
       }
       if (file.size > MAX_VIDEO_BYTES) {
@@ -86,7 +87,7 @@ export default function SceneMediaUpload({
         setProgress(85);
 
         const { data: pub } = supabase.storage.from('composer-uploads').getPublicUrl(fileName);
-        if (!pub?.publicUrl) throw new Error('Public URL konnte nicht erstellt werden');
+        if (!pub?.publicUrl) throw new Error(tx({ de: 'Public URL konnte nicht erstellt werden', en: 'Public URL could not be created', es: 'No se pudo crear la URL pública' }));
 
         setProgress(100);
         onChange(pub.publicUrl, 'video');

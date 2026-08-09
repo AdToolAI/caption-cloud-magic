@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * DirectorQualityCoach — gold-rimmed score badge + collapsible coach tips.
  *
@@ -115,7 +116,7 @@ export default function DirectorQualityCoach({ scene, characters, language = 'en
     result.tips.find((t) => t.severity === 'warn') ??
     null;
   const allClearLabel =
-    language === 'de' ? 'Alles bereit — keine offenen Notizen vom Regisseur.'
+    language === 'de' ? tx({ de: 'Alles bereit — keine offenen Notizen vom Regisseur.', en: 'All set — no open notes from the director.', es: 'Todo listo — no hay notas pendientes del director.' })
     : language === 'es' ? 'Todo listo — sin notas pendientes del director.'
     : 'All clear — no open notes from the director.';
 

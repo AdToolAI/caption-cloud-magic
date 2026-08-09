@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, MessageSquare, Sparkles, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { tx } from "@/lib/i18nText";
 
 interface BrandVoiceAnalyzerProps {
   brandKitId: string;
@@ -113,7 +114,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
                 id={`sample-${index}`}
                 value={sample}
                 onChange={(e) => updateSample(index, e.target.value)}
-                placeholder="Füge einen typischen Text/Caption deiner Marke ein (mind. 20 Zeichen)..."
+                placeholder={tx({ de: "Füge einen typischen Text/Caption deiner Marke ein (mind. 20 Zeichen)...", en: "Add a typical text/caption from your brand (min. 20 characters)...", es: "Añade un texto/leyenda típico de tu marca (mín. 20 caracteres)..." })}
                 rows={4}
                 className="resize-none"
               />

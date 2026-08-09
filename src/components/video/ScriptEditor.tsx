@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,7 @@ export const ScriptEditor = ({
     if (!value.trim()) {
       toast({
         title: "Kein Text vorhanden",
-        description: "Bitte gib zuerst einen Text ein.",
+        description: tx({ de: "Bitte gib zuerst einen Text ein.", en: "Please enter text first.", es: "Por favor, introduce un texto primero." }),
         variant: "destructive",
       });
       return;
@@ -63,7 +64,7 @@ export const ScriptEditor = ({
       console.error('Optimization error:', error);
       toast({
         title: "Fehler",
-        description: "Skript konnte nicht optimiert werden.",
+        description: tx({ de: "Skript konnte nicht optimiert werden.", en: "Script could not be optimized.", es: "No se pudo optimizar el guion." }),
         variant: "destructive",
       });
     } finally {
@@ -99,7 +100,7 @@ export const ScriptEditor = ({
           id="script"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Gib hier deinen Video-Skript ein..."
+          placeholder={tx({ de: "Gib hier deinen Video-Skript ein...", en: "Enter your video script here...", es: "Introduce tu guion de video aquí..." })}
           className="min-h-[200px] font-mono text-sm"
           maxLength={maxLength}
         />

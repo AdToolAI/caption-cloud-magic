@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,7 +47,7 @@ export function useCollaborations() {
       skills_needed: skillsNeeded,
     });
     if (error) {
-      toast.error("Post konnte nicht erstellt werden");
+      toast.error(tx({ de: "Post konnte nicht erstellt werden", en: "Could not create post", es: "No se pudo crear la publicación" }));
       console.error(error);
       return;
     }
@@ -61,7 +62,7 @@ export function useCollaborations() {
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", postId);
     if (error) {
-      toast.error("Status konnte nicht aktualisiert werden");
+      toast.error(tx({ de: "Status konnte nicht aktualisiert werden", en: "Could not update status", es: "No se pudo actualizar el estado" }));
       return;
     }
     toast.success("Status aktualisiert!");

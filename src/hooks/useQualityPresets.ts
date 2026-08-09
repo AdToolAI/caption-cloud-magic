@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -38,7 +39,7 @@ export const useQualityPresets = () => {
       setPresets(data as unknown as QualityPreset[]);
     } catch (error) {
       console.error('Error fetching quality presets:', error);
-      toast.error('Fehler beim Laden der Quality Presets');
+      toast.error(tx({ de: 'Fehler beim Laden der Quality Presets', en: 'Error loading quality presets', es: 'Error al cargar los preajustes de calidad' }));
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ export const useQualityPresets = () => {
       return data;
     } catch (error: any) {
       console.error('Error creating preset:', error);
-      toast.error(error.message || 'Fehler beim Erstellen des Presets');
+      toast.error(error.message || tx({ de: 'Fehler beim Erstellen des Presets', en: 'Error creating preset', es: 'Error al crear el preajuste' }));
       return null;
     }
   };
@@ -91,7 +92,7 @@ export const useQualityPresets = () => {
       return true;
     } catch (error: any) {
       console.error('Error updating preset:', error);
-      toast.error(error.message || 'Fehler beim Aktualisieren des Presets');
+      toast.error(error.message || tx({ de: 'Fehler beim Aktualisieren des Presets', en: 'Error updating preset', es: 'Error al actualizar el preajuste' }));
       return false;
     }
   };
@@ -110,7 +111,7 @@ export const useQualityPresets = () => {
       return true;
     } catch (error: any) {
       console.error('Error deleting preset:', error);
-      toast.error(error.message || 'Fehler beim Löschen des Presets');
+      toast.error(error.message || tx({ de: 'Fehler beim Löschen des Presets', en: 'Error deleting preset', es: 'Error al eliminar el preajuste' }));
       return false;
     }
   };

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -213,7 +214,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     } catch (error: any) {
       console.error('Save to library error:', error);
       const errorMsg = error?.message || '';
-      if (errorMsg.includes('nicht mehr verfügbar') || errorMsg.includes('abgelaufen') || errorMsg.includes('not reachable') || errorMsg.includes('expired')) {
+      if (errorMsg.includes(tx({ de: 'nicht mehr verfügbar', en: 'no longer available', es: 'ya no disponible' })) || errorMsg.includes('abgelaufen') || errorMsg.includes('not reachable') || errorMsg.includes('expired')) {
         sonnerToast.error(t('aiVid.videoExpired'), { description: t('aiVid.videoExpiredDesc') });
       } else {
         sonnerToast.error(t('aiVid.saveFailed'), { description: errorMsg || t('aiVid.saveFailedDesc') });

@@ -9,6 +9,7 @@ import type {
   GlobalTextOverlay,
 } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
+import { tx } from '@/lib/i18nText';
 import { PreviewTextOverlayLayer } from './PreviewTextOverlayLayer';
 import type { SceneAudioClip } from './SoundDesignPanel';
 
@@ -1258,22 +1259,22 @@ export default function ComposerSequencePreview({
               const codeMatch = err.match(/\[([a-z][a-z0-9_]+)\]/i);
               const syncCode = codeMatch ? codeMatch[1] : null;
               const SYNC_CODE_LABELS: Record<string, string> = {
-                generation_timeout: 'Sync.so Timeout — bitte „Lip-Sync neu rendern"',
-                generation_pipeline_failed: 'Sync.so Pipeline-Fehler — bitte „Lip-Sync neu rendern"',
-                generation_unhandled_error: 'Sync.so unerwarteter Fehler — bitte „Lip-Sync neu rendern"',
-                generation_database_error: 'Sync.so DB-Fehler — bitte „Lip-Sync neu rendern"',
-                generation_infra_storage_error: 'Sync.so Storage-Fehler — bitte „Lip-Sync neu rendern"',
-                generation_infra_resource_exhausted: 'Sync.so überlastet — bitte „Lip-Sync neu rendern"',
-                generation_infra_service_unavailable: 'Sync.so nicht erreichbar — bitte „Lip-Sync neu rendern"',
-                generation_input_audio_invalid: 'Audio-Metadaten ungültig — Voiceover neu generieren',
-                generation_media_metadata_missing: 'Audio-/Video-Metadaten fehlen — Voiceover neu generieren',
-                generation_audio_length_exceeded: 'Audio länger als 300s — Dialog kürzen',
-                generation_text_length_exceeded: 'Script zu lang (>5000 Zeichen) — kürzen',
-                generation_unsupported_model: 'Sync.so Modell nicht verfügbar',
-                generation_audio_missing: 'Voiceover fehlt — Dialog neu generieren',
-                generation_video_missing: 'Quell-Video fehlt — Szene neu rendern',
-                generation_input_validation_failed: 'Sync.so hat Input abgelehnt — Format prüfen',
-                generation_internal_auth: 'Sync.so Auth-Fehler — Support kontaktieren',
+                generation_timeout: tx({ de: 'Sync.so Timeout — bitte „Lip-Sync neu rendern"', en: 'Sync.so timeout — please click "Re-render lip-sync"', es: 'Tiempo de espera de Sync.so agotado — haz clic en "Volver a renderizar lip-sync"' }),
+                generation_pipeline_failed: tx({ de: 'Sync.so Pipeline-Fehler — bitte „Lip-Sync neu rendern"', en: 'Sync.so pipeline error — please click "Re-render lip-sync"', es: 'Error de pipeline de Sync.so — haz clic en "Volver a renderizar lip-sync"' }),
+                generation_unhandled_error: tx({ de: 'Sync.so unerwarteter Fehler — bitte „Lip-Sync neu rendern"', en: 'Sync.so unexpected error — please click "Re-render lip-sync"', es: 'Error inesperado de Sync.so — haz clic en "Volver a renderizar lip-sync"' }),
+                generation_database_error: tx({ de: 'Sync.so DB-Fehler — bitte „Lip-Sync neu rendern"', en: 'Sync.so DB error — please click "Re-render lip-sync"', es: 'Error de BD de Sync.so — haz clic en "Volver a renderizar lip-sync"' }),
+                generation_infra_storage_error: tx({ de: 'Sync.so Storage-Fehler — bitte „Lip-Sync neu rendern"', en: 'Sync.so storage error — please click "Re-render lip-sync"', es: 'Error de almacenamiento de Sync.so — haz clic en "Volver a renderizar lip-sync"' }),
+                generation_infra_resource_exhausted: tx({ de: 'Sync.so überlastet — bitte „Lip-Sync neu rendern"', en: 'Sync.so overloaded — please click "Re-render lip-sync"', es: 'Sync.so sobrecargado — haz clic en "Volver a renderizar lip-sync"' }),
+                generation_infra_service_unavailable: tx({ de: 'Sync.so nicht erreichbar — bitte „Lip-Sync neu rendern"', en: 'Sync.so unreachable — please click "Re-render lip-sync"', es: 'Sync.so no disponible — haz clic en "Volver a renderizar lip-sync"' }),
+                generation_input_audio_invalid: tx({ de: 'Audio-Metadaten ungültig — Voiceover neu generieren', en: 'Invalid audio metadata — regenerate voiceover', es: 'Metadatos de audio no válidos — regenerar voiceover' }),
+                generation_media_metadata_missing: tx({ de: 'Audio-/Video-Metadaten fehlen — Voiceover neu generieren', en: 'Audio/video metadata missing — regenerate voiceover', es: 'Faltan metadatos de audio/video — regenerar voiceover' }),
+                generation_audio_length_exceeded: tx({ de: 'Audio länger als 300s — Dialog kürzen', en: 'Audio longer than 300s — shorten dialog', es: 'Audio de más de 300s — acortar diálogo' }),
+                generation_text_length_exceeded: tx({ de: 'Script zu lang (>5000 Zeichen) — kürzen', en: 'Script too long (>5000 characters) — shorten', es: 'Guion demasiado largo (>5000 caracteres) — acortar' }),
+                generation_unsupported_model: tx({ de: 'Sync.so Modell nicht verfügbar', en: 'Sync.so model not available', es: 'Modelo de Sync.so no disponible' }),
+                generation_audio_missing: tx({ de: 'Voiceover fehlt — Dialog neu generieren', en: 'Voiceover missing — regenerate dialog', es: 'Falta el voiceover — regenerar diálogo' }),
+                generation_video_missing: tx({ de: 'Quell-Video fehlt — Szene neu rendern', en: 'Source video missing — re-render scene', es: 'Falta el video de origen — volver a renderizar la escena' }),
+                generation_input_validation_failed: tx({ de: 'Sync.so hat Input abgelehnt — Format prüfen', en: 'Sync.so rejected input — check format', es: 'Sync.so rechazó la entrada — verificar formato' }),
+                generation_internal_auth: tx({ de: 'Sync.so Auth-Fehler — Support kontaktieren', en: 'Sync.so auth error — contact support', es: 'Error de autenticación de Sync.so — contactar con soporte' }),
               };
               const willAutoRetry =
                 err === 'multi_speaker_scene_routed_to_single_lipsync' ||
@@ -1282,18 +1283,18 @@ export default function ComposerSequencePreview({
                 err.startsWith('auto-retry:');
               const friendly =
                 syncCode && SYNC_CODE_LABELS[syncCode] ? SYNC_CODE_LABELS[syncCode]
-                : err.startsWith('anchor_identity_clone_detected') || err.startsWith('anchor_identity_duplicate_detected') ? 'Charakter wurde doppelt erkannt — bitte „Clip + Lip-Sync neu rendern" klicken'
-                : err.startsWith('anchor_extra_person_detected') ? 'Anchor enthält eine zusätzliche Person — bitte „Clip + Lip-Sync neu rendern" klicken'
-                : err.startsWith('anchor_identity_missing_detected') ? 'Ein Charakter fehlt im Anchor — bitte „Clip + Lip-Sync neu rendern" klicken'
-                : err.startsWith('anchor_identity_ambiguous') ? 'Anchor-Identitäten unklar — bitte „Clip + Lip-Sync neu rendern" klicken'
-                : err.startsWith('anchor_missing_speakers') ? 'Anchor zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken'
-                : err.startsWith('source_clip_missing_speakers') ? 'Video zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken'
+                : err.startsWith('anchor_identity_clone_detected') || err.startsWith('anchor_identity_duplicate_detected') ? tx({ de: 'Charakter wurde doppelt erkannt — bitte „Clip + Lip-Sync neu rendern" klicken', en: 'Character detected twice — please click "Re-render clip + lip-sync"', es: 'Personaje detectado dos veces — haz clic en "Volver a renderizar clip + lip-sync"' })
+                : err.startsWith('anchor_extra_person_detected') ? tx({ de: 'Anchor enthält eine zusätzliche Person — bitte „Clip + Lip-Sync neu rendern" klicken', en: 'Anchor contains an extra person — please click "Re-render clip + lip-sync"', es: 'El anchor contiene una persona adicional — haz clic en "Volver a renderizar clip + lip-sync"' })
+                : err.startsWith('anchor_identity_missing_detected') ? tx({ de: 'Ein Charakter fehlt im Anchor — bitte „Clip + Lip-Sync neu rendern" klicken', en: 'A character is missing from the anchor — please click "Re-render clip + lip-sync"', es: 'Falta un personaje en el anchor — haz clic en "Volver a renderizar clip + lip-sync"' })
+                : err.startsWith('anchor_identity_ambiguous') ? tx({ de: 'Anchor-Identitäten unklar — bitte „Clip + Lip-Sync neu rendern" klicken', en: 'Anchor identities unclear — please click "Re-render clip + lip-sync"', es: 'Identidades del anchor poco claras — haz clic en "Volver a renderizar clip + lip-sync"' })
+                : err.startsWith('anchor_missing_speakers') ? tx({ de: 'Anchor zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken', en: 'Anchor does not show all speakers — please click "Re-render clip + lip-sync"', es: 'El anchor no muestra a todos los hablantes — haz clic en "Volver a renderizar clip + lip-sync"' })
+                : err.startsWith('source_clip_missing_speakers') ? tx({ de: 'Video zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken', en: 'Video does not show all speakers — please click "Re-render clip + lip-sync"', es: 'El video no muestra a todos los hablantes — haz clic en "Volver a renderizar clip + lip-sync"' })
                 : err.includes('Sync.so lieferte keinen error_code')
-                  ? '3-Sprecher-Szene: Sync.so meldete einen generischen Fehler — Audio-Trim wurde versucht. Bitte „Lip-Sync neu rendern" klicken'
-                  : err.startsWith('syncso_') ? `Sync.so Providerfehler — bitte „Lip-Sync neu rendern" klicken`
+                  ? tx({ de: '3-Sprecher-Szene: Sync.so meldete einen generischen Fehler — Audio-Trim wurde versucht. Bitte „Lip-Sync neu rendern" klicken', en: '3-speaker scene: Sync.so reported a generic error — audio trim was attempted. Please click "Re-render lip-sync"', es: 'Escena de 3 hablantes: Sync.so informó un error genérico — se intentó recortar el audio. Haz clic en "Volver a renderizar lip-sync"' })
+                  : err.startsWith('syncso_') ? tx({ de: 'Sync.so Providerfehler — bitte „Lip-Sync neu rendern" klicken', en: 'Sync.so provider error — please click "Re-render lip-sync"', es: 'Error del proveedor Sync.so — haz clic en "Volver a renderizar lip-sync"' })
                 : willAutoRetry
-                  ? 'Lip-Sync fehlgeschlagen — wird neu angestoßen'
-                  : 'Lip-Sync fehlgeschlagen — bitte „Lip-Sync neu rendern" klicken';
+                  ? tx({ de: 'Lip-Sync fehlgeschlagen — wird neu angestoßen', en: 'Lip-sync failed — retrying automatically', es: 'Lip-sync falló — reintentando automáticamente' })
+                  : tx({ de: 'Lip-Sync fehlgeschlagen — bitte „Lip-Sync neu rendern" klicken', en: 'Lip-sync failed — please click "Re-render lip-sync"', es: 'Lip-sync falló — haz clic en "Volver a renderizar lip-sync"' });
 
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-red-500/90 backdrop-blur text-[11px] text-white font-semibold flex items-center gap-1.5 z-20" title={syncCode ? `Sync.so error_code: ${syncCode}` : err.slice(0, 200)}>

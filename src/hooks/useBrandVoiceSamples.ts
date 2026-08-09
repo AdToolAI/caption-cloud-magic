@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -56,7 +57,7 @@ export function useBrandVoiceSamples(brandKitId: string | null | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["brand-voice-samples", brandKitId] });
     },
-    onError: (e: any) => toast({ title: "Konnte nicht speichern", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: tx({ de: "Konnte nicht speichern", en: "Could not save", es: "No se pudo guardar" }), description: e.message, variant: "destructive" }),
   });
 
   const remove = useMutation({

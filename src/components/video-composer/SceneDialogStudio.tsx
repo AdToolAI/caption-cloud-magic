@@ -66,6 +66,7 @@ import {
 } from '@/lib/shotDirector/spawnCoverageScenes';
 import type { ShotSelection } from '@/config/shotDirector';
 import { Sparkles as SparklesIcon, Play, Clapperboard } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 import type {
   ComposerCharacter,
   ComposerScene,
@@ -225,7 +226,7 @@ const T = {
   de: {
     title: 'Szenen-Skript',
     subtitle: 'Schreibe ein Drehbuch — der Dialog läuft als Voiceover in DIESER Szene.',
-    subtitleMono: 'Monolog — der Charakter spricht zur Kamera. Läuft als Voiceover in dieser Szene.',
+    subtitleMono: tx({ de: 'Monolog — der Charakter spricht zur Kamera. Läuft als Voiceover in dieser Szene.', en: 'Monologue — the character speaks to the camera. Runs as a voiceover in this scene.', es: 'Monólogo — el personaje habla a la cámara. Se reproduce como voz en off en esta escena.' }),
     script: 'Drehbuch',
     voices: 'Stimme pro Sprecher',
     pickVoice: 'Stimme wählen',
@@ -242,9 +243,9 @@ const T = {
     success: (n: number) => `${n} Lip-Sync-Clip${n === 1 ? '' : 's'} werden generiert (1–3 Min).`,
     successInline: (n: number) => `${n} Voiceover-Block${n === 1 ? '' : 'blöcke'} an diese Szene gehängt.`,
     failed: 'Generierung fehlgeschlagen',
-    aiFailed: 'KI-Skript konnte nicht erstellt werden',
-    srsLabel: 'Erweitert: Stattdessen als Voiceover über eine gemeinsame Szene legen',
-    srsHint: 'Standard bei mehreren Sprechern mit Portrait: jeder Sprecher bekommt seinen eigenen Lip-Sync-Cut. Schalter aktivieren, wenn du nur eine Gruppen-Szene mit Voiceover willst.',
+    aiFailed: tx({ de: 'KI-Skript konnte nicht erstellt werden', en: 'AI script could not be created', es: 'No se pudo crear el script de IA' }),
+    srsLabel: tx({ de: 'Erweitert: Stattdessen als Voiceover über eine gemeinsame Szene legen', en: 'Advanced: Instead, layer as a voiceover over a shared scene', es: 'Avanzado: En su lugar, superponer como voz en off sobre una escena compartida' }),
+    srsHint: tx({ de: 'Standard bei mehreren Sprechern mit Portrait: jeder Sprecher bekommt seinen eigenen Lip-Sync-Cut. Schalter aktivieren, wenn du nur eine Gruppen-Szene mit Voiceover willst.', en: 'Standard for multiple speakers with portrait: each speaker gets their own lip-sync cut. Activate the switch if you only want a group scene with voiceover.', es: 'Estándar para múltiples oradores con retrato: cada orador obtiene su propio corte de sincronización labial. Activa el interruptor si solo quieres una escena de grupo con voz en off.' }),
     close: 'Schließen',
     continuityLocked: 'Continuity gesperrt',
     continuityInherited: (n: number) => `Continuity erbt von Szene ${n}`,
@@ -1301,7 +1302,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               : 'Lip-Sync is off',
         description:
           language === 'de'
-            ? 'Aktiviere den Dialog & Lip-Sync-Schalter, um das Studio zu starten — oder nutze den regulären "Generieren"-Button für einen reinen Bild-Render ohne Sync.so.'
+            ? tx({ de: 'Aktiviere den Dialog & Lip-Sync-Schalter, um das Studio zu starten — oder nutze den regulären "Generieren"-Button für einen reinen Bild-Render ohne Sync.so.', en: 'Activate the dialog & lip-sync switch to start the studio — or use the regular "Generate" button for a pure image render without Sync.so.', es: 'Activa el interruptor de diálogo y sincronización labial para iniciar el estudio, o usa el botón "Generar" normal para un render de imagen puro sin Sync.so.' })
             : language === 'es'
               ? 'Activa el interruptor de Diálogo & Lip-Sync para usar el Studio — o pulsa "Generar" para un render solo de imagen.'
               : 'Turn the Dialog & Lip-Sync switch on to use the Studio — or use the standard Generate button for an image-only render.',
@@ -1760,7 +1761,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           };
           toast({
             title: 'Dialog länger als Szene',
-            description: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`,
+            description:
+              language === 'de'
+                ? `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`
+                : language === 'es'
+                ? `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} dura ${masterDuration}s. Sync.so recorta el final (cut_off). Para el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.`
+                : `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts off the end (cut_off). For the full dialog, increase scene duration or pick a provider with a larger duration window.`,
           });
         }
 
@@ -1806,7 +1812,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             onUpdate({ clipStatus: 'pending', pipelineState: 'idle' });
             toast({
               title: t.failed,
-              description: 'Projekt konnte nicht gespeichert werden — bitte erneut versuchen.',
+              description: tx({ de: 'Projekt konnte nicht gespeichert werden — bitte erneut versuchen.', en: 'Project could not be saved — please try again.', es: 'No se pudo guardar el proyecto — inténtalo de nuevo.' }),
               variant: 'destructive',
             });
             return;
@@ -1888,7 +1894,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       const degraded = isEdgeRuntimeDegraded(e);
       const description = degraded
         ? language === 'de'
-          ? 'Voiceover-Service kurzzeitig nicht erreichbar (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Bitte in ~30 s erneut auf „Clip generieren mit Voiceover" klicken — bereits erzeugte Voiceovers werden aus dem Cache wiederverwendet.'
+          ? tx({ de: 'Voiceover-Service kurzzeitig nicht erreichbar (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Bitte in ~30 s erneut auf „Clip generieren mit Voiceover" klicken — bereits erzeugte Voiceovers werden aus dem Cache wiederverwendet.', en: 'Voiceover service temporarily unavailable (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Please click "Generate clip with voiceover" again in ~30 s — already generated voiceovers will be reused from the cache.', es: 'Servicio de voz en off temporalmente no disponible (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Por favor, haz clic en "Generar clip con voz en off" de nuevo en ~30 s — las voces en off ya generadas se reutilizarán de la caché.' })
           : language === 'es'
           ? 'Servicio de voiceover temporalmente no disponible. Vuelve a intentarlo en ~30 s — los voiceovers ya generados se reutilizan.'
           : 'Voiceover service briefly unavailable (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Please click "Generate clip with voiceover" again in ~30s — already-generated voiceovers are cached.'
@@ -1925,7 +1931,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : 'Voice per speaker missing',
         description:
           language === 'de'
-            ? 'Bitte unten eine Stimme für jeden Sprecher wählen, dann erneut auf „Splitten" klicken.'
+            ? tx({ de: 'Bitte unten eine Stimme für jeden Sprecher wählen, dann erneut auf „Splitten" klicken.', en: 'Please select a voice for each speaker below, then click "Split" again.', es: 'Por favor, selecciona una voz para cada orador a continuación, luego haz clic en "Dividir" de nuevo.' })
             : language === 'es'
             ? 'Selecciona una voz para cada hablante y vuelve a hacer clic en "Dividir".'
             : 'Pick a voice for every speaker, then click "Split" again.',
@@ -1953,7 +1959,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-300" />
           <div className="leading-snug">
             {language === 'de'
-              ? 'Kein Cast-Charakter aufgelöst. Skript ist editierbar, aber für Voiceover/Lip-Sync bitte oben unter „Cast" einen Charakter aus der Avatar-Library zuweisen.'
+              ? tx({ de: 'Kein Cast-Charakter aufgelöst. Skript ist editierbar, aber für Voiceover/Lip-Sync bitte oben unter „Cast" einen Charakter aus der Avatar-Library zuweisen.', en: 'No cast character resolved. Script is editable, but for voiceover/lip-sync please assign a character from the avatar library under "Cast" above.', es: 'Ningún personaje del elenco resuelto. El script es editable, pero para voz en off/sincronización labial, asigna un personaje de la biblioteca de avatares en "Elenco" arriba.' })
               : language === 'es'
               ? 'Sin reparto resuelto. Puedes editar el guion, pero asigna un personaje arriba en "Cast" para generar voz/lip-sync.'
               : 'No cast character resolved. Script is editable, but assign a character above under "Cast" to generate voiceover/lip-sync.'}
@@ -2440,7 +2446,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : `⚡ Lip-sync via Sync.so sync-3 (Fast Dialog) — mouth matches the audio${speakers.length > 1 ? ` · ${speakers.length} speakers in one plate` : ''} (~€0.20/s)`;
         } else {
           label = language === 'de'
-            ? '🔊 Audio-Overlay (kein Lip-Sync möglich ohne Cast-Portrait)'
+            ? tx({ de: '🔊 Audio-Overlay (kein Lip-Sync möglich ohne Cast-Portrait)', en: '🔊 Audio overlay (no lip-sync possible without cast portrait)', es: '🔊 Superposición de audio (no es posible la sincronización labial sin retrato del elenco)' })
             : language === 'es'
             ? '🔊 Solo audio (sin retrato, no hay lip-sync posible)'
             : '🔊 Audio overlay (no lip-sync possible without a cast portrait)';

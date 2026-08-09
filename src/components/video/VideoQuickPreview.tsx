@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -227,7 +228,7 @@ export const VideoQuickPreview = ({
         setLoading(false);
       } catch (err) {
         console.error('Preview initialization error:', err);
-        setError(err instanceof Error ? err.message : 'Fehler beim Laden der Vorschau');
+        setError(err instanceof Error ? err.message : tx({ de: 'Fehler beim Laden der Vorschau', en: 'Error loading preview', es: 'Error al cargar la vista previa' }));
         setLoading(false);
       }
     };

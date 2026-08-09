@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import type { Language } from "@/lib/translations";
 import videoHero from "@/assets/landing/ai-arsenal/video-hero.jpg";
 import videoKling from "@/assets/landing/ai-arsenal/video-kling.jpg";
@@ -121,7 +122,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Kling Omni", "Kling Omni", "Kling Omni"],
     [
       "Native lip-sync in the model itself — no post-sync needed.",
-      "Natives Lip-Sync direkt im Modell — kein Nachsyncen mehr.",
+      tx({ de: "Natives Lip-Sync direkt im Modell — kein Nachsyncen mehr.", en: "Native lip-sync directly in the model — no more re-syncing.", es: "Sincronización labial nativa directamente en el modelo, sin necesidad de volver a sincronizar." }),
       "Lip-sync nativo dentro del propio modelo — sin post-sync.",
     ],
     [T2V, I2V, NATIVE_LIP, P1080],
@@ -393,7 +394,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Style Reference", "Style Reference", "Referencia de Estilo"],
     [
       "Lock your brand look across renders.",
-      "Fixiere deinen Brand-Look über alle Renders.",
+      tx({ de: "Fixiere deinen Brand-Look über alle Renders.", en: "Fix your brand look across all renders.", es: "Fija el aspecto de tu marca en todos los renders." }),
       "Fija el look de marca en todos los renders.",
     ],
     [STYLE, CONS],
@@ -455,7 +456,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Voice Studio Clone", "Voice Studio Klon", "Clon Voice Studio"],
     [
       "Clone your own voice from a WhatsApp note.",
-      "Klone deine eigene Stimme aus einer WhatsApp-Notiz.",
+      tx({ de: "Klone deine eigene Stimme aus einer WhatsApp-Notiz.", en: "Clone your own voice from a WhatsApp note.", es: "Clona tu propia voz desde una nota de WhatsApp." }),
       "Clona tu propia voz desde una nota de WhatsApp.",
     ],
     [CLONE, VOICE],
@@ -477,7 +478,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Brand Character Lock", "Brand-Character-Lock", "Anclaje de Personaje"],
     [
       "Persistent characters across every studio.",
-      "Persistente Charaktere über alle Studios hinweg.",
+      tx({ de: "Persistente Charaktere über alle Studios hinweg.", en: "Persistent characters across all studios.", es: "Personajes persistentes en todos los estudios." }),
       "Personajes persistentes en todos los estudios.",
     ],
     [CONS],

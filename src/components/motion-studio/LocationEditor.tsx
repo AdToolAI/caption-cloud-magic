@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -83,7 +84,7 @@ export default function LocationEditor({
     async (file: File | null) => {
       if (!file) return;
       if (!ACCEPTED.includes(file.type)) {
-        toast.error('Bitte JPG, PNG oder WEBP wählen.');
+        toast.error(tx({ de: 'Bitte JPG, PNG oder WEBP wählen.', en: 'Please choose JPG, PNG or WEBP.', es: 'Por favor, elige JPG, PNG o WEBP.' }));
         return;
       }
       if (file.size > MAX_BYTES) {
@@ -312,7 +313,7 @@ export default function LocationEditor({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {location ? 'Änderungen speichern' : 'Location anlegen'}
+            {location ? tx({ de: 'Änderungen speichern', en: 'Save changes', es: 'Guardar cambios' }) : 'Location anlegen'}
           </Button>
         </div>
       </DialogContent>

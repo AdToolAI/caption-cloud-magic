@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -32,9 +33,9 @@ export function LayoutStep() {
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="font-display text-3xl tracking-tight">Wähle deine Richtung</h2>
+            <h2 className="font-display text-3xl tracking-tight">{tx({ de: "Wähle deine Richtung", en: "Choose your direction", es: "Elige tu dirección" })}</h2>
             <p className="text-sm text-muted-foreground">
-              {s.imageBusy ? "Motiv wird gerendert — die Layouts stehen schon." : "Alles bleibt danach frei editierbar."}
+              {s.imageBusy ? tx({ de: "Motiv wird gerendert — die Layouts stehen schon.", en: "Motif is rendering — layouts are already available.", es: "El motivo se está renderizando — los diseños ya están disponibles." }) : "Alles bleibt danach frei editierbar."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

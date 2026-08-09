@@ -12,6 +12,7 @@ import { Check, Sparkles, Clapperboard, ArrowRight } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { NicheStep } from "@/components/onboarding/NicheStep";
 import { PlatformStep } from "@/components/onboarding/PlatformStep";
+import { tx } from "@/lib/i18nText";
 
 /**
  * Studio-Einzug — „Ein Creator. Ein ganzes Studio."
@@ -147,7 +148,7 @@ export default function Onboarding() {
       setCurrentStep("launch");
     } catch (err) {
       console.error("Setup error:", err);
-      toast.error("Dein Studio konnte nicht eingerichtet werden. Bitte versuche es erneut.");
+      toast.error(tx({ de: "Dein Studio konnte nicht eingerichtet werden. Bitte versuche es erneut.", en: "Your studio could not be set up. Please try again.", es: "No se pudo configurar tu estudio. Inténtalo de nuevo." }));
     } finally {
       setLoading(false);
     }
@@ -178,12 +179,12 @@ export default function Onboarding() {
             <span className="text-2xl font-bold">AdTool AI</span>
           </div>
           <CardTitle className="text-3xl">
-            {currentStep === "launch" ? "Dein Studio ist offen" : "Ein Creator. Ein ganzes Studio."}
+            {currentStep === "launch" ? tx({ de: "Dein Studio ist offen", en: "Your studio is open", es: "Tu estudio está abierto" }) : tx({ de: "Ein Creator. Ein ganzes Studio.", en: "One creator. A whole studio.", es: "Un creador. Todo un estudio." })}
           </CardTitle>
           <CardDescription>
             {currentStep === "launch"
-              ? "Deine erste Produktion steht bereit"
-              : `Studio-Setup — Schritt ${stepIndex + 1} von ${STEPS.length - 1}`}
+              ? tx({ de: "Deine erste Produktion steht bereit", en: "Your first production is ready", es: "Tu primera producción está lista" })
+              : tx({ de: `Studio-Setup — Schritt ${stepIndex + 1} von ${STEPS.length - 1}`, en: `Studio setup — step ${stepIndex + 1} of ${STEPS.length - 1}`, es: `Configuración del estudio — paso ${stepIndex + 1} de ${STEPS.length - 1}` })}
           </CardDescription>
 
           {currentStep !== "launch" && (
@@ -204,7 +205,7 @@ export default function Onboarding() {
           {/* Schritt 1: Sprache */}
           {currentStep === "language" && (
             <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-center">Wähle deine Sprache</h3>
+              <h3 className="text-xl font-semibold text-center">{tx({ de: "Wähle deine Sprache", en: "Choose your language", es: "Elige tu idioma" })}</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {languages.map((lang) => (
                   <Card
@@ -222,7 +223,7 @@ export default function Onboarding() {
                   </Card>
                 ))}
               </div>
-              <Button onClick={handleLanguageNext} className="w-full" size="lg">Weiter</Button>
+              <Button onClick={handleLanguageNext} className="w-full" size="lg">{tx({ de: "Weiter", en: "Next", es: "Siguiente" })}</Button>
             </div>
           )}
 
@@ -257,19 +258,19 @@ export default function Onboarding() {
           {/* Schritt 4: Look & Marke */}
           {currentStep === "brand" && (
             <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-center">Gib deinem Studio einen Namen</h3>
+              <h3 className="text-xl font-semibold text-center">{tx({ de: "Gib deinem Studio einen Namen", en: "Give your studio a name", es: "Ponle un nombre a tu estudio" })}</h3>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="brandName">Studio- bzw. Markenname</Label>
+                  <Label htmlFor="brandName">{tx({ de: "Studio- bzw. Markenname", en: "Studio or brand name", es: "Nombre del estudio o marca" })}</Label>
                   <Input
                     id="brandName"
-                    placeholder="Mein Studio"
+                    placeholder={tx({ de: "Mein Studio", en: "My Studio", es: "Mi Estudio" })}
                     value={brandName}
                     onChange={(e) => setBrandName(e.target.value)}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="brandColor">Signaturfarbe</Label>
+                  <Label htmlFor="brandColor">{tx({ de: "Signaturfarbe", en: "Signature color", es: "Color distintivo" })}</Label>
                   <div className="flex gap-4 items-center">
                     <Input
                       id="brandColor"
@@ -288,10 +289,10 @@ export default function Onboarding() {
               </div>
               <div className="flex gap-4">
                 <Button onClick={() => setCurrentStep("platforms")} variant="outline" size="lg" className="w-full">
-                  Zurück
+                  {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
                 </Button>
                 <Button onClick={handleFinishSetup} size="lg" className="w-full" disabled={loading || !brandName}>
-                  {loading ? "Studio wird eingerichtet..." : "Studio öffnen"}
+                  {loading ? tx({ de: "Studio wird eingerichtet...", en: "Setting up studio...", es: "Configurando estudio..." }) : tx({ de: "Studio öffnen", en: "Open studio", es: "Abrir estudio" })}
                 </Button>
               </div>
             </div>
@@ -307,19 +308,18 @@ export default function Onboarding() {
               </div>
               <div className="space-y-2">
                 <h3 className="text-xl font-semibold">
-                  {brandName || "Dein Studio"} ist bereit
+                  {brandName || tx({ de: "Dein Studio", en: "Your studio", es: "Tu estudio" })} {tx({ de: "ist bereit", en: "is ready", es: "está listo" })}
                 </h3>
                 <p className="text-muted-foreground">
-                  Wir haben eine erste Produktion für {niche || "deine Nische"} vorbereitet.
-                  Du musst sie nur noch starten — den Rest übernimmt dein Studio.
+                  {tx({ de: "Wir haben eine erste Produktion für " + (niche || "deine Nische") + " vorbereitet. Du musst sie nur noch starten — den Rest übernimmt dein Studio.", en: "We have prepared a first production for " + (niche || "your niche") + ". Just start it — your studio takes care of the rest.", es: "Hemos preparado una primera producción para " + (niche || "tu nicho") + ". Solo tienes que iniciarla — el resto lo hace tu estudio." })}
                 </p>
               </div>
               <Button onClick={startFirstProduction} size="lg" className="w-full">
-                Erste Produktion starten
+                {tx({ de: "Erste Produktion starten", en: "Start first production", es: "Iniciar primera producción" })}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button variant="ghost" className="w-full" onClick={() => navigate("/home")}>
-                Später — zuerst umsehen
+                {tx({ de: "Später — zuerst umsehen", en: "Later — look around first", es: "Más tarde — primero echar un vistazo" })}
               </Button>
             </div>
           )}

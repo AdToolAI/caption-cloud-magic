@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
@@ -891,9 +892,9 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
       <Dialog open={libraryPickerOpen} onOpenChange={setLibraryPickerOpen}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>{t('uc.libraryPickerTitle') || 'Video aus Mediathek wählen'}</DialogTitle>
+            <DialogTitle>{t('uc.libraryPickerTitle') || tx({ de: 'Video aus Mediathek wählen', en: 'Select video from media library', es: 'Seleccionar vídeo de la biblioteca multimedia' })}</DialogTitle>
             <DialogDescription>
-              {t('uc.libraryPickerDesc') || 'Wähle ein bereits erstelltes Video, um es als Hintergrund zu übernehmen.'}
+              {t('uc.libraryPickerDesc') || tx({ de: 'Wähle ein bereits erstelltes Video, um es als Hintergrund zu übernehmen.', en: 'Choose an already created video to use it as a background.', es: 'Elige un vídeo ya creado para usarlo como fondo.' })}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-3">
@@ -913,7 +914,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
               </div>
             ) : libraryVideos.length === 0 ? (
               <div className="py-12 text-center text-sm text-muted-foreground">
-                {t('uc.libraryEmpty') || 'Noch keine fertigen Videos in deiner Mediathek.'}
+                {t('uc.libraryEmpty') || tx({ de: 'Noch keine fertigen Videos in deiner Mediathek.', en: 'No videos in your media library yet.', es: 'Aún no hay vídeos en tu biblioteca multimedia.' })}
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">

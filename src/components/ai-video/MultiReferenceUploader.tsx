@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * MultiReferenceUploader
  * --------------------------------------------------------------
@@ -126,7 +127,7 @@ export function MultiReferenceUploader({
   const loadFromBrandCharacter = () => {
     if (!brandCharacterUrl) return;
     if (slots.some((s) => s.url === brandCharacterUrl)) {
-      toast.info(language === 'de' ? 'Charakter ist bereits geladen.' : 'Character already loaded.');
+      toast.info(language === 'de' ? tx({ de: 'Charakter ist bereits geladen.', en: 'Character is already loaded.', es: 'El personaje ya está cargado.' }) : 'Character already loaded.');
       return;
     }
     onChange([...slots, { url: brandCharacterUrl, role: 'character' }]);
@@ -179,7 +180,7 @@ export function MultiReferenceUploader({
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         {language === 'de'
-          ? `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : ' Ohne Bild wird rein aus dem Text generiert.'}`
+          ? `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : tx({ de: ' Ohne Bild wird rein aus dem Text generiert.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`
           : language === 'es'
           ? `Sube personaje, producto, ubicación y estilo — ${engine} los combina en una escena.${required ? '' : ' Sin imagen se genera solo a partir del texto.'}`
           : `Upload character, product, location and style — ${engine} blends them into one scene.${required ? '' : ' Without an image it generates from text only.'}`}

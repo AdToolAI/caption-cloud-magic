@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -352,7 +353,7 @@ export default function Analytics() {
                   </motion.div>
                   <div>
                     <h3 className="text-xl font-bold text-foreground">Top Performing Content</h3>
-                    <p className="text-sm text-muted-foreground">Identifiziere deine besten Posts mit KI-Insights</p>
+                    <p className="text-sm text-muted-foreground">{tx({ de: "Identifiziere deine besten Posts mit KI-Insights", en: "Identify your best posts with AI insights", es: "Identifica tus mejores publicaciones con información de IA" })}</p>
                   </div>
                 </div>
                 <Button 

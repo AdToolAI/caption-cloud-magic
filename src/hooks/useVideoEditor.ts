@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -54,7 +55,7 @@ export const useVideoEditor = () => {
       }
 
       toast({
-        title: 'Neue Version wird erstellt',
+        title: tx({ de: 'Neue Version wird erstellt', en: 'New version is being created', es: 'Se está creando una nueva versión' }),
         description: `Version ${newVersionNumber} wird jetzt gerendert. Das dauert einige Minuten.`
       });
 
@@ -69,7 +70,7 @@ export const useVideoEditor = () => {
       console.error('Video edit error:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Video konnte nicht bearbeitet werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Video konnte nicht bearbeitet werden', en: 'Video could not be edited', es: 'No se pudo editar el video' }),
         variant: 'destructive'
       });
       return null;

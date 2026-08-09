@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -174,7 +175,7 @@ export function useContinuityDrift() {
         .update(payload)
         .eq('id', sceneId);
       if (error) {
-        toast.error('Lock konnte nicht gespeichert werden');
+        toast.error(tx({ de: 'Lock konnte nicht gespeichert werden', en: 'Lock could not be saved', es: 'No se pudo guardar el bloqueo' }));
         console.error('[setSceneLock] error:', error);
         return false;
       }

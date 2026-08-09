@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -231,7 +232,7 @@ export function AISuperuserAdmin() {
     }
     const count = (data as number) ?? 0;
     if (count === 0) {
-      toast.success('Keine Runs zum Löschen — bereits sauber');
+      toast.success(tx({ de: 'Keine Runs zum Löschen — bereits sauber', en: 'No runs to delete — already clean', es: 'No hay ejecuciones para eliminar, ya está limpio' }));
     } else {
       toast.success(`${count} Run${count === 1 ? '' : 's'} gelöscht`);
     }
@@ -239,7 +240,7 @@ export function AISuperuserAdmin() {
   };
 
   const resetPassRateHistory = async () => {
-    if (!confirm('Komplett zurücksetzen? Behält nur den letzten Run pro Szenario, alles andere wird unwiderruflich gelöscht.')) return;
+    if (!confirm(tx({ de: 'Komplett zurücksetzen? Behält nur den letzten Run pro Szenario, alles andere wird unwiderruflich gelöscht.', en: 'Reset completely? Keeps only the last run per scenario, everything else will be irrevocably deleted.', es: '¿Restablecer completamente? Conserva solo la última ejecución por escenario, todo lo demás se eliminará irrevocablemente.' }))) return;
     const { data, error } = await supabase.rpc('cleanup_superuser_runs', { keep_per_scenario: 1 });
     if (error) {
       toast.error(`Fehler: ${error.message}`);
@@ -247,7 +248,7 @@ export function AISuperuserAdmin() {
     }
     const count = (data as number) ?? 0;
     if (count === 0) {
-      toast.success('Keine Runs zum Löschen — bereits sauber');
+      toast.success(tx({ de: 'Keine Runs zum Löschen — bereits sauber', en: 'No runs to delete — already clean', es: 'No hay ejecuciones para eliminar, ya está limpio' }));
     } else {
       toast.success(`${count} Run${count === 1 ? '' : 's'} gelöscht — Pass-Rate zurückgesetzt`);
     }
@@ -441,7 +442,7 @@ export function AISuperuserAdmin() {
                       variant={s.passRate >= 80 ? 'default' : s.passRate >= 50 ? 'secondary' : 'destructive'}
                       title={
                         s.lastRun?.status === 'pass' && s.passRate < 100
-                          ? 'Letzter Run grün — historische Fail-Runs noch im 5-Run-Window. Klicke „Komplett zurücksetzen" für 100%.'
+                          ? tx({ de: 'Letzter Run grün — historische Fail-Runs noch im 5-Run-Window. Klicke „Komplett zurücksetzen" für 100%.', en: 'Last run green — historical fail runs still in 5-run-window. Click "Reset completely" for 100%.', es: 'Última ejecución en verde — ejecuciones fallidas históricas aún en la ventana de 5 ejecuciones. Haz clic en "Restablecer completamente" para el 100%.' })
                           : undefined
                       }
                     >

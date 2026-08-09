@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play, Square } from 'lucide-react';
@@ -45,12 +46,12 @@ export function VoicePreviewButton({ voiceId, language = 'de', size = 'icon', cl
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => { setPlaying(false); audioRef.current = null; };
-      audio.onerror = () => { setPlaying(false); audioRef.current = null; toast.error('Audio konnte nicht abgespielt werden'); };
+      audio.onerror = () => { setPlaying(false); audioRef.current = null; toast.error(tx({ de: 'Audio konnte nicht abgespielt werden', en: 'Audio could not be played', es: 'No se pudo reproducir el audio' })); };
       await audio.play();
       setPlaying(true);
     } catch (err) {
       console.error('[VoicePreviewButton] Error:', err);
-      toast.error('Hörprobe konnte nicht generiert werden');
+      toast.error(tx({ de: 'Hörprobe konnte nicht generiert werden', en: 'Audition could not be generated', es: 'No se pudo generar la audición' }));
     } finally {
       setLoading(false);
     }

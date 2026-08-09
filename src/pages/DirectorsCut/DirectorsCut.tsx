@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { saveDraft, loadDraft, clearDraft, consumeReloadReset, installReloadFlag, SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
 import { extractTimestampedFrames, extractRefinementFrames, detectBoundariesAsync, type TimestampedFrame, type DetectedBoundary } from '@/lib/directors-cut-scene-detection';
@@ -327,7 +328,7 @@ export function DirectorsCut() {
     // Ein KI-Auto-Cut darüber würde die korrekten Szenen mit halluzinierten
     // Beschreibungen überschreiben — daher hart blockieren.
     if (composerSourceProjectId && (command === 'auto_cut' || command === 'analyze_scenes')) {
-      toast.info('Composer-Render: Szenen sind aus den Render-Metadaten gesperrt.');
+      toast.info(tx({ de: 'Composer-Render: Szenen sind aus den Render-Metadaten gesperrt.', en: 'Composer render: scenes are locked from the render metadata.', es: 'Renderizado de Composer: las escenas están bloqueadas desde los metadatos de renderizado.' }));
       return;
     }
     switch (command) {
@@ -535,7 +536,7 @@ export function DirectorsCut() {
         }
 
         if (!result || result.scenes.length === 0) {
-          toast.error('Render-Metadaten nicht gefunden – bitte das Video erneut aus dem Motion Studio öffnen.');
+          toast.error(tx({ de: 'Render-Metadaten nicht gefunden – bitte das Video erneut aus dem Motion Studio öffnen.', en: 'Render metadata not found – please reopen the video from Motion Studio.', es: 'No se encontraron los metadatos de renderizado – vuelve a abrir el video desde Motion Studio.' }));
           return;
         }
 
@@ -582,7 +583,7 @@ export function DirectorsCut() {
       } catch (err) {
         console.warn('[DirectorsCut] Composer scene import failed:', err);
         if (!cancelled) {
-          toast.error('Composer-Szenen konnten nicht importiert werden – bitte erneut aus dem Motion Studio öffnen.');
+          toast.error(tx({ de: 'Composer-Szenen konnten nicht importiert werden – bitte erneut aus dem Motion Studio öffnen.', en: 'Composer scenes could not be imported – please reopen from Motion Studio.', es: 'No se pudieron importar las escenas de Composer – vuelve a abrir desde Motion Studio.' }));
         }
       }
     })();
@@ -660,7 +661,7 @@ export function DirectorsCut() {
     // Hard lock: never run shot detection on a Composer render — the EDL is
     // already the authoritative scene list.
     if (composerLock.active || composerSourceProjectId) {
-      toast.info('Composer-Render: Szenen sind aus der EDL gesperrt.');
+      toast.info(tx({ de: 'Composer-Render: Szenen sind aus der EDL gesperrt.', en: 'Composer render: scenes are locked from the EDL.', es: 'Renderizado de Composer: las escenas están bloqueadas desde el EDL.' }));
       return;
     }
 

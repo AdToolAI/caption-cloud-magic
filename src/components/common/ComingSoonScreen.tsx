@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { ReactNode, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Bell, ArrowLeft, Eye } from 'lucide-react';
@@ -56,7 +57,7 @@ export function ComingSoonScreen({
           <div className="flex items-center gap-2 text-xs">
             <Eye className="h-3.5 w-3.5 text-amber-400" />
             <span className="font-medium text-amber-400">Admin-Preview</span>
-            <span className="text-muted-foreground">— dieses Feature ist für Kunden noch ausgeblendet (Coming Soon)</span>
+            <span className="text-muted-foreground">{tx({ de: "— dieses Feature ist für Kunden noch ausgeblendet (Coming Soon)", en: "— this feature is still hidden for customers (Coming Soon)", es: "— esta función aún está oculta para los clientes (Próximamente)" })}</span>
           </div>
           <Button
             size="sm"
@@ -139,7 +140,7 @@ export function ComingSoonScreen({
               onClick={() => {
                 setNotified(true);
                 toast.success('Eingetragen', {
-                  description: 'Wir melden uns, sobald dieses Feature für dich live geht.',
+                  description: tx({ de: 'Wir melden uns, sobald dieses Feature für dich live geht.', en: 'We\'ll let you know as soon as this feature goes live for you.', es: 'Te avisaremos tan pronto como esta función esté disponible para ti.' }),
                 });
               }}
               className={cn(

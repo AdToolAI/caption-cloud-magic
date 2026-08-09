@@ -38,6 +38,7 @@ import StageStoryboardError from './stage/StageStoryboardError';
 import StagePanel from './stage/StagePanel';
 
 import { Play, CheckCircle2 } from 'lucide-react';
+import { useTx } from '@/lib/i18nText';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
   hook: 'Hook',
@@ -116,6 +117,8 @@ export default function StoryboardTab({
   onRetryStoryboard,
   onBackToBriefing,
 }: StoryboardTabProps) {
+  const tr = useTx();
+
   const { t } = useTranslation();
 
   // Defensive: filter out cast entries with no usable `name`.
@@ -333,7 +336,7 @@ export default function StoryboardTab({
       // Lazy-import to avoid pulling sonner into module init
       import('sonner').then(({ toast }) => {
         toast.info('Engine geändert', {
-          description: 'Szene wird mit dem neuen Modell neu generiert, sobald du auf „Alle generieren" klickst.',
+          description: tr({ de: 'Szene wird mit dem neuen Modell neu generiert, sobald du auf „Alle generieren" klickst.', en: 'The scene will be regenerated with the new model once you click "Generate all".', es: 'La escena se regenerará con el nuevo modelo en cuanto hagas clic en "Generar todo".' }),
         });
       });
     }
@@ -488,7 +491,7 @@ export default function StoryboardTab({
     if (!addSceneAllowed) {
       void import('sonner').then(({ toast }) => {
         toast.error('Projekt-Budget voll', {
-          description: `Maximal ${formatDuration(MAX_PROJECT_SECONDS)} pro Projekt. Kürze oder lösche eine andere Szene, um Platz zu schaffen.`,
+          description: tr({ de: `Maximal ${formatDuration(MAX_PROJECT_SECONDS)} pro Projekt. Kürze oder lösche eine andere Szene, um Platz zu schaffen.`, en: `Maximum ${formatDuration(MAX_PROJECT_SECONDS)} per project. Shorten or delete another scene to make room.`, es: `Máximo ${formatDuration(MAX_PROJECT_SECONDS)} por proyecto. Acorta o elimina otra escena para hacer espacio.` }),
         });
       });
       return;
@@ -555,7 +558,7 @@ export default function StoryboardTab({
             title={
               addSceneAllowed
                 ? 'Neue Szene hinzufügen'
-                : `Budget voll (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — kürze oder lösche eine Szene.`
+                : tr({ de: `Budget voll (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — kürze oder lösche eine Szene.`, en: `Budget full (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — shorten or delete a scene.`, es: `Presupuesto lleno (máx. ${formatDuration(MAX_PROJECT_SECONDS)}) — acorta o elimina una escena.` })
             }
           >
             <Plus className="h-3.5 w-3.5" /> Szene
@@ -576,7 +579,7 @@ export default function StoryboardTab({
             variant={frameFirstMode ? 'default' : 'outline'}
             onClick={() => setFrameFirstMode((v) => !v)}
             className="gap-1 text-xs"
-            title="Artlist-Stil: erst Still-Frame freezen, dann Video — für maximale Kontrolle und nahtlose Übergänge."
+            title={tr({ de: "Artlist-Stil: erst Still-Frame freezen, dann Video — für maximale Kontrolle und nahtlose Übergänge.", en: "Artlist style: freeze a still frame first, then video — for maximum control and seamless transitions.", es: "Estilo Artlist: primero congela un fotograma fijo, luego el video — para máximo control y transiciones fluidas." })}
           >
             <ImageIcon className="h-3.5 w-3.5" /> Frame-First {frameFirstMode ? '✓' : ''}
           </Button>

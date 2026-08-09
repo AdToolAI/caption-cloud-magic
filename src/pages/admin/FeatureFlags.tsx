@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -97,7 +98,7 @@ export default function FeatureFlags() {
     localStorage.setItem('feature_flags_override', JSON.stringify(flags));
     toast({
       title: 'Feature Flags gespeichert',
-      description: 'Die Änderungen werden sofort wirksam.',
+      description: tx({ de: 'Die Änderungen werden sofort wirksam.', en: 'Changes will take effect immediately.', es: 'Los cambios surtirán efecto inmediatamente.' }),
     });
     setHasChanges(false);
     
@@ -112,7 +113,7 @@ export default function FeatureFlags() {
     localStorage.removeItem('feature_flags_override');
     toast({
       title: 'Feature Flags zurückgesetzt',
-      description: 'Alle Flags verwenden jetzt die Standard-Werte.',
+      description: tx({ de: 'Alle Flags verwenden jetzt die Standard-Werte.', en: 'All flags now use default values.', es: 'Todas las banderas ahora usan los valores predeterminados.' }),
     });
     setHasChanges(false);
     

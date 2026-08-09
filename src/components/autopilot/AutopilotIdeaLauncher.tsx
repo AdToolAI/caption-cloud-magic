@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * The one-field briefing.
  *
@@ -232,7 +233,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
     if (brief.trim().length < 8) {
       toast({
         title: 'Noch zu knapp',
-        description: 'Ein Satz reicht — sag, worum es gehen soll und für wen.',
+        description: tx({ de: 'Ein Satz reicht — sag, worum es gehen soll und für wen.', en: 'One sentence is enough — say what it should be about and for whom.', es: 'Una frase es suficiente: di de qué se trata y para quién.' }),
         variant: 'destructive',
       });
       return;
@@ -272,7 +273,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
       toast({
-        title: 'Ideen konnten nicht entwickelt werden',
+        title: tx({ de: 'Ideen konnten nicht entwickelt werden', en: 'Ideas could not be developed', es: 'No se pudieron desarrollar ideas' }),
         description:
           message === 'credits_exhausted'
             ? 'Dein KI-Guthaben ist aufgebraucht.'
@@ -293,7 +294,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
           <Sparkles className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h2 className="font-serif text-xl">Was sollen wir für dich drehen?</h2>
+          <h2 className="font-serif text-xl">{tx({ de: "Was sollen wir für dich drehen?", en: "What should we shoot for you?", es: "¿Qué deberíamos grabar para ti?" })}</h2>
           <p className="text-sm text-muted-foreground">
             Ein Satz genügt. Du bekommst fünf Ideen, die wir auch wirklich umsetzen können.
           </p>
@@ -304,7 +305,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         value={brief}
         onChange={(e) => setBrief(e.target.value)}
         rows={3}
-        placeholder="z. B. Werbespot für unsere neue Kaffeemischung — für Leute, die morgens keine Zeit haben."
+        placeholder={tx({ de: "z. B. Werbespot für unsere neue Kaffeemischung — für Leute, die morgens keine Zeit haben.", en: "e.g. Commercial for our new coffee blend — for people who don't have time in the morning.", es: "p. ej. Anuncio de nuestro nuevo café — para gente que no tiene tiempo por la mañana." })}
         className="resize-none text-base"
       />
 

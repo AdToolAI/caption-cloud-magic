@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -116,7 +117,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
               <p className="text-sm">
                 <span className="font-semibold">{brandKit.brand_name || "marke"}</span>
                 {" "}
-                {brandKit.example_caption || "Beispiel-Caption wird hier angezeigt..."}
+                {brandKit.example_caption || tx({ de: "Beispiel-Caption wird hier angezeigt...", en: "Example caption will be displayed here...", es: "El pie de foto de ejemplo se mostrará aquí..." })}
               </p>
               <div className="flex flex-wrap gap-1 mt-2">
                 {brandKit.recommended_hashtags?.slice(0, 5).map((tag: string, idx: number) => (

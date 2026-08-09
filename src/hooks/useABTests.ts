@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -38,8 +39,8 @@ export function useABTests() {
     } catch (error) {
       console.error('Failed to fetch A/B tests:', error);
       toast({
-        title: 'Fehler beim Laden',
-        description: 'A/B Tests konnten nicht geladen werden',
+        title: tx({ de: 'Fehler beim Laden', en: 'Error loading', es: 'Error al cargar' }),
+        description: tx({ de: 'A/B Tests konnten nicht geladen werden', en: 'A/B tests could not be loaded', es: 'No se pudieron cargar las pruebas A/B' }),
         variant: 'destructive'
       });
     } finally {
@@ -70,7 +71,7 @@ export function useABTests() {
 
       toast({
         title: 'Test erstellt',
-        description: 'A/B Test wurde erfolgreich erstellt'
+        description: tx({ de: 'A/B Test wurde erfolgreich erstellt', en: 'A/B test successfully created', es: 'Prueba A/B creada con éxito' })
       });
 
       fetchTests();
@@ -79,7 +80,7 @@ export function useABTests() {
       console.error('Failed to create test:', error);
       toast({
         title: 'Fehler',
-        description: 'Test konnte nicht erstellt werden',
+        description: tx({ de: 'Test konnte nicht erstellt werden', en: 'Could not create test', es: 'No se pudo crear la prueba' }),
         variant: 'destructive'
       });
       return null;
@@ -123,7 +124,7 @@ export function useABTests() {
       console.error('Failed to create variant:', error);
       toast({
         title: 'Fehler',
-        description: 'Variante konnte nicht erstellt werden',
+        description: tx({ de: 'Variante konnte nicht erstellt werden', en: 'Could not create variation', es: 'No se pudo crear la variación' }),
         variant: 'destructive'
       });
     }
@@ -143,7 +144,7 @@ export function useABTests() {
 
       toast({
         title: 'Test gestartet',
-        description: 'A/B Test läuft jetzt'
+        description: tx({ de: 'A/B Test läuft jetzt', en: 'A/B test is now running', es: 'La prueba A/B se está ejecutando ahora' })
       });
 
       fetchTests();
@@ -151,7 +152,7 @@ export function useABTests() {
       console.error('Failed to start test:', error);
       toast({
         title: 'Fehler',
-        description: 'Test konnte nicht gestartet werden',
+        description: tx({ de: 'Test konnte nicht gestartet werden', en: 'Could not start test', es: 'No se pudo iniciar la prueba' }),
         variant: 'destructive'
       });
     }
@@ -179,7 +180,7 @@ export function useABTests() {
       console.error('Failed to stop test:', error);
       toast({
         title: 'Fehler',
-        description: 'Test konnte nicht gestoppt werden',
+        description: tx({ de: 'Test konnte nicht gestoppt werden', en: 'Could not stop test', es: 'No se pudo detener la prueba' }),
         variant: 'destructive'
       });
     }
@@ -238,7 +239,7 @@ export function useABTests() {
       console.error('Failed to declare winner:', error);
       toast({
         title: 'Fehler',
-        description: 'Winner konnte nicht deklariert werden',
+        description: tx({ de: 'Winner konnte nicht deklariert werden', en: 'Could not declare winner', es: 'No se pudo declarar al ganador' }),
         variant: 'destructive'
       });
     }

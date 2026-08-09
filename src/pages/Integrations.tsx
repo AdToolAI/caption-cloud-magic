@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { tx } from "@/lib/i18nText";
 
 export default function Integrations() {
   const { user } = useAuth();
@@ -40,22 +41,22 @@ export default function Integrations() {
 
     if (error === 'tiktok_oauth_failed') {
       toast({
-        title: 'TikTok-Verbindung fehlgeschlagen',
+        title: tx({ de: 'TikTok-Verbindung fehlgeschlagen', en: 'TikTok connection failed', es: 'Fallo en la conexión con TikTok' }),
         description:
-          'Die Verbindung mit TikTok konnte nicht hergestellt werden. Bitte versuche es erneut. Falls das Problem bestehen bleibt, kontaktiere den Support.',
+          tx({ de: 'Die Verbindung mit TikTok konnte nicht hergestellt werden. Bitte versuche es erneut. Falls das Problem bestehen bleibt, kontaktiere den Support.', en: 'The connection with TikTok could not be established. Please try again. If the problem persists, contact support.', es: 'No se pudo establecer la conexión con TikTok. Inténtalo de nuevo. Si el problema persiste, contacta con soporte.' }),
         variant: 'destructive',
       });
     } else if (error === 'tiktok_oauth_denied') {
       toast({
-        title: 'TikTok-Autorisierung abgebrochen',
+        title: tx({ de: 'TikTok-Autorisierung abgebrochen', en: 'TikTok authorization canceled', es: 'Autorización de TikTok cancelada' }),
         description:
-          'Du hast die Autorisierung in TikTok abgelehnt. Klicke erneut auf „Verbinden", um es noch einmal zu versuchen.',
+          tx({ de: 'Du hast die Autorisierung in TikTok abgelehnt. Klicke erneut auf „Verbinden", um es noch einmal zu versuchen.', en: 'You declined the authorization in TikTok. Click "Connect" again to try once more.', es: 'Rechazaste la autorización en TikTok. Haz clic en "Conectar" de nuevo para intentarlo otra vez.' }),
         variant: 'destructive',
       });
     } else if (connected === 'tiktok' && status === 'success') {
       toast({
-        title: 'TikTok erfolgreich verbunden',
-        description: 'Dein TikTok-Account ist jetzt verknüpft.',
+        title: tx({ de: 'TikTok erfolgreich verbunden', en: 'TikTok connected successfully', es: 'TikTok conectado correctamente' }),
+        description: tx({ de: 'Dein TikTok-Account ist jetzt verknüpft.', en: 'Your TikTok account is now linked.', es: 'Tu cuenta de TikTok ya está vinculada.' }),
       });
     }
 

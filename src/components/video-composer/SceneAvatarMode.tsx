@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SceneAvatarMode — Stage 19: Artlist-style Character Workshop pane.
  *
@@ -153,7 +154,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
             type="button"
             onClick={clearOutfit}
             className="absolute top-3 right-3 z-20 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/70 backdrop-blur border border-primary/40 text-[10px] uppercase tracking-wider text-primary hover:bg-primary/15 transition-colors"
-            title="Outfit zurücksetzen — zeigt wieder das Standard-Porträt"
+            title={tx({ de: "Outfit zurücksetzen — zeigt wieder das Standard-Porträt", en: "Reset outfit — shows the standard portrait again", es: "Restablecer atuendo — muestra el retrato estándar de nuevo" })}
           >
             <RotateCcw className="h-3 w-3" />
             Reset Outfit
@@ -265,7 +266,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
               </div>
               <p className="text-[10px] text-muted-foreground line-clamp-1">
                 {noActive
-                  ? 'Bitte erst einen Cast wählen.'
+                  ? tx({ de: 'Bitte erst einen Cast wählen.', en: 'Please select a cast first.', es: 'Por favor, selecciona un elenco primero.' })
                   : 'Lifestyle · Historical · Fantasy · Sci-Fi · Sport — Identity-locked.'}
               </p>
             </div>
@@ -314,7 +315,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold text-foreground">Pose-Sheet</div>
               <p className="text-[10px] text-muted-foreground line-clamp-1">
-                {noActive ? 'Bitte erst einen Cast wählen.' : '4 Stand-/Action-Posen — Identity-locked.'}
+                {noActive ? tx({ de: 'Bitte erst einen Cast wählen.', en: 'Please select a cast first.', es: 'Por favor, selecciona un elenco primero.' }) : '4 Stand-/Action-Posen — Identity-locked.'}
               </p>
             </div>
             <ChevronDown

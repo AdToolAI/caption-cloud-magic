@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Brain, Send, Sparkles, Loader2, Lock, Trash2, GitBranch, Pin, PinOff } from "lucide-react";
 import { usePinnedChat } from "@/contexts/PinnedChatContext";
+import { tx } from "@/lib/i18nText";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -223,7 +224,7 @@ export default function AITextStudio() {
         .select("id,title,model,updated_at,parent_conversation_id,branch_label")
         .single();
       if (rootErr || !rootConv) {
-        toast.error(rootErr?.message || "Wurzel-Chat konnte nicht angelegt werden");
+        toast.error(rootErr?.message || tx({ de: "Wurzel-Chat konnte nicht angelegt werden", en: "Root chat could not be created", es: "No se pudo crear el chat raíz" }));
         return;
       }
       if (messages.length > 0) {
@@ -256,7 +257,7 @@ export default function AITextStudio() {
       .select("id,title,model,updated_at,parent_conversation_id,branch_label")
       .single();
     if (error || !newConv) {
-      toast.error(error?.message || "Branch konnte nicht erstellt werden");
+      toast.error(error?.message || tx({ de: "Branch konnte nicht erstellt werden", en: "Branch could not be created", es: "No se pudo crear la rama" }));
       return;
     }
 
@@ -324,9 +325,9 @@ export default function AITextStudio() {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        if (resp.status === 402) toast.error(err.error || "Wallet leer – bitte Credits aufladen.");
-        else if (resp.status === 429) toast.error("Rate limit – kurz warten und erneut probieren.");
-        else toast.error(err.error || "Fehler beim Senden");
+        if (resp.status === 402) toast.error(err.error || tx({ de: "Wallet leer – bitte Credits aufladen.", en: "Wallet empty – please top up credits.", es: "Monedero vacío – por favor recarga créditos." }));
+        else if (resp.status === 429) toast.error(tx({ de: "Rate limit – kurz warten und erneut probieren.", en: "Rate limit – please wait a moment and try again.", es: "Límite de velocidad – espera un momento e inténtalo de nuevo." }));
+        else toast.error(err.error || tx({ de: "Fehler beim Senden", en: "Error sending message", es: "Error al enviar" }));
         setMessages(next);
         setStreaming(false);
         return;
@@ -598,7 +599,7 @@ export default function AITextStudio() {
               variant="ghost"
               className="ml-auto h-7"
               disabled={!conversationId && messages.length === 0}
-              title={!conversationId && messages.length === 0 ? "Erst eine Nachricht senden, dann anheften" : undefined}
+              title={!conversationId && messages.length === 0 ? tx({ de: "Erst eine Nachricht senden, dann anheften", en: "Send a message first, then pin", es: "Envía un mensaje primero y luego fíjalo" }) : undefined}
               onClick={() => {
                 if (!conversationId) return;
                 if (pinned?.conversationId === conversationId) {

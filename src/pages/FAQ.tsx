@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { FAQ as FAQComponent } from "@/components/FAQ";
@@ -44,35 +45,35 @@ const FAQ = () => {
     de: [
       {
         question: "Welche Zahlungsmethoden werden akzeptiert?",
-        answer: "Wir akzeptieren alle gängigen Kreditkarten (Visa, MasterCard, American Express) und PayPal über Stripes sichere Zahlungsabwicklung."
+        answer: tx({ de: "Wir akzeptieren alle gängigen Kreditkarten (Visa, MasterCard, American Express) und PayPal über Stripes sichere Zahlungsabwicklung.", en: "We accept all major credit cards (Visa, MasterCard, American Express) and PayPal via Stripe's secure payment processing.", es: "Aceptamos todas las principales tarjetas de crédito (Visa, MasterCard, American Express) y PayPal a través del procesamiento de pagos seguro de Stripe." })
       },
       {
         question: "Kann ich jederzeit kündigen?",
-        answer: "Ja, Sie können Ihr Abonnement jederzeit über Ihr Abrechnungs-Dashboard kündigen. Ihr Zugang bleibt bis zum Ende des aktuellen Abrechnungszeitraums bestehen."
+        answer: tx({ de: "Ja, Sie können Ihr Abonnement jederzeit über Ihr Abrechnungs-Dashboard kündigen. Ihr Zugang bleibt bis zum Ende des aktuellen Abrechnungszeitraums bestehen.", en: "Yes, you can cancel your subscription anytime via your billing dashboard. Your access will remain until the end of the current billing period.", es: "Sí, puedes cancelar tu suscripción en cualquier momento a través de tu panel de facturación. Tu acceso se mantendrá hasta el final del período de facturación actual." })
       },
       {
         question: "Gibt es eine kostenlose Testversion?",
-        answer: "Unser kostenloser Plan ist dauerhaft verfügbar und erfordert keine Kreditkarte. Sie können jederzeit auf kostenpflichtige Pläne upgraden."
+        answer: tx({ de: "Unser kostenloser Plan ist dauerhaft verfügbar und erfordert keine Kreditkarte. Sie können jederzeit auf kostenpflichtige Pläne upgraden.", en: "Our free plan is permanently available and does not require a credit card. You can upgrade to paid plans at any time.", es: "Nuestro plan gratuito está disponible permanentemente y no requiere tarjeta de crédito. Puedes actualizar a planes de pago en cualquier momento." })
       },
       {
         question: "Wie kann ich auf meine Rechnungen zugreifen?",
-        answer: "Sie können alle Ihre Rechnungen über die Abrechnungsseite einsehen und herunterladen. Gehen Sie zu Konto > Abrechnung, um Ihren Rechnungsverlauf anzuzeigen."
+        answer: tx({ de: "Sie können alle Ihre Rechnungen über die Abrechnungsseite einsehen und herunterladen. Gehen Sie zu Konto > Abrechnung, um Ihren Rechnungsverlauf anzuzeigen.", en: "You can view and download all your invoices from the billing page. Go to Account > Billing to view your invoice history.", es: "Puedes ver y descargar todas tus facturas desde la página de facturación. Ve a Cuenta > Facturación para ver tu historial de facturas." })
       },
       {
         question: "Was passiert, wenn ich meinen Plan herabstufe?",
-        answer: "Ihr Konto wird am Ende des aktuellen Abrechnungszeitraums herabgestuft. Sie behalten Premium-Funktionen bis dahin."
+        answer: tx({ de: "Ihr Konto wird am Ende des aktuellen Abrechnungszeitraums herabgestuft. Sie behalten Premium-Funktionen bis dahin.", en: "Your account will be downgraded at the end of the current billing period. You will retain premium features until then.", es: "Tu cuenta será degradada al final del período de facturación actual. Conservarás las funciones premium hasta entonces." })
       },
       {
         question: "Sind meine Zahlungsdaten sicher?",
-        answer: "Ja, wir nutzen Stripe für die Zahlungsabwicklung, das PCI-konform ist und Ihre Daten mit modernster Verschlüsselung schützt."
+        answer: tx({ de: "Ja, wir nutzen Stripe für die Zahlungsabwicklung, das PCI-konform ist und Ihre Daten mit modernster Verschlüsselung schützt.", en: "Yes, we use Stripe for payment processing, which is PCI compliant and protects your data with state-of-the-art encryption.", es: "Sí, utilizamos Stripe para el procesamiento de pagos, que cumple con PCI y protege tus datos con cifrado de última generación." })
       },
       {
         question: "Kann ich eine Rückerstattung erhalten?",
-        answer: "Rückerstattungen sind innerhalb von 14 Tagen nach dem Kauf möglich, wenn Sie mit unserem Service nicht zufrieden sind. Kontaktieren Sie support@useadtool.ai für Hilfe."
+        answer: tx({ de: "Rückerstattungen sind innerhalb von 14 Tagen nach dem Kauf möglich, wenn Sie mit unserem Service nicht zufrieden sind. Kontaktieren Sie support@useadtool.ai für Hilfe.", en: "Refunds are possible within 14 days of purchase if you are not satisfied with our service. Contact support@useadtool.ai for assistance.", es: "Los reembolsos son posibles dentro de los 14 días posteriores a la compra si no estás satisfecho con nuestro servicio. Contacta a support@useadtool.ai para obtener ayuda." })
       },
       {
         question: "Wie werden meine Daten geschützt?",
-        answer: "Wir verwenden Unternehmensstandard-Verschlüsselung und sichere Server zum Schutz Ihrer Daten. Wir geben Ihre Informationen niemals ohne Ihre Zustimmung an Dritte weiter."
+        answer: tx({ de: "Wir verwenden Unternehmensstandard-Verschlüsselung und sichere Server zum Schutz Ihrer Daten. Wir geben Ihre Informationen niemals ohne Ihre Zustimmung an Dritte weiter.", en: "We use industry-standard encryption and secure servers to protect your data. We never share your information with third parties without your consent.", es: "Utilizamos cifrado estándar de la industria y servidores seguros para proteger tus datos. Nunca compartimos tu información con terceros sin tu consentimiento." })
       }
     ],
     es: [
@@ -136,7 +137,7 @@ const FAQ = () => {
     <div className="min-h-screen flex flex-col">
       <SEO
         title={title}
-        description="Finde Antworten auf häufig gestellte Fragen zu AdTool AI - Preise, Abonnements, Zahlungsmethoden und mehr."
+        description={tx({ de: "Finde Antworten auf häufig gestellte Fragen zu AdTool AI - Preise, Abonnements, Zahlungsmethoden und mehr.", en: "Find answers to frequently asked questions about AdTool AI - pricing, subscriptions, payment methods, and more.", es: "Encuentra respuestas a preguntas frecuentes sobre AdTool AI: precios, suscripciones, métodos de pago y más." })}
         canonical="https://useadtool.ai/faq"
         lang={language}
         ogImage="/og-faq.jpg"

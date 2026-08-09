@@ -19,6 +19,7 @@ import { DndContext, DragEndEvent, DragOverlay } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
 import { useUserBehavior } from '@/hooks/useUserBehavior';
+import { tx } from "@/lib/i18nText";
 
 export default function Planner() {
   const { user } = useAuth();
@@ -69,8 +70,8 @@ export default function Planner() {
       if (error) {
         console.error("Workspace load error:", error);
         clearTimeout(timeoutId);
-        toast.error("Fehler beim Laden des Workspace");
-        setError("Workspace konnte nicht geladen werden");
+        toast.error(tx({ de: "Fehler beim Laden des Workspace", en: "Failed to load workspace", es: "Error al cargar el workspace" }));
+        setError(tx({ de: "Workspace konnte nicht geladen werden", en: "Workspace could not be loaded", es: "No se pudo cargar el workspace" }));
         setLoading(false);
         return;
       }
@@ -101,7 +102,7 @@ export default function Planner() {
       clearTimeout(timeoutId);
       console.error("Unexpected error loading workspace:", error);
       toast.error("Unerwarteter Fehler: " + error.message);
-      setError("Ein unerwarteter Fehler ist aufgetreten");
+      setError(tx({ de: "Ein unerwarteter Fehler ist aufgetreten", en: "An unexpected error occurred", es: "Se ha producido un error inesperado" }));
       setLoading(false);
     }
   };
@@ -133,8 +134,8 @@ export default function Planner() {
       toast.success("Workspace erstellt");
     } catch (error: any) {
       console.error("Error creating workspace:", error);
-      toast.error("Fehler beim Erstellen des Workspace");
-      setError("Workspace konnte nicht erstellt werden");
+      toast.error(tx({ de: "Fehler beim Erstellen des Workspace", en: "Failed to create workspace", es: "Error al crear el workspace" }));
+      setError(tx({ de: "Workspace konnte nicht erstellt werden", en: "Workspace could not be created", es: "No se pudo crear el workspace" }));
       setLoading(false);
     }
   };
@@ -211,7 +212,7 @@ export default function Planner() {
       }
     } catch (error: any) {
       console.error("Error loading/creating weekplan:", error);
-      toast.error("Fehler beim Laden des Plans: " + (error.message || "Unbekannter Fehler"));
+      toast.error(tx({ de: "Fehler beim Laden des Plans: ", en: "Failed to load plan: ", es: "Error al cargar el plan: " }) + (error.message || tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" })));
     } finally {
       setLoading(false);
     }
@@ -256,7 +257,7 @@ export default function Planner() {
 
     if (error) {
       console.error("Error saving block:", error);
-      toast.error("Fehler beim Speichern: " + error.message);
+      toast.error(tx({ de: "Fehler beim Speichern: ", en: "Failed to save: ", es: "Error al guardar: " }) + error.message);
       return;
     }
 
@@ -287,13 +288,13 @@ export default function Planner() {
     });
 
     if (error) {
-      toast.error("Fehler beim Speichern");
+      toast.error(tx({ de: "Fehler beim Speichern", en: "Failed to save", es: "Error al guardar" }));
       return;
     }
 
     loadBlocks(weekplan.id);
     setSelectedBlock(null);
-    toast.success("Änderungen gespeichert");
+    toast.success(tx({ de: "Änderungen gespeichert", en: "Changes saved", es: "Cambios guardados" }));
   };
 
   const handleBlockDelete = async (blockId: string) => {
@@ -310,13 +311,13 @@ export default function Planner() {
 
       if (error) {
         console.error("Delete error:", error);
-        toast.error("Fehler beim Löschen: " + error.message, { id: loadingToast });
+        toast.error(tx({ de: "Fehler beim Löschen: ", en: "Failed to delete: ", es: "Error al eliminar: " }) + error.message, { id: loadingToast });
         return;
       }
 
       await loadBlocks(weekplan.id);
       setSelectedBlock(null);
-      toast.success("Post wurde gelöscht", { id: loadingToast });
+      toast.success(tx({ de: "Post wurde gelöscht", en: "Post deleted", es: "Publicación eliminada" }), { id: loadingToast });
     } catch (error: any) {
       console.error("Unexpected error:", error);
       toast.error("Unerwarteter Fehler: " + error.message, { id: loadingToast });
@@ -339,7 +340,7 @@ export default function Planner() {
     });
 
     if (error) {
-      toast.error("Fehler beim Aktualisieren");
+      toast.error(tx({ de: "Fehler beim Aktualisieren", en: "Failed to update", es: "Error al actualizar" }));
       return;
     }
 
@@ -371,7 +372,7 @@ export default function Planner() {
     });
 
     if (error) {
-      toast.error("Fehler beim Genehmigen");
+      toast.error(tx({ de: "Fehler beim Genehmigen", en: "Approval failed", es: "Error al aprobar" }));
       return;
     }
 
@@ -400,7 +401,7 @@ export default function Planner() {
 
       if (error) {
         console.error("Recommendations error:", error);
-        toast.error("Fehler beim Laden der Empfehlungen: " + error.message, { id: loadingToast });
+        toast.error(tx({ de: "Fehler beim Laden der Empfehlungen: ", en: "Failed to load recommendations: ", es: "Error al cargar las recomendaciones: " }) + error.message, { id: loadingToast });
         return;
       }
 
@@ -422,7 +423,7 @@ export default function Planner() {
 
         if (blocksError) {
           console.error("Error creating blocks:", blocksError);
-          toast.error("Fehler beim Erstellen der Posts", { id: loadingToast });
+          toast.error(tx({ de: "Fehler beim Erstellen der Posts", en: "Failed to create posts", es: "Error al crear las publicaciones" }), { id: loadingToast });
           return;
         }
 
@@ -541,7 +542,7 @@ export default function Planner() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">
-          {!workspaceId ? "Workspace wird geladen..." : "Wochenplan wird erstellt..."}
+          {!workspaceId ? tx({ de: "Workspace wird geladen...", en: "Loading workspace...", es: "Cargando workspace..." }) : tx({ de: "Wochenplan wird erstellt...", en: "Building weekly plan...", es: "Creando el plan semanal..." })}
         </p>
       </div>
     );

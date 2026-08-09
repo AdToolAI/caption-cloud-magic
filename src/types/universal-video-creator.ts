@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // ==========================================
 // Universal Video Creator - Type Definitions
 // ==========================================
@@ -318,7 +319,7 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
   {
     category: 'corporate-ad',
     name: 'Unternehmenswerbung',
-    description: 'Professionelle Werbevideos für Unternehmen und Dienstleistungen',
+    description: tx({ de: 'Professionelle Werbevideos für Unternehmen und Dienstleistungen', en: 'Professional promotional videos for businesses and services', es: 'Videos promocionales profesionales para empresas y servicios' }),
     icon: '🏢',
     color: 'from-blue-500 to-indigo-500',
     recommendedDuration: '15-90 Sekunden',
@@ -328,7 +329,7 @@ export const VIDEO_CATEGORIES: VideoCategoryInfo[] = [
   {
     category: 'product-ad',
     name: 'Produktwerbung',
-    description: 'Kreative Produktvideos mit deinen eigenen Produktfotos',
+    description: tx({ de: 'Kreative Produktvideos mit deinen eigenen Produktfotos', en: 'Creative product videos with your own product photos', es: 'Videos de productos creativos con tus propias fotos de productos' }),
     icon: '📦',
     color: 'from-green-500 to-emerald-500',
     recommendedDuration: '15-90 Sekunden',

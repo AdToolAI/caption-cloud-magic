@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Zentrale SEO-Konfiguration für AdTool AI
  * Alle SEO-bezogenen URLs und Einstellungen werden hier verwaltet
@@ -10,7 +11,7 @@ export const SEO_CONFIG = {
   // Site Information
   siteName: 'AdTool AI',
   defaultTitle: 'AdTool AI — Ein Creator. Ein ganzes Studio.',
-  defaultDescription: 'Erstelle komplette KI-Videos mit den führenden Modellen, Stimmen und Lip-Sync in einem einzigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.',
+  defaultDescription: tx({ de: 'Erstelle komplette KI-Videos mit den führenden Modellen, Stimmen und Lip-Sync in einem einzigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.', en: 'Create complete AI videos with leading models, voices, and lip-sync in a single workflow. From idea to finished video — without a film crew.', es: 'Crea videos completos de IA con los modelos, voces y sincronización labial líderes en un solo flujo de trabajo. De la idea al video terminado — sin equipo de filmación.' }),
 
   
   // Social Media
@@ -93,7 +94,7 @@ export const PAGES_SEO = {
   home: {
     path: '/',
     title: 'Ein Creator. Ein ganzes Studio. — KI-Videoproduktion',
-    description: 'Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.',
+    description: tx({ de: 'Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.', en: 'All leading AI models, voices, and precise lip-sync in a continuous workflow. From idea to finished video — without a film crew.', es: 'Todos los modelos de IA líderes, voces y sincronización labial precisa en un flujo de trabajo continuo. De la idea al video terminado — sin equipo de filmación.' }),
     ogImage: '/og-home.jpg',
     priority: 1.0,
     changefreq: 'weekly' as const,
@@ -102,7 +103,7 @@ export const PAGES_SEO = {
   pricing: {
     path: '/pricing',
     title: 'Preise & Pakete - Kostenlos starten | AdTool AI',
-    description: 'Transparente Preise für jeden Creator. Starte kostenlos mit 5 Captions täglich. Pro-Plan ab €9.99 für unbegrenzte AI-Captions & Content-Planer.',
+    description: tx({ de: 'Transparente Preise für jeden Creator. Starte kostenlos mit 5 Captions täglich. Pro-Plan ab €9.99 für unbegrenzte AI-Captions & Content-Planer.', en: 'Transparent pricing for every creator. Start for free with 5 captions daily. Pro plan from €9.99 for unlimited AI captions & content planner.', es: 'Precios transparentes para cada creador. Empieza gratis con 5 subtítulos diarios. Plan Pro desde 9,99 € para subtítulos de IA ilimitados y planificador de contenido.' }),
     ogImage: '/og-pricing.jpg',
     priority: 0.9,
     changefreq: 'monthly' as const,
@@ -111,7 +112,7 @@ export const PAGES_SEO = {
   faq: {
     path: '/faq',
     title: 'Häufig gestellte Fragen - AdTool AI Support',
-    description: 'Antworten auf die häufigsten Fragen zu AdTool AI. Funktionen, Preise, Integration, Datenschutz und mehr. Schnelle Hilfe für Creator.',
+    description: tx({ de: 'Antworten auf die häufigsten Fragen zu AdTool AI. Funktionen, Preise, Integration, Datenschutz und mehr. Schnelle Hilfe für Creator.', en: 'Answers to the most common questions about AdTool AI. Features, pricing, integration, data protection and more. Quick help for creators.', es: 'Respuestas a las preguntas más frecuentes sobre AdTool AI. Funciones, precios, integración, protección de datos y más. Ayuda rápida para creadores.' }),
     ogImage: '/og-faq.jpg',
     priority: 0.8,
     changefreq: 'monthly' as const,
@@ -120,7 +121,7 @@ export const PAGES_SEO = {
   features: {
     path: '/features',
     title: 'Features - KI-Captions, Planer & Analytics | AdTool AI',
-    description: 'Entdecke alle Features: KI-Caption-Generator, Content-Planer, Hashtag-Generator, Brand Voice, Analytics & mehr. Alles für deinen Social Media Erfolg.',
+    description: tx({ de: 'Entdecke alle Features: KI-Caption-Generator, Content-Planer, Hashtag-Generator, Brand Voice, Analytics & mehr. Alles für deinen Social Media Erfolg.', en: 'Discover all features: AI caption generator, content planner, hashtag generator, brand voice, analytics & more. Everything for your social media success.', es: 'Descubre todas las funciones: generador de subtítulos de IA, planificador de contenido, generador de hashtags, voz de marca, análisis y más. Todo para tu éxito en redes sociales.' }),
     ogImage: '/og-features.jpg',
     priority: 0.8,
     changefreq: 'monthly' as const,

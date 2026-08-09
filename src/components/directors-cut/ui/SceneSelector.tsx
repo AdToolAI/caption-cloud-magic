@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from 'framer-motion';
 import { Globe, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
@@ -235,8 +236,8 @@ export function SceneSelector({
       {/* Info text */}
       <p className="text-xs text-muted-foreground mt-2">
         {selectedSceneId 
-          ? "Änderungen gelten nur für diese Szene"
-          : "Änderungen gelten für das gesamte Video"
+          ? tx({ de: "Änderungen gelten nur für diese Szene", en: "Changes apply to this scene only", es: "Los cambios se aplican solo a esta escena" })
+          : tx({ de: "Änderungen gelten für das gesamte Video", en: "Changes apply to the entire video", es: "Los cambios se aplican a todo el video" })
         }
       </p>
     </div>

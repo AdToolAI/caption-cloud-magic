@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -85,7 +86,7 @@ export function DeliverStep() {
         .upload(path, blob, { cacheControl: "3600", upsert: true, contentType: "image/png" });
       if (error) throw new Error(error.message);
       const { data } = supabase.storage.from("composer-uploads").getPublicUrl(path);
-      if (!data?.publicUrl) throw new Error("Öffentliche URL konnte nicht erstellt werden");
+      if (!data?.publicUrl) throw new Error(tx({ de: "Öffentliche URL konnte nicht erstellt werden", en: "Public URL could not be created", es: "No se pudo crear la URL pública" }));
       return {
         mediaUrl: data.publicUrl,
         mediaType: "image",
@@ -161,7 +162,7 @@ export function DeliverStep() {
 
       <div className="space-y-2">
         <h2 className="font-display text-3xl tracking-tight">Ausspielen</h2>
-        <p className="text-sm text-muted-foreground">Ein Beitrag — oder gleich eine ganze Serie aus demselben Briefing.</p>
+        <p className="text-sm text-muted-foreground">{tx({ de: "Ein Beitrag — oder gleich eine ganze Serie aus demselben Briefing.", en: "One post — or a whole series from the same briefing.", es: "Una publicación, o toda una serie del mismo briefing." })}</p>
       </div>
 
       {s.hasDesign && (

@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { tx } from "@/lib/i18nText";
 
 // Block validation schema base
 const blockSchemaBase = z.object({
-  title: z.string().trim().min(1, "Titel erforderlich").max(80, "Max. 80 Zeichen"),
-  caption: z.string().max(2200, "Max. 2200 Zeichen").optional(),
+  title: z.string().trim().min(1, tx({ de: "Titel erforderlich", en: "Title required", es: "Título requerido" })).max(80, tx({ de: "Max. 80 Zeichen", en: "Max. 80 characters", es: "Máx. 80 caracteres" })),
+  caption: z.string().max(2200, tx({ de: "Max. 2200 Zeichen", en: "Max. 2200 characters", es: "Máx. 2200 caracteres" })).optional(),
   start_at: z.string().datetime(),
   end_at: z.string().datetime(),
   platform: z.enum(["Instagram", "TikTok", "LinkedIn", "Facebook", "X", "YouTube"]),
@@ -13,7 +14,7 @@ const blockSchemaBase = z.object({
 
 export const blockSchema = blockSchemaBase.refine(
   (data) => new Date(data.end_at) > new Date(data.start_at),
-  { message: "Endzeit muss nach Startzeit liegen", path: ["end_at"] }
+  { message: tx({ de: "Endzeit muss nach Startzeit liegen", en: "End time must be after start time", es: "La hora de finalización debe ser posterior a la de inicio" }), path: ["end_at"] }
 );
 
 export const blockSchemaPartial = blockSchemaBase.partial();
@@ -84,7 +85,7 @@ export function checkBlockConflicts(
   if (platformConflicts.length > 0) {
     conflicts.push({
       type: "hard",
-      message: `Kollision mit ${platformConflicts.length} anderen ${block.platform}-Posts`,
+      message: `${tx({ de: "Kollision mit", en: "Conflict with", es: "Conflicto con" })} ${platformConflicts.length} ${tx({ de: "anderen", en: "other", es: "otras" })} ${block.platform}-Posts`,
       severity: "error",
     });
   }
@@ -106,7 +107,7 @@ export function checkBlockConflicts(
       if (!inOptimalSlot) {
         conflicts.push({
           type: "soft",
-          message: "Außerhalb der empfohlenen Posting-Zeiten",
+          message: tx({ de: "Außerhalb der empfohlenen Posting-Zeiten", en: "Outside the recommended posting times", es: "Fuera de los horarios de publicación recomendados" }),
           severity: "warning",
         });
       }
@@ -120,7 +121,7 @@ export function checkBlockConflicts(
   if (platformRule && duration > platformRule.maxVideoDuration) {
     conflicts.push({
       type: "soft",
-      message: `Dauer (${Math.round(duration)}s) überschreitet ${block.platform}-Limit (${platformRule.maxVideoDuration}s)`,
+      message: `${tx({ de: "Dauer", en: "Duration", es: "Duración" })} (${Math.round(duration)}s) ${tx({ de: "überschreitet", en: "exceeds", es: "supera" })} ${block.platform}-${tx({ de: "Limit", en: "limit", es: "límite" })} (${platformRule.maxVideoDuration}s)`,
       severity: "warning",
     });
   }
@@ -134,7 +135,7 @@ export function checkBlockConflicts(
   if (sameDay.length >= 5) {
     conflicts.push({
       type: "soft",
-      message: `Bereits ${sameDay.length} Posts an diesem Tag geplant`,
+      message: `${tx({ de: "Bereits", en: "Already", es: "Ya hay" })} ${sameDay.length} ${tx({ de: "Posts an diesem Tag geplant", en: "posts scheduled for this day", es: "publicaciones programadas para este día" })}`,
       severity: "warning",
     });
   }

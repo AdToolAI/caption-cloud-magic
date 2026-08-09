@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ export const TwoFactorChallenge = ({ open, onSuccess, onCancel }: TwoFactorChall
 
   const handleVerify = async () => {
     if (code.length !== 6) {
-      setError("Bitte gib einen 6-stelligen Code ein");
+      setError(tx({ de: "Bitte gib einen 6-stelligen Code ein", en: "Please enter a 6-digit code", es: "Por favor, introduce un código de 6 dígitos" }));
       return;
     }
 

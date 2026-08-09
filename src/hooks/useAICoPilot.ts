@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { tx } from '@/lib/i18nText';
 
 export interface CoPilotSuggestion {
   id: string;
@@ -247,22 +248,22 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
         onCommand?.(localCommand.command, localCommand.params);
         
         const commandResponses: Record<string, string> = {
-          analyze_scenes: '🎬 Starte Szenenanalyse...',
-          generate_transitions: '✨ Generiere KI-Übergänge...',
-          auto_cut: '✂️ Aktiviere Auto-Cut...',
-          split_scene: '✂️ Teile Szene...',
-          duplicate_scene: '📋 Dupliziere Szene...',
-          delete_scene: '🗑️ Lösche Szene...',
-          apply_style: `🎨 Wende ${localCommand.params.style || 'Style'} an...`,
-          open_styles: '🎨 Öffne Style-Auswahl...',
-          apply_color: `🌈 Wende ${localCommand.params.preset || 'Farbkorrektur'} an...`,
-          open_color: '🌈 Öffne Farbkorrektur...',
-          adjust_volume: localCommand.params.change > 0 ? '🔊 Erhöhe Lautstärke...' : '🔉 Reduziere Lautstärke...',
-          noise_reduction: '🎙️ Aktiviere Rauschunterdrückung...',
-          export: `📤 Starte ${localCommand.params.quality || 'HD'} Export...`,
-          open_export: '📤 Öffne Export-Einstellungen...',
-          next_step: '➡️ Nächster Schritt...',
-          prev_step: '⬅️ Vorheriger Schritt...',
+          analyze_scenes: tx({ de: '🎬 Starte Szenenanalyse...', en: '🎬 Starting scene analysis...', es: '🎬 Iniciando análisis de escenas...' }),
+          generate_transitions: tx({ de: '✨ Generiere KI-Übergänge...', en: '✨ Generating AI transitions...', es: '✨ Generando transiciones de IA...' }),
+          auto_cut: tx({ de: '✂️ Aktiviere Auto-Cut...', en: '✂️ Activating auto-cut...', es: '✂️ Activando corte automático...' }),
+          split_scene: tx({ de: '✂️ Teile Szene...', en: '✂️ Splitting scene...', es: '✂️ Dividiendo escena...' }),
+          duplicate_scene: tx({ de: '📋 Dupliziere Szene...', en: '📋 Duplicating scene...', es: '📋 Duplicando escena...' }),
+          delete_scene: tx({ de: '🗑️ Lösche Szene...', en: '🗑️ Deleting scene...', es: '🗑️ Eliminando escena...' }),
+          apply_style: `🎨 ${tx({ de: 'Wende', en: 'Applying', es: 'Aplicando' })} ${localCommand.params.style || tx({ de: 'Style', en: 'style', es: 'estilo' })}...`,
+          open_styles: tx({ de: '🎨 Öffne Style-Auswahl...', en: '🎨 Opening style selection...', es: '🎨 Abriendo selección de estilo...' }),
+          apply_color: `🌈 ${tx({ de: 'Wende', en: 'Applying', es: 'Aplicando' })} ${localCommand.params.preset || tx({ de: 'Farbkorrektur', en: 'color correction', es: 'corrección de color' })}...`,
+          open_color: tx({ de: '🌈 Öffne Farbkorrektur...', en: '🌈 Opening color correction...', es: '🌈 Abriendo corrección de color...' }),
+          adjust_volume: localCommand.params.change > 0 ? tx({ de: '🔊 Erhöhe Lautstärke...', en: '🔊 Increasing volume...', es: '🔊 Aumentando volumen...' }) : tx({ de: '🔉 Reduziere Lautstärke...', en: '🔉 Decreasing volume...', es: '🔉 Reduciendo volumen...' }),
+          noise_reduction: tx({ de: '🎙️ Aktiviere Rauschunterdrückung...', en: '🎙️ Activating noise reduction...', es: '🎙️ Activando reducción de ruido...' }),
+          export: `📤 ${tx({ de: 'Starte', en: 'Starting', es: 'Iniciando' })} ${localCommand.params.quality || 'HD'} ${tx({ de: 'Export', en: 'export', es: 'exportación' })}...`,
+          open_export: tx({ de: '📤 Öffne Export-Einstellungen...', en: '📤 Opening export settings...', es: '📤 Abriendo ajustes de exportación...' }),
+          next_step: tx({ de: '➡️ Nächster Schritt...', en: '➡️ Next step...', es: '➡️ Siguiente paso...' }),
+          prev_step: tx({ de: '⬅️ Vorheriger Schritt...', en: '⬅️ Previous step...', es: '⬅️ Paso anterior...' }),
         };
 
         const assistantMessage: CoPilotMessage = {
@@ -293,7 +294,7 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
 
       let responseContent = typeof data?.response === 'string' 
         ? data.response 
-        : data?.raw || 'Ich kann dir bei der Videobearbeitung helfen. Frag mich etwas!';
+        : data?.raw || tx({ de: 'Ich kann dir bei der Videobearbeitung helfen. Frag mich etwas!', en: "I can help with your video editing. Ask me something!", es: '¡Puedo ayudarte con la edición de video. Pregúntame algo!' });
 
       // Check if AI detected a command
       if (typeof data?.response === 'object' && data.response?.command) {
@@ -333,7 +334,7 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
     if (suggestion.action) {
       onCommand?.(suggestion.action.command);
       dismissSuggestion(suggestion.id);
-      toast.success(`${suggestion.action.label} ausgeführt`);
+      toast.success(`${suggestion.action.label} ${tx({ de: 'ausgeführt', en: 'executed', es: 'ejecutado' })}`);
     }
   }, [onCommand, dismissSuggestion]);
 
@@ -360,35 +361,69 @@ function generateContextualResponse(input: string, context: CoPilotContext): str
   const lowerInput = input.toLowerCase();
 
   if (lowerInput.includes('hilf') || lowerInput.includes('help')) {
-    return `Ich kann dir bei vielen Aufgaben helfen! Probiere:
+    return tx({
+      de: `Ich kann dir bei vielen Aufgaben helfen! Probiere:
 • "Analysiere Szenen" - Startet KI-Analyse
 • "Generiere Übergänge" - Erstellt passende Übergänge
 • "Teile Szene" - Aktuelle Szene splitten (oder Taste S)
 • "Dupliziere Szene" - Szene kopieren (oder Taste D)
 • "Lösche Szene" - Szene entfernen (oder Delete)
 • "Wende Cinematic Style an" - Für filmischen Look
-• "Erhöhe die Lautstärke" - Audio anpassen`;
+• "Erhöhe die Lautstärke" - Audio anpassen`,
+      en: `I can help you with many tasks! Try:
+• "Analyze scenes" - Starts AI analysis
+• "Generate transitions" - Creates matching transitions
+• "Split scene" - Splits the current scene (or press S)
+• "Duplicate scene" - Copies the scene (or press D)
+• "Delete scene" - Removes the scene (or press Delete)
+• "Apply cinematic style" - For a filmic look
+• "Increase the volume" - Adjust audio`,
+      es: `¡Puedo ayudarte con muchas tareas! Prueba:
+• "Analizar escenas" - Inicia el análisis de IA
+• "Generar transiciones" - Crea transiciones adecuadas
+• "Dividir escena" - Divide la escena actual (o pulsa S)
+• "Duplicar escena" - Copia la escena (o pulsa D)
+• "Eliminar escena" - Elimina la escena (o pulsa Supr)
+• "Aplicar estilo cinematográfico" - Para un look cinematográfico
+• "Subir el volumen" - Ajustar el audio`,
+    });
   }
 
   if (lowerInput.includes('tipp') || lowerInput.includes('empfehl')) {
     if (context.scenesCount === 0) {
-      return '💡 Tipp: Starte mit der Szenenanalyse - sie erkennt automatisch die besten Schnittpunkte!';
+      return tx({ de: '💡 Tipp: Starte mit der Szenenanalyse - sie erkennt automatisch die besten Schnittpunkte!', en: '💡 Tip: Start with scene analysis - it automatically detects the best cut points!', es: '💡 Consejo: Empieza con el análisis de escenas — detecta automáticamente los mejores puntos de corte.' });
     }
     if (!context.hasTransitions) {
-      return '💡 Tipp: Probiere KI-Übergänge - sie wählen automatisch passende Effekte.';
+      return tx({ de: '💡 Tipp: Probiere KI-Übergänge - sie wählen automatisch passende Effekte.', en: '💡 Tip: Try AI transitions - they automatically choose matching effects.', es: '💡 Consejo: Prueba las transiciones con IA — eligen automáticamente los efectos adecuados.' });
     }
-    return '💡 Dein Video sieht gut aus! Experimentiere mit Style Transfer für einen einzigartigen Look.';
+    return tx({ de: '💡 Dein Video sieht gut aus! Experimentiere mit Style Transfer für einen einzigartigen Look.', en: '💡 Your video looks great! Experiment with style transfer for a unique look.', es: '💡 ¡Tu video se ve genial! Experimenta con la transferencia de estilo para un look único.' });
   }
 
   if (lowerInput.includes('shortcut') || lowerInput.includes('tastatur')) {
-    return `⌨️ Keyboard Shortcuts:
+    return tx({
+      de: `⌨️ Keyboard Shortcuts:
 • S - Szene teilen
 • D - Szene duplizieren
 • Delete/Backspace - Szene löschen
 • T - Übergang bearbeiten
 • ← → - Szenen navigieren
-• 1-6 - Schnell Übergang wählen`;
+• 1-6 - Schnell Übergang wählen`,
+      en: `⌨️ Keyboard shortcuts:
+• S - Split scene
+• D - Duplicate scene
+• Delete/Backspace - Delete scene
+• T - Edit transition
+• ← → - Navigate scenes
+• 1-6 - Quick-select transition`,
+      es: `⌨️ Atajos de teclado:
+• S - Dividir escena
+• D - Duplicar escena
+• Supr/Retroceso - Eliminar escena
+• T - Editar transición
+• ← → - Navegar entre escenas
+• 1-6 - Selección rápida de transición`,
+    });
   }
 
-  return 'Ich verstehe deine Anfrage. Versuche einen Befehl wie "Analysiere Szenen" oder frage nach "Hilfe" für alle Optionen.';
+  return tx({ de: 'Ich verstehe deine Anfrage. Versuche einen Befehl wie "Analysiere Szenen" oder frage nach "Hilfe" für alle Optionen.', en: 'I understand your request. Try a command like "Analyze scenes" or ask for "Help" to see all options.', es: 'Entiendo tu solicitud. Prueba un comando como "Analizar escenas" o pide "Ayuda" para ver todas las opciones.' });
 }

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * CastConsistencyMap
  * --------------------------------------------------------------
@@ -264,7 +265,7 @@ export function CastConsistencyMap({ scenes, characters, embedded = false, onUpd
               ⚠️ {orphans.map((o) => o.name).join(', ')} {orphans.length === 1 ? 'kommt' : 'kommen'} in keiner Szene vor.
               {canRepair
                 ? ' Die IDs tragen einen Outfit-/Katalog-Präfix — ein Klick repariert den Anker auf die Basis-UUID.'
-                : ' Klicke in einer Szene auf den Charakter-Button, um sie als Anker hinzuzufügen — oder generiere das Storyboard neu.'}
+                : tx({ de: ' Klicke in einer Szene auf den Charakter-Button, um sie als Anker hinzuzufügen — oder generiere das Storyboard neu.', en: ' In a scene, click the character button to add it as an anchor — or regenerate the storyboard.', es: ' En una escena, haz clic en el botón del personaje para añadirlo como ancla, o regenera el storyboard.' })}
             </div>
             {canRepair && (
               <Button

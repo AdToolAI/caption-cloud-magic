@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { tx } from '@/lib/i18nText';
 
 export interface UsageReport {
   id: string;
@@ -57,7 +58,7 @@ export const useUsageReports = () => {
       return data;
     } catch (error: any) {
       console.error('Error generating report:', error);
-      toast.error(error.message || 'Fehler beim Generieren des Reports');
+      toast.error(error.message || tx({ de: 'Fehler beim Generieren des Reports', en: 'Error generating the report', es: 'Error al generar el informe' }));
       return null;
     } finally {
       setLoading(false);

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -272,7 +273,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Video bearbeiten</DialogTitle>
-          <DialogDescription>Neue Version mit angepassten Einstellungen erstellen</DialogDescription>
+          <DialogDescription>{tx({ de: "Neue Version mit angepassten Einstellungen erstellen", en: "Create new version with adjusted settings", es: "Crear nueva versión con ajustes modificados" })}</DialogDescription>
         </DialogHeader>
 
         {hasChanges && (

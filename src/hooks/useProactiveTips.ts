@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { ensureValidSession } from '@/lib/ensureSession';
 import { useAuth } from '@/hooks/useAuth';
+import { tx } from "@/lib/i18nText";
 
 interface DiagnosticResult {
   category: string;
@@ -22,23 +23,23 @@ interface ProactiveTip {
 // Page-specific tips
 const PAGE_TIPS: Record<string, ProactiveTip> = {
   '/directors-cut': {
-    message: '💡 Tipp: Starte mit der KI-Analyse in Schritt 2 für automatische Szenen-Erkennung!',
+    message: tx({ de: '💡 Tipp: Starte mit der KI-Analyse in Schritt 2 für automatische Szenen-Erkennung!', en: '💡 Tip: Start with the AI analysis in step 2 for automatic scene detection!', es: '💡 Consejo: Empieza con el análisis de IA en el paso 2 para la detección automática de escenas.' }),
     type: 'info'
   },
   '/calendar': {
-    message: '💡 Tipp: Aktiviere Auto-Publish für geplante Posts um sie automatisch zu veröffentlichen!',
+    message: tx({ de: '💡 Tipp: Aktiviere Auto-Publish für geplante Posts um sie automatisch zu veröffentlichen!', en: '💡 Tip: Enable auto-publish for scheduled posts to publish them automatically!', es: '💡 Consejo: Activa la publicación automática para las publicaciones programadas.' }),
     type: 'info'
   },
   '/ai-text-studio': {
-    message: '💡 Tipp: Probiere verschiedene Töne (Humorvoll, Inspirierend) für bessere Ergebnisse!',
+    message: tx({ de: '💡 Tipp: Probiere verschiedene Töne (Humorvoll, Inspirierend) für bessere Ergebnisse!', en: '💡 Tip: Try different tones (humorous, inspiring) for better results!', es: '💡 Consejo: Prueba diferentes tonos (humorístico, inspirador) para mejores resultados.' }),
     type: 'info'
   },
   '/campaign-wizard': {
-    message: '💡 Tipp: Klicke ein Medium an und dann den Post, um es zuzuweisen - kein Drag & Drop nötig!',
+    message: tx({ de: '💡 Tipp: Klicke ein Medium an und dann den Post, um es zuzuweisen - kein Drag & Drop nötig!', en: '💡 Tip: Click a media item and then the post to assign it - no drag & drop needed!', es: '💡 Consejo: Haz clic en un archivo multimedia y luego en la publicación para asignarlo, sin necesidad de arrastrar y soltar.' }),
     type: 'info'
   },
   '/media-library': {
-    message: '💡 Tipp: Videos werden automatisch bereinigt wenn du das 100-Video-Limit erreichst.',
+    message: tx({ de: '💡 Tipp: Videos werden automatisch bereinigt wenn du das 100-Video-Limit erreichst.', en: '💡 Tip: Videos are automatically cleaned up once you reach the 100-video limit.', es: '💡 Consejo: Los videos se limpian automáticamente al alcanzar el límite de 100 videos.' }),
     type: 'info'
   },
 };

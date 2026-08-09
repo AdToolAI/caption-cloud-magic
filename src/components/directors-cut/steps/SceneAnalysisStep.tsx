@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -317,7 +318,7 @@ export function SceneAnalysisStep({
   // Apply all suggestions - scene by scene
   const applyAllSuggestions = () => {
     if (!onApplySuggestions) {
-      toast.error('Vorschläge können nicht angewendet werden');
+      toast.error(tx({ de: 'Vorschläge können nicht angewendet werden', en: 'Could not apply suggestions', es: 'No se pudieron aplicar las sugerencias' }));
       return;
     }
 
@@ -364,7 +365,7 @@ export function SceneAnalysisStep({
     if (!onApplySuggestions) return;
     
     if (scene.suggested_effects.length === 0) {
-      toast.info('Keine Vorschläge für diese Szene');
+      toast.info(tx({ de: 'Keine Vorschläge für diese Szene', en: 'No suggestions for this scene', es: 'No hay sugerencias para esta escena' }));
       return;
     }
     

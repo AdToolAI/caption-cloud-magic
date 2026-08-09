@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -51,7 +52,7 @@ const headlines: Record<string, { title: string; subtitle: string; allDone: stri
   },
   de: {
     title: "Deine erste Produktion",
-    subtitle: "Von der Idee zum veröffentlichten Video – Schritt für Schritt",
+    subtitle: tx({ de: "Von der Idee zum veröffentlichten Video – Schritt für Schritt", en: "From idea to published video – step by step", es: "De la idea al video publicado – paso a paso" }),
     allDone: "Alle Schritte abgeschlossen! 🎉",
   },
   es: {

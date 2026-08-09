@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +39,7 @@ export const ExportOptionsEditor = ({ options, onChange }: ExportOptionsEditorPr
     <Card>
       <CardHeader>
         <CardTitle>Export-Optionen</CardTitle>
-        <CardDescription>Wähle Format und Qualität für dein Video</CardDescription>
+        <CardDescription>{tx({ de: "Wähle Format und Qualität für dein Video", en: "Choose format and quality for your video", es: "Elige el formato y la calidad para tu video" })}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Format Selection */}

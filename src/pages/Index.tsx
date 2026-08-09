@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { SEO } from "@/components/SEO";
 import { PageWrapper } from "@/components/layout/PageWrapper";
@@ -49,7 +50,7 @@ const Index = () => {
       // aggregateRating intentionally omitted until real ratings are collected
       // (Google Search Console flags invented ratings as spammy structured data).
       "operatingSystem": "Web Browser",
-      "description": "KI-gestützte Social Media Marketing Platform für Content-Erstellung, Planung und Analytics.",
+      "description": tx({ de: "KI-gestützte Social Media Marketing Platform für Content-Erstellung, Planung und Analytics.", en: "AI-powered Social Media Marketing Platform for content creation, scheduling, and analytics.", es: "Plataforma de marketing en redes sociales impulsada por IA para creación de contenido, programación y análisis." }),
       "creator": {
         "@type": "Organization",
         "name": "AdTool AI"
@@ -81,7 +82,7 @@ const Index = () => {
       <div className="min-h-screen flex flex-col bg-background">
         <SEO
           title="Ein Creator. Ein ganzes Studio. — KI-Videoproduktion"
-          description="Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam."
+          description={tx({ de: "Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.", en: "All leading AI models, voices, and precise lip-sync in a continuous workflow. From idea to finished video — without a film crew.", es: "Todos los modelos de IA líderes, voces y sincronización labial precisa en un flujo de trabajo continuo. De la idea al video terminado — sin equipo de filmación." })}
           canonical="https://useadtool.ai/"
           lang={language}
           structuredData={structuredData}

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -15,7 +16,7 @@ const platformConfig = [
     icon: Instagram,
     color: 'text-pink-500',
     setupUrl: 'https://developers.facebook.com/apps',
-    description: 'Verbinde deinen Instagram Business Account über Meta Developer.',
+    description: tx({ de: 'Verbinde deinen Instagram Business Account über Meta Developer.', en: 'Connect your Instagram Business Account via Meta Developer.', es: 'Conecta tu cuenta de Instagram Business a través de Meta Developer.' }),
   },
   {
     id: 'tiktok' as Platform,
@@ -23,7 +24,7 @@ const platformConfig = [
     icon: Music,
     color: 'text-black dark:text-white',
     setupUrl: 'https://developers.tiktok.com',
-    description: 'Erstelle eine TikTok Developer App für API-Zugriff.',
+    description: tx({ de: 'Erstelle eine TikTok Developer App für API-Zugriff.', en: 'Create a TikTok Developer App for API access.', es: 'Crea una aplicación de desarrollador de TikTok para acceso a la API.' }),
   },
   {
     id: 'linkedin' as Platform,
@@ -31,7 +32,7 @@ const platformConfig = [
     icon: Linkedin,
     color: 'text-blue-600',
     setupUrl: 'https://www.linkedin.com/developers',
-    description: 'Richte LinkedIn OAuth 2.0 für deine Organization ein.',
+    description: tx({ de: 'Richte LinkedIn OAuth 2.0 für deine Organization ein.', en: 'Set up LinkedIn OAuth 2.0 for your Organization.', es: 'Configura LinkedIn OAuth 2.0 para tu organización.' }),
   },
   {
     id: 'youtube' as Platform,
@@ -47,7 +48,7 @@ const platformConfig = [
     icon: Facebook,
     color: 'text-blue-500',
     setupUrl: 'https://developers.facebook.com/apps',
-    description: 'Verbinde deine Facebook Page über Meta Developer.',
+    description: tx({ de: 'Verbinde deine Facebook Page über Meta Developer.', en: 'Connect your Facebook Page via Meta Developer.', es: 'Conecta tu página de Facebook a través de Meta Developer.' }),
   },
   {
     id: 'x' as Platform,
@@ -55,7 +56,7 @@ const platformConfig = [
     icon: Twitter,
     color: 'text-gray-900 dark:text-white',
     setupUrl: 'https://developer.twitter.com',
-    description: 'Erstelle eine X Developer App für API-Zugriff.',
+    description: tx({ de: 'Erstelle eine X Developer App für API-Zugriff.', en: 'Create an X Developer App for API access.', es: 'Crea una aplicación de desarrollador X para acceso a la API.' }),
   },
 ];
 

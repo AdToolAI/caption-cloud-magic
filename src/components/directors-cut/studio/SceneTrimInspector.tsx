@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useEffect, useMemo, useState } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
@@ -362,7 +363,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onSeek(sceneMid)}
-                title="Playhead an Szenengrenze — springt zur Szenenmitte, dann erneut teilen"
+                title={tx({ de: "Playhead an Szenengrenze — springt zur Szenenmitte, dann erneut teilen", en: "Playhead at scene boundary — jump to scene center, then split again", es: "Cabezal de reproducción en el límite de la escena: salta al centro de la escena y luego vuelve a dividir." })}
                 className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
               >
                 <MapPin className="h-3.5 w-3.5 mr-1.5" />

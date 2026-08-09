@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { Sparkles, ArrowRight, Gift } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -13,7 +14,7 @@ const copy = {
   de: {
     badge: "Express-Start",
     title: "Erstelle dein erstes KI-Video in 90 Sekunden",
-    body: "Wähle eine personalisierte Idee — Hailuo 2.3 generiert dein erstes Video in unter einer Minute. Du kannst den Prompt vor dem Start beliebig anpassen.",
+    body: tx({ de: "Wähle eine personalisierte Idee — Hailuo 2.3 generiert dein erstes Video in unter einer Minute. Du kannst den Prompt vor dem Start beliebig anpassen.", en: "Choose a personalized idea — Hailuo 2.3 generates your first video in under a minute. You can customize the prompt as you like before starting.", es: "Elige una idea personalizada — Hailuo 2.3 genera tu primer video en menos de un minuto. Puedes personalizar el prompt a tu gusto antes de empezar." }),
     cta: "Mit Hailuo 2.3 starten",
     chipsTitle: "Personalisierte Ideen",
     chipsTitleFallback: "Beliebte Ideen",

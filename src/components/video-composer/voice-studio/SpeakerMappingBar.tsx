@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -241,7 +242,7 @@ export function SpeakerMappingBar({
         }}
         language={targetLanguage}
         currentVoiceId={libraryFor ? speakerMap[libraryFor]?.voiceId : undefined}
-        title="Stimme für Sprecher wählen"
+        title={tx({ de: "Stimme für Sprecher wählen", en: "Choose voice for speaker", es: "Elegir voz para el orador" })}
       />
     </Card>
   );

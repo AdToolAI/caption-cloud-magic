@@ -8,6 +8,7 @@ import { Loader2, Crop, Smartphone, Monitor, Square, RectangleVertical, Wand2 } 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SceneAnalysis } from '@/types/directors-cut';
+import { tx } from "@/lib/i18nText";
 
 const ASPECT_RATIOS = [
   { id: '16:9', name: '16:9', description: 'YouTube, TV', icon: Monitor, width: 1920, height: 1080 },
@@ -110,12 +111,12 @@ export function SmartCropping({
       console.error('Smart Crop error:', error);
       
       if (error?.context?.status === 402) {
-        toast.error('Nicht genügend Credits', {
-          description: `Du benötigst ${CREDITS_COST} Credits für Smart Cropping`,
+        toast.error(tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'Créditos insuficientes' }), {
+          description: tx({ de: `Du benötigst ${CREDITS_COST} Credits für Smart Cropping`, en: `You need ${CREDITS_COST} credits for smart cropping`, es: `Necesitas ${CREDITS_COST} créditos para el recorte inteligente` }),
         });
       } else {
-        toast.error('Erkennung fehlgeschlagen', {
-          description: error.message || 'Bitte versuche es erneut',
+        toast.error(tx({ de: 'Erkennung fehlgeschlagen', en: 'Detection failed', es: 'Error en la detección' }), {
+          description: error.message || tx({ de: 'Bitte versuche es erneut', en: 'Please try again', es: 'Inténtalo de nuevo' }),
         });
       }
     } finally {

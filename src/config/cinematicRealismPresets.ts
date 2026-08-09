@@ -13,6 +13,7 @@
  */
 
 import type { ShotSelection } from '@/config/shotDirector';
+import { tx } from '@/lib/i18nText';
 
 export type RealismPresetId = 'cinematic-spot' | 'documentary' | 'lifestyle-hero';
 
@@ -50,7 +51,7 @@ export const REALISM_PRESETS: RealismPreset[] = [
   {
     id: 'cinematic-spot',
     label: 'Cinematic Spot',
-    description: '35 mm Filmlook, weiche Lens-Flares, flacher Fokus. Default für Werbespots.',
+    description: tx({ de: '35 mm Filmlook, weiche Lens-Flares, flacher Fokus. Default für Werbespots.', en: '35 mm film look, soft lens flares, shallow focus. Default for commercials.', es: 'Look de película de 35 mm, destellos de lente suaves, enfoque poco profundo. Predeterminado para anuncios.' }),
     glyph: '🎞️',
     directorContext: `REALISM PROFILE — CINEMATIC SPOT (TV commercial / brand film).
 Prefer action beats that feel like a real commercial: driving establishing shots,
@@ -73,7 +74,7 @@ unless the user explicitly asks for a presenter shot.`,
   {
     id: 'documentary',
     label: 'Documentary / Authentic',
-    description: 'Handheld, natürliches Licht, ungestellte Momente. Default für UGC und Testimonials.',
+    description: tx({ de: 'Handheld, natürliches Licht, ungestellte Momente. Default für UGC und Testimonials.', en: 'Handheld, natural light, unstaged moments. Default for UGC and testimonials.', es: 'Cámara en mano, luz natural, momentos sin escenificar. Predeterminado para UGC y testimonios.' }),
     glyph: '🎥',
     directorContext: `REALISM PROFILE — DOCUMENTARY / UGC AUTHENTIC.
 Prefer captured-not-staged beats: subject mid-action, glancing at the camera
@@ -95,7 +96,7 @@ casually while the subject keeps doing what they were doing.`,
   {
     id: 'lifestyle-hero',
     label: 'Lifestyle Hero',
-    description: 'Steadycam-Glide, dramatisches Licht, polished Post. Default für Brand-Hero & Aspirational.',
+    description: tx({ de: 'Steadycam-Glide, dramatisches Licht, polished Post. Default für Brand-Hero & Aspirational.', en: 'Steadicam glide, dramatic lighting, polished post. Default for brand hero & aspirational content.', es: 'Movimiento de Steadicam, iluminación dramática, posproducción pulida. Predeterminado para contenido de marca aspiracional.' }),
     glyph: '✨',
     directorContext: `REALISM PROFILE — LIFESTYLE HERO (aspirational brand film).
 Prefer wide aspirational beats: subject moving through a beautiful location,

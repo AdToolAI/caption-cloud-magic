@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Genre recipes.
  *
@@ -55,7 +56,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   corporate: {
     id: 'corporate',
     label: 'Unternehmensvideo',
-    description: 'Haltung und Menschen: Wer wir sind, wofür wir stehen, was wir bewegen.',
+    description: tx({ de: 'Haltung und Menschen: Wer wir sind, wofür wir stehen, was wir bewegen.', en: 'Attitude and People: Who we are, what we stand for, what we achieve.', es: 'Actitud y personas: Quiénes somos, qué defendemos, qué logramos.' }),
     beats: ['hook', 'emotion', 'proof', 'benefit', 'cta'],
     shotLadder: ['wide', 'medium_close', 'over_shoulder', 'medium', 'wide'],
     defaultMoves: ['crane_down', 'handheld', 'static', 'slow_push_in', 'slow_pull_out'],
@@ -79,7 +80,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   testimonial: {
     id: 'testimonial',
     label: 'Testimonial',
-    description: 'Eine Person, eine ehrliche Aussage, unterlegt mit Belegbildern.',
+    description: tx({ de: 'Eine Person, eine ehrliche Aussage, unterlegt mit Belegbildern.', en: 'One person, one honest statement, supported by evidence images.', es: 'Una persona, una declaración honesta, respaldada por imágenes de prueba.' }),
     beats: ['hook', 'problem', 'proof', 'benefit', 'cta'],
     shotLadder: ['medium_close', 'medium_close', 'insert', 'medium_close', 'medium'],
     defaultMoves: ['static', 'handheld', 'static', 'static', 'slow_push_in'],
@@ -103,7 +104,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   social_hook: {
     id: 'social_hook',
     label: 'Social Hook',
-    description: 'Maximal kurz, maximal auffällig — für Reels, Shorts und TikTok.',
+    description: tx({ de: 'Maximal kurz, maximal auffällig — für Reels, Shorts und TikTok.', en: 'As short as possible, as striking as possible — for Reels, Shorts, and TikTok.', es: 'Lo más corto posible, lo más llamativo posible — para Reels, Shorts y TikTok.' }),
     beats: ['hook', 'reveal', 'benefit', 'cta'],
     shotLadder: ['extreme_close_up', 'medium', 'insert', 'medium_close'],
     defaultMoves: ['whip_pan', 'handheld', 'rack_focus', 'slow_push_in'],
@@ -115,7 +116,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   image_post: {
     id: 'image_post',
     label: 'Bild-Post',
-    description: 'Ein einzelnes starkes Motiv — endet nach dem Anker, ohne Animation.',
+    description: tx({ de: 'Ein einzelnes starkes Motiv — endet nach dem Anker, ohne Animation.', en: 'A single strong motif — ends after the anchor, without animation.', es: 'Un único motivo fuerte — termina después del ancla, sin animación.' }),
     beats: ['hook'],
     shotLadder: ['medium'],
     defaultMoves: ['static'],

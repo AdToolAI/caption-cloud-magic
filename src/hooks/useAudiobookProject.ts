@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -96,7 +97,7 @@ export function useAudiobookProject() {
       await loadChapters(p.id);
     } catch (error) {
       console.error('[audiobook] init failed:', error);
-      toast.error('Hörbuch-Projekt konnte nicht geladen werden');
+      toast.error(tx({ de: 'Hörbuch-Projekt konnte nicht geladen werden', en: 'Could not load audiobook project', es: 'No se pudo cargar el proyecto del audiolibro' }));
     } finally {
       setLoading(false);
     }
@@ -156,7 +157,7 @@ export function useAudiobookProject() {
       title: `Kapitel ${chapters.length + 1}`,
       body: '',
     });
-    if (error) { toast.error('Kapitel konnte nicht angelegt werden'); return; }
+    if (error) { toast.error(tx({ de: 'Kapitel konnte nicht angelegt werden', en: 'Could not create chapter', es: 'No se pudo crear el capítulo' })); return; }
     await loadChapters(project.id);
   }, [project, chapters.length, loadChapters]);
 
@@ -171,7 +172,7 @@ export function useAudiobookProject() {
   const deleteChapter = useCallback(async (id: string) => {
     if (!project) return;
     const { error } = await supabase.from('audiobook_chapters').delete().eq('id', id);
-    if (error) { toast.error('Kapitel konnte nicht gelöscht werden'); return; }
+    if (error) { toast.error(tx({ de: 'Kapitel konnte nicht gelöscht werden', en: 'Could not delete chapter', es: 'No se pudo eliminar el capítulo' })); return; }
     const remaining = chapters.filter((c) => c.id !== id);
     await Promise.all(remaining.map((c, i) =>
       supabase.from('audiobook_chapters').update({ chapter_index: i }).eq('id', c.id)));

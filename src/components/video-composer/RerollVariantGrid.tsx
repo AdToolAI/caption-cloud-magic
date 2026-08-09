@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Phase 5.3 — Reroll Variant Grid (Artlist-style "pick your take")
  *
@@ -56,7 +57,7 @@ export default function RerollVariantGrid({
     if (!hasPrompt) {
       toast({
         title: 'Prompt fehlt',
-        description: 'Bitte zuerst einen Prompt schreiben.',
+        description: tx({ de: 'Bitte zuerst einen Prompt schreiben.', en: 'Please write a prompt first.', es: 'Por favor, escribe un prompt primero.' }),
         variant: 'destructive',
       });
       return;
@@ -76,7 +77,7 @@ export default function RerollVariantGrid({
       if (error) throw error;
       toast({
         title: parentSeed != null ? '🔁 Variationen gestartet' : '⚡ 4 Takes gestartet',
-        description: 'Fast-Previews ~10 Sek. — werden hier live aktualisiert.',
+        description: tx({ de: 'Fast-Previews ~10 Sek. — werden hier live aktualisiert.', en: 'Fast-Previews ~10 sec. — updated live here.', es: 'Vistas previas rápidas ~10 seg. — se actualizan en vivo aquí.' }),
       });
     } catch (err) {
       toast({

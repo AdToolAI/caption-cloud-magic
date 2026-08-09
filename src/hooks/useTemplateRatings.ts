@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -90,13 +91,13 @@ export const useSubmitRating = () => {
       queryClient.invalidateQueries({ queryKey: ['content-templates'] });
       toast({
         title: 'Bewertung gespeichert',
-        description: 'Ihre Bewertung wurde erfolgreich gespeichert.',
+        description: tx({ de: 'Ihre Bewertung wurde erfolgreich gespeichert.', en: 'Your rating has been saved successfully.', es: 'Tu valoración se ha guardado correctamente.' }),
       });
     },
     onError: (error) => {
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Bewertung konnte nicht gespeichert werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Bewertung konnte nicht gespeichert werden', en: 'Rating could not be saved', es: 'No se pudo guardar la calificación' }),
         variant: 'destructive',
       });
     },

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -124,7 +125,7 @@ export function LiveSweepTab() {
         const spent = rows.reduce((s, r) => s + Number(r.cost_eur || 0), 0);
         if (timedOut && !allTerminal) {
           toast.warning("Sweep läuft länger als 10 Min", {
-            description: "Polling gestoppt. Reload für neuen Status.",
+            description: tx({ de: "Polling gestoppt. Reload für neuen Status.", en: "Polling stopped. Reload for new status.", es: "Sondeo detenido. Recargar para nuevo estado." }),
           });
         } else {
           toast.success(`Sweep abgeschlossen — ${ok + expected + asyncStarted}/${rows.length} grün`, {
@@ -190,7 +191,7 @@ export function LiveSweepTab() {
         try {
           const json = await ctx?.json?.();
           if (json?.sweep_id) {
-            toast.info("Sweep läuft bereits — Polling übernommen.");
+            toast.info(tx({ de: "Sweep läuft bereits — Polling übernommen.", en: "Sweep already running — polling taken over.", es: "Barrido ya en curso — sondeo asumido." }));
             setActiveSweepId(json.sweep_id);
             await load();
             return;

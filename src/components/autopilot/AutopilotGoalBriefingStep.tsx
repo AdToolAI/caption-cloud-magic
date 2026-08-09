@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -105,7 +106,7 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
         </div>
         <p className="text-xs text-muted-foreground">
           {value.weekly_budget_eur < 20
-            ? '⚠️ Niedriges Budget: KI-Videos werden automatisch deaktiviert. Fokus auf KI-Bilder und Stock-Reels.'
+            ? tx({ de: '⚠️ Niedriges Budget: KI-Videos werden automatisch deaktiviert. Fokus auf KI-Bilder und Stock-Reels.', en: '⚠️ Low budget: AI videos are automatically disabled. Focus on AI images and stock reels.', es: '⚠️ Presupuesto bajo: los videos de IA se desactivan automáticamente. Concéntrate en imágenes de IA y reels de stock.' })
             : value.weekly_budget_eur < 50
             ? 'Mittleres Budget: gemischte Strategie aus Bildern, Stock & einzelnen KI-Videos.'
             : 'Hohes Budget: Volle KI-Video-Pipeline möglich.'}

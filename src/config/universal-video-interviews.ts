@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // ==========================================
 // Universal Video Creator - Interview Configurations
 // 4 Templates: Corporate Ad, Product Ad, Storytelling, Custom
@@ -11,7 +12,7 @@ import { CategoryInterviewConfig, InterviewPhase, VideoCategory } from '@/types/
 export const CORPORATE_AD_INTERVIEW: CategoryInterviewConfig = {
   category: 'corporate-ad',
   categoryName: 'Unternehmenswerbung',
-  categoryDescription: 'Professionelle Werbevideos für Unternehmen und Dienstleistungen',
+  categoryDescription: tx({ de: 'Professionelle Werbevideos für Unternehmen und Dienstleistungen', en: 'Professional promotional videos for businesses and services', es: 'Videos promocionales profesionales para empresas y servicios' }),
   icon: '🏢',
   phases: [
     { id: 'ca-1', phase: 1, question: 'Willkommen! Ich bin Max, dein KI-Berater. Was ist der Name deines Unternehmens oder deiner Marke?', purpose: 'Markenidentifikation', inputType: 'text', required: true },
@@ -49,7 +50,7 @@ export const CORPORATE_AD_INTERVIEW: CategoryInterviewConfig = {
 export const PRODUCT_AD_INTERVIEW: CategoryInterviewConfig = {
   category: 'product-ad',
   categoryName: 'Produktwerbung',
-  categoryDescription: 'Kreative Produktvideos mit deinen eigenen Produktfotos',
+  categoryDescription: tx({ de: 'Kreative Produktvideos mit deinen eigenen Produktfotos', en: 'Creative product videos with your own product photos', es: 'Videos de productos creativos con tus propias fotos de productos' }),
   icon: '📦',
   phases: [
     { id: 'pa-1', phase: 1, question: 'Wie heißt dein Produkt? Du hast bereits Bilder hochgeladen — lass uns das perfekte Werbevideo erstellen!', purpose: 'Produktname', inputType: 'text', required: true },
@@ -60,7 +61,7 @@ export const PRODUCT_AD_INTERVIEW: CategoryInterviewConfig = {
     { id: 'pa-6', phase: 6, question: 'Beschreibe eine ALLTAGSSZENE in der dein Produkt den entscheidenden Unterschied macht.', purpose: 'Alltagsszene', inputType: 'text', required: true },
     { id: 'pa-7', phase: 7, question: 'Was würde ein BEGEISTERTER KUNDE über dein Produkt in 10 Sekunden sagen?', purpose: 'Testimonial-Hook', inputType: 'text', required: true },
     { id: 'pa-8', phase: 8, question: 'Welchen FILMISCHEN STIL stellst du dir vor?', purpose: 'Filmischer Stil', inputType: 'select', options: ['Apple-like minimal & clean', 'Nike-energetisch & dynamisch', 'Luxury-elegant & premium', 'Lifestyle casual & authentisch', 'Tech-futuristisch & innovativ', 'Handmade/Organic & natürlich'], required: true },
-    { id: 'pa-9', phase: 9, question: 'Gibt es ein UNBOXING- oder REVEAL-MOMENT den wir dramatisch inszenieren können?', purpose: 'Reveal-Moment', inputType: 'text', required: false, quickReplies: ['Ja, Unboxing inszenieren', 'Ja, dramatischer Product-Reveal', 'Nein, direkt mit Produkt starten'] },
+    { id: 'pa-9', phase: 9, question: 'Gibt es ein UNBOXING- oder REVEAL-MOMENT den wir dramatisch inszenieren können?', purpose: 'Reveal-Moment', inputType: 'text', required: false, quickReplies: ['Ja, Unboxing inszenieren', 'Ja, dramatischer Product-Reveal', tx({ de: 'Nein, direkt mit Produkt starten', en: 'No, start directly with the product', es: 'No, empezar directamente con el producto' })] },
     { id: 'pa-10', phase: 10, question: 'Wer ist die Zielgruppe für dieses Produkt?', purpose: 'Zielgruppe', inputType: 'text', required: true },
     { id: 'pa-11', phase: 11, question: 'Gibt es einen Preis oder ein Angebot, das im Video genannt werden soll?', purpose: 'Pricing', inputType: 'text', required: false },
     { id: 'pa-12', phase: 12, question: 'Welche Aktion soll der Zuschauer nach dem Video ausführen?', purpose: 'CTA', inputType: 'select', options: ['Jetzt kaufen', 'Mehr erfahren', 'Kostenlos testen', 'Zum Shop', 'Vorbestellen', 'Link in Bio'], required: true },
@@ -88,30 +89,30 @@ export const STORYTELLING_INTERVIEW: CategoryInterviewConfig = {
   categoryDescription: 'Emotionale Geschichten — erfunden oder wahr, filmisch erzählt',
   icon: '📖',
   phases: [
-    { id: 'story-1', phase: 1, question: 'Willkommen! Ich bin Max und helfe dir, eine fesselnde Geschichte zu erzählen. Was ist der Name deines Unternehmens oder deiner Marke?', purpose: 'Markenidentifikation', inputType: 'text', required: true },
+    { id: 'story-1', phase: 1, question: tx({ de: 'Willkommen! Ich bin Max und helfe dir, eine fesselnde Geschichte zu erzählen. Was ist der Name deines Unternehmens oder deiner Marke?', en: 'Welcome! I\'m Max and I\'ll help you tell a captivating story. What is the name of your company or brand?', es: '¡Bienvenido! Soy Max y te ayudaré a contar una historia cautivadora. ¿Cuál es el nombre de tu empresa o marca?' }), purpose: 'Markenidentifikation', inputType: 'text', required: true },
     { id: 'story-2', phase: 2, question: 'Welche Art von Geschichte möchtest du erzählen?', purpose: 'Story-Typ', inputType: 'select', options: ['Gründergeschichte', 'Markengeschichte', 'Kundengeschichte', 'Fiktive Story', 'Unternehmensgeschichte', 'Vision & Mission'], required: true },
-    { id: 'story-3', phase: 3, question: 'Wer ist der Held deiner Geschichte? (Person, Unternehmen, Kunde, Produkt)', purpose: 'Protagonist', inputType: 'text', required: true },
+    { id: 'story-3', phase: 3, question: tx({ de: 'Wer ist der Held deiner Geschichte? (Person, Unternehmen, Kunde, Produkt)', en: 'Who is the hero of your story? (Person, company, customer, product)', es: '¿Quién es el héroe de tu historia? (Persona, empresa, cliente, producto)' }), purpose: 'Protagonist', inputType: 'text', required: true },
     { id: 'story-4', phase: 4, question: 'Was ist der Ausgangspunkt der Geschichte? Wie war die Situation am Anfang?', purpose: 'Setup', inputType: 'text', required: true },
-    { id: 'story-5', phase: 5, question: 'Welches Problem oder welche Herausforderung musste überwunden werden?', purpose: 'Konflikt', inputType: 'text', required: true },
+    { id: 'story-5', phase: 5, question: tx({ de: 'Welches Problem oder welche Herausforderung musste überwunden werden?', en: 'What problem or challenge had to be overcome?', es: '¿Qué problema o desafío hubo que superar?' }), purpose: 'Konflikt', inputType: 'text', required: true },
     { id: 'story-6', phase: 6, question: 'Was war der Wendepunkt? Der entscheidende Moment der Veränderung?', purpose: 'Wendepunkt', inputType: 'text', required: true },
-    { id: 'story-7', phase: 7, question: 'Wie wurde das Problem gelöst? Was war die Lösung oder Erkenntnis?', purpose: 'Lösung', inputType: 'text', required: true },
-    { id: 'story-8', phase: 8, question: 'Was ist das Ergebnis? Wie sieht die Situation jetzt aus?', purpose: 'Resolution', inputType: 'text', required: true },
+    { id: 'story-7', phase: 7, question: tx({ de: 'Wie wurde das Problem gelöst? Was war die Lösung oder Erkenntnis?', en: 'How was the problem solved? What was the solution or insight?', es: '¿Cómo se resolvió el problema? ¿Cuál fue la solución o el descubrimiento?' }), purpose: 'Lösung', inputType: 'text', required: true },
+    { id: 'story-8', phase: 8, question: tx({ de: 'Was ist das Ergebnis? Wie sieht die Situation jetzt aus?', en: 'What is the result? What does the situation look like now?', es: '¿Cuál es el resultado? ¿Cómo es la situación ahora?' }), purpose: 'Resolution', inputType: 'text', required: true },
     { id: 'story-9', phase: 9, question: 'Welche Emotion soll der Zuschauer am Ende empfinden?', purpose: 'Emotionales Ziel', inputType: 'select', options: ['Inspiriert', 'Berührt', 'Motiviert', 'Vertrauensvoll', 'Begeistert', 'Hoffnungsvoll', 'Verbunden'], required: true },
-    { id: 'story-10', phase: 10, question: 'Wer ist die Zielgruppe für diese Geschichte?', purpose: 'Zielgruppe', inputType: 'text', required: true },
+    { id: 'story-10', phase: 10, question: tx({ de: 'Wer ist die Zielgruppe für diese Geschichte?', en: 'Who is the target audience for this story?', es: '¿Quién es el público objetivo de esta historia?' }), purpose: 'Zielgruppe', inputType: 'text', required: true },
     { id: 'story-11', phase: 11, question: 'Was ist die zentrale Botschaft, die hängen bleiben soll?', purpose: 'Kernbotschaft', inputType: 'text', required: true },
-    { id: 'story-12', phase: 12, question: 'Welche Werte oder Überzeugungen sollen vermittelt werden?', purpose: 'Werte', inputType: 'multiselect', options: ['Innovation', 'Nachhaltigkeit', 'Qualität', 'Familie', 'Mut', 'Ehrlichkeit', 'Leidenschaft', 'Gemeinschaft'], required: true },
+    { id: 'story-12', phase: 12, question: tx({ de: 'Welche Werte oder Überzeugungen sollen vermittelt werden?', en: 'What values or beliefs should be conveyed?', es: '¿Qué valores o creencias deben transmitirse?' }), purpose: 'Werte', inputType: 'multiselect', options: ['Innovation', 'Nachhaltigkeit', 'Qualität', 'Familie', 'Mut', 'Ehrlichkeit', 'Leidenschaft', 'Gemeinschaft'], required: true },
     { id: 'story-13', phase: 13, question: 'Wie lang soll die Geschichte sein?', purpose: 'Dauer', inputType: 'select', options: ['60 Sekunden (Kurzform)', '90 Sekunden (Standard)', '2 Minuten (Ausführlich)', '3 Minuten (Episch)'], required: true },
     { id: 'story-14', phase: 14, question: 'Welchen visuellen Stil stellst du dir vor?', purpose: 'Visueller Stil', inputType: 'select', options: ['Cinematic & Filmisch', 'Dokumentarisch & Authentisch', 'Emotional & Warm', 'Modern & Stylisch', 'Nostalgisch & Vintage', 'Künstlerisch & Kreativ'], required: true },
-    { id: 'story-15', phase: 15, question: 'Welche Farben und Stimmung passen zur Geschichte?', purpose: 'Farbstimmung', inputType: 'select', options: ['Warme Erdtöne', 'Kühle Blautöne', 'Lebendige Farben', 'Schwarz-Weiß Akzente', 'Pastelltöne', 'Markenfarben'], required: true },
-    { id: 'story-16', phase: 16, question: 'Soll ein Charakter oder eine Person im Video erscheinen?', purpose: 'Charakter', inputType: 'select', options: ['Ja, animierter Charakter', 'Ja, reale Person (als Animation)', 'Nein, nur visuelle Szenen', 'Symbol oder Maskottchen'], required: true },
+    { id: 'story-15', phase: 15, question: tx({ de: 'Welche Farben und Stimmung passen zur Geschichte?', en: 'What colors and mood suit the story?', es: '¿Qué colores y ambiente se adaptan a la historia?' }), purpose: 'Farbstimmung', inputType: 'select', options: ['Warme Erdtöne', 'Kühle Blautöne', 'Lebendige Farben', 'Schwarz-Weiß Akzente', 'Pastelltöne', 'Markenfarben'], required: true },
+    { id: 'story-16', phase: 16, question: tx({ de: 'Soll ein Charakter oder eine Person im Video erscheinen?', en: 'Should a character or person appear in the video?', es: '¿Debería aparecer un personaje o una persona en el video?' }), purpose: 'Charakter', inputType: 'select', options: ['Ja, animierter Charakter', 'Ja, reale Person (als Animation)', 'Nein, nur visuelle Szenen', 'Symbol oder Maskottchen'], required: true },
     { id: 'story-17', phase: 17, question: 'Beschreibe den Charakter näher (Aussehen, Persönlichkeit).', purpose: 'Charakter-Details', inputType: 'text', required: false },
     { id: 'story-18', phase: 18, question: 'Welche Stimme soll die Geschichte erzählen?', purpose: 'Erzählerstimme', inputType: 'select', options: ['Männlich, warm & vertrauensvoll', 'Männlich, inspirierend', 'Weiblich, emotional & einfühlsam', 'Weiblich, kraftvoll & motivierend', 'Ich-Erzähler (Protagonist)'], required: true },
-    { id: 'story-19', phase: 19, question: 'In welcher Sprache soll die Geschichte erzählt werden?', purpose: 'Sprache', inputType: 'select', options: ['Deutsch', 'Englisch', 'Mehrsprachig'], required: true },
+    { id: 'story-19', phase: 19, question: tx({ de: 'In welcher Sprache soll die Geschichte erzählt werden?', en: 'In what language should the story be told?', es: '¿En qué idioma debe contarse la historia?' }), purpose: 'Sprache', inputType: 'select', options: ['Deutsch', 'Englisch', 'Mehrsprachig'], required: true },
     { id: 'story-20', phase: 20, question: 'Welche Musikstimmung unterstreicht die Geschichte am besten?', purpose: 'Musik', inputType: 'select', options: ['Emotional & Berührend', 'Inspirierend & Aufbauend', 'Episch & Cinematic', 'Sanft & Nachdenklich', 'Hoffnungsvoll & Optimistisch'], required: true },
     { id: 'story-21', phase: 21, question: 'Gibt es besondere visuelle Elemente oder Szenen, die vorkommen sollen?', purpose: 'Visuelle Wünsche', inputType: 'text', required: false },
     { id: 'story-22', phase: 22, question: 'Hast du Referenzvideos, die dich inspiriert haben?', purpose: 'Referenzen', inputType: 'text', required: false },
-    { id: 'story-23', phase: 23, question: 'Was soll der Zuschauer nach dem Video tun oder denken?', purpose: 'CTA/Outcome', inputType: 'text', required: true },
-    { id: 'story-24', phase: 24, question: 'Wunderbar! Deine Geschichte nimmt Form an. Möchtest du noch etwas hinzufügen?', purpose: 'Finale Bestätigung', inputType: 'text', required: false, quickReplies: ['Nein, lass uns starten!', 'Ja, ich möchte ergänzen...'] }
+    { id: 'story-23', phase: 23, question: tx({ de: 'Was soll der Zuschauer nach dem Video tun oder denken?', en: 'What should the viewer do or think after the video?', es: '¿Qué debería hacer o pensar el espectador después del video?' }), purpose: 'CTA/Outcome', inputType: 'text', required: true },
+    { id: 'story-24', phase: 24, question: tx({ de: 'Wunderbar! Deine Geschichte nimmt Form an. Möchtest du noch etwas hinzufügen?', en: 'Wonderful! Your story is taking shape. Would you like to add anything else?', es: '¡Maravilloso! Tu historia está tomando forma. ¿Te gustaría añadir algo más?' }), purpose: 'Finale Bestätigung', inputType: 'text', required: false, quickReplies: ['Nein, lass uns starten!', 'Ja, ich möchte ergänzen...'] }
   ],
   totalPhases: 24,
   recommendedStructure: 'hero-journey',
@@ -129,11 +130,11 @@ export const CUSTOM_INTERVIEW: CategoryInterviewConfig = {
   icon: '✨',
   phases: [
     { id: 'cust-1', phase: 1, question: 'Willkommen im Freien Editor! Beschreibe deine Video-Idee in 2-3 Sätzen.', purpose: 'Idee', inputType: 'text', required: true },
-    { id: 'cust-2', phase: 2, question: 'Was für eine Art Video möchtest du erstellen?', purpose: 'Video-Typ', inputType: 'select', options: ['Tutorial/How-To', 'Erklärvideo', 'Social Media Content', 'Event-Video', 'Promo/Teaser', 'Präsentation/Pitch', 'Testimonial', 'Anderes'], required: true },
+    { id: 'cust-2', phase: 2, question: tx({ de: 'Was für eine Art Video möchtest du erstellen?', en: 'What kind of video do you want to create?', es: '¿Qué tipo de video quieres crear?' }), purpose: 'Video-Typ', inputType: 'select', options: ['Tutorial/How-To', 'Erklärvideo', 'Social Media Content', 'Event-Video', 'Promo/Teaser', 'Präsentation/Pitch', 'Testimonial', 'Anderes'], required: true },
     { id: 'cust-3', phase: 3, question: 'Welches Ziel soll das Video erreichen?', purpose: 'Ziel', inputType: 'text', required: true },
-    { id: 'cust-4', phase: 4, question: 'Wer ist die Zielgruppe für dieses Video?', purpose: 'Zielgruppe', inputType: 'text', required: true },
+    { id: 'cust-4', phase: 4, question: tx({ de: 'Wer ist die Zielgruppe für dieses Video?', en: 'Who is the target audience for this video?', es: '¿Quién es el público objetivo de este video?' }), purpose: 'Zielgruppe', inputType: 'text', required: true },
     { id: 'cust-5', phase: 5, question: 'Gibt es ein Produkt, Service oder Thema im Fokus? Beschreibe es.', purpose: 'Fokus', inputType: 'text', required: true },
-    { id: 'cust-6', phase: 6, question: 'Was ist die Kernbotschaft in einem Satz?', purpose: 'Kernbotschaft', inputType: 'text', required: true },
+    { id: 'cust-6', phase: 6, question: tx({ de: 'Was ist die Kernbotschaft in einem Satz?', en: 'What is the core message in one sentence?', es: '¿Cuál es el mensaje principal en una frase?' }), purpose: 'Kernbotschaft', inputType: 'text', required: true },
     { id: 'cust-7', phase: 7, question: 'Welche Struktur soll das Video haben?', purpose: 'Struktur', inputType: 'select', options: ['Problem → Lösung', 'Hook → Wert → CTA', 'Schritt-für-Schritt', 'Vorher/Nachher', 'Feature-Showcase', 'Freie Erzählung', 'Listenformat'], required: true },
     { id: 'cust-8', phase: 8, question: 'Welchen visuellen Stil stellst du dir vor?', purpose: 'Visueller Stil', inputType: 'select', options: ['Modern & Clean', 'Cinematic', 'Minimalistisch', 'Bold & Farbenfroh', 'Comic/Cartoon', 'Dokumentarisch', 'Futuristisch'], required: true },
     { id: 'cust-9', phase: 9, question: 'Welche Farben sollen verwendet werden?', purpose: 'Farben', inputType: 'text', required: true, quickReplies: ['Blau & Weiß', 'Schwarz & Gold', 'Bunt & Lebendig', 'Markenfarben'] },

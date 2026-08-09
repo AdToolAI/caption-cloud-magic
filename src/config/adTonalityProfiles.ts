@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Ad Tonality Profiles — 12 abstract advertising voice profiles
  *
@@ -166,7 +167,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       de: [
         '73 % der Befragten sagen...',
         'Im April 2024 entschied sich Maria, alles zu ändern.',
-        'Das hier ist keine Werbung. Das hier ist passiert.',
+        tx({ de: 'Das hier ist keine Werbung. Das hier ist passiert.', en: 'This is not an advertisement. This is what happened.', es: 'Esto no es un anuncio. Esto es lo que pasó.' }),
       ],
       en: [
         '73% of those surveyed say...',
@@ -205,9 +206,9 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     },
     hookPatterns: {
       de: [
-        'Weil Mittwoch der neue Freitag ist.',
-        'Spoiler: Es schmeckt nicht nach Brokkoli.',
-        'Klein. Aber nicht so klein, wie deine Geduld.',
+        tx({ de: 'Weil Mittwoch der neue Freitag ist.', en: 'Because Wednesday is the new Friday.', es: 'Porque el miércoles es el nuevo viernes.' }),
+        tx({ de: 'Spoiler: Es schmeckt nicht nach Brokkoli.', en: 'Spoiler: It doesn\'t taste like broccoli.', es: 'Spoiler: No sabe a brócoli.' }),
+        tx({ de: 'Klein. Aber nicht so klein, wie deine Geduld.', en: 'Small. But not as small as your patience.', es: 'Pequeño. Pero no tan pequeño como tu paciencia.' }),
       ],
       en: [
         'Because Wednesday is the new Friday.',
@@ -221,7 +222,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       ],
     },
     ctaPatterns: {
-      de: ['Probier’s aus. Was kann schon schiefgehen?', 'Klick mich.', 'Du weißt, was zu tun ist.'],
+      de: [tx({ de: 'Probier’s aus. Was kann schon schiefgehen?', en: 'Try it. What could go wrong?', es: 'Pruébalo. ¿Qué podría salir mal?' }), 'Klick mich.', 'Du weißt, was zu tun ist.'],
       en: ["Try it. What's the worst that could happen?", 'Click me.', 'You know what to do.'],
       es: ['Pruébalo. ¿Qué puede salir mal?', 'Haz clic.', 'Ya sabes qué hacer.'],
     },
@@ -247,7 +248,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     hookPatterns: {
       de: [
         'Wir wissen, wie sich das anfühlt.',
-        'Du bist nicht allein damit.',
+        tx({ de: 'Du bist nicht allein damit.', en: 'You\'re not alone in this.', es: 'No estás solo en esto.' }),
         'Manche Tage sind schwerer als andere.',
       ],
       en: [
@@ -262,7 +263,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       ],
     },
     ctaPatterns: {
-      de: ['Wir sind hier.', 'Mach den ersten Schritt.', 'In deinem Tempo.'],
+      de: [tx({ de: 'Wir sind hier.', en: 'We are here.', es: 'Estamos aquí.' }), 'Mach den ersten Schritt.', 'In deinem Tempo.'],
       en: ["We're here.", 'Take the first step.', 'At your own pace.'],
       es: ['Estamos aquí.', 'Da el primer paso.', 'A tu ritmo.'],
     },
@@ -288,7 +289,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     hookPatterns: {
       de: [
         'Was wäre, wenn alles möglich wäre?',
-        'Stell dir eine Welt vor, in der...',
+        tx({ de: 'Stell dir eine Welt vor, in der...', en: 'Imagine a world where...', es: 'Imagina un mundo donde...' }),
         'Die Zukunft beginnt nicht morgen.',
       ],
       en: [
@@ -473,7 +474,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
     hookPatterns: {
       de: [
         'Gemeinsam machen wir den Tag bunter.',
-        'Heute ist ein guter Tag, oder?',
+        tx({ de: 'Heute ist ein guter Tag, oder?', en: 'Today is a good day, isn\'t it?', es: '¿Hoy es un buen día, verdad?' }),
         'Lass uns lächeln. Aus einem Grund.',
       ],
       en: [

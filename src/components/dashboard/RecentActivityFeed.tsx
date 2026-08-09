@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -368,7 +369,7 @@ export function RecentActivityFeed() {
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {language === 'de'
-                  ? '30-Tage Puls · gruppierte Signale aus deiner Plattform'
+                  ? tx({ de: '30-Tage Puls · gruppierte Signale aus deiner Plattform', en: '30-day pulse · grouped signals from your platform', es: 'Pulso de 30 días · señales agrupadas de tu plataforma' })
                   : language === 'es'
                   ? 'Pulso de 30 días · señales agrupadas'
                   : '30-day pulse · grouped signals from your platform'}
@@ -467,7 +468,7 @@ function EmptyState({ language }: { language: string }) {
       </div>
       <p className="mb-3 text-sm text-muted-foreground max-w-xs">
         {language === 'de'
-          ? 'Noch keine Signale. Verbinde einen Kanal, um Live-Aktivitäten zu sehen.'
+          ? tx({ de: 'Noch keine Signale. Verbinde einen Kanal, um Live-Aktivitäten zu sehen.', en: 'No signals yet. Connect a channel to see live activities.', es: 'Aún no hay señales. Conecta un canal para ver actividades en vivo.' })
           : language === 'es'
           ? 'Aún sin señales. Conecta un canal para ver actividad en vivo.'
           : 'No signals yet. Connect a channel to see live activity.'}
@@ -487,7 +488,7 @@ function StaleBanner({ language }: { language: string }) {
       <Radio className="h-4 w-4 text-primary" />
       <p className="flex-1 text-xs text-muted-foreground">
         {language === 'de'
-          ? 'Aktuell keine neuen Signale. Ältere Aktivitäten im Archiv unten.'
+          ? tx({ de: 'Aktuell keine neuen Signale. Ältere Aktivitäten im Archiv unten.', en: 'No new signals currently. Older activities in the archive below.', es: 'Actualmente no hay señales nuevas. Actividades anteriores en el archivo de abajo.' })
           : language === 'es'
           ? 'Sin señales recientes. Actividad antigua en el archivo abajo.'
           : 'No recent signals. Older activity in the archive below.'}

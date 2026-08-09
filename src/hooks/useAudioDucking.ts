@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -83,7 +84,7 @@ export function useAudioDucking({
       .then(b => { if (!cancelled) setSpeechBuffer(b); })
       .catch(err => {
         console.error('[useAudioDucking] speech decode failed:', err);
-        if (!cancelled) toast.error('Sprach-Audio konnte nicht geladen werden');
+        if (!cancelled) toast.error(tx({ de: 'Sprach-Audio konnte nicht geladen werden', en: 'Could not load voice audio', es: 'No se pudo cargar el audio de voz' }));
       })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
@@ -100,7 +101,7 @@ export function useAudioDucking({
       .then(b => { if (!cancelled) setMusicBuffer(b); })
       .catch(err => {
         console.error('[useAudioDucking] music decode failed:', err);
-        if (!cancelled) toast.error('Musik konnte nicht geladen werden');
+        if (!cancelled) toast.error(tx({ de: 'Musik konnte nicht geladen werden', en: 'Could not load music', es: 'No se pudo cargar la música' }));
       });
     return () => { cancelled = true; };
   }, [musicUrl, decode]);
@@ -300,7 +301,7 @@ export function useAudioDucking({
       // Upload
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error('Bitte einloggen, um Mixes zu speichern');
+        toast.error(tx({ de: 'Bitte einloggen, um Mixes zu speichern', en: 'Please log in to save mixes', es: 'Por favor, inicia sesión para guardar mezclas' }));
         return null;
       }
 

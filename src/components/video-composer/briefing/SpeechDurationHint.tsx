@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo } from 'react';
 import { Clock } from 'lucide-react';
 
@@ -92,7 +93,7 @@ export function SpeechDurationHint({ text, targetDurationSec, language = 'de' }:
     let message = '';
     if (words < 6) {
       tone = 'idle';
-      message = 'Noch zu wenig gesprochener Text für eine Schätzung.';
+      message = tx({ de: 'Noch zu wenig gesprochener Text für eine Schätzung.', en: 'Not enough spoken text yet for an estimate.', es: 'Todavía no hay suficiente texto hablado para una estimación.' });
     } else if (ratio <= 1.05) {
       tone = 'ok';
       message = `Passt zu ${targetDurationSec}s Gesamtdauer.`;

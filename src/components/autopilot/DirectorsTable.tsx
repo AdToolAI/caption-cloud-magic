@@ -59,6 +59,7 @@ import {
 } from '@/lib/autopilot/autoVoice';
 import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/autopilot/types';
 import { cn } from '@/lib/utils';
+import { useTx } from '@/lib/i18nText';
 
 const ASPECTS: Array<{ value: AutopilotAspect; label: string }> = [
   { value: '9:16', label: 'Hochkant 9:16 — Reels, Shorts, TikTok' },
@@ -109,6 +110,7 @@ export interface DirectorsTableBriefing {
 
 export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing } = {}) {
   const { toast } = useToast();
+  const tr = useTx();
 
   const [brief, setBrief] = useState(briefing?.brief ?? '');
   const [genre, setGenre] = useState<AutopilotGenre | 'auto'>(briefing?.genre ?? 'auto');
@@ -488,14 +490,14 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
       setApproved(true);
       toast({
-        title: 'Produktion läuft',
+        title: tr({ de: 'Produktion läuft', en: 'Production running', es: 'Producción en curso' }),
         description:
-          'Jede Szene wird erst als Standbild geprüft und nur dann animiert — du kannst live zuschauen.',
+          tr({ de: 'Jede Szene wird erst als Standbild geprüft und nur dann animiert — du kannst live zuschauen.', en: 'Each scene is first reviewed as a still frame and only then animated — you can watch live.', es: 'Cada escena se revisa primero como fotograma fijo y solo después se anima — puedes verlo en vivo.' }),
       });
     } catch (err) {
       toast({
-        title: 'Produktion konnte nicht starten',
-        description: err instanceof Error ? err.message : 'Unbekannter Fehler',
+        title: tr({ de: 'Produktion konnte nicht starten', en: 'Production could not start', es: 'La producción no pudo iniciarse' }),
+        description: err instanceof Error ? err.message : tr({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: 'destructive',
       });
     } finally {
@@ -527,7 +529,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
               value={brief}
               onChange={(event) => setBrief(event.target.value)}
               rows={3}
-              placeholder="z. B. Ein Werbevideo für unsere neue Espressomaschine — Zielgruppe Berufstätige, die morgens keine Zeit haben."
+              placeholder={tr({ de: "z. B. Ein Werbevideo für unsere neue Espressomaschine — Zielgruppe Berufstätige, die morgens keine Zeit haben.", en: "e.g. An ad video for our new espresso machine — target audience: working people who have no time in the morning.", es: "p. ej. Un video publicitario para nuestra nueva máquina de espresso — público objetivo: profesionales sin tiempo por la mañana." })}
               className="resize-none"
             />
           </div>
@@ -644,7 +646,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
 
           {castingBusy && (
             <div className="mt-4">
-              <StageProgressBar label="Besetzung und Stimmen werden zugeordnet …" />
+              <StageProgressBar label={tr({ de: "Besetzung und Stimmen werden zugeordnet …", en: "Assigning cast and voices …", es: "Asignando reparto y voces …" })} />
             </div>
           )}
 
@@ -790,7 +792,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
                   )}
                 >
                   Guthaben: {formatEuro(walletEuros)}
-                  {walletEuros < cost.totalEuros && ' — reicht nicht für den kompletten Film.'}
+                  {walletEuros < cost.totalEuros && tr({ de: ' — reicht nicht für den kompletten Film.', en: ' — not enough for the complete film.', es: ' — no alcanza para la película completa.' })}
                 </p>
               )}
             </div>

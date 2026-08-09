@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * VoiceProfileCard — Phase C, Baustein 3
  *
@@ -125,7 +126,7 @@ export function VoiceProfileCard({ avatarId, avatar }: VoiceProfileCardProps) {
       await qc.invalidateQueries({ queryKey: ['avatar-detail', avatarId] });
       toast.success(v ? `Voice gesetzt: ${v.name}` : 'Voice entfernt');
     } catch (e: any) {
-      toast.error(e?.message || 'Konnte Voice nicht speichern');
+      toast.error(e?.message || tx({ de: 'Konnte Voice nicht speichern', en: 'Could not save voice', es: 'No se pudo guardar la voz' }));
     } finally {
       setSaving(false);
     }

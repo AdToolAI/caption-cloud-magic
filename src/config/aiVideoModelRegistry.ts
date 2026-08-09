@@ -14,6 +14,7 @@ import {
   Film, Volume2, Zap, Wand2, Eye, Camera, Video, Sparkles, TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 import { KLING_VIDEO_MODELS } from './klingVideoCredits';
 import { VEO_VIDEO_MODELS } from './veoVideoCredits';
@@ -572,7 +573,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     tagline: 'Smooth motion · Start+End frame morphing',
     legacyRoute: '/pika-video-studio',
     status: 'maintenance',
-    statusReason: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.',
+    statusReason: tx({ de: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.', en: 'Pika is temporarily offline (provider maintenance). We will re-enable the model as soon as the Pika Labs API is stable again.', es: 'Pika está temporalmente fuera de línea (mantenimiento del proveedor). Reactivaremos el modelo en cuanto la API de Pika Labs vuelva a ser estable.' }),
   },
   {
     id: 'pika-2-2-pro',
@@ -591,7 +592,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     tagline: 'High-fidelity Pika · 1080p',
     legacyRoute: '/pika-video-studio',
     status: 'maintenance',
-    statusReason: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.',
+    statusReason: tx({ de: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.', en: 'Pika is temporarily offline (provider maintenance). We will re-enable the model as soon as the Pika Labs API is stable again.', es: 'Pika está temporalmente fuera de línea (mantenimiento del proveedor). Reactivaremos el modelo en cuanto la API de Pika Labs vuelva a ser estable.' }),
   },
 
   /* ─────────── Vidu (IDs q2-*, läuft real auf Q3) ─────────── */

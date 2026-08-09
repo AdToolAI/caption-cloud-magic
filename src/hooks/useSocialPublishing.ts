@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -237,7 +238,7 @@ export function useSocialPublishing() {
 
       if (!ytResult?.ok) {
         const message = ytResult?.error_message
-          || 'YouTube-Veröffentlichung fehlgeschlagen. Bitte Verbindung unter Einstellungen → Verbindungen prüfen.';
+          || tx({ de: 'YouTube-Veröffentlichung fehlgeschlagen. Bitte Verbindung unter Einstellungen → Verbindungen prüfen.', en: 'YouTube publishing failed. Please check connection under Settings → Connections.', es: 'La publicación en YouTube falló. Por favor, comprueba la conexión en Ajustes → Conexiones.' });
         toast({ title: 'YouTube Fehler', description: message, variant: 'destructive' });
         return { success: false, error: message };
       }

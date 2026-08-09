@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Info, ShieldCheck, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -47,16 +48,16 @@ export function SafePlanNotice({ normalization }: SafePlanNoticeProps) {
       : 'text-emerald-300';
 
   const headline = inconsistent
-    ? 'Plan noch nicht konsistent'
+    ? tx({ de: 'Plan noch nicht konsistent', en: 'Plan not yet consistent', es: 'El plan aún no es consistente' })
     : hasRepairs
       ? `${repairs.length} automatische Korrektur${repairs.length === 1 ? '' : 'en'}`
       : 'Plan passt zu deinem Briefing';
 
   const subline = inconsistent
-    ? 'Bitte Szenendauern anpassen oder Briefing neu analysieren.'
+    ? tx({ de: 'Bitte Szenendauern anpassen oder Briefing neu analysieren.', en: 'Please adjust scene durations or re-analyze the briefing.', es: 'Por favor, ajusta las duraciones de las escenas o vuelve a analizar el briefing.' })
     : hasRepairs
-      ? 'Wir haben Widersprüche zwischen Briefing, Board und Skript sauber aufgelöst.'
-      : 'Keine Widersprüche gefunden — dein Plan ist bereit.';
+      ? tx({ de: 'Wir haben Widersprüche zwischen Briefing, Board und Skript sauber aufgelöst.', en: 'We have cleanly resolved contradictions between briefing, board, and script.', es: 'Hemos resuelto limpiamente las contradicciones entre el briefing, el storyboard y el guion.' })
+      : tx({ de: 'Keine Widersprüche gefunden — dein Plan ist bereit.', en: 'No contradictions found — your plan is ready.', es: 'No se encontraron contradicciones — tu plan está listo.' });
 
   return (
     <div className={`rounded-lg border ${tone} p-3 text-xs space-y-2`}>

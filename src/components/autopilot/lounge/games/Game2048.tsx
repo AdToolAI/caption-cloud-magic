@@ -10,6 +10,7 @@
 import { useEffect, useReducer, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useTx } from '@/lib/i18nText';
 
 type Grid = number[][];
 type Dir = 'left' | 'right' | 'up' | 'down';
@@ -115,6 +116,7 @@ const TILE_STYLE: Record<number, string> = {
 };
 
 export default function Game2048() {
+  const tx = useTx();
   const [state, dispatch] = useReducer(reducer, undefined, init);
   const touch = useRef<{ x: number; y: number } | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -151,13 +153,13 @@ export default function Game2048() {
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          Punkte <span className="font-mono text-foreground">{state.score}</span>
+          {tx({ de: "Punkte", en: "Score", es: "Puntos" })} <span className="font-mono text-foreground">{state.score}</span>
         </span>
         <span>
-          Bestwert <span className="font-mono text-foreground">{state.best}</span>
+          {tx({ de: "Bestwert", en: "Best", es: "Mejor puntaje" })} <span className="font-mono text-foreground">{state.best}</span>
         </span>
         <Button size="sm" variant="outline" onClick={() => dispatch({ type: 'reset' })}>
-          Neu
+          {tx({ de: "Neu", en: "New", es: "Nuevo" })}
         </Button>
       </div>
 
@@ -211,7 +213,7 @@ export default function Game2048() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        {dead ? 'Kein Zug mehr möglich — neu starten.' : 'Pfeiltasten, Wischen oder Buttons.'}
+        {dead ? tx({ de: "Kein Zug mehr möglich — neu starten.", en: "No moves left — start over.", es: "No quedan movimientos — reinicia." }) : tx({ de: "Pfeiltasten, Wischen oder Buttons.", en: "Arrow keys, swiping or buttons.", es: "Teclas de flecha, deslizar o botones." })}
       </p>
     </div>
   );

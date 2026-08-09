@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -85,7 +86,7 @@ export function useCommunityMessages(channelId: string | null) {
     });
 
     if (error) {
-      toast.error("Nachricht konnte nicht gesendet werden");
+      toast.error(tx({ de: "Nachricht konnte nicht gesendet werden", en: "Message could not be sent", es: "No se pudo enviar el mensaje" }));
       console.error(error);
     }
 

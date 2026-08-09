@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * DialogTakeStrip — Phase B: Take-System A/B/C for per-line VO re-rolls.
  *
@@ -51,10 +52,10 @@ const T = {
     add: 'Take aufnehmen',
     addFirst: 'Take A aufnehmen',
     rerolling: 'Generiere…',
-    activeHint: 'Aktiver Take wird beim Rendern verwendet',
+    activeHint: tx({ de: 'Aktiver Take wird beim Rendern verwendet', en: 'Active take used for rendering', es: 'Toma activa utilizada para renderizar' }),
     setActive: 'Als aktiv markieren',
     delete: 'Löschen',
-    noVoice: 'Stimme wählen, dann Take aufnehmen.',
+    noVoice: tx({ de: 'Stimme wählen, dann Take aufnehmen.', en: 'Select voice, then record take.', es: 'Selecciona la voz, luego graba la toma.' }),
     failed: 'Take fehlgeschlagen',
     full: `Max ${MAX_TAKES_PER_LINE} Takes — lösche einen, um neu aufzunehmen.`,
   },

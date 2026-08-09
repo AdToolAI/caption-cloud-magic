@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * ProofMoment — der Beweis direkt unter dem Hero.
  *
@@ -30,7 +31,7 @@ const COPY = {
     note: "Skript, Stimme, Kamera, Schnitt, Lip-Sync — sonst ein Team und mehrere Tage.",
     cta: "Mit diesem Briefing starten",
     sound: "Ton",
-    honest: "Echter Clip aus diesem Studio — kein Rendering im Browser.",
+    honest: tx({ de: "Echter Clip aus diesem Studio — kein Rendering im Browser.", en: "Real clip from this Studio — no rendering in the browser.", es: "Clip real de este Studio, sin renderizado en el navegador." }),
   },
   en: {
     eyebrow: "The proof",

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -50,7 +51,7 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
             <RadioGroupItem value="free" id="opt-free" className="mt-1" />
             <div className="flex-1">
               <div className="flex items-center gap-2 font-medium"><Gift className="h-4 w-4 text-emerald-500" />Free Template</div>
-              <p className="text-xs text-muted-foreground mt-1">Sofort verfügbar. Du verdienst zwar nichts, baust aber Reputation auf und sammelst Bewertungen.</p>
+              <p className="text-xs text-muted-foreground mt-1">{tx({ de: "Sofort verfügbar. Du verdienst zwar nichts, baust aber Reputation auf und sammelst Bewertungen.", en: "Immediately available. You don't earn anything, but you build reputation and collect reviews.", es: "Disponible de inmediato. No ganas nada, pero construyes reputación y acumulas reseñas." })}</p>
             </div>
           </Label>
 
@@ -86,7 +87,7 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
 
             <div className="flex gap-2 text-xs text-muted-foreground bg-blue-500/10 border border-blue-500/30 rounded-md p-2">
               <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
-              <span>Earnings werden direkt deinem Credit-Wallet gutgeschrieben und können für AI-Generierung, Renderings etc. genutzt werden.</span>
+              <span>{tx({ de: "Earnings werden direkt deinem Credit-Wallet gutgeschrieben und können für AI-Generierung, Renderings etc. genutzt werden.", en: "Earnings are credited directly to your credit wallet and can be used for AI generation, renderings, etc.", es: "Las ganancias se acreditan directamente a tu billetera de crédito y se pueden usar para generación de IA, renderizados, etc." })}</span>
             </div>
           </div>
         )}

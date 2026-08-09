@@ -11,6 +11,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { tx } from "@/lib/i18nText";
 
 export interface SlashCommand {
   command: string;
@@ -51,8 +52,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   },
   {
     command: '/calendar',
-    label: 'Kalender-Übersicht',
-    description: 'Zeigt geplante Posts diese Woche',
+    label: tx({ de: 'Kalender-Übersicht', en: 'Calendar overview', es: 'Resumen del calendario' }),
+    description: tx({ de: 'Zeigt geplante Posts diese Woche', en: 'Shows scheduled posts this week', es: 'Muestra las publicaciones programadas de esta semana' }),
     icon: <Calendar className="w-4 h-4" />,
     category: 'status'
   },

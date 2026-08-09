@@ -24,6 +24,7 @@ import type { ComposerScene } from '@/types/video-composer';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
 import { isInFlightState, sceneState } from '@/lib/composer/sceneState';
+import { tx } from "@/lib/i18nText";
 
 interface Props {
   scene: ComposerScene;
@@ -207,17 +208,17 @@ export default function SceneInlinePlayer({
           {isWorking && (
             <span className="px-1.5 py-0.5 rounded-md bg-primary/15 backdrop-blur text-[9px] font-semibold text-primary border border-primary/40 flex items-center gap-1">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              {lipsyncRunning && status === 'ready' ? 'Lip-Sync' : 'Baut'}
+              {lipsyncRunning && status === 'ready' ? 'Lip-Sync' : tx({ de: 'Baut', en: 'Building', es: 'Construyendo' })}
             </span>
           )}
           {!isReady && !isWorking && !isFailed && (
             <span className="px-1.5 py-0.5 rounded-md bg-muted/40 backdrop-blur text-[9px] uppercase tracking-wider text-muted-foreground border border-border/40">
-              Wartet
+              {tx({ de: "Wartet", en: "Waiting", es: "Esperando" })}
             </span>
           )}
           {isFailed && (
             <span className="px-1.5 py-0.5 rounded-md bg-destructive/15 backdrop-blur text-[9px] font-semibold text-destructive border border-destructive/40">
-              ✕ Fehler
+              ✕ {tx({ de: "Fehler", en: "Error", es: "Error" })}
             </span>
           )}
           {/* Stage 5 warn: legacy HappyHorse master with multi-speaker dialog →
@@ -227,10 +228,10 @@ export default function SceneInlinePlayer({
             scene.engineOverride === 'cinematic-sync' &&
             dialogVoiceCount >= 2 && (
               <span
-                title="Lip-Sync auf altem HappyHorse-Master. Bitte 🔁 Lip-Sync neu rendern — wird automatisch mit Hailuo erzeugt."
+                title={tx({ de: "Lip-Sync auf altem HappyHorse-Master. Bitte 🔁 Lip-Sync neu rendern — wird automatisch mit Hailuo erzeugt.", en: "Lip-sync on old HappyHorse master. Please 🔁 re-render lip-sync — will be generated automatically with Hailuo.", es: "Sincronización labial en el máster antiguo de HappyHorse. Por favor 🔁 vuelve a renderizar la sincronización labial — se generará automáticamente con Hailuo." })}
                 className="px-1.5 py-0.5 rounded-md bg-amber-500/15 backdrop-blur text-[9px] font-semibold text-amber-300 border border-amber-500/40"
               >
-                ⚠ Re-Render empfohlen
+                ⚠ {tx({ de: "Re-Render empfohlen", en: "Re-render recommended", es: "Se recomienda volver a renderizar" })}
               </span>
             )}
         </div>
@@ -301,44 +302,44 @@ export default function SceneInlinePlayer({
 
                 const totalPasses = passesArr.length;
                 const donePasses = passesArr.filter((p: any) => p?.status === "done" || p?.status === "failed").length;
-                let title = 'Szene wird gebaut…';
-                let sub = isLipSyncIntentional(scene) ? 'VO & Lip-Sync inklusive' : 'Nur Bild-Render';
+                let title = tx({ de: 'Szene wird gebaut…', en: 'Scene is being built…', es: 'La escena se está creando…' });
+                let sub = isLipSyncIntentional(scene) ? tx({ de: 'VO & Lip-Sync inklusive', en: 'VO & lip-sync included', es: 'VO y sincronización labial incluidas' }) : tx({ de: 'Nur Bild-Render', en: 'Image render only', es: 'Solo renderizado de imagen' });
                 if (lipsyncRunning) {
                   if (pipelineState === 'lipsync_muxing') {
-                    title = 'Lip-Sync wird zusammengesetzt…';
-                    sub = 'Finaler Render läuft';
+                    title = tx({ de: 'Lip-Sync wird zusammengesetzt…', en: 'Lip-sync is being assembled…', es: 'La sincronización labial se está ensamblando…' });
+                    sub = tx({ de: 'Finaler Render läuft', en: 'Final render running', es: 'Renderizado final en curso' });
                   } else if (pipelineState === 'lipsync_running' && hasProviderJob) {
 
-                    title = 'Lip-Sync läuft…';
+                    title = tx({ de: 'Lip-Sync läuft…', en: 'Lip-sync running…', es: 'Sincronización labial en curso…' });
                     sub = totalPasses > 0
-                      ? `Sync.so · Pass ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
-                      : 'Sync.so · ~60 s pro Sprecher-Turn';
+                      ? `Sync.so · ${tx({ de: 'Pass', en: 'Pass', es: 'Pasada' })} ${Math.min(donePasses + 1, totalPasses)}/${totalPasses}`
+                      : `Sync.so · ${tx({ de: '~60 s pro Sprecher-Turn', en: '~60s per speaker turn', es: '~60 s por turno de hablante' })}`;
                   } else if (pipelineState === 'audio_prep') {
                     if (audioUrl) {
-                      title = 'Audio fertig — Lip-Sync wird gestartet…';
-                      sub = 'Gleich geht\'s los';
+                      title = tx({ de: 'Audio fertig — Lip-Sync wird gestartet…', en: 'Audio ready — starting lip-sync…', es: 'Audio listo — iniciando sincronización labial…' });
+                      sub = tx({ de: 'Gleich geht\'s los', en: 'Starting shortly', es: 'Comenzando en breve' });
                     } else {
-                      title = 'Audio wird vorbereitet…';
-                      sub = 'Voiceover wird generiert';
+                      title = tx({ de: 'Audio wird vorbereitet…', en: 'Audio is being prepared…', es: 'El audio se está preparando…' });
+                      sub = tx({ de: 'Voiceover wird generiert', en: 'Voiceover is being generated', es: 'Se está generando la voz en off' });
                     }
                   } else if (pipelineState === 'lipsync_dispatched' && hasProviderJob) {
-                    title = 'Lip-Sync läuft…';
-                    sub = 'Sync.so · ~60 s pro Sprecher-Turn';
+                    title = tx({ de: 'Lip-Sync läuft…', en: 'Lip-sync running…', es: 'Sincronización labial en curso…' });
+                    sub = `Sync.so · ${tx({ de: '~60 s pro Sprecher-Turn', en: '~60s per speaker turn', es: '~60 s por turno de hablante' })}`;
                   } else if (pipelineState === 'audio_ready' && !hasProviderJob) {
                     // Recovery-Fenster: server-watchdog dispatcht spätestens nach 3 min.
                     if (limboStuck) {
-                      title = 'Start hängt — wird neu angestoßen';
-                      sub = 'Server-Watchdog versucht es erneut · jederzeit manuell neu starten';
+                      title = tx({ de: 'Start hängt — wird neu angestoßen', en: 'Start is stuck — retrying', es: 'El inicio está bloqueado — reintentando' });
+                      sub = tx({ de: 'Server-Watchdog versucht es erneut · jederzeit manuell neu starten', en: 'Server watchdog is retrying · you can restart manually anytime', es: 'El vigilante del servidor está reintentando · puedes reiniciar manualmente en cualquier momento' });
                     } else {
-                      title = 'Lip-Sync wird gestartet…';
-                      sub = 'Bereit, Sync.so wird angestoßen';
+                      title = tx({ de: 'Lip-Sync wird gestartet…', en: 'Starting lip-sync…', es: 'Iniciando sincronización labial…' });
+                      sub = tx({ de: 'Bereit, Sync.so wird angestoßen', en: 'Ready, Sync.so is being triggered', es: 'Listo, se está activando Sync.so' });
                     }
                   } else if (pipelineState === 'audio_ready' && audioUrl) {
-                    title = 'Lip-Sync wird gestartet…';
-                    sub = 'Sync.so · ~60 s pro Sprecher-Turn';
+                    title = tx({ de: 'Lip-Sync wird gestartet…', en: 'Starting lip-sync…', es: 'Iniciando sincronización labial…' });
+                    sub = `Sync.so · ${tx({ de: '~60 s pro Sprecher-Turn', en: '~60s per speaker turn', es: '~60 s por turno de hablante' })}`;
                   } else {
-                    title = 'Lip-Sync startet…';
-                    sub = 'Sync.so · ~60 s pro Sprecher-Turn';
+                    title = tx({ de: 'Lip-Sync startet…', en: 'Lip-sync starting…', es: 'Iniciando sincronización labial…' });
+                    sub = `Sync.so · ${tx({ de: '~60 s pro Sprecher-Turn', en: '~60s per speaker turn', es: '~60 s por turno de hablante' })}`;
                   }
                 }
                 return (
@@ -367,7 +368,7 @@ export default function SceneInlinePlayer({
                         ) : (
                           <RefreshCw className="h-2.5 w-2.5" />
                         )}
-                        Lip-Sync neu anstoßen
+                        {tx({ de: "Lip-Sync neu anstoßen", en: "Retrigger lip-sync", es: "Reiniciar sincronización labial" })}
                       </Button>
                     )}
                   </>
@@ -400,10 +401,10 @@ export default function SceneInlinePlayer({
           const repairExhausted = lower.includes('prompt_repair_exhausted');
           if (isGreenNet || isInvalidPrompt) {
             friendly = repairExhausted
-              ? 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter) – auch der automatisch entschärfte Prompt wurde blockiert. Die Credits wurden zurückerstattet. Kürze den Prompt oder wechsle den Provider (z. B. Hailuo) und starte neu.'
-              : 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter). Der Prompt wurde automatisch entschärft und einmal erneut versucht. Die Credits wurden zurückerstattet – du kannst „Neu rendern" klicken oder den Provider wechseln.';
+              ? tx({ de: 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter) – auch der automatisch entschärfte Prompt wurde blockiert. Die Credits wurden zurückerstattet. Kürze den Prompt oder wechsle den Provider (z. B. Hailuo) und starte neu.', en: 'HappyHorse rejected the scene prompt (content filter) – the automatically softened prompt was also blocked. Your credits were refunded. Shorten the prompt or switch providers (e.g. Hailuo) and restart.', es: 'HappyHorse rechazó el prompt de la escena (filtro de contenido) – el prompt suavizado automáticamente también fue bloqueado. Se reembolsaron tus créditos. Acorta el prompt o cambia de proveedor (p. ej. Hailuo) y reinicia.' })
+              : tx({ de: 'HappyHorse hat den Szenen-Prompt abgelehnt (Inhaltsfilter). Der Prompt wurde automatisch entschärft und einmal erneut versucht. Die Credits wurden zurückerstattet – du kannst „Neu rendern" klicken oder den Provider wechseln.', en: 'HappyHorse rejected the scene prompt (content filter). The prompt was automatically softened and retried once. Your credits were refunded – you can click "Re-render" or switch providers.', es: 'HappyHorse rechazó el prompt de la escena (filtro de contenido). El prompt se suavizó automáticamente y se reintentó una vez. Se reembolsaron tus créditos – puedes hacer clic en "Volver a renderizar" o cambiar de proveedor.' });
           } else if (!rawErr) {
-            friendly = 'Render fehlgeschlagen.';
+            friendly = tx({ de: 'Render fehlgeschlagen.', en: 'Render failed.', es: 'Error en el renderizado.' });
           } else if (
             lower === 'model_failed_silently' ||
             lower.startsWith('model_failed') ||
@@ -411,7 +412,7 @@ export default function SceneInlinePlayer({
             lower === 'null'
           ) {
             friendly =
-              'Das Video-Modell hat die Generierung intern abgebrochen (kein Grund vom Provider geliefert). Bitte Anchor neu generieren oder Prompt leicht anpassen und erneut starten.';
+              tx({ de: 'Das Video-Modell hat die Generierung intern abgebrochen (kein Grund vom Provider geliefert). Bitte Anchor neu generieren oder Prompt leicht anpassen und erneut starten.', en: 'The video model internally aborted the generation (no reason provided by the provider). Please regenerate the anchor or slightly adjust the prompt and restart.', es: 'El modelo de video interrumpió internamente la generación (el proveedor no dio ningún motivo). Vuelve a generar el anclaje o ajusta ligeramente el prompt y reinicia.' });
           } else {
             friendly = rawErr.length > 220 ? rawErr.slice(0, 220) + '…' : rawErr;
           }
@@ -419,7 +420,7 @@ export default function SceneInlinePlayer({
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-destructive/30 via-black/70 to-destructive/30 backdrop-blur-[2px] px-3 text-center">
               <AlertTriangle className="h-7 w-7 text-destructive mb-1.5" />
               <p className="text-[11px] font-semibold text-destructive-foreground">
-                Szene fehlgeschlagen
+                {tx({ de: "Szene fehlgeschlagen", en: "Scene failed", es: "La escena falló" })}
               </p>
               <p className="mt-1 text-[9px] leading-snug text-foreground/80 line-clamp-4">
                 {friendly}
@@ -435,7 +436,7 @@ export default function SceneInlinePlayer({
                   className="h-6 px-2 text-[10px] gap-1 bg-destructive/10 border-destructive/40 text-destructive-foreground hover:bg-destructive/20"
                 >
                   <RefreshCw className="h-2.5 w-2.5" />
-                  Neu rendern
+                  {tx({ de: "Neu rendern", en: "Re-render", es: "Volver a renderizar" })}
                 </Button>
               </div>
             </div>
@@ -465,11 +466,11 @@ export default function SceneInlinePlayer({
             >
               {isReady ? (
                 <>
-                  <RefreshCw className="h-3 w-3" /> Neu generieren
+                  <RefreshCw className="h-3 w-3" /> {tx({ de: "Neu generieren", en: "Regenerate", es: "Regenerar" })}
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-3 w-3" /> Generieren
+                  <Sparkles className="h-3 w-3" /> {tx({ de: "Generieren", en: "Generate", es: "Generar" })}
                 </>
               )}
             </Button>
@@ -479,7 +480,7 @@ export default function SceneInlinePlayer({
         {/* Hover play hint (when ready & not hovered) */}
         {isReady && !hovering && (
           <div className="absolute bottom-1.5 right-1.5 z-10 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur text-[9px] text-foreground/80 flex items-center gap-1 border border-border/40">
-            <Play className="h-2.5 w-2.5 fill-current" /> Hover
+            <Play className="h-2.5 w-2.5 fill-current" /> {tx({ de: "Hover", en: "Hover", es: "Pasar cursor" })}
           </div>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -151,7 +152,7 @@ export function EffectControlPanel({
           onClick={() => toggleAll(enabledCount < totalEffects / 2)}
           className="text-xs h-7"
         >
-          {enabledCount > totalEffects / 2 ? 'Alle aus' : 'Alle an'}
+          {enabledCount > totalEffects / 2 ? tx({ de: 'Alle aus', en: 'All off', es: 'Todo apagado' }) : 'Alle an'}
         </Button>
       </div>
       

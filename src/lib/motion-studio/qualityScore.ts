@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // =============================================================================
 // qualityScore — Director Console heuristic prompt-quality analyzer
 // =============================================================================
@@ -92,23 +93,23 @@ const T = {
     length: { pass: 'Länge passt', warn: 'Länge knapp', fail: 'Länge daneben' },
     consistency: { pass: 'Kohärent', warn: 'Gemischte Cues', fail: 'Konflikt' },
     hints: {
-      subjectFail: 'Füge mindestens ein Cast-Mitglied oder einen Brand-Character hinzu — Provider brauchen ein klares Subjekt.',
+      subjectFail: tx({ de: 'Füge mindestens ein Cast-Mitglied oder einen Brand-Character hinzu — Provider brauchen ein klares Subjekt.', en: 'Add at least one cast member or brand character — providers need a clear subject.', es: 'Añade al menos un miembro del reparto o un personaje de marca — los proveedores necesitan un sujeto claro.' }),
       subjectWarn: 'Nenne das On-Camera-Subjekt explizit (z. B. "@Anna" oder "die Gründerin").',
       actionFail: 'Beschreibe konkret, was in der Szene physisch passiert (klares Verb).',
-      actionWarn: 'Ersetze abstrakte Verben ("zeigt", "fühlt") mit konkreten Aktionen ("läuft", "hebt").',
+      actionWarn: tx({ de: 'Ersetze abstrakte Verben ("zeigt", "fühlt") mit konkreten Aktionen ("läuft", "hebt").', en: 'Replace abstract verbs ("shows", "feels") with concrete actions ("walks", "lifts").', es: 'Reemplaza verbos abstractos ("muestra", "siente") con acciones concretas ("camina", "levanta").' }),
       shotFail: 'Wähle ein Shot-Director-Preset (Framing, Winkel, Bewegung, Licht).',
       shotWarn: 'Ergänze ein konkretes Linsen-/Bewegungs-Cue (z. B. "85mm langsamer Dolly-In").',
-      dialogFail: 'Dialog vorhanden aber kein Audio Plan gelockt — generiere das Voiceover, damit Timings fixiert sind.',
-      dialogWarn: 'Voiceover noch nicht generiert — Lip-Sync wird nur approximiert.',
+      dialogFail: tx({ de: 'Dialog vorhanden aber kein Audio Plan gelockt — generiere das Voiceover, damit Timings fixiert sind.', en: 'Dialogue present but no audio plan locked — generate the voiceover so timings are fixed.', es: 'Diálogo presente pero sin plan de audio bloqueado — genera la voz en off para que los tiempos estén fijos.' }),
+      dialogWarn: tx({ de: 'Voiceover noch nicht generiert — Lip-Sync wird nur approximiert.', en: 'Voiceover not yet generated — lip-sync is only approximated.', es: 'Voz en off aún no generada — la sincronización labial es solo aproximada.' }),
       negativeFail: 'Setze einen Negative Prompt, um Text/Untertitel/Watermarks zu unterdrücken.',
       negativeWarn: 'Negative ist kurz — ergänze z. B. "no captions, no subtitles".',
       lengthFail: 'Prompt zu kurz (<35 Zeichen) — Provider liefern dann generische Aufnahmen.',
       lengthFailLong: 'Prompt zu lang (>1200 Zeichen) — kürze auf "ein Outcome pro Zeile".',
       lengthWarn: 'Prompt grenzwertig — Artlist empfiehlt 80–600 Zeichen pro Szene.',
-      consistencyWarn: 'Gemischte Style-Cues entdeckt (z. B. "noir" + "cinematic colorful") — entscheide dich für eine Richtung.',
-      redundancyWarn: 'Cast-Aktionen wiederholen die Scene-Action — präzisiere oder lösche Dubletten, damit jede Zeile etwas Eigenes lenkt.',
-      boilerplateWarn: 'Auto-Platzhalter in Cast-Aktionen erkannt ("gestikuliert natürlich, sichtbar zur Kamera") — wird aus dem finalen Prompt gefiltert; ersetze sie für mehr Kontrolle.',
-      performanceConflictWarn: 'Eine Cast-Aktion beschreibt bereits eine Geste/Mimik, die auch im Performance-Tab gesetzt ist — wähle eine Quelle, damit das Modell eine eindeutige Anweisung erhält.',
+      consistencyWarn: tx({ de: 'Gemischte Style-Cues entdeckt (z. B. "noir" + "cinematic colorful") — entscheide dich für eine Richtung.', en: 'Mixed style cues detected (e.g., "noir" + "cinematic colorful") — choose one direction.', es: 'Se detectaron señales de estilo mixtas (ej., "noir" + "cinematic colorful") — elige una dirección.' }),
+      redundancyWarn: tx({ de: 'Cast-Aktionen wiederholen die Scene-Action — präzisiere oder lösche Dubletten, damit jede Zeile etwas Eigenes lenkt.', en: 'Cast actions repeat the scene action — clarify or delete duplicates so each line drives something unique.', es: 'Las acciones del reparto repiten la acción de la escena — aclara o elimina duplicados para que cada línea impulse algo único.' }),
+      boilerplateWarn: tx({ de: 'Auto-Platzhalter in Cast-Aktionen erkannt ("gestikuliert natürlich, sichtbar zur Kamera") — wird aus dem finalen Prompt gefiltert; ersetze sie für mehr Kontrolle.', en: 'Auto-placeholders detected in cast actions ("gesticulates naturally, visible to camera") — will be filtered from the final prompt; replace them for more control.', es: 'Marcadores de posición automáticos detectados en las acciones del reparto ("gesticula naturalmente, visible a la cámara") — se filtrarán del prompt final; reemplázalos para un mayor control.' }),
+      performanceConflictWarn: tx({ de: 'Eine Cast-Aktion beschreibt bereits eine Geste/Mimik, die auch im Performance-Tab gesetzt ist — wähle eine Quelle, damit das Modell eine eindeutige Anweisung erhält.', en: 'A cast action already describes a gesture/facial expression that is also set in the performance tab — choose one source so the model receives a clear instruction.', es: 'Una acción del reparto ya describe un gesto/expresión facial que también está configurado en la pestaña de rendimiento — elige una fuente para que el modelo reciba una instrucción clara.' }),
 
     },
 

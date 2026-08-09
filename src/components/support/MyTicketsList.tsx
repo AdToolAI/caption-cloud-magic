@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, FileQuestion } from "lucide-react";
@@ -30,7 +31,7 @@ const SEV_DOT: Record<string, string> = {
 
 const TEXT = {
   en: { title: "My tickets", empty: "You haven't submitted any tickets yet.", loading: "Loading…" },
-  de: { title: "Meine Tickets", empty: "Du hast noch keine Tickets eingereicht.", loading: "Lade…" },
+  de: { title: "Meine Tickets", empty: tx({ de: "Du hast noch keine Tickets eingereicht.", en: "You haven't submitted any tickets yet.", es: "Aún no has enviado ningún ticket." }), loading: "Lade…" },
   es: { title: "Mis tickets", empty: "Aún no has enviado tickets.", loading: "Cargando…" },
 } as const;
 

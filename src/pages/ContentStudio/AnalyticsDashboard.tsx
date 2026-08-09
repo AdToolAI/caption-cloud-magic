@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,7 @@ export default function AnalyticsDashboard() {
       setAnalytics(data);
     } catch (error) {
       console.error('Analytics load error:', error);
-      toast.error('Fehler beim Laden der Analytics');
+      toast.error(tx({ de: 'Fehler beim Laden der Analytics', en: 'Error loading analytics', es: 'Error al cargar los análisis' }));
     } finally {
       setLoading(false);
     }

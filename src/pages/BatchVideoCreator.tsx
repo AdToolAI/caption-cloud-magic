@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,7 +68,7 @@ export default function BatchVideoCreator() {
   const steps = [
     { title: 'CSV hochladen', description: 'Videodaten importieren' },
     { title: 'Bestätigen', description: 'Details überprüfen' },
-    { title: 'Fortschritt', description: 'Videos werden erstellt' }
+    { title: 'Fortschritt', description: tx({ de: 'Videos werden erstellt', en: 'Videos are being created', es: 'Se están creando videos' }) }
   ];
 
   return (

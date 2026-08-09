@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -296,7 +297,7 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error('Bitte einloggen, um Mixes zu speichern');
+        toast.error(tx({ de: 'Bitte einloggen, um Mixes zu speichern', en: 'Please log in to save mixes', es: 'Por favor, inicia sesión para guardar mezclas' }));
         return null;
       }
 

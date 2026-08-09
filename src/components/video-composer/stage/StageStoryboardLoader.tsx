@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useState } from "react";
 import { Sparkles, Radio } from "lucide-react";
 import { useNewsRadar } from "@/hooks/useNewsRadar";
@@ -34,7 +35,7 @@ const COPY: Record<Lang, {
     eyebrow: "DIRECTOR AT WORK",
     title: "Wir bauen dein Storyboard",
     subtitle:
-      "Skript, Cast und Szenen werden gerade komponiert — du musst nicht warten, wir benachrichtigen dich, sobald alles fertig ist.",
+      tx({ de: "Skript, Cast und Szenen werden gerade komponiert — du musst nicht warten, wir benachrichtigen dich, sobald alles fertig ist.", en: "Script, cast, and scenes are currently being composed — you don't have to wait, we'll notify you as soon as everything is ready.", es: "El guion, el elenco y las escenas se están componiendo actualmente — no tienes que esperar, te notificaremos tan pronto como todo esté listo." }),
     phases: [
       "Briefing wird analysiert…",
       "Cast wird besetzt…",
@@ -48,42 +49,42 @@ const COPY: Record<Lang, {
       {
         title: "Cast Consistency Map",
         body:
-          "Sobald das Storyboard steht, zeigt dir die Cast Consistency Map oben, in welcher Szene welcher Charakter auftaucht — und ob ein Reference-Image, ein Frame-Chain oder nur ein Prompt-Anker genutzt wird. Reference (grüner Punkt) gibt die stärkste visuelle Konsistenz über mehrere Shots.",
+          tx({ de: "Sobald das Storyboard steht, zeigt dir die Cast Consistency Map oben, in welcher Szene welcher Charakter auftaucht — und ob ein Reference-Image, ein Frame-Chain oder nur ein Prompt-Anker genutzt wird. Reference (grüner Punkt) gibt die stärkste visuelle Konsistenz über mehrere Shots.", en: "Once the storyboard is ready, the Cast Consistency Map above will show you which character appears in which scene — and whether a Reference-Image, a Frame-Chain, or just a Prompt-Anchor is used. Reference (green dot) provides the strongest visual consistency across multiple shots.", es: "Una vez que el storyboard esté listo, el Mapa de Consistencia del Elenco de arriba te mostrará qué personaje aparece en qué escena — y si se utiliza una Imagen de Referencia, una Cadena de Frames o solo un Ancla de Prompt. La Referencia (punto verde) proporciona la mayor consistencia visual en múltiples tomas." }),
       },
       {
         title: "Engine pro Szene",
         body:
-          "Jede Szene kann ein eigenes KI-Modell nutzen — Hailuo für günstige Realfilm-Looks, Kling für komplexe Choreografien, Vidu Q2 wenn mehrere Charaktere im selben Frame sein sollen. Über „Engine für alle“ überschreibst du alle Szenen auf einen Schlag.",
+          tx({ de: "Jede Szene kann ein eigenes KI-Modell nutzen — Hailuo für günstige Realfilm-Looks, Kling für komplexe Choreografien, Vidu Q2 wenn mehrere Charaktere im selben Frame sein sollen. Über „Engine für alle“ überschreibst du alle Szenen auf einen Schlag.", en: "Each scene can use its own AI model — Hailuo for affordable live-action looks, Kling for complex choreographies, Vidu Q2 if multiple characters are to be in the same frame. With “Engine for all” you overwrite all scenes at once.", es: "Cada escena puede usar su propio modelo de IA — Hailuo para looks de acción real asequibles, Kling para coreografías complejas, Vidu Q2 si varios personajes deben estar en el mismo encuadre. Con “Motor para todos” sobrescribes todas las escenas a la vez." }),
       },
       {
         title: "Frame-First Pipeline",
         body:
-          "Statt dem KI-Modell das erste Bild blind zu überlassen, kannst du via „Frame-First“ ein Standbild der Szene mit Nano Banana 2 generieren und freigeben. Das gewählte Standbild wird als first frame in den Video-Render gegeben — deutlich konsistentere Ergebnisse.",
+          tx({ de: "Statt dem KI-Modell das erste Bild blind zu überlassen, kannst du via „Frame-First“ ein Standbild der Szene mit Nano Banana 2 generieren und freigeben. Das gewählte Standbild wird als first frame in den Video-Render gegeben — deutlich konsistentere Ergebnisse.", en: "Instead of blindly leaving the first image to the AI model, you can generate and approve a still image of the scene via “Frame-First” with Nano Banana 2. The selected still image is given as the first frame in the video render — significantly more consistent results.", es: "En lugar de dejar ciegamente la primera imagen al modelo de IA, puedes generar y aprobar una imagen fija de la escena a través de “Frame-First” con Nano Banana 2. La imagen fija seleccionada se utiliza como el primer fotograma en la renderización del video — resultados significativamente más consistentes." }),
       },
       {
         title: "Talking-Head Modus",
         body:
-          "Brauchst du einen sprechenden Charakter direkt in die Kamera? Talking-Head nutzt HeyGen Photo Avatar mit deinem Voice-Over und liefert in ~30s einen lippensynchronen Avatar-Take — perfekt für Hook und CTA.",
+          tx({ de: "Brauchst du einen sprechenden Charakter direkt in die Kamera? Talking-Head nutzt HeyGen Photo Avatar mit deinem Voice-Over und liefert in ~30s einen lippensynchronen Avatar-Take — perfekt für Hook und CTA.", en: "Do you need a talking character directly into the camera? Talking-Head uses HeyGen Photo Avatar with your voice-over and delivers a lip-synced avatar take in ~30s — perfect for hook and CTA.", es: "¿Necesitas un personaje que hable directamente a la cámara? Talking-Head utiliza HeyGen Photo Avatar con tu voz en off y entrega una toma de avatar sincronizada con los labios en ~30s — perfecto para el gancho y la CTA." }),
       },
       {
         title: "Director Score",
         body:
-          "Jede Szene bekommt einen Director Score von 0–100. Werte ab 80 sind Render-ready, alles darunter zeigt dir konkret, was fehlt: zu langer Prompt, kein klares Outcome, fehlender Cast-Anker oder kollidierende Aktionen.",
+          tx({ de: "Jede Szene bekommt einen Director Score von 0–100. Werte ab 80 sind Render-ready, alles darunter zeigt dir konkret, was fehlt: zu langer Prompt, kein klares Outcome, fehlender Cast-Anker oder kollidierende Aktionen.", en: "Each scene gets a Director Score from 0–100. Values from 80 are render-ready, anything below shows you specifically what's missing: prompt too long, no clear outcome, missing cast anchor, or colliding actions.", es: "Cada escena obtiene una Puntuación de Director de 0 a 100. Los valores a partir de 80 están listos para renderizar, cualquier cosa por debajo te muestra específicamente lo que falta: prompt demasiado largo, sin resultado claro, ancla de elenco faltante o acciones en conflicto." }),
       },
       {
         title: "Cinematic-Sync Engine",
         body:
-          "Bei sprechenden Szenen empfiehlt sich „Cinematic-Sync“ statt eines reinen Avatar-Busts: Hailuo rendert die echte Szene, Sync.so legt anschließend lippensynchron dein Voice-Over drauf. Kostet etwas mehr, sieht aber wie ein echter Shot aus.",
+          tx({ de: "Bei sprechenden Szenen empfiehlt sich „Cinematic-Sync“ statt eines reinen Avatar-Busts: Hailuo rendert die echte Szene, Sync.so legt anschließend lippensynchron dein Voice-Over drauf. Kostet etwas mehr, sieht aber wie ein echter Shot aus.", en: "For talking scenes, “Cinematic-Sync” is recommended instead of a pure avatar bust: Hailuo renders the actual scene, then Sync.so overlays your voice-over lip-sync. Costs a bit more, but looks like a real shot.", es: "Para escenas habladas, se recomienda “Cinematic-Sync” en lugar de un busto de avatar puro: Hailuo renderiza la escena real, luego Sync.so superpone tu voz en off sincronizada con los labios. Cuesta un poco más, pero parece una toma real." }),
       },
       {
         title: "Continuity Guardian",
         body:
-          "Zwischen zwei Szenen zeigt dir der Continuity Guardian, ob sich Outfit, Location oder Beleuchtung zu stark ändern. Ein Klick und du übernimmst den letzten Frame der vorherigen Szene als Start-Frame der nächsten — Cuts werden weicher.",
+          tx({ de: "Zwischen zwei Szenen zeigt dir der Continuity Guardian, ob sich Outfit, Location oder Beleuchtung zu stark ändern. Ein Klick und du übernimmst den letzten Frame der vorherigen Szene als Start-Frame der nächsten — Cuts werden weicher.", en: "Between two scenes, the Continuity Guardian shows you if outfit, location, or lighting change too much. One click and you take the last frame of the previous scene as the start frame of the next — cuts become smoother.", es: "Entre dos escenas, el Continuity Guardian te muestra si el atuendo, la ubicación o la iluminación cambian demasiado. Un clic y tomas el último fotograma de la escena anterior como fotograma inicial de la siguiente, los cortes se vuelven más suaves." }),
       },
       {
         title: "Saved Outfit Looks",
         body:
-          "Outfits, die du einmal komponiert hast, lassen sich pro Avatar speichern und über @-Mention in jeder beliebigen Szene wieder einsetzen. Das hält deine Brand-Charaktere visuell stabil über Wochen und Kampagnen hinweg.",
+          tx({ de: "Outfits, die du einmal komponiert hast, lassen sich pro Avatar speichern und über @-Mention in jeder beliebigen Szene wieder einsetzen. Das hält deine Brand-Charaktere visuell stabil über Wochen und Kampagnen hinweg.", en: "Outfits you've composed once can be saved per avatar and reused in any scene via @-mention. This keeps your brand characters visually stable across weeks and campaigns.", es: "Los atuendos que hayas compuesto una vez se pueden guardar por avatar y reutilizar en cualquier escena mediante una mención con @. Esto mantiene a tus personajes de marca visualmente estables durante semanas y campañas." }),
       },
     ],
     newsLabel: "AdTool News Radar · LIVE",

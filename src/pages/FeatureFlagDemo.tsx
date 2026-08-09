@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
@@ -24,7 +25,7 @@ const FeatureFlagDemo = () => {
     {
       name: "enable_connection_pooling",
       title: "Connection Pooling",
-      description: "Datenbankverbindungen werden wiederverwendet für bessere Performance",
+      description: tx({ de: "Datenbankverbindungen werden wiederverwendet für bessere Performance", en: "Database connections are reused for better performance", es: "Las conexiones a la base de datos se reutilizan para un mejor rendimiento" }),
       rollout: "100%",
       status: connectionPooling,
       icon: Database,
@@ -33,7 +34,7 @@ const FeatureFlagDemo = () => {
     {
       name: "enable_advanced_analytics",
       title: "Advanced Analytics",
-      description: "Erweiterte Analytics mit zusätzlichen Metriken und Visualisierungen",
+      description: tx({ de: "Erweiterte Analytics mit zusätzlichen Metriken und Visualisierungen", en: "Advanced Analytics with additional metrics and visualizations", es: "Análisis avanzados con métricas y visualizaciones adicionales" }),
       rollout: "0%",
       status: advancedAnalytics,
       icon: BarChart3,

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -244,8 +245,8 @@ export function useToggleAutopilot() {
         toast({
           title: res.is_active ? 'Autopilot aktiviert' : 'Autopilot deaktiviert',
           description: res.is_active
-            ? 'Die KI plant jetzt deine nächsten 14 Tage. Erste Slots erscheinen in Kürze.'
-            : 'Alle automatischen Aktionen sind gestoppt. Bereits geplante Posts werden nicht veröffentlicht.',
+            ? tx({ de: 'Die KI plant jetzt deine nächsten 14 Tage. Erste Slots erscheinen in Kürze.', en: 'The AI is now planning your next 14 days. First slots will appear shortly.', es: 'La IA está planificando tus próximos 14 días. Las primeras franjas aparecerán en breve.' })
+            : tx({ de: 'Alle automatischen Aktionen sind gestoppt. Bereits geplante Posts werden nicht veröffentlicht.', en: 'All automatic actions are stopped. Already scheduled posts will not be published.', es: 'Todas las acciones automáticas están detenidas. Las publicaciones ya programadas no se publicarán.' }),
         });
       } else {
         toast({
@@ -328,7 +329,7 @@ export function useApproveSlot() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['autopilot-queue'] });
-      toast({ title: 'Freigegeben', description: 'Slot wird zur geplanten Zeit veröffentlicht.' });
+      toast({ title: 'Freigegeben', description: tx({ de: 'Slot wird zur geplanten Zeit veröffentlicht.', en: 'Slot will be published at the scheduled time.', es: 'La franja se publicará a la hora programada.' }) });
     },
   });
 }

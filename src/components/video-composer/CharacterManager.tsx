@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,20 +24,20 @@ const labels = {
   de: {
     title: 'Charaktere (optional)',
     subtitle:
-      'Hilft der KI, Personen über mehrere Szenen hinweg ähnlich aussehen zu lassen — exakte Gesichts-Identität ist mit Text-zu-Video technisch nicht möglich.',
+      tx({ de: 'Hilft der KI, Personen über mehrere Szenen hinweg ähnlich aussehen zu lassen — exakte Gesichts-Identität ist mit Text-zu-Video technisch nicht möglich.', en: 'Helps the AI make people look similar across multiple scenes — exact facial identity is not technically possible with text-to-video.', es: 'Ayuda a la IA a que las personas se parezcan en varias escenas; la identidad facial exacta no es técnicamente posible con texto a vídeo.' }),
     add: 'Charakter hinzufügen',
     pickFromLibrary: 'Aus Avatar-Bibliothek wählen',
     pickerTitle: 'Avatar als Charakter verknüpfen',
     pickerDesc:
-      'Verknüpfe einen Avatar aus deiner Bibliothek. Sein Portrait wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.',
-    pickerEmpty: 'Keine Avatare in der Bibliothek. Lege einen unter „Avatare" an.',
+      tx({ de: 'Verknüpfe einen Avatar aus deiner Bibliothek. Sein Portrait wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.', en: 'Link an avatar from your library. Its portrait will automatically be used as an anchor frame (i2v) for scenes with this character — this is the only reliable lever for true facial consistency.', es: 'Vincula un avatar de tu biblioteca. Su retrato se utilizará automáticamente como fotograma de anclaje (i2v) para las escenas con este personaje; esta es la única palanca fiable para una verdadera consistencia facial.' }),
+    pickerEmpty: tx({ de: 'Keine Avatare in der Bibliothek. Lege einen unter „Avatare" an.', en: 'No avatars in the library. Create one under "Avatars".', es: 'No hay avatares en la biblioteca. Crea uno en "Avatares".' }),
     use: 'Verknüpfen',
     anchorBadge: 'Look-Referenz',
     anchorBadgeLocked: 'Erster Frame fixiert',
     anchorHint:
-      'Das Portrait dient als Look-Referenz — die KI orientiert sich am Aussehen, ohne dass jede Szene starr mit dem Portrait beginnt.',
+      tx({ de: 'Das Portrait dient als Look-Referenz — die KI orientiert sich am Aussehen, ohne dass jede Szene starr mit dem Portrait beginnt.', en: 'The portrait serves as a look reference — the AI is guided by the appearance, without every scene rigidly starting with the portrait.', es: 'El retrato sirve como referencia de aspecto: la IA se guía por la apariencia, sin que cada escena comience rígidamente con el retrato.' }),
     lockToggle: 'Portrait als ersten Frame erzwingen',
-    lockToggleHint: 'Aus = Charakter sieht so aus wie das Portrait. An = Szene startet exakt mit dem Portrait-Bild (sehr starr).',
+    lockToggleHint: tx({ de: 'Aus = Charakter sieht so aus wie das Portrait. An = Szene startet exakt mit dem Portrait-Bild (sehr starr).', en: 'Off = Character looks like the portrait. On = Scene starts exactly with the portrait image (very rigid).', es: 'Apagado = El personaje se parece al retrato. Encendido = La escena comienza exactamente con la imagen del retrato (muy rígido).' }),
     name: 'Name',
     namePlaceholder: 'z. B. Richard Löwenherz',
     appearance: 'Aussehen (Englisch empfohlen)',
@@ -47,7 +48,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro-Tipp: Sherlock-Holmes-Effekt',
     proTipBody:
-      'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek (Button oben rechts).',
+      tx({ de: 'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek (Button oben rechts).', en: 'Describe distinctive clothing & objects in detail (coat, crown, weapon). The AI repeats these much more reliably than faces — the viewer recognizes the person by them. For true facial consistency, use an avatar from the library (button top right).', es: 'Describe la ropa y los objetos distintivos en detalle (abrigo, corona, arma). La IA los repite de forma mucho más fiable que los rostros; el espectador reconoce a la persona por ellos. Para una verdadera consistencia facial, utiliza un avatar de la biblioteca (botón superior derecho).' }),
     empty: 'Keine Charaktere definiert.',
     delete: 'Löschen',
     frequency: 'Auftritte im Storyboard',

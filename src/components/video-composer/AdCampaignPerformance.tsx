@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * AdCampaignPerformance — performance roll-up panel for the Campaign tab.
  *
@@ -88,8 +89,8 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
     } catch (err: any) {
       console.error('[AdCampaignPerformance] load failed:', err);
       toast({
-        title: 'Performance konnte nicht geladen werden',
-        description: err?.message ?? 'Bitte erneut versuchen.',
+        title: tx({ de: 'Performance konnte nicht geladen werden', en: 'Performance could not be loaded', es: 'No se pudo cargar el rendimiento' }),
+        description: err?.message ?? tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
         variant: 'destructive',
       });
     } finally {
@@ -146,14 +147,14 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
 
       toast({
         title: 'Winner geklont',
-        description: 'Neuer Master wurde erstellt — bereit für die nächste Iteration.',
+        description: tx({ de: 'Neuer Master wurde erstellt — bereit für die nächste Iteration.', en: 'New master created — ready for the next iteration.', es: 'Nuevo máster creado — listo para la próxima iteración.' }),
       });
       onCloneWinner?.(cloned.id);
     } catch (err: any) {
       console.error('[AdCampaignPerformance] clone failed:', err);
       toast({
         title: 'Klonen fehlgeschlagen',
-        description: err?.message ?? 'Bitte erneut versuchen.',
+        description: err?.message ?? tx({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Por favor, inténtalo de nuevo.' }),
         variant: 'destructive',
       });
     } finally {

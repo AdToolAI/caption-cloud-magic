@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { tx } from '@/lib/i18nText';
 
 export const useTemplates = () => {
   const { toast } = useToast();
@@ -77,14 +78,14 @@ export const useTemplates = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast({
-        title: 'Template dupliziert',
-        description: 'Das Template wurde erfolgreich kopiert.',
+        title: tx({ de: 'Template dupliziert', en: 'Template duplicated', es: 'Plantilla duplicada' }),
+        description: tx({ de: 'Das Template wurde erfolgreich kopiert.', en: 'The template was copied successfully.', es: 'La plantilla se copió correctamente.' }),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Template konnte nicht dupliziert werden',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: error instanceof Error ? error.message : tx({ de: 'Template konnte nicht dupliziert werden', en: 'The template could not be duplicated', es: 'No se pudo duplicar la plantilla' }),
         variant: 'destructive',
       });
     },
@@ -103,14 +104,14 @@ export const useTemplates = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast({
-        title: 'Template gelöscht',
-        description: 'Das Template wurde erfolgreich entfernt.',
+        title: tx({ de: 'Template gelöscht', en: 'Template deleted', es: 'Plantilla eliminada' }),
+        description: tx({ de: 'Das Template wurde erfolgreich entfernt.', en: 'The template was removed successfully.', es: 'La plantilla se eliminó correctamente.' }),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Template konnte nicht gelöscht werden',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: error instanceof Error ? error.message : tx({ de: 'Template konnte nicht gelöscht werden', en: 'The template could not be deleted', es: 'No se pudo eliminar la plantilla' }),
         variant: 'destructive',
       });
     },
@@ -132,14 +133,14 @@ export const useTemplates = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast({
-        title: 'Template aktualisiert',
-        description: 'Die Änderungen wurden gespeichert.',
+        title: tx({ de: 'Template aktualisiert', en: 'Template updated', es: 'Plantilla actualizada' }),
+        description: tx({ de: 'Die Änderungen wurden gespeichert.', en: 'Your changes have been saved.', es: 'Se guardaron los cambios.' }),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Template konnte nicht aktualisiert werden',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: error instanceof Error ? error.message : tx({ de: 'Template konnte nicht aktualisiert werden', en: 'The template could not be updated', es: 'No se pudo actualizar la plantilla' }),
         variant: 'destructive',
       });
     },

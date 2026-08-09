@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -88,7 +89,7 @@ export function useMultiSceneRender(opts: Options) {
         .single();
       if (insErr) {
         console.error('[useMultiSceneRender] insert run failed', insErr);
-        toast.error('Pipeline konnte nicht gestartet werden.');
+        toast.error(tx({ de: 'Pipeline konnte nicht gestartet werden.', en: 'Pipeline could not be started.', es: 'No se pudo iniciar la pipeline.' }));
         return null;
       }
       setRun(data as any);
@@ -205,7 +206,7 @@ export function useMultiSceneRender(opts: Options) {
   const startPipeline = useCallback(
     async (destination: 'directors_cut' | 'library' | 'download' = 'directors_cut') => {
       if (!projectId) {
-        toast.error('Projekt wird gespeichert — bitte erneut versuchen.');
+        toast.error(tx({ de: 'Projekt wird gespeichert — bitte erneut versuchen.', en: 'Project is being saved — please try again.', es: 'El proyecto se está guardando; inténtalo de nuevo.' }));
         return;
       }
       destinationRef.current = destination;

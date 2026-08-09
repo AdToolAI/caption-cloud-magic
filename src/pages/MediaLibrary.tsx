@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
 import { enforceLimits, deleteMediaItem, type CleanupMediaItem } from "@/lib/media-library/autoCleanup";
 import { LicenseButton } from "@/components/licensing/LicenseButton";
+import { tx } from "@/lib/i18nText";
 
 // Storage Limits
 const MAX_VIDEOS = 500;
@@ -108,7 +109,7 @@ export default function MediaLibrary() {
     if (data) {
       setSaveToAlbumImageId(data.id);
     } else {
-      toast({ title: "Fehler beim Vorbereiten", variant: "destructive" });
+      toast({ title: tx({ de: "Fehler beim Vorbereiten", en: "Preparation failed", es: "Error de preparación" }), variant: "destructive" });
     }
   };
 
@@ -225,7 +226,7 @@ export default function MediaLibrary() {
           scheduleReload();
           toast({
             title: "🎬 Neues AI-Video verfügbar!",
-            description: "Dein AI-Video wurde zur Mediathek hinzugefügt"
+            description: tx({ de: "Dein AI-Video wurde zur Mediathek hinzugefügt", en: "Your AI video was added to the media library", es: "Tu vídeo de IA se añadió a la mediateca" })
           });
         }
       )
@@ -585,13 +586,13 @@ export default function MediaLibrary() {
       if (decision.blockReason === 'cloud_offload_required') {
         toast({
           title: 'Speicher-Limit erreicht',
-          description: 'Bitte lagere ältere Medien in deine verbundene Google Drive aus, um Platz zu schaffen.',
+          description: tx({ de: 'Bitte lagere ältere Medien in deine verbundene Google Drive aus, um Platz zu schaffen.', en: 'Please offload older media to your connected Google Drive to free up space.', es: 'Traslada medios antiguos a tu Google Drive conectado para liberar espacio.' }),
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Limit erreicht',
-          description: 'Keine alten Medien zum Freigeben gefunden. Bitte manuell löschen oder Google Drive verbinden.',
+          description: tx({ de: 'Keine alten Medien zum Freigeben gefunden. Bitte manuell löschen oder Google Drive verbinden.', en: 'No older media found to free up. Please delete manually or connect Google Drive.', es: 'No se encontraron medios antiguos. Elimina manualmente o conecta Google Drive.' }),
           variant: 'destructive',
         });
       }
@@ -612,7 +613,7 @@ export default function MediaLibrary() {
       } catch (cleanupErr: any) {
         toast({
           title: 'Auto-Cleanup fehlgeschlagen',
-          description: cleanupErr?.message || 'Bitte manuell ältere Medien löschen.',
+          description: cleanupErr?.message || tx({ de: 'Bitte manuell ältere Medien löschen.', en: 'Please delete older media manually.', es: 'Elimina manualmente los medios antiguos.' }),
           variant: 'destructive',
         });
         const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -671,7 +672,7 @@ export default function MediaLibrary() {
 
   const handleDelete = async (id: string, mediaItem: NormalizedMediaItem) => {
     if (id === DEMO_VIDEO.id) {
-      toast({ title: 'Demo-Videos können nicht gelöscht werden' });
+      toast({ title: tx({ de: 'Demo-Videos können nicht gelöscht werden', en: 'Demo videos cannot be deleted', es: 'Los vídeos de demostración no se pueden eliminar' }) });
       return;
     }
     try {
@@ -725,7 +726,7 @@ export default function MediaLibrary() {
       }
     } catch (error: any) {
       toast({
-        title: 'Fehler beim Löschen',
+        title: tx({ de: 'Fehler beim Löschen', en: 'Delete failed', es: 'Error al eliminar' }),
         description: error.message,
         variant: 'destructive',
       });

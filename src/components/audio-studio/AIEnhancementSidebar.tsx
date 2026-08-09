@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Wand2, Volume2, Mic, Radio, Sparkles, Loader2, Check, AlertTriangle } from 'lucide-react';
@@ -135,7 +136,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
   };
 
   const presets = [
-    { id: 'podcast', label: 'Podcast', desc: 'Optimiert für Sprache' },
+    { id: 'podcast', label: 'Podcast', desc: tx({ de: 'Optimiert für Sprache', en: 'Optimized for speech', es: 'Optimizado para voz' }) },
     { id: 'interview', label: 'Interview', desc: 'Mehrere Sprecher' },
     { id: 'voiceover', label: 'Voiceover', desc: 'Professionelle Qualität' },
     { id: 'music', label: 'Music Mix', desc: 'Musik + Sprache' }
@@ -173,7 +174,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
           </div>
           <div>
             <h3 className="font-semibold">KI-Audio-Bearbeitung</h3>
-            <p className="text-xs text-muted-foreground">Wähle zwischen Enhancement oder Isolation</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: "Wähle zwischen Enhancement oder Isolation", en: "Choose between Enhancement or Isolation", es: "Elige entre Mejora o Aislamiento" })}</p>
           </div>
         </div>
 

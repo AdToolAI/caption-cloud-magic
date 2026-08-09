@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -63,7 +64,7 @@ export function useMentorSlots(channelId?: string | null) {
       .eq("status", "open");
 
     if (error) {
-      toast.error("Slot konnte nicht gebucht werden");
+      toast.error(tx({ de: "Slot konnte nicht gebucht werden", en: "Slot could not be booked", es: "No se pudo reservar el espacio" }));
       console.error(error);
       return;
     }
@@ -96,7 +97,7 @@ export function useMentorSlots(channelId?: string | null) {
     });
 
     if (error) {
-      toast.error("Slot konnte nicht erstellt werden");
+      toast.error(tx({ de: "Slot konnte nicht erstellt werden", en: "Slot could not be created", es: "No se pudo crear el espacio" }));
       console.error(error);
       return;
     }

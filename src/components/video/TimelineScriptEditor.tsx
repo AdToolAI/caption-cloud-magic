@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -142,7 +143,7 @@ export const TimelineScriptEditor = ({
     if (segments.length === 0) {
       toast({
         title: "Keine Segmente vorhanden",
-        description: "Füge zuerst Text-Segmente hinzu oder nutze 'Auto-Split'",
+        description: tx({ de: "Füge zuerst Text-Segmente hinzu oder nutze 'Auto-Split'", en: "First add text segments or use 'Auto-Split'", es: "Primero añade segmentos de texto o usa 'Auto-Split'" }),
         variant: "destructive"
       });
       return;
@@ -223,7 +224,7 @@ export const TimelineScriptEditor = ({
     if (!fullText) {
       toast({
         title: "Kein Text vorhanden",
-        description: "Füge zuerst Text zu deinen Segmenten hinzu",
+        description: tx({ de: "Füge zuerst Text zu deinen Segmenten hinzu", en: "First add text to your segments", es: "Primero añade texto a tus segmentos" }),
         variant: "destructive"
       });
       return;
@@ -377,7 +378,7 @@ export const TimelineScriptEditor = ({
                 size="sm" 
                 variant="secondary"
                 disabled={isAutoSyncing || segments.length === 0}
-                title="Segmente mit präzisem Timing und Untertiteln synchronisieren"
+                title={tx({ de: "Segmente mit präzisem Timing und Untertiteln synchronisieren", en: "Sync segments with precise timing and subtitles", es: "Sincronizar segmentos con temporización precisa y subtítulos" })}
               >
                 {isAutoSyncing ? (
                   <>

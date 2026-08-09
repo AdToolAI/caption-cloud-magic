@@ -106,6 +106,7 @@ function emptyPlanCastSlot(sceneIndex: number): PlanCastSlot {
 }
 
 import { shouldInheritContinuity as shouldInheritPlanContinuity } from '@/lib/video-composer/briefing/planContinuity';
+import { tx } from '@/lib/i18nText';
 
 function hydratePlanScenesForApply(scenes: TPlanScene[]): TPlanScene[] {
   let lastCast: PlanCastSlot | null = null;
@@ -744,11 +745,11 @@ export function useApplyProductionPlan() {
     const target = Number(plan.project?.totalDurationSec);
     const sum = (plan.scenes || []).reduce((acc, scene) => acc + (Number(scene.durationSec) || 0), 0);
     if (Number.isFinite(target) && Number.isFinite(sum) && Math.abs(target - sum) > 0.5) {
-      throw new Error(`Plan inkonsistent — Gesamtdauer ${target}s passt nicht zur Szenensumme ${sum}s.`);
+      throw new Error(tx({ de: `Plan inkonsistent — Gesamtdauer ${target}s passt nicht zur Szenensumme ${sum}s.`, en: `Plan inconsistent — total duration ${target}s does not match scene sum ${sum}s.`, es: `Plan inconsistente — la duración total ${target}s no coincide con la suma de escenas ${sum}s.` }));
     }
 
     if (!isUuid(projectId)) {
-      throw new Error('Projekt-ID fehlt — Plan wurde nicht angewendet, damit keine unverbundenen Szenen entstehen.');
+      throw new Error(tx({ de: 'Projekt-ID fehlt — Plan wurde nicht angewendet, damit keine unverbundenen Szenen entstehen.', en: 'Project ID missing — plan was not applied to avoid creating orphaned scenes.', es: 'Falta el ID del proyecto — el plan no se aplicó para evitar escenas huérfanas.' }));
     }
 
     // 1) Project metadata
@@ -933,7 +934,7 @@ export function useApplyProductionPlan() {
           .select('id, order_index, dialog_script, dialog_turns, dialog_voices, ai_prompt, mentioned_character_ids, character_voice_id');
         if (error) {
           console.error('[useApplyProductionPlan] INSERT failed', error);
-          throw new Error(`Neue Plan-Szenen konnten nicht gespeichert werden: ${error.message}`);
+          throw new Error(tx({ de: `Neue Plan-Szenen konnten nicht gespeichert werden: ${error.message}`, en: `New plan scenes could not be saved: ${error.message}`, es: `No se pudieron guardar las nuevas escenas del plan: ${error.message}` }));
         } else if (Array.isArray(data)) {
           // Map returned UUIDs back into newScenes (by order_index — stable
           // because we built rows in that exact order). Also merge the
@@ -997,7 +998,7 @@ export function useApplyProductionPlan() {
             await supabase.from('composer_scenes').delete().in('id', insertedIds).eq('project_id', projectId);
           }
           console.error('[useApplyProductionPlan] DB delete failed', error);
-          throw new Error(`Alte Storyboard-Szenen konnten nicht ersetzt werden: ${error.message}`);
+          throw new Error(tx({ de: `Alte Storyboard-Szenen konnten nicht ersetzt werden: ${error.message}`, en: `Old storyboard scenes could not be replaced: ${error.message}`, es: `No se pudieron reemplazar las escenas antiguas del storyboard: ${error.message}` }));
         }
       }
     }

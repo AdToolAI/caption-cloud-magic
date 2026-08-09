@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import JSZip from "jszip";
@@ -102,7 +103,7 @@ export const InstantAvatarDemo = () => {
 
   const handleGenerate = useCallback(async () => {
     if (!sourceDataUrl) {
-      toast.error("Bitte zuerst ein Foto hochladen.");
+      toast.error(tx({ de: "Bitte zuerst ein Foto hochladen.", en: "Please upload a photo first.", es: "Por favor, sube una foto primero." }));
       return;
     }
     setIsLoading(true);
@@ -118,14 +119,14 @@ export const InstantAvatarDemo = () => {
       }
       const received: Frame[] = data?.frames ?? [];
       if (received.filter((f) => f.b64).length === 0) {
-        toast.error("Keiner der Winkel konnte generiert werden. Bitte erneut versuchen.");
+        toast.error(tx({ de: "Keiner der Winkel konnte generiert werden. Bitte erneut versuchen.", en: "None of the angles could be generated. Please try again.", es: "No se pudo generar ninguno de los ángulos. Por favor, inténtalo de nuevo." }));
         return;
       }
       setFrames(received);
       setAngleIdx(received.findIndex((f) => f.angle === 0 && f.b64) ?? 2);
       setSweep(true);
       window.setTimeout(() => setSweep(false), 1300);
-      toast.success("Dein Avatar ist bereit — dreh ihn mit dem Scrubber.");
+      toast.success(tx({ de: "Dein Avatar ist bereit — dreh ihn mit dem Scrubber.", en: "Your avatar is ready — rotate it with the scrubber.", es: "Tu avatar está listo, gíralo con el control deslizante." }));
     } catch (err) {
       const msg = (err as Error)?.message ?? "Unbekannter Fehler.";
       if (msg.includes("429") || msg.toLowerCase().includes("rate")) {

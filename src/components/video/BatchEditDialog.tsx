@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -134,7 +135,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
                 <div className="space-y-2">
                   <Label>Skript-Anpassung</Label>
                   <Textarea
-                    placeholder="Optional: Individueller Skript-Text für diese Variante"
+                    placeholder={tx({ de: "Optional: Individueller Skript-Text für diese Variante", en: "Optional: Individual script text for this variant", es: "Opcional: Texto de guion individual para esta variante" })}
                     value={variation.customizations.script_text || ''}
                     onChange={(e) => updateVariation(index, 'script_text', e.target.value)}
                     rows={3}

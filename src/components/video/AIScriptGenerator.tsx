@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -25,9 +26,9 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
 };
 
 const CONTENT_TYPE_PLACEHOLDERS: Record<string, string> = {
-  ad: 'Beschreibe dein Produkt und Zielgruppe... z.B. "Innovative Fitness-App für vielbeschäftigte Berufstätige"',
+  ad: tx({ de: 'Beschreibe dein Produkt und Zielgruppe... z.B. "Innovative Fitness-App für vielbeschäftigte Berufstätige"', en: 'Describe your product and target audience... e.g. "Innovative fitness app for busy professionals"', es: 'Describe tu producto y público objetivo... p. ej. "Aplicación de fitness innovadora para profesionales ocupados"' }),
   story: 'Welche Story möchtest du erzählen? z.B. "Meine Morgenroutine als Entrepreneur"',
-  reel: 'Was ist deine Hook-Idee? z.B. "3 Fehler, die jeder beim Kochen macht"',
+  reel: tx({ de: 'Was ist deine Hook-Idee? z.B. "3 Fehler, die jeder beim Kochen macht"', en: 'What\'s your hook idea? e.g. "3 mistakes everyone makes when cooking"', es: '¿Cuál es tu idea de gancho? p. ej. "3 errores que todo el mundo comete al cocinar"' }),
   tutorial: 'Was soll das Tutorial zeigen? z.B. "Wie man in 5 Minuten professionelle Fotos macht"',
   testimonial: 'Beschreibe die Erfolgsgeschichte... z.B. "Wie ich 10kg in 3 Monaten abgenommen habe"',
   news: 'Was ist die Breaking News? z.B. "Neue KI-Technologie revolutioniert Marketing"'
@@ -89,13 +90,13 @@ ${script.cta}`;
       setGeneratedScript(formattedScript);
       toast({
         title: 'Script generiert!',
-        description: 'Du kannst das Script jetzt bearbeiten oder direkt verwenden'
+        description: tx({ de: 'Du kannst das Script jetzt bearbeiten oder direkt verwenden', en: 'You can now edit the script or use it directly', es: 'Ahora puedes editar el guion o usarlo directamente' })
       });
     } catch (error) {
       console.error('Script generation error:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Script konnte nicht generiert werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Script konnte nicht generiert werden', en: 'Script could not be generated', es: 'No se pudo generar el guion' }),
         variant: 'destructive'
       });
     } finally {
@@ -112,7 +113,7 @@ ${script.cta}`;
   // Get content-type specific options
   const placeholder = contentType 
     ? CONTENT_TYPE_PLACEHOLDERS[contentType] 
-    : 'z.B. "Produktvorstellung für neue App mit Fokus auf Benutzerfreundlichkeit"';
+    : tx({ de: 'z.B. "Produktvorstellung für neue App mit Fokus auf Benutzerfreundlichkeit"', en: 'e.g. "Product presentation for new app with focus on user-friendliness"', es: 'p. ej. "Presentación de producto para nueva aplicación con enfoque en la facilidad de uso"' });
   
   const tonePresets = contentType 
     ? CONTENT_TYPE_TONE_PRESETS[contentType] 

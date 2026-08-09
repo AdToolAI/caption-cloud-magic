@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -85,7 +86,7 @@ export function AutopilotWeeklyReviewPanel() {
       <Card className="p-6 bg-gradient-to-br from-primary/5 to-transparent">
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="h-5 w-5 text-primary" />
-          <h3 className="font-serif text-xl">KI-Strategie für nächste Woche</h3>
+          <h3 className="font-serif text-xl">{tx({ de: "KI-Strategie für nächste Woche", en: "AI strategy for next week", es: "Estrategia de IA para la próxima semana" })}</h3>
           {isPending ? (
             <Badge variant="outline" className="ml-auto">Wartet auf Bestätigung</Badge>
           ) : (

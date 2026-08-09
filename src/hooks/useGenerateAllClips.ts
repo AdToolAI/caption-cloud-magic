@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * useGenerateAllClips — extrahiert aus ClipsTab.handleGenerateAll, damit der
  * gleiche "Alle Clips generieren"-Flow auch vom Storyboard-Tab aus aufgerufen
@@ -162,7 +163,7 @@ export function useGenerateAllClips({
         } catch (err: any) {
           toast({
             title: 'Fehler',
-            description: err?.message || 'Projekt konnte nicht gespeichert werden',
+            description: err?.message || tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' }),
             variant: 'destructive',
           });
           emitPipelineEvent({ type: 'clips:end' });
@@ -277,7 +278,7 @@ export function useGenerateAllClips({
       });
 
       if (scenesPayload.length === 0) {
-        toast({ title: 'Alle Clips sind bereits fertig!' });
+        toast({ title: tx({ de: 'Alle Clips sind bereits fertig!', en: 'All clips are already finished!', es: '¡Todos los clips ya están terminados!' }) });
         emitPipelineEvent({ type: 'clips:end' });
         setIsGeneratingAll(false);
         return;
@@ -334,7 +335,7 @@ export function useGenerateAllClips({
       if (failedResults.length > 0) {
         toast({
           title: `${failedResults.length} Clip(s) fehlgeschlagen`,
-          description: 'Generierung fehlgeschlagen — bitte erneut versuchen.',
+          description: tx({ de: 'Generierung fehlgeschlagen — bitte erneut versuchen.', en: 'Generation failed — please try again.', es: 'Error de generación — inténtalo de nuevo.' }),
           variant: 'destructive',
         });
       } else {
@@ -349,7 +350,7 @@ export function useGenerateAllClips({
       toast({
         title: 'Fehler',
         description:
-          realMsg || 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.',
+          realMsg || tx({ de: 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', en: 'Clip generation failed — please try again.', es: 'Error al generar el clip — inténtalo de nuevo.' }),
         variant: 'destructive',
       });
       emitPipelineEvent({ type: 'clips:end' });

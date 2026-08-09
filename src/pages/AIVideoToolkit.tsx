@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
@@ -98,7 +99,7 @@ export default function AIVideoToolkit() {
 
 
   const subtitle = language === 'de'
-    ? 'Ein Prompt. Alle Top-Modelle. Wechsle Anbieter ohne Kontextwechsel.'
+    ? tx({ de: 'Ein Prompt. Alle Top-Modelle. Wechsle Anbieter ohne Kontextwechsel.', en: 'One prompt. All top models. Switch providers without changing context.', es: 'Un prompt. Todos los modelos principales. Cambia de proveedor sin cambiar de contexto.' })
     : language === 'es'
     ? 'Un prompt. Todos los modelos top. Cambia de proveedor sin perder el contexto.'
     : 'One prompt. All top models. Switch providers without losing context.';

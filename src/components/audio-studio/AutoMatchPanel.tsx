@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
@@ -177,7 +178,7 @@ export function AutoMatchPanel({
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
                 <div className="flex-1">
                   <div className="font-medium">{phaseLabels[phase]}</div>
-                  <div className="text-xs text-muted-foreground">Bitte einen Moment Geduld…</div>
+                  <div className="text-xs text-muted-foreground">{tx({ de: "Bitte einen Moment Geduld…", en: "Please wait a moment…", es: "Por favor, espera un momento…" })}</div>
                 </div>
                 <Badge variant="outline" className="border-primary/40">{progress}%</Badge>
               </div>

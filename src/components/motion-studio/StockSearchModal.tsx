@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Search, Image as ImageIcon, Video, Film, Sparkles, ExternalLink, Wand2, Anchor } from 'lucide-react';
 import { toast } from 'sonner';
@@ -99,11 +100,11 @@ export default function StockSearchPanel({
   const handleUseAsReferenceVideo = useCallback(
     async (v: StockVideoResult) => {
       if (!user) {
-        toast.error('Bitte zuerst anmelden');
+        toast.error(tx({ de: 'Bitte zuerst anmelden', en: 'Please log in first', es: 'Por favor, inicia sesión primero' }));
         return;
       }
       if (!onUseAsReference) {
-        toast.error('Reference-Aktion in diesem Kontext nicht verfügbar');
+        toast.error(tx({ de: 'Reference-Aktion in diesem Kontext nicht verfügbar', en: 'Reference action not available in this context', es: 'Acción de referencia no disponible en este contexto' }));
         return;
       }
       setBusyId(v.id);
@@ -125,7 +126,7 @@ export default function StockSearchPanel({
   const handleUseAsReferenceImage = useCallback(
     (img: StockImageResult) => {
       if (!onUseAsReference) {
-        toast.error('Reference-Aktion in diesem Kontext nicht verfügbar');
+        toast.error(tx({ de: 'Reference-Aktion in diesem Kontext nicht verfügbar', en: 'Reference action not available in this context', es: 'Acción de referencia no disponible en este contexto' }));
         return;
       }
       onUseAsReference(img.url, { source: img.source, author: img.user.name });
@@ -137,7 +138,7 @@ export default function StockSearchPanel({
   const handleUseAsBRoll = useCallback(
     (v: StockVideoResult) => {
       if (!onUseAsBRoll) {
-        toast.error('B-Roll-Aktion in diesem Kontext nicht verfügbar');
+        toast.error(tx({ de: 'B-Roll-Aktion in diesem Kontext nicht verfügbar', en: 'B-roll action not available in this context', es: 'Acción de B-roll no disponible en este contexto' }));
         return;
       }
       onUseAsBRoll({

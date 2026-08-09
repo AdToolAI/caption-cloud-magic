@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -34,7 +35,7 @@ const ForgotPassword = () => {
       setLoading(false);
 
       if (error) {
-        toast.error("Fehler beim Senden", {
+        toast.error(tx({ de: "Fehler beim Senden", en: "Error sending", es: "Error al enviar" }), {
           description: error.message,
         });
       } else {
@@ -45,8 +46,8 @@ const ForgotPassword = () => {
       }
     } catch (err: any) {
       setLoading(false);
-      toast.error("Fehler beim Senden", {
-        description: err.message || "Bitte versuchen Sie es später erneut",
+      toast.error(tx({ de: "Fehler beim Senden", en: "Error sending", es: "Error al enviar" }), {
+        description: err.message || tx({ de: "Bitte versuchen Sie es später erneut", en: "Please try again later", es: "Por favor, inténtalo de nuevo más tarde" }),
       });
     }
   };
@@ -77,7 +78,7 @@ const ForgotPassword = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 rounded-xl bg-muted/30 border border-white/5 text-sm text-muted-foreground">
-                  <p>Prüfen Sie auch Ihren Spam- oder Junk-Ordner, falls Sie die E-Mail nicht finden.</p>
+                  <p>{tx({ de: "Prüfen Sie auch Ihren Spam- oder Junk-Ordner, falls Sie die E-Mail nicht finden.", en: "Also check your spam or junk folder if you can't find the email.", es: "Revisa también tu carpeta de spam o correo no deseado si no encuentras el correo electrónico." })}</p>
                 </div>
                 <Button
                   variant="outline"

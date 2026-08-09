@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * ToolkitCastPicker
  * --------------------------------------------------------------
@@ -160,7 +161,7 @@ export function ToolkitCastPicker({
                   `Imagen y descripción de referencia se envían automáticamente (${info.mode}).`,
                 )
               : t(
-                  'Dieses Modell akzeptiert kein Referenzbild — nur die Beschreibung wird in den Prompt injiziert. Für längere Stories wechsle zu Kling oder Hailuo (bis zu 5★).',
+                  tx({ de: 'Dieses Modell akzeptiert kein Referenzbild — nur die Beschreibung wird in den Prompt injiziert. Für längere Stories wechsle zu Kling oder Hailuo (bis zu 5★).', en: 'This model does not accept a reference image — only the description is injected into the prompt. For longer stories, switch to Kling or Hailuo (up to 5★).', es: 'Este modelo no acepta una imagen de referencia; solo la descripción se inyecta en el prompt. Para historias más largas, cambia a Kling o Hailuo (hasta 5★).' }),
                   'This model does not accept a reference image — only the description is injected into the prompt. For longer stories, switch to Kling or Hailuo (up to 5★).',
                   'Este modelo no acepta imagen de referencia — solo se inyecta la descripción en el prompt. Para historias largas, cambia a Kling o Hailuo (hasta 5★).',
                 )}
@@ -259,7 +260,7 @@ function CharacterPicker({
           <div className="p-3 space-y-2">
             <p className="text-xs text-muted-foreground">
               {language === 'de'
-                ? 'Noch keine Charaktere. Erstelle einen in der Library.'
+                ? tx({ de: 'Noch keine Charaktere. Erstelle einen in der Library.', en: 'No characters yet. Create one in the Library.', es: 'Aún no hay personajes. Crea uno en la Biblioteca.' })
                 : 'No characters yet. Create one in the library.'}
             </p>
             <Link
@@ -334,7 +335,7 @@ function LocationPicker({
           <div className="p-3 space-y-2">
             <p className="text-xs text-muted-foreground">
               {language === 'de'
-                ? 'Noch keine Locations. Erstelle eine in der Library.'
+                ? tx({ de: 'Noch keine Locations. Erstelle eine in der Library.', en: 'No locations yet. Create one in the Library.', es: 'Aún no hay ubicaciones. Crea una en la Biblioteca.' })
                 : 'No locations yet. Create one in the library.'}
             </p>
             <Link

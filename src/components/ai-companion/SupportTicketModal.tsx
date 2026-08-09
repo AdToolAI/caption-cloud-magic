@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Bug, Lightbulb, User, CreditCard, HelpCircle, Loader2, CheckCircle } from 'lucide-react';
@@ -41,7 +42,7 @@ export function SupportTicketModal({
 
   const handleSubmit = async () => {
     if (!category) {
-      toast.error('Bitte wähle eine Kategorie');
+      toast.error(tx({ de: 'Bitte wähle eine Kategorie', en: 'Please select a category', es: 'Por favor, selecciona una categoría' }));
       return;
     }
 
@@ -112,7 +113,7 @@ export function SupportTicketModal({
 
     } catch (error) {
       console.error('Error creating ticket:', error);
-      toast.error('Fehler beim Erstellen des Tickets');
+      toast.error(tx({ de: 'Fehler beim Erstellen des Tickets', en: 'Error creating ticket', es: 'Error al crear el ticket' }));
     } finally {
       setIsSubmitting(false);
     }

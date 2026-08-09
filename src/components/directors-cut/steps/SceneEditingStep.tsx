@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
@@ -208,7 +209,7 @@ export function SceneEditingStep({
       // Users can still manually select any transition type.
       const transitionType = 'crossfade';
       const confidence = 0.92;
-      const reasoning = 'Crossfade sorgt für die sauberste Überblendung zwischen Szenen';
+      const reasoning = tx({ de: 'Crossfade sorgt für die sauberste Überblendung zwischen Szenen', en: 'Crossfade provides the cleanest blend between scenes', es: 'El fundido cruzado proporciona la mezcla más limpia entre escenas' });
       
       return {
         sceneId: scene.id,
@@ -637,7 +638,7 @@ export function SceneEditingStep({
     setSelectedSceneId(newScene.id);
     toast({
       title: 'Szene hinzugefügt',
-      description: 'Eine neue leere Szene wurde erstellt',
+      description: tx({ de: 'Eine neue leere Szene wurde erstellt', en: 'A new empty scene has been created', es: 'Se ha creado una nueva escena vacía' }),
     });
   }, [scenes, selectedSceneId, onScenesUpdate, toast]);
 

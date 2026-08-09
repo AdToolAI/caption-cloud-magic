@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -267,7 +268,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox checked={noDeepfake} onCheckedChange={(v) => setNoDeepfake(v === true)} disabled={!scrolled} />
-                <span>Ich werde <strong>keine Deepfakes</strong> realer Personen erstellen oder verbreiten.</span>
+                <span>Ich werde <strong>keine Deepfakes</strong> {tx({ de: "realer Personen erstellen oder verbreiten.", en: "create or distribute real people.", es: "crear o distribuir personas reales." })}</span>
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox checked={noCopyright} onCheckedChange={(v) => setNoCopyright(v === true)} disabled={!scrolled} />
@@ -276,7 +277,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               <label className="flex items-start gap-2 text-sm border-l-2 border-destructive pl-2">
                 <Checkbox checked={acceptTermination} onCheckedChange={(v) => setAcceptTermination(v === true)} disabled={!scrolled} />
                 <span className="text-destructive/90">
-                  Ich verstehe: <strong>Critical-Strikes führen zur sofortigen, fristlosen Löschung meines Accounts ohne Rückerstattung.</strong>
+                  Ich verstehe: <strong>{tx({ de: "Critical-Strikes führen zur sofortigen, fristlosen Löschung meines Accounts ohne Rückerstattung.", en: "Critical strikes will result in immediate, summary deletion of my account without refund.", es: "Las infracciones graves resultarán en la eliminación inmediata y sin previo aviso de mi cuenta, sin reembolso." })}</strong>
                 </span>
               </label>
             </div>

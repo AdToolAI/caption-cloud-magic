@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime',
 const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
 const ENHANCE_DEFAULT_TEXT =
-  "Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.";
+  tx({ de: "Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.", en: "Adopt this image 1:1 and improve quality, realism, light consistency, and detail — keep all people, clothing, composition, and background exactly as is.", es: "Adopta esta imagen 1:1 y mejora la calidad, el realismo, la consistencia de la luz y el detalle — mantén a todas las personas, la ropa, la composición y el fondo exactamente como están." });
 
 export function PromptHelperDialog({
   open, onOpenChange, initialUserText = '',
@@ -58,7 +59,7 @@ export function PromptHelperDialog({
   const handleGenerate = async (overrideText?: string, intent: 'enhance' | 'freeform' = 'freeform') => {
     const text = (typeof overrideText === 'string' ? overrideText : userText).trim();
     if (!text) {
-      toast.error("Bitte beschreib in deinen Worten was du willst.");
+      toast.error(tx({ de: "Bitte beschreib in deinen Worten was du willst.", en: "Please describe in your own words what you want.", es: "Por favor, describe con tus propias palabras lo que quieres." }));
       return;
     }
     setLoading(true);
@@ -143,7 +144,7 @@ export function PromptHelperDialog({
                 <ImageIcon className="h-4 w-4 text-primary shrink-0" />
                 <span>
                   {autoEnhance
-                    ? 'Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.'
+                    ? tx({ de: 'Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.', en: 'Adopt & enhance image — model, mode, and strength are set automatically.', es: 'Adoptar y mejorar imagen — el modelo, modo y fuerza se configuran automáticamente.' })
                     : 'Dein Referenzbild wird mitanalysiert.'}
                 </span>
                 <img src={referenceImageUrl} alt="ref" className="ml-auto h-10 w-10 object-cover rounded" />
@@ -155,7 +156,7 @@ export function PromptHelperDialog({
               <Textarea
                 value={userText}
                 onChange={(e) => setUserText(e.target.value)}
-                placeholder="z. B. Mach das Bild realistisch und detailliert, behalte alle Personen"
+                placeholder={tx({ de: "z. B. Mach das Bild realistisch und detailliert, behalte alle Personen", en: "e.g. Make the image realistic and detailed, keep all people", es: "ej. Haz la imagen realista y detallada, mantén a todas las personas" })}
                 rows={3}
                 className="resize-none bg-background/50"
               />

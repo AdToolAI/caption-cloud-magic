@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +48,7 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
       type: score >= 80 ? "success" : "tip",
       icon: score >= 80 ? CheckCircle : AlertCircle,
       text: score >= 80 
-        ? "Deine Marke ist konsistent! Weiter so!" 
+        ? tx({ de: "Deine Marke ist konsistent! Weiter so!", en: "Your brand is consistent! Keep it up!", es: "¡Tu marca es consistente! ¡Sigue así!" }) 
         : "Nutze deine Primärfarbe häufiger in Posts"
     },
     {

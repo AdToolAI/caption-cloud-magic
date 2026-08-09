@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Music, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -45,7 +46,7 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
       console.error('Music suggestion error:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Musik-Vorschläge konnten nicht generiert werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Musik-Vorschläge konnten nicht generiert werden', en: 'Music suggestions could not be generated', es: 'No se pudieron generar sugerencias musicales' }),
         variant: 'destructive'
       });
     } finally {

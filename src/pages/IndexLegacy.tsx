@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/Footer";
@@ -35,7 +36,7 @@ const Index = () => {
       "ratingCount": "1200"
     },
     "operatingSystem": "Web Browser",
-    "description": "KI-gestützte Social Media Caption Generator für Instagram, TikTok, LinkedIn und mehr. Erstelle perfekte Bildunterschriften in Sekunden.",
+    "description": tx({ de: "KI-gestützte Social Media Caption Generator für Instagram, TikTok, LinkedIn und mehr. Erstelle perfekte Bildunterschriften in Sekunden.", en: "AI-powered Social Media Caption Generator for Instagram, TikTok, LinkedIn, and more. Create perfect captions in seconds.", es: "Generador de subtítulos para redes sociales impulsado por IA para Instagram, TikTok, LinkedIn y más. Crea subtítulos perfectos en segundos." }),
     "creator": {
       "@type": "Organization",
       "name": "AdTool AI"

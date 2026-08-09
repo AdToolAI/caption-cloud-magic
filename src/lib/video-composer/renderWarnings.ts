@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * renderWarnings — derives contextual warnings for a scene about to be
  * rendered. Used by the Pre-Flight Confirm Dialog so the user sees
@@ -61,7 +62,7 @@ export function getRenderWarnings(scene: ComposerScene): RenderWarning[] {
   if (src === 'ai-pika') {
     out.push({
       level: 'warning',
-      message: 'Pika ist im Wartungsmodus — wird automatisch auf Hailuo migriert.',
+      message: tx({ de: 'Pika ist im Wartungsmodus — wird automatisch auf Hailuo migriert.', en: 'Pika is in maintenance mode — will be automatically migrated to Hailuo.', es: 'Pika está en modo de mantenimiento — se migrará automáticamente a Hailuo.' }),
     });
   }
 

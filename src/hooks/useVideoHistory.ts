@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -45,7 +46,7 @@ export const useVideoHistory = () => {
     mutationFn: async (videoId: string) => {
       // Block deletion of demo videos
       if (videoId === DEMO_VIDEO.id) {
-        throw new Error('Demo-Videos können nicht gelöscht werden');
+        throw new Error(tx({ de: 'Demo-Videos können nicht gelöscht werden', en: 'Demo videos cannot be deleted', es: 'Los videos de demostración no se pueden eliminar' }));
       }
       const { error } = await supabase
         .from('video_creations')
@@ -60,7 +61,7 @@ export const useVideoHistory = () => {
     },
     onError: (error) => {
       toast({
-        title: 'Fehler beim Löschen',
+        title: tx({ de: 'Fehler beim Löschen', en: 'Error deleting', es: 'Error al eliminar' }),
         description: error instanceof Error ? error.message : 'Unbekannter Fehler',
         variant: 'destructive'
       });

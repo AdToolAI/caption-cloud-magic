@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo } from 'react';
 import { Bell, CheckCheck, AlertTriangle, XCircle, Sparkles, ShieldAlert, Info, Calendar as CalIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -93,7 +94,7 @@ export function AutopilotApprovalInbox({ onOpenSlot }: Props) {
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Lade…</div>
         ) : notifications.length === 0 ? (
-          <EmptyState icon={Bell} text="Noch keine Notifications. Sobald die KI plant, postet oder prüft, erscheint es hier." />
+          <EmptyState icon={Bell} text={tx({ de: "Noch keine Notifications. Sobald die KI plant, postet oder prüft, erscheint es hier.", en: "No notifications yet. Once the AI plans, posts, or reviews, it will appear here.", es: "Aún no hay notificaciones. Una vez que la IA planifique, publique o revise, aparecerá aquí." })} />
         ) : (
           <ScrollArea className="h-[420px] pr-2">
             <div className="space-y-1.5">

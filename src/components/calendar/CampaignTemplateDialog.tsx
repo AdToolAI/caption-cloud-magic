@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Rocket, Calendar as CalendarIcon, FileText, Globe, User, Library } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { tx } from "@/lib/i18nText";
 
 interface CampaignTemplateDialogProps {
   open: boolean;
@@ -80,23 +81,23 @@ export function CampaignTemplateDialog({
   const handleGenerate = async () => {
     // Validation
     if (!workspaceId) {
-      toast.error("Kein Workspace ausgewählt");
+      toast.error(tx({ de: "Kein Workspace ausgewählt", en: "No workspace selected", es: "No se seleccionó ningún espacio de trabajo" }));
       console.error("❌ Missing workspace_id");
       return;
     }
 
     if (!selectedTemplate) {
-      toast.error("Bitte wähle ein Template aus");
+      toast.error(tx({ de: "Bitte wähle ein Template aus", en: "Please select a template", es: "Por favor selecciona una plantilla" }));
       return;
     }
 
     if (!campaignName.trim()) {
-      toast.error("Bitte gib einen Kampagnennamen ein");
+      toast.error(tx({ de: "Bitte gib einen Kampagnennamen ein", en: "Please enter a campaign name", es: "Por favor introduce un nombre de campaña" }));
       return;
     }
 
     if (!startDate) {
-      toast.error("Bitte wähle ein Startdatum");
+      toast.error(tx({ de: "Bitte wähle ein Startdatum", en: "Please select a start date", es: "Por favor selecciona una fecha de inicio" }));
       return;
     }
 
@@ -142,7 +143,7 @@ export function CampaignTemplateDialog({
       console.log("✅ Campaign created successfully:", data);
 
       const eventCount = data.count || data.events?.length || 0;
-      toast.success(`Kampagne "${campaignName}" mit ${eventCount} Events erstellt`);
+      toast.success(tx({ de: `Kampagne "${campaignName}" mit ${eventCount} Events erstellt`, en: `Campaign "${campaignName}" created with ${eventCount} events`, es: `Campaña "${campaignName}" creada con ${eventCount} eventos` }));
       
       onGenerated?.(data.campaign_id);
       handleClose();
@@ -158,7 +159,7 @@ export function CampaignTemplateDialog({
       
       // Show detailed error message
       const errorMessage = error.message || error.code || t("calendarCampaign.unknownError");
-      toast.error(`Fehler beim Erstellen der Kampagne: ${errorMessage}`);
+      toast.error(tx({ de: `Fehler beim Erstellen der Kampagne: ${errorMessage}`, en: `Error creating the campaign: ${errorMessage}`, es: `Error al crear la campaña: ${errorMessage}` }));
     } finally {
       setGenerating(false);
     }
@@ -208,10 +209,10 @@ export function CampaignTemplateDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-primary" />
-            Kampagne aus Template starten
+            {tx({ de: "Kampagne aus Template starten", en: "Start campaign from template", es: "Iniciar campaña desde plantilla" })}
           </DialogTitle>
           <DialogDescription className="flex items-center justify-between">
-            <span>Wähle ein Template und konfiguriere deine Kampagne</span>
+            <span>{tx({ de: "Wähle ein Template und konfiguriere deine Kampagne", en: "Select a template and configure your campaign", es: "Selecciona una plantilla y configura tu campaña" })}</span>
             <Button
               variant="ghost"
               size="sm"
@@ -221,7 +222,7 @@ export function CampaignTemplateDialog({
               }}
             >
               <Library className="w-4 h-4 mr-2" />
-              Templates verwalten
+              {tx({ de: "Templates verwalten", en: "Manage templates", es: "Gestionar plantillas" })}
             </Button>
           </DialogDescription>
         </DialogHeader>
@@ -230,17 +231,17 @@ export function CampaignTemplateDialog({
           {/* Template Selection */}
           <div className="flex flex-col gap-4 min-h-0">
             <div className="flex items-center justify-between flex-shrink-0">
-              <Label>Template auswählen</Label>
+              <Label>{tx({ de: "Template auswählen", en: "Select template", es: "Seleccionar plantilla" })}</Label>
               <Tabs value={filterTab} onValueChange={(v) => setFilterTab(v as any)} className="w-auto">
                 <TabsList className="h-8">
                   <TabsTrigger value="all" className="text-xs">
-                    Alle ({templates.length})
+                    {tx({ de: "Alle", en: "All", es: "Todas" })} ({templates.length})
                   </TabsTrigger>
                   <TabsTrigger value="my" className="text-xs">
-                    Meine ({templates.filter(isMyTemplate).length})
+                    {tx({ de: "Meine", en: "Mine", es: "Mías" })} ({templates.filter(isMyTemplate).length})
                   </TabsTrigger>
                   <TabsTrigger value="public" className="text-xs">
-                    Standard ({templates.filter(isPublicTemplate).length})
+                    {tx({ de: "Standard", en: "Default", es: "Predeterminadas" })} ({templates.filter(isPublicTemplate).length})
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -283,12 +284,12 @@ export function CampaignTemplateDialog({
                               {isMyTemplate(template) ? (
                                 <Badge variant="outline" className="gap-1">
                                   <User className="h-3 w-3" />
-                                  Eigenes Template
+                                  {tx({ de: "Eigenes Template", en: "My own template", es: "Plantilla propia" })}
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="gap-1">
                                   <Globe className="h-3 w-3" />
-                                  Standard
+                                  {tx({ de: "Standard", en: "Default", es: "Predeterminada" })}
                                 </Badge>
                               )}
                             </div>
@@ -317,12 +318,12 @@ export function CampaignTemplateDialog({
 
           {/* Configuration */}
           <div className="flex flex-col gap-4 min-h-0">
-            <Label className="flex-shrink-0">Kampagnen-Konfiguration</Label>
+            <Label className="flex-shrink-0">{tx({ de: "Kampagnen-Konfiguration", en: "Campaign configuration", es: "Configuración de campaña" })}</Label>
             
             {selectedTemplate ? (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="campaign-name">Kampagnen-Name *</Label>
+                  <Label htmlFor="campaign-name">{tx({ de: "Kampagnen-Name *", en: "Campaign name *", es: "Nombre de campaña *" })}</Label>
                   <Input
                     id="campaign-name"
                     value={campaignName}
@@ -332,7 +333,7 @@ export function CampaignTemplateDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Startdatum *</Label>
+                  <Label>{tx({ de: "Startdatum *", en: "Start date *", es: "Fecha de inicio *" })}</Label>
                   <Calendar
                     mode="single"
                     selected={startDate}
@@ -345,25 +346,25 @@ export function CampaignTemplateDialog({
                 {startDate && (
                   <Card className="bg-muted/50">
                     <CardHeader className="p-4">
-                      <CardTitle className="text-sm">Vorschau</CardTitle>
+                      <CardTitle className="text-sm">{tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}</CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-0 text-xs space-y-1">
                       <p>
-                        <span className="text-muted-foreground">Start:</span>{" "}
+                        <span className="text-muted-foreground">{tx({ de: "Start:", en: "Start:", es: "Inicio:" })}</span>{" "}
                         {startDate.toLocaleDateString("de-DE")}
                       </p>
                       <p>
-                        <span className="text-muted-foreground">Ende:</span>{" "}
+                        <span className="text-muted-foreground">{tx({ de: "Ende:", en: "End:", es: "Fin:" })}</span>{" "}
                         {new Date(
                           startDate.getTime() + selectedTemplate.duration_days * 24 * 60 * 60 * 1000
                         ).toLocaleDateString("de-DE")}
                       </p>
                       <p>
-                        <span className="text-muted-foreground">Dauer:</span>{" "}
-                        {selectedTemplate.duration_days} Tage
+                        <span className="text-muted-foreground">{tx({ de: "Dauer:", en: "Duration:", es: "Duración:" })}</span>{" "}
+                        {selectedTemplate.duration_days} {tx({ de: "Tage", en: "days", es: "días" })}
                       </p>
                       <p>
-                        <span className="text-muted-foreground">Posts:</span>{" "}
+                        <span className="text-muted-foreground">{tx({ de: "Posts:", en: "Posts:", es: "Publicaciones:" })}</span>{" "}
                         {Array.isArray(selectedTemplate.events_json) ? selectedTemplate.events_json.length : 0}
                       </p>
                     </CardContent>
@@ -374,7 +375,7 @@ export function CampaignTemplateDialog({
               <Card className="border-dashed">
                 <CardContent className="py-12">
                   <p className="text-sm text-muted-foreground text-center">
-                    Wähle ein Template aus, um deine Kampagne zu konfigurieren
+                    {tx({ de: "Wähle ein Template aus, um deine Kampagne zu konfigurieren", en: "Select a template to configure your campaign", es: "Selecciona una plantilla para configurar tu campaña" })}
                   </p>
                 </CardContent>
               </Card>

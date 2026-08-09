@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Loader2, Trash2, Play, Search, Wand2 } from 'lucide-react';
@@ -95,7 +96,7 @@ export function TranscriptWaveformEditor({
       toast.success('Transcript erfolgreich generiert');
     } catch (error) {
       console.error('Transcript error:', error);
-      toast.error('Fehler beim Generieren des Transcripts');
+      toast.error(tx({ de: 'Fehler beim Generieren des Transcripts', en: 'Error generating transcript', es: 'Error al generar la transcripción' }));
     } finally {
       // 5. Cleanup: Delete temp file
       if (tempFileName) {

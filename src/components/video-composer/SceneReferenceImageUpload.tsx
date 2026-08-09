@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useTx } from '@/lib/i18nText';
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB
 const ACCEPTED_IMAGE = ['image/jpeg', 'image/png', 'image/webp'];
@@ -28,6 +29,8 @@ export default function SceneReferenceImageUpload({
   onChange,
   disabled = false,
 }: SceneReferenceImageUploadProps) {
+  const tr = useTx();
+
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
@@ -38,7 +41,7 @@ export default function SceneReferenceImageUpload({
       if (!file || disabled) return;
 
       if (!ACCEPTED_IMAGE.includes(file.type)) {
-        toast.error('Bitte ein Bild wählen (JPG, PNG oder WEBP).');
+        toast.error(tr({ de: 'Bitte ein Bild wählen (JPG, PNG oder WEBP).', en: 'Please select an image (JPG, PNG or WEBP).', es: 'Selecciona una imagen (JPG, PNG o WEBP).' }));
         return;
       }
       if (file.size > MAX_IMAGE_BYTES) {
@@ -77,7 +80,7 @@ export default function SceneReferenceImageUpload({
         setProgress(85);
 
         const { data: pub } = supabase.storage.from('composer-uploads').getPublicUrl(fileName);
-        if (!pub?.publicUrl) throw new Error('Public URL konnte nicht erstellt werden');
+        if (!pub?.publicUrl) throw new Error(tr({ de: 'Public URL konnte nicht erstellt werden', en: 'Could not create public URL', es: 'No se pudo crear la URL pública' }));
 
         setProgress(100);
         onChange(pub.publicUrl);

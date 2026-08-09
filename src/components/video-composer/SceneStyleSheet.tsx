@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SceneStyleSheet — Cleaned-up "Stil ändern" dialog.
  *
@@ -73,7 +74,7 @@ const t = {
     looks: 'Looks',
     fine: 'Feintuning',
     modifiers: 'Modifier',
-    activeNone: 'Noch kein Stil gesetzt — wähle einen Look oder feinjustiere unten.',
+    activeNone: tx({ de: 'Noch kein Stil gesetzt — wähle einen Look oder feinjustiere unten.', en: 'No style set yet — choose a look or fine-tune below.', es: 'Aún no hay estilo establecido; elige un aspecto o ajústalo a continuación.' }),
     active: 'Aktiv',
     resetAll: 'Alles zurücksetzen',
     done: 'Fertig',

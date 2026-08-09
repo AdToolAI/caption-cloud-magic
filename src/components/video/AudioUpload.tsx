@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { tx } from '@/lib/i18nText';
 
 interface AudioUploadProps {
   value: { url: string; volume: number } | null;
@@ -56,7 +57,7 @@ export function AudioUpload({
       toast.success('Audio hochgeladen');
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Fehler beim Hochladen');
+      toast.error(tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }));
       clearInterval(interval);
     } finally {
       setTimeout(() => {

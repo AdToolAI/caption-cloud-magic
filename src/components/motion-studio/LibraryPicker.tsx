@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -114,8 +115,8 @@ export default function LibraryPicker({
             <div className="text-center py-12 px-6">
               <p className="text-sm text-muted-foreground mb-3">
                 {items.length === 0
-                  ? 'Du hast noch keine gespeicherten Einträge.'
-                  : 'Keine Ergebnisse für deine Suche.'}
+                  ? tx({ de: 'Du hast noch keine gespeicherten Einträge.', en: 'You don\'t have any saved entries yet.', es: 'Aún no tienes entradas guardadas.' })
+                  : tx({ de: 'Keine Ergebnisse für deine Suche.', en: 'No results for your search.', es: 'No hay resultados para tu búsqueda.' })}
               </p>
               {items.length === 0 && (
                 <Link to="/motion-studio/library" onClick={() => onOpenChange(false)}>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Film, Image as ImageIcon, Layers, Sparkles } from 'lucide-react';
@@ -85,7 +86,7 @@ export default function VideoModeSelector({ value, language, onChange }: VideoMo
     lang === 'de' ? 'Video-Modus' : lang === 'es' ? 'Modo de Video' : 'Video Mode';
   const headerDesc =
     lang === 'de'
-      ? 'Wähle, wie deine Szenen erstellt werden — Video, animierte Bilder oder eine Mischung.'
+      ? tx({ de: 'Wähle, wie deine Szenen erstellt werden — Video, animierte Bilder oder eine Mischung.', en: 'Choose how your scenes are created — video, animated images, or a mix.', es: 'Elige cómo se crean tus escenas — vídeo, imágenes animadas o una mezcla.' })
       : lang === 'es'
         ? 'Elige cómo se crean tus escenas — video, imágenes animadas o una combinación.'
         : 'Choose how your scenes are produced — video, animated images, or a mix.';

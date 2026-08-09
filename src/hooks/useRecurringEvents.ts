@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,7 +50,7 @@ export function useRecurringEvents(workspace_id?: string) {
       queryClient.invalidateQueries({ queryKey: ['recurring-event-rules'] });
       toast({
         title: '✅ Recurring Rule erstellt',
-        description: 'Automatische Events werden jetzt generiert',
+        description: tx({ de: 'Automatische Events werden jetzt generiert', en: 'Automatic events are now being generated', es: 'Se están generando eventos automáticos' }),
       });
     },
     onError: (error: any) => {

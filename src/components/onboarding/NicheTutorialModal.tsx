@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { NicheStep } from "./NicheStep";
@@ -101,7 +102,7 @@ export function NicheTutorialModal({ onComplete }: NicheTutorialModalProps) {
       setPlans(data?.plans || []);
     } catch (err: any) {
       console.error("Plan generation error:", err);
-      setPlanError("Fehler beim Erstellen des Plans. Bitte versuche es erneut.");
+      setPlanError(tx({ de: "Fehler beim Erstellen des Plans. Bitte versuche es erneut.", en: "Error creating plan. Please try again.", es: "Error al crear el plan. Por favor, inténtalo de nuevo." }));
     } finally {
       setPlanLoading(false);
     }

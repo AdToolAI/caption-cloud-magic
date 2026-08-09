@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,19 +43,19 @@ const FALLBACKS: Record<string, string> = {
   framesRendering: 'Frames werden gerendert …',
   encodingUploading: 'Video wird kodiert & hochgeladen …',
   renderingPercent: 'Video wird gerendert … {percent}%',
-  videoReady: 'Dein Video ist fertig',
-  videoReadyDesc: 'Vorschau, Download oder direkt in der Mediathek öffnen.',
+  videoReady: tx({ de: 'Dein Video ist fertig', en: 'Your video is ready', es: 'Tu video está listo' }),
+  videoReadyDesc: tx({ de: 'Vorschau, Download oder direkt in der Mediathek öffnen.', en: 'Preview, download or open directly in the media library.', es: 'Previsualiza, descarga o abre directamente en la biblioteca de medios.' }),
   download: 'Herunterladen',
   savedToLibrary: 'In Mediathek gespeichert',
-  savedToLibraryDesc: 'Du findest dieses Video jetzt in der Mediathek.',
+  savedToLibraryDesc: tx({ de: 'Du findest dieses Video jetzt in der Mediathek.', en: 'You can now find this video in the media library.', es: 'Ahora puedes encontrar este video en la biblioteca de medios.' }),
   viewInLibrary: 'Mediathek öffnen',
   takingLonger: 'Dauert länger als üblich',
-  checkLaterDesc: 'Du kannst die Seite verlassen und später wieder öffnen — der Status wird aus der Datenbank geladen.',
+  checkLaterDesc: tx({ de: 'Du kannst die Seite verlassen und später wieder öffnen — der Status wird aus der Datenbank geladen.', en: 'You can leave the page and open it again later — the status will be loaded from the database.', es: 'Puedes salir de la página y volver a abrirla más tarde — el estado se cargará desde la base de datos.' }),
   renderFailed: 'Rendering fehlgeschlagen',
   error: 'Fehler',
   renderIdShort: 'Render-ID',
   clipsNotReady: 'Clips nicht bereit',
-  generateClipsFirst: 'Bitte generiere zuerst alle Clips im Clips-Tab.',
+  generateClipsFirst: tx({ de: 'Bitte generiere zuerst alle Clips im Clips-Tab.', en: 'Please generate all clips in the Clips tab first.', es: 'Por favor, genera todos los clips en la pestaña Clips primero.' }),
   renderStarted: 'Video-Rendering gestartet! 🎬',
   renderVideo: 'Video rendern',
   backgroundMusic: 'Hintergrundmusik',
@@ -62,7 +63,7 @@ const FALLBACKS: Record<string, string> = {
   musicWillBeMixed: 'Wird im finalen Export mit der unten gewählten Lautstärke gemischt.',
   musicVolume: 'Lautstärke',
   editInAudioTab: 'Im Audio-Tab ändern',
-  musicEnabledNoTrack: 'Musik aktiviert, aber kein Track gewählt — wähle einen Track im Audio-Tab.',
+  musicEnabledNoTrack: tx({ de: 'Musik aktiviert, aber kein Track gewählt — wähle einen Track im Audio-Tab.', en: 'Music activated, but no track selected — choose a track in the Audio tab.', es: 'Música activada, pero no hay pista seleccionada — elige una pista en la pestaña Audio.' }),
   musicDisabledHint: 'Keine Hintergrundmusik gewählt — im Audio-Tab hinzufügen.',
 };
 

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { Component, type ReactNode } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,7 +54,7 @@ export class ComposerTabErrorBoundary extends Component<Props, State> {
               <div className="font-medium">
                 {this.props.label
                   ? `${this.props.label} konnte nicht gerendert werden`
-                  : 'Beim Rendern ist ein Fehler aufgetreten'}
+                  : tx({ de: 'Beim Rendern ist ein Fehler aufgetreten', en: 'An error occurred during rendering', es: 'Se produjo un error durante el renderizado' })}
               </div>
               {this.state.error?.message && (
                 <div className="text-xs text-muted-foreground font-mono mt-1 break-all">

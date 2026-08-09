@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -282,8 +283,8 @@ function EmptyContentLibrary({ campaignFilter }: { campaignFilter: boolean }) {
       </h3>
       <p className="text-xs text-muted-foreground mb-4 max-w-xs">
         {campaignFilter 
-          ? "Erstellen Sie Inhalte für diese Kampagne oder laden Sie Medien in die Mediathek hoch."
-          : "Laden Sie Medien in die Mediathek hoch oder erstellen Sie Kampagnen, um Inhalte hier zu planen."}
+          ? tx({ de: "Erstellen Sie Inhalte für diese Kampagne oder laden Sie Medien in die Mediathek hoch.", en: "Create content for this campaign or upload media to the media library.", es: "Crea contenido para esta campaña o sube medios a la biblioteca de medios." })
+          : tx({ de: "Laden Sie Medien in die Mediathek hoch oder erstellen Sie Kampagnen, um Inhalte hier zu planen.", en: "Upload media to the media library or create campaigns to schedule content here.", es: "Sube medios a la biblioteca de medios o crea campañas para programar contenido aquí." })}
       </p>
       {!campaignFilter && (
         <Button

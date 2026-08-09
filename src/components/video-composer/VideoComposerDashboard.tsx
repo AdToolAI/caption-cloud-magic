@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FileText, LayoutGrid, Film, Music, Download, ArrowLeft, AlertTriangle, RotateCcw, Mic, Sparkles, Megaphone, LogOut } from 'lucide-react';
@@ -680,9 +681,9 @@ export default function VideoComposerDashboard() {
       setActiveTab('storyboard');
     } catch (err: any) {
       console.error('[VideoComposerDashboard] persist failed:', err);
-      const msg = err?.message || 'Projekt konnte nicht gespeichert werden';
+      const msg = err?.message || tx({ de: 'Projekt konnte nicht gespeichert werden', en: 'Project could not be saved', es: 'No se pudo guardar el proyecto' });
       setError(msg);
-      toast({ title: 'Fehler beim Speichern', description: msg, variant: 'destructive' });
+      toast({ title: tx({ de: 'Fehler beim Speichern', en: 'Error saving', es: 'Error al guardar' }), description: msg, variant: 'destructive' });
     } finally {
       setIsPersisting(false);
     }
@@ -725,7 +726,7 @@ export default function VideoComposerDashboard() {
           title: 'Cancel teilweise fehlgeschlagen',
           description:
             (e instanceof Error ? e.message : String(e)) +
-            ' — neues Projekt wird trotzdem gestartet.',
+            tx({ de: ' — neues Projekt wird trotzdem gestartet.', en: ' — new project will be started anyway.', es: ' — se iniciará un nuevo proyecto de todos modos.' }),
           variant: 'destructive',
         });
       } finally {
@@ -747,7 +748,7 @@ export default function VideoComposerDashboard() {
         }
       } catch (e) {
         toast({
-          title: 'Altes Projekt konnte nicht gelöscht werden',
+          title: tx({ de: 'Altes Projekt konnte nicht gelöscht werden', en: 'Old project could not be deleted', es: 'No se pudo eliminar el proyecto antiguo' }),
           description: e instanceof Error ? e.message : String(e),
           variant: 'destructive',
         });
@@ -1373,7 +1374,7 @@ export default function VideoComposerDashboard() {
     // resolved in the same click handler.
     const projectId = projectIdRef.current || project.id;
     if (!projectId) {
-      throw new Error('Projekt konnte nicht gespeichert werden — bitte oben „Speichern" klicken und erneut versuchen.');
+      throw new Error(tx({ de: 'Projekt konnte nicht gespeichert werden — bitte oben „Speichern" klicken und erneut versuchen.', en: 'Could not save project — please click "Save" at the top and try again.', es: 'No se pudo guardar el proyecto — haz clic en "Guardar" arriba e inténtalo de nuevo.' }));
     }
 
     // Build snake_case payload for the atomic DB function.

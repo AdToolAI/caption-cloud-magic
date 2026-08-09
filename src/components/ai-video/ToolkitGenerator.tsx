@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -405,7 +406,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   /* ── Generate dispatch ── */
   const runGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error(language === 'de' ? 'Bitte gib einen Prompt ein.' : 'Please enter a prompt.');
+      toast.error(language === 'de' ? tx({ de: 'Bitte gib einen Prompt ein.', en: 'Please enter a prompt.', es: 'Por favor, introduce un prompt.' }) : 'Please enter a prompt.');
       return;
     }
     if (!canAfford) {
@@ -598,7 +599,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           ) {
             throw new Error(
               language === 'de'
-                ? 'Szenen-Komposition fehlgeschlagen. Bitte erneut versuchen.'
+                ? tx({ de: 'Szenen-Komposition fehlgeschlagen. Bitte erneut versuchen.', en: 'Scene composition failed. Please try again.', es: 'La composición de la escena falló. Por favor, inténtalo de nuevo.' })
                 : 'Scene composition failed. Please try again.',
             );
           }
@@ -609,7 +610,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           toast.error(
             e?.message ??
               (language === 'de'
-                ? 'Szenen-Komposition fehlgeschlagen. Bitte erneut versuchen.'
+                ? tx({ de: 'Szenen-Komposition fehlgeschlagen. Bitte erneut versuchen.', en: 'Scene composition failed. Please try again.', es: 'La composición de la escena falló. Por favor, inténtalo de nuevo.' })
                 : 'Scene composition failed. Please try again.'),
           );
           return;
@@ -686,7 +687,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         if (model.capabilities.multiRefRequired && viduReferences.length === 0) {
           toast.error(
             language === 'de'
-              ? 'Bitte mindestens 1 Referenzbild hinzufügen.'
+              ? tx({ de: 'Bitte mindestens 1 Referenzbild hinzufügen.', en: 'Please add at least 1 reference image.', es: 'Por favor, añade al menos 1 imagen de referencia.' })
               : 'Please add at least 1 reference image.',
           );
           setGenerating(false);
@@ -789,7 +790,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   /* Gate: opens cost-confirm dialog unless user suppressed it within 24 h. */
   const handleGenerate = () => {
     if (!prompt.trim()) {
-      toast.error(language === 'de' ? 'Bitte gib einen Prompt ein.' : 'Please enter a prompt.');
+      toast.error(language === 'de' ? tx({ de: 'Bitte gib einen Prompt ein.', en: 'Please enter a prompt.', es: 'Por favor, introduce un prompt.' }) : 'Please enter a prompt.');
       return;
     }
     if (!canAfford) {
@@ -848,10 +849,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           lockedReason={
             referencePlacement === 'end'
               ? (language === 'de'
-                  ? 'Endframe wird nur von Luma Ray 2 unterstützt. Placement zurück auf „Am Anfang" setzen, um andere Modelle zu wählen.'
+                  ? tx({ de: 'Endframe wird nur von Luma Ray 2 unterstützt. Placement zurück auf „Am Anfang" setzen, um andere Modelle zu wählen.', en: 'End frame is only supported by Luma Ray 2. Set placement back to "At the beginning" to choose other models.', es: 'El fotograma final solo es compatible con Luma Ray 2. Vuelve a colocar la posición en "Al principio" para elegir otros modelos.' })
                   : 'End-frame is only supported by Luma Ray 2. Reset placement to "At start" to select other models.')
               : (language === 'de'
-                  ? 'Anker-Modus wird nur von Vidu Q2 und Kling 3 unterstützt.'
+                  ? tx({ de: 'Anker-Modus wird nur von Vidu Q2 und Kling 3 unterstützt.', en: 'Anchor mode is only supported by Vidu Q2 and Kling 3.', es: 'El modo ancla solo es compatible con Vidu Q2 y Kling 3.' })
                   : 'Anchor mode is only supported by Vidu Q2 and Kling 3.')
           }
         />
@@ -876,7 +877,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           onChange={setPrompt}
           placeholder={
             language === 'de'
-              ? 'Beschreibe dein Video … nutze @charakter und @location aus deiner Library'
+              ? tx({ de: 'Beschreibe dein Video … nutze @charakter und @location aus deiner Library', en: 'Describe your video… use @character and @location from your Library', es: 'Describe tu vídeo… usa @personaje y @ubicación de tu Biblioteca' })
               : language === 'es'
               ? 'Describe tu vídeo … usa @personaje y @ubicación de tu biblioteca'
               : 'Describe your video … use @character and @location from your library'
@@ -885,7 +886,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         />
         <p className="mt-1.5 text-[10px] text-muted-foreground/80 italic">
           {language === 'de'
-            ? 'ℹ️ Tippe @ um Charaktere & Locations aus deiner Library zu taggen.'
+            ? tx({ de: 'ℹ️ Tippe @ um Charaktere & Locations aus deiner Library zu taggen.', en: 'ℹ️ Type @ to tag characters & locations from your Library.', es: 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu Biblioteca.' })
             : language === 'es'
             ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu biblioteca.'
             : 'ℹ️ Type @ to tag characters & locations from your library.'}
@@ -961,7 +962,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               </div>
               <div className="text-muted-foreground">
                 {language === 'de'
-                  ? 'Kling Omni komponiert das Referenzbild automatisch aus den gebuchten Charakteren. Manuelle Uploads würden den Anker überschreiben und zu fremden Gesichtern mit deinen Stimmen führen. Entferne alle Charaktere oben, um manuelle Bilder/Videos zu nutzen.'
+                  ? tx({ de: 'Kling Omni komponiert das Referenzbild automatisch aus den gebuchten Charakteren. Manuelle Uploads würden den Anker überschreiben und zu fremden Gesichtern mit deinen Stimmen führen. Entferne alle Charaktere oben, um manuelle Bilder/Videos zu nutzen.', en: 'Kling Omni automatically composes the reference image from the booked characters. Manual uploads would overwrite the anchor and lead to foreign faces with your voices. Remove all characters above to use manual images/videos.', es: 'Kling Omni compone automáticamente la imagen de referencia a partir de los personajes reservados. Las cargas manuales sobrescribirían el ancla y darían lugar a caras extrañas con tus voces. Elimina todos los personajes de arriba para usar imágenes/vídeos manuales.' })
                   : 'Kling Omni composes the reference image automatically from the booked characters. Manual uploads would overwrite the anchor and produce foreign faces with your voices. Remove all characters above to use manual images/videos.'}
               </div>
             </div>
@@ -1049,7 +1050,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     label: language === 'de' ? 'Nur Anker' : 'Anchor only',
                     hint: model.capabilities.anchorOnly
                       ? (language === 'de' ? 'Nur Identitäts-Referenz, kein fester Frame' : 'Identity reference only, no forced frame')
-                      : (language === 'de' ? 'Nur mit Vidu Q2 oder Kling 3 möglich' : 'Only available with Vidu Q2 or Kling 3'),
+                      : (language === 'de' ? tx({ de: 'Nur mit Vidu Q2 oder Kling 3 möglich', en: 'Only possible with Vidu Q2 or Kling 3', es: 'Solo es posible con Vidu Q2 o Kling 3' }) : 'Only available with Vidu Q2 or Kling 3'),
                     supportedByCurrent: !!model.capabilities.anchorOnly,
                   },
                 ]).map((opt) => {
@@ -1289,7 +1290,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {generateAudio && !ttsLangSupported && (
               <p className="text-[11px] leading-snug text-amber-500/90 pt-1 border-t border-border/30">
                 {language === 'de'
-                  ? `${model.name} unterstützt ${effectiveSpokenLang === 'de' ? 'Deutsch' : effectiveSpokenLang === 'es' ? 'Spanisch' : 'diese Sprache'} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`
+                  ? `${model.name} unterstützt ${effectiveSpokenLang === 'de' ? 'Deutsch' : effectiveSpokenLang === 'es' ? 'Spanisch' : tx({ de: 'diese Sprache', en: 'this language', es: 'este idioma' })} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`
                   : language === 'es'
                   ? `${model.name} no admite ${effectiveSpokenLang === 'de' ? 'alemán' : effectiveSpokenLang === 'es' ? 'español' : 'este idioma'} de forma fiable. Esta escena se generará sin voz — solo sonido ambiente/música. Para voz real usa p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.`
                   : `${model.name} does not reliably support ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : 'this language'}. This scene will render without voiceover — ambient sound / music only. For real voiceover pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`}
@@ -1329,14 +1330,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             if (checked && omniNonEnglishSilent) {
               toast.info(
                 language === 'de'
-                  ? 'Kling Omni spricht Deutsch aktuell nicht zuverlässig. Dieser Clip bleibt stumm; nutze Motion Studio für deutsches Lip-Sync.'
+                  ? tx({ de: 'Kling Omni spricht Deutsch aktuell nicht zuverlässig. Dieser Clip bleibt stumm; nutze Motion Studio für deutsches Lip-Sync.', en: 'Kling Omni currently does not reliably speak German. This clip remains silent; use Motion Studio for German lip-sync.', es: 'Kling Omni actualmente no habla alemán de forma fiable. Este clip permanecerá en silencio; usa Motion Studio para la sincronización labial en alemán.' })
                   : 'Kling Omni does not speak this language reliably yet. This clip stays silent; use Motion Studio for non-English lip-sync.',
               );
               return;
             }
             if (checked && lipSyncCount >= LIP_SYNC_MAX) return;
             if (!checked && row.line.trim()) {
-              if (!confirm(language === 'de' ? 'Lip-Sync für diesen Charakter deaktivieren? Der Dialogtext wird verworfen.' : 'Disable lip-sync for this character? The dialogue will be discarded.')) return;
+              if (!confirm(language === 'de' ? tx({ de: 'Lip-Sync für diesen Charakter deaktivieren? Der Dialogtext wird verworfen.', en: 'Disable lip-sync for this character? The dialogue text will be discarded.', es: '¿Desactivar la sincronización labial para este personaje? El texto del diálogo se descartará.' }) : 'Disable lip-sync for this character? The dialogue will be discarded.')) return;
               updateRow(idx, { lipSync: false, line: '' });
               return;
             }
@@ -1364,18 +1365,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
               <p className="text-[11px] text-muted-foreground leading-snug">
                 {omniNonEnglishSilent && language === 'de'
-                  ? 'Deutsch ist bei Kling Omni aktuell silent-only, weil die native Stimme sonst Fantasiesprache mit englischem Akzent erzeugt. Die Charaktere erscheinen im Bild, sprechen aber nicht. Für deutsches Lip-Sync bitte Motion Studio verwenden.'
+                  ? tx({ de: 'Deutsch ist bei Kling Omni aktuell silent-only, weil die native Stimme sonst Fantasiesprache mit englischem Akzent erzeugt. Die Charaktere erscheinen im Bild, sprechen aber nicht. Für deutsches Lip-Sync bitte Motion Studio verwenden.', en: 'German is currently silent-only in Kling Omni because the native voice would otherwise generate fantasy language with an English accent. The characters appear in the image but do not speak. For German lip-sync, please use Motion Studio.', es: 'El alemán es actualmente solo silencioso en Kling Omni porque la voz nativa generaría un lenguaje de fantasía con acento inglés. Los personajes aparecen en la imagen pero no hablan. Para la sincronización labial en alemán, utiliza Motion Studio.' })
                   : omniNonEnglishSilent
                   ? 'This language is silent-only for Kling Omni because native speech is not reliable yet. Characters appear in frame but do not speak. Use Motion Studio for non-English lip-sync.'
                   : language === 'de'
-                  ? 'Bis zu 4 Charaktere aus Cast & World. Aktiviere den Lip-Sync-Switch für max. 2 sprechende Charaktere — die anderen erscheinen als stumme Statist:innen im Bild.'
+                  ? tx({ de: 'Bis zu 4 Charaktere aus Cast & World. Aktiviere den Lip-Sync-Switch für max. 2 sprechende Charaktere — die anderen erscheinen als stumme Statist:innen im Bild.', en: 'Up to 4 characters from Cast & World. Activate the lip-sync switch for a maximum of 2 speaking characters — the others appear as silent extras in the image.', es: 'Hasta 4 personajes de Cast & World. Activa el interruptor de sincronización labial para un máximo de 2 personajes que hablen; los demás aparecerán como extras mudos en la imagen.' })
                   : 'Up to 4 characters from Cast & World. Toggle lip-sync for up to 2 speaking characters — the rest appear as silent extras in the frame.'}
               </p>
 
               {omniLines.length === 0 && (
                 <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-4 text-center text-[12px] text-muted-foreground">
                   {language === 'de'
-                    ? 'Noch keine Charaktere. Füge unten deinen ersten Cast-Charakter hinzu.'
+                    ? tx({ de: 'Noch keine Charaktere. Füge unten deinen ersten Cast-Charakter hinzu.', en: 'No characters yet. Add your first cast character below.', es: 'Aún no hay personajes. Añade tu primer personaje del elenco a continuación.' })
                     : 'No characters yet. Add your first cast character below.'}
                 </div>
               )}
@@ -1429,7 +1430,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                             switchDisabled
                               ? (omniNonEnglishSilent
                                   ? (language === 'de'
-                                      ? 'Deutsch/Spanisch sind für Kling Omni gesperrt, um Fantasie-Sprache zu verhindern.'
+                                      ? tx({ de: 'Deutsch/Spanisch sind für Kling Omni gesperrt, um Fantasie-Sprache zu verhindern.', en: 'German/Spanish are blocked for Kling Omni to prevent fantasy language.', es: 'El alemán/español están bloqueados para Kling Omni para evitar el lenguaje de fantasía.' })
                                       : 'Non-English lip-sync is blocked for Kling Omni to prevent fantasy speech.')
                                   : language === 'de'
                                   ? 'Kling Omni erlaubt max. 2 sprechende Charaktere pro Clip.'
@@ -1583,7 +1584,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       {lastAnchorComposed && (
         <p className="text-center text-[11px] text-primary/80">
           🎬 {language === 'de'
-            ? 'Scene-Aware: Charakter wurde in die Szene komponiert (kein Portrait-Startframe).'
+            ? tx({ de: 'Scene-Aware: Charakter wurde in die Szene komponiert (kein Portrait-Startframe).', en: 'Scene-Aware: Character was composed into the scene (no portrait start frame).', es: 'Consciente de la escena: el personaje se compuso en la escena (sin fotograma de inicio de retrato).' })
             : 'Scene-Aware: character composed into the scene (no portrait-locked first frame).'}
         </p>
       )}
@@ -1650,7 +1651,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           title: language === 'de' ? 'Video generieren?' : 'Generate video?',
           description:
             language === 'de'
-              ? 'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein AI-Guthaben wird belastet.'
+              ? tx({ de: 'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein AI-Guthaben wird belastet.', en: 'Overview of your costs — once you confirm, generation will start and your AI credit will be charged.', es: 'Resumen de tus costes: una vez que confirmes, la generación comenzará y se cargará tu crédito de IA.' })
               : 'Cost overview — once confirmed, generation starts and your AI wallet will be charged.',
           modelName: model.name,
           modelBadge: model.badge ?? undefined,

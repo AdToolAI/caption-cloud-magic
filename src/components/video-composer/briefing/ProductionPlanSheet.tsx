@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * ProductionPlanSheet — the editable "Drehbuch"-Formular shown after the
  * deep-parser returns. The user can correct cast/location mappings, tweak
@@ -589,8 +590,8 @@ export default function ProductionPlanSheet({
     }
     if (!isUuid(projectId)) {
       toast({
-        title: 'Projekt noch nicht gespeichert',
-        description: 'Bitte erst über den Briefing-Flow ins Storyboard wechseln, damit ein echtes Projekt angelegt wird.',
+        title: tx({ de: 'Projekt noch nicht gespeichert', en: 'Project not yet saved', es: 'Proyecto aún no guardado' }),
+        description: tx({ de: 'Bitte erst über den Briefing-Flow ins Storyboard wechseln, damit ein echtes Projekt angelegt wird.', en: 'Please switch to the storyboard via the briefing flow first, so that a real project is created.', es: 'Por favor, primero cambia al storyboard a través del flujo de briefing para que se cree un proyecto real.' }),
         variant: 'destructive',
       });
       return;
@@ -644,7 +645,7 @@ export default function ProductionPlanSheet({
       const status = details.status;
       console.error('[ProductionPlanSheet] deep-parse failed', { status, msg, body: details.body });
       toast({
-        title: 'Briefing konnte nicht verarbeitet werden',
+        title: tx({ de: 'Briefing konnte nicht verarbeitet werden', en: 'Could not process briefing', es: 'No se pudo procesar el briefing' }),
         description: status === 402 || /402/.test(msg) ? 'Keine AI-Credits mehr.'
           : status === 429 || /429/.test(msg) ? 'Zu viele Anfragen — bitte kurz warten.'
           : status ? `${status}: ${msg}` : msg,
@@ -660,7 +661,7 @@ export default function ProductionPlanSheet({
     if (!planForApply) return;
     setApplyResult(null);
     if (!isUuid(projectId)) {
-      const message = 'Projekt-ID fehlt — Plan wurde nicht angewendet.';
+      const message = tx({ de: 'Projekt-ID fehlt — Plan wurde nicht angewendet.', en: 'Project ID missing — Plan was not applied.', es: 'Falta el ID del proyecto — El plan no se aplicó.' });
       setApplyResult({ ok: false, message, warnings: [] });
       toast({
         title: 'Plan blockiert',
@@ -670,7 +671,7 @@ export default function ProductionPlanSheet({
       return;
     }
     if (durationInconsistent) {
-      const message = 'Plan inkonsistent — Projekt-Gesamtdauer passt nicht zur Szenensumme.';
+      const message = tx({ de: 'Plan inkonsistent — Projekt-Gesamtdauer passt nicht zur Szenensumme.', en: 'Plan inconsistent — Project total duration does not match scene sum.', es: 'Plan inconsistente — La duración total del proyecto no coincide con la suma de las escenas.' });
       setApplyResult({ ok: false, message, warnings: [] });
       toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
       return;
@@ -731,7 +732,7 @@ export default function ProductionPlanSheet({
     } catch (e: any) {
       setApplyResult({ ok: false, message: e?.message ?? String(e), warnings: [] });
       toast({
-        title: 'Plan konnte nicht angewendet werden',
+        title: tx({ de: 'Plan konnte nicht angewendet werden', en: 'Could not apply plan', es: 'No se pudo aplicar el plan' }),
         description: e?.message ?? String(e),
         variant: 'destructive',
       });
@@ -1100,8 +1101,8 @@ export default function ProductionPlanSheet({
           </DialogTitle>
           <DialogDescription className="text-xs">
             {safePlan?._meta?.source === 'local-fallback'
-              ? 'Achtung: Die AI-Analyse ist fehlgeschlagen — dieser Plan wurde nur lokal aus deinem Briefing-Text extrahiert. Prüfe Prompts und Dialoge, oder starte die Analyse über „Briefing analysieren" erneut.'
-              : 'Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.'}
+              ? tx({ de: 'Achtung: Die AI-Analyse ist fehlgeschlagen — dieser Plan wurde nur lokal aus deinem Briefing-Text extrahiert. Prüfe Prompts und Dialoge, oder starte die Analyse über „Briefing analysieren" erneut.', en: 'Attention: AI analysis failed — this plan was only extracted locally from your briefing text. Check prompts and dialogues, or restart the analysis via "Analyze Briefing" again.', es: 'Atención: El análisis de IA falló — este plan solo se extrajo localmente de tu texto de briefing. Revisa los prompts y diálogos, o reinicia el análisis a través de "Analizar Briefing" de nuevo.' })
+              : tx({ de: 'Editierbarer Drehplan aus deinem Briefing. Bereits gerenderte oder Lip-Sync-aktive Szenen werden nie überschrieben.', en: 'Editable shooting schedule from your briefing. Already rendered or lip-sync active scenes will never be overwritten.', es: 'Plan de rodaje editable de tu briefing. Las escenas ya renderizadas o con sincronización labial activa nunca se sobrescribirán.' })}
 
           </DialogDescription>
         </DialogHeader>
@@ -1531,7 +1532,7 @@ export default function ProductionPlanSheet({
                                       : sc),
                                   });
                                 }}
-                                title="Weiteren Charakter-Slot zu dieser Szene hinzufügen"
+                                title={tx({ de: "Weiteren Charakter-Slot zu dieser Szene hinzufügen", en: "Add another character slot to this scene", es: "Añadir otra ranura de personaje a esta escena" })}
                               >
                                 <Plus className="h-3 w-3" /> Cast-Slot
                               </Button>
@@ -1674,7 +1675,7 @@ export default function ProductionPlanSheet({
                                 className="h-7 px-2 text-[10px] gap-1 whitespace-nowrap"
                                 disabled={creatingLoc === s.index}
                                 onClick={() => quickCreateLocation(s.index, loc.locationName || loc.mentionKey)}
-                                title="Als neue Location in der Library speichern"
+                                title={tx({ de: "Als neue Location in der Library speichern", en: "Save as new location in Library", es: "Guardar como nueva ubicación en la biblioteca" })}
                               >
                                 {creatingLoc === s.index ? (
                                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -1837,7 +1838,7 @@ export default function ProductionPlanSheet({
                 onClick={handleApply}
                 disabled={applying || durationInconsistent}
                 className="gap-2"
-                title={durationInconsistent ? 'Projekt-Gesamtdauer passt nicht zur Szenensumme.' : undefined}
+                title={durationInconsistent ? tx({ de: 'Projekt-Gesamtdauer passt nicht zur Szenensumme.', en: 'Project total duration does not match scene sum.', es: 'La duración total del proyecto no coincide con la suma de las escenas.' }) : undefined}
               >
                 {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Plan anwenden

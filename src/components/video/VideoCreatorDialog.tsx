@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -105,7 +106,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       handleFieldChange(key, publicUrl);
     } catch (error) {
       console.error('Image upload error:', error);
-      toast.error('Fehler beim Hochladen');
+      toast.error(tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }));
     } finally {
       setUploadingImages(prev => {
         const next = new Set(prev);
@@ -196,7 +197,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
 
     // Validate script if subtitles or voiceover enabled
     if ((enableSubtitles || voiceStyle) && !scriptText) {
-      toast.error('Bitte generiere zuerst ein Script im AI Script Tab für Voiceover und Untertitel.', {
+      toast.error(tx({ de: 'Bitte generiere zuerst ein Script im AI Script Tab für Voiceover und Untertitel.', en: 'Please generate a script in the AI Script tab first for voiceover and subtitles.', es: 'Por favor, genera primero un script en la pestaña de Script de IA para la voz en off y los subtítulos.' }), {
         duration: 5000
       });
       return;
@@ -474,7 +475,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             <Video className="h-5 w-5" />
             {step === 'gallery' && 'Template auswählen'}
             {step === 'customize' && `Video erstellen: ${selectedTemplate?.name}`}
-            {step === 'rendering' && 'Video wird erstellt...'}
+            {step === 'rendering' && tx({ de: 'Video wird erstellt...', en: 'Video is being created...', es: 'El video se está creando...' })}
           </DialogTitle>
         </DialogHeader>
 
@@ -602,7 +603,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                   <AIScriptGenerator
                     onGenerate={(script) => {
                       setScriptText(script);
-                      toast.success('Script wurde generiert und ist bereit für Voiceover und Untertitel!', {
+                      toast.success(tx({ de: 'Script wurde generiert und ist bereit für Voiceover und Untertitel!', en: 'Script has been generated and is ready for voiceover and subtitles!', es: '¡El script ha sido generado y está listo para voz en off y subtítulos!' }), {
                         duration: 4000
                       });
                     }}
@@ -625,7 +626,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                           ✓ Script bereit
                         </Badge>
-                        <span>Wird für Voiceover, intelligentes Timing und Untertitel verwendet</span>
+                        <span>{tx({ de: "Wird für Voiceover, intelligentes Timing und Untertitel verwendet", en: "Used for voiceover, intelligent timing, and subtitles", es: "Se utiliza para voz en off, temporización inteligente y subtítulos" })}</span>
                       </div>
                     </div>
                   )}
@@ -671,7 +672,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <div className="text-center space-y-2">
-                <h3 className="font-semibold text-lg">Dein Video wird erstellt</h3>
+                <h3 className="font-semibold text-lg">{tx({ de: "Dein Video wird erstellt", en: "Your video is being created", es: "Tu video se está creando" })}</h3>
                 <p className="text-sm text-muted-foreground">
                   Dies kann einige Minuten dauern. Du kannst das Fenster schließen und später zurückkommen.
                 </p>

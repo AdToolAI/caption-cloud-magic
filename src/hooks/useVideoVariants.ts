@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -55,7 +56,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['video-variants'] });
       toast({
         title: 'Variante erstellt',
-        description: 'Video-Variante wurde erfolgreich erstellt',
+        description: tx({ de: 'Video-Variante wurde erfolgreich erstellt', en: 'Video variant successfully created', es: 'Variante de video creada exitosamente' }),
       });
     },
     onError: (error: Error) => {
@@ -81,7 +82,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['video-variants'] });
       toast({
         title: 'Variante gelöscht',
-        description: 'Video-Variante wurde erfolgreich gelöscht',
+        description: tx({ de: 'Video-Variante wurde erfolgreich gelöscht', en: 'Video variant successfully deleted', es: 'Variante de video eliminada exitosamente' }),
       });
     },
     onError: (error: Error) => {
@@ -116,7 +117,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
       console.error('Error generating variants:', error);
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Varianten konnten nicht erstellt werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Varianten konnten nicht erstellt werden', en: 'Variants could not be created', es: 'No se pudieron crear las variantes' }),
         variant: 'destructive',
       });
     } finally {

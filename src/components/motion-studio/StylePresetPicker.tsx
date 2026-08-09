@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Block K-4 — Style Preset Picker (Modal/Popover)
 //
 // Tabbed browser for Motion Studio Style Presets:
@@ -199,7 +200,7 @@ export default function StylePresetPicker({
           <DialogDescription>
             {t(
               language,
-              'Wende einen vorgefertigten Look an oder speichere deinen aktuellen Build als wiederverwendbares Preset.',
+              tx({ de: 'Wende einen vorgefertigten Look an oder speichere deinen aktuellen Build als wiederverwendbares Preset.', en: 'Apply a pre-made look or save your current build as a reusable preset.', es: 'Aplica un look predefinido o guarda tu configuración actual como un preset reutilizable.' }),
               'Apply a curated look or save your current build as a reusable preset.',
               'Aplica un look curado o guarda tu configuración actual como preset reutilizable.'
             )}

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Button } from "@/components/ui/button";
 import { Download, FileImage, FileText, Package } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +13,7 @@ interface ExportBundleProps {
 export const ExportBundle = ({ onExportPNG, onExportPDF, onExportBundle, isPro }: ExportBundleProps) => {
   const handleExport = (type: string, callback: () => void) => {
     if (!isPro && type !== "png") {
-      toast.error("🔒 Diese Funktion ist nur für Pro-Nutzer verfügbar");
+      toast.error(tx({ de: "🔒 Diese Funktion ist nur für Pro-Nutzer verfügbar", en: "🔒 This feature is only available for Pro users", es: "🔒 Esta función solo está disponible para usuarios Pro" }));
       return;
     }
     callback();

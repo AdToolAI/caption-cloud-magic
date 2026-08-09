@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ExportActionBar } from "@/components/publishing/ExportActionBar";
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,7 @@ export function StudioLightbox({ image, open, onOpenChange, onDownload, onSaveTo
             {isUpscaling && (
               <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 z-20">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="text-sm font-medium">AI Upscaling läuft… (kann 30–90s dauern)</p>
+                <p className="text-sm font-medium">{tx({ de: "AI Upscaling läuft… (kann 30–90s dauern)", en: "AI Upscaling in progress… (may take 30–90s)", es: "Escalado de IA en curso… (puede tardar 30–90s)" })}</p>
               </div>
             )}
           </div>

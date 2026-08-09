@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef } from 'react';
 import { Bug, X, Loader2, Camera, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -48,7 +49,7 @@ export function BugReporter() {
 
   const submit = async () => {
     if (!title.trim() || !description.trim()) {
-      toast.error('Titel und Beschreibung sind Pflicht');
+      toast.error(tx({ de: 'Titel und Beschreibung sind Pflicht', en: 'Title and description are mandatory', es: 'El título y la descripción son obligatorios' }));
       return;
     }
 

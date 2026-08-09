@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Save, X, Plus, Settings as SettingsIcon, Target } from 'lucide-react';
 import { useUpsertAutopilotBrief, type AutopilotBrief } from '@/hooks/useAutopilot';
 import { AutopilotGoalBriefingStep, type GoalBriefingValue } from './AutopilotGoalBriefingStep';
+import { useTx } from '@/lib/i18nText';
 
 interface Props {
   brief: AutopilotBrief | null | undefined;
@@ -32,6 +33,7 @@ const VIDEO_RATIOS: { id: string; label: string }[] = [
 ];
 
 export function AutopilotStrategyEditor({ brief }: Props) {
+  const tx = useTx();
   const upsert = useUpsertAutopilotBrief();
   const [pillars, setPillars] = useState<string[]>([]);
   const [forbidden, setForbidden] = useState<string[]>([]);
@@ -311,8 +313,8 @@ export function AutopilotStrategyEditor({ brief }: Props) {
           </div>
           <p className="text-[11px] text-muted-foreground">
             {autoPublish
-              ? '🟢 Aktiv: Posts werden nach QA-Gate automatisch veröffentlicht.'
-              : '🟡 Co-Pilot-Modus: Du musst jeden Slot vor Veröffentlichung freigeben.'}
+              ? tx({ de: '🟢 Aktiv: Posts werden nach QA-Gate automatisch veröffentlicht.', en: '🟢 Active: Posts are published automatically after the QA gate.', es: '🟢 Activo: las publicaciones se publican automáticamente después del control de calidad.' })
+              : tx({ de: '🟡 Co-Pilot-Modus: Du musst jeden Slot vor Veröffentlichung freigeben.', en: '🟡 Co-pilot mode: You must approve every slot before publishing.', es: '🟡 Modo copiloto: debes aprobar cada franja antes de publicarla.' })}
           </p>
         </Card>
       </div>
@@ -406,7 +408,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       <div className="sticky bottom-4 z-20">
         <Card className="p-3 flex items-center gap-3 bg-card/80 backdrop-blur border-primary/30">
           <span className="text-xs text-muted-foreground flex-1">
-            {dirty ? 'Änderungen noch nicht gespeichert' : 'Alle Änderungen gespeichert'}
+            {dirty ? tx({ de: 'Änderungen noch nicht gespeichert', en: 'Changes not saved yet', es: 'Cambios aún no guardados' }) : tx({ de: 'Alle Änderungen gespeichert', en: 'All changes saved', es: 'Todos los cambios guardados' })}
           </span>
           <Button onClick={save} disabled={!dirty || upsert.isPending} size="sm" className="gap-1.5">
             <Save className="h-3.5 w-3.5" />

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
@@ -52,7 +53,7 @@ export function AnalyticsExport({ data, dateRange }: Props) {
     } catch (error) {
       toast({
         title: 'Export fehlgeschlagen',
-        description: 'CSV konnte nicht erstellt werden',
+        description: tx({ de: 'CSV konnte nicht erstellt werden', en: 'CSV could not be created', es: 'No se pudo crear el CSV' }),
         variant: 'destructive'
       });
     }
@@ -85,7 +86,7 @@ export function AnalyticsExport({ data, dateRange }: Props) {
     } catch (error) {
       toast({
         title: 'Export fehlgeschlagen',
-        description: 'JSON konnte nicht erstellt werden',
+        description: tx({ de: 'JSON konnte nicht erstellt werden', en: 'JSON could not be created', es: 'No se pudo crear el JSON' }),
         variant: 'destructive'
       });
     }

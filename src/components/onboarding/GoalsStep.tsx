@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Check, TrendingUp, ShoppingCart, Palette } from "lucide-react";
+import { useTx } from "@/lib/i18nText";
 
 const goals = [
   { id: "grow_audience", label: "Reichweite aufbauen", icon: TrendingUp, desc: "Videos, die neue Zuschauer erreichen" },
@@ -32,9 +33,10 @@ export function GoalsStep({
   onGoalChange, onPostsPerWeekChange, onExperienceChange,
   onNext, onBack,
 }: GoalsStepProps) {
+  const tx = useTx();
   return (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-center">Was ist dein Hauptziel?</h3>
+      <h3 className="text-xl font-semibold text-center">{tx({ de: "Was ist dein Hauptziel?", en: "What is your main goal?", es: "¿Cuál es tu objetivo principal?" })}</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {goals.map((g) => {

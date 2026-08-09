@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -169,7 +170,7 @@ export default function TalkingHeadDialog({
 
   const commitNewCharacter = () => {
     if (!newName.trim()) {
-      toast({ title: 'Name fehlt', description: 'Bitte gib dem Charakter einen Namen.', variant: 'destructive' });
+      toast({ title: 'Name fehlt', description: tx({ de: 'Bitte gib dem Charakter einen Namen.', en: 'Please give the character a name.', es: 'Por favor, dale un nombre al personaje.' }), variant: 'destructive' });
       return;
     }
     if (!newPhotoUrl) {
@@ -243,13 +244,13 @@ export default function TalkingHeadDialog({
     if (!imageUrl || !selectedCharId) {
       toast({
         title: 'Charakter fehlt',
-        description: 'Bitte wähle einen Charakter aus deinem Briefing-Cast oder lege einen neuen an.',
+        description: tx({ de: 'Bitte wähle einen Charakter aus deinem Briefing-Cast oder lege einen neuen an.', en: 'Please select a character from your briefing cast or create a new one.', es: 'Por favor, selecciona un personaje de tu elenco de briefing o crea uno nuevo.' }),
         variant: 'destructive',
       });
       return;
     }
     if (!script.trim()) {
-      toast({ title: 'Skript fehlt', description: 'Bitte schreibe einen Text.', variant: 'destructive' });
+      toast({ title: 'Skript fehlt', description: tx({ de: 'Bitte schreibe einen Text.', en: 'Please write some text.', es: 'Por favor, escribe un texto.' }), variant: 'destructive' });
       return;
     }
 
@@ -734,7 +735,7 @@ function DialogModeTab({
     if (blocks.length === 0) {
       toast({
         title: 'Kein gültiges Dialog-Skript',
-        description: 'Format: "Sarah: Hallo!" — der Name muss exakt einem Cast-Charakter entsprechen.',
+        description: tx({ de: 'Format: "Sarah: Hallo!" — der Name muss exakt einem Cast-Charakter entsprechen.', en: 'Format: "Sarah: Hello!" — the name must exactly match a cast character.', es: 'Formato: "Sarah: ¡Hola!" — el nombre debe coincidir exactamente con un personaje del elenco.' }),
         variant: 'destructive',
       });
       return;

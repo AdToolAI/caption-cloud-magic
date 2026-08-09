@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback } from 'react';
 import { Upload, X, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,7 @@ export function VideoUpload({
       toast.success('Video hochgeladen');
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Fehler beim Hochladen');
+      toast.error(tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }));
       clearInterval(interval);
     } finally {
       setTimeout(() => {

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Picture Studio model capabilities matrix.
  * Drives the Smart Model Picker, Pre-Flight Checks and the Prompt-Helper.
@@ -81,7 +82,7 @@ export const PICTURE_MODES: Record<PictureMode, {
   },
   restyle: {
     label: 'Stil übernehmen',
-    description: 'Nutze Farben & Mood eines Referenzbildes für ein neues Motiv.',
+    description: tx({ de: 'Nutze Farben & Mood eines Referenzbildes für ein neues Motiv.', en: 'Use colors & mood of a reference image for a new visual.', es: 'Usa los colores y el ambiente de una imagen de referencia para un nuevo visual.' }),
     needsReference: true,
   },
 };

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -24,7 +25,7 @@ const TEXT = {
     tNew: "Neuer Fall",
     tMine: "Meine Tickets",
     tHelp: "Schnelle Hilfe",
-    loginRequired: "Bitte melde dich an, um ein Support-Ticket zu öffnen.",
+    loginRequired: tx({ de: "Bitte melde dich an, um ein Support-Ticket zu öffnen.", en: "Please log in to open a support ticket.", es: "Inicia sesión para abrir un ticket de soporte." }),
   },
   es: {
     title: "Centro de Soporte",

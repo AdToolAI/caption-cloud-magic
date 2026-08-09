@@ -23,6 +23,7 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { extractFunctionsError } from '@/lib/functionsError';
 import { isRealizedScene } from '@/lib/composer/isRealizedScene';
 import { isLipSyncIntentionalRow } from '@/lib/video-composer/lipSyncIntent';
+import { tx } from '@/lib/i18nText';
 
 // v94: 8s → 2.5s. Saves up to ~5.5s per stage transition (×3-4 transitions
 // per scene). DB select is filtered by project_id + indexed, load negligible.
@@ -553,16 +554,16 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               if (reason === 'tts_failed' || reason === 'no_voiceover') {
                 emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
-                  title: 'Cinematic-Sync braucht ein Voiceover',
+                  title: tx({ de: 'Cinematic-Sync braucht ein Voiceover', en: 'Cinematic-Sync needs a voiceover', es: 'Cinematic-Sync necesita un voiceover' }),
                   description:
-                    message || 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut versuchen.',
+                    message || tx({ de: 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut versuchen.', en: 'Please check a voice in the Voiceover tab, then try again.', es: 'Comprueba una voz en la pestaña Voiceover y vuelve a intentarlo.' }),
                   variant: 'destructive',
                 });
               } else if (lsErr) {
                 emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
-                  title: 'Lip-Sync fehlgeschlagen',
-                  description: realMsg || message || 'Unbekannter Fehler beim Lip-Sync.',
+                  title: tx({ de: 'Lip-Sync fehlgeschlagen', en: 'Lip-sync failed', es: 'Lip-sync fallido' }),
+                  description: realMsg || message || tx({ de: 'Unbekannter Fehler beim Lip-Sync.', en: 'Unknown error during lip-sync.', es: 'Error desconocido en el lip-sync.' }),
                   variant: 'destructive',
                 });
                 console.warn(

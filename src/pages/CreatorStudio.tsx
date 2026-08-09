@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Card } from '@/components/ui/card';
@@ -31,13 +32,13 @@ export default function CreatorStudio() {
     <>
       <Helmet>
         <title>Creator Studio | AdTool</title>
-        <meta name="description" content="Veröffentliche deine eigenen Motion-Studio-Templates und verdiene Credits, wenn die Community sie nutzt." />
+        <meta name="description" content={tx({ de: "Veröffentliche deine eigenen Motion-Studio-Templates und verdiene Credits, wenn die Community sie nutzt.", en: "Publish your own Motion Studio templates and earn credits when the community uses them.", es: "Publica tus propias plantillas de Motion Studio y gana créditos cuando la comunidad las use." })} />
       </Helmet>
 
       <div className="container mx-auto py-8 space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Creator Studio</h1>
-          <p className="text-muted-foreground">Teile deine Templates und verdiene 70% pro Verkauf.</p>
+          <p className="text-muted-foreground">{tx({ de: "Teile deine Templates und verdiene 70% pro Verkauf.", en: "Share your templates and earn 70% per sale.", es: "Comparte tus plantillas y gana el 70% por cada venta." })}</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -116,7 +117,7 @@ export default function CreatorStudio() {
           <TabsContent value="earnings" className="mt-6">
             <Card className="p-4">
               {!earnings || earnings.ledger.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">Noch keine Verkäufe. Sobald jemand dein Template kauft, erscheint es hier.</p>
+                <p className="text-sm text-muted-foreground text-center py-8">{tx({ de: "Noch keine Verkäufe. Sobald jemand dein Template kauft, erscheint es hier.", en: "No sales yet. Once someone buys your template, it will appear here.", es: "Aún no hay ventas. Una vez que alguien compre tu plantilla, aparecerá aquí." })}</p>
               ) : (
                 <div className="space-y-2">
                   {earnings.ledger.map(e => (

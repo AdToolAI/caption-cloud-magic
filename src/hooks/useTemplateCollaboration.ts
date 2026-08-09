@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -176,7 +177,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     onError: (error) => {
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Kommentar konnte nicht hinzugefügt werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Kommentar konnte nicht hinzugefügt werden', en: 'Could not add comment', es: 'No se pudo añadir el comentario' }),
         variant: 'destructive',
       });
     },
@@ -215,13 +216,13 @@ export const useTemplateCollaboration = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-approvals'] });
       toast({
         title: 'Freigabe beantragt',
-        description: 'Das Template wurde zur Freigabe eingereicht.',
+        description: tx({ de: 'Das Template wurde zur Freigabe eingereicht.', en: 'The template has been submitted for approval.', es: 'La plantilla ha sido enviada para su aprobación.' }),
       });
     },
     onError: (error) => {
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Freigabe konnte nicht beantragt werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Freigabe konnte nicht beantragt werden', en: 'Could not request approval', es: 'No se pudo solicitar la aprobación' }),
         variant: 'destructive',
       });
     },
@@ -259,7 +260,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     onError: (error) => {
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Freigabe konnte nicht aktualisiert werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Freigabe konnte nicht aktualisiert werden', en: 'Could not update approval', es: 'No se pudo actualizar la aprobación' }),
         variant: 'destructive',
       });
     },

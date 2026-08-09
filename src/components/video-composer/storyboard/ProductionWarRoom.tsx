@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * ProductionWarRoom — fullscreen 2028-style overlay shown while the
  * briefing-deep-parse Edge Function runs (~60-120s). Displays live News
@@ -35,10 +36,10 @@ const TRENDING_TAGS = [
 
 const PRO_TIPS = [
   'Hooks unter 1.5s halten die ersten 3s der Watch-Time stabil.',
-  'Cinematic-Sync rendert echte Wunsch-Szenen — kein Avatar-Bust mehr.',
-  'Brand-Charaktere mit Identity-Card sind über alle Provider konsistent.',
+  tx({ de: 'Cinematic-Sync rendert echte Wunsch-Szenen — kein Avatar-Bust mehr.', en: 'Cinematic-Sync renders real desired scenes — no more avatar bust.', es: 'Cinematic-Sync renderiza escenas deseadas reales, sin más bustos de avatar.' }),
+  tx({ de: 'Brand-Charaktere mit Identity-Card sind über alle Provider konsistent.', en: 'Brand characters with Identity-Card are consistent across all providers.', es: 'Los personajes de marca con Identity-Card son consistentes en todos los proveedores.' }),
   'Negative-Prompts werden auf Szenen-Ebene global injiziert.',
-  'Lip-Sync-aktive Szenen werden vom Plan niemals überschrieben.',
+  tx({ de: 'Lip-Sync-aktive Szenen werden vom Plan niemals überschrieben.', en: 'Lip-sync active scenes are never overwritten by the plan.', es: 'Las escenas con sincronización labial activa nunca son sobrescritas por el plan.' }),
 ];
 
 export default function ProductionWarRoom({ open, progress, phaseLabel, phase, onCancel }: Props) {

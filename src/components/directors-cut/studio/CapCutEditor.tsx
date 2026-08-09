@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useNavigate } from 'react-router-dom';
@@ -2744,7 +2745,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             toast.success(t('dc.videoAddedAsScene', { name: media.name }));
           } else {
             // Images as scenes are not yet supported in the preview pipeline
-            toast.info('Bilder als Szene werden bald unterstützt. Bitte vorerst ein Video wählen.');
+            toast.info(tx({ de: 'Bilder als Szene werden bald unterstützt. Bitte vorerst ein Video wählen.', en: 'Images as scenes will be supported soon. Please choose a video for now.', es: 'Las imágenes como escenas serán compatibles pronto. Por favor, elige un video por ahora.' }));
           }
         }}
       />

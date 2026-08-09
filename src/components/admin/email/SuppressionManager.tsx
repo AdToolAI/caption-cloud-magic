@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
@@ -264,7 +265,7 @@ export function SuppressionManager() {
       <AlertDialog open={adding} onOpenChange={setAdding}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Adresse zur Suppression-Liste hinzufügen</AlertDialogTitle>
+            <AlertDialogTitle>{tx({ de: "Adresse zur Suppression-Liste hinzufügen", en: "Add address to suppression list", es: "Añadir dirección a la lista de supresión" })}</AlertDialogTitle>
             <AlertDialogDescription>
               Diese Adresse erhält keine Mails mehr — auch keine transaktionalen.
             </AlertDialogDescription>

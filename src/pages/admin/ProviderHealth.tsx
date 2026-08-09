@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -232,9 +233,9 @@ export const ProviderHealth = () => {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>• Jeder API-Call wird in <code className="text-xs bg-muted px-1 py-0.5 rounded">provider_quota_log</code> erfasst.</p>
-          <p>• Aggregation läuft jede Minute, Anzeige aktualisiert alle 30 Sekunden.</p>
-          <p>• Bei <strong>≥80% Auslastung</strong> wird automatisch eine E-Mail-Warnung an Admins gesendet (Cooldown 60 Min).</p>
-          <p>• Lambda-Concurrency wird vom <strong>Circuit Breaker</strong> automatisch zwischen <strong>{lambdaInfo?.safe ?? 15}</strong> (Safe) und <strong>{lambdaInfo?.max ?? 25}</strong> (Normal) angepasst.</p>
+          <p>{tx({ de: "• Aggregation läuft jede Minute, Anzeige aktualisiert alle 30 Sekunden.", en: "• Aggregation runs every minute, display updates every 30 seconds.", es: "• La agregación se ejecuta cada minuto, la visualización se actualiza cada 30 segundos." })}</p>
+          <p>• Bei <strong>≥80% Auslastung</strong> {tx({ de: "wird automatisch eine E-Mail-Warnung an Admins gesendet (Cooldown 60 Min).", en: "an email warning is automatically sent to admins (Cooldown 60 min).", es: "se envía automáticamente una advertencia por correo electrónico a los administradores (Enfriamiento 60 min)." })}</p>
+          <p>{tx({ de: "• Lambda-Concurrency wird vom", en: "• Lambda concurrency is set by", es: "• La concurrencia de Lambda está establecida por" })} <strong>Circuit Breaker</strong> automatisch zwischen <strong>{lambdaInfo?.safe ?? 15}</strong> (Safe) und <strong>{lambdaInfo?.max ?? 25}</strong> (Normal) angepasst.</p>
           <p>• <strong>Kill-Switch</strong> (oben rechts, nur Admin): drosselt im Notfall sofort auf <strong>10</strong> parallele Renders.</p>
         </CardContent>
       </Card>

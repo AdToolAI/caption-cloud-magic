@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, X, Image, Video, Edit } from "lucide-react";
 import { toast } from "sonner";
+import { useTx } from '@/lib/i18nText';
 
 export interface UploadedMedia {
   id: string;
@@ -27,6 +28,8 @@ export function CampaignMediaUploader({
   onMediaChange, 
   maxFiles = 20 
 }: CampaignMediaUploaderProps) {
+  const tr = useTx();
+
   const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [editingMedia, setEditingMedia] = useState<UploadedMedia | null>(null);
@@ -49,7 +52,7 @@ export function CampaignMediaUploader({
       const isVideo = file.type.startsWith('video/');
       
       if (!isImage && !isVideo) {
-        toast.error(`${file.name} ist kein Bild oder Video`);
+        toast.error(tr({ de: `${file.name} ist kein Bild oder Video`, en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un video` }));
         return;
       }
 
@@ -88,7 +91,7 @@ export function CampaignMediaUploader({
       toast.success(`${files.length} Datei(en) hinzugefügt`);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Fehler beim Hochladen');
+      toast.error(tr({ de: 'Fehler beim Hochladen', en: 'Error uploading', es: 'Error al subir' }));
     } finally {
       setIsUploading(false);
     }

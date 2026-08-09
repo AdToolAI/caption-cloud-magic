@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Check, Instagram, Music, Linkedin, Facebook, Twitter, Youtube } from "lucide-react";
@@ -23,7 +24,7 @@ export function PlatformStep({ selectedPlatforms, onToggle, onNext, onBack }: Pl
     <div className="space-y-6">
       <div className="text-center">
         <h3 className="text-xl font-semibold">Wohin sollen deine fertigen Videos?</h3>
-        <p className="text-sm text-muted-foreground mt-1">Wähle mindestens einen Kanal – wir optimieren Format und Länge dafür</p>
+        <p className="text-sm text-muted-foreground mt-1">{tx({ de: "Wähle mindestens einen Kanal – wir optimieren Format und Länge dafür", en: "Choose at least one channel – we'll optimize format and length for it", es: "Elige al menos un canal – optimizaremos el formato y la duración para él" })}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

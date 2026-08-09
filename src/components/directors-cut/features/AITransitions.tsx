@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -317,7 +318,7 @@ export function AITransitions({
                     <Info className="h-3 w-3 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Wird für neue Übergänge verwendet</p>
+                    <p className="text-xs">{tx({ de: "Wird für neue Übergänge verwendet", en: "Used for new transitions", es: "Usado para nuevas transiciones" })}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

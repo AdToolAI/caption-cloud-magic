@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SceneRenderConfirmDialog — Schritt 1 (Render-All entfernt + Confirm-Gate).
  *
@@ -81,7 +82,7 @@ export default function SceneRenderConfirmDialog({
           </AlertDialogTitle>
           <AlertDialogDescription>
             {description ||
-              'Genaue Aufschlüsselung pro Komponente — sobald du bestätigst, startet die Render-Pipeline und Credits werden verbraucht.'}
+              tx({ de: 'Genaue Aufschlüsselung pro Komponente — sobald du bestätigst, startet die Render-Pipeline und Credits werden verbraucht.', en: 'Detailed breakdown per component — once you confirm, the render pipeline will start and credits will be consumed.', es: 'Desglose detallado por componente: una vez que confirmes, la tubería de renderizado comenzará y se consumirán créditos.' })}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -253,7 +254,7 @@ export default function SceneRenderConfirmDialog({
               className={`text-[11px] cursor-pointer ${hasRisk ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}
             >
               30 Minuten lang nicht mehr fragen
-              {hasRisk && ' (nicht verfügbar bei Provider-Risiko)'}
+              {hasRisk && tx({ de: ' (nicht verfügbar bei Provider-Risiko)', en: ' (not available with provider risk)', es: ' (no disponible con riesgo de proveedor)' })}
             </Label>
           </div>
         </div>

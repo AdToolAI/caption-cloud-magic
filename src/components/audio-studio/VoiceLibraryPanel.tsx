@@ -8,6 +8,7 @@ import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { VoiceStudioDialog } from '@/components/voice/studio/VoiceStudioDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { tx } from '@/lib/i18nText';
 
 export function VoiceLibraryPanel() {
   const { voices, loading, deleteVoice, toggleVoiceActive } = useCustomVoices();
@@ -25,7 +26,7 @@ export function VoiceLibraryPanel() {
   const handleTestSynthesis = async (voiceId: string, elevenlabsVoiceId: string) => {
     const text = (testTexts[voiceId] || '').trim();
     if (!text) {
-      toast.error('Bitte gib einen Test-Text ein');
+      toast.error(tx({ de: 'Bitte gib einen Test-Text ein', en: 'Please enter a test text', es: 'Introduce un texto de prueba' }));
       return;
     }
     setTestingId(voiceId);

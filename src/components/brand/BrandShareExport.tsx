@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -80,7 +81,7 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
           <Share2 className="h-4 w-4 text-primary" />
           Teilen & Export
         </CardTitle>
-        <CardDescription>Read-only Link für Kunden, oder PDF-Guidelines.</CardDescription>
+        <CardDescription>{tx({ de: "Read-only Link für Kunden, oder PDF-Guidelines.", en: "Read-only link for customers, or PDF guidelines.", es: "Enlace de solo lectura para clientes, o directrices en PDF." })}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {token ? (

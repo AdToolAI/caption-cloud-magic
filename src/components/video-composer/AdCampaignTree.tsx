@@ -32,6 +32,7 @@ import { getTonalityVoice } from '@/config/adTonalityVoiceMap';
 import type { AdCampaignMeta } from '@/types/video-composer';
 import type { AdTonalityId } from '@/config/adTonalityProfiles';
 import AdCampaignPerformance from './AdCampaignPerformance';
+import { useTx } from '@/lib/i18nText';
 
 interface CampaignChild {
   id: string;
@@ -89,6 +90,8 @@ export default function AdCampaignTree({
   adMeta,
   onOpenChild,
 }: AdCampaignTreeProps) {
+  const tr = useTx();
+
   const [children, setChildren] = useState<CampaignChild[]>([]);
   const [loading, setLoading] = useState(false);
   const [resynthing, setResynthing] = useState<string | null>(null);
@@ -153,8 +156,8 @@ export default function AdCampaignTree({
         .filter(Boolean);
       if (scriptLines.length === 0) {
         toast({
-          title: 'Kein Skript gefunden',
-          description: 'Diese Variante hat keine Text-Overlays — VO kann nicht generiert werden.',
+          title: tr({ de: 'Kein Skript gefunden', en: 'No script found', es: 'No se encontró guion' }),
+          description: tr({ de: 'Diese Variante hat keine Text-Overlays — VO kann nicht generiert werden.', en: 'This variant has no text overlays — voiceover cannot be generated.', es: 'Esta variante no tiene superposiciones de texto — no se puede generar el locución.' }),
           variant: 'destructive',
         });
         return;
@@ -215,8 +218,8 @@ export default function AdCampaignTree({
     } catch (err: any) {
       console.error('[AdCampaignTree] re-synth VO failed:', err);
       toast({
-        title: 'VO-Synthese fehlgeschlagen',
-        description: err?.message ?? 'Bitte erneut versuchen.',
+        title: tr({ de: 'VO-Synthese fehlgeschlagen', en: 'Voiceover synthesis failed', es: 'Falló la síntesis de locución' }),
+        description: err?.message ?? tr({ de: 'Bitte erneut versuchen.', en: 'Please try again.', es: 'Inténtalo de nuevo.' }),
         variant: 'destructive',
       });
     } finally {
@@ -367,6 +370,7 @@ function ChildCard({
   onResynthVO?: () => void;
   resynthing?: boolean;
 }) {
+  const tr = useTx();
   let label: string;
   if (child.cutdown_type) {
     label = CUTDOWN_LABEL[child.cutdown_type] ?? child.cutdown_type;
@@ -397,7 +401,7 @@ function ChildCard({
             variant="ghost"
             onClick={onResynthVO}
             disabled={resynthing}
-            title={hasVO ? 'Voiceover neu synthetisieren' : 'Voiceover für diese Länge erzeugen'}
+            title={hasVO ? tr({ de: 'Voiceover neu synthetisieren', en: 'Re-synthesize voiceover', es: 'Resintetizar locución' }) : tr({ de: 'Voiceover für diese Länge erzeugen', en: 'Generate voiceover for this length', es: 'Generar locución para esta duración' })}
           >
             {resynthing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

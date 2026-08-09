@@ -9,6 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { WaveformDisplay } from '@/components/directors-cut/timeline/WaveformDisplay';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useTx } from '@/lib/i18nText';
 
 interface Beat {
   time: number;
@@ -33,6 +34,8 @@ export function BeatSyncTimeline({
   initialMusicUrl,
   onBpmDetected,
 }: BeatSyncTimelineProps) {
+  const tr = useTx();
+
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicUrl, setMusicUrl] = useState<string | null>(initialMusicUrl ?? null);
   const [beats, setBeats] = useState<Beat[]>([]);
@@ -241,7 +244,7 @@ export function BeatSyncTimeline({
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <Music className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">Musik für Beat-Sync hinzufügen</h3>
+            <h3 className="text-lg font-semibold mb-2">{tr({ de: "Musik für Beat-Sync hinzufügen", en: "Add music for beat-sync", es: "Agregar música para sincronización de ritmo" })}</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Lade eine Musikdatei hoch, um automatisch Beats zu erkennen 
               und Video-Schnitte darauf zu synchronisieren.

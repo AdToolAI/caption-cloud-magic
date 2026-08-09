@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { AlertTriangle, Zap } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ export const CreditLimitWarning = ({ balance, monthlyCredits, planCode }: Credit
       <AlertDescription className="flex items-center justify-between">
         <span>
           Sie haben nur noch <strong>{balance} Credits</strong> ({usagePercent.toFixed(0)}%) übrig.
-          {planCode === 'free' && ' Upgraden Sie für mehr Credits!'}
+          {planCode === 'free' && tx({ de: ' Upgraden Sie für mehr Credits!', en: ' Upgrade for more credits!', es: ' ¡Actualiza para obtener más créditos!' })}
         </span>
         <Button 
           size="sm" 

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -56,7 +57,7 @@ export function useMotionStudioLibrary() {
       setLocations((locsRes.data || []) as MotionStudioLocation[]);
     } catch (err) {
       console.error('[useMotionStudioLibrary] load error:', err);
-      toast.error('Bibliothek konnte nicht geladen werden');
+      toast.error(tx({ de: 'Bibliothek konnte nicht geladen werden', en: 'Library could not be loaded', es: 'No se pudo cargar la biblioteca' }));
     } finally {
       setLoading(false);
     }
@@ -82,7 +83,7 @@ export function useMotionStudioLibrary() {
       } = await supabase.auth.getUser();
       const effectiveUser = user ?? liveUser ?? null;
       if (!effectiveUser) {
-        toast.error('Nicht angemeldet — bitte erneut einloggen');
+        toast.error(tx({ de: 'Nicht angemeldet — bitte erneut einloggen', en: 'Not signed in — please log in again', es: 'No has iniciado sesión — vuelve a iniciar sesión' }));
         return null;
       }
       const { data, error } = await supabase
@@ -100,7 +101,7 @@ export function useMotionStudioLibrary() {
         if (prev.some((c) => c.id === created.id)) return prev;
         return [created, ...prev];
       });
-      toast.success(`„${created.name}" wurde gespeichert`);
+      toast.success(tx({ de: `„${created.name}" wurde gespeichert`, en: `"${created.name}" was saved`, es: `"${created.name}" se guardó` }));
       // Fire-and-forget reconciliation
       loadAll();
       return created;
@@ -145,7 +146,7 @@ export function useMotionStudioLibrary() {
       } = await supabase.auth.getUser();
       const effectiveUser = user ?? liveUser ?? null;
       if (!effectiveUser) {
-        toast.error('Nicht angemeldet — bitte erneut einloggen');
+        toast.error(tx({ de: 'Nicht angemeldet — bitte erneut einloggen', en: 'Not signed in — please log in again', es: 'No has iniciado sesión — vuelve a iniciar sesión' }));
         return null;
       }
       const { data, error } = await supabase
@@ -162,7 +163,7 @@ export function useMotionStudioLibrary() {
         if (prev.some((l) => l.id === created.id)) return prev;
         return [created, ...prev];
       });
-      toast.success(`„${created.name}" wurde gespeichert`);
+      toast.success(tx({ de: `„${created.name}" wurde gespeichert`, en: `"${created.name}" was saved`, es: `"${created.name}" se guardó` }));
       loadAll();
       return created;
     },
@@ -333,7 +334,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error || !data) {
-        toast.error('Primäre Variante konnte nicht gesetzt werden');
+        toast.error(tx({ de: 'Primäre Variante konnte nicht gesetzt werden', en: 'Could not set primary variant', es: 'No se pudo establecer la variante principal' }));
         return false;
       }
       // Mirror into character.reference_image_url so existing pipelines work.
@@ -535,7 +536,7 @@ export function useMotionStudioLibrary() {
       const { data, error } = await query;
       if (error) {
         console.warn('[listCommunitySnippets]', error);
-        toast.error('Community konnte nicht geladen werden');
+        toast.error(tx({ de: 'Community konnte nicht geladen werden', en: 'Community could not be loaded', es: 'No se pudo cargar la comunidad' }));
         return [];
       }
       const snippets = (data || []) as SceneSnippet[];

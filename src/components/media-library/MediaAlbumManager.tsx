@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -164,7 +165,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       name: newAlbumName.trim(),
     });
     if (error) {
-      toast.error("Fehler beim Erstellen");
+      toast.error(tx({ de: "Fehler beim Erstellen", en: "Error creating", es: "Error al crear" }));
     } else {
       toast.success("Album erstellt! 📁");
       setNewAlbumName("");
@@ -177,7 +178,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
   const deleteAlbum = async (albumId: string) => {
     const album = albums.find(a => a.id === albumId);
     if (album?.is_system) {
-      toast.error("Systemalben können nicht gelöscht werden");
+      toast.error(tx({ de: "Systemalben können nicht gelöscht werden", en: "System albums cannot be deleted", es: "Los álbumes del sistema no se pueden eliminar" }));
       return;
     }
     const { error } = await supabase.from('studio_albums').delete().eq('id', albumId);
@@ -206,7 +207,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
         .from('studio_images')
         .update({ album_id: albumId })
         .eq('id', imageData.id);
-      if (error) { toast.error("Fehler beim Verschieben"); return; }
+      if (error) { toast.error(tx({ de: "Fehler beim Verschieben", en: "Error moving", es: "Error al mover" })); return; }
       toast.success("Bild verschoben! 📁");
       setUnsortedImages(prev => prev.filter(img => img.id !== imageData.id));
       setAlbums(prev => prev.map(a =>
@@ -245,7 +246,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       loadAlbums();
     } catch (err) {
       console.error(err);
-      toast.error("Fehler beim Löschen");
+      toast.error(tx({ de: "Fehler beim Löschen", en: "Error deleting", es: "Error al eliminar" }));
     }
   };
 
@@ -400,7 +401,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       {albums.length === 0 && unsortedImages.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
           <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p>Noch keine Bilder oder Alben vorhanden</p>
+          <p>{tx({ de: "Noch keine Bilder oder Alben vorhanden", en: "No images or albums yet", es: "Aún no hay imágenes o álbumes" })}</p>
           <p className="text-sm mt-1">Generiere dein erstes Bild im KI Picture Studio!</p>
         </div>
       )}

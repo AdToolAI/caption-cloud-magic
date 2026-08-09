@@ -20,6 +20,7 @@
  */
 
 import type { TProductionPlan, TPlanScene } from './productionPlan';
+import { tx } from '@/lib/i18nText';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -463,7 +464,7 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   if (source === 'scene-sum' && canonicalDur && Math.abs(canonicalDur - currentSum) >= 0.5) {
     repairLog.push({
       kind: 'canonical-ignored',
-      label: `Widersprüchliche Briefing-Dauer (${canonicalDur}s) ignoriert — Szenensumme (${target}s) gewinnt.`,
+      label: tx({ de: `Widersprüchliche Briefing-Dauer (${canonicalDur}s) ignoriert — Szenensumme (${target}s) gewinnt.`, en: `Conflicting briefing duration (${canonicalDur}s) ignored — scene sum (${target}s) wins.`, es: `Duración de briefing contradictoria (${canonicalDur}s) ignorada — gana la suma de escenas (${target}s).` }),
       before: canonicalDur,
       after: target,
     });
@@ -471,21 +472,21 @@ export function finalizePlanCanonical(plan: TProductionPlan | null | undefined):
   if (sanitized.droppedCharIds > 0) {
     repairLog.push({
       kind: 'cast-ids-sanitized',
-      label: `${sanitized.droppedCharIds} ungültige Charakter-Zuordnung${sanitized.droppedCharIds === 1 ? '' : 'en'} entfernt (kein Match in deiner Charakter-Bibliothek).`,
+      label: tx({ de: `${sanitized.droppedCharIds} ungültige Charakter-Zuordnung${sanitized.droppedCharIds === 1 ? '' : 'en'} entfernt (kein Match in deiner Charakter-Bibliothek).`, en: `${sanitized.droppedCharIds} invalid character mapping${sanitized.droppedCharIds === 1 ? '' : 's'} removed (no match in your character library).`, es: `${sanitized.droppedCharIds} asignación${sanitized.droppedCharIds === 1 ? '' : 'es'} de personaje inválida${sanitized.droppedCharIds === 1 ? '' : 's'} eliminada${sanitized.droppedCharIds === 1 ? '' : 's'} (sin coincidencia en tu biblioteca de personajes).` }),
       before: sanitized.droppedCharIds,
     });
   }
   if (sanitized.droppedVoiceIds > 0) {
     repairLog.push({
       kind: 'voice-ids-sanitized',
-      label: `${sanitized.droppedVoiceIds} versehentlich gesetzte Voice-ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} entfernt (Voice wird sauber aus dem Charakter-Default nachgeladen).`,
+      label: tx({ de: `${sanitized.droppedVoiceIds} versehentlich gesetzte Voice-ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} entfernt (Voice wird sauber aus dem Charakter-Default nachgeladen).`, en: `${sanitized.droppedVoiceIds} accidentally set voice ID${sanitized.droppedVoiceIds === 1 ? '' : 's'} removed (voice will be reloaded cleanly from the character default).`, es: `${sanitized.droppedVoiceIds} ID de voz establecida por error${sanitized.droppedVoiceIds === 1 ? '' : 's'} eliminada${sanitized.droppedVoiceIds === 1 ? '' : 's'} (la voz se recargará limpiamente desde el valor predeterminado del personaje).` }),
       before: sanitized.droppedVoiceIds,
     });
   }
   if (source === 'default') {
     repairLog.push({
       kind: 'default-fallback',
-      label: `Fallback-Gesamtdauer gesetzt (${target}s) — dein Briefing enthielt keine klare Zeitangabe.`,
+      label: tx({ de: `Fallback-Gesamtdauer gesetzt (${target}s) — dein Briefing enthielt keine klare Zeitangabe.`, en: `Fallback total duration set (${target}s) — your briefing did not contain a clear time indication.`, es: `Duración total de reserva establecida (${target}s) — tu briefing no incluía una indicación de tiempo clara.` }),
       after: target,
     });
   }

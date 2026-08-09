@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, Trash2, Play, Eye, EyeOff, Loader2, Check, AlertCircle } from 'lucide-react';
@@ -92,7 +93,7 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
       
       toast.success(`${fillerIndices.size} Füllwörter automatisch entfernt`);
     } catch (error) {
-      toast.error('Fehler beim Entfernen');
+      toast.error(tx({ de: 'Fehler beim Entfernen', en: 'Error removing', es: 'Error al eliminar' }));
     } finally {
       setIsAnalyzing(false);
     }

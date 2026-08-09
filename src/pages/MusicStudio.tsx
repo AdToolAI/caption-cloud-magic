@@ -32,11 +32,13 @@ const GENRES = ['any', 'pop', 'rock', 'electronic', 'hip-hop', 'jazz', 'classica
 const MOODS = ['energetic', 'calm', 'epic', 'sad', 'happy', 'mysterious', 'romantic', 'dark', 'uplifting', 'dreamy'];
 
 import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+import { useTx } from '@/lib/i18nText';
 
 export default function MusicStudio() {
   useTrackPageFeature("music_studio");
   const navigate = useNavigate();
   const { wallet } = useAIVideoWallet();
+  const tr = useTx();
   const { generateMusic, generateLyrics, loading, generatingLyrics } = useMusicGeneration();
 
   const [engineId, setEngineId] = useState<MusicEngineId>('stable-audio-25');
@@ -115,7 +117,7 @@ export default function MusicStudio() {
 
   const handleResetProject = () => {
     const hasContent = prompt.trim() || lyrics.trim() || lastTrack;
-    if (hasContent && !window.confirm('Neues Projekt starten? Alle aktuellen Eingaben (Prompt, Lyrics, Track-Preview) werden zurückgesetzt.')) {
+    if (hasContent && !window.confirm(tr({ de: 'Neues Projekt starten? Alle aktuellen Eingaben (Prompt, Lyrics, Track-Preview) werden zurückgesetzt.', en: 'Start a new project? All current inputs (prompt, lyrics, track preview) will be reset.', es: '¿Iniciar un nuevo proyecto? Se restablecerán todas las entradas actuales (prompt, letras, vista previa de pista).' }))) {
       return;
     }
     setPrompt('');

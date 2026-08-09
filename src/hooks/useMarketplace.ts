@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -89,15 +90,15 @@ export function useTemplatePurchase() {
           result.error === 'INSUFFICIENT_CREDITS'
             ? `Nicht genug Credits — du brauchst ${result.required}, hast aber nur ${result.balance}.`
             : result.error === 'CANNOT_BUY_OWN_TEMPLATE'
-            ? 'Du kannst dein eigenes Template nicht kaufen.'
+            ? tx({ de: 'Du kannst dein eigenes Template nicht kaufen.', en: 'You cannot buy your own template.', es: 'No puedes comprar tu propia plantilla.' })
             : `Kauf fehlgeschlagen: ${result.error}`;
         toast({ title: 'Fehler', description: msg, variant: 'destructive' });
         return;
       }
       if (result.already_owned) {
-        toast({ title: 'Bereits gekauft', description: 'Du besitzt dieses Template bereits.' });
+        toast({ title: 'Bereits gekauft', description: tx({ de: 'Du besitzt dieses Template bereits.', en: 'You already own this template.', es: 'Ya posees esta plantilla.' }) });
       } else if (result.price_credits === 0) {
-        toast({ title: 'Template hinzugefügt', description: 'Free-Template ist jetzt in deiner Bibliothek.' });
+        toast({ title: 'Template hinzugefügt', description: tx({ de: 'Free-Template ist jetzt in deiner Bibliothek.', en: 'Free template is now in your library.', es: 'La plantilla gratuita ya está en tu biblioteca.' }) });
       } else {
         toast({
           title: 'Kauf erfolgreich',
@@ -152,7 +153,7 @@ export function useSubmitTemplateToMarketplace() {
       toast({
         title: isPublished ? 'Live im Marketplace' : 'Eingereicht',
         description: isPublished
-          ? 'Dein Free-Template ist jetzt öffentlich verfügbar.'
+          ? tx({ de: 'Dein Free-Template ist jetzt öffentlich verfügbar.', en: 'Your free template is now publicly available.', es: 'Tu plantilla gratuita ya está disponible públicamente.' })
           : 'Dein Premium-Template wartet auf Admin-Freigabe.',
       });
       queryClient.invalidateQueries({ queryKey: ['my-marketplace-templates'] });
@@ -217,7 +218,7 @@ export function useSubmitRating() {
       return data;
     },
     onSuccess: (_d, vars) => {
-      toast({ title: 'Bewertung gespeichert', description: 'Danke für dein Feedback!' });
+      toast({ title: 'Bewertung gespeichert', description: tx({ de: 'Danke für dein Feedback!', en: 'Thanks for your feedback!', es: '¡Gracias por tus comentarios!' }) });
       queryClient.invalidateQueries({ queryKey: ['template-ratings', vars.templateId] });
       queryClient.invalidateQueries({ queryKey: ['marketplace-templates'] });
     },
@@ -259,8 +260,8 @@ export function useReviewTemplate() {
       toast({
         title: vars.decision === 'approve' ? 'Freigegeben' : 'Abgelehnt',
         description: vars.decision === 'approve'
-          ? 'Template ist jetzt im Marketplace live.'
-          : 'Creator wurde über die Ablehnung informiert.',
+          ? tx({ de: 'Template ist jetzt im Marketplace live.', en: 'Template is now live on the Marketplace.', es: 'La plantilla ya está disponible en el Marketplace.' })
+          : tx({ de: 'Creator wurde über die Ablehnung informiert.', en: 'Creator has been informed about the rejection.', es: 'Se ha informado al creador sobre el rechazo.' }),
       });
       queryClient.invalidateQueries({ queryKey: ['admin-pending-templates'] });
       queryClient.invalidateQueries({ queryKey: ['marketplace-templates'] });
