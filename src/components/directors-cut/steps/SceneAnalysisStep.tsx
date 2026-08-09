@@ -365,7 +365,7 @@ export function SceneAnalysisStep({
     if (!onApplySuggestions) return;
     
     if (scene.suggested_effects.length === 0) {
-      toast.info(tx({ de: 'tx({ de: 'Keine Vorschläge für diese Szene', en: 'No suggestions for this scene', es: 'No hay sugerencias para esta escena' })', en: 'No suggestions for this scene', es: 'No hay sugerencias para esta escena' }));
+      toast.info(tx({ de: 'Keine Vorschläge für diese Szene', en: 'No suggestions for this scene', es: 'No hay sugerencias para esta escena' }));
       return;
     }
     
@@ -404,7 +404,7 @@ export function SceneAnalysisStep({
     
     // Pass empty effects for this scene to clear it
     onApplySuggestions({}, { [sceneId]: {} });
-    toast.info('tx({ de: 'Szeneneffekte zurückgesetzt', en: 'Scene effects reset', es: 'Efectos de escena restablecidos' })');
+    toast.info(tx({ de: 'Szeneneffekte zurückgesetzt', en: 'Scene effects reset', es: 'Efectos de escena restablecidos' }));
   };
 
   // Check if scene has effects applied

@@ -83,7 +83,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
       });
       if (error) throw error;
       const audioB64 = data?.audioBase64 || data?.audio || data?.audioContent;
-      if (!audioB64) throw new Error('tx({ de: "Keine Audio-Daten erhalten", en: "No audio data received", es: "No se recibieron datos de audio" })');
+      if (!audioB64) throw new Error(tx({ de: "Keine Audio-Daten erhalten", en: "No audio data received", es: "No se recibieron datos de audio" }));
       const audio = new Audio(`data:audio/mpeg;base64,${audioB64}`);
       await audio.play();
     } catch (err) {
@@ -127,7 +127,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
         >
           <Mic className="h-4 w-4 mr-2 text-muted-foreground" />
           <span className="truncate">
-            {selectedLabel ? selectedLabel.name : 'tx({ de: "Voice-Bibliothek öffnen…", en: "Open voice library...", es: "Abrir biblioteca de voces..." })'}
+            {selectedLabel ? selectedLabel.name : tx({ de: "Voice-Bibliothek öffnen…", en: "Open voice library...", es: "Abrir biblioteca de voces..." })}
           </span>
         </Button>
 

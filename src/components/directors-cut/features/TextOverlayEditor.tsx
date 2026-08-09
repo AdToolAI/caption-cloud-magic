@@ -323,7 +323,7 @@ export function TextOverlayEditor({
                         className="flex-1"
                       />
                       <span className="text-xs w-10 text-right">
-                        {selectedOverlay.endTime ? `${selectedOverlay.endTime.toFixed(1)}s` : 'tx({ de: "Ende", en: "End", es: "Fin" })'}
+                        {selectedOverlay.endTime ? `${selectedOverlay.endTime.toFixed(1)}s` : tx({ de: "Ende", en: "End", es: "Fin" })}
                       </span>
                     </div>
                   </div>

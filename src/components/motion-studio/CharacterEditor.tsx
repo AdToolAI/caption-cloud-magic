@@ -188,11 +188,11 @@ export default function CharacterEditor({
 
   const handleSave = async () => {
     if (!draft.name.trim()) {
-      toast.error(tx({ de: 'tx({ de: 'Name ist erforderlich', en: 'Name is required', es: 'El nombre es obligatorio' })', en: 'Name is required', es: 'El nombre es obligatorio' }));
+      toast.error(tx({ de: 'Name ist erforderlich', en: 'Name is required', es: 'El nombre es obligatorio' }));
       return;
     }
     if (!draft.description.trim()) {
-      toast.error(tx({ de: 'tx({ de: 'Beschreibung ist erforderlich', en: 'Description is required', es: 'La descripción es obligatoria' })', en: 'Description is required', es: 'Se requiere descripción' }));
+      toast.error(tx({ de: 'Beschreibung ist erforderlich', en: 'Description is required', es: 'La descripción es obligatoria' }));
       return;
     }
     setSaving(true);

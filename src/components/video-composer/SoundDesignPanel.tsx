@@ -159,7 +159,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
 
         {!loading && clips.length === 0 && (
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {tx({ de: 'Noch kein AI Sound Design generiert. Klick "tx({ de: "Mix erstellen", en: "Create mix", es: "Crear mezcla" })" um Atmo + SFX vorschlagen und generieren zu lassen.', en: 'No AI sound design generated yet. Click "Create mix" to suggest and generate ambience + SFX.', es: 'Aún no se ha generado diseño de sonido con IA. Haz clic en "Crear mezcla" para sugerir y generar ambiente + SFX.' })}
+            {tx({ de: 'Noch kein AI Sound Design generiert. Klick tx({ de: "Mix erstellen", en: "Create mix", es: "Crear mezcla" }) um Atmo + SFX vorschlagen und generieren zu lassen.', en: 'No AI sound design generated yet. Click "Create mix" to suggest and generate ambience + SFX.', es: 'Aún no se ha generado diseño de sonido con IA. Haz clic en "Crear mezcla" para sugerir y generar ambiente + SFX.' })}
           </div>
         )}
 

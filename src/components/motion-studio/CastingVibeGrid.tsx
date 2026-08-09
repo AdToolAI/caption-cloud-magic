@@ -108,7 +108,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
       const ok = await deleteCharacterVariant(variant.id);
       if (ok) {
         setVariants((prev) => prev.filter((v) => v.id !== variant.id));
-        toast.success('tx({ de: 'Variante entfernt', en: 'Variant removed', es: 'Variante eliminada' })');
+        toast.success(tx({ de: 'Variante entfernt', en: 'Variant removed', es: 'Variante eliminada' }));
       }
     },
     [deleteCharacterVariant],

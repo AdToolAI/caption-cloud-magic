@@ -196,7 +196,7 @@ const Carousel = () => {
 
   const handleCreateABVariant = async () => {
     if (!carouselOutline) {
-      toast.error("tx({ de: 'Erstelle zuerst Variante A', en: 'Create Variant A first', es: 'Crea primero la Variante A' })");
+      toast.error(tx({ de: 'Erstelle zuerst Variante A', en: 'Create Variant A first', es: 'Crea primero la Variante A' }));
       return;
     }
     await handleGenerate(true);
@@ -214,7 +214,7 @@ const Carousel = () => {
     const fullText = `${caption}\n\n${hashtags}`;
     
     navigator.clipboard.writeText(fullText);
-    toast.success("tx({ de: 'Caption & Hashtags kopiert!', en: 'Caption & Hashtags copied!', es: '¡Subtítulos y hashtags copiados!' })");
+    toast.success(tx({ de: 'Caption & Hashtags kopiert!', en: 'Caption & Hashtags copied!', es: '¡Subtítulos y hashtags copiados!' }));
   };
 
   const handleExportPNG = () => {

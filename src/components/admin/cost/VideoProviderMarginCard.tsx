@@ -67,7 +67,7 @@ export function VideoProviderMarginCard() {
                       {r.tier === 'premium-engine' && (
                         <span
                           className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-400/5 px-1.5 py-0.5 text-[9px] font-medium text-amber-300"
-                          title="tx({ de: 'Premium-Engine: echte Provider-Kosten an User durchgereicht', en: 'Premium engine: real provider costs passed through to user', es: 'Motor premium: los costos reales del proveedor se transfieren al usuario' })"
+                          title={tx({ de: 'Premium-Engine: echte Provider-Kosten an User durchgereicht', en: 'Premium engine: real provider costs passed through to user', es: 'Motor premium: los costos reales del proveedor se transfieren al usuario' })}
                         >
                           <Crown className="h-2.5 w-2.5" />
                           Premium

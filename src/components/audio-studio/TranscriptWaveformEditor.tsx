@@ -171,7 +171,7 @@ export function TranscriptWaveformEditor({
             </div>
             <h3 className="text-lg font-semibold mb-2">{tx({ de: "Transcript generieren", en: "Generate transcript", es: "Generar transcripción" })}</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              tx({ de: "tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })n Transcript, um Audio wie Text zu bearbeiten.", en: "Generate a transcript to edit audio like text.", es: "Generar una transcripción para editar audio como texto." }) 
+              tx({ de: "Generiere...", en: "Generating...", es: "Generando..." }) 
               tx({ de: "Markiere Wörter zum Löschen oder suche nach bestimmten Passagen.", en: "Highlight words to delete or search for specific passages.", es: "Resalte palabras para eliminarlas o busque pasajes específicos." })
             </p>
             <Button

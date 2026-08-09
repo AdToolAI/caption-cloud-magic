@@ -134,7 +134,7 @@ export const TimelineScriptEditor = ({
     setSelectedtx({ de: "Segment", en: "Segment", es: "Segmento" })Id(newtx({ de: "Segment", en: "Segment", es: "Segmento" }).id);
     
     toast({
-      title: tx({ de: "tx({ de: "Segment", en: "Segment", es: "Segmento" }) hinzugefügt", en: "tx({ de: "Segment", en: "Segment", es: "Segmento" }) added", es: "tx({ de: "Segment", en: "Segment", es: "Segmento" })o añadido" }),
+      title: tx({ de: "Segment", en: "Segment", es: "Segmento" }),
       description: tx({ de: "Neues tx({ de: "Segment", en: "Segment", es: "Segmento" }) zur Timeline hinzugefügt", en: "New segment added to the timeline", es: "Nuevo segmento añadido a la línea de tiempo" })
     });
   };
@@ -208,7 +208,7 @@ export const TimelineScriptEditor = ({
     } catch (error) {
       console.error('tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" }) error:', error);
       toast({
-        title: tx({ de: "tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" }) fehlgeschlagen", en: "Auto-sync failed", es: "Sincronización automática fallida" }),
+        title: tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" }),
         description: error instanceof Error ? error.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: "destructive"
       });
@@ -313,8 +313,8 @@ export const TimelineScriptEditor = ({
     }
     
     toast({
-      title: tx({ de: "tx({ de: "Segment", en: "Segment", es: "Segmento" }) gelöscht", en: "tx({ de: "Segment", en: "Segment", es: "Segmento" }) deleted", es: "tx({ de: "Segment", en: "Segment", es: "Segmento" })o eliminado" }),
-      description: tx({ de: "tx({ de: "Segment", en: "Segment", es: "Segmento" }) von der Timeline entfernt", en: "tx({ de: "Segment", en: "Segment", es: "Segmento" }) removed from timeline", es: "tx({ de: "Segment", en: "Segment", es: "Segmento" })o eliminado de la línea de tiempo" })
+      title: tx({ de: "Segment", en: "Segment", es: "Segmento" }),
+      description: tx({ de: "Segment", en: "Segment", es: "Segmento" })
     });
   };
 
@@ -378,7 +378,7 @@ export const TimelineScriptEditor = ({
                 size="sm" 
                 variant="secondary"
                 disabled={isAutoSyncing || segments.length === 0}
-                title={tx({ de: "tx({ de: "Segment", en: "Segment", es: "Segmento" })e mit präzisem Timing und Untertiteln synchronisieren", en: "Sync segments with precise timing and subtitles", es: "Sincronizar segmentos con temporización precisa y subtítulos" })}
+                title={tx({ de: "Segment", en: "Segment", es: "Segmento" })}
               >
                 {isAutoSyncing ? (
                   <>
@@ -451,7 +451,7 @@ export const TimelineScriptEditor = ({
             <Card className="border-primary/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{tx({ de: "tx({ de: "Segment", en: "Segment", es: "Segmento" }) Details", en: "tx({ de: "Segment", en: "Segment", es: "Segmento" }) details", es: "Detalles del segmento" })}</CardTitle>
+                  <CardTitle className="text-base">{tx({ de: "Segment", en: "Segment", es: "Segmento" })}</CardTitle>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"

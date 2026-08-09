@@ -25,49 +25,49 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     command: '/status',
     label: 'Account Status',
-    description: tx({ de: 'tx({ de: "Zeigt vollständige Account-Übersicht", en: "Shows complete account overview", es: "Muestra la descripción completa de la cuenta" })', en: 'Shows complete account overview', es: 'Muestra una descripción general completa de la cuenta.' }),
+    description: tx({ de: "Zeigt vollständige Account-Übersicht", en: "Shows complete account overview", es: "Muestra la descripción completa de la cuenta" }),
     icon: <BarChart3 className="w-4 h-4" />,
     category: 'status'
   },
   {
     command: '/credits',
     label: tx({ de: "Credits anzeigen", en: "Show credits", es: "Mostrar créditos" }),
-    description: tx({ de: 'tx({ de: "Zeigt deine Credit-Balance", en: "Shows your credit balance", es: "Muestra tu saldo de crédito" })', en: 'Shows your credit balance', es: 'Muestra tu saldo de crédito' }),
+    description: tx({ de: "Zeigt deine Credit-Balance", en: "Shows your credit balance", es: "Muestra tu saldo de crédito" }),
     icon: <CreditCard className="w-4 h-4" />,
     category: 'status'
   },
   {
     command: '/render',
     label: 'Render-Status',
-    description: tx({ de: 'tx({ de: "Zeigt aktive Video-Renderings", en: "Shows active video renderings", es: "Muestra representaciones de vídeo activas" })', en: 'Shows active video renderings', es: 'Muestra representaciones de vídeo activas.' }),
+    description: tx({ de: "Zeigt aktive Video-Renderings", en: "Shows active video renderings", es: "Muestra representaciones de vídeo activas" }),
     icon: <Video className="w-4 h-4" />,
     category: 'status'
   },
   {
     command: '/reconnect',
     label: 'Reconnect Platform',
-    description: tx({ de: "tx({ de: "Erneuert Social Media Verbindung", en: "Renews social media connection", es: "Renueva la conexión a las redes sociales" })", en: "Renews social media connection", es: "Renueva la conexión a las redes sociales" }),
+    description: tx({ de: "Erneuert Social Media Verbindung", en: "Renews social media connection", es: "Renueva la conexión a las redes sociales" }),
     icon: <RefreshCcw className="w-4 h-4" />,
     category: 'action'
   },
   {
     command: '/calendar',
     label: tx({ de: 'Kalender-Übersicht', en: 'Calendar overview', es: 'Resumen del calendario' }),
-    description: tx({ de: 'tx({ de: "Zeigt geplante Posts diese Woche", en: "Shows scheduled posts this week", es: "Muestra las publicaciones programadas de esta semana" })', en: 'Shows scheduled posts this week', es: 'Muestra las publicaciones programadas de esta semana' }),
+    description: tx({ de: "Zeigt geplante Posts diese Woche", en: "Shows scheduled posts this week", es: "Muestra las publicaciones programadas de esta semana" }),
     icon: <Calendar className="w-4 h-4" />,
     category: 'status'
   },
   {
     command: '/tips',
     label: tx({ de: "Tipps anzeigen", en: "Show tips", es: "Mostrar consejos" }),
-    description: tx({ de: 'tx({ de: "Zeigt personalisierte Tipps", en: "Shows personalized tips", es: "Muestra consejos personalizados" })', en: 'Shows personalized tips', es: 'Muestra consejos personalizados' }),
+    description: tx({ de: "Zeigt personalisierte Tipps", en: "Shows personalized tips", es: "Muestra consejos personalizados" }),
     icon: <Sparkles className="w-4 h-4" />,
     category: 'help'
   },
   {
     command: '/settings',
     label: tx({ de: "Einstellungen", en: "Settings", es: "Ajustes" }),
-    description: tx({ de: 'tx({ de: "Öffnet Account-Einstellungen", en: "Opens account settings", es: "Abre la configuración de la cuenta" })', en: 'Opens account settings', es: 'Abre la configuración de la cuenta' }),
+    description: tx({ de: "Öffnet Account-Einstellungen", en: "Opens account settings", es: "Abre la configuración de la cuenta" }),
     icon: <Settings className="w-4 h-4" />,
     category: 'action'
   },

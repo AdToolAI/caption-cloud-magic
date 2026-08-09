@@ -240,7 +240,7 @@ export function SmartTemplates({ onApply, currentTemplateId }: SmartTemplatesPro
                           <span className="font-medium capitalize">{template.preview.transitionType}</span>
                         </div>
                         <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">{tx({ de: "tx({ de: "Ø Szene", en: "Ø Scene", es: "Ø Escena" })", en: "Ø Scene", es: "Ø Escena" })}</span>
+                          <span className="text-muted-foreground">{tx({ de: "Ø Szene", en: "Ø Scene", es: "Ø Escena" })}</span>
                           <span className="font-medium">{template.preview.avgSceneDuration}s</span>
                         </div>
                         <div className="flex justify-between text-[10px]">

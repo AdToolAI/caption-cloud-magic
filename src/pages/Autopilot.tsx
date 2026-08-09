@@ -158,7 +158,7 @@ function AutopilotReal() {
                       onClick={() => pause.mutate({ hours: isPaused ? null : 24 })}
                       className="gap-1.5"
                     >
-                      <Pause className="h-3.5 w-3.5" /> {isPaused ? 'tx({ de: "Pause aufheben", en: "Resume", es: "Reanudar" })' : 'tx({ de: "Pause 24h", en: "Pause 24h", es: "Pausar 24h" })'}
+                      <Pause className="h-3.5 w-3.5" /> {isPaused ? tx({ de: "Pause aufheben", en: "Resume", es: "Reanudar" }) : tx({ de: "Pause 24h", en: "Pause 24h", es: "Pausar 24h" })}
                     </Button>
                   </>
                 )}
@@ -319,12 +319,12 @@ function ToolsPanel() {
   const tools = [
     { name: 'Video Composer', desc: tx({ de: 'Mehrszenige AI-Videos mit konsistenten Charakteren', en: 'Multi-scene AI videos with consistent characters', es: 'Vídeos de IA de múltiples escenas con personajes consistentes' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
     { name: 'Picture Studio', desc: tx({ de: 'AI-Bilder, Magic Edit, Style-Reference, Brand-Kit', en: 'AI images, magic edit, style reference, brand kit', es: 'Imágenes AI, edición mágica, referencia de estilo, kit de marca' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
-    { name: 'Music Studio', desc: 'tx({ de: "Hintergrundmusik via Stable Audio + MiniMax", en: "Background music via Stable Audio + MiniMax", es: "Música de fondo a través de Stable Audio + MiniMax" })', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Music Studio', desc: tx({ de: "Hintergrundmusik via Stable Audio + MiniMax", en: "Background music via Stable Audio + MiniMax", es: "Música de fondo a través de Stable Audio + MiniMax" }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
     { name: 'Talking Head Avatare', desc: tx({ de: 'Lippensynchrone Avatar-Videos mit Stimme', en: 'Lip-sync avatar videos with voice', es: 'Vídeos de avatares con sincronización labial y voz' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
     { name: 'Trend Radar', desc: tx({ de: 'Lokalisierte Trends, alle 5 Stunden aktualisiert', en: 'Localized trends, updated every 5 hours', es: 'Tendencias localizadas, actualizadas cada 5 horas.' }), status: tx({ de: 'live', en: 'live', es: 'en vivo' }) },
-    { name: 'Posting Berater', desc: 'tx({ de: "Optimale Veröffentlichungszeiten pro Plattform/Sprache", en: "Optimal posting times per platform/language", es: "Tiempos de publicación óptimos por plataforma/idioma" })', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Posting Berater', desc: tx({ de: "Optimale Veröffentlichungszeiten pro Plattform/Sprache", en: "Optimal posting times per platform/language", es: "Tiempos de publicación óptimos por plataforma/idioma" }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
     { name: 'KI-QA-Gate', desc: tx({ de: 'Vision-Check auf Brand-CI, Copyright, Deepfakes', en: 'Vision check for brand CI, copyright, deepfakes', es: 'Verificación de visión para CI de marca, derechos de autor y deepfakes' }), status: tx({ de: 'aktiv', en: 'active', es: 'activo' }) },
-    { name: 'Performance-Loop', desc: 'tx({ de: "Lernende Optimierung — kommt in Stufe 2", en: "Learning optimization — coming in Stage 2", es: "Optimización del aprendizaje: llegará en la Etapa 2" })', status: tx({ de: 'geplant', en: 'planned', es: 'planificado' }) },
+    { name: 'Performance-Loop', desc: tx({ de: "Lernende Optimierung — kommt in Stufe 2", en: "Learning optimization — coming in Stage 2", es: "Optimización del aprendizaje: llegará en la Etapa 2" }), status: tx({ de: 'geplant', en: 'planned', es: 'planificado' }) },
   ];
   return (
     <div className="grid md:grid-cols-2 gap-3">

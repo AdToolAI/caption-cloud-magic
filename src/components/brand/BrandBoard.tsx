@@ -98,7 +98,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
               )}
               <div>
                 <p className="font-semibold">{brandKit.brand_name || "Deine Marke"}</p>
-                <p className="text-xs text-muted-foreground">tx({ de: 'tx({ de: 'Gesponsert', en: 'Sponsored', es: 'Patrocinado' })', en: 'Sponsored', es: 'Patrocinado' })}</p>
+                <p className="text-xs text-muted-foreground">tx({ de: 'Gesponsert', en: 'Sponsored', es: 'Patrocinado' })}</p>
               </div>
             </div>
 

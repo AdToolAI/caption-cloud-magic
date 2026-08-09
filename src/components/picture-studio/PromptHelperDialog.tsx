@@ -80,7 +80,7 @@ export function PromptHelperDialog({
       setResult(data as PromptHelperResult);
     } catch (err: any) {
       console.error('[PromptHelper] error', err);
-      toast.error(err?.message || tx({ de: "tx({ de: 'Prompt-Helfer', en: 'Prompt Helper', es: 'Ayudante de prompts' }) konnte nicht antworten.", en: "Prompt helper couldn't respond.", es: "El ayudante de prompts no pudo responder." }));
+      toast.error(err?.message || tx({ de: 'Prompt-Helfer', en: 'Prompt Helper', es: 'Ayudante de prompts' }));
     } finally {
       setLoading(false);
     }

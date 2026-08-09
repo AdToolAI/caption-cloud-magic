@@ -103,7 +103,7 @@ export function CostAnalysis({ costData }: Props) {
               <XAxis dataKey="template_name" angle={-45} textAnchor="end" height={100} />
               <YAxis />
               <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-              <Bar dataKey="total_cost" fill="hsl(var(--primary))" name="tx({ de: "Gesamtkosten", en: "Total cost", es: "Coste total" })" />
+              <Bar dataKey="total_cost" fill="hsl(var(--primary))" name={tx({ de: "Gesamtkosten", en: "Total cost", es: "Coste total" })} />
             </BarChart>
           </ResponsiveContainer>
         </Card>

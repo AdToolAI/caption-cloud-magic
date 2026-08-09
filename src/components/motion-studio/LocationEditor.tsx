@@ -313,7 +313,7 @@ export default function LocationEditor({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {location ? tx({ de: 'Änderungen speichern', en: 'Save changes', es: 'Guardar cambios' }) : 'tx({ de: 'Location anlegen', en: 'Create Location', es: 'Crear ubicación' })'}
+            {location ? tx({ de: 'Änderungen speichern', en: 'Save changes', es: 'Guardar cambios' }) : tx({ de: 'Location anlegen', en: 'Create Location', es: 'Crear ubicación' })}
           </Button>
         </div>
       </DialogContent>

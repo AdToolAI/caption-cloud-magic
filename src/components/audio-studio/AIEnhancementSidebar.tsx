@@ -336,7 +336,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
                   { label: tx({ de: 'Videos mit Hintergrundmusik', en: 'Videos with background music', es: 'Vídeos con música de fondo.' }), desc: tx({ de: 'Musik komplett entfernen', en: 'Completely remove music', es: 'Eliminar completamente la música' }) },
                   { label: tx({ de: 'Interviews mit Störgeräuschen', en: 'Interviews with noise', es: 'Entrevistas con ruido' }), desc: tx({ de: 'Nur Sprecher behalten', en: 'Keep only speakers', es: 'Mantener solo a los oradores' }) },
                   { label: 'Podcast-Clips', desc: tx({ de: 'Reine Sprache extrahieren', en: 'Extract pure speech', es: 'Extraer voz pura' }) },
-                  { label: tx({ de: 'Voice-Over aus Videos', en: 'Voice over from videos', es: 'Voz en off de vídeos' }), desc: tx({ de: 'tx({ de: "Stimme isolieren", en: "Isolate voice", es: "Aislar voz" })', en: 'Isolate voice', es: 'Aislar voz' }) }
+                  { label: tx({ de: 'Voice-Over aus Videos', en: 'Voice over from videos', es: 'Voz en off de vídeos' }), desc: tx({ de: "Stimme isolieren", en: "Isolate voice", es: "Aislar voz" }) }
                 ].map((useCase, idx) => (
                   <div key={idx} className="p-3 rounded-lg bg-muted/20 border border-border/50">
                     <span className="text-sm font-medium">{useCase.label}</span>

@@ -1377,7 +1377,7 @@ export default function MediaLibrary() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{tx({ de: "tx({ de: "Löschen", en: "Delete", es: "Borrar" })", en: "Delete", es: "Borrar" })}</TooltipContent>
+                      <TooltipContent>{tx({ de: "Löschen", en: "Delete", es: "Borrar" })}</TooltipContent>
                     </Tooltip>
                   </>
 

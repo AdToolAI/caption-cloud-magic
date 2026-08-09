@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -161,7 +162,7 @@ export default function PlatformAnalytics() {
                     {posts.slice(0, 20).map((post) => (
                       <div key={post.id} className="flex items-start justify-between p-3 rounded-lg border">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm line-clamp-2">{post.caption_text || "Kein Text"}</p>
+                          <p className="text-sm line-clamp-2">{post.caption_text || tx({ de: "Kein Text", en: "No text", es: "Sin texto" })}</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {post.posted_at ? new Date(post.posted_at).toLocaleDateString() : "—"}
                           </p>

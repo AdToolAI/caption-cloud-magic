@@ -197,7 +197,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       tick();
     } catch (err) {
       console.error("[VoiceStudio] mic error:", err);
-      toast.error(tx({ de: "tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" })zugriff wurde abgelehnt oder ist nicht verfügbar.", en: "Microphone access denied or unavailable.", es: "Acceso al micrófono denegado o no disponible." }));
+      toast.error(tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" }));
     }
   }, []);
 
@@ -534,7 +534,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">
-                        {isRecording ? "tx({ de: "Aufnahme läuft…", en: "Recording in progress...", es: "Grabación en curso..." })" : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
+                        {isRecording ? tx({ de: "Aufnahme läuft…", en: "Recording in progress...", es: "Grabación en curso..." }) : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {tx({ de: "Ziel: 60–90 Sekunden pro Aufnahme, in ruhiger Umgebung.", en: "Goal: 60–90 seconds per recording, in a quiet environment.", es: "Objetivo: 60-90 segundos por grabación, en un entorno tranquilo." })}

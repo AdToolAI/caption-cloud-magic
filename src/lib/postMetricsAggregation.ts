@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Shared aggregation functions for post_metrics data.
  * Used by CaptionInsightsTab and RecoCard.
@@ -89,7 +90,7 @@ export const aggregateHashtags = (posts: any[]) => {
 export const aggregateCaptionLength = (posts: any[]) => {
   const grouped = posts.reduce((acc, post) => {
     const len = (post.caption_text || '').length;
-    const bucket = len < 80 ? 'kurz' : len <= 220 ? 'mittel' : 'lang';
+    const bucket = len < 80 ? 'kurz' : len <= 220 ? tx({ de: "mittel", en: "medium", es: "medio" }) : 'lang';
 
     if (!acc[bucket]) {
       acc[bucket] = { bucket, total: 0, count: 0 };

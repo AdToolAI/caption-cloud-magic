@@ -23,7 +23,7 @@ const STAGE_LABEL: Record<string, string> = {
   treatment: tx({ de: 'Konzept', en: 'Concept', es: 'Concepto' }),
   anchors: tx({ de: 'Bildfreigabe', en: 'Image release', es: 'Lanzamiento de imagen' }),
   motion: tx({ de: 'Animation', en: 'Animation', es: 'Animación' }),
-  scenes_ready: tx({ de: 'tx({ de: "Szenen", en: "Scenes", es: "Escenas" }) fertig', en: 'Scenes ready', es: 'Escenas listas' }),
+  scenes_ready: tx({ de: "Szenen", en: "Scenes", es: "Escenas" }),
   audio: tx({ de: 'Ton', en: 'Audio', es: 'Sonido' }),
   lipsync: tx({ de: 'Lip-Sync', en: 'Lip sync', es: 'Sincronización labial' }),
   finalizing: tx({ de: 'Endschnitt', en: 'Final cut', es: 'Corte final' }),

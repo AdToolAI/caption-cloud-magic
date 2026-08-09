@@ -80,7 +80,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
       if (error) throw error;
 
       setGoogletx({ de: "Verbunden", en: "Connected", es: "Conectado" })(false);
-      toast.success(tx({ de: "tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }) getrennt", en: "tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }) disconnected", es: "tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }) desconectado" }));
+      toast.success(tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }));
     } catch (error: any) {
       console.error("Failed to disconnect tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }):", error);
       toast.error(tx({ de: "Fehler beim Trennen", en: "Failed to disconnect", es: "Error al desconectar" }));
@@ -194,7 +194,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
                   <p className="text-xs text-muted-foreground">
                     {syncDirection === "push" && "Events are synced from your calendar to tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })"}
                     {syncDirection === "pull" && "Events are synced from tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }) to your calendar"}
-                    {syncDirection === "two_way" && "tx({ de: "Ereignisse werden in beide Richtungen synchronisiert", en: "Events are synced in both directions", es: "Los eventos se sincronizan en ambas direcciones." })"}
+                    {syncDirection === "two_way" && tx({ de: "Ereignisse werden in beide Richtungen synchronisiert", en: "Events are synced in both directions", es: "Los eventos se sincronizan en ambas direcciones." })}
                   </p>
                 </div>
 

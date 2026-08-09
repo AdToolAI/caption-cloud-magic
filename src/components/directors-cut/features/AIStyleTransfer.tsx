@@ -94,7 +94,7 @@ export function AIStyleTransfer({
       const filter = AVAILABLE_FILTERS.find(f => f.id === currentFilter);
       return filter?.name || 'Filter';
     }
-    return 'tx({ de: "Filter wählen", en: "Choose filter", es: "Elegir filtro" })';
+    return tx({ de: "Filter wählen", en: "Choose filter", es: "Elegir filtro" });
   };
 
   const handleMouseDown = () => setIsDragging(true);

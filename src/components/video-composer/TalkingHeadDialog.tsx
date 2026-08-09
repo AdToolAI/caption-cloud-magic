@@ -131,7 +131,7 @@ export default function TalkingHeadDialog({
   const pickCastCharacter = (c: ComposerCharacter) => {
     if (!c.referenceImageUrl) {
       toast({
-        title: tx({ de: 'tx({ de: "Charakter", en: "Character", es: "Personaje" }) ohne Foto', en: 'Character without photo', es: 'Personaje sin foto' }),
+        title: tx({ de: "Charakter", en: "Character", es: "Personaje" }),
         description: tx({ de: `"${c.name}" hat noch kein Referenzbild. Lege eines im Briefing an oder importiere ihn aus der Avatar-Bibliothek.`, en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }),
         variant: 'destructive',
       });
@@ -479,7 +479,7 @@ export default function TalkingHeadDialog({
                 <div classtx({ de: "Name", en: "Name", es: "Nombre" })="flex items-start gap-3">
                   <img src={imageUrl} alt="Selected" classtx({ de: "Name", en: "Name", es: "Nombre" })="w-20 h-20 rounded-md object-cover border border-border/40" />
                   <div classtx({ de: "Name", en: "Name", es: "Nombre" })="flex-1 min-w-0">
-                    <div classtx({ de: "Name", en: "Name", es: "Nombre" })="text-sm font-medium">{selectedChartx({ de: "Name", en: "Name", es: "Nombre" }) || 'tx({ de: "Charakter", en: "Character", es: "Personaje" })'}</div>
+                    <div classtx({ de: "Name", en: "Name", es: "Nombre" })="text-sm font-medium">{selectedChartx({ de: "Name", en: "Name", es: "Nombre" }) || tx({ de: "Charakter", en: "Character", es: "Personaje" })}</div>
                     <div classtx({ de: "Name", en: "Name", es: "Nombre" })="text-xs text-muted-foreground mt-0.5">
                       Bereit für Lip-Sync — wechsle in den Tab „tx({ de: "Skript & Stimme", en: "Script & Voice", es: "Guión y voz" })".
                     </div>

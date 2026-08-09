@@ -214,12 +214,12 @@ export function ConversionFunnel() {
           <div className="text-3xl font-bold">{formatHours(data.avg_hours_to_verify)}</div>
           <p className="text-xs text-muted-foreground mt-2">
             {data.avg_hours_to_verify < 1
-              ? "tx({ de: "🎉 Blitzschnell", en: "🎉 Lightning fast", es: "🎉 Muy rápido" })"
+              ? tx({ de: "🎉 Blitzschnell", en: "🎉 Lightning fast", es: "🎉 Muy rápido" })
               : data.avg_hours_to_verify < 6
-              ? "tx({ de: "✅ Sehr gut", en: "✅ Very good", es: "✅ Muy bueno" })"
+              ? tx({ de: "✅ Sehr gut", en: "✅ Very good", es: "✅ Muy bueno" })
               : data.avg_hours_to_verify < 24
-              ? "tx({ de: "👍 Solide", en: "👍 Solid", es: "👍 Sólido" })"
-              : "tx({ de: "⚠️ Verbesserungspotenzial", en: "⚠️ Potential for improvement", es: "⚠️ Potencial de mejora" })"}
+              ? tx({ de: "👍 Solide", en: "👍 Solid", es: "👍 Sólido" })
+              : tx({ de: "⚠️ Verbesserungspotenzial", en: "⚠️ Potential for improvement", es: "⚠️ Potencial de mejora" })}
           </p>
         </Card>
 
@@ -235,10 +235,10 @@ export function ConversionFunnel() {
           <div className="text-3xl font-bold">{formatHours(data.avg_hours_to_first_video)}</div>
           <p className="text-xs text-muted-foreground mt-2">
             {data.avg_hours_to_first_video < 1
-              ? "tx({ de: "🎉 Sofort-Aktivierung", en: "🎉 Immediate Activation", es: "🎉 Activación inmediata" })"
+              ? tx({ de: "🎉 Sofort-Aktivierung", en: "🎉 Immediate Activation", es: "🎉 Activación inmediata" })
               : data.avg_hours_to_first_video < 24
-              ? "tx({ de: "✅ Same-day Activation", en: "✅ Same-day Activation", es: "✅ Activación en el mismo día" })"
-              : "tx({ de: "⚠️ Onboarding straffen", en: "⚠️ Streamline onboarding", es: "⚠️ Optimizar el proceso de incorporación" })"}
+              ? tx({ de: "✅ Same-day Activation", en: "✅ Same-day Activation", es: "✅ Activación en el mismo día" })
+              : tx({ de: "⚠️ Onboarding straffen", en: "⚠️ Streamline onboarding", es: "⚠️ Optimizar el proceso de incorporación" })}
           </p>
         </Card>
 

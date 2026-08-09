@@ -151,7 +151,7 @@ export const useCloudStorage = () => {
       setCloudFiles([]);
 
       toast({
-        title: 'tx({ de: "Google Drive getrennt", en: "Google Drive disconnected", es: "Google Drive desconectado" })',
+        title: tx({ de: "Google Drive getrennt", en: "Google Drive disconnected", es: "Google Drive desconectado" }),
         description: tx({ de: 'Die Verbindung wurde entfernt.', en: 'The connection has been removed.', es: 'La conexión ha sido eliminada.' }),
       });
     } catch (err) {
@@ -221,7 +221,7 @@ export const useCloudStorage = () => {
     } catch (err) {
       console.error('Error uploading to cloud:', err);
       toast({
-        title: 'tx({ de: "Upload-Fehler", en: "Upload error", es: "Error de carga" })',
+        title: tx({ de: "Upload-Fehler", en: "Upload error", es: "Error de carga" }),
         description: tx({ de: 'Datei konnte nicht in die Cloud hochgeladen werden.', en: 'File could not be uploaded to the cloud.', es: 'No se pudo subir el archivo a la nube.' }),
         variant: 'destructive',
       });
@@ -244,7 +244,7 @@ export const useCloudStorage = () => {
       setCloudFiles(prev => prev.filter(f => f.id !== driveFileId));
       
       toast({
-        title: 'tx({ de: "Gelöscht", en: "Deleted", es: "Eliminado" })',
+        title: tx({ de: "Gelöscht", en: "Deleted", es: "Eliminado" }),
         description: tx({ de: 'Datei wurde aus Google Drive entfernt.', en: 'File was removed from Google Drive.', es: 'El archivo se eliminó de Google Drive.' }),
       });
     } catch (err) {

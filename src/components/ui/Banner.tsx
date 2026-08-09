@@ -83,7 +83,7 @@ export const Banner = ({
           <button
             onClick={onDismiss}
             className="flex-shrink-0 text-foreground/50 hover:text-foreground transition-colors"
-            aria-label="tx({ de: "Schließen", en: "Close", es: "Cerrar" })"
+            aria-label={tx({ de: "Schließen", en: "Close", es: "Cerrar" })}
           >
             <X className="h-5 w-5" />
           </button>

@@ -115,7 +115,7 @@ export function BrandVoiceLibrary({ brandKitId }: { brandKitId: string | null })
                         <button
                           onClick={() => remove.mutate(s.id)}
                           className="opacity-60 hover:opacity-100 transition"
-                          aria-label="Löschen"
+                          aria-label={tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
