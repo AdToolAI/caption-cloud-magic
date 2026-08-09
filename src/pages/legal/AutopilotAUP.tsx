@@ -47,7 +47,7 @@ export default function AutopilotAUP() {
           </Section>
 
           <Section title={tx({ de: "§2 Striktes Deepfake-Verbot", en: "§2 Strict deepfake ban", es: "§2 Prohibición estricta de deepfakes" })}>
-            tx({ de: "Verboten ist insbesondere die Generierung, Speicherung oder Veröffentlichung von Inhalten, die:", en: "In particular, it is prohibited to generate, store, or publish content that:", es: "En particular, está prohibido generar, almacenar o publicar contenido que:" })
+            {tx({ de: "Verboten ist insbesondere die Generierung, Speicherung oder Veröffentlichung von Inhalten, die:", en: "In particular, it is prohibited to generate, store, or publish content that:", es: "En particular, está prohibido generar, almacenar o publicar contenido que:" })}
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li>{tx({ de: "reale, identifizierbare Personen ohne deren ausdrückliche schriftliche Einwilligung darstellen (Politiker, Prominente, Privatpersonen, Kollegen, Kunden, etc.);", en: "depict real, identifiable persons without their express written consent (politicians, celebrities, private individuals, colleagues, customers, etc.);", es: "representan a personas reales e identificables sin su consentimiento explícito por escrito (políticos, famosos, particulares, compañeros, clientes, etc.);" })}</li>
               <li>{tx({ de: "den Eindruck erwecken, eine reale Person habe etwas gesagt oder getan, was sie nicht gesagt oder getan hat;", en: "give the impression that a real person said or did something they did not say or do;", es: "dar la impresión de que una persona real dijo o hizo algo que no dijo o hizo;" })}</li>
