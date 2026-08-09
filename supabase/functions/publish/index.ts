@@ -1207,7 +1207,9 @@ async function publishToYouTube(
     });
     
     // Titel = erste 100 Zeichen (YouTube erlaubt max 100)
-    const title = text.substring(0, 100) || 'Untitled Video';
+    const title = (youtubeConfig?.title as string | undefined)?.slice(0, 100)
+      || text.substring(0, 100)
+      || 'Untitled Video';
     const description = text;
 
     // Upload-Request (resumable upload) mit erweiterten Metadaten

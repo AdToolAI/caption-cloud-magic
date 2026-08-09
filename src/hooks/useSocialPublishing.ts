@@ -194,24 +194,64 @@ export function useSocialPublishing() {
     setBusy('youtube', true);
     try {
       const descWithUtm = applyUtm(config.description || config.caption, 'youtube', config.utm);
-      const { data, error } = await supabase.functions.invoke('publish-to-youtube', {
+      const title = config.title || config.caption?.substring(0, 100) || 'Video';
+
+      // Dateigröße bestmöglich ermitteln — der publish-Zweig lehnt Dateien < 1 KB ab.
+      let size = 5 * 1024 * 1024;
+      let mime = 'video/mp4';
+      try {
+        const head = await fetch(config.videoUrl, { method: 'HEAD' });
+        const len = Number(head.headers.get('content-length'));
+        if (Number.isFinite(len) && len > 0) size = len;
+        const ct = head.headers.get('content-type');
+        if (ct?.startsWith('video/')) mime = ct;
+      } catch {
+        /* HEAD nicht möglich (CORS) — Defaults bleiben */
+      }
+
+      const chapterBlock = (config.chapters ?? []).length >= 3
+        ? '\n\n' + (config.chapters ?? []).map((c) => `${c.timestamp} ${c.label}`).join('\n')
+        : '';
+
+      const { data, error } = await supabase.functions.invoke('publish', {
         body: {
-          videoUrl: config.videoUrl,
-          title: config.title || config.caption?.substring(0, 100) || 'Video',
-          description: descWithUtm,
-          tags: config.tags || config.hashtags,
-          privacyStatus: config.privacyLevel || 'public',
-          aspectRatio: config.aspectRatio,
-          durationSec: config.durationSec,
-          chapters: config.chapters,
+          text: `${descWithUtm}${chapterBlock}`.trim(),
+          channels: ['youtube'],
+          media: [{ type: 'video', path: config.videoUrl, mime, size }],
+          youtubeConfig: {
+            title,
+            privacyStatus: (config.privacyLevel as string)?.toLowerCase() === 'private'
+              ? 'private'
+              : (config.privacyLevel as string)?.toLowerCase() === 'unlisted'
+                ? 'unlisted'
+                : 'public',
+            madeForKids: false,
+            categoryId: '22',
+            tags: (config.tags || config.hashtags || []).map((tag) => tag.replace(/^#/, '')),
+          },
         },
       });
       if (error) throw error;
+
+      const ytResult = (data?.results ?? []).find((r: any) => r.provider === 'youtube') ?? data;
+
+      if (!ytResult?.ok) {
+        const message = ytResult?.error_message
+          || 'YouTube-Veröffentlichung fehlgeschlagen. Bitte Verbindung unter Einstellungen → Verbindungen prüfen.';
+        toast({ title: 'YouTube Fehler', description: message, variant: 'destructive' });
+        return { success: false, error: message };
+      }
+
       toast({
-        title: data.isShort ? '📺 YouTube Short veröffentlicht' : '📺 YouTube veröffentlicht',
-        description: data.message,
+        title: '📺 YouTube veröffentlicht',
+        description: ytResult.permalink || 'Video wurde hochgeladen.',
       });
-      return data;
+      return {
+        success: true,
+        postId: ytResult.external_id,
+        url: ytResult.permalink,
+        message: ytResult.permalink,
+      };
     } catch (error: any) {
       console.error('YouTube publish error:', error);
       toast({ title: 'YouTube Fehler', description: error?.message, variant: 'destructive' });
@@ -220,6 +260,7 @@ export function useSocialPublishing() {
       setBusy('youtube', false);
     }
   };
+
 
   const publishToMultiplePlatforms = async (
     config: Omit<PublishConfig, 'platform'>,

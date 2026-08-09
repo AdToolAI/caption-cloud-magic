@@ -126,12 +126,12 @@ export function ConnectionDiagnostics() {
           }),
         ),
         (async () => {
-          if (!headers) return {} as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean }>;
+          if (!headers) return {} as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean; account_name?: string | null; has_refresh_token?: boolean }>;
           try {
             const { data } = await supabase.functions.invoke('social-health', { headers });
-            return (data?.providers ?? {}) as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean }>;
+            return (data?.providers ?? {}) as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean; account_name?: string | null; has_refresh_token?: boolean }>;
           } catch {
-            return {} as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean }>;
+            return {} as Record<string, { connected?: boolean; expiring_in_days?: number; can_publish?: boolean; account_name?: string | null; has_refresh_token?: boolean }>;
           }
         })(),
         (async () => {
@@ -196,12 +196,25 @@ export function ConnectionDiagnostics() {
         const connected = !!conn?.connected;
         const expiring = conn?.expiring_in_days;
 
-        const connection: Status = !connected ? 'warn' : expiring !== undefined && expiring <= 7 ? 'warn' : 'ok';
-        const connectionNote = !connected
+        let connection: Status = !connected ? 'warn' : expiring !== undefined && expiring <= 7 ? 'warn' : 'ok';
+        let connectionNote = !connected
           ? t('connectionDiagnostics.notConnected')
           : expiring !== undefined
           ? t('connectionDiagnostics.expiresInDays').replace('{days}', String(expiring))
           : undefined;
+
+        // YouTube: Kanalname zeigen und fehlenden Refresh-Token sofort als Befund melden.
+        if (channel.id === 'youtube' && connected) {
+          const channelName = conn?.account_name;
+          const parts: string[] = [];
+          if (channelName) parts.push(t('connectionDiagnostics.ytChannel').replace('{name}', channelName));
+          if (conn?.has_refresh_token === false) {
+            connection = 'error';
+            parts.push(t('connectionDiagnostics.ytNoRefreshToken'));
+          }
+          if (connectionNote) parts.push(connectionNote);
+          connectionNote = parts.length ? parts.join(' · ') : connectionNote;
+        }
 
         let publishing: Status = 'unknown';
         let publishingNote: string | undefined;

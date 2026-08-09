@@ -259,7 +259,7 @@ export const SMOKE_REGISTRY: SmokeEntry[] = [
   { name: "publish-to-instagram", category: "social-publishing", body: { caption: "qa" }, expect: "any-2xx" },
   { name: "publish-to-linkedin", category: "social-publishing", body: { text: "qa" }, expect: "any-2xx" },
   { name: "publish-to-tiktok", category: "social-publishing", body: { caption: "qa", videoUrl: "https://example.com/v.mp4" }, expect: "any-2xx" },
-  { name: "publish-to-youtube", category: "social-publishing", body: { title: "qa", videoUrl: "https://example.com/v.mp4" }, expect: "any-2xx" },
+  
   { name: "schedule-post-with-ab", category: "social-publishing", body: { postId: "qa-mock" }, expect: "any-2xx" },
   { name: "social-health", category: "social-publishing", body: {}, expect: "any-2xx" },
   { name: "tiktok-health", category: "social-publishing", body: {}, expect: "any-2xx" },
