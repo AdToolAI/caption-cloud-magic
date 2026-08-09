@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { Activity, Loader2, Play, AlertTriangle, CheckCircle2, ShieldCheck, ExternalLink, Bell } from "lucide-react";
-import { useTx } from '@/lib/i18nText';
+import { tx, useTx } from '@/lib/i18nText';
 
 function ageSec(iso: string | null | undefined): number {
   if (!iso) return Number.POSITIVE_INFINITY;
