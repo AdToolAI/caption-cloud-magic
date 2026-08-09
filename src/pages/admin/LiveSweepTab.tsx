@@ -124,12 +124,12 @@ export function LiveSweepTab() {
         const skipped = rows.filter((r) => r.status === "skipped_budget").length;
         const spent = rows.reduce((s, r) => s + Number(r.cost_eur || 0), 0);
         if (timedOut && !allTerminal) {
-          toast.warning("Sweep läuft länger als 10 Min", {
+          toast.warning(tx({ de: "Sweep läuft länger als 10 Min", en: "Sweep running longer than 10 min", es: "El barrido dura más de 10 minutos." }), {
             description: tx({ de: "Polling gestoppt. Reload für neuen Status.", en: "Polling stopped. Reload for new status.", es: "Sondeo detenido. Recargar para nuevo estado." }),
           });
         } else {
-          toast.success(`Sweep abgeschlossen — ${ok + expected + asyncStarted}/${rows.length} grün`, {
-            description: `${failed} failed · ${timeout} timeout · ${asyncStarted} async · ${expected} expected · ${skipped} skipped · ${spent.toFixed(2)} € ausgegeben`,
+          toast.success(tx({ de: `Sweep abgeschlossen — ${ok + expected + asyncStarted}/${rows.length} grün`, en: `Sweep completed — ${ok + expected + asyncStarted}/${rows.length} green`, es: `Barrido completado — ${ok + expected + asyncStarted}/${rows.length} verde` }), {
+            description: tx({ de: `${failed} fehlgeschlagen · ${timeout} Zeitüberschreitung · ${asyncStarted} async · ${expected} erwartet · ${skipped} übersprungen · ${spent.toFixed(2)} € ausgegeben`, en: `${failed} failed · ${timeout} timeout · ${asyncStarted} async · ${expected} expected · ${skipped} skipped · ${spent.toFixed(2)} € spent`, es: `${failed} fallido · ${timeout} tiempo agotado · ${asyncStarted} asíncrono · ${expected} esperado · ${skipped} omitido · ${spent.toFixed(2)} € gastado` }),
           });
         }
         setActiveSweepId(null);
@@ -150,8 +150,8 @@ export function LiveSweepTab() {
         { body: {} },
       );
       if (error) throw error;
-      toast.success("Test-Assets bereit", {
-        description: `${(data as any)?.assets?.length ?? 0} Asset(s) im Bucket.`,
+      toast.success(tx({ de: "Test-Assets bereit", en: "Test assets ready", es: "Activos de prueba listos" }), {
+        description: tx({ de: `${(data as any)?.assets?.length ?? 0} Asset(s) im Bucket.`, en: `${(data as any)?.assets?.length ?? 0} asset(s) in bucket.`, es: `${(data as any)?.assets?.length ?? 0} activo(s) en el cubo.` }),
       });
     } catch (e: any) {
       toast.error(tx({ de: "Bootstrap fehlgeschlagen", en: "Bootstrap failed", es: "El arranque falló" }), { description: e?.message });
@@ -170,8 +170,8 @@ export function LiveSweepTab() {
       const s = data as any;
       // Server returns 202 with { sweep_id, status: "running", total }
       if (s?.sweep_id && s?.status === "running") {
-        toast.info(`Sweep gestartet — ${s.total} Provider`, {
-          description: "UI updated sich live, ~3-8 Min erwartet.",
+        toast.info(tx({ de: `Sweep gestartet — ${s.total} Provider`, en: `Sweep started — ${s.total} providers`, es: `Barrido iniciado — ${s.total} proveedores` }), {
+          description: tx({ de: "UI updated sich live, ~3-8 Min erwartet.", en: "UI updates live, ~3-8 min expected.", es: "La interfaz de usuario se actualiza en vivo, se esperan entre 3 y 8 minutos." }),
         });
         setActiveSweepId(s.sweep_id);
         await load();
@@ -180,7 +180,7 @@ export function LiveSweepTab() {
       // Fallback for older sync response shape
       const expected = s?.expected ?? 0;
       const effectiveOk = (s?.succeeded ?? 0) + expected;
-      toast.success(`Sweep abgeschlossen — ${effectiveOk}/${s?.total_tested ?? 0} grün`);
+      toast.success(tx({ de: `Sweep abgeschlossen — ${effectiveOk}/${s?.total_tested ?? 0} grün`, en: `Sweep completed — ${effectiveOk}/${s?.total_tested ?? 0} green`, es: `Barrido completado — ${effectiveOk}/${s?.total_tested ?? 0} verde` }));
       setSweeping(false);
       await load();
     } catch (e: any) {
@@ -220,7 +220,7 @@ export function LiveSweepTab() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="text-sm text-[#F5C76A] font-medium uppercase tracking-wider">
-              Live Sweep — Hard Cap (per Run)
+              {tx({ de: "Live Sweep — Hard Cap (pro Run)", en: "Live Sweep — Hard Cap (per run)", es: "Barrido en vivo — Límite estricto (por ejecución)" })}
             </div>
             <div className="mt-1 text-3xl font-bold text-white">
               {spent.toFixed(2)} <span className="text-base text-slate-400">/ {cap.toFixed(2)} €</span>
@@ -229,7 +229,7 @@ export function LiveSweepTab() {
             <div className="mt-2 text-xs text-slate-400">
               {budget?.last_run_at
                 ? tx({ de: `Letzter Run: ${new Date(budget.last_run_at).toLocaleString()} · Cap wird beim nächsten Sweep auf 0 € zurückgesetzt`, en: `Last run: ${new Date(budget.last_run_at).toLocaleString()} · Cap will be reset to 0 € on next sweep`, es: `Última ejecución: ${new Date(budget.last_run_at).toLocaleString()} · El límite se restablecerá a 0 € en el próximo barrido` })
-                : "Noch nie ausgeführt."}
+                : tx({ de: "Noch nie ausgeführt.", en: "Never executed.", es: "Nunca ejecutado." })}
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -270,7 +270,7 @@ export function LiveSweepTab() {
                 {sweeping ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Sweep läuft …
+                    {tx({ de: "Sweep läuft …", en: "Sweep running …", es: "Barrido en curso …" })}
                   </>
                 ) : (
                   <>
@@ -283,19 +283,19 @@ export function LiveSweepTab() {
             <AlertDialogContent className="bg-[#050816] border-[#F5C76A]/30">
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-[#F5C76A]">
-                  Live Sweep starten?
+                  {tx({ de: "Live {tx({ de: "Sweep starten", en: "Start sweep", es: "Iniciar barrido" })}?", en: "Start live sweep?", es: "¿Iniciar barrido en vivo?" })}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Dies feuert <strong>echte Provider-Calls</strong> bei Replicate, Runway und Hedra.
-                  Geschätzte Kosten: ~8 €. Hard-Cap stoppt bei {cap.toFixed(2)} €.
+                  {tx({ de: "Dies feuert echte Provider-Calls bei Replicate, Runway und Hedra.", en: "This fires real provider calls at Replicate, Runway, and Hedra.", es: "Esto activa llamadas a proveedores reales en Replicate, Runway y Hedra." })}
+                  {tx({ de: `Geschätzte Kosten: ~8 €. Hard-Cap stoppt bei ${cap.toFixed(2)} €.`, en: `Estimated costs: ~8 €. Hard cap stops at ${cap.toFixed(2)} €.`, es: `Costos estimados: ~8 €. El límite estricto se detiene en ${cap.toFixed(2)} €.` })}
                   <br /><br />
-                  Test-Assets müssen vorher per "Bootstrap Assets" erzeugt sein.
+                  {tx({ de: "Test-Assets müssen vorher per "Bootstrap Assets" erzeugt sein.", en: "Test assets must have been created beforehand via "Bootstrap Assets".", es: "Los activos de prueba deben haberse creado previamente mediante "Activos de arranque"." })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
                 <AlertDialogAction onClick={handleSweep} className="bg-[#F5C76A] text-[#050816]">
-                  Sweep starten
+                  {tx({ de: "Sweep starten", en: "Start sweep", es: "Iniciar barrido" })}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -378,7 +378,7 @@ export function LiveSweepTab() {
       {Object.keys(sweeps).length === 0 && !loading && (
         <Card className="bg-[#0A0F1F]/40 border-[#F5C76A]/10 p-8 text-center">
           <div className="text-slate-400">
-            Noch keine Live-Sweeps. Klicke "Bootstrap Assets" und dann "Run Live Sweep".
+            {tx({ de: "Noch keine Live-Sweeps. Klicke "Bootstrap Assets" und dann "Run Live Sweep".", en: "No live sweeps yet. Click "Bootstrap Assets" and then "Run Live Sweep".", es: "Aún no hay barridos en vivo. Haz clic en "Activos de arranque" y luego en "Ejecutar barrido en vivo"." })}
           </div>
         </Card>
       )}

@@ -83,9 +83,9 @@ const ASPECTS = [
 ];
 
 const LANGUAGES = [
-  { value: 'de', label: 'Deutsch' },
-  { value: 'en', label: 'Englisch' },
-  { value: 'es', label: 'Spanisch' },
+  { value: 'de', label: tx({ de: 'Deutsch', en: 'German', es: 'Alemán' }) },
+  { value: 'en', label: tx({ de: 'Englisch', en: 'English', es: 'Inglés' }) },
+  { value: 'es', label: tx({ de: 'Spanisch', en: 'Spanish', es: 'Español' }) },
 ];
 
 export function AutopilotIdeaLauncher({ onIdeas }: Props) {
@@ -312,7 +312,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       {/* -------------------------------------------------------- own images */}
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
-          <Label className="text-sm">Eigene Bilder (optional)</Label>
+          <Label className="text-sm">{tx({ de: 'Eigene Bilder (optional)', en: 'Own images (optional)', es: 'Imágenes propias (opcional)' })}</Label>
           <span className="text-xs text-muted-foreground">{assets.length}/{MAX_ASSETS}</span>
         </div>
 
@@ -412,7 +412,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       {/* ------------------------------------------------------------ choices */}
       <div className="mt-6 grid gap-5 md:grid-cols-2">
         <div className="space-y-2">
-          <Label className="text-sm">Format</Label>
+          <Label className="text-sm">{tx({ de: 'Format', en: 'Format', es: 'Formato' })}</Label>
           <Select value={options.aspect} onValueChange={(v) => set('aspect', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -424,7 +424,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm">Sprache</Label>
+          <Label className="text-sm">{tx({ de: 'Sprache', en: 'Language', es: 'Idioma' })}</Label>
           <Select value={options.language} onValueChange={(v) => set('language', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -437,8 +437,8 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
 
         <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
-            <Label className="text-sm">Länge</Label>
-            <span className="text-sm text-muted-foreground">{options.duration} Sekunden</span>
+            <Label className="text-sm">{tx({ de: 'Länge', en: 'Length', es: 'Longitud' })}</Label>
+            <span className="text-sm text-muted-foreground">{options.duration} + " " + tx({ de: 'Sekunden', en: 'seconds', es: 'segundos' })</span>
           </div>
           <Slider
             value={[options.duration]}
@@ -448,7 +448,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
             step={5}
           />
           <p className="text-xs text-muted-foreground">
-            Mehr als 180 Sekunden produzieren wir bewusst nicht — darunter leidet die Qualität.
+            Mehr als 180 + " " + tx({ de: 'Sekunden', en: 'seconds', es: 'segundos' }) produzieren wir bewusst nicht — darunter leidet die Qualität.
           </p>
         </div>
 

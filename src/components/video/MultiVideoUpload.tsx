@@ -32,7 +32,7 @@ export function MultiVideoUpload({
   minFiles = 1,
   maxSizeMB = 100,
   disabled = false,
-  label = 'Videos hochladen'
+  label = tx({ de: 'Videos hochladen', en: 'Upload videos', es: 'Subir videos' })
 }: MultiVideoUploadProps) {
   const [dragOver, setDragOver] = useState(false);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -76,7 +76,7 @@ export function MultiVideoUpload({
     // Check file size
     const oversizedFiles = videoFiles.filter(file => file.size > maxSizeMB * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      toast.error(`Maximale Dateigröße: ${maxSizeMB}MB pro Video`);
+      toast.error(`Maximale Dateigröße: ${maxSizeMB}MB tx({ de: 'pro Video', en: 'per video', es: 'por video' })`);
       return;
     }
 
@@ -191,10 +191,10 @@ export function MultiVideoUpload({
         />
         <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
         <p className="text-sm text-muted-foreground mb-1">
-          Videos hier ablegen oder klicken zum Auswählen
+          {tx({ de: 'Videos hier ablegen oder klicken zum Auswählen', en: 'Drop videos here or click to select', es: 'Arrastra videos aquí o haz clic para seleccionar' })}
         </p>
         <p className="text-xs text-muted-foreground">
-          Max. {maxFiles} Videos • Max. {maxSizeMB}MB pro Video
+          Max. {maxFiles} Videos • Max. {maxSizeMB}MB tx({ de: 'pro Video', en: 'per video', es: 'por video' })
         </p>
       </div>
 
@@ -308,7 +308,7 @@ export function MultiVideoUpload({
       {/* Validation Message */}
       {value.length < minFiles && (
         <p className="text-sm text-destructive">
-          Mindestens {minFiles} Video{minFiles > 1 ? 's' : ''} erforderlich
+          Mindestens {minFiles} Video{minFiles > 1 ? 's' : ''} tx({ de: 'erforderlich', en: 'required', es: 'obligatorio' })
         </p>
       )}
     </div>

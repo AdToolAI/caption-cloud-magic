@@ -102,10 +102,10 @@ export function BatchGeneratePanel() {
 
   const handleStart = async () => {
     if (!user) { toast.error(tx({ de: "Bitte zuerst einloggen", en: "Please log in first", es: "Por favor, inicia sesión primero" })); return; }
-    if (!prompts.length) { toast.error("Mindestens 1 Prompt eingeben"); return; }
-    if (prompts.length > 20) { toast.error("Max. 20 Prompts pro Batch"); return; }
+    if (!prompts.length) { toast.error(tx({ de: "Mindestens 1 Prompt eingeben", en: "Enter at least 1 prompt", es: "Introduce al menos 1 mensaje" })); return; }
+    if (prompts.length > 20) { toast.error(tx({ de: "Max. 20 Prompts pro Batch", en: "Max. 20 prompts per batch", es: "Máx. 20 indicaciones por lote" })); return; }
     if (insufficient) {
-      toast.error(`Nicht genügend Credits. Brauchst ${currencySymbol}${totalCost.toFixed(2)}.`);
+      toast.error(tx({ de: `Nicht genügend Credits. Du benötigst ${currencySymbol}${totalCost.toFixed(2)}.`, en: `Not enough credits. You need ${currencySymbol}${totalCost.toFixed(2)}.`, es: `No hay suficientes créditos. Necesitas ${currencySymbol}${totalCost.toFixed(2)}.` }));
       navigate('/ai-video-purchase-credits');
       return;
     }
@@ -119,7 +119,7 @@ export function BatchGeneratePanel() {
     }
 
     setRunning(false);
-    toast.success(`Batch fertig: ${prompts.filter((_, i) => true).length} verarbeitet`);
+    toast.success(tx({ de: `Batch fertig: ${prompts.length} verarbeitet`, en: `Batch finished: ${prompts.length} processed`, es: `Lote terminado: ${prompts.length} procesado` }));
   };
 
   return (
@@ -137,7 +137,7 @@ export function BatchGeneratePanel() {
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={() => navigate('/ai-video-purchase-credits')}>
-            Aufladen
+            {tx({ de: "Aufladen", en: "Top up", es: "Recargar" })}
           </Button>
         </CardContent>
       </Card>
@@ -147,7 +147,7 @@ export function BatchGeneratePanel() {
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <ListChecks className="h-4 w-4 text-primary" />
-              Prompts (1 pro Zeile, max. 20)
+              {tx({ de: "Prompts (1 pro Zeile, max. 20)", en: "Prompts (1 per line, max. 20)", es: "Indicaciones (1 por línea, máx. 20)" })}
             </Label>
             <Textarea
               placeholder={tx({ de: `Modernes Office im skandinavischen Stil\\nProduktfoto roter Sneaker auf weißem Hintergrund\\nMacro Shot frische Kaffeebohnen mit Dampf\\n…`, en: `Modern office in Scandinavian style\\nProduct photo of red sneakers on a white background\\nMacro shot of fresh coffee beans with steam\\n…`, es: `Oficina moderna en estilo escandinavo\\nFoto del producto de zapatillas rojas sobre un fondo blanco\\nFoto macro de granos de café frescos con vapor\\n...` })}
@@ -158,13 +158,13 @@ export function BatchGeneratePanel() {
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{prompts.length} Prompt{prompts.length !== 1 ? 's' : ''} erkannt</span>
-              {prompts.length > 20 && <span className="text-destructive">Max. 20 Prompts erlaubt</span>}
+              {prompts.length > 20 && <span className="text-destructive">{tx({ de: "Max. 20 Prompts erlaubt", en: "Max. 20 prompts allowed", es: "Máx. 20 indicaciones permitidas" })}</span>}
             </div>
           </div>
 
           {/* Tier */}
           <div className="space-y-2">
-            <Label>Qualität & Modell</Label>
+            <Label>{tx({ de: "Qualität & Modell", en: "Quality & Model", es: "Calidad y modelo" })}</Label>
             <div className="grid grid-cols-3 gap-2">
               {(Object.keys(TIER_META) as QualityTier[]).map((t) => {
                 const meta = TIER_META[t];
@@ -188,7 +188,7 @@ export function BatchGeneratePanel() {
                     </div>
                     <p className="text-[10px] text-muted-foreground mb-1.5">{meta.model}</p>
                     <Badge variant="outline" className="text-[10px] h-5">
-                      {currencySymbol}{TIER_COSTS[t].toFixed(2)}/Bild
+                      {currencySymbol}{TIER_COSTS[t].toFixed(2)}/{tx({ de: "Bild", en: "Image", es: "Imagen" })}
                     </Badge>
                   </button>
                 );
@@ -198,28 +198,28 @@ export function BatchGeneratePanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Stil</Label>
+              <Label>{tx({ de: "Stil", en: "Style", es: "Estilo" })}</Label>
               <Select value={style} onValueChange={setStyle} disabled={running}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="realistic">Realistisch</SelectItem>
-                  <SelectItem value="cinematic">Cinematic</SelectItem>
-                  <SelectItem value="product-photo">Produktfoto</SelectItem>
-                  <SelectItem value="minimalist">Minimalistisch</SelectItem>
-                  <SelectItem value="editorial">Editorial</SelectItem>
-                  <SelectItem value="3d-render">3D Render</SelectItem>
+                  <SelectItem value="realistic">{tx({ de: "Realistisch", en: "Realistic", es: "Realista" })}</SelectItem>
+                  <SelectItem value="cinematic">{tx({ de: "Cinematic", en: "Cinematic", es: "Cinematográfico" })}</SelectItem>
+                  <SelectItem value="product-photo">{tx({ de: "Produktfoto", en: "Product photo", es: "Foto de producto" })}</SelectItem>
+                  <SelectItem value="minimalist">{tx({ de: "Minimalistisch", en: "Minimalist", es: "Minimalista" })}</SelectItem>
+                  <SelectItem value="editorial">{tx({ de: "Editorial", en: "Editorial", es: "Editorial" })}</SelectItem>
+                  <SelectItem value="3d-render">{tx({ de: "3D Render", en: "3D Render", es: "Renderizado 3D" })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Format</Label>
+              <Label>{tx({ de: "Format", en: "Format", es: "Formato" })}</Label>
               <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={running}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1:1">1:1 Quadrat</SelectItem>
-                  <SelectItem value="16:9">16:9 Landscape</SelectItem>
-                  <SelectItem value="9:16">9:16 Portrait</SelectItem>
-                  <SelectItem value="4:5">4:5 Instagram</SelectItem>
+                  <SelectItem value="1:1">{tx({ de: "1:1 Quadrat", en: "1:1 Square", es: "1:1 Cuadrado" })}</SelectItem>
+                  <SelectItem value="16:9">{tx({ de: "16:9 Landscape", en: "16:9 Landscape", es: "16:9 Paisaje" })}</SelectItem>
+                  <SelectItem value="9:16">{tx({ de: "9:16 Portrait", en: "9:16 Portrait", es: "9:16 Retrato" })}</SelectItem>
+                  <SelectItem value="4:5">{tx({ de: "4:5 Instagram", en: "4:5 Instagram", es: "4:5 Instagram" })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -231,9 +231,9 @@ export function BatchGeneratePanel() {
               <div className="flex items-center gap-3">
                 <Palette className="h-4 w-4 text-primary" />
                 <div>
-                  <Label className="text-sm">Brand-Kit aktiv: {activeBrandKit.brand_name || 'Markenkit'}</Label>
+                  <Label className="text-sm">{tx({ de: "Brand-Kit aktiv:", en: "Brand Kit active:", es: "Kit de marca activo:" })} {activeBrandKit.brand_name || tx({ de: "Markenkit", en: "Brand Kit", es: "Kit de marca" })}</Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Farben & Mood werden in jeden Prompt injiziert
+                    {tx({ de: "Farben & Mood werden in jeden Prompt injiziert", en: "Colors & mood are injected into every prompt", es: "Los colores y el estado de ánimo se inyectan en cada mensaje." })}
                   </p>
                 </div>
               </div>
@@ -245,14 +245,14 @@ export function BatchGeneratePanel() {
           {prompts.length > 0 && (
             <div className="flex items-center justify-between p-3 rounded-lg border border-primary/30 bg-primary/5">
               <div>
-                <p className="text-xs text-muted-foreground">Gesamtkosten</p>
+                <p className="text-xs text-muted-foreground">{tx({ de: "Gesamtkosten", en: "Total cost", es: "Coste total" })}</p>
                 <p className="text-xl font-bold text-primary">
                   {currencySymbol}{totalCost.toFixed(2)}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">{prompts.length} × {currencySymbol}{TIER_COSTS[tier].toFixed(2)}</p>
-                {insufficient && <p className="text-xs text-destructive font-medium">Credits unzureichend</p>}
+                {insufficient && <p className="text-xs text-destructive font-medium">{tx({ de: "Credits unzureichend", en: "Insufficient credits", es: "Créditos insuficientes" })}</p>}
               </div>
             </div>
           )}
@@ -305,7 +305,7 @@ export function BatchGeneratePanel() {
                 </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center opacity-40">
-                  <span className="text-xs">Wartet…</span>
+                  <span className="text-xs">{tx({ de: "Wartet…", en: "Waiting…", es: "Esperando…" })}</span>
                 </div>
               )}
 

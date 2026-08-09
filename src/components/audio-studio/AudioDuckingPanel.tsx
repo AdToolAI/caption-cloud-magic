@@ -95,11 +95,11 @@ export function AudioDuckingPanel({
               <div className="flex items-center gap-2 mb-0.5">
                 <h3 className="text-lg font-bold">Audio Ducking</h3>
                 <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
-                  {usingTranscript ? 'Transkript-präzise' : 'RMS-Erkennung'}
+                  {usingTranscript ? tx({ de: 'Transkript-präzise', en: 'Transcript-precise', es: 'Preciso según transcripción' }) : tx({ de: 'RMS-Erkennung', en: 'RMS detection', es: 'Detección de RMS' })}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Musik wird automatisch leiser, wenn Sprache erkannt wird
+                Musik wird automatisch leiser, wenn " " + tx({ de: 'Sprache', en: 'speech', es: 'habla' }) erkannt wird
               </p>
             </div>
           </div>
@@ -112,7 +112,7 @@ export function AudioDuckingPanel({
               className="border-primary/40"
             >
               {isPlaying ? <Pause className="w-5 h-5 mr-2" /> : <Play className="w-5 h-5 mr-2" />}
-              {isPlaying ? 'Pause' : 'Live-Mix abspielen'}
+              {isPlaying ? 'Pause' : tx({ de: 'Live-Mix abspielen', en: 'Play live mix', es: 'Reproducir mezcla en vivo' })}
             </Button>
             <Button
               size="lg"
@@ -144,7 +144,7 @@ export function AudioDuckingPanel({
                   {speechLabel}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {intervals.length} Sprach-Block{intervals.length === 1 ? '' : 'e'} · {speechCoverage.toFixed(0)}% Sprache
+                  {intervals.length} tx({ de: `Sprach-Block${intervals.length === 1 ? '' : 'e'}`, en: `speech block${intervals.length === 1 ? '' : 's'}`, es: `bloque${intervals.length === 1 ? '' : 's'} de voz` }) + " ·" {speechCoverage.toFixed(0)}% " " + tx({ de: 'Sprache', en: 'speech', es: 'habla' })
                 </span>
               </div>
               <div className="relative h-20 rounded-lg bg-muted/30 border border-border/50 overflow-hidden cursor-pointer"
@@ -194,7 +194,7 @@ export function AudioDuckingPanel({
                   <Music className="w-4 h-4 text-primary" />
                   {musicLabel}
                   <Badge variant="secondary" className="text-[10px]">
-                    -{settings.reductionDb} dB beim Sprechen
+                    -{settings.reductionDb} dB " " + tx({ de: 'beim Sprechen', en: 'while speaking', es: 'mientras habla' })
                   </Badge>
                 </div>
                 <span className="text-xs text-muted-foreground tabular-nums">
@@ -227,10 +227,10 @@ export function AudioDuckingPanel({
         <Label className="text-sm font-medium mb-3 block">Preset</Label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {([
-            { key: 'subtle', label: 'Subtil', sub: '-6 dB', icon: Sparkles },
-            { key: 'standard', label: 'Standard', sub: '-12 dB', icon: Volume2 },
-            { key: 'aggressive', label: 'Aggressiv', sub: '-18 dB', icon: AudioLines },
-            { key: 'custom', label: 'Custom', sub: 'Manuell', icon: Sparkles },
+            { key: 'subtle', label: tx({ de: 'Subtil', en: 'Subtle', es: 'Sutil' }), sub: '-6 dB', icon: Sparkles },
+            { key: 'standard', label: tx({ de: 'Standard', en: 'Standard', es: 'Estándar' }), sub: '-12 dB', icon: Volume2 },
+            { key: 'aggressive', label: tx({ de: 'Aggressiv', en: 'Aggressive', es: 'Agresivo' }), sub: '-18 dB', icon: AudioLines },
+            { key: 'custom', label: tx({ de: 'Custom', en: 'Custom', es: 'Personalizado' }), sub: tx({ de: 'Manuell', en: 'Manual', es: 'Manual' }), icon: Sparkles },
           ] as const).map(p => (
             <button
               key={p.key}
@@ -255,7 +255,7 @@ export function AudioDuckingPanel({
       <Card className="backdrop-blur-xl bg-card/60 border-border/50 p-4 space-y-5">
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-sm">Reduktion</Label>
+            <Label className="text-sm">{tx({ de: 'Reduktion', en: 'Reduction', es: 'Reducción' })}</Label>
             <span className="text-sm tabular-nums text-primary font-medium">-{settings.reductionDb} dB</span>
           </div>
           <Slider
@@ -268,7 +268,7 @@ export function AudioDuckingPanel({
         </div>
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-sm">Attack (Geschwindigkeit runter)</Label>
+            <Label className="text-sm">{tx({ de: 'Attack (Geschwindigkeit runter)', en: 'Attack (speed down)', es: 'Ataque (velocidad baja)' })}</Label>
             <span className="text-sm tabular-nums text-primary font-medium">{settings.attackMs} ms</span>
           </div>
           <Slider
@@ -281,7 +281,7 @@ export function AudioDuckingPanel({
         </div>
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-sm">Release (Geschwindigkeit hoch)</Label>
+            <Label className="text-sm">{tx({ de: 'Release (Geschwindigkeit hoch)', en: 'Release (speed up)', es: 'Lanzamiento (velocidad alta)' })}</Label>
             <span className="text-sm tabular-nums text-primary font-medium">{settings.releaseMs} ms</span>
           </div>
           <Slider
@@ -295,7 +295,7 @@ export function AudioDuckingPanel({
         {!usingTranscript && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm">Threshold (RMS-Schwelle)</Label>
+              <Label className="text-sm">{tx({ de: 'Threshold (RMS-Schwelle)', en: 'Threshold (RMS threshold)', es: 'Umbral (umbral RMS)' })}</Label>
               <span className="text-sm tabular-nums text-primary font-medium">{settings.threshold.toFixed(2)}</span>
             </div>
             <Slider
