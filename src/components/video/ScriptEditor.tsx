@@ -57,7 +57,7 @@ export const ScriptEditor = ({
         onChange(data.optimizedText);
         toast({
           title: "✨ Optimiert!",
-          description: tx({ de: tx({ de: tx({ de: `Skript wurde ${label}.`, en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }), en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }), en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }),
+          description: tx({ de: `Skript wurde ${label}.`, en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }),
         });
       }
     } catch (error) {

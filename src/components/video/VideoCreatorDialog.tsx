@@ -143,7 +143,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
     } catch (error) {
       console.error('Upload error:', error);
       if (error instanceof Error) {
-        toast.error(tx({ de: tx({ de: tx({ de: tx({ de: `Bild-Upload fehlgeschlagen: ${error.message}`, en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }), en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }));
+        toast.error(tx({ de: `Bild-Upload fehlgeschlagen: ${error.message}`, en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }));
       } else {
         toast.error(tx({ de: 'Bild-Upload fehlgeschlagen', en: 'Image upload failed', es: 'Error al subir la imagen' }));
       }
@@ -474,7 +474,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             )}
             <Video className="h-5 w-5" />
             {step === 'gallery' && tx({ de: "Template auswählen", en: "Select template", es: "Seleccionar plantilla" })}
-            {step === 'customize' && tx({ de: tx({ de: tx({ de: tx({ de: `Video erstellen: ${selectedTemplate?.name}`, en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` }), en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` })}
+            {step === 'customize' && tx({ de: `Video erstellen: ${selectedTemplate?.name}`, en: `Create video: ${selectedTemplate?.name}`, es: `Crear vídeo: ${selectedTemplate?.name}` })}
             {step === 'rendering' && tx({ de: 'Video wird erstellt...', en: 'Video is being created...', es: 'El video se está creando...' })}
           </DialogTitle>
         </DialogHeader>

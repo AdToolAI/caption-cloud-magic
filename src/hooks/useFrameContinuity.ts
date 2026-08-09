@@ -112,7 +112,7 @@ export function useFrameContinuity() {
             upsert: true,
             cacheControl: '31536000',
           });
-        if (upErr) throw new Error(tx({ de: tx({ de: tx({ de: tx({ de: `Upload fehlgeschlagen: ${upErr.message}`, en: `Upload failed: ${upErr.message}`, es: `Error al cargar: ${upErr.message}` }), en: `Upload failed: ${upErr.message}`, es: `Error al cargar: ${upErr.message}` }), en: `Upload failed: ${upErr.message}`, es: `Error al cargar: ${upErr.message}` }), en: `Upload failed: ${upErr.message}`, es: `Error al cargar: ${upErr.message}` }));
+        if (upErr) throw new Error(tx({ de: `Upload fehlgeschlagen: ${upErr.message}`, en: `Upload failed: ${upErr.message}`, es: `Error al cargar: ${upErr.message}` }));
 
         const { data: pub } = supabase.storage
           .from('composer-frames')

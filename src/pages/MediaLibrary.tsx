@@ -376,11 +376,11 @@ export default function MediaLibrary() {
           title: isSoraAI 
             ? (metadata?.prompt?.slice(0, 60) + '...' || 'AI Video')
             : isDirectorCutEnhancement
-              ? tx({ de: tx({ de: tx({ de: tx({ de: `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...` }), en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Realce'}...` }), en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Realce'}...` }), en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Realce'}...` })
+              ? tx({ de: `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...` })
               : isDirectorsCut
                 ? `Director's Cut - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                 : isMotionStudioClip
-                  ? tx({ de: tx({ de: tx({ de: tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}` }), en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` }), en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` }), en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
+                  ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}` })
                   : isUniversalCreator
                     ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                     : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
@@ -608,7 +608,7 @@ export default function MediaLibrary() {
         }
         toast({
           title: 'Platz geschaffen',
-          description: tx({ de: tx({ de: tx({ de: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, es: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.` }), en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }), en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }), en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }),
+          description: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, es: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.` }),
         });
       } catch (cleanupErr: any) {
         toast({
@@ -769,7 +769,7 @@ export default function MediaLibrary() {
   // Send to Calendar
   const sendToCalendar = (mediaItem: NormalizedMediaItem) => {
     sessionStorage.setItem('calendar_prefill', JSON.stringify({
-      title: mediaItem.title || tx({ de: tx({ de: tx({ de: tx({ de: `Post vom ${new Date().toLocaleDateString('de-DE')}`, en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }),
+      title: mediaItem.title || tx({ de: `Post vom ${new Date().toLocaleDateString('de-DE')}`, en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }),
       caption: mediaItem.caption || '',
       mediaUrl: mediaItem.url,
       mediaType: mediaItem.type,
@@ -829,7 +829,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "✉️ Medien gesendet",
-      description: tx({ de: tx({ de: tx({ de: tx({ de: `${selectedItems.length} Dateien werden im Composer geladen...`, en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }), en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }), en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }), en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }),
+      description: tx({ de: `${selectedItems.length} Dateien werden im Composer geladen...`, en: `${selectedItems.length} files are loaded in composer...`, es: `Los archivos ${selectedItems.length} están cargados en Composer...` }),
     });
     
     navigate('/command-center?compose=1');
@@ -852,7 +852,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "📸 Media gesendet",
-      description: tx({ de: tx({ de: tx({ de: tx({ de: `Erstes Medium wird im KI-Post-Generator geladen...`, en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }), en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }), en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }), en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }),
+      description: tx({ de: `Erstes Medium wird im KI-Post-Generator geladen...`, en: `First medium is loaded in the AI ​​post generator...`, es: `El primer medio se carga en el generador de publicaciones de IA...` }),
     });
     
     navigate('/content-studio?step=layout');
@@ -868,7 +868,7 @@ export default function MediaLibrary() {
     const firstItem = selectedItems[0];
     
     sessionStorage.setItem('calendar_prefill', JSON.stringify({
-      title: firstItem.title || tx({ de: tx({ de: tx({ de: tx({ de: `Post vom ${new Date().toLocaleDateString('de-DE')}`, en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }), en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }),
+      title: firstItem.title || tx({ de: `Post vom ${new Date().toLocaleDateString('de-DE')}`, en: `Post from ${new Date().toLocaleDateString('de-DE')}`, es: `Publicar desde ${new Date().toLocaleDateString('de-DE')}` }),
       caption: firstItem.caption || '',
       mediaUrl: firstItem.url,
       mediaType: firstItem.type,
@@ -878,7 +878,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "📅 Media gesendet",
-      description: tx({ de: tx({ de: tx({ de: tx({ de: `Erstes Medium wird im Kalender geladen...`, en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }), en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }), en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }), en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }),
+      description: tx({ de: `Erstes Medium wird im Kalender geladen...`, en: `First medium is loaded in the calendar...`, es: `El primer medio está cargado en el calendario...` }),
     });
     
     navigate('/command-center?view=calendar&prefill=true');
@@ -909,7 +909,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "🎨 Media gesendet",
-      description: tx({ de: tx({ de: tx({ de: tx({ de: `Erstes Bild wird in Smart Background geladen...`, en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }), en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }), en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }), en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }),
+      description: tx({ de: `Erstes Bild wird in Smart Background geladen...`, en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }),
     });
     
     navigate('/picture-studio?tab=background');

@@ -224,7 +224,7 @@ export default function ContentProjects() {
                   <CardDescription>
                     {selectedStatus === "all"
                       ? tx({ de: "Erstelle dein erstes Video im Content Studio", en: "Create your first video in Content Studio", es: "Crea tu primer vídeo en Content Studio" })
-                      : tx({ de: tx({ de: tx({ de: tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
+                      : tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>
                     Zum Content Studio

@@ -95,7 +95,7 @@ function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: Sc
   const titleText =
     (scene as any).title ||
     scene.aiPrompt?.slice(0, 64) ||
-    tx({ de: tx({ de: tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` }), en: `Scene ${index + 1}`, es: `Escena ${índice + 1}` }), en: `Scene ${index + 1}`, es: `Escena ${índice + 1}` });
+    tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` });
 
   return (
     <button

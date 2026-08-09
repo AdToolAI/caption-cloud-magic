@@ -33,7 +33,7 @@ export function useVoiceTranslation() {
 
       toast({
         title: 'Übersetzung & Voiceover erstellt',
-        description: tx({ de: tx({ de: tx({ de: `Text wurde nach ${params.target_language} übersetzt`, en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }), en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }), en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }),
+        description: tx({ de: `Text wurde nach ${params.target_language} übersetzt`, en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }),
       });
 
       return data;
