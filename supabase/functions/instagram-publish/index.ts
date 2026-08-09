@@ -159,7 +159,7 @@ Deno.serve(withTelemetry('instagram-publish', async (req) => {
       );
     }
 
-    const finalCaption = caption || 'Posted via CaptionGenie 🚀';
+    const finalCaption = caption || 'Posted via AdTool AI 🚀';
 
     // Step 1: Create container
     console.log('Creating container for user:', igUserId);

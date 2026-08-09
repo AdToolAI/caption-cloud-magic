@@ -74,10 +74,10 @@ Deno.serve(async (req) => {
     switch (type) {
       case "test":
         embed = {
-          title: "🎮 CaptionGenie — Verbindung erfolgreich!",
+          title: "🎮 AdTool AI — Verbindung erfolgreich!",
           description: "Dein Discord-Webhook ist korrekt eingerichtet. Du erhältst ab jetzt automatische Benachrichtigungen.",
           color: 5793266, // green
-          footer: { text: "CaptionGenie Gaming Hub" },
+          footer: { text: "AdTool AI Gaming Hub" },
           timestamp: new Date().toISOString(),
         };
         break;
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
           description: custom_message || "Der Stream hat gerade begonnen — schau jetzt rein!",
           color,
           fields: [],
-          footer: { text: "CaptionGenie Gaming Hub" },
+          footer: { text: "AdTool AI Gaming Hub" },
           timestamp: new Date().toISOString(),
         };
         if (include_category !== false && game_name) {
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
           description: custom_message || "Der Stream ist jetzt offline. Danke fürs Zuschauen!",
           color: 0x95a5a6,
           fields: [],
-          footer: { text: "CaptionGenie Gaming Hub" },
+          footer: { text: "AdTool AI Gaming Hub" },
           timestamp: new Date().toISOString(),
         };
         if (viewer_count !== undefined) {
@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
           title: `✂️ Neuer Clip: ${clip_title || "Highlight"}`,
           description: clip_url ? `[Clip ansehen](${clip_url})` : "Ein neuer Clip wurde erstellt!",
           color,
-          footer: { text: "CaptionGenie Gaming Hub" },
+          footer: { text: "AdTool AI Gaming Hub" },
           timestamp: new Date().toISOString(),
         };
         if (thumbnail_url) {

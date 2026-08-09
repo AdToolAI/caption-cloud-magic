@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
         .from('social_connections')
         .update({
           account_id: IG_USER_ID,
-          account_name: '@captiongenie_socialmanager',
+          account_name: '@adtoolai_socialmanager',
           access_token_hash: await encryptToken(tokenData.encrypted_value),
           token_expires_at: null,
           account_metadata: { account_type: 'business' },
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         provider: 'instagram',
         account_id: IG_USER_ID,
-        account_name: '@captiongenie_socialmanager',
+        account_name: '@adtoolai_socialmanager',
         access_token_hash: await encryptToken(tokenData.encrypted_value),
         token_expires_at: null,
         account_metadata: { account_type: 'business' }
