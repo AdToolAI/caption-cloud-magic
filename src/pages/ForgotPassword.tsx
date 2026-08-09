@@ -40,8 +40,8 @@ const ForgotPassword = () => {
         });
       } else {
         setSent(true);
-        toast.success("E-Mail gesendet!", {
-          description: "Prüfen Sie Ihren Posteingang",
+        toast.success(tx({ de: "E-Mail gesendet!", en: "Email sent!", es: "¡Email enviado!" }), {
+          description: tx({ de: "Prüfen Sie Ihren Posteingang", en: "Check your inbox", es: "Revisa tu bandeja de entrada" }),
         });
       }
     } catch (err: any) {
@@ -78,7 +78,7 @@ const ForgotPassword = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 rounded-xl bg-muted/30 border border-white/5 text-sm text-muted-foreground">
-                  <p>{tx({ de: "Prüfen Sie auch Ihren Spam- oder Junk-Ordner, falls Sie die E-Mail nicht finden.", en: "Also check your spam or junk folder if you can't find the email.", es: "Revisa también tu carpeta de spam o correo no deseado si no encuentras el correo electrónico." })}</p>
+                  <p>Prüfen Sie auch Ihren Spam- oder Junk-Ordner, falls Sie die E-Mail nicht finden.</p>
                 </div>
                 <Button
                   variant="outline"

@@ -118,7 +118,7 @@ export class TemplateErrorBoundary extends Component<Props, State> {
                 <div className="flex gap-3 pt-4">
                   <Button onClick={this.handleReset} className="flex items-center gap-2">
                     <RefreshCw className="h-4 w-4" />
-                    Erneut versuchen
+                    {tx({ de: 'Erneut versuchen', en: 'Try again', es: 'Intentar de nuevo' })}
                   </Button>
                   <Button
                     variant="outline"
@@ -126,14 +126,14 @@ export class TemplateErrorBoundary extends Component<Props, State> {
                     className="flex items-center gap-2"
                   >
                     <Home className="h-4 w-4" />
-                    Zur Startseite
+                    {tx({ de: 'Zur Startseite', en: 'To home page', es: 'A la página de inicio' })}
                   </Button>
                 </div>
 
                 {import.meta.env.DEV && (
                   <details className="mt-6">
                     <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-                      Erweiterte Fehlerinformationen anzeigen
+                      {tx({ de: 'Erweiterte Fehlerinformationen anzeigen', en: 'Show advanced error information', es: 'Mostrar información de error avanzada' })}
                     </summary>
                     <div className="mt-4 p-4 bg-muted rounded-lg">
                       <pre className="text-xs overflow-auto whitespace-pre-wrap">

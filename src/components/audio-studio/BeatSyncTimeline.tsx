@@ -10,6 +10,7 @@ import { WaveformDisplay } from '@/components/directors-cut/timeline/WaveformDis
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useTx } from '@/lib/i18nText';
+import { tx } from '@/lib/i18nText';
 
 interface Beat {
   time: number;
@@ -83,7 +84,7 @@ export function BeatSyncTimeline({
         setDetectedBpm(bpm);
         onBpmDetected?.(bpm);
         toast.success('Beat-Analyse abgeschlossen', {
-          description: `${data.beats.length} Beats erkannt bei ~${bpm} BPM`
+          description: tr({ de: `${data.beats.length} Beats erkannt bei ~${bpm} BPM`, en: `${data.beats.length} beats detected at ~${bpm} BPM`, es: `${data.beats.length} ritmos detectados a ~${bpm} BPM` })
         });
       } else {
         // Fallback to generated beats if API returns empty
@@ -92,7 +93,7 @@ export function BeatSyncTimeline({
         setDetectedBpm(bpm);
         onBpmDetected?.(bpm);
         toast.success('Beat-Analyse abgeschlossen', {
-          description: `${mockBeats.length} Beats erkannt`
+          description: tr({ de: `${mockBeats.length} Beats erkannt`, en: `${mockBeats.length} beats detected`, es: `${mockBeats.length} ritmos detectados` })
         });
       }
     } catch (error) {
@@ -103,7 +104,7 @@ export function BeatSyncTimeline({
       setDetectedBpm(120);
       onBpmDetected?.(120);
       toast.success('Beat-Analyse abgeschlossen (lokal)', {
-        description: `${mockBeats.length} Beats erkannt`
+        description: tr({ de: `${mockBeats.length} Beats erkannt`, en: `${mockBeats.length} beats detected`, es: `${mockBeats.length} ritmos detectados` })
       });
     } finally {
       setIsAnalyzing(false);
@@ -139,7 +140,7 @@ export function BeatSyncTimeline({
 
     if (nearestBeat && !cutMarkers.includes(nearestBeat.time)) {
       setCutMarkers(prev => [...prev, nearestBeat.time].sort((a, b) => a - b));
-      toast.success('Schnitt auf Beat gesetzt');
+      toast.success(tr({ de: 'Schnitt auf Beat gesetzt', en: 'Cut set to beat', es: 'Corte ajustado al ritmo' }));
     }
   };
 
@@ -148,7 +149,7 @@ export function BeatSyncTimeline({
     const strongBeats = beats.filter(b => b.strength >= 0.8 || b.type === 'drop');
     const cutTimes = strongBeats.map(b => b.time);
     setCutMarkers(cutTimes);
-    toast.success(`${cutTimes.length} automatische Schnitte generiert`);
+    toast.success(tr({ de: `${cutTimes.length} automatische Schnitte generiert`, en: `${cutTimes.length} automatic cuts generated`, es: `${cutTimes.length} cortes automáticos generados` }));
   };
 
   const handleTimelineClick = (e: React.MouseEvent) => {
@@ -180,8 +181,8 @@ export function BeatSyncTimeline({
               <Music className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold">Beat-Sync Timeline</h3>
-              <p className="text-xs text-muted-foreground">Automatische Schnitte auf Musik-Beats</p>
+              <h3 className="font-semibold">{tr({ de: 'Beat-Sync Timeline', en: 'Beat-Sync Timeline', es: 'Línea de tiempo de sincronización' })}</h3>
+              <p className="text-xs text-muted-foreground">{tr({ de: 'Automatische Schnitte auf Musik-Beats', en: 'Automatic cuts to music beats', es: 'Cortes automáticos a los ritmos de la música' })}</p>
             </div>
           </div>
 
@@ -196,7 +197,7 @@ export function BeatSyncTimeline({
               <Button variant="outline" className="border-border/50" asChild>
                 <span>
                   <Upload className="w-4 h-4 mr-2" />
-                  Musik hochladen
+                  {tr({ de: 'Musik hochladen', en: 'Upload music', es: 'Subir música' })}
                 </span>
               </Button>
             </label>
@@ -211,11 +212,11 @@ export function BeatSyncTimeline({
                 checked={snapToBeats}
                 onCheckedChange={setSnapToBeats}
               />
-              <Label htmlFor="snap-beats" className="text-sm">Snap to Beat</Label>
+              <Label htmlFor="snap-beats" className="text-sm">{tr({ de: 'Snap to Beat', en: 'Snap to Beat', es: 'Ajustar al ritmo' })}</Label>
             </div>
 
             <div className="flex items-center gap-2 flex-1 max-w-[200px]">
-              <Label className="text-xs text-muted-foreground whitespace-nowrap">Sensitivität</Label>
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">{tr({ de: 'Sensitivität', en: 'Sensitivity', es: 'Sensibilidad' })}</Label>
               <Slider
                 value={[sensitivity]}
                 onValueChange={([v]) => setSensitivity(v)}
@@ -226,12 +227,12 @@ export function BeatSyncTimeline({
 
             <Button size="sm" variant="outline" onClick={addCutAtCurrentBeat}>
               <Scissors className="w-4 h-4 mr-2" />
-              Schnitt setzen
+              {tr({ de: 'Schnitt setzen', en: 'Set cut', es: 'Establecer corte' })}
             </Button>
 
             <Button size="sm" onClick={autoGenerateCuts} className="bg-gradient-to-r from-primary to-cyan-500">
               <Zap className="w-4 h-4 mr-2" />
-              Auto-Schnitte
+              {tr({ de: 'Auto-Schnitte', en: 'Auto-cuts', es: 'Cortes automáticos' })}
             </Button>
           </div>
         )}
@@ -253,13 +254,13 @@ export function BeatSyncTimeline({
         ) : isAnalyzing ? (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-            <p className="text-muted-foreground">Analysiere Beats...</p>
+            <p className="text-muted-foreground">{tr({ de: 'Analysiere Beats...', en: 'Analyzing beats...', es: 'Analizando ritmos...' })}</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Original Audio Waveform */}
+            {/* {tr({ de: 'Original Audio', en: 'Original Audio', es: 'Audio original' })} Waveform */}
             <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Original Audio</Label>
+              <Label className="text-xs text-muted-foreground mb-2 block">{tr({ de: 'Original Audio', en: 'Original Audio', es: 'Audio original' })}</Label>
               <div className="h-16 bg-muted/20 rounded-lg overflow-hidden">
                 <WaveformDisplay
                   audioUrl={audioUrl}
@@ -272,7 +273,7 @@ export function BeatSyncTimeline({
 
             {/* Music Waveform with Beats */}
             <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Musik + Beats</Label>
+              <Label className="text-xs text-muted-foreground mb-2 block">{tr({ de: 'Musik + Beats', en: 'Music + Beats', es: 'Música + Ritmos' })}</Label>
               <div
                 ref={timelineRef}
                 onClick={handleTimelineClick}
@@ -341,9 +342,9 @@ export function BeatSyncTimeline({
               {detectedBpm && (
                 <span className="font-semibold text-primary">~{detectedBpm} BPM</span>
               )}
-              <span>{beats.length} Beats erkannt</span>
-              <span>{beats.filter(b => b.type === 'drop').length} Drops</span>
-              <span>{cutMarkers.length} Schnitte gesetzt</span>
+              <span>{tx({ de: `${beats.length} Beats erkannt`, en: `${beats.length} beats detected`, es: `${beats.length} ritmos detectados` })}</span>
+              <span>{tx({ de: `${beats.filter(b => b.type === 'drop').length} Drops`, en: `${beats.filter(b => b.type === 'drop').length} drops`, es: `${beats.filter(b => b.type === 'drop').length} caídas` })}</span>
+              <span>{tx({ de: `${cutMarkers.length} Schnitte gesetzt`, en: `${cutMarkers.length} cuts set`, es: `${cutMarkers.length} cortes establecidos` })}</span>
             </div>
           </div>
         )}

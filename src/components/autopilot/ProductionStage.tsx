@@ -20,23 +20,23 @@ import { StageProgressBar } from '@/components/autopilot/StageProgressBar';
 import { cn } from '@/lib/utils';
 
 const STAGE_LABEL: Record<string, string> = {
-  treatment: 'Konzept',
-  anchors: 'Bildfreigabe',
-  motion: 'Animation',
-  scenes_ready: tx({ de: 'Szenen fertig', en: 'Scenes ready', es: 'Escenas listas' }),
-  audio: 'Ton',
-  lipsync: 'Lip-Sync',
-  finalizing: 'Endschnitt',
+  treatment: tx({ de: 'Konzept', en: 'Concept', es: 'Concepto' }),
+  anchors: tx({ de: 'Bildfreigabe', en: 'Image release', es: 'Lanzamiento de imagen' }),
+  motion: tx({ de: 'Animation', en: 'Animation', es: 'Animación' }),
+  scenes_ready: tx({ de: "Szenen", en: "Scenes", es: "Escenas" }),
+  audio: tx({ de: 'Ton', en: 'Audio', es: 'Sonido' }),
+  lipsync: tx({ de: 'Lip-Sync', en: 'Lip sync', es: 'Sincronización labial' }),
+  finalizing: tx({ de: 'Endschnitt', en: 'Final cut', es: 'Corte final' }),
   completed: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }),
-  failed: 'Abgebrochen',
+  failed: tx({ de: 'Abgebrochen', en: 'Cancelled', es: 'Cancelado' }),
 };
 
 /** The visible arc of a run — used for the phase strip. */
 const PHASES: Array<{ key: string; label: string }> = [
-  { key: 'anchors', label: 'Bild' },
-  { key: 'motion', label: 'Bewegung' },
-  { key: 'audio', label: 'Ton' },
-  { key: 'finalizing', label: 'Endschnitt' },
+  { key: 'anchors', label: tx({ de: 'Bild', en: 'Image', es: 'Imagen' }) },
+  { key: 'motion', label: tx({ de: 'Bewegung', en: 'Motion', es: 'Movimiento' }) },
+  { key: 'audio', label: tx({ de: 'Ton', en: 'Audio', es: 'Sonido' }) },
+  { key: 'finalizing', label: tx({ de: 'Endschnitt', en: 'Final cut', es: 'Corte final' }) },
   { key: 'completed', label: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }) },
 ];
 
@@ -51,11 +51,11 @@ function phaseIndex(stage: string): number {
 }
 
 const SCENE_LABEL: Record<string, string> = {
-  pending: 'Wartet',
+  pending: tx({ de: 'Wartet', en: 'Waiting', es: 'Esperando' }),
   anchor: tx({ de: 'Bild wird geprüft', en: 'Checking image', es: 'Comprobando imagen' }),
-  motion: 'Wird animiert',
+  motion: tx({ de: 'Wird animiert', en: 'Being animated', es: 'Ser animado' }),
   completed: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }),
-  failed: 'Fehlgeschlagen',
+  failed: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' }),
 };
 
 function SceneIcon({ status }: { status: string }) {
@@ -80,7 +80,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{STAGE_LABEL[production.stage] ?? production.stage}</Badge>
         <Badge variant="outline">
-          {done}/{scenes.length} Szenen
+          {done}/{scenes.length} {tx({ de: "Szenen", en: "Scenes", es: "Escenas" })}
         </Badge>
         {production.status === 'failed' && <Badge variant="destructive">Abgebrochen</Badge>}
       </div>
@@ -166,7 +166,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
                 <div className="mt-1 flex flex-wrap gap-1">
                   {(scene.attempt ?? 1) > 1 && (
                     <Badge variant="outline" className="text-[10px]">
-                      2. Anlauf
+                      {tx({ de: "2. Anlauf", en: "2nd attempt", es: "2º intento" })}
                     </Badge>
                   )}
                   {scene.fallback_kind === 'still' && (
@@ -211,9 +211,9 @@ export function ProductionStage({ production, scenes, log }: Props) {
 
       {(production.spent_credits ?? 0) > 0 && (
         <p className="mt-4 text-xs text-muted-foreground">
-          Verbraucht: {Math.round(production.spent_credits ?? 0)} Cr
+          {tx({ de: "Verbraucht", en: "Used", es: "Usado" })} + ":" {Math.round(production.spent_credits ?? 0)} Cr
           {(production.refunded_credits ?? 0) > 0 &&
-            ` · erstattet: ${Math.round(production.refunded_credits ?? 0)} Cr`}
+            ` + " · " + tx({ de: "erstattet", en: "refunded", es: "reembolsado" }) + ":" ${Math.round(production.refunded_credits ?? 0)} Cr`}
         </p>
       )}
 

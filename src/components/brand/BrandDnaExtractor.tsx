@@ -21,7 +21,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
 
   const handleExtract = () => {
     if (!url.trim()) {
-      toast({ title: "URL fehlt", description: tx({ de: "Bitte gib eine Website-URL ein.", en: "Please enter a website URL.", es: "Por favor, introduce una URL de sitio web." }), variant: "destructive" });
+      toast({ title: tx({ de: "URL fehlt", en: "URL missing", es: "Falta la URL" }), description: tx({ de: "Bitte gib eine Website-URL ein.", en: "Please enter a website URL.", es: "Por favor, introduce una URL de sitio web." }), variant: "destructive" });
       return;
     }
     let safeUrl = url.trim();

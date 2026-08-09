@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Link2, Palette, Target, Calendar, Zap, Check } from 'lucide-react';

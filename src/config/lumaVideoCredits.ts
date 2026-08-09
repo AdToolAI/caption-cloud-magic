@@ -19,7 +19,7 @@ export const LUMA_VIDEO_MODELS = {
       EUR: tx({ de: 'Cinematic AI-Videos ab 1,05€ pro 5 Sekunden', en: 'Cinematic AI videos from €1.05 per 5 seconds', es: 'Vídeos cinematográficos con IA desde 1,05 € por 5 segundos' }),
       USD: 'Cinematic AI videos from $1.05 per 5 seconds',
     },
-    badge: 'Empfohlen',
+    badge: tx({ de: 'Empfohlen', en: 'Recommended', es: 'Recomendado' }),
   },
   'luma-pro': {
     name: 'Luma Ray 2 Pro',
@@ -36,7 +36,7 @@ export const LUMA_VIDEO_MODELS = {
       EUR: tx({ de: 'Premium cinematic Qualität ab 1,80€ pro 5 Sekunden', en: 'Premium cinematic quality from €1.80 per 5 seconds', es: 'Calidad cinematográfica premium desde 1,80 € por 5 segundos' }),
       USD: 'Premium cinematic quality from $1.80 per 5 seconds',
     },
-    badge: 'Premium',
+    badge: tx({ de: 'Premium', en: 'Premium', es: 'Premium' }),
   },
   'luma-ray32-5s': {
     name: 'Luma Ray 3.2 (5s)',
@@ -50,10 +50,10 @@ export const LUMA_VIDEO_MODELS = {
     maxDuration: 5,
     allowedDurations: [5] as const,
     description: {
-      EUR: 'Ray 3.2 · neueste Luma-Generation — 0,90€ pro Clip',
+      EUR: tx({ de: 'Ray 3.2 · neueste Luma-Generation — 0,90€ pro Clip', en: 'Ray 3.2 · latest Luma generation — €0.90 per clip', es: 'Ray 3.2 · última generación de Luma — 0,90 € por clip' }),
       USD: 'Ray 3.2 · latest Luma generation — $0.90 per clip',
     },
-    badge: 'Neu',
+    badge: tx({ de: 'Neu', en: 'New', es: 'Nuevo' }),
   },
   'luma-ray32-10s': {
     name: 'Luma Ray 3.2 (10s)',
@@ -67,10 +67,10 @@ export const LUMA_VIDEO_MODELS = {
     maxDuration: 10,
     allowedDurations: [10] as const,
     description: {
-      EUR: 'Ray 3.2 · 10s Langclip — 2,70€ pro Clip',
+      EUR: tx({ de: 'Ray 3.2 · 10s Langclip — 2,70€ pro Clip', en: 'Ray 3.2 · 10s long clip — €2.70 per clip', es: 'Ray 3.2 · clip largo de 10 segundos — 2,70 € por clip' }),
       USD: 'Ray 3.2 · 10s long clip — $2.70 per clip',
     },
-    badge: 'Neu',
+    badge: tx({ de: 'Neu', en: 'New', es: 'Nuevo' }),
   },
 } as const;
 
@@ -80,17 +80,17 @@ export const LUMA_ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const;
 export type LumaAspectRatio = typeof LUMA_ASPECT_RATIOS[number];
 
 export const LUMA_CAMERA_CONCEPTS = [
-  { id: 'none', label: 'Keine', description: 'Standard' },
-  { id: 'orbit_left', label: 'Orbit Left', description: 'Kamera kreist links' },
-  { id: 'orbit_right', label: 'Orbit Right', description: 'Kamera kreist rechts' },
-  { id: 'zoom_in', label: 'Zoom In', description: 'Hereinzoomen' },
-  { id: 'zoom_out', label: 'Zoom Out', description: 'Herauszoomen' },
-  { id: 'dolly_in', label: 'Dolly In', description: 'Kamerabewegung nach vorne' },
+  { id: 'none', label: tx({ de: 'Keine', en: 'None', es: 'Ninguno' }), description: tx({ de: 'Standard', en: 'Standard', es: 'Estándar' }) },
+  { id: 'orbit_left', label: 'Orbit Left', description: tx({ de: 'Kamera kreist links', en: 'Camera orbits left', es: 'Cámara orbita a la izquierda' }) },
+  { id: 'orbit_right', label: 'Orbit Right', description: tx({ de: 'Kamera kreist rechts', en: 'Camera orbits right', es: 'Cámara orbita a la derecha' }) },
+  { id: 'zoom_in', label: 'Zoom In', description: tx({ de: 'Hereinzoomen', en: 'Zooming in', es: 'Acercar zoom' }) },
+  { id: 'zoom_out', label: 'Zoom Out', description: tx({ de: 'Herauszoomen', en: 'Zooming out', es: 'Alejar zoom' }) },
+  { id: 'dolly_in', label: 'Dolly In', description: tx({ de: 'Kamerabewegung nach vorne', en: 'Camera movement forward', es: 'Movimiento de cámara hacia adelante' }) },
   { id: 'dolly_out', label: 'Dolly Out', description: tx({ de: 'Kamerabewegung zurück', en: 'Camera movement back', es: 'Movimiento de cámara hacia atrás' }) },
-  { id: 'pan_left', label: 'Pan Left', description: 'Schwenk nach links' },
-  { id: 'pan_right', label: 'Pan Right', description: 'Schwenk nach rechts' },
-  { id: 'tilt_up', label: 'Tilt Up', description: 'Neigung nach oben' },
-  { id: 'tilt_down', label: 'Tilt Down', description: 'Neigung nach unten' },
+  { id: 'pan_left', label: 'Pan Left', description: tx({ de: 'Schwenk nach links', en: 'Pan left', es: 'Panorámica a la izquierda' }) },
+  { id: 'pan_right', label: 'Pan Right', description: tx({ de: 'Schwenk nach rechts', en: 'Pan right', es: 'Panorámica a la derecha' }) },
+  { id: 'tilt_up', label: 'Tilt Up', description: tx({ de: 'Neigung nach oben', en: 'Tilt up', es: 'Inclinación hacia arriba' }) },
+  { id: 'tilt_down', label: 'Tilt Down', description: tx({ de: 'Neigung nach unten', en: 'Tilt down', es: 'Inclinación hacia abajo' }) },
 ] as const;
 
 export type LumaCameraConcept = typeof LUMA_CAMERA_CONCEPTS[number]['id'];

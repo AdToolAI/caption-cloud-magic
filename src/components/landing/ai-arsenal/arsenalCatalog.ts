@@ -322,7 +322,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["LTX Pro", "LTX Pro", "LTX Pro"],
     [
       "Studio LTX quality at practical costs.",
-      "Studio-LTX-Qualität zu praktikablen Kosten.",
+      tx({ de: "Studio-LTX-Qualität zu praktikablen Kosten.", en: "Studio LTX quality at practical costs.", es: "Calidad de estudio LTX a costes prácticos." }),
       "Calidad LTX estudio a coste práctico.",
     ],
     [T2V, I2V],

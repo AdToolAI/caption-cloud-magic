@@ -100,14 +100,14 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
         <div className="relative rounded-lg overflow-hidden border border-primary/30 bg-black/40">
           <img
             src={scene.referenceImageUrl}
-            alt="Szenen-Referenzbild"
+            alt={tx({ de: "Szenen-Referenzbild", en: "Scene reference image", es: "Imagen de referencia de la escena" })}
             className="w-full max-h-48 object-contain"
           />
           <button
             type="button"
             onClick={clear}
             className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-black/70 backdrop-blur border border-destructive/40 text-[10px] uppercase tracking-wider text-destructive hover:bg-destructive/15 transition-colors"
-            title="Referenzbild entfernen"
+            title={tx({ de: "Referenzbild entfernen", en: "Remove reference image", es: "Eliminar imagen de referencia" })}
           >
             <X className="h-3 w-3" />
             Entfernen
@@ -123,7 +123,7 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
           className="w-full gap-2 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5"
         >
           <Upload className="h-3.5 w-3.5" />
-          {uploading ? 'Lädt hoch…' : tx({ de: 'Bild hochladen (PNG/JPG/WEBP · max. 10 MB)', en: 'Upload image (PNG/JPG/WEBP · max. 10 MB)', es: 'Subir imagen (PNG/JPG/WEBP · máx. 10 MB)' })}
+          {uploading ? tx({ de: 'Lädt hoch…', en: 'Uploading…', es: 'Cargando…' }) : tx({ de: 'Bild hochladen (PNG/JPG/WEBP · max. 10 MB)', en: 'Upload image (PNG/JPG/WEBP · max. 10 MB)', es: 'Subir imagen (PNG/JPG/WEBP · máx. 10 MB)' })}
         </Button>
       )}
     </div>

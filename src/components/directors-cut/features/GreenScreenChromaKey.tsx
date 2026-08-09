@@ -10,11 +10,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 const PRESET_COLORS = [
-  { id: 'green', name: 'Grün', color: '#00ff00', hsl: [120, 100, 50] },
-  { id: 'blue', name: 'Blau', color: '#0000ff', hsl: [240, 100, 50] },
-  { id: 'red', name: 'Rot', color: '#ff0000', hsl: [0, 100, 50] },
-  { id: 'white', name: 'Weiß', color: '#ffffff', hsl: [0, 0, 100] },
-  { id: 'black', name: 'Schwarz', color: '#000000', hsl: [0, 0, 0] },
+  { id: 'green', name: tx({ de: 'Grün', en: 'Green', es: 'Verde' }), color: '#00ff00', hsl: [120, 100, 50] },
+  { id: 'blue', name: tx({ de: 'Blau', en: 'Blue', es: 'Azul' }), color: '#0000ff', hsl: [240, 100, 50] },
+  { id: 'red', name: tx({ de: 'Rot', en: 'Red', es: 'Rojo' }), color: '#ff0000', hsl: [0, 100, 50] },
+  { id: 'white', name: tx({ de: 'Weiß', en: 'White', es: 'Blanco' }), color: '#ffffff', hsl: [0, 0, 100] },
+  { id: 'black', name: tx({ de: 'Schwarz', en: 'Black', es: 'Negro' }), color: '#000000', hsl: [0, 0, 0] },
 ];
 
 interface ChromaKeySettings {
@@ -87,7 +87,7 @@ export function GreenScreenChromaKey({
         setAiConfidence(analysis.confidence || 0.85);
         
         toast({
-          title: 'AI Erkennung abgeschlossen',
+          title: tx({ de: 'AI Erkennung abgeschlossen', en: 'AI detection completed', es: 'Detección de IA completada' }),
           description: tx({ de: `${analysis.color_name || 'Farbe'} erkannt mit ${Math.round((analysis.confidence || 0.85) * 100)}% Konfidenz. (${data.credits_used || 3} Credits)`, en: `${analysis.color_name || 'Color'} detected with ${Math.round((analysis.confidence || 0.85) * 100)}% confidence. (${data.credits_used || 3} credits)`, es: `${analysis.color_name || 'Color'} detectado con ${Math.round((analysis.confidence || 0.85) * 100)}% de confianza. (${data.credits_used || 3} créditos)` }),
         });
       } else {
@@ -197,7 +197,7 @@ export function GreenScreenChromaKey({
               style={{ backgroundColor: settings.color }}
             />
             <div className="flex-1">
-              <span className="text-xs">Aktive Key-Farbe: {settings.color}</span>
+              <span className="text-xs">{tx({ de: 'Aktive Key-Farbe', en: 'Active key color', es: 'Color clave activo' })}: {settings.color}</span>
               {aiConfidence !== null && (
                 <span className="text-[10px] text-green-600 ml-2">
                   AI Konfidenz: {Math.round(aiConfidence * 100)}%
@@ -211,7 +211,7 @@ export function GreenScreenChromaKey({
         {settings.enabled && (
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Label className="text-xs">Toleranz</Label>
+              <Label className="text-xs">{tx({ de: 'Toleranz', en: 'Tolerance', es: 'Tolerancia' })}</Label>
               <span className="text-xs text-muted-foreground">{settings.tolerance}%</span>
             </div>
             <Slider
@@ -228,7 +228,7 @@ export function GreenScreenChromaKey({
         {settings.enabled && (
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Label className="text-xs">Kanten-Weichheit</Label>
+              <Label className="text-xs">{tx({ de: 'Kanten-Weichheit', en: 'Edge softness', es: 'Suavidad de bordes' })}</Label>
               <span className="text-xs text-muted-foreground">{settings.edgeSoftness}px</span>
             </div>
             <Slider
@@ -245,7 +245,7 @@ export function GreenScreenChromaKey({
         {settings.enabled && (
           <div className="space-y-2">
             <div className="flex justify-between">
-              <Label className="text-xs">Farbüberlauf-Unterdrückung</Label>
+              <Label className="text-xs">{tx({ de: 'Farbüberlauf-Unterdrückung', en: 'Spill suppression', es: 'Supresión de desbordamiento' })}</Label>
               <span className="text-xs text-muted-foreground">{settings.spillSuppression}%</span>
             </div>
             <Slider
@@ -261,7 +261,7 @@ export function GreenScreenChromaKey({
         {/* Background Replacement */}
         {settings.enabled && (
           <div className="space-y-2 pt-2 border-t">
-            <label className="text-xs font-medium">Ersatz-Hintergrund</label>
+            <label className="text-xs font-medium">{tx({ de: 'Ersatz-Hintergrund', en: 'Replacement background', es: 'Fondo de repuesto' })}</label>
             <input
               ref={fileInputRef}
               type="file"
@@ -276,13 +276,13 @@ export function GreenScreenChromaKey({
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="h-4 w-4 mr-2" />
-              {settings.backgroundUrl ? 'Hintergrund ändern' : 'Hintergrund hochladen'}
+              {settings.backgroundUrl ? tx({ de: 'Hintergrund ändern', en: 'Change background', es: 'Cambiar fondo' }) : tx({ de: 'Hintergrund hochladen', en: 'Upload background', es: 'Subir fondo' })}
             </Button>
             {settings.backgroundUrl && (
               <div className="relative aspect-video bg-muted rounded overflow-hidden">
                 <img 
                   src={settings.backgroundUrl} 
-                  alt="Background" 
+                  alt={tx({ de: "Hintergrund", en: "Background", es: "Fondo" })} 
                   className="w-full h-full object-cover"
                 />
                 <Button
@@ -307,7 +307,7 @@ export function GreenScreenChromaKey({
             onClick={() => setPreviewEnabled(!previewEnabled)}
           >
             <Eye className="h-4 w-4 mr-2" />
-            {previewEnabled ? 'Vorschau deaktivieren' : 'Vorschau aktivieren'}
+            {previewEnabled ? tx({ de: 'Vorschau deaktivieren', en: 'Disable preview', es: 'Desactivar vista previa' }) : tx({ de: 'Vorschau aktivieren', en: 'Enable preview', es: 'Activar vista previa' })}
           </Button>
         )}
 

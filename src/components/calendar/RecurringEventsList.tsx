@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { useRecurringEvents } from '@/hooks/useRecurringEvents';
 import { Repeat, Trash2, Calendar } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { tx } from '@/lib/i18nText';
 import { de } from 'date-fns/locale';
 
 interface RecurringEventsListProps {
@@ -16,9 +17,9 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
 
   const getPatternLabel = (pattern: string) => {
     switch (pattern) {
-      case 'daily': return 'Täglich';
-      case 'weekly': return 'Wöchentlich';
-      case 'monthly': return 'Monatlich';
+      case 'daily': return tx({ de: 'Täglich', en: 'Daily', es: 'Diario' });
+      case 'weekly': return tx({ de: 'Wöchentlich', en: 'Weekly', es: 'Semanal' });
+      case 'monthly': return tx({ de: 'Monatlich', en: 'Monthly', es: 'Mensual' });
       default: return pattern;
     }
   };
@@ -37,7 +38,7 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
         <CardContent className="pt-6">
           <div className="text-center py-8 text-muted-foreground">
             <Repeat className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Keine Recurring Rules</p>
+            <p>{tx({ de: 'Keine Recurring Rules', en: 'No recurring rules', es: 'No hay reglas recurrentes' })}</p>
             <p className="text-sm mt-2">
               Erstelle automatisch wiederkehrende Events
             </p>
@@ -81,7 +82,7 @@ export function RecurringEventsList({ workspace_id }: RecurringEventsListProps) 
           <CardContent>
             <div className="space-y-3">
               <div>
-                <p className="text-sm font-medium">Event-Vorlage:</p>
+                <p className="text-sm font-medium">{tx({ de: 'Event-Vorlage', en: 'Event template', es: 'Plantilla de evento' })}:</p>
                 <p className="text-sm text-muted-foreground">
                   {(rule.template_event as any)?.title || 'Event'}
                 </p>

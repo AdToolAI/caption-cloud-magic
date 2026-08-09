@@ -35,7 +35,7 @@ export function useBulkScheduling() {
 
       toast({
         title: tx({ de: '🎉 Bulk Scheduling erfolgreich', en: '🎉 Bulk scheduling successful', es: '🎉 Programación masiva exitosa' }),
-        description: `${data.events_created} Events geplant`,
+        description: tx({ de: `${data.events_created} Events geplant`, en: `${data.events_created} events scheduled`, es: `${data.events_created} eventos programados` }),
       });
 
       return data;

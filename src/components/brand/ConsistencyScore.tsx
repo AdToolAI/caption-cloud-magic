@@ -36,11 +36,11 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
   };
 
   const getScoreLabel = (score: number) => {
-    if (score >= 90) return "Exzellent";
-    if (score >= 80) return "Sehr gut";
-    if (score >= 70) return "Gut";
-    if (score >= 60) return "Akzeptabel";
-    return "Verbesserung nötig";
+    if (score >= 90) return tx({ de: "Exzellent", en: "Excellent", es: "Excelente" });
+    if (score >= 80) return tx({ de: "Sehr gut", en: "Very good", es: "Muy bueno" });
+    if (score >= 70) return tx({ de: "Gut", en: "Good", es: "Bueno" });
+    if (score >= 60) return tx({ de: "Akzeptabel", en: "Acceptable", es: "Aceptable" });
+    return tx({ de: "Verbesserung nötig", en: "Improvement needed", es: "Mejora necesaria" });
   };
 
   const suggestions = [
@@ -54,12 +54,12 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
     {
       type: "tip",
       icon: TrendingUp,
-      text: `Tonalität "${brandKit.brand_tone}" beibehalten`
+      text: tx({ de: `Tonalität "${brandKit.brand_tone}" beibehalten`, en: `Maintain tonality "${brandKit.brand_tone}"`, es: `Mantener la tonalidad "${brandKit.brand_tone}"` })
     },
     {
       type: "tip",
       icon: TrendingUp,
-      text: "Empfohlene Hashtags in jedem Post verwenden"
+      text: tx({ de: "Empfohlene Hashtags in jedem Post verwenden", en: "Use recommended hashtags in every post", es: "Usar hashtags recomendados en cada publicación" })
     }
   ];
 
@@ -104,12 +104,12 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
         <div>
           <Progress value={score} className="h-3" />
           <p className="text-xs text-muted-foreground text-center mt-2">
-            Basierend auf {recentChecks.length} {recentChecks.length === 1 ? 'Analyse' : 'Analysen'}
+            {tx({ de: `Basierend auf ${recentChecks.length} ${recentChecks.length === 1 ? "Analyse" : "Analysen"}`, en: `Based on ${recentChecks.length} ${recentChecks.length === 1 ? "analysis" : "analyses"}`, es: `Basado en ${recentChecks.length} ${recentChecks.length === 1 ? "análisis" : "análisis"}` })}
           </p>
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium">Verbesserungsvorschläge:</p>
+          <p className="text-sm font-medium">{tx({ de: "Verbesserungsvorschläge:", en: "Suggestions for improvement:", es: "Sugerencias de mejora:" })}</p>
           {suggestions.map((suggestion, idx) => (
             <div key={idx} className="flex items-start gap-2 text-sm">
               <suggestion.icon className={`h-4 w-4 mt-0.5 ${
@@ -122,7 +122,7 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
 
         {recentChecks.length > 0 && (
           <div className="pt-4 border-t">
-            <p className="text-sm font-medium mb-2">Letzte Analysen</p>
+            <p className="text-sm font-medium mb-2">{tx({ de: "Letzte Analysen", en: "Recent analyses", es: "Análisis recientes" })}</p>
             <div className="space-y-2">
               {recentChecks.slice(0, 3).map((check: any) => (
                 <div key={check.id} className="flex items-center justify-between text-sm">

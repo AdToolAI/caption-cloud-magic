@@ -206,7 +206,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
     setActiveKey(preset.key);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Nicht eingeloggt');
+      if (!user) throw new Error(tx({ de: "Nicht eingeloggt", en: "Not logged in", es: "No has iniciado sesión" }));
 
       const { data: row, error: insertErr } = await supabase
         .from('composer_exports')

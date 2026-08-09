@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VOICE_LANGUAGES, toPickerLanguage } from '@/lib/voice-languages';
 import { cn } from '@/lib/utils';
@@ -26,10 +27,10 @@ export function VoiceLanguageSelect({
   return (
     <Select value={current} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger className={cn('bg-background/50', className)}>
-        <SelectValue placeholder="Sprache" />
+        <SelectValue placeholder={tx({ de: 'Sprache', en: 'Language', es: 'Idioma' })} />
       </SelectTrigger>
       <SelectContent className="max-h-[320px]">
-        {allowAll && <SelectItem value="all">🌍 Alle Sprachen</SelectItem>}
+        {allowAll && <SelectItem value="all">{tx({ de: '🌍 Alle Sprachen', en: '🌍 All languages', es: '🌍 Todos los idiomas' })}</SelectItem>}
         {VOICE_LANGUAGES.map((l) => (
           <SelectItem key={l.code} value={l.code}>
             {l.flag} {l.label}

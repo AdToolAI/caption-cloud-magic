@@ -328,7 +328,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
   const copyScript = async () => {
     try {
       await navigator.clipboard.writeText(personalizedText);
-      toast.success("Skript kopiert");
+      toast.success(tx({ de: "Skript kopiert", en: "Script copied", es: "Guion copiado" }));
     } catch {
       toast.error(tx({ de: "Kopieren fehlgeschlagen", en: "Copy failed", es: "Copia fallida" }));
     }

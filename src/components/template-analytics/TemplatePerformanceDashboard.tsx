@@ -29,7 +29,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">Keine Analytics-Daten verfügbar</p>
+          <p className="text-center text-muted-foreground">{tx({ de: 'Keine Analytics-Daten verfügbar', en: 'No analytics data available', es: 'No hay datos de análisis disponibles' })}</p>
         </CardContent>
       </Card>
     );
@@ -52,18 +52,18 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gesamte Views</CardTitle>
+            <CardTitle className="text-sm font-medium">{tx({ de: 'Gesamte Views', en: 'Total views', es: 'Vistas totales' })}</CardTitle>
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summary?.total_views || 0}</div>
-            <p className="text-xs text-muted-foreground">Letzte {days} Tage</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: 'Letzte', en: 'Last', es: 'Últimos' })} {days} {tx({ de: 'Tage', en: 'days', es: 'días' })}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Auswahl-Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">{tx({ de: 'Auswahl-Rate', en: 'Selection rate', es: 'Tasa de selección' })}</CardTitle>
             <MousePointer className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -78,7 +78,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversion-Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">{tx({ de: 'Conversion-Rate', en: 'Conversion rate', es: 'Tasa de conversión' })}</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -93,7 +93,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Publish-Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">{tx({ de: 'Publish-Rate', en: 'Publish rate', es: 'Tasa de publicación' })}</CardTitle>
             <Share2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -111,15 +111,15 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
       {conversion && (
         <Card>
           <CardHeader>
-            <CardTitle>Conversion Funnel</CardTitle>
-            <CardDescription>Von View bis Publish</CardDescription>
+            <CardTitle>{tx({ de: 'Conversion Funnel', en: 'Conversion funnel', es: 'Embudo de conversión' })}</CardTitle>
+            <CardDescription>{tx({ de: 'Von View bis Publish', en: 'From view to publish', es: 'De la vista a la publicación' })}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span className="text-sm">Views</span>
+                  <span className="text-sm">{tx({ de: 'Views', en: 'Views', es: 'Vistas' })}</span>
                 </div>
                 <div className="text-right">
                   <div className="font-bold">{conversion.total_views}</div>
@@ -143,7 +143,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-orange-500" />
-                  <span className="text-sm">Projekte erstellt</span>
+                  <span className="text-sm">{tx({ de: 'Projekte erstellt', en: 'Projects created', es: 'Proyectos creados' })}</span>
                 </div>
                 <div className="text-right">
                   <div className="font-bold">{conversion.total_creates}</div>
@@ -156,7 +156,7 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-purple-500" />
-                  <span className="text-sm">Veröffentlicht</span>
+                  <span className="text-sm">{tx({ de: 'Veröffentlicht', en: 'Published', es: 'Publicado' })}</span>
                 </div>
                 <div className="text-right">
                   <div className="font-bold">{conversion.total_publishes}</div>
@@ -173,14 +173,14 @@ export function TemplatePerformanceDashboard({ templateId, days = 30 }: Template
       {/* Performance Charts */}
       <Card>
         <CardHeader>
-          <CardTitle>Performance Trends</CardTitle>
-          <CardDescription>Tägliche Metriken über {days} Tage</CardDescription>
+          <CardTitle>{tx({ de: 'Performance Trends', en: 'Performance trends', es: 'Tendencias de rendimiento' })}</CardTitle>
+          <CardDescription>{tx({ de: 'Tägliche Metriken über', en: 'Daily metrics over', es: 'Métricas diarias durante' })} {days} {tx({ de: 'Tage', en: 'days', es: 'días' })}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="funnel" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="funnel">Funnel Metriken</TabsTrigger>
-              <TabsTrigger value="daily">Tägliche Activity</TabsTrigger>
+              <TabsTrigger value="funnel">{tx({ de: 'Funnel Metriken', en: 'Funnel metrics', es: 'Métricas de embudo' })}</TabsTrigger>
+              <TabsTrigger value="daily">{tx({ de: 'Tägliche Activity', en: 'Daily activity', es: 'Actividad diaria' })}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="funnel" className="pt-4">

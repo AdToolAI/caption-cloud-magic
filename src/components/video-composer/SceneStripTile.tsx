@@ -36,7 +36,7 @@ interface SceneStripTileProps {
 const SCENE_TYPE_LABEL: Record<string, string> = {
   hook: 'Hook',
   problem: 'Problem',
-  solution: 'Lösung',
+  solution: tx({ de: "Lösung", en: "Solution", es: "Solución" }),
   demo: 'Demo',
   'social-proof': 'Social Proof',
   cta: 'CTA',
@@ -45,12 +45,12 @@ const SCENE_TYPE_LABEL: Record<string, string> = {
 
 const STATUS_STYLE: Record<string, { label: string; cls: string; icon: React.ComponentType<{ className?: string }> }> = {
   ready: {
-    label: 'Bereit',
+    label: tx({ de: "Bereit", en: "Ready", es: "Listo" }),
     cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
     icon: Check,
   },
   generating: {
-    label: 'Render',
+    label: tx({ de: "Render", en: "Render", es: "Render" }),
     cls: 'bg-primary/15 text-primary border-primary/30 animate-pulse',
     icon: Loader2,
   },
@@ -60,7 +60,7 @@ const STATUS_STYLE: Record<string, { label: string; cls: string; icon: React.Com
     icon: AlertCircle,
   },
   pending: {
-    label: 'Wartet',
+    label: tx({ de: "Wartet", en: "Wait", es: "Esperando" }),
     cls: 'bg-muted/40 text-muted-foreground border-border/40',
     icon: Sparkles,
   },
@@ -190,7 +190,7 @@ function SceneStripTileImpl({ scene, index, isActive, characters, onSelect }: Sc
 
       {/* Footer meta */}
       <div className="flex items-center justify-between px-2.5 py-1.5 border-t border-border/30 text-[10px] text-muted-foreground">
-        <span>{scene.durationSeconds}s · {scene.clipSource?.replace(/^ai-/, 'KI ')}</span>
+        <span>{scene.durationSeconds}s · {scene.clipSource?.replace(/^ai-/, tx({ de: "KI ", en: "AI ", es: "IA " }))}</span>
         <span className="font-mono text-primary/80">€{cost.toFixed(2)}</span>
       </div>
     </button>

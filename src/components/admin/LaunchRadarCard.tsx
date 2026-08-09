@@ -48,10 +48,10 @@ export function LaunchRadarCard() {
 
   const metrics = stats
     ? [
-        { icon: Users, label: 'Registrierungen (24h)', value: stats.users_24h, sub: `${stats.users_7d} in 7 Tagen` },
-        { icon: Film, label: 'Videos (24h)', value: stats.videos_24h, sub: `${stats.videos_7d} in 7 Tagen` },
-        { icon: CreditCard, label: 'Zahlende Kunden', value: stats.paying_customers, sub: `${stats.users_total} Nutzer gesamt` },
-        { icon: Activity, label: 'Automations-Events (24h)', value: stats.events_24h, sub: 'interner Event-Bus' },
+        { icon: Users, label: tx({ de: 'Registrierungen (24h)', en: 'Registrations (24h)', es: 'Registros (24h)' }), value: stats.users_24h, sub: tx({ de: `${stats.users_7d} in 7 Tagen`, en: `${stats.users_7d} in 7 days`, es: `${stats.users_7d} en 7 días` }) },
+        { icon: Film, label: tx({ de: 'Videos (24h)', en: 'Videos (24h)', es: 'Videos (24h)' }), value: stats.videos_24h, sub: tx({ de: `${stats.videos_7d} in 7 Tagen`, en: `${stats.videos_7d} in 7 days`, es: `${stats.videos_7d} en 7 días` }) },
+        { icon: CreditCard, label: tx({ de: 'Zahlende Kunden', en: 'Paying Customers', es: 'Clientes de pago' }), value: stats.paying_customers, sub: tx({ de: `${stats.users_total} Nutzer gesamt`, en: `${stats.users_total} users total`, es: `${stats.users_total} usuarios en total` }) },
+        { icon: Activity, label: tx({ de: 'Automations-Events (24h)', en: 'Automation Events (24h)', es: 'Eventos de automatización (24h)' }), value: stats.events_24h, sub: tx({ de: 'interner Event-Bus', en: 'internal event bus', es: 'bus de eventos interno' }) },
       ]
     : [];
 
@@ -63,7 +63,7 @@ export function LaunchRadarCard() {
           Launch Radar
           {stats && (
             <Badge variant="outline" className="ml-2">
-              Tag {stats.days_since_launch} seit Launch
+              {tx({ de: `Tag ${stats.days_since_launch} seit Launch`, en: `Day ${stats.days_since_launch} since launch`, es: `Día ${stats.days_since_launch} desde el lanzamiento` })}
             </Badge>
           )}
         </CardTitle>
@@ -98,10 +98,10 @@ export function LaunchRadarCard() {
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
                 <h4 className="mb-3 flex items-center gap-2 text-sm font-medium">
-                  <Trophy className="h-4 w-4 text-primary" /> Meilensteine
+                  <Trophy className="h-4 w-4 text-primary" /> {tx({ de: 'Meilensteine', en: 'Milestones', es: 'Hitos' })}
                 </h4>
                 {stats.milestones.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Noch kein Meilenstein erreicht.</p>
+                  <p className="text-sm text-muted-foreground">{tx({ de: 'Noch kein Meilenstein erreicht.', en: 'No milestone reached yet.', es: 'Aún no se ha alcanzado ningún hito.' })}</p>
                 ) : (
                   <ul className="space-y-2">
                     {stats.milestones.map((m) => (
@@ -116,7 +116,7 @@ export function LaunchRadarCard() {
 
               <div>
                 <h4 className="mb-3 flex items-center gap-2 text-sm font-medium">
-                  <Users className="h-4 w-4 text-primary" /> Letzte Registrierungen
+                  <Users className="h-4 w-4 text-primary" /> {tx({ de: 'Letzte Registrierungen', en: 'Last Registrations', es: 'Últimos registros' })}
                 </h4>
                 {stats.recent_signups.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{tx({ de: "Noch keine Registrierungen.", en: "No registrations yet.", es: "Aún no hay inscripciones." })}</p>

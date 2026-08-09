@@ -59,7 +59,7 @@ export function useScheduledPublishing() {
       if (error) throw error;
 
       toast({
-        title: '⏰ Veröffentlichung geplant',
+        title: tx({ de: '⏰ Veröffentlichung geplant', en: '⏰ Publication scheduled', es: '⏰ Publicación programada' }),
         description: tx({ de: `Post wird am ${config.publishAt.toLocaleString('de-DE')} auf ${config.platform} veröffentlicht`, en: `Post will be published on ${config.publishAt.toLocaleString('de-DE')} on ${config.platform}`, es: `La publicación se publicará en ${config.publishAt.toLocaleString('de-DE')} en ${config.platform}` }),
       });
 
@@ -102,7 +102,7 @@ export function useScheduledPublishing() {
       if (error) throw error;
 
       toast({
-        title: '🚫 Veröffentlichung abgebrochen',
+        title: tx({ de: '🚫 Veröffentlichung abgebrochen', en: '🚫 Publication canceled', es: '🚫 Publicación cancelada' }),
         description: tx({ de: "Die geplante Veröffentlichung wurde storniert", en: "The planned release has been canceled", es: "El lanzamiento previsto ha sido cancelado." }),
       });
 

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { Calendar, Check, Play, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

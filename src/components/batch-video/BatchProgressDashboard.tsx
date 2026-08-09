@@ -206,7 +206,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
                   </p>
                   <p className="text-muted-foreground text-xs">
                     {video.status === 'completed' && tx({ de: 'Fertig', en: 'Ready', es: 'Listo' })}
-                    {video.status === 'rendering' && 'Wird erstellt...'}
+                    {video.status === 'rendering' && tx({ de: "Wird erstellt...", en: "Creating...", es: "Creando..." })}
                     {video.status === 'failed' && tx({ de: `Fehler: ${video.error_message?.substring(0, 50)}`, en: `Error: ${video.error_message?.substring(0, 50)}`, es: `Error: ${video.error_message?.substring(0, 50)}` })}
                     {video.status === 'pending' && 'Wartet...'}
                   </p>

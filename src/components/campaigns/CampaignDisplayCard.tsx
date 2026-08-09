@@ -128,8 +128,8 @@ export const CampaignDisplayCard = ({
                 <Upload className="h-5 w-5 text-accent" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">Medien-Bibliothek</h3>
-                <p className="text-xs text-muted-foreground">{campaignMedia.length} Dateien</p>
+                <h3 className="font-semibold text-foreground">{tx({ de: 'Medien-Bibliothek', en: 'Media Library', es: 'Biblioteca de medios' })}</h3>
+                <p className="text-xs text-muted-foreground">{tx({ de: `${campaignMedia.length} Dateien`, en: `${campaignMedia.length} files`, es: `${campaignMedia.length} archivos` })}</p>
               </div>
             </div>
             <Button
@@ -139,7 +139,7 @@ export const CampaignDisplayCard = ({
               className="gap-2 border-primary/30 hover:border-primary hover:bg-primary/10"
             >
               <Sparkles className="h-4 w-4 text-primary" />
-              Auto-Zuordnung
+              {tx({ de: 'Auto-Zuordnung', en: 'Auto-assignment', es: 'Asignación automática' })}
             </Button>
           </div>
           
@@ -189,7 +189,7 @@ export const CampaignDisplayCard = ({
           
           <p className="text-xs text-muted-foreground mt-4 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-            Klicke auf ein Medium, dann auf einen Post zum Zuordnen
+            {tx({ de: 'Klicke auf ein Medium, dann auf einen Post zum Zuordnen', en: 'Click on a medium, then on a post to assign', es: 'Haga clic en un medio, luego en una publicación para asignar' })}
           </p>
         </motion.div>
       )}
@@ -206,7 +206,7 @@ export const CampaignDisplayCard = ({
         <div className="p-6 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-foreground">{campaign.title}</h2>
-            <p className="text-sm text-muted-foreground mt-1">{campaign.ai_json.weeks.length} Wochen geplant</p>
+            <p className="text-sm text-muted-foreground mt-1">{tx({ de: `${campaign.ai_json.weeks.length} Wochen geplant`, en: `${campaign.ai_json.weeks.length} weeks planned`, es: `${campaign.ai_json.weeks.length} semanas planificadas` })}</p>
           </div>
           
           <div className="flex flex-wrap gap-2">
@@ -217,7 +217,7 @@ export const CampaignDisplayCard = ({
               className="gap-2 border-white/10 hover:border-accent/50 hover:bg-accent/10"
             >
               <Calendar className="h-4 w-4 text-accent" />
-              2-Wochen-Planer
+              {tx({ de: '2-Wochen-Planer', en: '2-week planner', es: 'Planificador de 2 semanas' })}
             </Button>
             <Button 
               onClick={() => onScheduleToPlanner(campaign)}
@@ -231,7 +231,7 @@ export const CampaignDisplayCard = ({
               ) : (
                 <Sparkles className="h-4 w-4 text-accent" />
               )}
-              KI-Planner
+              {tx({ de: 'KI-Planner', en: 'AI Planner', es: 'Planificador de IA' })}
             </Button>
             <Button 
               onClick={() => onScheduleToCalendar(campaign)}
@@ -245,7 +245,7 @@ export const CampaignDisplayCard = ({
               ) : (
                 <Calendar className="h-4 w-4" />
               )}
-              In Kalender
+              {tx({ de: 'In Kalender', en: 'To Calendar', es: 'Al calendario' })}
             </Button>
             {userPlan === "pro" && (
               <Button variant="outline" size="sm" className="border-white/10">
@@ -299,11 +299,11 @@ export const CampaignDisplayCard = ({
                       )}
                     </div>
                     <div className="text-left">
-                      <p className="font-semibold text-foreground">Woche {week.week_number}</p>
+                      <p className="font-semibold text-foreground">{tx({ de: `Woche ${week.week_number}`, en: `Week ${week.week_number}`, es: `Semana ${week.week_number}` })}</p>
                       <p className="text-sm text-muted-foreground">{week.theme}</p>
                     </div>
                     <Badge variant="secondary" className="ml-auto bg-muted/50 text-muted-foreground">
-                      {week.posts.length} Posts
+                      {tx({ de: `${week.posts.length} Posts`, en: `${week.posts.length} posts`, es: `${week.posts.length} publicaciones` })}
                     </Badge>
                   </div>
                 </AccordionTrigger>
@@ -343,7 +343,7 @@ export const CampaignDisplayCard = ({
                             <div className="flex items-center gap-2 mb-2">
                               <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">
                                 <Sparkles className="h-2.5 w-2.5 mr-1" />
-                                KI-generiert
+                                {tx({ de: 'KI-generiert', en: 'AI-generated', es: 'Generado por IA' })}
                               </Badge>
                             </div>
                           )}

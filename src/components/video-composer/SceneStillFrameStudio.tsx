@@ -91,14 +91,14 @@ export default function SceneStillFrameStudio({
       setVariants(list);
       toast.success(
         (data as any)?.cached
-          ? language === 'de' ? 'Cache-Treffer' : 'Cache hit'
+          ? language === 'de' ? tx({ de: 'Cache-Treffer', en: 'Cache hit', es: 'Acierto de caché' }) : 'Cache hit'
           : language === 'de' ? `${list.length} Frames generiert` : `${list.length} frames generated`,
       );
     } catch (e: any) {
       console.error(e);
       toast.error(
         e?.message?.includes('402')
-          ? language === 'de' ? 'AI-Credits aufgebraucht' : 'AI credits exhausted'
+          ? language === 'de' ? tx({ de: 'AI-Credits aufgebraucht', en: 'AI credits exhausted', es: 'Créditos de IA agotados' }) : 'AI credits exhausted'
           : e?.message ?? (language === 'de' ? tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }) : 'Generation failed'),
       );
     } finally {
@@ -110,7 +110,7 @@ export default function SceneStillFrameStudio({
     onPick(url);
     toast.success(
       language === 'de'
-        ? 'Als Referenz-Frame gesetzt'
+        ? tx({ de: tx({ de: 'Als Referenz-Frame gesetzt', en: 'Set as reference frame', es: 'Establecido como fotograma de referencia' }), en: 'Set as reference frame', es: 'Establecido como fotograma de referencia' })
         : language === 'es'
         ? 'Establecido como fotograma de referencia'
         : 'Set as reference frame',
@@ -124,7 +124,7 @@ export default function SceneStillFrameStudio({
           <Sparkles className="h-3 w-3 text-primary" />
           <span className="text-[11px] font-medium text-foreground/90">
             {language === 'de'
-              ? 'Frame-First Vorschau'
+              ? tx({ de: 'Frame-First Vorschau', en: 'Frame-first preview', es: 'Vista previa de fotograma primero' })
               : language === 'es'
               ? 'Vista previa Frame-First'
               : 'Frame-First Preview'}
@@ -162,8 +162,8 @@ export default function SceneStillFrameStudio({
               <Sparkles className="h-3 w-3" />
             )}
             {variants.length > 0
-              ? language === 'de' ? 'Neu generieren' : language === 'es' ? 'Regenerar' : 'Regenerate'
-              : language === 'de' ? 'Frames generieren' : language === 'es' ? 'Generar fotogramas' : 'Generate frames'}
+              ? language === 'de' ? tx({ de: 'Neu generieren', en: 'Regenerate', es: 'Regenerar' }) : language === 'es' ? 'Regenerar' : 'Regenerate'
+              : language === 'de' ? tx({ de: 'Frames generieren', en: 'Generate frames', es: 'Generar fotogramas' }) : language === 'es' ? 'Generar fotogramas' : 'Generate frames'}
           </Button>
         </div>
       </div>
@@ -171,7 +171,7 @@ export default function SceneStillFrameStudio({
       {injectedLabels && injectedLabels.length > 0 && (
         <div className="flex items-center gap-1 flex-wrap">
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
-            {language === 'de' ? 'Auto-injiziert' : language === 'es' ? 'Auto-inyectado' : 'Auto-injected'}:
+            {language === 'de' ? tx({ de: 'Auto-injiziert', en: 'Auto-injected', es: 'Auto-inyectado' }) : language === 'es' ? 'Auto-inyectado' : 'Auto-injected'}:
           </span>
           {injectedLabels.slice(0, 4).map((it) => (
             <span

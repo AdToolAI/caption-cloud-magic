@@ -57,7 +57,7 @@ export const TemplateRating = ({
       {showForm && (
         <div className="space-y-3 p-4 border rounded-lg bg-card">
           <p className="text-sm font-medium">
-            {userRating ? 'Ihre Bewertung bearbeiten' : 'Template bewerten'}
+            {userRating ? tx({ de: 'Ihre Bewertung bearbeiten', en: 'Edit your rating', es: 'Editar tu calificación' }) : tx({ de: 'Template bewerten', en: 'Rate template', es: 'Calificar plantilla' })}
           </p>
           
           <div className="flex gap-1">
@@ -93,7 +93,7 @@ export const TemplateRating = ({
             disabled={rating === 0 || isPending}
             size="sm"
           >
-            {isPending ? 'Speichern...' : userRating ? 'Bewertung aktualisieren' : 'Bewertung abgeben'}
+            {isPending ? tx({ de: 'Speichern...', en: 'Saving...', es: 'Guardando...' }) : userRating ? tx({ de: 'Bewertung aktualisieren', en: 'Update rating', es: 'Actualizar calificación' }) : tx({ de: 'Bewertung abgeben', en: 'Submit rating', es: 'Enviar calificación' })}
           </Button>
         </div>
       )}

@@ -266,7 +266,7 @@ const ResetPassword = () => {
                   ) : (
                     <Lock className="mr-2 h-5 w-5" />
                   )}
-                  Passwort zurücksetzen
+                  {tx({ de: 'Passwort zurücksetzen', en: 'Reset password', es: 'Restablecer contraseña' })}
                 </Button>
               </CardContent>
             </form>

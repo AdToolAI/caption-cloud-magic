@@ -2238,7 +2238,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
             onClick={() => { history.commit(); history.undo(); }}
             disabled={!history.canUndo}
-            title={`Rückgängig (${navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl'}+Z) · ${history.historySize} Schritte`}
+            title={tx({ de: `Rückgängig (${navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl'}+Z) · ${history.historySize} Schritte`, en: `Undo (${navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl'}+Z) · ${history.historySize} steps`, es: `Deshacer (${navigator.platform.toUpperCase().includes('MAC') ? '⌘' : 'Ctrl'}+Z) · ${history.historySize} pasos` })}
           >
             <Undo2 className="h-3.5 w-3.5" />
           </Button>
@@ -2255,7 +2255,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <button
             type="button"
             onClick={() => setRippleMode((v) => !v)}
-            title={rippleMode ? 'Ripple Delete AN — Lücken schließen automatisch' : 'Ripple Delete AUS — Lücken bleiben stehen'}
+            title={rippleMode ? tx({ de: 'Ripple Delete AN — Lücken schließen automatisch', en: 'Ripple Delete ON — gaps close automatically', es: 'Ripple Delete activado: los huecos se cierran automáticamente' }) : tx({ de: 'Ripple Delete AUS — Lücken bleiben stehen', en: 'Ripple Delete OFF — gaps remain', es: 'Ripple Delete desactivado: los huecos permanecen' })}
             className={cn(
               'h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium border transition-colors',
               rippleMode
@@ -2663,7 +2663,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   <SlidersHorizontal className="h-3.5 w-3.5 text-[#F5C76A]" />
                   <span className="text-[11px] uppercase tracking-wider text-[#F5C76A]/70 font-semibold">Inspector</span>
                   <span className="ml-auto text-[10px] text-white/50">
-                    {selectedSubtitle ? 'Untertitel' : selectedClip ? 'Audio-Clip' : selectedSceneId ? 'Szene' : tx({ de: 'Nichts ausgewählt', en: 'Nothing selected', es: 'Nada seleccionado' })}
+                    {selectedSubtitle ? tx({ de: 'Untertitel', en: 'Subtitles', es: 'Subtítulos' }) : selectedClip ? tx({ de: 'Audio-Clip', en: 'Audio clip', es: 'Clip de audio' }) : selectedSceneId ? tx({ de: 'Szene', en: 'Scene', es: 'Escena' }) : tx({ de: 'Nichts ausgewählt', en: 'Nothing selected', es: 'Nada seleccionado' })}
                   </span>
                 </div>
                 <div className="flex-1 min-h-0">
@@ -2787,7 +2787,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           toast.success(
             `Auto Cut-Down ${target}s angewendet — Master als Snapshot gesichert.`,
             {
-              description: 'Über den ↺-Button in der Toolbar jederzeit wiederherstellbar.',
+              description: tx({ de: 'Über den ↺-Button in der Toolbar jederzeit wiederherstellbar.', en: 'Can be restored at any time via the ↺ button in the toolbar.', es: 'Se puede restaurar en cualquier momento mediante el botón ↺ de la barra de herramientas.' }),
             },
           );
         }}

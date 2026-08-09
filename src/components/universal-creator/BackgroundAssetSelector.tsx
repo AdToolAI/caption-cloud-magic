@@ -106,7 +106,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
           user_id: user!.id,
           type: 'color',
           color,
-          title: `Color ${color}`,
+          title: `${tx({ de: "Farbe", en: "Color", es: "Color" })} ${color}`,
         })
         .select()
         .single();
@@ -130,7 +130,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
           user_id: user!.id,
           type: 'gradient',
           gradient_colors: { colors: params.colors, direction: params.direction },
-          title: `Gradient ${params.colors[0]} → ${params.colors[1]}`,
+          title: `${tx({ de: "Verlauf", en: "Gradient", es: "Degradado" })} ${params.colors[0]} → ${params.colors[1]}`,
         })
         .select()
         .single();
@@ -184,7 +184,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
 
       queryClient.invalidateQueries({ queryKey: ['background-assets'] });
       onSelectAsset(assetData as BackgroundAsset);
-      toast.success(`${type === 'video' ? 'Video' : t('uc.images')} ${t('uc.uploaded')}`);
+      toast.success(tx({ de: `${type === 'video' ? 'Video' : t('uc.images')} hochgeladen`, en: `${type === 'video' ? 'Video' : t('uc.images')} uploaded`, es: `${type === 'video' ? 'Vídeo' : t('uc.images')} subido` }));
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error(`${t('uc.uploadError')}: ${error.message}`);
@@ -223,7 +223,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     if (validFiles.length === 0) return;
     
     setUploading(true);
-    toast.info(`${validFiles.length} ${t('uc.imagesUploading')}`);
+    toast.info(tx({ de: `${validFiles.length} Bilder werden hochgeladen...`, en: `${validFiles.length} images are being uploaded...`, es: `${validFiles.length} las imágenes se están cargando...` }));
     
     try {
       // Upload all files in parallel
@@ -270,7 +270,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
         onSelectAsset(results[0] as BackgroundAsset);
       }
       
-      toast.success(`${results.length} ${t('uc.imagesUploaded')}`);
+      toast.success(tx({ de: `${results.length} Bilder hochgeladen`, en: `${results.length} images uploaded`, es: `${results.length} imágenes subidas` }));
     } catch (error: any) {
       console.error('Multi-upload error:', error);
       toast.error(`${t('uc.uploadError')}: ${error.message}`);
@@ -325,7 +325,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
       const title =
         video?.customizations?.title ||
         video?.metadata?.title ||
-        `Video ${new Date(video.created_at).toLocaleDateString()}`;
+        `${tx({ de: "Video", en: "Video", es: "Vídeo" })} ${new Date(video.created_at).toLocaleDateString()}`;
       const { data: assetData, error } = await supabase
         .from('universal_background_assets')
         .insert({

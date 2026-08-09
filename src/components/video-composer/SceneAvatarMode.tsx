@@ -157,7 +157,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
             title={tx({ de: "Outfit zurücksetzen — zeigt wieder das Standard-Porträt", en: "Reset outfit — shows the standard portrait again", es: "Restablecer atuendo — muestra el retrato estándar de nuevo" })}
           >
             <RotateCcw className="h-3 w-3" />
-            Reset Outfit
+            {tx({ de: 'Outfit zurücksetzen', en: 'Reset Outfit', es: 'Restablecer atuendo' })}
           </button>
         )}
       </div>
@@ -170,7 +170,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
             className="text-[10px] py-0.5 border-primary/40 bg-primary/10 text-primary"
           >
             <Sparkles className="h-2.5 w-2.5 mr-1" />
-            {accessible.length} Avatare verfügbar
+            {tx({ de: `${accessible.length} Avatare verfügbar`, en: `${accessible.length} avatars available`, es: `${accessible.length} avatares disponibles` })}
           </Badge>
         </div>
         <Button
@@ -180,14 +180,14 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
           className="gap-1 h-7 text-[10px] text-primary/80 hover:text-primary"
         >
           <ExternalLink className="h-3 w-3" />
-          Avatare verwalten
+          {tx({ de: 'Avatare verwalten', en: 'Manage Avatars', es: 'Gestionar avatares' })}
         </Button>
       </div>
 
       {/* Cast picker */}
       <div className="px-1">
         <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-semibold mb-1.5">
-          Cast für diese Szene
+          {tx({ de: 'Cast für diese Szene', en: 'Cast for this scene', es: 'Reparto para esta escena' })}
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {accessible.slice(0, 7).map((c) => {
@@ -234,7 +234,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
             className="aspect-[3/4] rounded-xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary transition-colors"
           >
             <Plus className="h-4 w-4" />
-            <span className="text-[10px]">Neu</span>
+            <span className="text-[10px]">{tx({ de: 'Neu', en: 'New', es: 'Nuevo' })}</span>
           </button>
         </div>
       </div>
@@ -346,7 +346,7 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
               Talking-Head & Lip-Sync
             </div>
             <p className="text-[10px] text-muted-foreground line-clamp-2">
-              Schaltet automatischen Lip-Sync mit der Voiceover-Stimme an. Render dauert ~30s länger.
+              {tx({ de: 'Schaltet automatischen Lip-Sync mit der Voiceover-Stimme an.', en: 'Turns on automatic lip-sync with the voiceover voice.', es: 'Activa la sincronización labial automática con la voz en off.' })} {tx({ de: 'Render dauert ~30s länger.', en: 'Render takes ~30s longer.', es: 'El renderizado tarda unos 30 segundos más.' })}
             </p>
           </div>
         </div>

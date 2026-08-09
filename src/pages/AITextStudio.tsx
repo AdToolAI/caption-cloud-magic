@@ -216,7 +216,7 @@ export default function AITextStudio() {
         .from("text_studio_conversations")
         .insert({
           user_id: user.id,
-          title: messages[0]?.content?.slice(0, 60) || "Konversation",
+          title: messages[0]?.content?.slice(0, 60) || tx({ de: "Konversation", en: "Conversation", es: "Conversación" }),
           model,
           persona_id: personaId && personaId !== "none" ? personaId : null,
           is_private: isPrivate,
@@ -373,7 +373,7 @@ export default function AITextStudio() {
         }
       }
     } catch (e) {
-      toast.error("Verbindungsfehler");
+      toast.error(tx({ de: "Verbindungsfehler", en: "Connection error", es: "Error de conexión" }));
       console.error(e);
     } finally {
       setStreaming(false);
@@ -448,18 +448,18 @@ export default function AITextStudio() {
           <Brain className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-3xl font-display font-bold">AI Text Studio</h1>
+          <h1 className="text-3xl font-display font-bold">{tx({ de: "AI Text Studio", en: "AI Text Studio", es: "AI Text Studio" })}</h1>
           <p className="text-sm text-muted-foreground">
-            Premium Reasoning & Writing — OpenAI, Google und Anthropic in drei Qualitätsstufen
+            {tx({ de: "Premium Reasoning & Writing — OpenAI, Google und Anthropic in drei Qualitätsstufen", en: "Premium Reasoning & Writing — OpenAI, Google and Anthropic in three quality levels", es: "Razonamiento y redacción premium: OpenAI, Google y Anthropic en tres niveles de calidad" })}
           </p>
         </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="chat">Chat</TabsTrigger>
-          <TabsTrigger value="compare">Compare</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="chat">{tx({ de: "Chat", en: "Chat", es: "Chat" })}</TabsTrigger>
+          <TabsTrigger value="compare">{tx({ de: "Compare", en: "Compare", es: "Comparar" })}</TabsTrigger>
+          <TabsTrigger value="history">{tx({ de: "History", en: "History", es: "Historial" })}</TabsTrigger>
         </TabsList>
 
         {/* CHAT TAB */}
@@ -467,7 +467,7 @@ export default function AITextStudio() {
           <Card className="p-4 space-y-4">
             <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] items-end">
               <div>
-                <Label className="text-xs">Anbieter</Label>
+                <Label className="text-xs">{tx({ de: "Anbieter", en: "Provider", es: "Proveedor" })}</Label>
                 <Select
                   value={providerKey}
                   onValueChange={(v) => {

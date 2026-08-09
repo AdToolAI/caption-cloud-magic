@@ -107,7 +107,7 @@ const DeleteAccount = () => {
               <ShieldAlert className="h-7 w-7 text-destructive" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Account unwiderruflich löschen</h1>
+              <h1 className="text-2xl font-bold text-foreground">{tx({ de: "Account unwiderruflich löschen", en: "Permanently delete account", es: "Eliminar cuenta de forma permanente" })}</h1>
               <p className="text-muted-foreground text-sm">{tx({ de: "Dieser Vorgang kann nicht rückgängig gemacht werden.", en: "This action cannot be undone.", es: "Esta acción no se puede deshacer." })}</p>
             </div>
           </div>
@@ -117,7 +117,7 @@ const DeleteAccount = () => {
             <CardContent className="p-4 flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
               <div className="text-sm text-muted-foreground">
-                <p className="font-medium text-amber-400 mb-1">30-Tage-Widerrufsfrist</p>
+                <p className="font-medium text-amber-400 mb-1">{tx({ de: "30-Tage-Widerrufsfrist", en: "30-day revocation period", es: "Período de revocación de 30 días" })}</p>
                 <p>{tx({ de: "Nach Absenden der Löschanfrage haben Sie 30 Tage Zeit, die Löschung zu widerrufen. Danach werden alle Daten unwiderruflich entfernt.", en: "After submitting the deletion request you have 30 days to revoke it. After that, all data is removed irreversibly.", es: "Tras enviar la solicitud de eliminación dispones de 30 días para revocarla. Después, todos los datos se eliminan de forma irreversible." })}</p>
               </div>
             </CardContent>
@@ -129,7 +129,7 @@ const DeleteAccount = () => {
               <CardContent className="p-4 flex items-start gap-3">
                 <Crown className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div className="text-sm text-muted-foreground">
-                  <p className="font-medium text-primary mb-1">Sie verlieren Ihren Gründer-Status</p>
+                  <p className="font-medium text-primary mb-1">{tx({ de: "Sie verlieren Ihren Gründer-Status", en: "You lose your founder status", es: "Pierdes tu estatus de fundador" })}</p>
                   <p>{tx({ de: "Mit der Löschung endet Ihr 24-Monats-Founders-Vorteil (20 % Rabatt auf alle KI-Credits). Ihr Slot wird für einen neuen Nutzer freigegeben und kann nicht wiederhergestellt werden.", en: "Deleting your account ends your 24-month founders benefit (20% off all AI credits). Your slot is released to a new user and cannot be restored.", es: "Al eliminar la cuenta finaliza tu ventaja de fundador de 24 meses (20 % de descuento en todos los créditos de IA). Tu plaza se libera para otro usuario y no se puede recuperar." })}</p>
                 </div>
               </CardContent>
@@ -159,8 +159,8 @@ const DeleteAccount = () => {
           <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="font-medium text-foreground text-sm">Daten vorher exportieren</p>
-                <p className="text-xs text-muted-foreground">Wir empfehlen, Ihre Daten vor der Löschung herunterzuladen.</p>
+                <p className="font-medium text-foreground text-sm">{tx({ de: "Daten vorher exportieren", en: "Export data first", es: "Exportar datos antes" })}</p>
+                <p className="text-xs text-muted-foreground">{tx({ de: "Wir empfehlen, Ihre Daten vor der Löschung herunterzuladen.", en: "We recommend downloading your data before deletion.", es: "Recomendamos descargar tus datos antes de la eliminación." })}</p>
               </div>
               <Button variant="outline" onClick={handleExportData} disabled={exporting} size="sm">
                 {exporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="h-4 w-4 mr-2" />}
@@ -172,30 +172,30 @@ const DeleteAccount = () => {
           {/* Checkboxen */}
           <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
             <CardContent className="p-6 space-y-5">
-              <p className="text-sm font-medium text-foreground">Bitte bestätigen Sie folgende Punkte:</p>
+              <p className="text-sm font-medium text-foreground">{tx({ de: "Bitte bestätigen Sie folgende Punkte:", en: "Please confirm the following points:", es: "Confirma los siguientes puntos:" })}</p>
 
               <div className="flex items-start gap-3">
                 <Checkbox id="check-data" checked={checkDataLoss} onCheckedChange={(v) => setCheckDataLoss(v === true)} />
                 <Label htmlFor="check-data" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                  Ich verstehe, dass alle meine Daten nach Ablauf der 30-Tage-Frist unwiderruflich gelöscht werden und nicht wiederhergestellt werden können.
+                  {tx({ de: "Ich verstehe, dass alle meine Daten nach Ablauf der 30-Tage-Frist unwiderruflich gelöscht werden und nicht wiederhergestellt werden können.", en: "I understand that all my data will be irreversibly deleted after the 30-day period and cannot be restored.", es: "Entiendo que todos mis datos se eliminarán de forma irreversible tras el plazo de 30 días y no se podrán recuperar." })}
                 </Label>
               </div>
 
               <div className="flex items-start gap-3">
                 <Checkbox id="check-legal" checked={checkLegal} onCheckedChange={(v) => setCheckLegal(v === true)} />
                 <Label htmlFor="check-legal" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                  Ich habe die{" "}
+                  {tx({ de: "Ich habe die", en: "I have read the", es: "He leído los" })}{" "}
                   <Link to="/legal/terms" className="text-primary underline">AGB</Link>{" "}
                   und{" "}
                   <Link to="/privacy" className="text-primary underline">Datenschutzbestimmungen</Link>{" "}
-                  zur Kenntnis genommen.
+                  {tx({ de: "zur Kenntnis genommen.", en: "noticed.", es: "avisos." })}
                 </Label>
               </div>
 
               <div className="flex items-start gap-3">
                 <Checkbox id="check-sub" checked={checkSubscription} onCheckedChange={(v) => setCheckSubscription(v === true)} />
                 <Label htmlFor="check-sub" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                  Ich bestätige, dass mein aktives Abonnement gekündigt wird und verbleibende Credits verfallen.
+                  {tx({ de: "Ich bestätige, dass mein aktives Abonnement gekündigt wird und verbleibende Credits verfallen.", en: "I confirm that my active subscription will be canceled and remaining credits will expire.", es: "Confirmo que se cancelará mi suscripción activa y que los créditos restantes caducarán." })}
                 </Label>
               </div>
             </CardContent>
@@ -205,12 +205,12 @@ const DeleteAccount = () => {
           <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
             <CardContent className="p-6 space-y-3">
               <Label className="text-sm">
-                Geben Sie <strong className="text-foreground">{user.email}</strong> ein, um die Löschung zu bestätigen:
+                Geben Sie <strong className="text-foreground">{user.email}</strong> {tx({ de: "ein, um die Löschung zu bestätigen:", en: "to confirm deletion:", es: "para confirmar la eliminación:" })}
               </Label>
               <Input
                 value={confirmEmail}
                 onChange={(e) => setConfirmEmail(e.target.value)}
-                placeholder="E-Mail-Adresse eingeben"
+                placeholder={tx({ de: "E-Mail-Adresse eingeben", en: "Enter email address", es: "Introduce la dirección de correo electrónico" })}
                 className="bg-muted/20 border-white/10"
               />
             </CardContent>

@@ -94,7 +94,7 @@ export function AIStyleTransfer({
       const filter = AVAILABLE_FILTERS.find(f => f.id === currentFilter);
       return filter?.name || 'Filter';
     }
-    return 'Filter wählen';
+    return tx({ de: "Filter wählen", en: "Choose filter", es: "Elegir filtro" });
   };
 
   const handleMouseDown = () => setIsDragging(true);
@@ -289,7 +289,7 @@ export function AIStyleTransfer({
 
           {/* Drag Hint */}
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm text-[9px] text-white/60 opacity-0 group-hover:opacity-100 transition-opacity">
-            ← Ziehen zum Vergleichen →
+            {tx({ de: "← Ziehen zum Vergleichen →", en: "← Drag to compare →", es: "← Arrastrar para comparar →" })}
           </div>
         </div>
       )}
@@ -301,7 +301,7 @@ export function AIStyleTransfer({
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Palette className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">Klassische Filter</span>
+              <span className="text-xs text-muted-foreground font-medium">{tx({ de: "Klassische Filter", en: "Classic filters", es: "Filtros clásicos" })}</span>
               <span className="text-[10px] text-muted-foreground/60 ml-auto">{tx({ de: "Hover für Live-Vorschau", en: "Hover for live preview", es: "Pasa el ratón para vista previa en vivo" })}</span>
             </div>
             {renderFilterGrid(basicFilters, 0)}
@@ -311,9 +311,9 @@ export function AIStyleTransfer({
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Zap className="h-3.5 w-3.5 text-yellow-500" />
-              <span className="text-xs text-muted-foreground font-medium">Kreative Filter</span>
+              <span className="text-xs text-muted-foreground font-medium">{tx({ de: "Kreative Filter", en: "Creative filters", es: "Filtros creativos" })}</span>
               <Badge variant="outline" className="text-[9px] px-1 py-0 border-yellow-500/50 text-yellow-500 h-4">
-                Transformativ
+                {tx({ de: "Transformativ", en: "Transformative", es: "Transformativo" })}
               </Badge>
             </div>
             {renderFilterGrid(creativeFilters, basicFilters.length)}
@@ -345,7 +345,7 @@ export function AIStyleTransfer({
             className="w-full h-8 text-xs"
           >
             <RotateCcw className="h-3 w-3 mr-1" />
-            Filter zurücksetzen
+            {tx({ de: "Filter zurücksetzen", en: "Reset filters", es: "Restablecer filtros" })}
           </Button>
         </motion.div>
       )}

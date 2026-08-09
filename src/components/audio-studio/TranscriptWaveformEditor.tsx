@@ -54,7 +54,7 @@ export function TranscriptWaveformEditor({
         .from('audio-temp')
         .upload(tempFileName, blob, { contentType: blob.type || 'audio/mpeg' });
       
-      if (uploadError) throw new Error(`Upload fehlgeschlagen: ${uploadError.message}`);
+      if (uploadError) throw new Error(`{tx({ de: "Upload fehlgeschlagen: ", en: "Upload failed: ", es: "Error de carga: " })}${uploadError.message}`);
       
       // 3. Get public URL
       const { data: urlData } = supabase.storage
@@ -96,7 +96,7 @@ export function TranscriptWaveformEditor({
       toast.success(tx({ de: 'Transcript erfolgreich generiert', en: 'Transcript generated successfully', es: 'Transcripción generada con éxito' }));
     } catch (error) {
       console.error('Transcript error:', error);
-      toast.error(tx({ de: 'Fehler beim Generieren des Transcripts', en: 'Error generating transcript', es: 'Error al generar la transcripción' }));
+      toast.error(tx({ de: 'Fehler beim {tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })}es Transcripts', en: 'Error generating transcript', es: 'Error al generar la transcripción' }));
     } finally {
       // 5. Cleanup: Delete temp file
       if (tempFileName) {
@@ -120,7 +120,7 @@ export function TranscriptWaveformEditor({
     const newTranscript = transcript.filter((_, i) => !selectedWords.has(i));
     onTranscriptChange(newTranscript);
     setSelectedWords(new Set());
-    toast.success(`${selectedWords.size} Wörter entfernt`);
+    toast.success(tx({ de: `${selectedWords.size} Wörter entfernt`, en: `${selectedWords.size} words removed`, es: `${selectedWords.size} palabras eliminadas` }));
   };
 
   const getCurrentWordIndex = () => {
@@ -169,10 +169,10 @@ export function TranscriptWaveformEditor({
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <Mic className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">Transcript generieren</h3>
+            <h3 className="text-lg font-semibold mb-2">{tx({ de: "Transcript generieren", en: "Generate transcript", es: "Generar transcripción" })}</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Generiere ein Transcript, um Audio wie Text zu bearbeiten. 
-              Markiere Wörter zum Löschen oder suche nach bestimmten Passagen.
+              {tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })} 
+              {tx({ de: "Markiere Wörter zum Löschen oder suche nach bestimmten Passagen.", en: "Highlight words to delete or search for specific passages.", es: "Resalte palabras para eliminarlas o busque pasajes específicos." })}
             </p>
             <Button
               onClick={generateTranscript}
@@ -182,7 +182,7 @@ export function TranscriptWaveformEditor({
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generiere...
+                  {tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })}
                 </>
               ) : (
                 <>
@@ -201,7 +201,7 @@ export function TranscriptWaveformEditor({
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Im Transcript suchen..."
+                  placeholder={tx({ de: "Im Transcript suchen...", en: "Search in transcript...", es: "Buscar en la transcripción..." })}
                   className="pl-10 bg-muted/30 border-border/50"
                 />
               </div>
@@ -268,15 +268,15 @@ export function TranscriptWaveformEditor({
             <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border/50 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-cyan-500/30" />
-                <span>Aktuell</span>
+                <span>{tx({ de: "Aktuell", en: "Current", es: "Actual" })}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-yellow-500/20" />
-                <span>Füllwort</span>
+                <span>{tx({ de: "Füllwort", en: "Filler word", es: "Palabra de relleno" })}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-destructive/30" />
-                <span>Zum Löschen markiert</span>
+                <span>{tx({ de: "Zum Löschen markiert", en: "Marked for deletion", es: "Marcado para eliminación" })}</span>
               </div>
             </div>
           </>

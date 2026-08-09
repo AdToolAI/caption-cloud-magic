@@ -81,7 +81,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
           await insertCharacterVariant(character.id, v.vibe, persisted, v.seed ?? null, false);
         }),
       );
-      toast.success(`${incoming.length} Casting-Varianten generiert ✨`);
+      toast.success(`${incoming.length} tx({ de: 'Casting-Varianten generiert ✨', en: 'Casting variants generated ✨', es: 'Variantes de casting generadas ✨' })`);
       await reload();
     } catch (err) {
       const msg = err instanceof Error ? err.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' });
@@ -108,7 +108,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
       const ok = await deleteCharacterVariant(variant.id);
       if (ok) {
         setVariants((prev) => prev.filter((v) => v.id !== variant.id));
-        toast.success('Variante entfernt');
+        toast.success(tx({ de: 'Variante entfernt', en: 'Variant removed', es: 'Variante eliminada' }));
       }
     },
     [deleteCharacterVariant],
@@ -122,7 +122,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
             Casting · Multi-Vibe
           </p>
           <p className="text-[11px] text-muted-foreground">
-            4 Visualisierungen pro Charakter — wähle das passende „Vibe".
+            {tx({ de: '4 Visualisierungen pro Charakter — wähle das passende „Vibe".', en: '4 visualizations per character — choose the right "vibe".', es: '4 visualizaciones por personaje: elige la "vibe" adecuada.' })}
           </p>
         </div>
         <Button
@@ -137,17 +137,17 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
           ) : (
             <Wand2 className="h-3 w-3" />
           )}
-          Casting starten
+          {tx({ de: 'Casting starten', en: 'Start casting', es: 'Iniciar casting' })}
         </Button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lädt Varianten...
+          <Loader2 className="h-4 w-4 animate-spin mr-2" /> {tx({ de: 'Lädt Varianten...', en: 'Loading variants...', es: 'Cargando variantes...' })}
         </div>
       ) : variants.length === 0 ? (
         <div className="rounded-md border border-dashed border-border/60 p-4 text-center text-[11px] text-muted-foreground">
-          Noch keine Casting-Varianten — klicke „Casting starten" um 4 Looks zu generieren.
+          Noch keine Casting-Varianten — klicke „{tx({ de: 'Casting starten', en: 'Start casting', es: 'Iniciar casting' })}" um 4 Looks zu generieren.
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -187,7 +187,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
                     onClick={() => handleSetPrimary(v)}
                   >
                     <Sparkles className="h-2.5 w-2.5" />
-                    Wählen
+                    {tx({ de: 'Wählen', en: 'Select', es: 'Seleccionar' })}
                   </Button>
                 )}
                 <Button

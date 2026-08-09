@@ -1,5 +1,6 @@
 import { useTranslation } from '@/hooks/useTranslation';
 import type { Language } from '@/lib/translations';
+import { tx } from '@/lib/i18nText';
 
 /**
  * Lightweight per-string localisation helper.

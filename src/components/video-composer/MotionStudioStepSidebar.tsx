@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { LucideIcon, Check, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -137,7 +138,7 @@ export default function MotionStudioStepSidebar({
                     <TooltipContent side="right" className="max-w-[220px]">
                       <p className="font-medium text-xs mb-0.5">{step.label}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {accessible ? step.hint : 'Vorherige Schritte zuerst abschließen.'}
+                        {accessible ? step.hint : tx({ de: 'Vorherige Schritte zuerst abschließen.', en: 'Complete previous steps first.', es: 'Complete los pasos anteriores primero.' })}
                       </p>
                     </TooltipContent>
                   </Tooltip>

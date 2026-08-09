@@ -53,7 +53,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
 
     if (result) {
       toast({
-        title: "Test erstellt",
+        title: tx({ de: "Test erstellt", en: "Test created", es: "Prueba creada" }),
         description: tx({ de: "A/B Test wurde erfolgreich erstellt", en: "A/B test successfully created", es: "Prueba A/B creada con éxito" }),
       });
       setShowCreateDialog(false);
@@ -74,7 +74,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
     const success = await startTest(testId);
     if (success) {
       toast({
-        title: "Test gestartet",
+        title: tx({ de: "Test gestartet", en: "Test started", es: "Prueba iniciada" }),
         description: tx({ de: "A/B Test wurde gestartet", en: "A/B Test started", es: "Prueba A/B iniciada" }),
       });
       fetchActiveTests(templateId);
@@ -96,7 +96,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
     const success = await completeTest(testId, winnerVariant);
     if (success) {
       toast({
-        title: "Test abgeschlossen",
+        title: tx({ de: "Test abgeschlossen", en: "Test completed", es: "Prueba completada" }),
         description: tx({ de: "A/B Test wurde abgeschlossen", en: "A/B Test completed", es: "Prueba A/B completada" }),
       });
       fetchActiveTests(templateId);
@@ -131,7 +131,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                 <DialogHeader>
                   <DialogTitle>{tx({ de: "Neuen A/B Test erstellen", en: "Create a new A/B test", es: "Crear una nueva prueba A/B" })}</DialogTitle>
                   <DialogDescription>
-                    Erstelle einen neuen Test um verschiedene Varianten zu vergleichen
+                    {tx({ de: "Erstelle einen neuen Test um verschiedene Varianten zu vergleichen", en: "Create a new test to compare different variants", es: "Crea una nueva prueba para comparar diferentes variantes" })}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -141,7 +141,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                       id="testName"
                       value={testName}
                       onChange={(e) => setTestName(e.target.value)}
-                      placeholder="z.B. Header Text Test"
+                      placeholder={tx({ de: "z.B. Header Text Test", en: "e.g. Header Text Test", es: "p. ej. Prueba de texto de encabezado" })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -197,7 +197,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
             </div>
           ) : tests.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              Keine aktiven Tests. Erstelle einen neuen Test um zu starten.
+              {tx({ de: "Keine aktiven Tests. Erstelle einen neuen Test um zu starten.", en: "No active tests. Create a new test to start.", es: "No hay pruebas activas. Crea una nueva prueba para empezar." })}
             </div>
           ) : (
             <div className="space-y-4">

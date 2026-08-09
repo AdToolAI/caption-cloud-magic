@@ -44,7 +44,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   product_demo: {
     id: 'product_demo',
     label: 'Produktvideo',
-    description: 'Das Produkt im Mittelpunkt: Kontext, Feature, Nutzen, Detail, Abbinder.',
+    description: tx({ de: 'Das Produkt im Mittelpunkt: Kontext, Feature, Nutzen, Detail, Abbinder.', en: 'The product at the center: context, feature, benefit, detail, final card.', es: 'El producto en el centro: contexto, característica, beneficio, detalle, cierre.' }),
     beats: ['hook', 'reveal', 'benefit', 'proof', 'cta'],
     shotLadder: ['extreme_close_up', 'medium', 'insert', 'close_up', 'wide'],
     defaultMoves: ['slow_push_in', 'orbit', 'static', 'rack_focus', 'slow_pull_out'],
@@ -68,7 +68,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   storytelling: {
     id: 'storytelling',
     label: 'Storytelling',
-    description: 'Erzählbogen: Figur, Konflikt, Wendepunkt, Auflösung.',
+    description: tx({ de: 'Erzählbogen: Figur, Konflikt, Wendepunkt, Auflösung.', en: 'Narrative arc: character, conflict, turning point, resolution.', es: 'Arco narrativo: personaje, conflicto, punto de giro, resolución.' }),
     beats: ['hook', 'problem', 'emotion', 'reveal', 'benefit', 'cta'],
     shotLadder: ['extreme_wide', 'medium_close', 'close_up', 'wide', 'medium', 'medium_close'],
     defaultMoves: ['static', 'handheld', 'slow_push_in', 'pan_right', 'rack_focus', 'slow_pull_out'],

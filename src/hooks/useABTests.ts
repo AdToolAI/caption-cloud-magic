@@ -70,7 +70,7 @@ export function useABTests() {
       if (error) throw error;
 
       toast({
-        title: 'Test erstellt',
+        title: tx({ de: 'Test erstellt', en: 'Test created', es: 'Prueba creada' }),
         description: tx({ de: 'A/B Test wurde erfolgreich erstellt', en: 'A/B test successfully created', es: 'Prueba A/B creada con éxito' })
       });
 
@@ -115,7 +115,7 @@ export function useABTests() {
       if (error) throw error;
 
       toast({
-        title: 'Variante erstellt',
+        title: tx({ de: 'Variante erstellt', en: 'Variant created', es: 'Variante creada' }),
         description: tx({ de: "Test-Variante wurde hinzugefügt", en: "Test variant was added", es: "Se añadió variante de prueba." })
       });
 
@@ -143,7 +143,7 @@ export function useABTests() {
       if (error) throw error;
 
       toast({
-        title: 'Test gestartet',
+        title: tx({ de: 'Test gestartet', en: 'Test started', es: 'Prueba iniciada' }),
         description: tx({ de: 'A/B Test läuft jetzt', en: 'A/B test is now running', es: 'La prueba A/B se está ejecutando ahora' })
       });
 
@@ -171,7 +171,7 @@ export function useABTests() {
       if (error) throw error;
 
       toast({
-        title: 'Test beendet',
+        title: tx({ de: 'Test beendet', en: 'Test ended', es: 'Prueba finalizada' }),
         description: tx({ de: "A/B Test wurde gestoppt", en: "A/B testing has been stopped", es: "Se han detenido las pruebas A/B" })
       });
 
@@ -230,7 +230,7 @@ export function useABTests() {
       if (error) throw error;
 
       toast({
-        title: '🏆 Winner deklariert',
+        title: tx({ de: '🏆 Winner deklariert', en: '🏆 Winner declared', es: '🏆 Ganador declarado' }),
         description: tx({ de: "Beste Variante wurde als Winner markiert", en: "The best option was marked as the winner", es: "La mejor opción quedó marcada como ganadora." })
       });
 

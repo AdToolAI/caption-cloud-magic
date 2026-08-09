@@ -115,7 +115,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'duration',
       severity: 'fail',
-      title: 'Timeline zu kurz',
+      title: tx({ de: 'Timeline zu kurz', en: 'Timeline too short', es: 'Línea de tiempo demasiado corta' }),
       detail: tx({ de: `Gesamtdauer ${input.totalDuration.toFixed(2)}s — mindestens 1s benötigt.`, en: `Total duration ${input.totalDuration.toFixed(2)}s — at least 1s needed.`, es: `Duración total ${input.totalDuration.toFixed(2)}s — se necesita al menos 1s.` }),
     });
   }
@@ -135,7 +135,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'voice-lock-mismatch',
       severity: 'warn',
-      title: 'Voice-Lock weicht ab',
+      title: tx({ de: 'Voice-Lock weicht ab', en: 'Voice lock deviates', es: 'El bloqueo de voz se desvía' }),
       detail: tx({ de: `Projekt ist auf Voice "${lock.voiceId}" gelockt, Voice-Over nutzt "${input.currentVoiceId}".`, en: `Project is locked to voice "${lock.voiceId}", voice over uses "${input.currentVoiceId}".`, es: `El proyecto está bloqueado para la voz "${lock.voiceId}", la voz en off usa "${input.currentVoiceId}".` }),
       hint: tx({ de: 'Entsperre den Lock oder generiere das Voice-Over mit der gelockten Stimme neu.', en: 'Unlock the lock or regenerate the voice-over with the locked voice.', es: 'Desbloquea el candado o regenera la voz en off con la voz bloqueada.' }),
     });
@@ -198,7 +198,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'aspect-missing',
       severity: 'warn',
-      title: 'Kein Seitenverhältnis gewählt',
+      title: tx({ de: 'Kein Seitenverhältnis gewählt', en: 'No aspect ratio selected', es: 'Ninguna relación de aspecto seleccionada' }),
       hint: tx({ de: "Standardmäßig wird 16:9 verwendet.", en: "By default 16:9 is used.", es: "Por defecto se utiliza 16:9." }),
     });
   }
@@ -242,7 +242,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       findings.push({
         id: 'endcard-short',
         severity: 'info',
-        title: 'Endcard sehr kurz',
+        title: tx({ de: 'Endcard sehr kurz', en: 'Endcard very short', es: 'Endcard muy corto' }),
         detail: tx({ de: `Letzte Szene ${lastDur.toFixed(2)}s — für Logo, CTA oder Call-out werden 1.5–3s empfohlen.`, en: `Last scene ${lastDur.toFixed(2)}s — 1.5–3s recommended for logo, CTA or call-out.`, es: `Última escena ${lastDur.toFixed(2)}s — se recomiendan 1.5–3s para el logo, CTA o llamada a la acción.` }),
       });
     }
@@ -263,8 +263,8 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       findings.push({
         id: 'loudness-hot',
         severity: 'warn',
-        title: 'Mix wirkt zu laut',
-        detail: `Musik ${musicVol}% + Voice-Over ${voVol}% überschreiten voraussichtlich -14 LUFS (Social-Standard).`,
+        title: tx({ de: 'Mix wirkt zu laut', en: 'Mix seems too loud', es: 'La mezcla parece demasiado ruidosa' }),
+        detail: tx({ de: `Musik ${musicVol}% + Voice-Over ${voVol}% überschreiten voraussichtlich -14 LUFS (Social-Standard).`, en: `Music ${musicVol}% + Voice-Over ${voVol}% are expected to exceed -14 LUFS (Social Standard).`, es: `Se espera que la música ${musicVol}% + Voice-Over ${voVol}% excedan los -14 LUFS (Estándar social).` }),
         hint: tx({ de: "Reduziere Musik auf ~40–50% oder aktiviere stärkeres Ducking.", en: "Reduce music to ~40-50% or enable more ducking.", es: "Reduzca la música a ~40-50% o habilite más agacharse." }),
       });
     }
@@ -272,7 +272,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'loudness-music',
       severity: 'info',
-      title: 'Musik sehr laut',
+      title: tx({ de: 'Musik sehr laut', en: 'Music very loud', es: 'Música muy fuerte' }),
       detail: tx({ de: `Musik-Bett auf ${musicVol}% — ohne Ducking kann das im Feed unangenehm knallen.`, en: `Music bed at ${musicVol}% — without ducking, this can be unpleasantly loud in the feed.`, es: `Música de fondo al ${musicVol}% — sin atenuación, esto puede ser desagradablemente ruidoso en el feed.` }),
     });
   }
@@ -319,7 +319,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'consecutive-blackscreens',
       severity: 'info',
-      title: `${blackRunMax} Blackscreens in Folge`,
+      title: tx({ de: `${blackRunMax} Blackscreens in Folge`, en: `${blackRunMax} consecutive blackscreens`, es: `${blackRunMax} pantallas negras consecutivas` }),
       hint: tx({ de: 'Meist ein Restartefakt vom Schneiden — zusammenfassen oder entfernen.', en: 'Mostly a leftover artifact from cutting — merge or remove.', es: 'Principalmente un artefacto sobrante del corte — fusionar o eliminar.' }),
     });
   }
@@ -329,7 +329,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'too-long-for-social',
       severity: 'info',
-      title: `Video ${Math.round(input.totalDuration)}s lang`,
+      title: tx({ de: `Video ${Math.round(input.totalDuration)}s lang`, en: `Video ${Math.round(input.totalDuration)}s long`, es: `Vídeo de ${Math.round(input.totalDuration)} s de duración` }),
       hint: tx({ de: 'Für TikTok / Reels / Shorts liefern 15–60s meist die beste Retention. Nutze Auto Cut-Down für kürzere Varianten.', en: 'For TikTok / Reels / Shorts, 15-60s usually delivers the best retention. Use Auto Cut-Down for shorter versions.', es: 'Para TikTok/Reels/Shorts, entre 15 y 60 años suele ofrecer la mejor retención. Utilice Auto Cut-Down para versiones más cortas.' }),
     });
   }

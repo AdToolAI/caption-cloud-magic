@@ -19,15 +19,15 @@ const PLATFORM_EMOJI: Record<string, string> = {
 };
 
 const STATUS_META: Record<AutopilotSlot['status'], { label: string; className: string; icon: typeof Clock }> = {
-  draft:      { label: 'Entwurf',     className: 'bg-muted text-foreground border-border',                        icon: Clock },
-  generating: { label: 'Generiere…',  className: 'bg-primary/15 text-primary border-primary/30 animate-pulse',    icon: Sparkles },
-  generating_video: { label: 'Video…',  className: 'bg-fuchsia-500/15 text-fuchsia-600 border-fuchsia-500/40 animate-pulse', icon: Sparkles },
-  qa_review:  { label: 'QA-Review',   className: 'bg-amber-500/15 text-amber-600 border-amber-500/40',            icon: AlertTriangle },
-  scheduled:  { label: 'Geplant',     className: 'bg-primary/20 text-primary border-primary/40',                  icon: CalendarIcon },
-  posted:     { label: 'Live',        className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/40',      icon: CheckCircle2 },
-  blocked:    { label: 'Blockiert',   className: 'bg-destructive/15 text-destructive border-destructive/40',      icon: Ban },
+  draft:      { label: tx({ de: 'Entwurf', en: 'Draft', es: 'Borrador' }),     className: 'bg-muted text-foreground border-border',                        icon: Clock },
+  generating: { label: tx({ de: 'Generiere…', en: 'Generating...', es: 'Generando...' }),  className: 'bg-primary/15 text-primary border-primary/30 animate-pulse',    icon: Sparkles },
+  generating_video: { label: tx({ de: 'Video…', en: 'Video...', es: 'Vídeo...' }),  className: 'bg-fuchsia-500/15 text-fuchsia-600 border-fuchsia-500/40 animate-pulse', icon: Sparkles },
+  qa_review:  { label: tx({ de: 'QA-Review', en: 'QA Review', es: 'Revisión de control de calidad' }),   className: 'bg-amber-500/15 text-amber-600 border-amber-500/40',            icon: AlertTriangle },
+  scheduled:  { label: tx({ de: 'Geplant', en: 'Scheduled', es: 'Programado' }),     className: 'bg-primary/20 text-primary border-primary/40',                  icon: CalendarIcon },
+  posted:     { label: tx({ de: 'Live', en: 'Live', es: 'En vivo' }),        className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/40',      icon: CheckCircle2 },
+  blocked:    { label: tx({ de: 'Blockiert', en: 'Blocked', es: 'Bloqueado' }),   className: 'bg-destructive/15 text-destructive border-destructive/40',      icon: Ban },
   failed:     { label: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),      className: 'bg-destructive/10 text-destructive border-destructive/30',      icon: AlertTriangle },
-  skipped:    { label: 'Übersprungen',className: 'bg-muted/60 text-muted-foreground border-border line-through',  icon: SkipForward },
+  skipped:    { label: tx({ de: 'Übersprungen', en: 'Skipped', es: 'Omitido' }),className: 'bg-muted/60 text-muted-foreground border-border line-through',  icon: SkipForward },
 };
 
 export function AutopilotCalendarGrid({ queue, hasBrief, onSelectSlot }: Props) {
@@ -57,7 +57,7 @@ export function AutopilotCalendarGrid({ queue, hasBrief, onSelectSlot }: Props) 
     return (
       <Card className="p-12 text-center border-dashed">
         <CalendarIcon className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-        <h3 className="font-serif text-xl mb-1">Noch kein Plan</h3>
+        <h3 className="font-serif text-xl mb-1">{tx({ de: "Noch kein Plan", en: "No plan yet", es: "Aún no hay plan" })}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           Aktiviere den Autopilot oben — die KI erstellt automatisch einen 14-Tage-Plan basierend auf deinem Brief und den aktuellen Trends.
         </p>
@@ -74,9 +74,9 @@ export function AutopilotCalendarGrid({ queue, hasBrief, onSelectSlot }: Props) 
     <div className="space-y-4">
       {/* Summary strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-        <SummaryPill label="Slots gesamt" value={total} />
-        <SummaryPill label="Live" value={posted} tone="success" />
-        <SummaryPill label="Review nötig" value={review} tone="warn" highlight={review > 0} />
+        <SummaryPill label={tx({ de: "Slots gesamt", en: "Total slots", es: "Total de espacios" })} value={total} />
+        <SummaryPill label={tx({ de: "Live", en: "Live", es: "En vivo" })} value={posted} tone="success" />
+        <SummaryPill label={tx({ de: "Review nötig", en: "Review needed", es: "Revisión necesaria" })} value={review} tone="warn" highlight={review > 0} />
         <SummaryPill label={tx({ de: "Blockiert / Fehler", en: "Blocked / Error", es: "Bloqueado/Error" })} value={blocked} tone="danger" highlight={blocked > 0} />
       </div>
 

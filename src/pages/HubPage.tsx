@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Lock, ArrowRight } from "lucide-react";

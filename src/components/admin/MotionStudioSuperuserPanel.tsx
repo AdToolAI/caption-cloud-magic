@@ -114,7 +114,7 @@ export function MotionStudioSuperuserPanel() {
       });
       if (error) throw error;
       toast.success(
-        `Lauf abgeschlossen: ${data?.summary?.passed ?? 0}/${data?.summary?.total ?? 0} bestanden`,
+        tx({ de: `Lauf abgeschlossen: ${data?.summary?.passed ?? 0}/${data?.summary?.total ?? 0} bestanden`, en: `Run completed: ${data?.summary?.passed ?? 0}/${data?.summary?.total ?? 0} passed`, es: `Ejecución completada: ${data?.summary?.passed ?? 0}/${data?.summary?.total ?? 0} superadas` }),
       );
       await loadRuns();
     } catch (e) {
@@ -256,10 +256,10 @@ export function MotionStudioSuperuserPanel() {
 
       {/* Summary chips */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <SummaryChip label="Bestanden" value={summary.passed} variant="success" />
-        <SummaryChip label="Fehlgeschlagen" value={summary.failed} variant="danger" />
-        <SummaryChip label="Warnungen" value={summary.warnings} variant="warning" />
-        <SummaryChip label="Szenarien gesamt" value={ALL_SCENARIOS.length} variant="neutral" />
+        <SummaryChip label={tx({ de: "Bestanden", en: "Passed", es: "Aprobado" })} value={summary.passed} variant="success" />
+        <SummaryChip label={tx({ de: "Fehlgeschlagen", en: "Failed", es: "Fallido" })} value={summary.failed} variant="danger" />
+        <SummaryChip label={tx({ de: "Warnungen", en: "Warnings", es: "Advertencias" })} value={summary.warnings} variant="warning" />
+        <SummaryChip label={tx({ de: "Szenarien gesamt", en: "Total scenarios", es: "Total de escenarios" })} value={ALL_SCENARIOS.length} variant="neutral" />
       </div>
 
       {/* Last render preview */}
@@ -291,7 +291,7 @@ export function MotionStudioSuperuserPanel() {
       {/* Scenario list */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Szenarien — letzter Status</CardTitle>
+          <CardTitle className="text-base">{tx({ de: "Szenarien — letzter Status", en: "Scenarios — last status", es: "Escenarios — último estado" })}</CardTitle>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[480px] pr-4">
@@ -341,7 +341,7 @@ function ScenarioRow({ name, run }: { name: string; run: Run | undefined }) {
       <div className="flex items-center justify-between rounded-md border border-dashed border-muted px-3 py-2">
         <span className="text-sm text-muted-foreground">{name}</span>
         <Badge variant="outline" className="text-xs">
-          Noch nicht ausgeführt
+          {tx({ de: "Noch nicht ausgeführt", en: "Not executed yet", es: "Aún no ejecutado" })}
         </Badge>
       </div>
     );

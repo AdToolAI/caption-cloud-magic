@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
@@ -13,23 +14,23 @@ export const VideoStatusBadge = ({ status }: VideoStatusBadgeProps) => {
     className?: string;
   }> = {
     pending: {
-      label: 'Wartend',
+      label: tx({ de: 'Wartend', en: 'Pending', es: 'Esperando' }),
       variant: 'secondary',
       icon: Clock
     },
     rendering: {
-      label: 'Wird erstellt',
+      label: tx({ de: 'Wird erstellt', en: 'Rendering', es: 'Representación' }),
       variant: 'default',
       icon: Loader2
     },
     completed: {
-      label: 'Fertig',
+      label: tx({ de: 'Fertig', en: 'Completed', es: 'Terminado' }),
       variant: 'default',
       icon: CheckCircle2,
       className: 'bg-green-600 hover:bg-green-700'
     },
     failed: {
-      label: 'Fehlgeschlagen',
+      label: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' }),
       variant: 'destructive',
       icon: XCircle
     }

@@ -112,7 +112,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
       console.error('Beat-Sync error:', error);
       
       if (error?.context?.status === 402) {
-        toast.error('Nicht genügend Credits', {
+        toast.error(tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'No hay suficientes créditos' }), {
           description: tx({ de: `Du benötigst ${CREDITS_COST} Credits für Beat-Sync Analyse`, en: `You need ${CREDITS_COST} credits for beat sync analysis`, es: `Necesitas ${CREDITS_COST} créditos para el análisis de sincronización de ritmos` }),
         });
       } else {
@@ -146,7 +146,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
       <CardContent className="space-y-4">
         {/* Music Upload */}
         <div className="space-y-2">
-          <Label className="text-xs">Musik-Track</Label>
+          <Label className="text-xs">{tx({ de: 'Musik-Track', en: 'Music track', es: 'Pista de música' })}</Label>
           <input
             ref={fileInputRef}
             type="file"
@@ -160,7 +160,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="h-4 w-4 mr-2" />
-            {musicFile ? musicFile.name : 'Musik hochladen'}
+            {musicFile ? musicFile.name : tx({ de: 'Musik hochladen', en: 'Upload music', es: 'Subir música' })}
           </Button>
         </div>
 
@@ -235,7 +235,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
         {beats.length > 0 && (
           <div className="space-y-3 pt-3 border-t">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Beat-Sync aktivieren</Label>
+              <Label className="text-xs">{tx({ de: 'Beat-Sync aktivieren', en: 'Activate beat sync', es: 'Activar sincronización de ritmo' })}</Label>
               <Switch
                 checked={settings.enabled}
                 onCheckedChange={(v) => handleSettingChange('enabled', v)}
@@ -270,7 +270,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
                 
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <Label className="text-xs">Beat-Empfindlichkeit</Label>
+                    <Label className="text-xs">{tx({ de: 'Beat-Empfindlichkeit', en: 'Beat sensitivity', es: 'Sensibilidad al ritmo' })}</Label>
                     <span className="text-xs text-muted-foreground">{settings.beatSensitivity}%</span>
                   </div>
                   <Slider

@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTx } from '@/lib/i18nText';
 import ReactCrop, { Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import { tx } from '@/lib/i18nText';
 
 interface MediaEditorProps {
   currentImageUrl?: string;

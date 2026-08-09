@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // AI Video Composer — Scene-Based Video Assembly Types
 
 import type { TextOverlay as DirectorCutTextOverlay } from '@/types/directors-cut';
@@ -962,7 +963,7 @@ export const SCENE_TYPE_LABELS: Record<SceneType, { de: string; en: string; es: 
   demo: { de: 'Demo', en: 'Demo', es: 'Demo' },
   'social-proof': { de: 'Social Proof', en: 'Social Proof', es: 'Prueba Social' },
   cta: { de: 'Call to Action', en: 'Call to Action', es: 'Llamada a la Acción' },
-  custom: { de: 'Eigene Szene', en: 'Custom Scene', es: 'Escena Personalizada' },
+  custom: { de: tx({ de: "Eigene Szene", en: "Custom scene", es: "Escena propia" }), en: 'Custom Scene', es: 'Escena Personalizada' },
 };
 
 // Clip source labels

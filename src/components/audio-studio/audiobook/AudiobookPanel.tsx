@@ -83,7 +83,7 @@ export function AudiobookPanel() {
       a.download = `${(project?.title || 'hoerbuch').replace(/\s+/g, '-').toLowerCase()}.zip`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`${done.length} Kapitel exportiert`);
+      toast.success(tx({ de: `${done.length} Kapitel exportiert`, en: `${done.length} chapters exported`, es: `${done.length} capítulos exportados` }));
     } catch (error) {
       console.error('[audiobook] export failed:', error);
       toast.error(tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Exportación fallida' }));
@@ -97,7 +97,7 @@ export function AudiobookPanel() {
       <Card className="p-8 text-center bg-card/60 backdrop-blur-xl border-primary/20">
         <BookOpen className="w-8 h-8 mx-auto mb-3 text-primary" />
         <p className="text-sm text-muted-foreground">
-          Bitte melde dich an, um den Hörbuch-Modus zu nutzen.
+          {tx({ de: 'Bitte melde dich an, um den Hörbuch-Modus zu nutzen.', en: 'Please log in to use the audiobook mode.', es: 'Inicie sesión para utilizar el modo audiolibro.' })}
         </p>
       </Card>
     );
@@ -124,14 +124,14 @@ export function AudiobookPanel() {
               value={project.title}
               onChange={(e) => updateProject({ title: e.target.value })}
               className="h-9 text-base font-semibold bg-background/40"
-              placeholder="Titel des Hörbuchs"
+              placeholder={tx({ de: "Titel des Hörbuchs", en: "Audiobook title", es: "Título del audiolibro" })}
             />
             <div className="flex gap-2 flex-wrap">
               <Input
                 value={project.author ?? ''}
                 onChange={(e) => updateProject({ author: e.target.value })}
                 className="h-9 text-sm bg-background/40 max-w-[16rem]"
-                placeholder="Autor / Sprecher-Label"
+                placeholder={tx({ de: "Autor / Sprecher-Label", en: "Author / Speaker Label", es: "Autor / Etiqueta de orador" })}
               />
               <Select
                 value={project.language}
@@ -149,8 +149,8 @@ export function AudiobookPanel() {
             </div>
           </div>
           <div className="text-right text-xs text-muted-foreground space-y-1">
-            <div><span className="text-foreground font-semibold">{chapters.length}</span> Kapitel</div>
-            <div>{totals.chars.toLocaleString('de-DE')} Zeichen</div>
+            <div><span className="text-foreground font-semibold">{chapters.length}</span> {tx({ de: "Kapitel", en: "Chapters", es: "Capítulos" })} + "</div>"
+            <div>{totals.chars.toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })} + "</div>"
             <div>≈ {formatDuration(totals.duration)}</div>
             <div className="text-primary font-semibold">
               {totals.credits.toLocaleString('de-DE')} Cr · {totals.euros.toFixed(2)} €
@@ -169,23 +169,23 @@ export function AudiobookPanel() {
       {chapters.length === 0 && (
         <Card className="p-5 space-y-3 bg-card/60 backdrop-blur-xl border-primary/20">
           <h3 className="text-sm font-semibold flex items-center gap-2">
-            <FileUp className="w-4 h-4 text-primary" /> Manuskript
+            <FileUp className="w-4 h-4 text-primary" /> {tx({ de: 'Manuskript', en: 'Manuscript', es: 'Manuscrito' })}
           </h3>
           <Textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder={'Text einfügen…\n\nÜberschriften („Kapitel 1tx({ de: " oder „# Titel", en: "or “#Title", es: "o “#Título" })) werden automatisch als Kapitel erkannt.'}
+            placeholder={'Text einfügen…\n\nÜberschriften („Kapitel 1{tx({ de: " oder „# Titel", en: "or “#Title", es: "o “#Título" })}) werden automatisch als Kapitel erkannt.'}
             className="min-h-[180px] text-sm bg-background/40"
           />
           <div className="flex gap-2 flex-wrap">
             <Button onClick={() => importManuscript(importText)} disabled={!importText.trim()}>
-              <Wand2 className="w-4 h-4 mr-2" /> Kapitel erkennen
+              <Wand2 className="w-4 h-4 mr-2" /> {tx({ de: 'Kapitel erkennen', en: 'Recognize chapters', es: 'Reconocer capítulos' })}
             </Button>
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <FileUp className="w-4 h-4 mr-2" /> .txt / .md laden
+              <FileUp className="w-4 h-4 mr-2" /> {tx({ de: '.txt / .md laden', en: 'Load .txt / .md', es: 'Cargar .txt / .md' })}
             </Button>
             <Button variant="ghost" onClick={addChapter}>
-              <Plus className="w-4 h-4 mr-2" /> Leeres Kapitel
+              <Plus className="w-4 h-4 mr-2" /> {tx({ de: 'Leeres Kapitel', en: 'Empty chapter', es: 'Capítulo vacío' })}
             </Button>
             <input
               ref={fileInputRef}
@@ -220,8 +220,7 @@ export function AudiobookPanel() {
                 </div>
                 <div className="flex items-center gap-1 mt-1.5">
                   <span className="text-[10px] text-muted-foreground flex-1">
-                    {countChars(chapter.body).toLocaleString('de-DE')} Zeichen
-                  </span>
+                    {countChars(chapter.body).toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })} + "\n                  </span>"
                   <Button size="icon" variant="ghost" className="h-6 w-6"
                     onClick={(e) => { e.stopPropagation(); void moveChapter(chapter.id, -1); }}>
                     <ChevronUp className="w-3.5 h-3.5" />
@@ -280,7 +279,7 @@ export function AudiobookPanel() {
                     {renderingId === active.id
                       ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       : <Sparkles className="w-4 h-4 mr-2" />}
-                    Kapitel vertonen
+                    {tx({ de: 'Kapitel vertonen', en: 'Narrate chapter', es: 'Narrar capítulo' })}
                   </Button>
                   {active.audio_url && (
                     <audio controls src={active.audio_url} className="h-9 flex-1 min-w-[14rem]" />
@@ -294,7 +293,7 @@ export function AudiobookPanel() {
               <div className="grid sm:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">
-                    Pause zwischen Absätzen: {(project.paragraph_gap_ms / 1000).toFixed(1)} s
+                    {tx({ de: 'Pause zwischen Absätzen', en: 'Pause between paragraphs', es: 'Pausa entre párrafos' })}: {(project.paragraph_gap_ms / 1000).toFixed(1)} s
                   </label>
                   <Slider
                     value={[project.paragraph_gap_ms]}
@@ -304,7 +303,7 @@ export function AudiobookPanel() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">
-                    Pause am Kapitelende: {(project.chapter_gap_ms / 1000).toFixed(1)} s
+                    {tx({ de: 'Pause am Kapitelende', en: 'Pause at chapter end', es: 'Pausa al final del capítulo' })}: {(project.chapter_gap_ms / 1000).toFixed(1)} s
                   </label>
                   <Slider
                     value={[project.chapter_gap_ms]}
@@ -319,7 +318,7 @@ export function AudiobookPanel() {
                   ZIP-Export ({totals.rendered} Kapitel)
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                  MP3 pro Kapitel, 44,1 kHz · Abrechnung über Media Credits
+                  {tx({ de: 'MP3 pro Kapitel, 44,1 kHz · Abrechnung über Media Credits', en: 'MP3 per chapter, 44.1 kHz · billing via Media Credits', es: 'MP3 por capítulo, 44,1 kHz · facturación mediante Media Credits' })}
                 </span>
               </div>
             </Card>

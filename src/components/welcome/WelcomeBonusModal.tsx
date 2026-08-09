@@ -19,11 +19,11 @@ const copy = {
   de: {
     headline: tx({ de: "Willkommen — dein Startguthaben wartet", en: "Welcome - your starting credit is waiting", es: "Bienvenido: su crédito inicial está esperando" }),
     subheadline: tx({ de: "Erstelle dein erstes KI-Video in unter 60 Sekunden. Keine Kreditkarte, kein Risiko.", en: "Create your first AI video in under 60 seconds. No credit card, no risk.", es: "Crea tu primer video con IA en menos de 60 segundos. Sin tarjeta de crédito, sin riesgo." }),
-    badge1: "6 KI-Modelle (Sora, Kling, Hailuo …)",
-    badge2: "Erste Vorschau in ~30 Sek",
-    badge3: "Guthaben = ~5–10 Clips gratis",
+    badge1: tx({ de: "6 KI-Modelle (Sora, Kling, Hailuo …)", en: "6 AI models (Sora, Kling, Hailuo …)", es: "6 modelos de IA (Sora, Kling, Hailuo …)" }),
+    badge2: tx({ de: "Erste Vorschau in ~30 Sek", en: "First preview in ~30 sec", es: "Primera vista previa en ~30 seg" }),
+    badge3: tx({ de: "Guthaben = ~5–10 Clips gratis", en: "Credits = ~5–10 clips free", es: "Créditos = ~5–10 clips gratis" }),
     cta: tx({ de: "Jetzt mein erstes Video erstellen", en: "Now create my first video", es: "Ahora crea mi primer video." }),
-    later: "Später",
+    later: tx({ de: "Später", en: "Later", es: "Luego" }),
     chip: tx({ de: "Geschenk für dich", en: "Gift for you", es: "Regalo para ti" }),
   },
   en: {

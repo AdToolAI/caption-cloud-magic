@@ -91,7 +91,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const triggerFastPreview = async () => {
     if (busy) return;
     if (!hasPrompt) {
-      toast({ title: 'Prompt fehlt', description: tx({ de: 'Bitte zuerst einen Prompt schreiben.', en: 'Please write a prompt first.', es: 'Por favor, escribe un prompt primero.' }), variant: 'destructive' });
+      toast({ title: tx({ de: 'Prompt fehlt', en: 'Prompt missing', es: 'Falta el prompt' }), description: tx({ de: 'Bitte zuerst einen Prompt schreiben.', en: 'Please write a prompt first.', es: 'Por favor, escribe un prompt primero.' }), variant: 'destructive' });
       return;
     }
     setBusy(true);
@@ -235,16 +235,16 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       <>
         <div className="relative w-full h-full bg-amber-500/10 border border-amber-500/40 flex flex-col items-center justify-center gap-1 p-2 text-center">
           <UserCheck className="h-5 w-5 text-amber-500" />
-          <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">Face-Map prüfen</span>
+          <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold">{tx({ de: 'Face-Map prüfen', en: 'Check Face-Map', es: 'Comprobar Face-Map' })}</span>
           <span className="text-[8px] text-muted-foreground leading-tight">
-            Sprecher konnten dem Anker nicht eindeutig zugeordnet werden.
+            {tx({ de: 'Sprecher konnten dem Anker nicht eindeutig zugeordnet werden.', en: 'Speakers could not be clearly assigned to the anchor.', es: 'No se pudo asignar claramente a los hablantes al ancla.' })}
           </span>
           <button
             type="button"
             onClick={() => setFaceMapOpen(true)}
             className="mt-1 bg-amber-500/90 hover:bg-amber-500 text-black rounded px-2 py-1 text-[9px] font-semibold"
           >
-            Zuordnung öffnen
+            {tx({ de: 'Zuordnung öffnen', en: 'Open Assignment', es: 'Abrir asignación' })}
           </button>
         </div>
         <FaceMapReviewDialog open={faceMapOpen} onOpenChange={setFaceMapOpen} scene={scene} />
@@ -256,9 +256,9 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     return (
       <div className="relative w-full h-full bg-destructive/10 border border-destructive/40 flex flex-col items-center justify-center gap-1 p-2 text-center">
         <XCircle className="h-5 w-5 text-destructive" />
-        <span className="text-[9px] text-destructive font-semibold">Falscher Renderpfad</span>
+        <span className="text-[9px] text-destructive font-semibold">{tx({ de: 'Falscher Renderpfad', en: 'Wrong render path', es: 'Ruta de renderizado incorrecta' })}</span>
         <span className="text-[8px] text-muted-foreground leading-tight">
-          Talking-Head statt Szene + Sync.so
+          {tx({ de: 'Talking-Head statt Szene + Sync.so', en: 'Talking-Head instead of scene + Sync.so', es: 'Talking-Head en lugar de escena + Sync.so' })}
         </span>
         <button
           type="button"
@@ -267,7 +267,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           className="mt-1 bg-amber-500/90 hover:bg-amber-500 text-black rounded px-2 py-1 text-[9px] flex items-center gap-1 font-semibold disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RotateCcw className="h-2.5 w-2.5" />}
-          Sauber neu starten
+          {tx({ de: 'Sauber neu starten', en: 'Restart clean', es: 'Reiniciar limpiamente' })}
         </button>
       </div>
     );
@@ -313,7 +313,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           {lipSyncRunning && (
             <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1 pointer-events-none">
               <Loader2 className="h-5 w-5 text-emerald-300 animate-spin" />
-              <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wide">Lip-Sync läuft</span>
+              <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wide">{tx({ de: 'Lip-Sync läuft', en: 'Lip-Sync running', es: 'Sincronización labial en curso' })}</span>
               <span className="text-[8px] text-emerald-100/80">Sync.so · ~60 s</span>
             </div>
           )}

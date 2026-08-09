@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Activity } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { tx } from '@/lib/i18nText';
 
 interface TemplateActivityFeedProps {
   templateId: string;
@@ -14,9 +15,9 @@ export const TemplateActivityFeed = ({ templateId }: TemplateActivityFeedProps) 
 
   const getActionLabel = (action: string) => {
     const labels: Record<string, string> = {
-      'UPDATE': 'Aktualisiert',
-      'INSERT': 'Erstellt',
-      'DELETE': 'Gelöscht',
+      'UPDATE': tx({ de: 'Aktualisiert', en: 'Updated', es: 'Actualizado' }),
+      'INSERT': tx({ de: 'Erstellt', en: 'Created', es: 'Creado' }),
+      'DELETE': tx({ de: 'Gelöscht', en: 'Deleted', es: 'Eliminado' }),
     };
     return labels[action] || action;
   };
@@ -25,7 +26,7 @@ export const TemplateActivityFeed = ({ templateId }: TemplateActivityFeedProps) 
     <Card className="p-6">
       <div className="flex items-center gap-2 mb-4">
         <Activity className="h-5 w-5 text-primary" />
-        <h3 className="font-semibold text-foreground">Aktivitätsprotokoll</h3>
+        <h3 className="font-semibold text-foreground">{tx({ de: "Aktivitätsprotokoll", en: "Activity log", es: "Registro de actividades" })}</h3>
       </div>
 
       <ScrollArea className="h-[400px]">
@@ -45,7 +46,7 @@ export const TemplateActivityFeed = ({ templateId }: TemplateActivityFeedProps) 
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Benutzer: {item.user_id.slice(0, 8)}
+                  {tx({ de: "Benutzer:", en: "User:", es: "Usuario:" })} {item.user_id.slice(0, 8)}
                 </p>
               </div>
             </div>
@@ -53,7 +54,7 @@ export const TemplateActivityFeed = ({ templateId }: TemplateActivityFeedProps) 
 
           {activity?.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Keine Aktivitäten vorhanden
+              {tx({ de: "Keine Aktivitäten vorhanden", en: "No activities available", es: "No hay actividades disponibles" })}
             </p>
           )}
         </div>

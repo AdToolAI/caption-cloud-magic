@@ -34,7 +34,7 @@ export const useVideoCreation = () => {
       if (!data.ok) {
         if (data.error === 'INSUFFICIENT_CREDITS') {
           toast({
-            title: 'Nicht genügend Credits',
+            title: tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'Créditos insuficientes' }),
             description: data.message,
             variant: 'destructive'
           });
@@ -111,7 +111,7 @@ export const useVideoCreation = () => {
         queryClient.invalidateQueries({ queryKey: ['video-history'] });
         
         toast({
-          title: 'Video fertig!',
+          title: tx({ de: 'Video fertig!', en: 'Video ready!', es: '¡Vídeo listo!' }),
           description: tx({ de: 'Dein Werbevideo wurde erfolgreich erstellt.', en: 'Your promotional video has been successfully created.', es: 'Tu video promocional ha sido creado exitosamente.' })
         });
         onComplete(result.output_url);

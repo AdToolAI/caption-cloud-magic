@@ -152,8 +152,8 @@ export default function RerollVariantGrid({
             )}
           </DialogTitle>
           <DialogDescription>
-            4 schnelle LTX-Vorschauen (~3 Sek., 384px) parallel. Wähle deinen Lieblings-Take —
-            der gewählte Seed wird für die High-Quality-Generierung gelockt.
+            {tx({ de: "4 schnelle LTX-Vorschauen (~3 Sek., 384px) parallel. Wähle deinen Lieblings-Take —", en: "4 fast LTX previews (~3 sec, 384px) in parallel. Pick your favorite take —", es: "4 vistas previas rápidas de LTX (~3 seg., 384px) en paralelo. Elige tu toma favorita —" })}
+            {tx({ de: "der gewählte Seed wird für die High-Quality-Generierung gelockt.", en: "the chosen seed will be locked for high-quality generation.", es: "la semilla elegida se bloqueará para la generación de alta calidad." })}
           </DialogDescription>
         </DialogHeader>
 
@@ -172,7 +172,7 @@ export default function RerollVariantGrid({
 
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/40">
           <div className="text-[11px] text-muted-foreground">
-            ~0.02 € pro 4er-Batch · LTX-Video · läuft im Hintergrund weiter, wenn du schließt
+            {tx({ de: "~0.02 € pro 4er-Batch · LTX-Video · läuft im Hintergrund weiter, wenn du schließt", en: "~0.02 € per 4-batch · LTX video · continues in the background if you close", es: "~0.02 € por lote de 4 · video LTX · continúa en segundo plano si cierras" })}
           </div>
           <div className="flex gap-2">
             {scene.seed != null && (

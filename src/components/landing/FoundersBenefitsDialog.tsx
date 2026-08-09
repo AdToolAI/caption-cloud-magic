@@ -56,7 +56,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
           <DialogDescription className="text-base leading-relaxed">
             Ein Creator. Ein ganzes Studio. Wir starten am{" "}
             <strong className="text-foreground">26.07.2026</strong> in eine öffentliche{" "}
-            <strong className="text-foreground">3-Monats-Beta</strong>. Als einer der ersten{" "}
+            <strong className="text-foreground">3-Monats-Beta</strong>. {tx({ de: 'Als einer der ersten', en: 'As one of the first', es: 'Como uno de los primeros' })}{" "}
             <strong className="text-foreground">1.000 Founders</strong> sicherst du dir dauerhaften
             Zugang zum kompletten Produktionsworkflow — und hilfst uns, ihn gemeinsam großartig zu machen.
           </DialogDescription>

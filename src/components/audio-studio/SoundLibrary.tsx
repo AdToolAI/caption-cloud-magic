@@ -197,7 +197,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
       if (error) throw error;
       
       setSounds(prev => prev.filter(s => s.id !== soundId));
-      toast.success('Sound gelöscht');
+      toast.success(tx({ de: 'Sound gelöscht', en: 'Sound deleted', es: 'Sonido eliminado' }));
     } catch (error) {
       console.error('Delete error:', error);
       toast.error(tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' }));
@@ -228,20 +228,20 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
     if (sound.source === 'ai_generated') return 'AI Music';
     if (sound.source === 'stem_separation') return sound.processing_preset || 'Stem';
     const labels: Record<string, string> = {
-      minimal: 'Minimal',
-      podcast: 'Podcast',
-      radio: 'Radio',
-      maximal: 'Maximal',
-      custom: 'Custom'
+      minimal: tx({ de: 'Minimal', en: 'Minimal', es: 'Mínimo' }),
+      podcast: tx({ de: 'Podcast', en: 'Podcast', es: 'Pódcast' }),
+      radio: tx({ de: 'Radio', en: 'Radio', es: 'Radio' }),
+      maximal: tx({ de: 'Maximal', en: 'Maximal', es: 'Máximo' }),
+      custom: tx({ de: 'Custom', en: 'Custom', es: 'Personalizado' })
     };
     return labels[sound.processing_preset || ''] || sound.processing_preset || 'Standard';
   };
 
   const FILTER_TABS: { id: FilterCategory; label: string; icon: typeof Library }[] = [
-    { id: 'all', label: 'Alle', icon: Library },
-    { id: 'enhanced', label: 'Optimiert', icon: Volume2 },
-    { id: 'music', label: 'AI Musik', icon: Music2 },
-    { id: 'stems', label: 'Stems', icon: Scissors },
+    { id: 'all', label: tx({ de: 'Alle', en: 'All', es: 'Todos' }), icon: Library },
+    { id: 'enhanced', label: tx({ de: 'Optimiert', en: 'Optimized', es: 'Optimizado' }), icon: Volume2 },
+    { id: 'music', label: tx({ de: 'AI Musik', en: 'AI Music', es: 'Música IA' }), icon: Music2 },
+    { id: 'stems', label: tx({ de: 'Stems', en: 'Stems', es: 'Pistas' }), icon: Scissors },
   ];
 
   const counts = {
@@ -267,8 +267,8 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
             <Library className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold">Sound-Bibliothek</h3>
-            <p className="text-xs text-muted-foreground">{sounds.length} gespeicherte Sounds</p>
+            <h3 className="font-semibold">{tx({ de: 'Sound-Bibliothek', en: 'Sound Library', es: 'Biblioteca de sonidos' })}</h3>
+            <p className="text-xs text-muted-foreground">{sounds.length} {tx({ de: 'gespeicherte Sounds', en: 'saved sounds', es: 'sonidos guardados' })}</p>
           </div>
         </div>
 
@@ -276,7 +276,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Suchen..."
+            placeholder={tx({ de: 'Suchen...', en: 'Search...', es: 'Buscar...' })}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 bg-muted/20 border-border/50"
@@ -315,7 +315,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
           {isLoading ? (
             <div className="text-center py-12 text-muted-foreground">
               <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
-              Lädt...
+              {tx({ de: 'Lädt...', en: 'Loading...', es: 'Cargando...' })}
             </div>
           ) : filteredSounds.length === 0 ? (
             <motion.div
@@ -328,7 +328,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
                 {searchQuery ? tx({ de: 'Keine Ergebnisse gefunden', en: 'No results found', es: 'No se encontraron resultados' }) : tx({ de: 'Noch keine Sounds gespeichert', en: 'No sounds saved yet', es: 'Aún no hay sonidos guardados' })}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Optimiere Audio und speichere es in der Bibliothek
+                {tx({ de: 'Optimiere Audio und speichere es in der Bibliothek', en: 'Optimize audio and save it to the library', es: 'Optimiza el audio y guárdalo en la biblioteca.' })}
               </p>
             </motion.div>
           ) : (
@@ -396,7 +396,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
                         size="icon"
                         onClick={() => onSendToBeatSync(sound.url, sound.title)}
                         className="w-9 h-9 hover:bg-primary/10 hover:text-primary"
-                        title="An Beat-Sync senden"
+                        title={tx({ de: 'An Beat-Sync senden', en: 'Send to Beat-Sync', es: 'Enviar a Beat-Sync' })}
                       >
                         <Sparkles className="w-4 h-4" />
                       </Button>
@@ -423,7 +423,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
                         size="icon"
                         onClick={() => onLoadAudio(sound.url, sound.original_url, sound.effect_config)}
                         className="w-9 h-9 hover:bg-cyan-500/10 hover:text-cyan-500"
-                        title="In Editor laden"
+                        title={tx({ de: 'In Editor laden', en: 'Load into editor', es: 'Cargar en el editor' })}
                       >
                         <RotateCcw className="w-4 h-4" />
                       </Button>
@@ -433,7 +433,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
                       size="icon"
                       onClick={() => downloadAudio(sound)}
                       className="w-9 h-9 hover:bg-primary/10 hover:text-primary"
-                      title="Herunterladen"
+                      title={tx({ de: 'Herunterladen', en: 'Download', es: 'Descargar' })}
                     >
                       <Download className="w-4 h-4" />
                     </Button>

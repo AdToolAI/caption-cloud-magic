@@ -50,14 +50,14 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
-      {/* Farbpalette */}
+      {/* {tx({ de: 'Farbpalette', en: 'Color Palette', es: 'Paleta de colores' })} */}
       <Card className="animate-fade-in">
         <CardContent className="p-6">
-          <h3 className="font-semibold text-lg mb-4">🎨 Farbpalette</h3>
+          <h3 className="font-semibold text-lg mb-4">🎨 {tx({ de: 'Farbpalette', en: 'Color Palette', es: 'Paleta de colores' })}</h3>
           <div className="space-y-3">
-            <ColorSwatch color={brandKit.color_palette.primary} label="Primär" />
-            <ColorSwatch color={brandKit.color_palette.secondary} label="Sekundär" />
-            <ColorSwatch color={brandKit.color_palette.accent} label="Akzent" />
+            <ColorSwatch color={brandKit.color_palette.primary} label={tx({ de: 'Primär', en: 'Primary', es: 'Primario' })} />
+            <ColorSwatch color={brandKit.color_palette.secondary} label={tx({ de: 'Sekundär', en: 'Secondary', es: 'Secundario' })} />
+            <ColorSwatch color={brandKit.color_palette.accent} label={tx({ de: 'Akzent', en: 'Accent', es: 'Acento' })} />
             {brandKit.color_palette.neutrals?.map((color: string, idx: number) => (
               <ColorSwatch key={idx} color={color} label={`Neutral ${idx + 1}`} />
             ))}
@@ -65,19 +65,19 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
         </CardContent>
       </Card>
 
-      {/* Schriftarten */}
+      {/* {tx({ de: 'Schriftarten', en: 'Fonts', es: 'Fuentes' })} */}
       <Card className="animate-fade-in">
         <CardContent className="p-6">
-          <h3 className="font-semibold text-lg mb-4">✍️ Schriftarten</h3>
+          <h3 className="font-semibold text-lg mb-4">✍️ {tx({ de: 'Schriftarten', en: 'Fonts', es: 'Fuentes' })}</h3>
           <div className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Überschrift</p>
+              <p className="text-sm text-muted-foreground mb-1">{tx({ de: 'Überschrift', en: 'Headline', es: 'Titular' })}</p>
               <p className="text-2xl font-bold" style={{ fontFamily: brandKit.font_pairing.headline }}>
                 {brandKit.font_pairing.headline}
               </p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Fließtext</p>
+              <p className="text-sm text-muted-foreground mb-1">{tx({ de: 'Fließtext', en: 'Body Text', es: 'Texto del cuerpo' })}</p>
               <p className="text-lg" style={{ fontFamily: brandKit.font_pairing.body }}>
                 {brandKit.font_pairing.body}
               </p>
@@ -89,7 +89,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
       {/* Beispiel-Post Vorschau */}
       <Card className="animate-fade-in md:col-span-2">
         <CardContent className="p-6">
-          <h3 className="font-semibold text-lg mb-4">📱 Instagram Post Vorschau</h3>
+          <h3 className="font-semibold text-lg mb-4">📱 {tx({ de: 'Instagram Post Vorschau', en: 'Instagram Post Preview', es: 'Vista previa de la publicación de Instagram' })}</h3>
           <div className="max-w-md mx-auto border rounded-2xl overflow-hidden shadow-lg">
             {/* Header */}
             <div className="flex items-center gap-3 p-4 bg-card">
@@ -98,7 +98,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
               )}
               <div>
                 <p className="font-semibold">{brandKit.brand_name || "Deine Marke"}</p>
-                <p className="text-xs text-muted-foreground">Gesponsert</p>
+                <p className="text-xs text-muted-foreground">{tx({ de: 'Gesponsert', en: 'Sponsored', es: 'Patrocinado' })}</p>
               </div>
             </div>
 
@@ -132,7 +132,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
       {/* Stimmung & Keywords */}
       <Card className="animate-fade-in">
         <CardContent className="p-6">
-          <h3 className="font-semibold text-lg mb-4">💫 Markenstimmung</h3>
+          <h3 className="font-semibold text-lg mb-4">💫 {tx({ de: 'Markenstimmung', en: 'Brand Mood', es: 'Estado de ánimo de la marca' })}</h3>
           <Badge variant="secondary" className="text-base px-4 py-2 mb-4">
             {brandKit.mood}
           </Badge>
@@ -161,10 +161,10 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
         </CardContent>
       </Card>
 
-      {/* Verwendungstipps */}
+      {/* {tx({ de: 'Verwendungstipps', en: 'Usage Tips', es: 'Consejos de uso' })} */}
       <Card className="animate-fade-in">
         <CardContent className="p-6">
-          <h3 className="font-semibold text-lg mb-4">💡 Verwendungstipps</h3>
+          <h3 className="font-semibold text-lg mb-4">💡 {tx({ de: 'Verwendungstipps', en: 'Usage Tips', es: 'Consejos de uso' })}</h3>
           <ul className="space-y-2">
             {brandKit.usage_examples?.map((example: string, idx: number) => (
               <li key={idx} className="text-sm flex items-start gap-2">

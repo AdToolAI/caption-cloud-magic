@@ -25,56 +25,56 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     command: '/status',
     label: 'Account Status',
-    description: tx({ de: 'Zeigt vollständige Account-Übersicht', en: 'Shows complete account overview', es: 'Muestra una descripción general completa de la cuenta.' }),
+    description: tx({ de: "Zeigt vollständige Account-Übersicht", en: "Shows complete account overview", es: "Muestra la descripción completa de la cuenta" }),
     icon: <BarChart3 className="w-4 h-4" />,
     category: 'status'
   },
   {
     command: '/credits',
-    label: 'Credits anzeigen',
-    description: tx({ de: 'Zeigt deine Credit-Balance', en: 'Shows your credit balance', es: 'Muestra tu saldo de crédito' }),
+    label: tx({ de: "Credits anzeigen", en: "Show credits", es: "Mostrar créditos" }),
+    description: tx({ de: "Zeigt deine Credit-Balance", en: "Shows your credit balance", es: "Muestra tu saldo de crédito" }),
     icon: <CreditCard className="w-4 h-4" />,
     category: 'status'
   },
   {
     command: '/render',
     label: 'Render-Status',
-    description: tx({ de: 'Zeigt aktive Video-Renderings', en: 'Shows active video renderings', es: 'Muestra representaciones de vídeo activas.' }),
+    description: tx({ de: "Zeigt aktive Video-Renderings", en: "Shows active video renderings", es: "Muestra representaciones de vídeo activas" }),
     icon: <Video className="w-4 h-4" />,
     category: 'status'
   },
   {
     command: '/reconnect',
     label: 'Reconnect Platform',
-    description: 'Erneuert Social Media Verbindung',
+    description: tx({ de: "Erneuert Social Media Verbindung", en: "Renews social media connection", es: "Renueva la conexión a las redes sociales" }),
     icon: <RefreshCcw className="w-4 h-4" />,
     category: 'action'
   },
   {
     command: '/calendar',
     label: tx({ de: 'Kalender-Übersicht', en: 'Calendar overview', es: 'Resumen del calendario' }),
-    description: tx({ de: 'Zeigt geplante Posts diese Woche', en: 'Shows scheduled posts this week', es: 'Muestra las publicaciones programadas de esta semana' }),
+    description: tx({ de: "Zeigt geplante Posts diese Woche", en: "Shows scheduled posts this week", es: "Muestra las publicaciones programadas de esta semana" }),
     icon: <Calendar className="w-4 h-4" />,
     category: 'status'
   },
   {
     command: '/tips',
-    label: 'Tipps anzeigen',
-    description: tx({ de: 'Zeigt personalisierte Tipps', en: 'Shows personalized tips', es: 'Muestra consejos personalizados' }),
+    label: tx({ de: "Tipps anzeigen", en: "Show tips", es: "Mostrar consejos" }),
+    description: tx({ de: "Zeigt personalisierte Tipps", en: "Shows personalized tips", es: "Muestra consejos personalizados" }),
     icon: <Sparkles className="w-4 h-4" />,
     category: 'help'
   },
   {
     command: '/settings',
-    label: 'Einstellungen',
-    description: tx({ de: 'Öffnet Account-Einstellungen', en: 'Opens account settings', es: 'Abre la configuración de la cuenta' }),
+    label: tx({ de: "Einstellungen", en: "Settings", es: "Ajustes" }),
+    description: tx({ de: "Öffnet Account-Einstellungen", en: "Opens account settings", es: "Abre la configuración de la cuenta" }),
     icon: <Settings className="w-4 h-4" />,
     category: 'action'
   },
   {
     command: '/help',
-    label: 'Hilfe',
-    description: tx({ de: 'Zeigt alle verfügbaren Befehle', en: 'Shows all available commands', es: 'Muestra todos los comandos disponibles' }),
+    label: tx({ de: "Hilfe", en: "Help", es: "Ayuda" }),
+    description: tx({ de: 'Zeigt alle verfügbaren {tx({ de: "Befehle", en: "Commands", es: "Comandos" })}', en: 'Shows all available commands', es: 'Muestra todos los comandos disponibles' }),
     icon: <HelpCircle className="w-4 h-4" />,
     category: 'help'
   }
@@ -105,7 +105,7 @@ export function SlashCommandSuggestions({ input, onSelect, visible }: SlashComma
       className="absolute bottom-full left-0 right-0 mb-2 bg-card/95 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden shadow-xl z-10"
     >
       <div className="p-2 border-b border-white/10 text-xs text-muted-foreground">
-        Befehle
+        {tx({ de: "Befehle", en: "Commands", es: "Comandos" })}
       </div>
       <div className="max-h-[200px] overflow-y-auto">
         {filteredCommands.map((cmd, index) => (
@@ -156,18 +156,18 @@ export function parseSlashCommand(input: string): { command: string; args: strin
 export function generateSlashCommandResponse(command: string, args: string[]): string | null {
   switch (command) {
     case '/help':
-      return `📋 **Verfügbare Befehle:**
+      return `📋 **Verfügbare {tx({ de: "Befehle", en: "Commands", es: "Comandos" })}:**
 
-\`/status\` - Zeigt vollständige Account-Übersicht
-\`/credits\` - Zeigt deine Credit-Balance
-\`/render\` - Zeigt aktive Video-Renderings
-\`/reconnect [platform]\` - Erneuert Social Media Verbindung
-\`/calendar\` - Zeigt geplante Posts diese Woche
-\`/tips\` - Zeigt personalisierte Tipps
-\`/settings\` - Öffnet Account-Einstellungen
-\`/help\` - Zeigt diese Hilfe
+\`/status\` - tx({ de: "Zeigt vollständige Account-Übersicht", en: "Shows complete account overview", es: "Muestra la descripción completa de la cuenta" })
+\`/credits\` - tx({ de: "Zeigt deine Credit-Balance", en: "Shows your credit balance", es: "Muestra tu saldo de crédito" })
+\`/render\` - tx({ de: "Zeigt aktive Video-Renderings", en: "Shows active video renderings", es: "Muestra representaciones de vídeo activas" })
+\`/reconnect [platform]\` - tx({ de: "Erneuert Social Media Verbindung", en: "Renews social media connection", es: "Renueva la conexión a las redes sociales" })
+\`/calendar\` - tx({ de: "Zeigt geplante Posts diese Woche", en: "Shows scheduled posts this week", es: "Muestra las publicaciones programadas de esta semana" })
+\`/tips\` - tx({ de: "Zeigt personalisierte Tipps", en: "Shows personalized tips", es: "Muestra consejos personalizados" })
+\`/settings\` - tx({ de: "Öffnet Account-Einstellungen", en: "Opens account settings", es: "Abre la configuración de la cuenta" })
+\`/help\` - tx({ de: "Zeigt diese Hilfe", en: "Shows this help", es: "Muestra esta ayuda" })
 
-💡 **Tipp:** Du kannst auch einfach Fragen stellen, ich verstehe natürliche Sprache!`;
+tx({ de: "💡 **Tipp:** Du kannst auch einfach Fragen stellen, ich verstehe natürliche Sprache!", en: "💡 **Tip:** You can also just ask questions, I understand natural language!", es: "💡 **Consejo:** ¡También puedes hacer preguntas, entiendo el lenguaje natural!" })`;
 
     case '/status':
       return '[COMMAND:status]'; // Will be processed specially
@@ -180,14 +180,14 @@ export function generateSlashCommandResponse(command: string, args: string[]): s
 
     case '/reconnect':
       if (args.length === 0) {
-        return `Um eine Plattform neu zu verbinden, nutze:\n\n\`/reconnect instagram\`\n\`/reconnect youtube\`\n\`/reconnect tiktok\`\n\`/reconnect linkedin\`\n\`/reconnect x\`\n\nOder gehe direkt zu [Einstellungen](/settings/social-media).`;
+        return tx({ de: "Um eine Plattform neu zu verbinden, nutze:\n\n\`/reconnect instagram\`\n\`/reconnect youtube\`\n\`/reconnect tiktok\`\n\`/reconnect linkedin\`\n\`/reconnect x\`\n\nOder gehe direkt zu [Einstellungen](/settings/social-media).", en: "To reconnect a platform, use:\n\n\`/reconnect instagram\`\n\`/reconnect youtube\`\n\`/reconnect tiktok\`\n\`/reconnect linkedin\`\n\`/reconnect x\`\n\nOr go directly to [Settings](/settings/social-media).", es: "Para volver a conectar una plataforma, use:\n\n\`/reconnect instagram\`\n\`/reconnect youtube\`\n\`/reconnect tiktok\`\n\`/reconnect linkedin\`\n\`/reconnect x\`\n\nO vaya directamente a [Configuración](/settings/social-media)." });
       }
       const platform = args[0].toLowerCase();
       const validPlatforms = ['instagram', 'youtube', 'tiktok', 'linkedin', 'x', 'facebook'];
       if (validPlatforms.includes(platform)) {
         return `[ACTION:reconnect:${platform}]`;
       }
-      return `Unbekannte Plattform: ${args[0]}. Verfügbare Plattformen: Instagram, YouTube, TikTok, LinkedIn, X, Facebook`;
+      return tx({ de: `Unbekannte Plattform: ${args[0]}. Verfügbare Plattformen: Instagram, YouTube, TikTok, LinkedIn, X, Facebook`, en: `Unknown platform: ${args[0]}. Available platforms: Instagram, YouTube, TikTok, LinkedIn, X, Facebook`, es: `Plataforma desconocida: ${args[0]}. Plataformas disponibles: Instagram, YouTube, TikTok, LinkedIn, X, Facebook` });
 
     case '/calendar':
       return '[COMMAND:calendar]';

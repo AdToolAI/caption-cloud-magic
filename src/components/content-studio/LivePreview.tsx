@@ -39,13 +39,13 @@ export function LivePreview({ compact = false }: { compact?: boolean }) {
         ) : (
           <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted/40">
             {s.image ? (
-              <img src={s.image} alt="Motiv-Vorschau" className="h-full w-full object-cover" />
+              <img src={s.image} alt={tx({ de: "Motiv-Vorschau", en: "Motif preview", es: "Vista previa del motivo" })} className="h-full w-full object-cover" />
             ) : (
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,hsl(var(--primary)/0.12),transparent_65%)]" />
             )}
             <div className="absolute inset-x-0 bottom-0 space-y-1 bg-gradient-to-t from-background/90 to-transparent p-4">
-              <p className="font-display text-lg leading-tight">{headline || "Deine Headline"}</p>
-              <p className="text-xs text-muted-foreground">{subline || "Die Aussage in einem Satz."}</p>
+              <p className="font-display text-lg leading-tight">{headline || tx({ de: "Deine Headline", en: "Your headline", es: "Tu titular" })}</p>
+              <p className="text-xs text-muted-foreground">{subline || tx({ de: "Die Aussage in einem Satz.", en: "The statement in one sentence.", es: "La declaración en una frase." })}</p>
             </div>
           </div>
         )}

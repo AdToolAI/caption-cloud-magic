@@ -45,7 +45,7 @@ export default function SharePage() {
 
       // Check view limit
       if (shareLink.max_views && shareLink.current_views >= shareLink.max_views) {
-        setError('Maximale Aufrufe erreicht');
+        setError(tx({ de: "Maximale Aufrufe erreicht", en: "Maximum views reached", es: "Máximo de visitas alcanzado" }));
         return;
       }
 
@@ -67,7 +67,7 @@ export default function SharePage() {
   const handleDownload = () => {
     if (shareData?.allow_download && shareData.content_projects?.output_video_url) {
       window.open(shareData.content_projects.output_video_url, '_blank');
-      toast.success("Download gestartet!");
+      toast.success(tx({ de: "Download gestartet!", en: "Download started!", es: "¡Descarga iniciada!" }));
     }
   };
 
@@ -92,7 +92,7 @@ export default function SharePage() {
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">{error}</p>
               <Button onClick={() => navigate('/')} className="w-full">
-                Zur Startseite
+                {tx({ de: "Zur Startseite", en: "Back to home", es: "Volver al inicio" })}
               </Button>
             </CardContent>
           </Card>
@@ -119,7 +119,7 @@ export default function SharePage() {
                   </p>
                 </div>
                 <Badge variant="secondary">
-                  {project?.status === 'completed' ? '✅ Fertig' : '🔄 In Bearbeitung'}
+                  {project?.status === 'completed' ? tx({ de: '✅ Fertig', en: '✅ Done', es: '✅ Hecho' }) : tx({ de: '🔄 In Bearbeitung', en: '🔄 In progress', es: '🔄 En progreso' })}
                 </Badge>
               </div>
             </CardHeader>
@@ -143,22 +143,22 @@ export default function SharePage() {
           {/* Project Details */}
           <Card>
             <CardHeader>
-              <CardTitle>📝 Projektdetails</CardTitle>
+              <CardTitle>{tx({ de: "📝 Projektdetails", en: "📝 Project details", es: "📝 Detalles del proyecto" })}</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
-                <div className="text-sm text-muted-foreground">Content-Type</div>
+                <div className="text-sm text-muted-foreground">{tx({ de: "Content-Type", en: "Content type", es: "Tipo de contenido" })}</div>
                 <div className="font-medium capitalize">{project?.content_type}</div>
               </div>
               <div>
-                <div className="text-sm text-muted-foreground">Erstellt am</div>
+                <div className="text-sm text-muted-foreground">{tx({ de: "Erstellt am", en: "Created at", es: "Creado el" })}</div>
                 <div className="font-medium">
                   {new Date(project?.created_at).toLocaleDateString('de-DE')}
                 </div>
               </div>
               {project?.customizations?.duration && (
                 <div>
-                  <div className="text-sm text-muted-foreground">Dauer</div>
+                  <div className="text-sm text-muted-foreground">{tx({ de: "Dauer", en: "Duration", es: "Duración" })}</div>
                   <div className="font-medium">{project.customizations.duration}s</div>
                 </div>
               )}
@@ -170,7 +170,7 @@ export default function SharePage() {
             {shareData?.allow_download && project?.output_video_url && (
               <Button onClick={handleDownload} className="flex-1">
                 <Download className="mr-2 h-4 w-4" />
-                Video herunterladen (MP4)
+                {tx({ de: "Video herunterladen (MP4)", en: "Download video (MP4)", es: "Descargar vídeo (MP4)" })}
               </Button>
             )}
             <Button
@@ -179,7 +179,7 @@ export default function SharePage() {
               className="flex-1"
             >
               <Sparkles className="mr-2 h-4 w-4" />
-              Eigenes Video erstellen
+              {tx({ de: "Eigenes Video erstellen", en: "Create own video", es: "Crear vídeo propio" })}
             </Button>
           </div>
         </div>

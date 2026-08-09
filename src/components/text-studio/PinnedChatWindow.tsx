@@ -225,7 +225,7 @@ export default function PinnedChatWindow() {
         }
       }
     } catch (e) {
-      toast.error("Verbindungsfehler");
+      toast.error(tx({ de: "Verbindungsfehler", en: "Connection error", es: "Error de conexión" }));
       console.error(e);
     } finally {
       setStreaming(false);
@@ -245,7 +245,7 @@ export default function PinnedChatWindow() {
       <button
         onClick={() => setWindowState({ minimized: false })}
         className="fixed z-[60] bottom-6 right-6 flex items-center gap-2 rounded-full bg-black/90 backdrop-blur-md border border-[#F5C76A]/40 px-4 py-2.5 text-sm text-[#F5C76A] shadow-2xl shadow-[#F5C76A]/20 hover:border-[#F5C76A] transition-all hover:scale-105"
-        aria-label="Angeheftet Chat öffnen"
+        aria-label={tx({ de: "Angeheftet Chat öffnen", en: "Open pinned chat", es: "Abrir chat anclado" })}
       >
         <Pin className="h-3.5 w-3.5" />
         <span className="font-medium">{modelLabel}</span>
@@ -278,14 +278,14 @@ export default function PinnedChatWindow() {
           {modelLabel}
         </Badge>
         <span className="text-xs text-white/60 truncate flex-1">
-          {pinned.title || "Angehefteter Chat"}
+          {pinned.title || tx({ de: "Angehefteter Chat", en: "Pinned chat", es: "Chat anclado" })}
         </span>
         <Button
           size="icon"
           variant="ghost"
           className="h-6 w-6 text-white/60 hover:text-white"
           onClick={() => navigate(`/ai-text-studio?conversation=${pinned.conversationId}`)}
-          title="Im Studio öffnen"
+          title={tx({ de: "Im Studio öffnen", en: "Open in studio", es: "Abrir en el estudio" })}
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </Button>
@@ -294,7 +294,7 @@ export default function PinnedChatWindow() {
           variant="ghost"
           className="h-6 w-6 text-white/60 hover:text-white"
           onClick={() => setWindowState({ minimized: true })}
-          title="Minimieren"
+          title={tx({ de: "Minimieren", en: "Minimize", es: "Minimizar" })}
         >
           <Minus className="h-3.5 w-3.5" />
         </Button>
@@ -305,7 +305,7 @@ export default function PinnedChatWindow() {
           onClick={() => {
             setWindowState({ w: Math.min(MAX_W, 600), h: Math.min(MAX_H, 700) });
           }}
-          title="Vergrößern"
+          title={tx({ de: "Vergrößern", en: "Enlarge", es: "Agrandar" })}
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </Button>
@@ -314,7 +314,7 @@ export default function PinnedChatWindow() {
           variant="ghost"
           className="h-6 w-6 text-white/60 hover:text-red-400"
           onClick={unpin}
-          title="Schließen (Chat bleibt erhalten)"
+          title={tx({ de: "Schließen (Chat bleibt erhalten)", en: "Close (chat remains)", es: "Cerrar (el chat permanece)" })}
         >
           <X className="h-3.5 w-3.5" />
         </Button>
@@ -328,7 +328,7 @@ export default function PinnedChatWindow() {
           </div>
         ) : messages.length === 0 ? (
           <div className="text-white/40 text-xs text-center py-8">
-            Noch keine Nachrichten. Schreib etwas …
+            {tx({ de: "Noch keine Nachrichten. Schreib etwas …", en: "No messages yet. Write something ...", es: "Aún no hay mensajes. Escribe algo ..." })}
           </div>
         ) : (
           messages.map((m, i) => (
@@ -341,7 +341,7 @@ export default function PinnedChatWindow() {
               }`}
             >
               <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">
-                {m.role === "user" ? "Du" : modelLabel}
+                {m.role === "user" ? tx({ de: "Du", en: "You", es: "Tú" }) : modelLabel}
               </div>
               <div className="prose prose-invert prose-sm max-w-none break-words [&_p]:my-1 [&_pre]:my-1 [&_pre]:text-xs">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>

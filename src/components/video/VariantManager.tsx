@@ -32,7 +32,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
-      toast.success('Download gestartet');
+      toast.success(tx({ de: "Download gestartet", en: "Download started", es: "Descarga iniciada" }));
     } catch (error) {
       console.error('Download error:', error);
       toast.error(tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Descarga fallida' }));

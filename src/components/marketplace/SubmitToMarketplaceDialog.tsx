@@ -40,9 +40,9 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Im Marketplace veröffentlichen</DialogTitle>
+          <DialogTitle>{tx({ de: "Im Marketplace veröffentlichen", en: "Publish in Marketplace", es: "Publicar en el mercado" })}</DialogTitle>
           <DialogDescription>
-            "{template.name}" mit der Community teilen. Free → sofort live. Premium → Admin-Review.
+            "{template.name}"{tx({ de: " mit der Community teilen. Free → sofort live. Premium → Admin-Review.", en: " share with the community. Free → live immediately. Premium → Admin review.", es: " compartir con la comunidad. Gratis → en vivo de inmediato. Premium → revisión de administrador." })}
           </DialogDescription>
         </DialogHeader>
 
@@ -58,8 +58,8 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
           <Label htmlFor="opt-premium" className="flex items-start gap-3 border rounded-lg p-3 cursor-pointer hover:bg-muted/50">
             <RadioGroupItem value="premium" id="opt-premium" className="mt-1" />
             <div className="flex-1">
-              <div className="flex items-center gap-2 font-medium"><Coins className="h-4 w-4 text-amber-500" />Premium Template</div>
-              <p className="text-xs text-muted-foreground mt-1">Käufer zahlen Credits, du erhältst {REVENUE_SHARE}%. Wartet auf Admin-Freigabe.</p>
+              <div className="flex items-center gap-2 font-medium"><Coins className="h-4 w-4 text-amber-500" />{tx({ de: "Premium Template", en: "Premium template", es: "Plantilla premium" })}</div>
+              <p className="text-xs text-muted-foreground mt-1">{tx({ de: `Käufer zahlen Credits, du erhältst ${REVENUE_SHARE}%. Wartet auf Admin-Freigabe.`, en: `Buyers pay credits, you receive ${REVENUE_SHARE}%. Waiting for admin approval.`, es: `Los compradores pagan créditos, tú recibes ${REVENUE_SHARE}%. Esperando aprobación del administrador.` })}</p>
             </div>
           </Label>
         </RadioGroup>
@@ -68,7 +68,7 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
           <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label>Preis: <span className="font-bold text-foreground">{priceCredits} Credits</span></Label>
+                <Label>{tx({ de: "Preis:", en: "Price:", es: "Precio:" })} <span className="font-bold text-foreground">{priceCredits} Credits</span></Label>
                 <span className="text-xs text-muted-foreground">25 – 1000</span>
               </div>
               <Slider min={25} max={1000} step={25} value={[priceCredits]} onValueChange={([v]) => setPriceCredits(v)} />
@@ -76,11 +76,11 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
 
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-md p-2">
-                <div className="text-xs text-muted-foreground">Du bekommst (pro Verkauf)</div>
+                <div className="text-xs text-muted-foreground">{tx({ de: "Du bekommst (pro Verkauf)", en: "You get (per sale)", es: "Recibes (por venta)" })}</div>
                 <div className="font-bold text-emerald-600 dark:text-emerald-400">{creatorEarning} Credits</div>
               </div>
               <div className="bg-muted rounded-md p-2">
-                <div className="text-xs text-muted-foreground">Plattform-Anteil</div>
+                <div className="text-xs text-muted-foreground">{tx({ de: "Plattform-Anteil", en: "Platform share", es: "Cuota de plataforma" })}</div>
                 <div className="font-bold">{platformFee} Credits</div>
               </div>
             </div>
@@ -93,10 +93,10 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
           <Button onClick={handleSubmit} disabled={submit.isPending}>
             {submit.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {pricingType === 'free' ? 'Sofort veröffentlichen' : 'Zur Prüfung einreichen'}
+            {pricingType === 'free' ? tx({ de: 'Sofort veröffentlichen', en: 'Publish immediately', es: 'Publicar de inmediato' }) : tx({ de: 'Zur Prüfung einreichen', en: 'Submit for review', es: 'Enviar para revisión' })}
           </Button>
         </DialogFooter>
       </DialogContent>

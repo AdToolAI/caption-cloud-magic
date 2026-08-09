@@ -222,7 +222,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
           });
         }
         toast({
-          title: 'Generierung gestartet',
+          title: tx({ de: 'Generierung gestartet', en: 'Generation started', es: 'Generación iniciada' }),
           description: tx({ de: `Szene ${(workingScene.orderIndex ?? 0) + 1} wird gebaut…`, en: `Building scene ${(workingScene.orderIndex ?? 0) + 1}…`, es: `Construyendo escena ${(workingScene.orderIndex ?? 0) + 1}…` }),
         });
         // Intentionally do NOT emit clips:end on success — the server only

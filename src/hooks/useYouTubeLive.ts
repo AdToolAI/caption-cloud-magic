@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { tx } from '@/lib/i18nText';
 
 interface Broadcast {
   id: string;
@@ -106,33 +107,33 @@ export function useYouTubeLive() {
     title: string, description: string, scheduledStartTime: string, privacyStatus: string
   ) => {
     const res = await invoke('create_broadcast', { title, description, scheduledStartTime, privacyStatus });
-    toast({ title: '🎬 Broadcast erstellt', description: title });
+    toast({ title: tx({ de: '🎬 Broadcast erstellt', en: '🎬 Broadcast created', es: '🎬 Transmisión creada' }), description: title });
     await fetchBroadcasts();
     return res;
   }, [invoke, fetchBroadcasts, toast]);
 
   const updateBroadcast = useCallback(async (broadcastId: string, title: string, description: string) => {
     await invoke('update_broadcast', { broadcastId, title, description });
-    toast({ title: '✏️ Broadcast aktualisiert' });
+    toast({ title: tx({ de: '✏️ Broadcast aktualisiert', en: '✏️ Broadcast updated', es: '✏️ Transmisión actualizada' }) });
     await fetchBroadcasts();
   }, [invoke, fetchBroadcasts, toast]);
 
   const transitionBroadcast = useCallback(async (broadcastId: string, broadcastStatus: string) => {
     await invoke('transition_broadcast', { broadcastId, broadcastStatus });
-    toast({ title: `🔄 Status: ${broadcastStatus}` });
+    toast({ title: `${tx({ de: '🔄 Status:', en: '🔄 Status:', es: '🔄 Estado:' })} ${broadcastStatus}` });
     await fetchBroadcasts();
   }, [invoke, fetchBroadcasts, toast]);
 
   const createStream = useCallback(async (streamTitle?: string) => {
     const res = await invoke('create_stream', { streamTitle });
-    toast({ title: '🔑 Stream-Key erstellt' });
+    toast({ title: tx({ de: '🔑 Stream-Key erstellt', en: '🔑 Stream key created', es: '🔑 Clave de transmisión creada' }) });
     await fetchStreams();
     return res;
   }, [invoke, fetchStreams, toast]);
 
   const bindStream = useCallback(async (broadcastId: string, streamId: string) => {
     await invoke('bind_stream', { broadcastId, streamId });
-    toast({ title: '🔗 Stream an Broadcast gebunden' });
+    toast({ title: tx({ de: '🔗 Stream an Broadcast gebunden', en: '🔗 Stream bound to broadcast', es: '🔗 Transmisión vinculada a la transmisión' }) });
     await fetchBroadcasts();
   }, [invoke, fetchBroadcasts, toast]);
 

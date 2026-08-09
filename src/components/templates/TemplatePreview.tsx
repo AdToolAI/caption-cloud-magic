@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,16 +28,16 @@ export const TemplatePreview = ({
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      social_media: 'Social Media',
-      advertising: 'Werbung',
-      explainer: 'Erklärvideos',
-      tutorial: 'Tutorials',
-      testimonial: 'Testimonials',
-      product_showcase: 'Produktpräsentation',
-      event: 'Events',
-      educational: 'Bildung',
-      entertainment: 'Unterhaltung',
-      other: 'Sonstige',
+      social_media: tx({ de: 'Social Media', en: 'Social Media', es: 'Redes sociales' }),
+      advertising: tx({ de: 'Werbung', en: 'Advertising', es: 'Publicidad' }),
+      explainer: tx({ de: 'Erklärvideos', en: 'Explainer videos', es: 'Videos explicativos' }),
+      tutorial: tx({ de: 'Tutorials', en: 'Tutorials', es: 'Tutoriales' }),
+      testimonial: tx({ de: 'Testimonials', en: 'Testimonials', es: 'Testimonios' }),
+      product_showcase: tx({ de: 'Produktpräsentation', en: 'Product showcase', es: 'Presentación de producto' }),
+      event: tx({ de: 'Events', en: 'Events', es: 'Eventos' }),
+      educational: tx({ de: 'Bildung', en: 'Education', es: 'Educación' }),
+      entertainment: tx({ de: 'Unterhaltung', en: 'Entertainment', es: 'Entretenimiento' }),
+      other: tx({ de: 'Sonstige', en: 'Other', es: 'Otros' }),
     };
     return labels[category] || category;
   };

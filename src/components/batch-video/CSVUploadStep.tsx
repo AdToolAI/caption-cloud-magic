@@ -36,7 +36,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
     URL.revokeObjectURL(url);
 
     toast({
-      title: 'Template heruntergeladen',
+      title: tx({ de: 'Template heruntergeladen', en: 'Template downloaded', es: 'Plantilla descargada' }),
       description: tx({ de: 'Fülle die CSV-Datei mit deinen Daten und lade sie wieder hoch.', en: 'Fill the CSV file with your data and upload it again.', es: 'Rellena el archivo CSV con tus datos y súbelo de nuevo.' })
     });
   };
@@ -50,7 +50,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
         
         if (data.length === 0) {
           toast({
-            title: 'Leere CSV',
+            title: tx({ de: 'Leere CSV', en: 'Empty CSV', es: 'CSV vacío' }),
             description: tx({ de: 'Die CSV-Datei enthält keine Daten.', en: 'The CSV file contains no data.', es: 'El archivo CSV no contiene datos.' }),
             variant: 'destructive'
           });
@@ -65,8 +65,8 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
 
         if (missingFields.length > 0) {
           toast({
-            title: 'Fehlende Spalten',
-            description: `Die CSV muss folgende Spalten enthalten: ${missingFields.join(', ')}`,
+            title: tx({ de: 'Fehlende Spalten', en: 'Missing columns', es: 'Columnas faltantes' }),
+            description: tx({ de: `Die CSV muss folgende Spalten enthalten: ${missingFields.join(', ')}`, en: `The CSV must contain the following columns: ${missingFields.join(', ')}`, es: `El CSV debe contener las siguientes columnas: ${missingFields.join(', ')}` }),
             variant: 'destructive'
           });
           return;
@@ -76,12 +76,12 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
         onDataParsed(data);
         toast({
           title: tx({ de: 'CSV erfolgreich hochgeladen', en: 'CSV uploaded successfully', es: 'CSV cargado exitosamente' }),
-          description: tx({ de: `${data.length} Videos werden erstellt.`, en: `${data.length} videos are being created.`, es: `Se están creando ${data.length} videos.` })
+          description: tx({ de: `${data.length} {tx({ de: 'Videos', en: 'Videos', es: 'Videos' })} werden erstellt.`, en: `${data.length} videos are being created.`, es: `Se están creando ${data.length} videos.` })
         });
       },
       error: (error) => {
         toast({
-          title: 'CSV Parsefehler',
+          title: tx({ de: 'CSV Parsefehler', en: 'CSV parse error', es: 'Error de análisis de CSV' }),
           description: error.message,
           variant: 'destructive'
         });
@@ -98,7 +98,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
       parseCSV(file);
     } else {
       toast({
-        title: 'Ungültiges Dateiformat',
+        title: tx({ de: 'Ungültiges Dateiformat', en: 'Invalid file format', es: 'Formato de archivo inválido' }),
         description: tx({ de: 'Bitte lade eine CSV-Datei hoch.', en: 'Please upload a CSV file.', es: 'Por favor, sube un archivo CSV.' }),
         variant: 'destructive'
       });
@@ -117,7 +117,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
       <div className="space-y-2">
         <h3 className="text-lg font-semibold">{tx({ de: "CSV-Datei hochladen", en: "Upload CSV file", es: "Subir archivo CSV" })}</h3>
         <p className="text-sm text-muted-foreground">
-          Lade eine CSV-Datei mit deinen Video-Daten hoch oder lade zuerst die Vorlage herunter.
+          {tx({ de: 'Lade eine CSV-Datei mit deinen Video-Daten hoch oder lade zuerst die Vorlage herunter.', en: 'Upload a CSV file with your video data or download the template first.', es: 'Sube un archivo CSV con tus datos de vídeo o descarga primero la plantilla.' })}
         </p>
       </div>
 
@@ -128,7 +128,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
         className="w-full"
       >
         <Download className="mr-2 h-4 w-4" />
-        CSV-Vorlage herunterladen
+        {tx({ de: 'CSV-Vorlage herunterladen', en: 'Download CSV template', es: 'Descargar plantilla CSV' })}
       </Button>
 
       {/* Upload Area */}
@@ -146,13 +146,13 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
       >
         <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         <p className="text-sm text-muted-foreground mb-4">
-          CSV-Datei hierher ziehen oder klicken zum Hochladen
+          {tx({ de: 'CSV-Datei hierher ziehen oder klicken zum Hochladen', en: 'Drag CSV file here or click to upload', es: 'Arrastra el archivo CSV aquí o haz clic para subirlo' })}
         </p>
         <label htmlFor="csv-upload">
           <Button variant="secondary" asChild>
             <span>
               <Upload className="mr-2 h-4 w-4" />
-              CSV hochladen
+              {tx({ de: 'CSV hochladen', en: 'Upload CSV', es: 'Subir CSV' })}
             </span>
           </Button>
         </label>
@@ -169,9 +169,9 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
       {csvData.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium">Vorschau (erste 3 Zeilen)</h4>
+            <h4 className="font-medium">{tx({ de: 'Vorschau (erste 3 Zeilen)', en: 'Preview (first 3 rows)', es: 'Vista previa (primeras 3 filas)' })}</h4>
             <span className="text-sm text-muted-foreground">
-              {csvData.length} Videos
+              {csvData.length} {tx({ de: 'Videos', en: 'Videos', es: 'Videos' })}
             </span>
           </div>
           <div className="border rounded-lg overflow-auto max-h-64">
@@ -205,7 +205,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
             <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
             <div className="text-sm space-y-1">
               <p className="font-medium text-blue-900 dark:text-blue-100">
-                Validierung erfolgreich
+                {tx({ de: 'Validierung erfolgreich', en: 'Validation successful', es: 'Validación exitosa' })}
               </p>
               <p className="text-blue-700 dark:text-blue-300">
                 Alle Pflichtfelder sind vorhanden. Kosten: {csvData.length * 50} Credits

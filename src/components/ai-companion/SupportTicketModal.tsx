@@ -21,11 +21,11 @@ interface SupportTicketModalProps {
 }
 
 const categories = [
-  { id: 'bug', label: 'Bug melden', icon: Bug, color: 'text-red-400' },
-  { id: 'feature', label: 'Feature-Wunsch', icon: Lightbulb, color: 'text-yellow-400' },
-  { id: 'account', label: 'Account-Problem', icon: User, color: 'text-blue-400' },
-  { id: 'billing', label: 'Abrechnung', icon: CreditCard, color: 'text-green-400' },
-  { id: 'other', label: 'Sonstiges', icon: HelpCircle, color: 'text-muted-foreground' },
+  { id: 'bug', label: tx({ de: 'Bug melden', en: 'Report bug', es: 'Reportar error' }), icon: Bug, color: 'text-red-400' },
+  { id: 'feature', label: tx({ de: 'Feature-Wunsch', en: 'Feature request', es: 'Solicitud de función' }), icon: Lightbulb, color: 'text-yellow-400' },
+  { id: 'account', label: tx({ de: 'Account-Problem', en: 'Account problem', es: 'Problema de cuenta' }), icon: User, color: 'text-blue-400' },
+  { id: 'billing', label: tx({ de: 'Abrechnung', en: 'Billing', es: 'Facturación' }), icon: CreditCard, color: 'text-green-400' },
+  { id: 'other', label: tx({ de: 'Sonstiges', en: 'Other', es: 'Otro' }), icon: HelpCircle, color: 'text-muted-foreground' },
 ];
 
 export function SupportTicketModal({
@@ -79,7 +79,7 @@ export function SupportTicketModal({
         conversation_id: conversationId || null,
         category,
         subject,
-        description: description || conversationSummary || 'Keine Beschreibung',
+        description: description || conversationSummary || tx({ de: 'Keine Beschreibung', en: 'No description', es: 'Sin descripción' }),
         priority: detectedError ? 'high' : 'normal',
         metadata: ticketMetadata,
       };
@@ -102,7 +102,7 @@ export function SupportTicketModal({
       });
 
       setIsSuccess(true);
-      toast.success('Support-Ticket erstellt!');
+      toast.success(tx({ de: 'Support-Ticket erstellt!', en: 'Support ticket created!', es: '¡Ticket de soporte creado!' }));
       
       setTimeout(() => {
         onClose();
@@ -139,7 +139,7 @@ export function SupportTicketModal({
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 bg-gradient-to-r from-primary/10 to-transparent">
               <h3 className="text-lg font-semibold text-foreground">
-                An Support weiterleiten
+                {tx({ de: 'An Support weiterleiten', en: 'Forward to support', es: 'Reenviar al soporte' })}
               </h3>
               <Button
                 variant="ghost"
@@ -179,7 +179,7 @@ export function SupportTicketModal({
 
                   {/* Category Selection */}
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Kategorie</Label>
+                    <Label className="text-sm text-muted-foreground">{tx({ de: 'Kategorie', en: 'Category', es: 'Categoría' })}</Label>
                     <div className="grid grid-cols-2 gap-2">
                       {categories.map((cat) => (
                         <button
@@ -203,7 +203,7 @@ export function SupportTicketModal({
                   {/* Description */}
                   <div className="space-y-2">
                     <Label className="text-sm text-muted-foreground">
-                      Beschreibung (optional)
+                      {tx({ de: 'Beschreibung (optional)', en: 'Description (optional)', es: 'Descripción (opcional)' })}
                     </Label>
                     <Textarea
                       value={description}
@@ -231,12 +231,12 @@ export function SupportTicketModal({
                     {isSubmitting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Wird gesendet...
+                        {tx({ de: 'Wird gesendet...', en: 'Sending...', es: 'Enviando...' })}
                       </>
                     ) : (
                       <>
                         <Send className="w-4 h-4 mr-2" />
-                        Ticket erstellen
+                        {tx({ de: 'Ticket erstellen', en: 'Create ticket', es: 'Crear ticket' })}
                       </>
                     )}
                   </Button>

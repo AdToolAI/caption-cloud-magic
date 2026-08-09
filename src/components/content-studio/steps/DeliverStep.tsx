@@ -161,7 +161,7 @@ export function DeliverStep() {
       )}
 
       <div className="space-y-2">
-        <h2 className="font-display text-3xl tracking-tight">Ausspielen</h2>
+        <h2 className="font-display text-3xl tracking-tight">{tx({ de: "Ausspielen", en: "Deliver", es: "Entrega" })}</h2>
         <p className="text-sm text-muted-foreground">{tx({ de: "Ein Beitrag — oder gleich eine ganze Serie aus demselben Briefing.", en: "One post — or a whole series from the same briefing.", es: "Una publicación, o toda una serie del mismo briefing." })}</p>
       </div>
 
@@ -172,7 +172,7 @@ export function DeliverStep() {
               value={s.design.title}
               onChange={(e) => s.setDesign((p) => ({ ...p, title: e.target.value }))}
               className="h-9 w-full sm:w-64"
-              placeholder="Titel"
+              placeholder={tx({ de: "Titel", en: "Title", es: "Título" })}
             />
             <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
@@ -195,7 +195,7 @@ export function DeliverStep() {
               <Layers className="h-4 w-4 text-primary" /> Serie statt Einzelpost
             </Label>
             <p className="text-xs text-muted-foreground">
-              Aus demselben Briefing entsteht eine Kampagne mit Terminvorschlägen.
+              {tx({ de: "Aus demselben Briefing entsteht eine Kampagne mit Terminvorschlägen.", en: "The same briefing creates a campaign with suggested dates.", es: "El mismo briefing crea una campaña con fechas sugeridas." })}
             </p>
           </div>
           <Switch checked={series} onCheckedChange={setSeries} />

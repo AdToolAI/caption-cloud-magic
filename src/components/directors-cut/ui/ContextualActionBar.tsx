@@ -78,7 +78,7 @@ export function ContextualActionBar({
             {cutSegmentMode ? (
               <div className="flex items-center gap-1 px-2">
                 <ScissorsLineDashed className="w-4 h-4 text-destructive" />
-                <span className="text-xs text-destructive font-medium mr-1">Segment markieren</span>
+                <span className="text-xs text-destructive font-medium mr-1">{tx({ de: "Segment markieren", en: "Mark segment", es: "Marcar segmento" })}</span>
                 {canApplyCutSegment && (
                   <Button
                     variant="default"
@@ -122,7 +122,7 @@ export function ContextualActionBar({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
-                          {preset.icon} {preset.value < 1 ? 'Zeitlupe' : preset.value === 1 ? 'Normal' : 'Zeitraffer'}
+                          {preset.icon} {preset.value < 1 ? tx({ de: 'Zeitlupe', en: 'Slow motion', es: 'Cámara lenta' }) : preset.value === 1 ? tx({ de: 'Normal', en: 'Normal', es: 'Normal' }) : tx({ de: 'Zeitraffer', en: 'Time lapse', es: 'Cámara rápida' })}
                         </TooltipContent>
                       </Tooltip>
                     ))}
@@ -145,7 +145,7 @@ export function ContextualActionBar({
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
                         <span className="flex items-center gap-1">
-                          Am Playhead teilen <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">S</kbd>
+                          {tx({ de: "Am Playhead teilen", en: "Split at playhead", es: "Dividir en el cabezal de reproducción" })} <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">S</kbd>
                         </span>
                       </TooltipContent>
                     </Tooltip>
@@ -163,7 +163,7 @@ export function ContextualActionBar({
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
                         <span className="flex items-center gap-1">
-                          Duplizieren <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">D</kbd>
+                          {tx({ de: "Duplizieren", en: "Duplicate", es: "Duplicar" })} <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">D</kbd>
                         </span>
                       </TooltipContent>
                     </Tooltip>
@@ -199,7 +199,7 @@ export function ContextualActionBar({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
-                          Szene hinzufügen (danach)
+                          {tx({ de: "Szene hinzufügen (danach)", en: "Add scene (after)", es: "Añadir escena (después)" })}
                         </TooltipContent>
                       </Tooltip>
                     )}
@@ -218,7 +218,7 @@ export function ContextualActionBar({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
-                          Segment herausschneiden
+                          {tx({ de: "Segment herausschneiden", en: "Cut out segment", es: "Recortar segmento" })}
                         </TooltipContent>
                       </Tooltip>
                     )}
@@ -236,12 +236,12 @@ export function ContextualActionBar({
                         className="h-8 px-3 gap-1.5 hover:bg-purple-500/20 hover:text-purple-500"
                       >
                         <Sparkles className="w-4 h-4" />
-                        <span className="text-xs font-medium">Effekte</span>
+                        <span className="text-xs font-medium">{tx({ de: "Effekte", en: "Effects", es: "Efectos" })}</span>
                         <ChevronRight className="w-3 h-3" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs">
-                      Effekte & Filter anwenden
+                      {tx({ de: "Effekte & Filter anwenden", en: "Apply effects & filters", es: "Aplicar efectos y filtros" })}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -251,7 +251,7 @@ export function ContextualActionBar({
             {/* Keyboard hint */}
             <div className="ml-1 px-2 py-1 bg-muted/50 rounded-lg">
               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Zap className="w-3 h-3" /> Shortcuts aktiv
+                <Zap className="w-3 h-3" /> {tx({ de: "Shortcuts aktiv", en: "Shortcuts active", es: "Atajos activos" })}
               </span>
             </div>
           </div>

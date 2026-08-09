@@ -84,7 +84,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
           <Mic className="w-6 h-6 text-primary" />
         </div>
         <h3 className="text-lg font-semibold mb-1">{tx({ de: "Noch keine eigenen Stimmen", en: "No custom voices yet", es: "Aún no hay voces propias" })}</h3>
-        <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+        <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">{tx({ de: 'Klone deine erste Stimme über das Voice Studio — Skript vorlesen, Mikrofon oder WhatsApp-Sprachnachricht.', en: 'Clone your first voice via the Voice Studio — read a script, use the microphone, or send a WhatsApp voice message.', es: 'Clona tu primera voz a través del Voice Studio: lee un guion, usa el micrófono o envía un mensaje de voz de WhatsApp.' })}
           Klone deine erste Stimme über das Voice Studio — Skript vorlesen, Mikrofon oder
           WhatsApp-Sprachnachricht.
         </p>
@@ -171,7 +171,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
                       </div>
                     ) : (
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{v.name || 'Unbenannt'}</p>
+                        <p className="font-medium truncate">{v.name || tx({ de: 'Unbenannt', en: 'Unnamed', es: 'Sin nombre' })}</p>
                         <p className="text-[11px] text-muted-foreground">
                           {(v.language || 'en').toUpperCase()} ·{' '}
                           {new Date(v.created_at).toLocaleDateString()}
@@ -188,7 +188,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
                           : 'bg-muted/40 border-border/50 text-muted-foreground text-[10px]'
                       }
                     >
-                      {v.is_active ? 'Aktiv' : 'Inaktiv'}
+                      {v.is_active ? tx({ de: 'Aktiv', en: 'Active', es: 'Activo' }) : tx({ de: 'Inaktiv', en: 'Inactive', es: 'Inactivo' })}
                     </Badge>
                   )}
                 </div>
@@ -214,7 +214,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
                     size="icon"
                     variant="ghost"
                     className="h-9 w-9"
-                    title="Umbenennen"
+                    title={tx({ de: 'Umbenennen', en: 'Rename', es: 'Renombrar' })}
                     onClick={() => startRename(v.id, v.name)}
                   >
                     <Pencil className="w-4 h-4" />
@@ -223,7 +223,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
                     size="icon"
                     variant="ghost"
                     className="h-9 w-9 text-destructive hover:text-destructive"
-                    title="Löschen"
+                    title={tx({ de: 'Löschen', en: 'Delete', es: 'Eliminar' })}
                     onClick={() => setConfirmDeleteId(v.id)}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -232,7 +232,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
 
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
                   <span className="text-[11px] text-muted-foreground">
-                    Für Voiceovers verfügbar
+                    {tx({ de: 'Für Voiceovers verfügbar', en: 'Available for voiceovers', es: 'Disponible para locuciones' })}
                   </span>
                   <Switch
                     checked={v.is_active}
@@ -258,7 +258,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}</AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
                 if (confirmDeleteId) await deleteVoice(confirmDeleteId);

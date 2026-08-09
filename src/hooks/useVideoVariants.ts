@@ -55,7 +55,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-variants'] });
       toast({
-        title: 'Variante erstellt',
+        title: tx({ de: 'Variante erstellt', en: 'Variant created', es: 'Variante creada' }),
         description: tx({ de: 'Video-Variante wurde erfolgreich erstellt', en: 'Video variant successfully created', es: 'Variante de video creada exitosamente' }),
       });
     },
@@ -81,7 +81,7 @@ export const useVideoVariants = (videoCreationId?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-variants'] });
       toast({
-        title: 'Variante gelöscht',
+        title: tx({ de: 'Variante gelöscht', en: 'Variant deleted', es: 'Variante eliminada' }),
         description: tx({ de: 'Video-Variante wurde erfolgreich gelöscht', en: 'Video variant successfully deleted', es: 'Variante de video eliminada exitosamente' }),
       });
     },

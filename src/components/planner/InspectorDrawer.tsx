@@ -83,9 +83,9 @@ export function InspectorDrawer({
   ) : [];
 
   const statusOptions = [
-    { value: "draft", label: "Entwurf", color: "bg-slate-500" },
-    { value: "scheduled", label: "Geplant", color: "bg-blue-500" },
-    { value: "approved", label: "Genehmigt", color: "bg-green-500" },
+    { value: "draft", label: tx({ de: "Entwurf", en: "Draft", es: "Borrador" }), color: "bg-slate-500" },
+    { value: "scheduled", label: tx({ de: "Geplant", en: "Scheduled", es: "Programado" }), color: "bg-blue-500" },
+    { value: "approved", label: tx({ de: "Genehmigt", en: "Approved", es: "Aprobado" }), color: "bg-green-500" },
   ];
 
   return (
@@ -93,7 +93,7 @@ export function InspectorDrawer({
       <Sheet open={!!block} onOpenChange={(open) => !open && onClose()}>
         <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Post Details</SheetTitle>
+            <SheetTitle>{tx({ de: "Post Details", en: "Post details", es: "Detalles de la publicación" })}</SheetTitle>
           </SheetHeader>
 
           <div className="space-y-4 mt-6">
@@ -104,32 +104,32 @@ export function InspectorDrawer({
 
             {/* Title */}
             <div>
-              <Label>Titel *</Label>
+              <Label>{tx({ de: "Titel *", en: "Title *", es: "Título *" })}</Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={80}
-                placeholder="Max. 80 Zeichen"
+                placeholder={tx({ de: "Max. 80 Zeichen", en: "Max. 80 characters", es: "Máx. 80 caracteres" })}
               />
               <p className="text-xs text-muted-foreground mt-1">{title.length}/80</p>
             </div>
 
             {/* Caption */}
             <div>
-              <Label>Caption</Label>
+              <Label>{tx({ de: "Caption", en: "Caption", es: "Subtítulo" })}</Label>
               <Textarea
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
                 rows={6}
                 maxLength={2200}
-                placeholder="Post-Text..."
+                placeholder={tx({ de: "Post-Text...", en: "Post text...", es: "Texto de la publicación..." })}
               />
               <p className="text-xs text-muted-foreground mt-1">{caption.length}/2200</p>
             </div>
 
             {/* Platform */}
             <div>
-              <Label>Plattform *</Label>
+              <Label>{tx({ de: "Plattform *", en: "Platform *", es: "Plataforma *" })}</Label>
               <Select value={platform} onValueChange={setPlatform}>
                 <SelectTrigger>
                   <SelectValue />
@@ -157,7 +157,7 @@ export function InspectorDrawer({
               </div>
 
               <div>
-                <Label>Dauer (Sekunden)</Label>
+                <Label>{tx({ de: "Dauer (Sekunden)", en: "Duration (seconds)", es: "Duración (segundos)" })}</Label>
                 <Input
                   type="number"
                   value={duration}
@@ -170,7 +170,7 @@ export function InspectorDrawer({
 
             {/* Status */}
             <div>
-              <Label>Status</Label>
+              <Label>{tx({ de: "Status", en: "Status", es: "Estado" })}</Label>
               <div className="flex gap-2 mt-2 flex-wrap">
                 {statusOptions.map((s) => (
                   <Badge
@@ -194,7 +194,7 @@ export function InspectorDrawer({
                   ) : (
                     <ImageIcon className="h-4 w-4" />
                   )}
-                  Original Content
+                  {tx({ de: "Original-Inhalt", en: "Original content", es: "Contenido original" })}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {block.content_items.title}
@@ -207,7 +207,7 @@ export function InspectorDrawer({
                   />
                 )}
                 <div className="flex gap-2 text-xs text-muted-foreground">
-                  <span>Quelle: {block.content_items.source}</span>
+                  <span>{tx({ de: "Quelle:", en: "Source:", es: "Fuente:" })} {block.content_items.source}</span>
                   {block.content_items.duration_sec && (
                     <span>· {block.content_items.duration_sec}s</span>
                   )}
@@ -219,18 +219,18 @@ export function InspectorDrawer({
             <div className="flex gap-2 pt-4 border-t">
               <Button onClick={handleSave} className="flex-1">
                 <Check className="h-4 w-4 mr-2" />
-                Speichern
+                {tx({ de: "Speichern", en: "Save", es: "Guardar" })}
               </Button>
               
               <Button onClick={() => setShowOptimization(!showOptimization)} variant="outline">
                 <Sparkles className="h-4 w-4 mr-2" />
-                {showOptimization ? 'Schließen' : 'Optimieren'}
+                {showOptimization ? tx({ de: 'Schließen', en: 'Close', es: 'Cerrar' }) : tx({ de: 'Optimieren', en: 'Optimize', es: 'Optimizar' })}
               </Button>
               
               {status !== "approved" && (
                 <Button variant="secondary" onClick={handleQuickApprove}>
                   <Check className="h-4 w-4 mr-2" />
-                  Genehmigen
+                  {tx({ de: "Genehmigen", en: "Approve", es: "Aprobar" })}
                 </Button>
               )}
             </div>
@@ -261,7 +261,7 @@ export function InspectorDrawer({
                 className="w-full"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Post löschen
+                {tx({ de: "Post löschen", en: "Delete post", es: "Eliminar publicación" })}
               </Button>
             </div>
           </div>
@@ -271,13 +271,13 @@ export function InspectorDrawer({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Post löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{tx({ de: "Post löschen", en: "Delete post", es: "Eliminar publicación" })}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+              {tx({ de: "Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.", en: "Are you sure you want to delete this scheduled post? This action cannot be undone.", es: "¿Estás seguro de que quieres eliminar esta publicación programada? Esta acción no se puede deshacer." })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (block?.id) {
@@ -287,7 +287,7 @@ export function InspectorDrawer({
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Löschen
+              {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

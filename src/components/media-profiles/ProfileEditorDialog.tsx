@@ -97,7 +97,7 @@ export function ProfileEditorDialog({
 
     if (!isValid) {
       toast({
-        title: 'Ungültige Konfiguration',
+        title: tx({ de: 'Ungültige Konfiguration', en: 'Invalid configuration', es: 'Configuración no válida' }),
         description: tx({ de: 'Bitte behebe die Validierungsfehler.', en: 'Please fix the validation errors.', es: 'Corrija los errores de validación.' }),
         variant: 'destructive'
       });
@@ -136,14 +136,14 @@ export function ProfileEditorDialog({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {profile ? 'Profil bearbeiten' : tx({ de: "Neues Profil erstellen", en: "Create new profile", es: "Crear nuevo perfil" })}
+            {profile ? tx({ de: 'Profil bearbeiten', en: 'Edit profile', es: 'Editar perfil' }) : tx({ de: "Neues Profil erstellen", en: "Create new profile", es: "Crear nuevo perfil" })}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="config" className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="config">Konfiguration</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
+            <TabsTrigger value="config">{tx({ de: 'Konfiguration', en: 'Configuration', es: 'Configuración' })}</TabsTrigger>
+            <TabsTrigger value="preview">{tx({ de: 'Preview', en: 'Preview', es: 'Vista previa' })}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="config" className="flex-1 overflow-y-auto space-y-4 p-1">
@@ -159,7 +159,7 @@ export function ProfileEditorDialog({
             </div>
 
             <div>
-              <Label htmlFor="platform">Plattform *</Label>
+              <Label htmlFor="platform">{tx({ de: 'Plattform *', en: 'Platform *', es: 'Plataforma *' })}</Label>
               <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
                 <SelectTrigger id="platform">
                   <SelectValue />
@@ -176,14 +176,14 @@ export function ProfileEditorDialog({
             </div>
 
             <div>
-              <Label htmlFor="type">Medientyp *</Label>
+              <Label htmlFor="type">{tx({ de: 'Medientyp *', en: 'Media type *', es: 'Tipo de medio *' })}</Label>
               <Select value={type} onValueChange={(v) => setType(v as MediaType)}>
                 <SelectTrigger id="type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="image">Bild</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="image">{tx({ de: 'Bild', en: 'Image', es: 'Imagen' })}</SelectItem>
+                  <SelectItem value="video">{tx({ de: 'Video', en: 'Video', es: 'Vídeo' })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -195,7 +195,7 @@ export function ProfileEditorDialog({
             />
 
             <div>
-              <Label>Konfiguration (JSON) *</Label>
+              <Label>{tx({ de: 'Konfiguration (JSON) *', en: 'Configuration (JSON) *', es: 'Configuración (JSON) *' })}</Label>
               <MonacoJsonEditor
                 value={configJson}
                 onChange={setConfigJson}
@@ -218,7 +218,7 @@ export function ProfileEditorDialog({
             Abbrechen
           </Button>
           <Button onClick={handleSave} disabled={!isValid || isSaving}>
-            {isSaving ? 'Speichert...' : tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' })}
+            {isSaving ? tx({ de: 'Speichert...', en: 'Saving...', es: 'Guardando...' }) : tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' })}
           </Button>
         </DialogFooter>
       </DialogContent>

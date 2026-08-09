@@ -157,7 +157,7 @@ export function SmokeTestsAdmin() {
           ) : summary.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">{tx({ de: "Noch keine Smoke-Test-Daten", en: "No smoke test data yet", es: "Aún no hay datos de pruebas de humo" })}</p>
+              <p className="font-medium">Noch keine Smoke-Test-Daten</p>
               <p className="text-sm mt-1">Klicke „Jetzt ausführen" um den ersten Test zu starten.</p>
             </div>
           ) : (

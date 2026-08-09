@@ -20,17 +20,17 @@ const PROOF_POSTER = "/videos/proof-clip-poster.jpg";
 
 const COPY = {
   de: {
-    eyebrow: "Der Beweis",
-    title1: "Ein Briefing.",
-    title2: "Ein fertiger Clip.",
-    briefLabel: "Dein Briefing",
+    eyebrow: tx({ de: "Der Beweis", en: "The proof", es: "La prueba" }),
+    title1: tx({ de: "Ein Briefing.", en: "One briefing.", es: "Una instrucción." }),
+    title2: tx({ de: "Ein fertiger Clip.", en: "One finished clip.", es: "Un clip terminado." }),
+    briefLabel: tx({ de: "Dein Briefing", en: "Your briefing", es: "Tu instrucción" }),
     brief: tx({ de: "Büroszene, vier Kolleg:innen im Dialog, deutsch gesprochen, 8 Sekunden.", en: "Office scene, four colleagues in dialogue, German spoken, 8 seconds.", es: "Escena de oficina, cuatro compañeros dialogando, alemán hablado, 8 segundos." }),
-    resultLabel: "Das Ergebnis",
+    resultLabel: tx({ de: "Das Ergebnis", en: "The result", es: "El resultado" }),
     steps: ["Skript & Cast", "Stimmen", "Lip-Sync", "Fertiger Clip"],
     meta: "8s · Deutsch · 4 Sprecher · Lip-Sync",
     note: tx({ de: "Skript, Stimme, Kamera, Schnitt, Lip-Sync — sonst ein Team und mehrere Tage.", en: "Script, voice, camera, editing, lip-sync — otherwise a team and several days.", es: "Guion, voz, cámara, edición, sincronización labial — de lo contrario, un equipo y varios días." }),
-    cta: "Mit diesem Briefing starten",
-    sound: "Ton",
+    cta: tx({ de: "Mit diesem Briefing starten", en: "Start with this briefing", es: "Empezar con esta instrucción" }),
+    sound: tx({ de: "Ton", en: "Sound", es: "Sonido" }),
     honest: tx({ de: "Echter Clip aus diesem Studio — kein Rendering im Browser.", en: "Real clip from this Studio — no rendering in the browser.", es: "Clip real de este Studio, sin renderizado en el navegador." }),
   },
   en: {

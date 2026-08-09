@@ -122,7 +122,7 @@ export default function Analytics() {
       setLastUpdated(new Date());
     } catch (error) {
       console.error("Error fetching analytics:", error);
-      toast.error("Failed to load analytics data");
+      toast.error(tx({ de: 'Fehler beim Laden der Analysedaten', en: 'Failed to load analytics data', es: 'Error al cargar los datos de análisis' }));
     } finally {
       setLoading(false);
     }
@@ -200,7 +200,7 @@ export default function Analytics() {
             {[
               { value: "overview", label: "Overview", icon: BarChart3 },
               { value: "performance", label: "Performance", icon: TrendingUp },
-              { value: "platforms", label: "Plattformen", icon: Globe },
+              { value: "platforms", label: tx({ de: 'Plattformen', en: 'Platforms', es: 'Plataformas' }), icon: Globe },
               { value: "top-posts", label: "Top Posts", icon: Award },
               { value: "hashtags", label: "Hashtags", icon: Hash },
               { value: "best-content", label: "Best Content", icon: Sparkles }
@@ -293,7 +293,7 @@ export default function Analytics() {
                       <Hash className="h-8 w-8 text-primary/60" />
                     </motion.div>
                     <p className="text-muted-foreground">
-                      Noch keine Hashtag-Daten. Klicke "Jetzt analysieren" um zu starten.
+                      {tx({ de: 'Noch keine Hashtag-Daten. Klicke "Jetzt analysieren" um zu starten.', en: 'No hashtag data yet. Click "Analyze now" to start.', es: 'Aún no hay datos de hashtags. Haz clic en "Analizar ahora" para comenzar.' })}
                     </p>
                   </motion.div>
                 ) : (
@@ -388,7 +388,7 @@ export default function Analytics() {
                       <Award className="h-8 w-8 text-primary/60" />
                     </motion.div>
                     <p className="text-muted-foreground">
-                      Noch keine Analyse. Klicke "Best identifizieren" um deinen Top-Content zu entdecken.
+                      {tx({ de: 'Noch keine Analyse. Klicke "Best identifizieren" um deinen Top-Content zu entdecken.', en: 'No analysis yet. Click "Identify best" to discover your top content.', es: 'Aún no hay análisis. Haz clic en "Identificar mejores" para descubrir tu contenido principal.' })}
                     </p>
                   </motion.div>
                 ) : (

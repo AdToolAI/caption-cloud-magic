@@ -60,7 +60,7 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className={className ?? "h-14 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors"}>
-        <SelectValue placeholder="Modell wählen…">
+        <SelectValue placeholder={tx({ de: "Modell wählen…", en: "Select model…", es: "Seleccionar modelo…" })}>
           {selected && (
             <div className="flex items-center gap-3 text-left">
               <div className="p-1.5 rounded-md bg-primary/10">

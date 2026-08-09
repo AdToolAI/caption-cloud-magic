@@ -32,22 +32,22 @@ const ANIMATIONS = [
 ] as const;
 
 const POSITIONS = [
-  { id: 'topLeft', name: '↖ O.L.', icon: AlignLeft },
-  { id: 'top', name: '⬆ Oben', icon: AlignCenter },
-  { id: 'topRight', name: '↗ O.R.', icon: AlignRight },
-  { id: 'centerLeft', name: '⬅ M.L.', icon: AlignLeft },
-  { id: 'center', name: '⏺ Mitte', icon: AlignCenter },
-  { id: 'centerRight', name: '➡ M.R.', icon: AlignRight },
-  { id: 'bottomLeft', name: '↙ U.L.', icon: AlignLeft },
-  { id: 'bottom', name: '⬇ Unten', icon: AlignCenter },
-  { id: 'bottomRight', name: '↘ U.R.', icon: AlignRight },
+  { id: 'topLeft', name: tx({ de: "↖ O.L.", en: "↖ T.L.", es: "↖ S.I." }), icon: AlignLeft },
+  { id: 'top', name: tx({ de: "⬆ Oben", en: "⬆ Top", es: "⬆ Arriba" }), icon: AlignCenter },
+  { id: 'topRight', name: tx({ de: "↗ O.R.", en: "↗ T.R.", es: "↗ S.D." }), icon: AlignRight },
+  { id: 'centerLeft', name: tx({ de: "⬅ M.L.", en: "⬅ M.L.", es: "⬅ C.I." }), icon: AlignLeft },
+  { id: 'center', name: tx({ de: "⏺ Mitte", en: "⏺ Center", es: "⏺ Centro" }), icon: AlignCenter },
+  { id: 'centerRight', name: tx({ de: "➡ M.R.", en: "➡ M.R.", es: "➡ C.D." }), icon: AlignRight },
+  { id: 'bottomLeft', name: tx({ de: "↙ U.L.", en: "↙ B.L.", es: "↙ I.I." }), icon: AlignLeft },
+  { id: 'bottom', name: tx({ de: "⬇ Unten", en: "⬇ Bottom", es: "⬇ Abajo" }), icon: AlignCenter },
+  { id: 'bottomRight', name: tx({ de: "↘ U.R.", en: "↘ B.R.", es: "↘ I.D." }), icon: AlignRight },
 ] as const;
 
 const FONT_SIZES = [
-  { id: 'sm', name: 'Klein', px: '16px' },
-  { id: 'md', name: 'Mittel', px: '24px' },
-  { id: 'lg', name: 'Groß', px: '36px' },
-  { id: 'xl', name: 'Riesig', px: '48px' },
+  { id: 'sm', name: tx({ de: "Klein", en: "Small", es: "Pequeño" }), px: '16px' },
+  { id: 'md', name: tx({ de: "Mittel", en: "Medium", es: "Medio" }), px: '24px' },
+  { id: 'lg', name: tx({ de: "Groß", en: "Large", es: "Grande" }), px: '36px' },
+  { id: 'xl', name: tx({ de: "Riesig", en: "Huge", es: "Enorme" }), px: '48px' },
 ] as const;
 
 const FONT_FAMILIES = [
@@ -75,7 +75,7 @@ export function TextOverlayEditor({
   const addOverlay = (template?: typeof TEXT_OVERLAY_TEMPLATES[number]) => {
     const newOverlay: TextOverlay = {
       id: `overlay-${Date.now()}`,
-      text: template?.text || 'Neuer Text',
+      text: template?.text || tx({ de: "Neuer Text", en: "New Text", es: "Nuevo texto" }),
       animation: template?.animation || 'fadeIn',
       position: template?.position || 'center',
       startTime: currentTime,
@@ -126,7 +126,7 @@ export function TextOverlayEditor({
           Text & Overlays
           {overlays.length > 0 && (
             <Badge variant="secondary" className="ml-auto">
-              {overlays.length} aktiv
+              {overlays.length} {tx({ de: "aktiv", en: "active", es: "activo" })}
             </Badge>
           )}
         </CardTitle>
@@ -135,12 +135,12 @@ export function TextOverlayEditor({
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="overlays">Overlays</TabsTrigger>
-            <TabsTrigger value="templates">Vorlagen</TabsTrigger>
+            <TabsTrigger value="templates">{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="templates" className="space-y-3 mt-3">
             <p className="text-sm text-muted-foreground">
-              Schnell-Vorlagen mit einem Klick hinzufügen
+              Schnell-{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })} mit einem Klick hinzufügen
             </p>
             <div className="grid grid-cols-2 gap-2">
               {TEXT_OVERLAY_TEMPLATES.map((template) => (
@@ -169,14 +169,14 @@ export function TextOverlayEditor({
               className="w-full border-dashed"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Neues Overlay hinzufügen
+              {tx({ de: "Neues Overlay hinzufügen", en: "Add new overlay", es: "Añadir nueva superposición" })}
             </Button>
 
             {/* Overlay List */}
             {overlays.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Type className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>Keine Overlays vorhanden</p>
+                <p>{tx({ de: "Keine Overlays vorhanden", en: "No overlays available", es: "No hay superposiciones disponibles" })}</p>
                 <p className="text-sm">{tx({ de: "Füge Text, CTAs oder Watermarks hinzu", en: "Add text, CTAs or watermarks", es: "Añadir texto, CTAs o marcas de agua" })}</p>
               </div>
             ) : (
@@ -250,7 +250,7 @@ export function TextOverlayEditor({
                   <Input
                     value={selectedOverlay.text}
                     onChange={(e) => updateOverlay(selectedOverlay.id, { text: e.target.value })}
-                    placeholder="Text eingeben..."
+                    placeholder={tx({ de: "Text eingeben...", en: "Enter text...", es: "Introducir texto..." })}
                     className="bg-white/5"
                   />
                 </div>
@@ -311,7 +311,7 @@ export function TextOverlayEditor({
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> Ende
+                      <Clock className="h-3 w-3" /> {tx({ de: "Ende", en: "End", es: "Fin" })}
                     </Label>
                     <div className="flex items-center gap-2">
                       <Slider
@@ -323,7 +323,7 @@ export function TextOverlayEditor({
                         className="flex-1"
                       />
                       <span className="text-xs w-10 text-right">
-                        {selectedOverlay.endTime ? `${selectedOverlay.endTime.toFixed(1)}s` : 'Ende'}
+                        {selectedOverlay.endTime ? `${selectedOverlay.endTime.toFixed(1)}s` : tx({ de: "Ende", en: "End", es: "Fin" })}
                       </span>
                     </div>
                   </div>
@@ -331,7 +331,7 @@ export function TextOverlayEditor({
 
                 {/* Font Size */}
                 <div className="space-y-2">
-                  <Label className="text-sm">Schriftgröße</Label>
+                  <Label className="text-sm">{tx({ de: "Schriftgröße", en: "Font size", es: "Tamaño de fuente" })}</Label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {FONT_SIZES.map((size) => (
                       <Button
@@ -349,7 +349,7 @@ export function TextOverlayEditor({
 
                 {/* Font Family */}
                 <div className="space-y-2">
-                  <Label className="text-sm">Schriftart</Label>
+                  <Label className="text-sm">{tx({ de: "Schriftart", en: "Font", es: "Fuente" })}</Label>
                   <div className="grid grid-cols-3 gap-1.5">
                     {FONT_FAMILIES.map((font) => (
                       <Button
@@ -369,7 +369,7 @@ export function TextOverlayEditor({
                 {/* Colors */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-sm">Textfarbe</Label>
+                    <Label className="text-sm">{tx({ de: "Textfarbe", en: "Text color", es: "Color de texto" })}</Label>
                     <div className="flex flex-wrap gap-1">
                       {PRESET_COLORS.map((color) => (
                         <button
@@ -384,7 +384,7 @@ export function TextOverlayEditor({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Hintergrund</Label>
+                    <Label className="text-sm">{tx({ de: "Hintergrund", en: "Background", es: "Fondo" })}</Label>
                     <div className="flex flex-wrap gap-1">
                       <button
                         onClick={() => updateOverlayStyle(selectedOverlay.id, { backgroundColor: 'transparent' })}

@@ -134,7 +134,7 @@ export default function AdCampaignTree({
     if (!adMeta?.tonality) {
       toast({
         title: tx({ de: 'Voiceover nicht möglich', en: 'Voiceover not possible', es: 'No es posible la voz en off' }),
-        description: 'Tonalität fehlt im Kampagnen-Meta.',
+        description: tx({ de: 'Tonalität fehlt im Kampagnen-Meta.', en: 'Tonality missing in campaign meta.', es: 'Falta la tonalidad en los metadatos de la campaña.' }),
         variant: 'destructive',
       });
       return;
@@ -212,7 +212,7 @@ export default function AdCampaignTree({
       );
 
       toast({
-        title: 'Voiceover erstellt',
+        title: tx({ de: 'Voiceover erstellt', en: 'Voiceover created', es: 'Voz en off creada' }),
         description: tx({ de: `Neue VO (${voiceCfg.voiceLabel}) für „${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`, en: `New VO (${voiceCfg.voiceLabel}) for "${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`, es: `Nueva VO (${voiceCfg.voiceLabel}) para "${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".` }),
       });
     } catch (err: any) {
@@ -233,7 +233,7 @@ export default function AdCampaignTree({
         <Megaphone className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
         <h3 className="text-base font-semibold mb-1">Keine Kampagne aktiv</h3>
         <p className="text-sm text-muted-foreground">
-          Starte den <strong>Ad Director</strong>, um eine Kampagne mit Cutdowns, A/B-Varianten und Multi-Format zu erstellen.
+          Starte den Ad Director, um eine Kampagne mit Cutdowns, A/B-Varianten und Multi-Format zu erstellen.
         </p>
       </Card>
     );
@@ -248,7 +248,7 @@ export default function AdCampaignTree({
           Kampagnen-Übersicht
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Master-Spot + automatisch erzeugte Cutdowns, A/B-Varianten &amp; Format-Klone.
+          Master-Spot + automatisch erzeugte Cutdowns, A/B-Varianten & Format-Klone.
         </p>
       </div>
 
@@ -290,13 +290,13 @@ export default function AdCampaignTree({
       {/* Cutdowns */}
       <section>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Scissors className="h-4 w-4" />
-          Cutdowns ({cutdowns.length})
+          <Scissors className="h-4 w-4" /> Cutdowns
+          
         </h3>
         {loading && <p className="text-xs text-muted-foreground">Lade …</p>}
         {!loading && cutdowns.length === 0 && (
           <p className="text-xs text-muted-foreground italic">
-            {tx({ de: 'Keine Cutdowns konfiguriert. Aktiviere im Ad Director „15s“ oder „6s Hook“.', en: 'No cutdowns configured. Enable “15s” or “6s Hook” in the Ad Director.', es: 'No hay cutdowns configurados. Activa «15s» o «6s Hook» en el Ad Director.' })}
+            Keine Cutdowns konfiguriert. Aktiviere im Ad Director „15s“ oder „6s Hook“.
           </p>
         )}
         <div className="grid sm:grid-cols-2 gap-3">
@@ -408,7 +408,7 @@ function ChildCard({
             ) : (
               <Mic className="h-3.5 w-3.5" />
             )}
-            <span className="ml-1.5 text-xs">{hasVO ? 'VO neu' : 'VO erzeugen'}</span>
+            <span className="ml-1.5 text-xs">{hasVO ? tx({ de: 'VO neu', en: 'VO new', es: 'VO nueva' }) : tx({ de: 'VO erzeugen', en: 'Generate VO', es: 'Generar VO' })}</span>
           </Button>
         )}
         {child.output_url && (

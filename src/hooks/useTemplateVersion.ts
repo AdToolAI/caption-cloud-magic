@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -85,7 +86,7 @@ export const useTemplateVersion = (templateId?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['template-versions'] });
       toast({
-        title: 'Version erstellt',
+        title: tx({ de: 'Version erstellt', en: 'Version created', es: 'Versión creada' }),
         description: tx({ de: 'Eine neue Template-Version wurde gespeichert.', en: 'A new template version has been saved.', es: 'Se ha guardado una nueva versión de la plantilla.' }),
       });
     },

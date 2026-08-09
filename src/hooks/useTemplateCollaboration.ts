@@ -152,7 +152,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
       parentCommentId?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Nicht authentifiziert');
+      if (!user) throw new Error(tx({ de: 'Nicht authentifiziert', en: 'Not authenticated', es: 'No autenticado' }));
 
       const { data, error } = await supabase
         .from('template_comments')
@@ -170,7 +170,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     },
     onSuccess: () => {
       toast({
-        title: 'Kommentar hinzugefügt',
+        title: tx({ de: 'Kommentar hinzugefügt', en: 'Comment added', es: 'Comentario añadido' }),
         description: tx({ de: 'Ihr Kommentar wurde erfolgreich hinzugefügt.', en: 'Your comment has been added successfully.', es: 'Tu comentario ha sido agregado exitosamente.' }),
       });
     },
@@ -195,7 +195,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
       approverId: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Nicht authentifiziert');
+      if (!user) throw new Error(tx({ de: 'Nicht authentifiziert', en: 'Not authenticated', es: 'No autenticado' }));
 
       const { data, error } = await supabase
         .from('template_approvals')
@@ -215,7 +215,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['template-approvals'] });
       toast({
-        title: 'Freigabe beantragt',
+        title: tx({ de: 'Freigabe beantragt', en: 'Approval requested', es: 'Aprobación solicitada' }),
         description: tx({ de: 'Das Template wurde zur Freigabe eingereicht.', en: 'The template has been submitted for approval.', es: 'La plantilla ha sido enviada para su aprobación.' }),
       });
     },
@@ -253,7 +253,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['template-approvals'] });
       toast({
-        title: 'Freigabe aktualisiert',
+        title: tx({ de: 'Freigabe aktualisiert', en: 'Approval updated', es: 'Aprobación actualizada' }),
         description: tx({ de: 'Der Freigabestatus wurde aktualisiert.', en: 'The release status has been updated.', es: 'El estado de la versión ha sido actualizado.' }),
       });
     },
@@ -270,7 +270,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
   const startEditingSession = useMutation({
     mutationFn: async (templateId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Nicht authentifiziert');
+      if (!user) throw new Error(tx({ de: 'Nicht authentifiziert', en: 'Not authenticated', es: 'No autenticado' }));
 
       const { data, error } = await supabase
         .from('template_editing_sessions')

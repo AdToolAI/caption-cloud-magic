@@ -8,6 +8,7 @@ import {
   type AIVideoModel,
 } from '@/config/modelStyleCompatibility';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 interface StylePickerCompactProps {
   /** Selected style — `null` means "no style hint, free prompt". */
@@ -21,7 +22,7 @@ interface StylePickerCompactProps {
 }
 
 const LABELS = {
-  de: { none: 'Kein Stil', noneDesc: 'Prompt unverändert verwenden', clear: 'Stil entfernen' },
+  de: { none: tx({ de: "Kein Stil", en: "No style", es: "Sin estilo" }), noneDesc: 'Prompt unverändert verwenden', clear: 'Stil entfernen' },
   en: { none: 'No style', noneDesc: 'Use prompt as-is', clear: 'Clear style' },
   es: { none: 'Sin estilo', noneDesc: 'Usar prompt tal cual', clear: 'Quitar estilo' },
 };

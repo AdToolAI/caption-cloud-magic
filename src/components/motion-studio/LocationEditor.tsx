@@ -71,7 +71,7 @@ export default function LocationEditor({
         const url = await uploadLibraryImage(file, 'location', tmpId);
         if (url) {
           setDraft((d) => ({ ...d, reference_image_url: url }));
-          toast.success('Referenzbild hochgeladen');
+          toast.success(tx({ de: 'Referenzbild hochgeladen', en: 'Reference image uploaded', es: 'Imagen de referencia cargada' }));
         }
       } finally {
         setUploading(false);
@@ -155,7 +155,7 @@ export default function LocationEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            {location ? 'Location bearbeiten' : 'Neue Location anlegen'}
+            {location ? tx({ de: 'Location bearbeiten', en: 'Edit Location', es: 'Editar ubicación' }) : tx({ de: 'Neue Location anlegen', en: 'Create New Location', es: 'Crear nueva ubicación' })}
           </DialogTitle>
           <DialogDescription>
             Schauplätze einmal definieren — in jedem Projekt wiederverwenden.
@@ -313,7 +313,7 @@ export default function LocationEditor({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {location ? tx({ de: 'Änderungen speichern', en: 'Save changes', es: 'Guardar cambios' }) : 'Location anlegen'}
+            {location ? tx({ de: 'Änderungen speichern', en: 'Save changes', es: 'Guardar cambios' }) : tx({ de: 'Location anlegen', en: 'Create Location', es: 'Crear ubicación' })}
           </Button>
         </div>
       </DialogContent>

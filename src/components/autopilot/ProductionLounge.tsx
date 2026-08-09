@@ -71,7 +71,7 @@ export function ProductionLounge({ production, scenes, log, language = 'de' }: P
           <Card className="border-primary/20 bg-card/60 p-4 backdrop-blur">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium">
-                {currentLine ?? 'Die KI arbeitet an deinem Film.'}
+                {currentLine ?? tx({ de: 'Die KI arbeitet an deinem Film.', en: 'The AI is working on your film.', es: 'La IA está trabajando en tu película.' })}
               </p>
               {eta.label && (
                 <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -83,7 +83,7 @@ export function ProductionLounge({ production, scenes, log, language = 'de' }: P
             <StageProgressBar
               className="mt-3"
               value={production.progress > 0 ? production.progress : null}
-              label="Gesamtfortschritt"
+              label={tx({ de: "Gesamtfortschritt", en: "Overall progress", es: "Progreso general" })}
             />
             {typeof Notification !== 'undefined' && Notification.permission === 'default' && (
               <Button
@@ -93,7 +93,7 @@ export function ProductionLounge({ production, scenes, log, language = 'de' }: P
                 onClick={() => void Notification.requestPermission()}
               >
                 <Bell className="mr-1.5 h-3.5 w-3.5" />
-                Benachrichtigen, wenn fertig
+                {tx({ de: "Benachrichtigen, wenn fertig", en: "Notify when finished", es: "Notificar cuando termine" })}
               </Button>
             )}
           </Card>

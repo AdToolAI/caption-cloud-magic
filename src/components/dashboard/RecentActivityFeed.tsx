@@ -326,10 +326,10 @@ export function RecentActivityFeed() {
   const isStale = events.length > 0 && buckets.today.length === 0 && buckets.week.length === 0;
 
   const chips: { key: Category; label: string }[] = [
-    { key: 'all', label: language === 'de' ? 'Alle' : language === 'es' ? 'Todos' : 'All' },
-    { key: 'content', label: language === 'de' ? 'Content' : 'Content' },
+    { key: 'all', label: tx({ de: 'Alle', en: 'All', es: 'Todos' }) },
+    { key: 'content', label: tx({ de: 'Content', en: 'Content', es: 'Contenido' }) },
     { key: 'performance', label: 'Performance' },
-    { key: 'goals', label: language === 'de' ? 'Ziele' : language === 'es' ? 'Metas' : 'Goals' },
+    { key: 'goals', label: tx({ de: 'Ziele', en: 'Goals', es: 'Metas' }) },
   ];
 
   if (loading) {
@@ -361,7 +361,7 @@ export function RecentActivityFeed() {
                   <Radio className="h-3.5 w-3.5" />
                 </motion.div>
                 <h3 className="text-lg font-semibold tracking-tight">
-                  {language === 'de' ? 'Signal Log' : language === 'es' ? 'Signal Log' : 'Signal Log'}
+                  {tx({ de: 'Signal Log', en: 'Signal Log', es: 'Log de señales' })}
                 </h3>
                 <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   · Live
@@ -475,7 +475,7 @@ function EmptyState({ language }: { language: string }) {
       </p>
       <Button asChild size="sm" variant="outline" className="border-primary/40 text-primary hover:bg-primary/10">
         <Link to="/performance-tracker?tab=connections">
-          {language === 'de' ? 'Kanäle verbinden' : language === 'es' ? 'Conectar canales' : 'Connect channels'}
+          {tx({ de: 'Kanäle verbinden', en: 'Connect channels', es: 'Conectar canales' })}
         </Link>
       </Button>
     </div>
@@ -495,7 +495,7 @@ function StaleBanner({ language }: { language: string }) {
       </p>
       <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10">
         <Link to="/performance-tracker?tab=connections">
-          {language === 'de' ? 'Kanäle prüfen' : language === 'es' ? 'Revisar canales' : 'Review channels'}
+          {tx({ de: 'Kanäle prüfen', en: 'Review channels', es: 'Revisar canales' })}
         </Link>
       </Button>
     </div>

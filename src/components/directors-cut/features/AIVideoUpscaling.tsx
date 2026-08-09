@@ -9,6 +9,7 @@ import { ArrowUpCircle, Sparkles, Zap, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useTx } from '@/lib/i18nText';
+import { tx } from '@/lib/i18nText';
 
 interface AIVideoUpscalingProps {
   videoUrl?: string;

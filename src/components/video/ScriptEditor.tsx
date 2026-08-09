@@ -82,11 +82,11 @@ export const ScriptEditor = ({
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
         <div className="flex items-center gap-1">
           <Type className="h-4 w-4" />
-          <span>{wordCount} Wörter</span>
+          <span>{wordCount} {tx({ de: 'Wörter', en: 'words', es: 'palabras' })}</span>
         </div>
         <div className="flex items-center gap-1">
           <Clock className="h-4 w-4" />
-          <span>~{estimatedDuration}s Sprechdauer</span>
+          <span>~{estimatedDuration}s {tx({ de: 'Sprechdauer', en: 'speaking duration', es: 'duración del habla' })}</span>
         </div>
         <div className="ml-auto">
           {value.length}/{maxLength}
@@ -95,7 +95,7 @@ export const ScriptEditor = ({
 
       {/* Textarea */}
       <div className="space-y-2">
-        <Label htmlFor="script">Skript-Text</Label>
+        <Label htmlFor="script">{tx({ de: 'Skript-Text', en: 'Script text', es: 'Texto del guion' })}</Label>
         <Textarea
           id="script"
           value={value}
@@ -111,7 +111,7 @@ export const ScriptEditor = ({
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            AI-Assistent
+            {tx({ de: 'AI-Assistent', en: 'AI Assistant', es: 'Asistente de IA' })}
           </Label>
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -122,7 +122,7 @@ export const ScriptEditor = ({
               className="justify-start"
             >
               <Scissors className="h-4 w-4 mr-2" />
-              Kürzer machen
+              {tx({ de: 'Kürzer machen', en: 'Make shorter', es: 'Hacer más corto' })}
             </Button>
             <Button
               variant="outline"
@@ -132,7 +132,7 @@ export const ScriptEditor = ({
               className="justify-start"
             >
               <Briefcase className="h-4 w-4 mr-2" />
-              Professioneller
+              {tx({ de: 'Professioneller', en: 'More professional', es: 'Más profesional' })}
             </Button>
             <Button
               variant="outline"
@@ -142,7 +142,7 @@ export const ScriptEditor = ({
               className="justify-start"
             >
               <Target className="h-4 w-4 mr-2" />
-              CTA hinzufügen
+              {tx({ de: 'CTA hinzufügen', en: 'Add CTA', es: 'Añadir CTA' })}
             </Button>
             <Button
               variant="outline"
@@ -152,7 +152,7 @@ export const ScriptEditor = ({
               className="justify-start"
             >
               <Heart className="h-4 w-4 mr-2" />
-              Emotionaler
+              {tx({ de: 'Emotionaler', en: 'More emotional', es: 'Más emocional' })}
             </Button>
           </div>
         </div>
@@ -167,7 +167,7 @@ export const ScriptEditor = ({
         className="w-full"
       >
         <RotateCcw className="h-4 w-4 mr-2" />
-        Zurücksetzen
+        {tx({ de: 'Zurücksetzen', en: 'Reset', es: 'Reiniciar' })}
       </Button>
     </div>
   );

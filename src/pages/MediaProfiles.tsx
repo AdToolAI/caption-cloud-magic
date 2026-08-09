@@ -190,7 +190,7 @@ export default function MediaProfiles() {
     }
 
     toast({
-      title: 'Standard gesetzt',
+      title: tx({ de: 'Standard gesetzt', en: 'Default set', es: 'Establecer predeterminado' }),
       description: tx({ de: 'Das Profil ist jetzt der Standard für diesen Kanal.', en: 'This profile is now the default for this channel.', es: 'Este perfil ahora es el predeterminado para este canal.' })
     });
 
@@ -213,7 +213,7 @@ export default function MediaProfiles() {
     }
 
     toast({
-      title: 'Profil gelöscht',
+      title: tx({ de: 'Profil gelöscht', en: 'Profile deleted', es: 'Perfil eliminado' }),
       description: tx({ de: 'Das Profil wurde erfolgreich gelöscht.', en: 'Profile deleted successfully.', es: 'Perfil eliminado correctamente.' })
     });
 
@@ -264,9 +264,9 @@ export default function MediaProfiles() {
       <div className="container max-w-6xl py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Medien-Profile</h1>
+            <h1 className="text-3xl font-bold mb-2">{tx({ de: "Medien-Profile", en: "Media Profiles", es: "Perfiles de medios" })}</h1>
             <p className="text-muted-foreground">
-              Verwalte Formate und Einstellungen für verschiedene Plattformen.
+              {tx({ de: "Verwalte Formate und Einstellungen für verschiedene Plattformen.", en: "Manage formats and settings for different platforms.", es: "Gestione formatos y configuraciones para diferentes plataformas." })}
             </p>
           </div>
 
@@ -275,12 +275,12 @@ export default function MediaProfiles() {
             setShowEditor(true);
           }}>
             <Plus className="h-4 w-4 mr-2" />
-            Neues Profil
+            {tx({ de: "Neues Profil", en: "New profile", es: "Nuevo perfil" })}
           </Button>
         </div>
 
         <div className="mb-6">
-          <Label>Plattform filtern</Label>
+          <Label>{tx({ de: "Plattform filtern", en: "Filter platform", es: "Filtrar plataforma" })}</Label>
           <Select value={filterPlatform} onValueChange={setFilterPlatform}>
             <SelectTrigger className="w-[200px]">
               <SelectValue />
@@ -300,7 +300,7 @@ export default function MediaProfiles() {
         {isLoading ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">Lade Profile...</p>
+              <p className="text-muted-foreground">{tx({ de: 'Lade Profile...', en: 'Loading profiles...', es: 'Cargando perfiles...' })}</p>
             </CardContent>
           </Card>
         ) : profiles.length === 0 ? (
@@ -318,7 +318,7 @@ export default function MediaProfiles() {
                 setShowEditor(true);
               }}>
                 <Plus className="h-4 w-4 mr-2" />
-                Erstes Profil erstellen
+                {tx({ de: "Erstes Profil erstellen", en: "Create first profile", es: "Crear primer perfil" })}
               </Button>
             </CardContent>
           </Card>
@@ -360,7 +360,7 @@ export default function MediaProfiles() {
                         setEditingProfile(profile);
                         setShowEditor(true);
                       }}>
-                        Bearbeiten
+                        {tx({ de: "Bearbeiten", en: "Edit", es: "Editar" })}
                       </Button>
                       <Button 
                         size="sm" 
@@ -368,7 +368,7 @@ export default function MediaProfiles() {
                         onClick={() => handleDuplicate(profile)}
                       >
                         <Copy className="h-3 w-3 mr-1" />
-                        Duplizieren
+                        {tx({ de: "Duplizieren", en: "Duplicate", es: "Duplicar" })}
                       </Button>
                       {!profile.is_default && (
                         <Button 
@@ -377,7 +377,7 @@ export default function MediaProfiles() {
                           onClick={() => handleSetDefault(profile.id!, profile.platform)}
                         >
                           <Star className="h-3 w-3 mr-1" />
-                          Als Standard
+                          {tx({ de: "Als Standard", en: "As default", es: "Como predeterminado" })}
                         </Button>
                       )}
                       <Button 
@@ -394,7 +394,7 @@ export default function MediaProfiles() {
                         onClick={() => setDeleteDialog({ open: true, profileId: profile.id! })}
                       >
                         <Trash2 className="h-3 w-3 mr-1" />
-                        Löschen
+                        {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
                       </Button>
                     </div>
                   </div>
@@ -417,7 +417,7 @@ export default function MediaProfiles() {
             <AlertDialogHeader>
               <AlertDialogTitle>{tx({ de: "Profil wirklich löschen?", en: "Really delete your profile?", es: "¿De verdad eliminas tu perfil?" })}</AlertDialogTitle>
               <AlertDialogDescription>
-                Diese Aktion kann nicht rückgängig gemacht werden. Das Profil wird dauerhaft gelöscht.
+                {tx({ de: "Diese Aktion kann nicht rückgängig gemacht werden. Das Profil wird dauerhaft gelöscht.", en: "This action cannot be undone. The profile will be permanently deleted.", es: "Esta acción no se puede deshacer. El perfil se eliminará permanentemente." })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -426,7 +426,7 @@ export default function MediaProfiles() {
                 onClick={() => deleteDialog.profileId && handleDelete(deleteDialog.profileId)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Löschen
+                {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

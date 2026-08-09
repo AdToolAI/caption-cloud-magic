@@ -76,7 +76,7 @@ export function LayoutStep() {
         {s.imageBusy && (
           <div className="flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-            Motiv wird erzeugt … es erscheint automatisch in allen Layouts.
+            {tx({ de: "Motiv wird erzeugt … es erscheint automatisch in allen Layouts.", en: "Motif is being created... it appears automatically in all layouts.", es: "Se está creando el motivo... aparece automáticamente en todos los diseños." })}
           </div>
         )}
 
@@ -118,7 +118,7 @@ export function LayoutStep() {
                 >
                   {layer.type === "text" || layer.type === "badge"
                     ? (layer as TextLayer).text?.slice(0, 24) || layer.type
-                    : layer.type === "image" ? "Bild" : layer.type === "logo" ? "Logo" : "Form"}
+                    : layer.type === "image" ? tx({ de: "Bild", en: "Image", es: "Imagen" }) : layer.type === "logo" ? tx({ de: "Logo", en: "Logo", es: "Logo" }) : tx({ de: "Form", en: "Shape", es: "Forma" })}
                 </button>
               ))}
             </div>

@@ -65,11 +65,11 @@ export function assessIdea(input: AutopilotIdea, ctx: FeasibilityContext): Feasi
   if (idea.maxPeopleInShot > MAX_PEOPLE_PER_SHOT) {
     idea.maxPeopleInShot = MAX_PEOPLE_PER_SHOT;
     score -= 12;
-    notes.push(`Auf ${MAX_PEOPLE_PER_SHOT} sichtbare Personen pro Einstellung begrenzt.`);
+    notes.push(tx({ de: `Auf ${MAX_PEOPLE_PER_SHOT} sichtbare Personen pro Einstellung begrenzt.`, en: `Limited to ${MAX_PEOPLE_PER_SHOT} visible people per shot.`, es: `Limitado a ${MAX_PEOPLE_PER_SHOT} personas visibles por toma.` }));
   }
   if (ctx.castCount > 0 && idea.maxPeopleInShot > ctx.castCount) {
     idea.maxPeopleInShot = ctx.castCount;
-    notes.push('An die Größe deines Casts angepasst.');
+    notes.push(tx({ de: "An die Größe deines Casts angepasst.", en: "Adjusted to the size of your cast.", es: "Ajustado al tamaño de tu reparto." }));
   }
 
   // --- Speaking scenes need cast and lip-sync ------------------------------
@@ -81,7 +81,7 @@ export function assessIdea(input: AutopilotIdea, ctx: FeasibilityContext): Feasi
   } else if (idea.speakingScenes > allowedSpeakers) {
     idea.speakingScenes = allowedSpeakers;
     score -= 5;
-    notes.push(`Auf ${allowedSpeakers} Sprechszene(n) reduziert.`);
+    notes.push(tx({ de: `Auf ${allowedSpeakers} Sprechszene(n) reduziert.`, en: `Reduced to ${allowedSpeakers} speaking scene(s).`, es: `Reducido a ${allowedSpeakers} escena(s) hablada(s).` }));
   }
 
   // --- Content the models render badly -------------------------------------
@@ -94,7 +94,7 @@ export function assessIdea(input: AutopilotIdea, ctx: FeasibilityContext): Feasi
   }
   if (CROWD.test(haystack)) {
     score -= 14;
-    notes.push('Große Menschenmengen ersetzt — sie zerfallen in der Generierung.');
+    notes.push(tx({ de: "Große Menschenmengen ersetzt — sie zerfallen in der Generierung.", en: "Replaced large crowds — they fall apart in the generation.", es: "Se reemplazaron las grandes multitudes: se desmoronan en la generación." }));
   }
   if (RISKY_MOTION.test(haystack)) {
     score -= 12;

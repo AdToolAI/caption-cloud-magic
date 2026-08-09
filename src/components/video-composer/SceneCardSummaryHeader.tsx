@@ -31,6 +31,7 @@ import {
 import { evaluateSceneQuality } from '@/lib/motion-studio/qualityScore';
 import type { ComposerScene } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost } from '@/types/video-composer';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   scene: ComposerScene;
@@ -234,7 +235,7 @@ export default function SceneCardSummaryHeader({
           className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
           onClick={onMoveUp}
           disabled={index === 0}
-          title="Move up"
+          title={tx({ de: "Nach oben verschieben", en: "Move up", es: "Mover hacia arriba" })}
         >
           <ChevronUp className="h-3 w-3" />
         </Button>
@@ -244,7 +245,7 @@ export default function SceneCardSummaryHeader({
           className="h-6 w-6 text-muted-foreground/60 hover:text-foreground"
           onClick={onMoveDown}
           disabled={index === totalScenes - 1}
-          title="Move down"
+          title={tx({ de: "Nach unten verschieben", en: "Move down", es: "Mover hacia abajo" })}
         >
           <ChevronDown className="h-3 w-3" />
         </Button>
@@ -253,7 +254,7 @@ export default function SceneCardSummaryHeader({
           variant="ghost"
           className="h-6 w-6 text-muted-foreground/60 hover:text-rose-400"
           onClick={onDelete}
-          title="Delete"
+          title={tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
         >
           <Trash2 className="h-3 w-3" />
         </Button>

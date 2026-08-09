@@ -196,7 +196,7 @@ const Carousel = () => {
 
   const handleCreateABVariant = async () => {
     if (!carouselOutline) {
-      toast.error("Erstelle zuerst Variante A");
+      toast.error(tx({ de: 'Erstelle zuerst Variante A', en: 'Create Variant A first', es: 'Crea primero la Variante A' }));
       return;
     }
     await handleGenerate(true);
@@ -214,7 +214,7 @@ const Carousel = () => {
     const fullText = `${caption}\n\n${hashtags}`;
     
     navigator.clipboard.writeText(fullText);
-    toast.success("Caption & Hashtags kopiert!");
+    toast.success(tx({ de: 'Caption & Hashtags kopiert!', en: 'Caption & Hashtags copied!', es: '¡Subtítulos y hashtags copiados!' }));
   };
 
   const handleExportPNG = () => {
@@ -331,8 +331,8 @@ const Carousel = () => {
           <div className="mb-8 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-bold mb-2">PRO Karussell-Generator</h1>
-                <p className="text-muted-foreground">Storytelling-Engine mit Brand-Sync & Performance-Analytics</p>
+                <h1 className="text-4xl font-bold mb-2">{tx({ de: 'PRO Karussell-Generator', en: 'PRO Carousel Generator', es: 'Generador de carrusel PRO' })}</h1>
+                <p className="text-muted-foreground">{tx({ de: 'Storytelling-Engine mit Brand-Sync & Performance-Analytics', en: 'Storytelling engine with Brand Sync & performance analytics', es: 'Motor de narración con Brand Sync y análisis de rendimiento' })}</p>
               </div>
               {activeBrandKit && (
                 <BrandSyncBadge 
@@ -349,12 +349,12 @@ const Carousel = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Inhalt & Einstellungen
+                  {tx({ de: 'Inhalt & Einstellungen', en: 'Content & Settings', es: 'Contenido y ajustes' })}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="text">Dein Thema oder Stichpunkte</Label>
+                  <Label htmlFor="text">{tx({ de: 'Dein Thema oder Stichpunkte', en: 'Your topic or bullet points', es: 'Tu tema o puntos clave' })}</Label>
                   <Textarea
                     id="text"
                     placeholder={tx({ de: "🪄 Tipp: Gib 3 Stichpunkte ein – wir bauen die Story für dich.", en: "🪄 Tip: Enter 3 bullet points – we'll build the story for you.", es: "🪄 Consejo: Introduce 3 puntos clave y nosotros crearemos la historia por ti." })}
@@ -470,12 +470,12 @@ const Carousel = () => {
                     {isGenerating ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generiere...
+                        {tx({ de: 'Generiere...', en: 'Generating...', es: 'Generando...' })}
                       </>
                     ) : (
                       <>
                         <Sparkles className="mr-2 h-4 w-4" />
-                        Folien erstellen
+                        {tx({ de: 'Folien erstellen', en: 'Create slides', es: 'Crear diapositivas' })}
                       </>
                     )}
                   </Button>
@@ -487,7 +487,7 @@ const Carousel = () => {
                       variant="outline"
                       className="w-full"
                     >
-                      Variante B generieren
+                      {tx({ de: 'Variante B generieren', en: 'Generate Variant B', es: 'Generar Variante B' })}
                     </Button>
                   )}
                 </div>

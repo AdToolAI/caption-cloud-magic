@@ -62,16 +62,16 @@ import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/
 import { cn } from '@/lib/utils';
 
 const ASPECTS: Array<{ value: AutopilotAspect; label: string }> = [
-  { value: '9:16', label: 'Hochkant 9:16 — Reels, Shorts, TikTok' },
-  { value: '16:9', label: 'Quer 16:9 — YouTube, Website' },
-  { value: '1:1', label: 'Quadrat 1:1 — Feed' },
-  { value: '4:5', label: 'Portrait 4:5 — Feed' },
+  { value: '9:16', label: tx({ de: 'Hochkant 9:16 — Reels, Shorts, TikTok', en: 'Portrait 9:16 — Reels, Shorts, TikTok', es: 'Vertical 9:16 — Reels, Shorts, TikTok' }) },
+  { value: '16:9', label: tx({ de: 'Quer 16:9 — YouTube, Website', en: 'Landscape 16:9 — YouTube, Website', es: 'Horizontal 16:9 — YouTube, Website' }) },
+  { value: '1:1', label: tx({ de: 'Quadrat 1:1 — Feed', en: 'Square 1:1 — Feed', es: 'Cuadrado 1:1 — Feed' }) },
+  { value: '4:5', label: tx({ de: 'Portrait 4:5 — Feed', en: 'Portrait 4:5 — Feed', es: 'Retrato 4:5 — Feed' }) },
 ];
 
 const LANGUAGES = [
-  { value: 'de', label: 'Deutsch' },
-  { value: 'en', label: 'Englisch' },
-  { value: 'es', label: 'Spanisch' },
+  { value: 'de', label: tx({ de: 'Deutsch', en: 'German', es: 'Alemán' }) },
+  { value: 'en', label: tx({ de: 'Englisch', en: 'English', es: 'Inglés' }) },
+  { value: 'es', label: tx({ de: 'Spanisch', en: 'Spanish', es: 'Español' }) },
 ];
 
 const TREATMENT_PHASES = [
@@ -79,17 +79,17 @@ const TREATMENT_PHASES = [
   tx({ de: 'Konzept und Dramaturgie …', en: 'Concept and dramaturgy…', es: 'Concepto y dramaturgia…' }),
   tx({ de: 'Szenen werden gebaut …', en: 'Building scenes…', es: 'Creando escenas…' }),
   tx({ de: 'Dialoge und Besetzung …', en: 'Dialogues and casting…', es: 'Diálogos y reparto…' }),
-  'Letzter Feinschliff …',
+  tx({ de: 'Letzter Feinschliff …', en: 'Final touches…', es: 'Toques finales…' }),
 ];
 
 const BEAT_LABEL: Record<string, string> = {
-  hook: 'Aufhänger',
-  problem: 'Problem',
-  reveal: 'Lösung',
-  proof: 'Beweis',
-  benefit: 'Nutzen',
-  emotion: 'Emotion',
-  cta: 'Abbinder',
+  hook: tx({ de: 'Aufhänger', en: 'Hook', es: 'Gancho' }),
+  problem: tx({ de: 'Problem', en: 'Problem', es: 'Problema' }),
+  reveal: tx({ de: 'Lösung', en: 'Solution', es: 'Solución' }),
+  proof: tx({ de: 'Beweis', en: 'Proof', es: 'Prueba' }),
+  benefit: tx({ de: 'Nutzen', en: 'Benefit', es: 'Beneficio' }),
+  emotion: tx({ de: 'Emotion', en: 'Emotion', es: 'Emoción' }),
+  cta: tx({ de: 'Abbinder', en: 'CTA', es: 'Llamada a la acción' }),
 };
 
 export interface DirectorsTableBriefing {
@@ -221,7 +221,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
         const voice = resolved ?? narratorVoice ?? undefined;
         return {
           ...turn,
-          speakerName: turn.speakerName ?? cast?.name ?? 'Erzähler',
+          speakerName: turn.speakerName ?? cast?.name ?? tx({ de: 'Erzähler', en: 'Narrator', es: 'Narrador' }),
           voiceId: turn.voiceId ?? voice?.voiceId,
           voiceName: voice?.voiceName,
           autoVoice: !turn.voiceId && (voice?.auto ?? false),
@@ -353,7 +353,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
   const handleDevelop = async () => {
     if (brief.trim().length < 8) {
       toast({
-        title: 'Noch zu knapp',
+        title: tx({ de: 'Noch zu knapp', en: 'Too short', es: 'Demasiado corto' }),
         description: tx({ de: 'Beschreibe in einem Satz, worum es im Video gehen soll.', en: 'Describe in one sentence what the video should be about.', es: 'Describe en una frase de qué debería tratar el video.' }),
         variant: 'destructive',
       });

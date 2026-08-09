@@ -31,14 +31,14 @@ import { CLIP_SOURCE_LABELS } from '@/types/video-composer';
 const LIVE_STATUSES = ['pending', 'queued', 'generating', 'composing', 'lipsync'] as const;
 
 const STATUS_META: Record<string, { tint: string; label: string }> = {
-  pending: { tint: 'bg-slate-500/20 text-slate-300 border-slate-500/30', label: 'Wartet' },
-  queued: { tint: 'bg-slate-500/20 text-slate-300 border-slate-500/30', label: 'In Queue' },
-  generating: { tint: 'bg-sky-500/20 text-sky-300 border-sky-500/30', label: 'Render läuft' },
-  composing: { tint: 'bg-sky-500/20 text-sky-300 border-sky-500/30', label: 'Audio + Komposition' },
-  lipsync: { tint: 'bg-violet-500/20 text-violet-300 border-violet-500/30', label: 'Lip-Sync' },
-  completed: { tint: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', label: 'Fertig' },
-  failed: { tint: 'bg-rose-500/20 text-rose-300 border-rose-500/30', label: 'Fehlgeschlagen' },
-  canceled: { tint: 'bg-muted/30 text-muted-foreground border-muted', label: 'Abgebrochen' },
+  pending: { tint: 'bg-slate-500/20 text-slate-300 border-slate-500/30', label: tx({ de: 'Wartet', en: 'Waiting', es: 'Esperando' }) },
+  queued: { tint: 'bg-slate-500/20 text-slate-300 border-slate-500/30', label: tx({ de: 'In Queue', en: 'In queue', es: 'En cola' }) },
+  generating: { tint: 'bg-sky-500/20 text-sky-300 border-sky-500/30', label: tx({ de: 'Render läuft', en: 'Rendering', es: 'Renderizando' }) },
+  composing: { tint: 'bg-sky-500/20 text-sky-300 border-sky-500/30', label: tx({ de: 'Audio + Komposition', en: 'Audio + Composition', es: 'Audio y composición' }) },
+  lipsync: { tint: 'bg-violet-500/20 text-violet-300 border-violet-500/30', label: tx({ de: 'Lip-Sync', en: 'Lip-sync', es: 'Sincronización labial' }) },
+  completed: { tint: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', label: tx({ de: 'Fertig', en: 'Done', es: 'Hecho' }) },
+  failed: { tint: 'bg-rose-500/20 text-rose-300 border-rose-500/30', label: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' }) },
+  canceled: { tint: 'bg-muted/30 text-muted-foreground border-muted', label: tx({ de: 'Abgebrochen', en: 'Canceled', es: 'Cancelado' }) },
 };
 
 function statusBadge(status: string) {
@@ -106,7 +106,7 @@ function QueueRowCard({
             <Clock className="h-3 w-3" />
             {timeAgo(row.updated_at)}
             <span>·</span>
-            <span className="truncate">Projekt {row.project_id.slice(0, 8)}</span>
+            <span className="truncate">{tx({ de: "Projekt", en: "Project", es: "Proyecto" })} {row.project_id.slice(0, 8)}</span>
           </div>
         </div>
       </div>
@@ -119,7 +119,7 @@ function QueueRowCard({
             className="h-7 px-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
             onClick={() => onCancel(row)}
             disabled={canceling}
-            title="Diesen Job abbrechen"
+            title={tx({ de: "Diesen Job abbrechen", en: "Cancel this job", es: "Cancelar este trabajo" })}
           >
             {canceling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
           </Button>
@@ -174,7 +174,7 @@ export default function RenderQueue() {
             Render-Queue
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Live-Status aller Motion-Studio-Renderjobs. Aktualisiert sich automatisch alle 5 Sekunden.
+            {tx({ de: "Live-Status aller Motion-Studio-Renderjobs. Aktualisiert sich automatisch alle 5 Sekunden.", en: "Live status of all Motion Studio render jobs. Updates automatically every 5 seconds.", es: "Estado en vivo de todos los trabajos de renderizado de Motion Studio. Se actualiza automáticamente cada 5 segundos." })}
           </p>
         </div>
         <div className="flex items-center gap-2">

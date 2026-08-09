@@ -18,36 +18,36 @@ interface Shortcut {
 
 const SHORTCUTS: Shortcut[] = [
   // Playback
-  { keys: ['Space'], label: 'Play / Pause', category: 'Playback' },
-  { keys: ['J'], label: 'Rückwärts (Shuttle)', category: 'Playback' },
-  { keys: ['K'], label: 'Pause', category: 'Playback' },
-  { keys: ['L'], label: 'Vorwärts (Shuttle)', category: 'Playback' },
+  { keys: ['Space'], label: tx({ de: 'Play / Pause', en: 'Play / Pause', es: 'Reproducir / Pausa' }), category: 'Playback' },
+  { keys: ['J'], label: tx({ de: 'Rückwärts (Shuttle)', en: 'Reverse (Shuttle)', es: 'Retroceder (Shuttle)' }), category: 'Playback' },
+  { keys: ['K'], label: tx({ de: 'Pause', en: 'Pause', es: 'Pausa' }), category: 'Playback' },
+  { keys: ['L'], label: tx({ de: 'Vorwärts (Shuttle)', en: 'Forward (Shuttle)', es: 'Avanzar (Shuttle)' }), category: 'Playback' },
   { keys: ['←'], label: tx({ de: '1 Frame zurück', en: '1 frame back', es: '1 fotograma atrás' }), category: 'Playback' },
-  { keys: ['→'], label: '1 Frame vor', category: 'Playback' },
+  { keys: ['→'], label: tx({ de: '1 Frame vor', en: '1 frame forward', es: '1 fotograma adelante' }), category: 'Playback' },
   { keys: ['⇧', '←'], label: tx({ de: '1 Sekunde zurück', en: '1 second back', es: '1 segundo atrás' }), category: 'Playback' },
   { keys: ['⇧', '→'], label: '1 Sekunde vor', category: 'Playback' },
-  { keys: ['Home'], label: 'Zum Anfang', category: 'Playback' },
-  { keys: ['End'], label: 'Zum Ende', category: 'Playback' },
+  { keys: ['Home'], label: tx({ de: 'Zum Anfang', en: 'To beginning', es: 'Al principio' }), category: 'Playback' },
+  { keys: ['End'], label: tx({ de: 'Zum Ende', en: 'To end', es: 'Al final' }), category: 'Playback' },
 
   // Editing
-  { keys: ['S'], label: 'Am Playhead teilen (Split)', category: 'Editing' },
-  { keys: ['Delete'], label: 'Ripple Delete (Lücke schließen)', category: 'Editing' },
-  { keys: ['⌥', 'Delete'], label: 'Delete (Lücke bleibt)', category: 'Editing' },
-  { keys: ['⌘', 'Z'], label: 'Rückgängig', category: 'Editing' },
-  { keys: ['⌘', '⇧', 'Z'], label: 'Wiederherstellen', category: 'Editing' },
-  { keys: ['⌘', 'D'], label: 'Duplizieren', category: 'Editing' },
-  { keys: ['I'], label: 'In-Marker setzen', category: 'Editing' },
-  { keys: ['O'], label: 'Out-Marker setzen', category: 'Editing' },
+  { keys: ['S'], label: tx({ de: 'Am Playhead teilen (Split)', en: 'Split at playhead', es: 'Dividir en el cabezal de reproducción' }), category: 'Editing' },
+  { keys: ['Delete'], label: tx({ de: 'Ripple Delete (Lücke schließen)', en: 'Ripple delete (close gap)', es: 'Eliminación con desplazamiento (cerrar hueco)' }), category: 'Editing' },
+  { keys: ['⌥', 'Delete'], label: tx({ de: 'Delete (Lücke bleibt)', en: 'Delete (gap remains)', es: 'Eliminar (el hueco permanece)' }), category: 'Editing' },
+  { keys: ['⌘', 'Z'], label: tx({ de: 'Rückgängig', en: 'Undo', es: 'Deshacer' }), category: 'Editing' },
+  { keys: ['⌘', '⇧', 'Z'], label: tx({ de: 'Wiederherstellen', en: 'Redo', es: 'Rehacer' }), category: 'Editing' },
+  { keys: ['⌘', 'D'], label: tx({ de: 'Duplizieren', en: 'Duplicate', es: 'Duplicar' }), category: 'Editing' },
+  { keys: ['I'], label: tx({ de: 'In-Marker setzen', en: 'Set in-marker', es: 'Establecer marcador de entrada' }), category: 'Editing' },
+  { keys: ['O'], label: tx({ de: 'Out-Marker setzen', en: 'Set out-marker', es: 'Establecer marcador de salida' }), category: 'Editing' },
 
   // Selection
   { keys: ['⌘', 'A'], label: tx({ de: 'Alles auswählen', en: 'Select everything', es: 'Selecciona todo' }), category: 'Selection' },
-  { keys: ['⇧', 'Klick'], label: 'Range-Select', category: 'Selection' },
+  { keys: ['⇧', 'Klick'], label: tx({ de: 'Range-Select', en: 'Range select', es: 'Selección de rango' }), category: 'Selection' },
   { keys: ['⌘', 'Klick'], label: tx({ de: 'Zur Auswahl hinzufügen', en: 'Add to selection', es: 'Añadir a la selección' }), category: 'Selection' },
-  { keys: ['Esc'], label: 'Auswahl aufheben', category: 'Selection' },
+  { keys: ['Esc'], label: tx({ de: 'Auswahl aufheben', en: 'Deselect', es: 'Anular selección' }), category: 'Selection' },
 
   // Navigation
-  { keys: ['?'], label: 'Diese Übersicht öffnen', category: 'Navigation' },
-  { keys: ['+', '−'], label: 'Timeline-Zoom', category: 'Navigation' },
+  { keys: ['?'], label: tx({ de: 'Diese Übersicht öffnen', en: 'Open this overview', es: 'Abrir este resumen' }), category: 'Navigation' },
+  { keys: ['+', '−'], label: tx({ de: 'Timeline-Zoom', en: 'Timeline zoom', es: 'Zoom de línea de tiempo' }), category: 'Navigation' },
 ];
 
 interface Props {
@@ -81,7 +81,7 @@ export const ShortcutOverlay: React.FC<Props> = ({ open, onOpenChange }) => {
             Tastatur-Shortcuts
           </DialogTitle>
           <DialogDescription className="text-white/50">
-            Pro-Editing Shortcuts für den Universal Cut. Drücke <kbd className="px-1 border border-white/20 rounded text-[10px]">?</kbd> jederzeit, um diese Übersicht zu öffnen.
+            Pro-Editing Shortcuts für den Universal Cut. Drücke <kbd className="px-1 border border-white/20 rounded text-[10px]">?</kbd> {tx({ de: "jederzeit, um diese Übersicht zu öffnen.", en: "anytime to open this overview.", es: "en cualquier momento para abrir este resumen." })}
           </DialogDescription>
         </DialogHeader>
 
@@ -89,7 +89,7 @@ export const ShortcutOverlay: React.FC<Props> = ({ open, onOpenChange }) => {
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
           <Input
             autoFocus
-            placeholder="Shortcut suchen …"
+            placeholder={tx({ de: "Shortcut suchen …", en: "Search shortcut...", es: "Buscar atajo..." })}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-[#F5C76A]/30"
@@ -128,7 +128,7 @@ export const ShortcutOverlay: React.FC<Props> = ({ open, onOpenChange }) => {
             </section>
           ))}
           {Object.keys(grouped).length === 0 && (
-            <p className="text-center text-sm text-white/40 py-8">Keine Treffer.</p>
+            <p className="text-center text-sm text-white/40 py-8">{tx({ de: "Keine Treffer.", en: "No results.", es: "Sin resultados." })}</p>
           )}
         </div>
       </DialogContent>

@@ -26,7 +26,7 @@ export function AutopilotWeeklyReviewPanel() {
           Jeden Samstag um 10:00 UTC erstellt der Autopilot automatisch ein Review der vergangenen Woche.
         </p>
         <Button variant="outline" onClick={() => trigger.mutate()} disabled={trigger.isPending}>
-          {trigger.isPending ? 'Wird erstellt …' : tx({ de: "Jetzt manuell erstellen", en: "Now create manually", es: "Ahora crea manualmente" })}
+          {trigger.isPending ? tx({ de: 'Wird erstellt …', en: 'Creating…', es: 'Creando…' }) : tx({ de: "Jetzt manuell erstellen", en: "Now create manually", es: "Ahora crea manualmente" })}
         </Button>
       </Card>
     );

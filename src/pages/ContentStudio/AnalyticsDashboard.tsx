@@ -116,25 +116,25 @@ export default function AnalyticsDashboard() {
 
   const statCards = [
     {
-      title: "Videos erstellt",
+      title: tx({ de: "Videos erstellt", en: "Videos created", es: "Vídeos creados" }),
       value: analytics.overview.total_videos,
       icon: Video,
       color: "text-blue-500"
     },
     {
-      title: "Gesamt Aufrufe",
+      title: tx({ de: "Gesamt Aufrufe", en: "Total Views", es: "Vistas totales" }),
       value: analytics.overview.total_views.toLocaleString(),
       icon: Eye,
       color: "text-green-500"
     },
     {
-      title: "Ø Engagement",
+      title: tx({ de: "Ø Engagement", en: "Avg Engagement", es: "Promedio de compromiso" }),
       value: `${analytics.overview.avg_engagement}%`,
       icon: TrendingUp,
       color: "text-purple-500"
     },
     {
-      title: "Videos/Monat",
+      title: tx({ de: "Videos/Monat", en: "Videos/Month", es: "Vídeos/Mes" }),
       value: Math.round(analytics.overview.total_videos / 3),
       icon: BarChart3,
       color: "text-orange-500"
@@ -147,9 +147,9 @@ export default function AnalyticsDashboard() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Content Performance</h1>
+            <h1 className="text-3xl font-bold">{tx({ de: 'Content Performance', en: 'Content Performance', es: 'Rendimiento del contenido' })}</h1>
             <p className="text-muted-foreground mt-1">
-              Analysiere die Performance deiner Videos
+              {tx({ de: 'Analysiere die Performance deiner Videos', en: 'Analyze the performance of your videos', es: 'Analiza el rendimiento de tus vídeos' })}
             </p>
           </div>
           <div className="flex gap-2">
@@ -158,9 +158,9 @@ export default function AnalyticsDashboard() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7d">7 Tage</SelectItem>
-                <SelectItem value="30d">30 Tage</SelectItem>
-                <SelectItem value="90d">90 Tage</SelectItem>
+                <SelectItem value="7d">{tx({ de: '7 Tage', en: '7 Days', es: '7 Días' })}</SelectItem>
+                <SelectItem value="30d">{tx({ de: '30 Tage', en: '30 Days', es: '30 Días' })}</SelectItem>
+                <SelectItem value="90d">{tx({ de: '90 Tage', en: '90 Days', es: '90 Días' })}</SelectItem>
                 <SelectItem value="all">{tx({ de: "Alle Zeit", en: "All time", es: "Todo el tiempo" })}</SelectItem>
               </SelectContent>
             </Select>
@@ -191,7 +191,7 @@ export default function AnalyticsDashboard() {
         {/* Performance by Content Type */}
         <Card>
           <CardHeader>
-            <CardTitle>Performance nach Content-Type</CardTitle>
+            <CardTitle>{tx({ de: 'Performance nach Content-Type', en: 'Performance by Content Type', es: 'Rendimiento por tipo de contenido' })}</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -204,7 +204,7 @@ export default function AnalyticsDashboard() {
                 <XAxis dataKey="type" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="engagement" fill="hsl(var(--primary))" name="Engagement %" />
+                <Bar dataKey="engagement" fill="hsl(var(--primary))" name={tx({ de: 'Engagement %', en: 'Engagement %', es: 'Compromiso %' })} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -213,7 +213,7 @@ export default function AnalyticsDashboard() {
         {/* Top Templates */}
         <Card>
           <CardHeader>
-            <CardTitle>🏆 Top Performing Templates</CardTitle>
+            <CardTitle>{tx({ de: '🏆 Top Performing Templates', en: '🏆 Top Performing Templates', es: '🏆 Plantillas de mejor rendimiento' })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -226,7 +226,7 @@ export default function AnalyticsDashboard() {
                     <div>
                       <div className="font-medium">{template.name}</div>
                       <div className="text-sm text-muted-foreground">
-                        {template.usage_count}× verwendet
+                        {template.usage_count} {tx({ de: '× verwendet', en: '× used', es: '× usado' })}
                       </div>
                     </div>
                   </div>
@@ -243,7 +243,7 @@ export default function AnalyticsDashboard() {
         {/* Timeline */}
         <Card>
           <CardHeader>
-            <CardTitle>📅 Timeline (Letzte 30 Tage)</CardTitle>
+            <CardTitle>{tx({ de: '📅 Timeline (Letzte 30 Tage)', en: '📅 Timeline (Last 30 Days)', es: '📅 Cronología (Últimos 30 días)' })}</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -261,14 +261,14 @@ export default function AnalyticsDashboard() {
                   type="monotone" 
                   dataKey="videos_created" 
                   stroke="hsl(var(--primary))" 
-                  name="Videos erstellt"
+                  name={tx({ de: 'Videos erstellt', en: 'Videos created', es: 'Vídeos creados' })}
                   strokeWidth={2}
                 />
                 <Line 
                   type="monotone" 
                   dataKey="views" 
                   stroke="hsl(var(--chart-2))" 
-                  name="Aufrufe"
+                  name={tx({ de: 'Aufrufe', en: 'Views', es: 'Vistas' })}
                   strokeWidth={2}
                 />
               </LineChart>

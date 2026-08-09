@@ -276,7 +276,7 @@ export function AISuperuserAdmin() {
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Bot className="h-6 w-6" /> KI Superuser
           </h2>
-          <p className="text-muted-foreground">Proaktive Tests aller kritischen User-Flows</p>
+          <p className="text-muted-foreground">{tx({ de: "Proaktive Tests aller kritischen User-Flows", en: "Proactive tests of all critical user flows", es: "Pruebas proactivas de todos los flujos de usuarios críticos" })}</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={fetchData} variant="outline" size="sm" disabled={loading}>
@@ -295,7 +295,7 @@ export function AISuperuserAdmin() {
             Komplett-Test
           </Button>
           <Button onClick={trimHistory} variant="ghost" size="sm" title="Behält die letzten 5 Runs pro Szenario">
-            Historie kürzen (letzte 5 behalten)
+            {tx({ de: "Historie kürzen (letzte 5 behalten)", en: "Trim history (keep last 5)", es: "Recortar historial (mantener últimos 5)" })}
           </Button>
           <Button onClick={resetPassRateHistory} variant="ghost" size="sm" title={tx({ de: "Behält nur den letzten Run pro Szenario — Pass-Rate startet sofort bei 100% wenn grün", en: "Only keeps the last run per scenario — pass rate immediately starts at 100% when green", es: "Solo mantiene la última ejecución por escenario; la tasa de aprobación comienza inmediatamente al 100 % cuando está verde" })}>
             Komplett zurücksetzen (nur letzten Run behalten)
@@ -308,11 +308,11 @@ export function AISuperuserAdmin() {
           <ShieldCheck className="h-6 w-6 text-green-500 flex-shrink-0" />
           <div className="flex-1">
             <div className="font-semibold text-green-700 dark:text-green-400">
-              Alle {scenarios.length} Szenarien laufen stabil
+              {tx({ de: `Alle ${scenarios.length} Szenarien laufen stabil`, en: `All ${scenarios.length} scenarios are running stably`, es: `Los ${scenarios.length} escenarios funcionan de forma estable` })}
             </div>
             {latestRunAt && (
               <div className="text-xs text-muted-foreground">
-                Letzter Komplett-Test {formatDistanceToNow(new Date(latestRunAt), { addSuffix: true, locale: de })}
+                {tx({ de: "Letzter Komplett-Test ", en: "Last full test ", es: "Última prueba completa " })}{formatDistanceToNow(new Date(latestRunAt), { addSuffix: true, locale: de })}
               </div>
             )}
           </div>
@@ -322,7 +322,7 @@ export function AISuperuserAdmin() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground" title="Summe der Latenzen aller Szenarien im letzten Komplett-Test">Letzter Run (gesamt)</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground" title="Summe der Latenzen aller Szenarien im letzten Komplett-Test">{tx({ de: "Letzter Run (gesamt)", en: "Last Run (Total)", es: "Última ejecución (Total)" })}</CardTitle>
           </CardHeader>
           <CardContent>
             {(() => {
@@ -342,7 +342,7 @@ export function AISuperuserAdmin() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Szenarien</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{tx({ de: "Szenarien", en: "Scenarios", es: "Escenarios" })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{scenarios.length}</div>
@@ -350,7 +350,7 @@ export function AISuperuserAdmin() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Test-Runs (7d)</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{tx({ de: "Test-Runs (7d)", en: "Test Runs (7d)", es: "Ejecuciones de prueba (7d)" })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{runs.length}</div>
@@ -358,7 +358,7 @@ export function AISuperuserAdmin() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Pass-Rate (letzte 5)</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{tx({ de: "Pass-Rate (letzte 5)", en: "Pass Rate (last 5)", es: "Tasa de aprobación (últimas 5)" })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-500">
@@ -370,7 +370,7 @@ export function AISuperuserAdmin() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Offene Anomalien</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{tx({ de: "Offene Anomalien", en: "Open Anomalies", es: "Anomalías abiertas" })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-destructive">

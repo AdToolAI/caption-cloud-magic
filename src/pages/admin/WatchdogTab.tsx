@@ -131,7 +131,7 @@ export function WatchdogTab() {
         </CardHeader>
         <CardContent className="space-y-2">
           {!sentry.data ? (
-            <p className="text-sm text-muted-foreground">Lade Sentry-Status…</p>
+            <p className="text-sm text-muted-foreground">{tx({ de: 'Lade Sentry-Status…', en: 'Loading Sentry status…', es: 'Cargando estado de Sentry…' })}</p>
           ) : !sentry.data.enabled ? (
             <p className="text-sm text-amber-400/80">{tx({ de: "⚠ Sentry nicht konfiguriert (SENTRY_AUTH_TOKEN/ORG/PROJECT fehlen).", en: "⚠ Sentry not configured (SENTRY_AUTH_TOKEN/ORG/PROJECT missing).", es: "⚠ Sentry no configurado (falta SENTRY_AUTH_TOKEN/ORG/PROJECT)." })}</p>
           ) : (
@@ -220,7 +220,7 @@ export function WatchdogTab() {
       {/* Recent runs */}
       <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10">
         <CardHeader>
-          <CardTitle className="text-[#F5C76A] text-base">Letzte 50 Watchdog-Läufe</CardTitle>
+          <CardTitle className="text-[#F5C76A] text-base">{tx({ de: 'Letzte 50 Watchdog-Läufe', en: 'Last 50 watchdog runs', es: 'Últimas 50 ejecuciones de vigilancia' })}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {(runs.data ?? []).length === 0 && (
@@ -250,17 +250,17 @@ export function WatchdogTab() {
                     </Badge>
                     {anomalyCount > 0 && (
                       <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40">
-                        {anomalyCount} Anomalie{anomalyCount === 1 ? "" : "n"}
+                        {anomalyCount} {tx({ de: `Anomalie${anomalyCount === 1 ? '' : 'n'}`, en: `anomaly${anomalyCount === 1 ? '' : 'ies'}`, es: `anomalía${anomalyCount === 1 ? '' : 's'}` })}
                       </Badge>
                     )}
                     {r.bugs_created > 0 && (
                       <Badge className="bg-red-500/20 text-red-300 border-red-500/40">
-                        {r.bugs_created} Bug{r.bugs_created === 1 ? "" : "s"} erstellt
+                        {r.bugs_created} {tx({ de: `Bug${r.bugs_created === 1 ? '' : 's'} erstellt`, en: `bug${r.bugs_created === 1 ? '' : 's'} created`, es: `bug${r.bugs_created === 1 ? '' : 's'} creado` })}
                       </Badge>
                     )}
                     {r.rows_auto_failed > 0 && (
                       <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/40">
-                        {r.rows_auto_failed} Zeile{r.rows_auto_failed === 1 ? "" : "n"} auto-failed
+                        {r.rows_auto_failed} {tx({ de: `Zeile${r.rows_auto_failed === 1 ? '' : 'n'} auto-failed`, en: `row${r.rows_auto_failed === 1 ? '' : 's'} auto-failed`, es: `fila${r.rows_auto_failed === 1 ? '' : 's'} auto-failed` })}
                       </Badge>
                     )}
                   </div>

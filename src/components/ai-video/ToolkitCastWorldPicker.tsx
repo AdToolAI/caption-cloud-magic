@@ -212,7 +212,7 @@ export function ToolkitCastWorldPicker({
                 onPick={(c) => addChar(c.id)}
                 language={language}
                 emptyLabel={t(tx({ de: 'Noch keine Charaktere.', en: 'No characters yet.', es: 'Aún no hay personajes.' }), 'No characters yet.', 'Aún no hay personajes.')}
-                triggerLabel={t(tx({ de: 'Charakter hinzufügen', en: 'Add character', es: 'Añadir personaje' }), 'Add character', 'Añadir personaje')}
+                triggerLabel={tx({ de: 'Charakter hinzufügen', en: 'Add character', es: 'Añadir personaje' })}
               />
             )}
           </div>
@@ -240,7 +240,7 @@ export function ToolkitCastWorldPicker({
               onPick={(l) => onLocationIdChange((l as MotionStudioLocation).id)}
               language={language}
               emptyLabel={t(tx({ de: 'Noch keine Locations.', en: 'No locations yet.', es: 'Aún no hay ubicaciones.' }), 'No locations yet.', 'Aún no hay ubicaciones.')}
-              triggerLabel={t('Location wählen', 'Pick location', 'Elegir ubicación')}
+              triggerLabel={tx({ de: 'Location wählen', en: 'Pick location', es: 'Elegir ubicación' })}
               fullWidth
             />
           )}
@@ -266,7 +266,7 @@ export function ToolkitCastWorldPicker({
               onPick={(l) => onBuildingIdChange((l as MotionStudioLocation).id)}
               language={language}
               emptyLabel={t(tx({ de: 'Noch keine Buildings.', en: 'No buildings yet.', es: 'Aún no hay edificios.' }), 'No buildings yet.', 'Aún no hay edificios.')}
-              triggerLabel={t('Building wählen', 'Pick building', 'Elegir edificio')}
+              triggerLabel={tx({ de: 'Building wählen', en: 'Pick building', es: 'Elegir edificio' })}
               fullWidth
             />
           )}

@@ -75,7 +75,7 @@ export function useAudiobookProject() {
       if (!row) {
         const { data: created, error } = await supabase
           .from('audiobook_projects')
-          .insert({ user_id: user.id, title: 'Neues Hörbuch', language: 'de' })
+          .insert({ user_id: user.id, title: tx({ de: 'Neues Hörbuch', en: 'New Audiobook', es: 'Nuevo audiolibro' }), language: 'de' })
           .select('*')
           .single();
         if (error) throw error;
@@ -126,7 +126,7 @@ export function useAudiobookProject() {
   const importManuscript = useCallback(async (raw: string) => {
     if (!project) return;
     const parsed = parseChapters(raw);
-    if (parsed.length === 0) { toast.error('Kein Text erkannt'); return; }
+    if (parsed.length === 0) { toast.error(tx({ de: 'Kein Text erkannt', en: 'No text recognized', es: 'No se reconoció ningún texto' })); return; }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -143,7 +143,7 @@ export function useAudiobookProject() {
     const { error } = await supabase.from('audiobook_chapters').insert(rows);
     if (error) { toast.error(tx({ de: 'Import fehlgeschlagen', en: 'Import failed', es: 'Importación fallida' })); return; }
     await loadChapters(project.id);
-    toast.success(`${parsed.length} Kapitel importiert`);
+    toast.success(tx({ de: `${parsed.length} Kapitel importiert`, en: `${parsed.length} chapters imported`, es: `${parsed.length} capítulos importados` }));
   }, [project, loadChapters]);
 
   const addChapter = useCallback(async () => {
@@ -154,7 +154,7 @@ export function useAudiobookProject() {
       project_id: project.id,
       user_id: user.id,
       chapter_index: chapters.length,
-      title: `Kapitel ${chapters.length + 1}`,
+      title: tx({ de: `Kapitel ${chapters.length + 1}`, en: `Chapter ${chapters.length + 1}`, es: `Capítulo ${chapters.length + 1}` }),
       body: '',
     });
     if (error) { toast.error(tx({ de: 'Kapitel konnte nicht angelegt werden', en: 'Could not create chapter', es: 'No se pudo crear el capítulo' })); return; }
@@ -196,10 +196,10 @@ export function useAudiobookProject() {
     if (!project) return;
     const { segments, missingVoices } = buildRenderSegments(chapter.body, project.cast_config);
     if (missingVoices.length > 0) {
-      toast.error('Stimme fehlt', { description: `Ohne Stimme: ${missingVoices.join(', ')}` });
+      toast.error(tx({ de: 'Stimme fehlt', en: 'Voice missing', es: 'Falta voz' }), { description: tx({ de: `Ohne Stimme: ${missingVoices.join(', ')}`, en: `Without voice: ${missingVoices.join(', ')}`, es: `Sin voz: ${missingVoices.join(', ')}` }) });
       return;
     }
-    if (segments.length === 0) { toast.error('Kapitel enthält keinen Text'); return; }
+    if (segments.length === 0) { toast.error(tx({ de: 'Kapitel enthält keinen Text', en: 'Chapter contains no text', es: 'El capítulo no contiene texto' })); return; }
 
     setRenderingId(chapter.id);
     setChapters((prev) => prev.map((c) => (c.id === chapter.id

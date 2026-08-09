@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Heart, MessageCircle, Send, Bookmark } from "lucide-react";
 import { useState } from "react";
+import { tx } from '@/lib/i18nText';
 
 interface InstagramPostPreviewProps {
   mediaUrl: string;
@@ -20,7 +21,7 @@ export const InstagramPostPreview = ({
   caption,
   hook,
   hashtags = [],
-  username = "ihr_profil",
+  username = tx({ de: "ihr_profil", en: "your_profile", es: "tu_perfil" }),
   profileImage,
 }: InstagramPostPreviewProps) => {
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -96,7 +97,7 @@ export const InstagramPostPreview = ({
 
         {/* Likes */}
         <div className="mb-2">
-          <span className="font-semibold text-sm">Gefällt {likes.toLocaleString('de-DE')} Mal</span>
+          <span className="font-semibold text-sm">{tx({ de: `Gefällt ${likes.toLocaleString()} Mal`, en: `${likes.toLocaleString()} likes`, es: `Le gusta a ${likes.toLocaleString()} personas` })}</span>
         </div>
 
         {/* Caption */}
@@ -114,7 +115,7 @@ export const InstagramPostPreview = ({
               onClick={() => setShowFullCaption(!showFullCaption)}
               className="text-muted-foreground ml-1"
             >
-              {showFullCaption ? 'weniger' : 'mehr'}
+              {showFullCaption ? tx({ de: "weniger", en: "less", es: "menos" }) : tx({ de: "mehr", en: "more", es: "más" })}
             </button>
           )}
           {(showFullCaption || !shouldTruncate) && hashtags.length > 0 && (
@@ -131,13 +132,13 @@ export const InstagramPostPreview = ({
         {/* Comments */}
         <div className="mt-2">
           <button className="text-sm text-muted-foreground">
-            Alle {comments} Kommentare ansehen
+            {tx({ de: `Alle ${comments} Kommentare ansehen`, en: `View all ${comments} comments`, es: `Ver los ${comments} comentarios` })}
           </button>
         </div>
 
         {/* Timestamp */}
         <div className="mt-1">
-          <span className="text-xs text-muted-foreground uppercase">VOR 5 MINUTEN</span>
+          <span className="text-xs text-muted-foreground uppercase">{tx({ de: "VOR 5 MINUTEN", en: "5 MINUTES AGO", es: "HACE 5 MINUTOS" })}</span>
         </div>
       </div>
     </Card>

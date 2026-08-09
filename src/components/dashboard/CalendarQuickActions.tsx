@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Zap, Calendar, FileDown, Plus } from "lucide-react";
 import { useTx } from "@/lib/i18nText";
+import { tx } from '@/lib/i18nText';
 
 interface CalendarQuickActionsProps {
   onAutoSchedule?: () => void;

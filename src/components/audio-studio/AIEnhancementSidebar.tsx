@@ -36,23 +36,23 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
   const [enhancements, setEnhancements] = useState<Enhancement[]>([
     {
       id: 'noise',
-      label: 'Rauschentfernung',
-      description: 'Entfernt Hintergrundgeräusche',
+      label: tx({ de: 'Rauschentfernung', en: 'Noise removal', es: 'Eliminación de ruido' }),
+      description: tx({ de: 'Entfernt Hintergrundgeräusche', en: 'Removes background noise', es: 'Elimina el ruido de fondo' }),
       icon: Volume2,
       enabled: true,
       intensity: 75
     },
     {
       id: 'echo',
-      label: 'Hall-Entfernung',
-      description: 'Reduziert Raumhall',
+      label: tx({ de: 'Hall-Entfernung', en: 'Echo removal', es: 'Eliminación de eco' }),
+      description: tx({ de: 'Reduziert Raumhall', en: 'Reduces room reverb', es: 'Reduce la reverberación de la sala' }),
       icon: Radio,
       enabled: true,
       intensity: 60
     },
     {
       id: 'voice',
-      label: 'Stimm-Optimierung',
+      label: tx({ de: 'Stimm-Optimierung', en: 'Voice optimization', es: 'Optimización de voz' }),
       description: tx({ de: 'Klarheit und Wärme', en: 'Clarity and warmth', es: 'Claridad y calidez' }),
       icon: Mic,
       enabled: true,
@@ -60,8 +60,8 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
     },
     {
       id: 'normalize',
-      label: 'Lautstärke-Normalisierung',
-      description: 'Konsistente Lautstärke',
+      label: tx({ de: 'Lautstärke-Normalisierung', en: 'Loudness normalization', es: 'Normalización de volumen' }),
+      description: tx({ de: 'Konsistente Lautstärke', en: 'Consistent volume', es: 'Volumen consistente' }),
       icon: Volume2,
       enabled: true,
       intensity: 100
@@ -137,9 +137,9 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
   const presets = [
     { id: 'podcast', label: 'Podcast', desc: tx({ de: 'Optimiert für Sprache', en: 'Optimized for speech', es: 'Optimizado para voz' }) },
-    { id: 'interview', label: 'Interview', desc: 'Mehrere Sprecher' },
-    { id: 'voiceover', label: 'Voiceover', desc: 'Professionelle Qualität' },
-    { id: 'music', label: 'Music Mix', desc: 'Musik + Sprache' }
+    { id: 'interview', label: 'Interview', desc: tx({ de: 'Mehrere Sprecher', en: 'Multiple speakers', es: 'Varios oradores' }) },
+    { id: 'voiceover', label: 'Voiceover', desc: tx({ de: 'Professionelle Qualität', en: 'Professional quality', es: 'Calidad profesional' }) },
+    { id: 'music', label: 'Music Mix', desc: tx({ de: 'Musik + Sprache', en: 'Music + Speech', es: 'Música + voz' }) }
   ];
 
   const presetConfigs: Record<string, Record<string, number>> = {
@@ -161,7 +161,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
     })));
     
     const presetLabel = presets.find(p => p.id === presetId)?.label;
-    toast.success(`${presetLabel} Preset aktiviert`);
+    toast.success(tx({ de: `${presetLabel} Preset aktiviert`, en: `${presetLabel} preset activated`, es: `Preset ${presetLabel} activado` }));
   };
 
   return (
@@ -174,7 +174,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
           </div>
           <div>
             <h3 className="font-semibold">KI-Audio-Bearbeitung</h3>
-            <p className="text-xs text-muted-foreground">{tx({ de: "Wähle zwischen Enhancement oder Isolation", en: "Choose between Enhancement or Isolation", es: "Elige entre Mejora o Aislamiento" })}</p>
+            <p className="text-xs text-muted-foreground">Wähle zwischen Enhancement oder Isolation</p>
           </div>
         </div>
 
@@ -318,7 +318,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-medium text-amber-500">{tx({ de: "Wichtiger Hinweis", en: "Important NOTE", es: "NOTA IMPORTANTE" })}</h4>
+                  <h4 className="text-sm font-medium text-amber-500">Wichtiger Hinweis</h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     Die Stimmisolierung entfernt <strong>alle</strong> Hintergrundgeräusche und Musik. 
                     Nur die reine Stimme bleibt erhalten. Ideal für Videos mit störender Hintergrundmusik 
@@ -330,13 +330,13 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
             {/* Use Cases */}
             <div className="space-y-3">
-              <Label className="text-xs text-muted-foreground">{tx({ de: "Ideal für:", en: "Ideal for:", es: "Ideal para:" })}</Label>
+              <Label className="text-xs text-muted-foreground">Ideal für:</Label>
               <div className="grid gap-2">
                 {[
-                  { label: tx({ de: 'Videos mit Hintergrundmusik', en: 'Videos with background music', es: 'Vídeos con música de fondo.' }), desc: 'Musik komplett entfernen' },
-                  { label: tx({ de: 'Interviews mit Störgeräuschen', en: 'Interviews with noise', es: 'Entrevistas con ruido' }), desc: 'Nur Sprecher behalten' },
-                  { label: 'Podcast-Clips', desc: 'Reine Sprache extrahieren' },
-                  { label: tx({ de: 'Voice-Over aus Videos', en: 'Voice over from videos', es: 'Voz en off de vídeos' }), desc: 'Stimme isolieren' }
+                  { label: tx({ de: 'Videos mit Hintergrundmusik', en: 'Videos with background music', es: 'Vídeos con música de fondo.' }), desc: tx({ de: 'Musik komplett entfernen', en: 'Completely remove music', es: 'Eliminar completamente la música' }) },
+                  { label: tx({ de: 'Interviews mit Störgeräuschen', en: 'Interviews with noise', es: 'Entrevistas con ruido' }), desc: tx({ de: 'Nur Sprecher behalten', en: 'Keep only speakers', es: 'Mantener solo a los oradores' }) },
+                  { label: 'Podcast-Clips', desc: tx({ de: 'Reine Sprache extrahieren', en: 'Extract pure speech', es: 'Extraer voz pura' }) },
+                  { label: tx({ de: 'Voice-Over aus Videos', en: 'Voice over from videos', es: 'Voz en off de vídeos' }), desc: tx({ de: "Stimme isolieren", en: "Isolate voice", es: "Aislar voz" }) }
                 ].map((useCase, idx) => (
                   <div key={idx} className="p-3 rounded-lg bg-muted/20 border border-border/50">
                     <span className="text-sm font-medium">{useCase.label}</span>

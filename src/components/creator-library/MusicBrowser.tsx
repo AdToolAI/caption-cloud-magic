@@ -152,7 +152,7 @@ export default function MusicBrowser() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Suche nach Music (z.B. beach, epic, lofi)…"
+            placeholder={tx({ de: "Suche nach Music (z.B. beach, epic, lofi)…", en: "Search for music (e.g. beach, epic, lofi)...", es: "Buscar música (por ejemplo, playa, épica, lofi)..." })}
             className="pl-9"
           />
         </div>

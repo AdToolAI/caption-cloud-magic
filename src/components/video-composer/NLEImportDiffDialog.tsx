@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useTx } from '@/lib/i18nText';
 import React from 'react';
 import {
@@ -156,7 +157,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {/* Deleted (warning, not applied) */}
               {diff.deleted.length > 0 && (
                 <Section
-                  title={tr({ de: "Fehlend in FCPXML — werden NICHT gelöscht", en: "Missing in FCPXML — will NOT be deleted", es: "Falta en FCPXML — NO se eliminará" })}
+                  title={tr({ de: tx({ de: "Fehlend in FCPXML — werden NICHT gelöscht", en: "Missing in FCPXML — will NOT be deleted", es: "Faltan en FCPXML — NO serán eliminados" }), en: "Missing in FCPXML — will NOT be deleted", es: "Falta en FCPXML — NO se eliminará" })}
                   icon={<Trash2 className="h-4 w-4 text-warning" />}
                   tone="warning"
                 >
@@ -177,7 +178,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {/* Unknown assets */}
               {diff.unknownAssets.length > 0 && (
                 <Section
-                  title="Unbekannte Clips im FCPXML"
+                  title={tx({ de: "Unbekannte Clips im FCPXML", en: "Unknown clips in FCPXML", es: "Clips desconocidos en FCPXML" })}
                   icon={<AlertTriangle className="h-4 w-4 text-warning" />}
                   tone="warning"
                 >

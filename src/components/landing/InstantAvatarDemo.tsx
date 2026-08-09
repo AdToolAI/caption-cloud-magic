@@ -238,17 +238,17 @@ export const InstantAvatarDemo = () => {
         <div className="text-center mb-8">
           <Badge className="mb-3 bg-primary/15 text-primary border-primary/30 hover:bg-primary/20">
             <Sparkles className="w-3 h-3 mr-1.5" />
-            Live · 10 s · Kein Login
+            {tx({ de: 'Live · 10 s · Kein Login', en: 'Live · 10 s · No Login', es: 'En vivo · 10 s · Sin inicio de sesión' })}
           </Badge>
           <h2 className="font-serif text-3xl md:text-4xl font-semibold tracking-tight mb-3">
-            Werde in 10 Sekunden zum{" "}
+            {tx({ de: 'Werde in 10 Sekunden zum', en: 'Become in 10 seconds a', es: 'Conviértete en 10 segundos en un' })}{" "}
             <span className="bg-gradient-to-r from-primary via-primary to-primary/70 bg-clip-text text-transparent">
-              Cast-Mitglied
+              {tx({ de: 'Cast-Mitglied', en: 'cast member', es: 'miembro del reparto' })}
             </span>
             .
           </h2>
           <p className="text-base text-muted-foreground max-w-xl mx-auto">
-            Foto hoch, Style wählen, in 5 Winkeln drehen — im Bond-Gold-Cinematic-Look.
+            {tx({ de: 'Foto hoch, Style wählen, in 5 Winkeln drehen — im Bond-Gold-Cinematic-Look.', en: 'Upload photo, choose style, rotate in 5 angles — in Bond Gold Cinematic look.', es: 'Sube una foto, elige el estilo, gírala en 5 ángulos, con el look cinemático Bond Gold.' })}
           </p>
         </div>
 
@@ -288,7 +288,7 @@ export const InstantAvatarDemo = () => {
                   disabled={isLoading}
                   className="absolute top-3 right-3 z-10 rounded-full bg-background/80 backdrop-blur px-3 py-1.5 text-xs font-medium hover:bg-background transition"
                 >
-                  Anderes Foto
+                  {tx({ de: 'Anderes Foto', en: 'Another photo', es: 'Otra foto' })}
                 </button>
               </div>
             )}
@@ -330,17 +330,17 @@ export const InstantAvatarDemo = () => {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Turnaround wird gerendert...
+                  {tx({ de: 'Turnaround wird gerendert...', en: 'Turnaround is being rendered...', es: 'Se está renderizando el turnaround...' })}
                 </>
               ) : hasResult ? (
                 <>
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Nochmal generieren
+                  {tx({ de: 'Nochmal generieren', en: 'Generate again', es: 'Generar de nuevo' })}
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Avatar generieren
+                  {tx({ de: 'Avatar generieren', en: 'Generate avatar', es: 'Generar avatar' })}
                 </>
               )}
             </Button>
@@ -348,7 +348,7 @@ export const InstantAvatarDemo = () => {
             <div className="mt-3 flex items-start gap-2 text-[11px] text-muted-foreground">
               <Lock className="w-3 h-3 mt-0.5 flex-shrink-0 text-primary/70" />
               <p>
-                Foto nur zur Generierung, nach 24 h automatisch gelöscht. Keine
+                {tx({ de: 'Foto nur zur Generierung, nach 24 h automatisch gelöscht.', en: 'Photo only for generation, deleted automatically after 24h.', es: 'Foto solo para generación, se elimina automáticamente después de 24 horas.' })} Keine
                 Weitergabe. 3 Versuche pro Stunde.
               </p>
             </div>

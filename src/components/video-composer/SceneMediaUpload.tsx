@@ -66,7 +66,7 @@ export default function SceneMediaUpload({
           data: { user },
           error: authErr,
         } = await supabase.auth.getUser();
-        if (authErr || !user) throw new Error('Nicht angemeldet');
+        if (authErr || !user) throw new Error(tx({ de: "Nicht angemeldet", en: "Not logged in", es: "No has iniciado sesión" }));
 
         const projectFolder = projectId || 'draft';
         const ext = file.name.split('.').pop()?.toLowerCase() || 'mp4';
@@ -91,7 +91,7 @@ export default function SceneMediaUpload({
 
         setProgress(100);
         onChange(pub.publicUrl, 'video');
-        toast.success(`Video hochgeladen (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+        toast.success(tx({ de: `Video hochgeladen (${(file.size / 1024 / 1024).toFixed(1)} MB)`, en: `Video uploaded (${(file.size / 1024 / 1024).toFixed(1)} MB)`, es: `Vídeo subido (${(file.size / 1024 / 1024).toFixed(1)} MB)` }));
       } catch (err) {
         console.error('[SceneMediaUpload] Upload error:', err);
         toast.error(err instanceof Error ? err.message : tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
@@ -122,7 +122,7 @@ export default function SceneMediaUpload({
       console.warn('[SceneMediaUpload] Storage remove failed (ignored):', err);
     }
     onChange(null, null);
-    toast.success('Datei entfernt');
+    toast.success(tx({ de: 'Datei entfernt', en: 'File removed', es: 'Archivo eliminado' }));
   }, [uploadUrl, onChange]);
 
   const handleDrop = useCallback(
@@ -204,13 +204,13 @@ export default function SceneMediaUpload({
               <Film className="h-4 w-4 text-muted-foreground/60" />
             </div>
             <p className="text-[11px] text-foreground font-medium">
-              Video hierher ziehen
+              {tx({ de: "Video hierher ziehen", en: "Drag video here", es: "Arrastra el vídeo aquí" })}
             </p>
             <p className="text-[9px] text-muted-foreground mt-0.5">
               MP4, MOV, WEBM · max. 200 MB
             </p>
             <p className="text-[9px] text-muted-foreground/60 mt-1">
-              💡 Bilder gehören zur KI-Referenz (im KI-Tab)
+              {tx({ de: "💡 Bilder gehören zur KI-Referenz (im KI-Tab)", en: "💡 Images belong to the AI reference (in the AI tab)", es: "💡 Las imágenes pertenecen a la referencia de IA (en la pestaña de IA)" })}
             </p>
           </>
         )}

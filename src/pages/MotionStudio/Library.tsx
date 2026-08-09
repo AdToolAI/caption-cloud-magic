@@ -155,7 +155,7 @@ export default function MotionStudioLibrary() {
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Suchen nach Name, Beschreibung, Tag..."
+                  placeholder={tx({ de: "Suchen nach Name, Beschreibung, Tag...", en: "Search by name, description, tag...", es: "Buscar por nombre, descripción, etiqueta..." })}
                   className="pl-8 bg-card/40 border-border/40"
                 />
               </div>
@@ -291,7 +291,7 @@ function CharacterGrid({
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">
-              {c.description || 'Keine Beschreibung'}
+              {c.description || tx({ de: "Keine Beschreibung", en: "No description", es: "Sin descripción" })}
             </p>
             {c.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 pt-1">
@@ -372,7 +372,7 @@ function LocationGrid({
               )}
             </div>
             <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug">
-              {l.description || 'Keine Beschreibung'}
+              {l.description || tx({ de: "Keine Beschreibung", en: "No description", es: "Sin descripción" })}
             </p>
             {l.lighting_notes && (
               <p className="text-[10px] text-primary/80 truncate">💡 {l.lighting_notes}</p>

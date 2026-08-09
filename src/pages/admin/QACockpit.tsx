@@ -251,7 +251,7 @@ export default function QACockpit() {
               <ShieldCheck className="h-8 w-8" /> Bond QA Cockpit
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Autonomer KI-Tester · 300€ Smart-Budget · Live-Preview
+              {tx({ de: "Autonomer KI-Tester · 300€ Smart-Budget · Live-Preview", en: "Autonomous AI tester · 300€ smart budget · Live preview", es: "Probador de IA autónomo · Presupuesto inteligente de 300 € · Vista previa en vivo" })}
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -321,7 +321,7 @@ export default function QACockpit() {
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="bg-[#0A0F1F]/80 border border-[#F5C76A]/20">
-            <TabsTrigger value="live">Live Runs</TabsTrigger>
+            <TabsTrigger value="live">{tx({ de: "Live Runs", en: "Live Runs", es: "Ejecuciones en vivo" })}</TabsTrigger>
             <TabsTrigger value="e2e">
               <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
               E2E Tests
@@ -363,10 +363,10 @@ export default function QACockpit() {
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
               Meta Token
             </TabsTrigger>
-            <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
-            <TabsTrigger value="missions">Missionen</TabsTrigger>
-            <TabsTrigger value="budget">Budget</TabsTrigger>
-            <TabsTrigger value="rotation">Provider-Rotation</TabsTrigger>
+            <TabsTrigger value="bugs">{tx({ de: "Bug Inbox", en: "Bug Inbox", es: "Bandeja de entrada de errores" })}</TabsTrigger>
+            <TabsTrigger value="missions">{tx({ de: "Missionen", en: "Missions", es: "Misiones" })}</TabsTrigger>
+            <TabsTrigger value="budget">{tx({ de: "Budget", en: "Budget", es: "Presupuesto" })}</TabsTrigger>
+            <TabsTrigger value="rotation">{tx({ de: "Provider-Rotation", en: "Provider Rotation", es: "Rotación de proveedores" })}</TabsTrigger>
           </TabsList>
 
           {/* E2E PLAYWRIGHT RESULTS */}

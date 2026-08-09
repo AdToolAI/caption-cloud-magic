@@ -9,6 +9,7 @@ import { Loader2, Inbox, Sparkles, Send, CheckCircle2, RefreshCw } from "lucide-
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useTx } from "@/lib/i18nText";
+import { tx } from '@/lib/i18nText';
 
 const SEV: Record<string, string> = {
   blocking: "bg-red-500/20 text-red-300 border-red-500/40",

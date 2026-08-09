@@ -51,7 +51,7 @@ export function useCollaborations() {
       console.error(error);
       return;
     }
-    toast.success("Kollaborations-Post erstellt!");
+    toast.success(tx({ de: "Kollaborations-Post erstellt!", en: "Collaboration post created!", es: "¡Publicación de colaboración creada!" }));
     fetchPosts();
   };
 
@@ -65,7 +65,7 @@ export function useCollaborations() {
       toast.error(tx({ de: "Status konnte nicht aktualisiert werden", en: "Could not update status", es: "No se pudo actualizar el estado" }));
       return;
     }
-    toast.success("Status aktualisiert!");
+    toast.success(tx({ de: "Status aktualisiert!", en: "Status updated!", es: "¡Estado actualizado!" }));
     fetchPosts();
   };
 

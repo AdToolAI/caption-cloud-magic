@@ -20,11 +20,11 @@ export interface SpeedKeyframe {
 
 const SPEED_PRESETS = [
   { id: 'slow-mo', name: 'Slow Motion', speed: 0.25, icon: Rewind },
-  { id: 'half', name: 'Halbe Geschw.', speed: 0.5, icon: Clock },
-  { id: 'normal', name: 'Normal', speed: 1, icon: Play },
-  { id: 'fast', name: 'Schnell', speed: 1.5, icon: FastForward },
-  { id: 'double', name: 'Doppelt', speed: 2, icon: Zap },
-  { id: 'triple', name: 'Dreifach', speed: 3, icon: Gauge },
+  { id: 'half', name: tx({ de: 'Halbe Geschw.', en: 'Half speed', es: 'Media velocidad' }), speed: 0.5, icon: Clock },
+  { id: 'normal', name: tx({ de: 'Normal', en: 'Normal', es: 'Normal' }), speed: 1, icon: Play },
+  { id: 'fast', name: tx({ de: 'Schnell', en: 'Fast', es: 'Rápido' }), speed: 1.5, icon: FastForward },
+  { id: 'double', name: tx({ de: 'Doppelt', en: 'Double', es: 'Doble' }), speed: 2, icon: Zap },
+  { id: 'triple', name: tx({ de: 'Dreifach', en: 'Triple', es: 'Triple' }), speed: 3, icon: Gauge },
 ];
 
 const EASING_OPTIONS = [
@@ -186,7 +186,7 @@ export function SpeedRamping({
       <CardContent className="space-y-4">
         {/* Speed Presets */}
         <div className="space-y-2">
-          <label className="text-xs font-medium">Geschwindigkeits-Presets</label>
+          <label className="text-xs font-medium">{tx({ de: "Geschwindigkeits-Presets", en: "Speed presets", es: "Ajustes de velocidad" })}</label>
           <div className="grid grid-cols-3 gap-2">
             {SPEED_PRESETS.map((preset) => {
               const Icon = preset.icon;
@@ -210,7 +210,7 @@ export function SpeedRamping({
         {/* Timeline Visualization */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <label className="text-xs font-medium">Keyframes</label>
+            <label className="text-xs font-medium">{tx({ de: "Keyframes", en: "Keyframes", es: "Fotogramas clave" })}</label>
             <Button
               variant="ghost"
               size="sm"
@@ -273,7 +273,7 @@ export function SpeedRamping({
         {selectedKf && (
           <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-medium">Keyframe bearbeiten</span>
+              <span className="text-xs font-medium">{tx({ de: "Keyframe bearbeiten", en: "Edit keyframe", es: "Editar fotograma clave" })}</span>
               <Button
                 variant="ghost"
                 size="icon"
@@ -287,7 +287,7 @@ export function SpeedRamping({
             {/* Time */}
             <div className="space-y-1">
               <div className="flex justify-between">
-                <label className="text-[10px]">Zeit</label>
+                <label className="text-[10px]">{tx({ de: "Zeit", en: "Time", es: "Tiempo" })}</label>
                 <span className="text-[10px] text-muted-foreground">
                   {formatTime(selectedKf.time)}
                 </span>
@@ -304,7 +304,7 @@ export function SpeedRamping({
             {/* Speed */}
             <div className="space-y-1">
               <div className="flex justify-between">
-                <label className="text-[10px]">Geschwindigkeit</label>
+                <label className="text-[10px]">{tx({ de: "Geschwindigkeit", en: "Speed", es: "Velocidad" })}</label>
                 <span className={`text-[10px] font-medium ${getSpeedColor(selectedKf.speed)}`}>
                   {selectedKf.speed.toFixed(2)}x
                 </span>
@@ -360,7 +360,7 @@ export function SpeedRamping({
             <p className="text-xs">
               {selectedSceneId 
                 ? tx({ de: 'Füge Keyframes für diese Szene hinzu', en: 'Add keyframes for this scene', es: 'Añadir fotogramas clave para esta escena' })
-                : 'Füge globale Keyframes hinzu um Speed Ramping zu nutzen'
+                : tx({ de: 'Füge globale Keyframes hinzu um Speed Ramping zu nutzen', en: 'Add global keyframes to use speed ramping', es: 'Agregue fotogramas clave globales para usar el aumento de velocidad' })
               }
             </p>
           </div>

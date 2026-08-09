@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -92,7 +93,7 @@ export function InlineEditor({ block, onSave, onCancel }: InlineEditorProps) {
           onChange={(e) => setTitle(e.target.value)}
           maxLength={80}
           className="h-8 text-sm"
-          placeholder="Post-Titel..."
+          placeholder={tx({ de: "Post-Titel...", en: "Post title...", es: "Título de la publicación..." })}
         />
         {errors.title && <p className="text-xs text-destructive mt-1">{errors.title}</p>}
         <p className="text-xs text-muted-foreground mt-1">{title.length}/80</p>

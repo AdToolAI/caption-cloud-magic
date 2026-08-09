@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,7 +66,7 @@ export function CalendarTimeline({ events, loading, onEventClick }: CalendarTime
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Nächste 7 Tage – Timeline
+            {tx({ de: "Nächste 7 Tage – Timeline", en: "Next 7 Days – Timeline", es: "Próximos 7 días: cronograma" })}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -85,13 +86,13 @@ export function CalendarTimeline({ events, loading, onEventClick }: CalendarTime
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Nächste 7 Tage – Timeline
+            {tx({ de: "Nächste 7 Tage – Timeline", en: "Next 7 Days – Timeline", es: "Próximos 7 días: cronograma" })}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            <p>Keine geplanten Posts in den nächsten 7 Tagen.</p>
-            <p className="text-sm mt-2">Starte die Auto-Planung, um Posts einzuplanen.</p>
+            <p>{tx({ de: "Keine geplanten Posts in den nächsten 7 Tagen.", en: "No scheduled posts in the next 7 days.", es: "No hay publicaciones programadas en los próximos 7 días." })}</p>
+            <p className="text-sm mt-2">{tx({ de: "Starte die Auto-Planung, um Posts einzuplanen.", en: "Start auto-planning to schedule posts.", es: "Inicia la planificación automática para programar publicaciones." })}</p>
           </div>
         </CardContent>
       </Card>
@@ -103,7 +104,7 @@ export function CalendarTimeline({ events, loading, onEventClick }: CalendarTime
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5" />
-          Nächste 7 Tage – Timeline
+          {tx({ de: "Nächste 7 Tage – Timeline", en: "Next 7 Days – Timeline", es: "Próximos 7 días: cronograma" })}
         </CardTitle>
       </CardHeader>
       <CardContent>

@@ -91,8 +91,8 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
       });
       if (error) throw error;
       toast({
-        title: 'AI Sound Design erstellt',
-        description: `${data?.generated_count ?? 0} Clips generiert${data?.failed_count ? `, ${data.failed_count} fehlgeschlagen` : ''}.`,
+        title: tx({ de: 'AI Sound Design erstellt', en: 'AI sound design created', es: 'Diseño de sonido AI creado' }),
+        description: tx({ de: `${data?.generated_count ?? 0} Clips generiert${data?.failed_count ? `, ${data.failed_count} fehlgeschlagen` : ''}.`, en: `${data?.generated_count ?? 0} clips generated${data?.failed_count ? `, ${data.failed_count} failed` : ''}.`, es: `${data?.generated_count ?? 0} clips generados${data?.failed_count ? `, ${data.failed_count} fallidos` : ''}.` }),
       });
       await load();
       emitSceneAudioClipsChanged(projectId);
@@ -152,14 +152,14 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
           Diese werden im finalen Render automatisch unter die Voiceover-Spur gemischt (Auto-Ducking, -14 LUFS).
         </p>
         <p className="text-[11px] text-muted-foreground/80 italic">
-          Hinweis: Lip-Sync für sprechende Charaktere wird im <strong>Talking-Head-Dialog</strong> erstellt — der Sound-Mix mischt nur Atmo, SFX und Musik.
+          Hinweis:
         </p>
 
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
 
         {!loading && clips.length === 0 && (
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {tx({ de: 'Noch kein AI Sound Design generiert. Klick "Mix erstellen" um Atmo + SFX vorschlagen und generieren zu lassen.', en: 'No AI sound design generated yet. Click "Create mix" to suggest and generate ambience + SFX.', es: 'Aún no se ha generado diseño de sonido con IA. Haz clic en "Crear mezcla" para sugerir y generar ambiente + SFX.' })}
+            Noch kein AI Sound Design generiert. Klick Mix erstellen um Atmo + SFX vorschlagen und generieren zu lassen.
           </div>
         )}
 

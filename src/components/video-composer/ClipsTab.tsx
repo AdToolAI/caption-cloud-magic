@@ -75,10 +75,10 @@ interface ClipsTabProps {
 }
 
 const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
-  pending: { color: 'text-muted-foreground', bg: 'bg-muted/40 border-border/40', label: 'Ausstehend' },
-  generating: { color: 'text-accent', bg: 'bg-accent/15 border-accent/40 animate-pulse', label: 'Generiert…' },
+  pending: { color: 'text-muted-foreground', bg: 'bg-muted/40 border-border/40', label: tx({ de: 'Ausstehend', en: 'Pending', es: 'Pendiente' }) },
+  generating: { color: 'text-accent', bg: 'bg-accent/15 border-accent/40 animate-pulse', label: tx({ de: 'Generiert…', en: 'Generating…', es: 'Generando...' }) },
   ready: { color: 'text-green-400', bg: 'bg-green-500/15 border-green-500/40', label: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }) },
-  failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
+  failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' }) },
 };
 
 export default function ClipsTab({ scenes, projectId, visualStyle, characters, language, onUpdateScenes, onUpdateScenesLocalOnly, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
@@ -153,7 +153,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       );
       onUpdateScenes(updated);
       toast({
-        title: 'Continuity aktiviert ✨',
+        title: tx({ de: 'Continuity aktiviert ✨', en: 'Continuity activated ✨', es: 'Continuidad activada ✨' }),
         description: tx({ de: `Szene ${scenes.findIndex(s => s.id === nextScene.id) + 1} startet jetzt nahtlos.`, en: `Scene ${scenes.findIndex(s => s.id === nextScene.id) + 1} starts seamlessly now.`, es: `La escena ${scenes.findIndex(s => s.id === nextScene.id) + 1} comienza ahora sin interrupciones.` }),
       });
     },

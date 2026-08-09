@@ -91,7 +91,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
       console.error('Auto-Cut error:', error);
       
       if (error?.context?.status === 402) {
-        toast.error('Nicht genügend Credits', {
+        toast.error(tx({ de: "Nicht genügend Credits", en: "Insufficient credits", es: "Créditos insuficientes" }), {
           description: tx({ de: `Du benötigst ${CREDITS_COST} Credits für AI Auto-Cut`, en: `You need ${CREDITS_COST} credits for AI Auto-Cut`, es: `Necesitas ${CREDITS_COST} créditos para el corte automático con IA` }),
         });
       } else {

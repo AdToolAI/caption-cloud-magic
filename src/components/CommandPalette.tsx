@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/command";
 import * as LucideIcons from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { tx } from '@/lib/i18nText';
 
 interface Command {
   id: string;
@@ -30,30 +31,30 @@ export const CommandPalette = () => {
 
   const commands: Command[] = [
     // Create
-    { id: "generator", label: t("nav.textStudio"), icon: "Sparkles", route: "/ai-text-studio", category: "create", keywords: ["caption", "generate", "erstellen", "text", "studio", "prompt"] },
+    { id: "generator", label: t("nav.textStudio"), icon: "Sparkles", route: "/ai-text-studio", category: "create", keywords: ["caption", "generate", tx({ de: "erstellen", en: "create", es: "crear" }), "text", "studio", "prompt"] },
     
-    { id: "rewriter", label: t("nav.rewriter"), icon: "RefreshCw", route: "/rewriter", category: "create", keywords: ["rewrite", "umschreiben", "verbessern"] },
-    { id: "carousel", label: "Carousel Generator", icon: "LayoutGrid", route: "/carousel", category: "create", keywords: ["carousel", "slides", "präsentation"] },
+    { id: "rewriter", label: t("nav.rewriter"), icon: "RefreshCw", route: "/rewriter", category: "create", keywords: ["rewrite", tx({ de: "umschreiben", en: "rewrite", es: "reescribir" }), tx({ de: "verbessern", en: "improve", es: "mejorar" })] },
+    { id: "carousel", label: "Carousel Generator", icon: "LayoutGrid", route: "/carousel", category: "create", keywords: ["carousel", "slides", tx({ de: "präsentation", en: "presentation", es: "presentación" })] },
     
     
     // Optimize
-    { id: "wizard", label: t("nav.wizard"), icon: "Wand2", route: "/wizard", category: "optimize", keywords: ["prompt", "optimize", "optimieren"] },
-    { id: "advisor", label: t("nav.advisor"), icon: "Clock", route: "/post-time-advisor", category: "optimize", keywords: ["time", "zeit", "schedule"] },
-    { id: "calendar", label: "Calendar", icon: "Calendar", route: "/command-center?view=calendar", category: "optimize", keywords: ["calendar", "kalender", "planen"] },
+    { id: "wizard", label: t("nav.wizard"), icon: "Wand2", route: "/wizard", category: "optimize", keywords: ["prompt", "optimize", tx({ de: "optimieren", en: "optimize", es: "optimizar" })] },
+    { id: "advisor", label: t("nav.advisor"), icon: "Clock", route: "/post-time-advisor", category: "optimize", keywords: ["time", tx({ de: "zeit", en: "time", es: "tiempo" }), "schedule"] },
+    { id: "calendar", label: "Calendar", icon: "Calendar", route: "/command-center?view=calendar", category: "optimize", keywords: ["calendar", tx({ de: "kalender", en: "calendar", es: "calendario" }), tx({ de: "planen", en: "plan", es: "planificar" })] },
     
     // Analyze
-    { id: "performance", label: t("nav.performance"), icon: "TrendingUp", route: "/performance", category: "analyze", keywords: ["performance", "analytics", "statistik"] },
-    { id: "goals", label: t("nav.goals"), icon: "Target", route: "/goals", category: "analyze", keywords: ["goals", "ziele", "tracking"] },
+    { id: "performance", label: t("nav.performance"), icon: "TrendingUp", route: "/performance", category: "analyze", keywords: ["performance", "analytics", tx({ de: "statistik", en: "statistics", es: "estadísticas" })] },
+    { id: "goals", label: t("nav.goals"), icon: "Target", route: "/goals", category: "analyze", keywords: ["goals", tx({ de: "ziele", en: "goals", es: "objetivos" }), "tracking"] },
     
     
     // Design
-    { id: "image-caption", label: "Image Caption", icon: "Image", route: "/image-caption", category: "design", keywords: ["image", "bild", "foto"] },
+    { id: "image-caption", label: "Image Caption", icon: "Image", route: "/image-caption", category: "design", keywords: ["image", tx({ de: "bild", en: "image", es: "imagen" }), "foto"] },
     { id: "bio", label: "Bio Optimizer", icon: "User", route: "/bio-optimizer", category: "design", keywords: ["bio", "profile", "profil"] },
-    { id: "brandkit", label: "Brand Kit", icon: "Palette", route: "/brand-kit", category: "design", keywords: ["brand", "marke", "design"] },
+    { id: "brandkit", label: "Brand Kit", icon: "Palette", route: "/brand-kit", category: "design", keywords: ["brand", tx({ de: "marke", en: "brand", es: "marca" }), "design"] },
     
     // Other
-    { id: "account", label: t("nav.account"), icon: "Settings", route: "/account", category: "other", keywords: ["account", "settings", "einstellungen"] },
-    { id: "pricing", label: t("nav.pricing"), icon: "CreditCard", route: "/pricing", category: "other", keywords: ["pricing", "preise", "upgrade"] },
+    { id: "account", label: t("nav.account"), icon: "Settings", route: "/account", category: "other", keywords: ["account", "settings", tx({ de: "einstellungen", en: "settings", es: "ajustes" })] },
+    { id: "pricing", label: t("nav.pricing"), icon: "CreditCard", route: "/pricing", category: "other", keywords: ["pricing", tx({ de: "preise", en: "prices", es: "precios" }), "upgrade"] },
   ];
 
   useEffect(() => {

@@ -268,7 +268,7 @@ export default function ContinuityGuardianStrip({
       });
       onUpdateScenes(updated);
       toast.success(
-        `Continuity geprüft: ${okCount} ok · ${warnCount} drift · ${brokenCount} bruch`
+        `tx({ de: 'Continuity geprüft:', en: 'Continuity checked:', es: 'Continuidad comprobada:' }) ${okCount} ok · ${warnCount} drift · ${brokenCount} bruch`
       );
     } finally {
       setBulkRunning(false);
@@ -293,7 +293,7 @@ export default function ContinuityGuardianStrip({
       anchorUrl = r.lastFrameUrl;
     }
     if (!anchorUrl) {
-      toast.error('Kein Anker-Frame verfügbar');
+      toast.error(tx({ de: 'Kein Anker-Frame verfügbar', en: 'No anchor frame available', es: 'No hay ningún marco de anclaje disponible' }));
       return;
     }
     const lockedNext: ComposerScene = {
@@ -310,7 +310,7 @@ export default function ContinuityGuardianStrip({
     );
     // Persist lock to DB (best-effort, non-blocking)
     void setSceneLock(pair.next.id, true, anchorUrl);
-    toast.success('Anker-Frame verriegelt — starte Repair-Render…');
+    toast.success(tx({ de: 'Anker-Frame verriegelt — starte Repair-Render…', en: 'Anchor frame locked — starting repair render…', es: 'Fotograma de anclaje bloqueado: iniciando renderizado de reparación...' }));
     await onRepairScene(lockedNext);
   };
 
@@ -340,7 +340,7 @@ export default function ContinuityGuardianStrip({
         p.next.continuityDriftScore! >= 76
     );
     if (broken.length === 0) {
-      toast.info('Keine kaputten Cuts zu reparieren');
+      toast.info(tx({ de: 'Keine kaputten Cuts zu reparieren', en: 'No broken cuts to repair', es: 'No hay cortes rotos que reparar' }));
       return;
     }
     for (const p of broken) {
@@ -373,7 +373,7 @@ export default function ContinuityGuardianStrip({
           <div>
             <div className="font-semibold text-sm">Continuity Guardian</div>
             <div className="text-[11px] text-muted-foreground">
-              Prüft nur Cuts mit gleichem Charakter oder verriegeltem Anker · {pairs.length} Cut
+              {tx({ de: 'Prüft nur Cuts mit gleichem Charakter oder verriegeltem Anker ·', en: 'Only checks cuts with same character or locked anchor ·', es: 'Solo comprueba cortes con el mismo personaje o anclaje bloqueado ·' })} {pairs.length} Cut
               {pairs.length === 1 ? '' : 's'} überwacht
             </div>
           </div>
@@ -396,7 +396,7 @@ export default function ContinuityGuardianStrip({
           )}
           {summary.unknown > 0 && (
             <Badge variant="outline" className="text-muted-foreground">
-              {summary.unknown} ungeprüft
+              {summary.unknown} {tx({ de: 'ungeprüft', en: 'unchecked', es: 'sin marcar' })}
             </Badge>
           )}
           <Button
@@ -411,7 +411,7 @@ export default function ContinuityGuardianStrip({
             ) : (
               <Sparkles className="h-3.5 w-3.5" />
             )}
-            Alles prüfen
+            {tx({ de: 'Alles prüfen', en: 'Check all', es: 'Comprobar todo' })}
           </Button>
           {projectId && (
             <Button
@@ -421,7 +421,7 @@ export default function ContinuityGuardianStrip({
               className="gap-1.5"
             >
               <History className="h-3.5 w-3.5" />
-              Verlauf
+              {tx({ de: 'Verlauf', en: 'History', es: 'Historial' })}
             </Button>
           )}
           {summary.broken > 0 && (
@@ -432,7 +432,7 @@ export default function ContinuityGuardianStrip({
               className="gap-1.5 bg-gradient-to-r from-primary to-accent"
             >
               <Wand2 className="h-3.5 w-3.5" />
-              Alle reparieren
+              {tx({ de: 'Alle reparieren', en: 'Repair all', es: 'Reparar todo' })}
             </Button>
           )}
         </div>
@@ -458,7 +458,7 @@ export default function ContinuityGuardianStrip({
                     : s,
                 ),
               );
-              toast.success('Shot Director angepasst');
+              toast.success(tx({ de: 'Shot Director angepasst', en: 'Shot Director adjusted', es: 'Shot Director ajustado' }));
             }}
           />
         ))}

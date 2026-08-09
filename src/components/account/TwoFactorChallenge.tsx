@@ -39,7 +39,7 @@ export const TwoFactorChallenge = ({ open, onSuccess, onCancel }: TwoFactorChall
       const totpFactor = factorsData.totp.find(f => f.status === 'verified');
       
       if (!totpFactor) {
-        throw new Error('Kein verifizierter TOTP-Faktor gefunden');
+        throw new Error(tx({ de: 'Kein verifizierter TOTP-Faktor gefunden', en: 'No verified TOTP factor found', es: 'No se encontró ningún factor TOTP verificado' }));
       }
 
       // Create a challenge
@@ -59,14 +59,14 @@ export const TwoFactorChallenge = ({ open, onSuccess, onCancel }: TwoFactorChall
       if (verifyError) throw verifyError;
 
       toast({
-        title: "Erfolgreich verifiziert",
+        title: tx({ de: "Erfolgreich verifiziert", en: "Successfully verified", es: "Verificado con éxito" }),
         description: tx({ de: "Du bist jetzt angemeldet", en: "You are now logged in", es: "Ya has iniciado sesión" })
       });
       
       onSuccess();
     } catch (err: any) {
       console.error('MFA challenge error:', err);
-      setError(err.message || 'Ungültiger Code');
+      setError(err.message || tx({ de: 'Ungültiger Code', en: 'Invalid code', es: 'Código no válido' }));
     } finally {
       setLoading(false);
     }
@@ -162,7 +162,7 @@ export const TwoFactorChallenge = ({ open, onSuccess, onCancel }: TwoFactorChall
             >
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              <span className="relative">Verifizieren</span>
+              <span className="relative">{tx({ de: "Verifizieren", en: "Verify", es: "Verificar" })}</span>
             </Button>
           </div>
         </motion.div>

@@ -99,7 +99,7 @@ export function VoiceInput({ onTranscription, onListeningChange, disabled }: Voi
   const startListening = useCallback(() => {
     if (!SpeechRecognition) {
       toast({
-        title: 'Nicht unterstützt',
+        title: tx({ de: "Nicht unterstützt", en: "Not supported", es: "No compatible" }),
         description: tx({ de: 'Dein Browser unterstützt keine Spracherkennung. Bitte verwende Chrome oder Edge.', en: 'Your browser does not support speech recognition. Please use Chrome or Edge.', es: 'Tu navegador no es compatible con el reconocimiento de voz. Por favor, usa Chrome o Edge.' }),
         variant: 'destructive',
       });

@@ -13,6 +13,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { PostComposerPanel } from "./PostComposerPanel";
+import { tx } from '@/lib/i18nText';
 
 interface EventDrawerProps {
   open: boolean;
@@ -33,13 +34,13 @@ const PLATFORM_BLADES: Record<string, { color: string; rgb: string }> = {
 };
 
 const STATUS_META: Record<string, { label: string; dot: string; ring: string; pulse: boolean }> = {
-  briefing:         { label: "Entwurf",         dot: "bg-zinc-300",    ring: "border-zinc-500/40", pulse: false },
-  in_progress:      { label: "In Arbeit",       dot: "bg-cyan-300",    ring: "border-cyan-400/40", pulse: true  },
-  review:           { label: "Review",          dot: "bg-amber-300",   ring: "border-amber-400/40", pulse: false },
-  pending_approval: { label: "Freigabe offen",  dot: "bg-orange-300",  ring: "border-orange-400/40", pulse: true },
-  approved:         { label: "Freigegeben",     dot: "bg-emerald-300", ring: "border-emerald-400/40", pulse: false },
-  scheduled:        { label: "Geplant",         dot: "bg-indigo-300",  ring: "border-indigo-400/40", pulse: true  },
-  published:        { label: "Veröffentlicht",  dot: "bg-fuchsia-300", ring: "border-fuchsia-400/40", pulse: false },
+  briefing:         { label: tx({ de: 'Entwurf', en: 'Draft', es: 'Borrador' }),         dot: "bg-zinc-300",    ring: "border-zinc-500/40", pulse: false },
+  in_progress:      { label: tx({ de: 'In Arbeit', en: 'In progress', es: 'En progreso' }),       dot: "bg-cyan-300",    ring: "border-cyan-400/40", pulse: true  },
+  review:           { label: tx({ de: 'Review', en: 'Review', es: 'Revisión' }),          dot: "bg-amber-300",   ring: "border-amber-400/40", pulse: false },
+  pending_approval: { label: tx({ de: 'Freigabe offen', en: 'Pending approval', es: 'Aprobación pendiente' }),  dot: "bg-orange-300",  ring: "border-orange-400/40", pulse: true },
+  approved:         { label: tx({ de: 'Freigegeben', en: 'Approved', es: 'Aprobado' }),     dot: "bg-emerald-300", ring: "border-emerald-400/40", pulse: false },
+  scheduled:        { label: tx({ de: 'Geplant', en: 'Scheduled', es: 'Programado' }),         dot: "bg-indigo-300",  ring: "border-indigo-400/40", pulse: true  },
+  published:        { label: tx({ de: 'Veröffentlicht', en: 'Published', es: 'Publicado' }),  dot: "bg-fuchsia-300", ring: "border-fuchsia-400/40", pulse: false },
 };
 
 export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: EventDrawerProps) {
@@ -160,7 +161,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[10px] uppercase tracking-[0.2em] text-[hsl(var(--primary))]/70 font-semibold">
-                      Post-Studio
+                      {tx({ de: "Post-Studio", en: "Post Studio", es: "Post-Studio" })}
                     </span>
                     <span className="text-[10px] text-muted-foreground">·</span>
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">

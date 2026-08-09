@@ -154,25 +154,25 @@ export default function MotionStudioHub() {
 
   const stats = [
     {
-      label: 'Charaktere',
+      label: tx({ de: "Charaktere", en: "Characters", es: "Personajes" }),
       value: characters.length,
       icon: Users,
       loading: libLoading,
     },
     {
-      label: 'Locations',
+      label: tx({ de: "Locations", en: "Locations", es: "Ubicaciones" }),
       value: locations.length,
       icon: MapPin,
       loading: libLoading,
     },
     {
-      label: 'Custom Voices',
+      label: tx({ de: "Custom Voices", en: "Custom Voices", es: "Voces personalizadas" }),
       value: voices.length,
       icon: Mic,
       loading: voicesLoading,
     },
     {
-      label: 'AI-Video Guthaben',
+      label: tx({ de: "AI-Video Guthaben", en: "AI video balance", es: "Crédito de video AI" }),
       value: walletLoading
         ? '—'
         : wallet
@@ -260,7 +260,7 @@ export default function MotionStudioHub() {
               <CostComparisonWidget />
             </div>
             <div className="lg:col-span-2 space-y-4">
-              <h2 className="text-2xl font-semibold">Module</h2>
+              <h2 className="text-2xl font-semibold">{tx({ de: "Module", en: "Modules", es: "Módulos" })}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {QUICK_ACTIONS.map((a) => (
                   <Link key={a.href} to={a.href} className="group">
@@ -286,7 +286,7 @@ export default function MotionStudioHub() {
                           <p className="text-sm text-muted-foreground mt-1">{a.desc}</p>
                         </div>
                         <div className="flex items-center text-sm text-primary group-hover:gap-2 transition-all">
-                          Öffnen
+                          {tx({ de: "Öffnen", en: "Open", es: "Abrir" })}
                           <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
@@ -302,7 +302,7 @@ export default function MotionStudioHub() {
             {/* Recent projects */}
             <Card className="lg:col-span-2 p-6 backdrop-blur-xl bg-card/60 border-border/50">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Letzte Composer-Projekte</h3>
+                <h3 className="text-lg font-semibold">{tx({ de: "Letzte Composer-Projekte", en: "Recent Composer projects", es: "Últimos proyectos de Composer" })}</h3>
                 <Button asChild variant="ghost" size="sm">
                   <Link to="/video-composer">{tx({ de: "Alle anzeigen", en: "View all", es: "Ver todo" })}</Link>
                 </Button>
@@ -320,7 +320,7 @@ export default function MotionStudioHub() {
                   <Button asChild className="mt-4 gap-2">
                     <Link to="/video-composer">
                       <Plus className="h-4 w-4" />
-                      Projekt erstellen
+                      {tx({ de: "Projekt erstellen", en: "Create project", es: "Crear proyecto" })}
                     </Link>
                   </Button>
                 </div>
@@ -337,7 +337,7 @@ export default function MotionStudioHub() {
                           <Film className="h-4 w-4 text-primary" />
                         </div>
                         <div className="min-w-0">
-                          <div className="font-medium truncate">{p.title || 'Unbenannt'}</div>
+                          <div className="font-medium truncate">{p.title || tx({ de: "Unbenannt", en: "Untitled", es: "Sin nombre" })}</div>
                           <div className="text-xs text-muted-foreground">
                             {new Date(p.updated_at).toLocaleString('de-DE', {
                               dateStyle: 'short',

@@ -79,18 +79,18 @@ const PROGRESS: Record<SceneState, number> = {
 
 /** Kurzlabel für die UI (DE). */
 export const SCENE_STATE_LABEL: Record<SceneState, string> = {
-  idle: 'Bereit',
-  plate_queued: 'In der Warteschlange',
+  idle: tx({ de: 'Bereit', en: 'Ready', es: 'Listo' }),
+  plate_queued: tx({ de: 'In der Warteschlange', en: 'In queue', es: 'En cola' }),
   plate_rendering: tx({ de: 'Clip wird generiert', en: 'Clip is generated', es: 'Se genera el clip' }),
-  plate_ready: 'Clip fertig',
+  plate_ready: tx({ de: 'Clip fertig', en: 'Clip ready', es: 'Clip listo' }),
   audio_prep: tx({ de: 'Voiceover wird erzeugt', en: 'Voiceover is generated', es: 'Se genera voz en off' }),
-  audio_ready: 'Voiceover fertig',
+  audio_ready: tx({ de: 'Voiceover fertig', en: 'Voiceover ready', es: 'Voz en off lista' }),
   lipsync_dispatched: tx({ de: 'Lip-Sync wird gestartet', en: 'Starting lip-sync', es: 'Iniciando sincronización labial' }),
-  lipsync_running: 'Lip-Sync läuft',
-  lipsync_muxing: 'Wird zusammengesetzt',
+  lipsync_running: tx({ de: 'Lip-Sync läuft', en: 'Lip-sync running', es: 'Sincronización labial en curso' }),
+  lipsync_muxing: tx({ de: 'Wird zusammengesetzt', en: 'Composing', es: 'Ensamblando' }),
   complete: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }),
-  failed: 'Fehlgeschlagen',
-  canceled: 'Abgebrochen',
+  failed: tx({ de: 'Fehlgeschlagen', en: 'Failed', es: 'Fallido' }),
+  canceled: tx({ de: 'Abgebrochen', en: 'Canceled', es: 'Cancelado' }),
 };
 
 export function isSceneState(v: unknown): v is SceneState {

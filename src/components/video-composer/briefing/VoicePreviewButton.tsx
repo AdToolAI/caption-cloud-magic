@@ -34,7 +34,7 @@ export function VoicePreviewButton({ voiceId, text, label }: Props) {
 
   const play = async () => {
     if (!voiceId) {
-      toast({ title: 'Keine Stimme zugeordnet', description: tx({ de: 'Wende den Plan an — die Stimme wird beim Anwenden automatisch vergeben.', en: 'Apply the plan — the voice will be automatically assigned upon application.', es: 'Aplica el plan — la voz se asignará automáticamente al aplicarlo.' }), variant: 'default' });
+      toast({ title: tx({ de: "Keine Stimme zugeordnet", en: "No voice assigned", es: "Sin voz asignada" }), description: tx({ de: 'Wende den Plan an — die Stimme wird beim Anwenden automatisch vergeben.', en: 'Apply the plan — the voice will be automatically assigned upon application.', es: 'Aplica el plan — la voz se asignará automáticamente al aplicarlo.' }), variant: 'default' });
       return;
     }
     if (state === 'playing') { stop(); return; }
@@ -46,7 +46,7 @@ export function VoicePreviewButton({ voiceId, text, label }: Props) {
       });
       if (error) throw error;
       const b64 = (data as any)?.audioContent;
-      if (!b64) throw new Error('Keine Audio-Antwort erhalten.');
+      if (!b64) throw new Error(tx({ de: "Keine Audio-Antwort erhalten.", en: "No audio response received.", es: "No se recibió respuesta de audio." }));
       const src = `data:audio/mpeg;base64,${b64}`;
       const audio = new Audio(src);
       audioRef.current = audio;

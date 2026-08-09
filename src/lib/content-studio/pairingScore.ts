@@ -42,7 +42,7 @@ export function scorePairing(input: {
     return {
       score: 0,
       label: tx({ de: "Kein Motiv", en: "No motive", es: "Sin motivo" }),
-      hint: "Reine Typografie — das Layout trägt die Aussage allein.",
+      hint: tx({ de: "Reine Typografie — das Layout trägt die Aussage allein.", en: "Pure typography — the layout carries the statement alone.", es: "Tipografía pura: el diseño por sí solo transmite el mensaje." }),
       tone: "ok",
     };
   }
@@ -52,7 +52,7 @@ export function scorePairing(input: {
   if (!motif.size || !text.length) {
     return {
       score: 55,
-      label: "Nicht bewertbar",
+      label: tx({ de: "Nicht bewertbar", en: "Not assessable", es: "No evaluable" }),
       hint: tx({ de: "Zu wenig Text für eine Einschätzung.", en: "Too little text for an assessment.", es: "Muy poco texto para una evaluación." }),
       tone: "ok",
     };
@@ -65,7 +65,7 @@ export function scorePairing(input: {
   if (score >= 75) {
     return {
       score,
-      label: "Starke Paarung",
+      label: tx({ de: "Starke Paarung", en: "Strong pairing", es: "Emparejamiento fuerte" }),
       hint: tx({ de: "Motiv und Text erzählen dieselbe Geschichte.", en: "The motif and text tell the same story.", es: "El motivo y el texto cuentan la misma historia." }),
       tone: "good",
     };
@@ -73,14 +73,14 @@ export function scorePairing(input: {
   if (score >= 55) {
     return {
       score,
-      label: "Solide Paarung",
-      hint: "Passt. Ein konkreteres Motiv würde die Aussage schärfen.",
+      label: tx({ de: "Solide Paarung", en: "Solid pairing", es: "Emparejamiento sólido" }),
+      hint: tx({ de: "Passt. Ein konkreteres Motiv würde die Aussage schärfen.", en: "Fits. A more concrete motif would sharpen the message.", es: "Encaja. Un motivo más concreto agudizaría el mensaje." }),
       tone: "ok",
     };
   }
   return {
     score,
-    label: "Schwache Paarung",
+    label: tx({ de: "Schwache Paarung", en: "Weak pairing", es: "Emparejamiento débil" }),
     hint: tx({ de: "Motiv und Text laufen auseinander — Motiv neu denken oder Copy schärfen.", en: "Visual and text diverge — rethink visual or sharpen copy.", es: "El visual y el texto divergen — replantea el visual o afina el copy." }),
     tone: "weak",
   };

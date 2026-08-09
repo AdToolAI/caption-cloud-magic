@@ -100,7 +100,7 @@ const Billing = () => {
       }
     } catch (error: any) {
       toast({
-        title: language === "de" ? tx({ de: "Fehler", en: "Mistake", es: "Error" }) : "Error",
+        title: tx({ de: "Fehler", en: "Error", es: "Error" }),
         description: error.message || tx({ de: "Portal konnte nicht geöffnet werden", en: "Failed to open portal", es: "No se pudo abrir el portal" }),
         variant: "destructive"
       });

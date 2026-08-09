@@ -57,7 +57,7 @@ export const useVideoHistory = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['video-history'] });
-      toast({ title: 'Video gelöscht' });
+      toast({ title: tx({ de: 'Video gelöscht', en: 'Video deleted', es: 'Video eliminado' }) });
     },
     onError: (error) => {
       toast({
