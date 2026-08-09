@@ -210,10 +210,10 @@ export function AlbumManager() {
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => setSelectedAlbum(null)}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Zurück
+            <ArrowLeft className="h-4 w-4 mr-1" /> {tx({ de: 'Zurück', en: 'Back', es: 'Atrás' })}
           </Button>
           <h3 className="text-lg font-semibold">{selectedAlbum.name}</h3>
-          <span className="text-sm text-muted-foreground">({albumImages.length} Bilder)</span>
+          <span className="text-sm text-muted-foreground">{tx({ de: `(${albumImages.length} Bilder)`, en: `(${albumImages.length} images)`, es: `(${albumImages.length} imágenes)` })}</span>
           <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto text-destructive" onClick={() => deleteAlbum(selectedAlbum.id)}>
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -244,9 +244,9 @@ export function AlbumManager() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Meine Alben</h3>
+        <h3 className="text-lg font-semibold">{tx({ de: 'Meine Alben', en: 'My albums', es: 'Mis álbumes' })}</h3>
         <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
-          <FolderPlus className="h-4 w-4 mr-1" /> Neues Album
+          <FolderPlus className="h-4 w-4 mr-1" /> {tx({ de: 'Neues Album', en: 'New album', es: 'Nuevo álbum' })}
         </Button>
       </div>
 
@@ -284,7 +284,7 @@ export function AlbumManager() {
               </div>
               <CardContent className="p-3">
                 <p className="font-medium text-sm truncate">{album.name}</p>
-                <p className="text-xs text-muted-foreground">{album.image_count || 0} Bilder</p>
+                <p className="text-xs text-muted-foreground">{tx({ de: `${album.image_count || 0} Bilder`, en: `${album.image_count || 0} images`, es: `${album.image_count || 0} imágenes` })}</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -294,7 +294,7 @@ export function AlbumManager() {
       {/* Unsorted Images */}
       {unsortedImages.length > 0 && (
         <div>
-          <h4 className="text-md font-medium mb-3 text-muted-foreground">Unsortierte Bilder ({unsortedImages.length})</h4>
+          <h4 className="text-md font-medium mb-3 text-muted-foreground">{tx({ de: `Unsortierte Bilder (${unsortedImages.length})`, en: `Unsorted images (${unsortedImages.length})`, es: `Imágenes sin clasificar (${unsortedImages.length})` })}</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <AnimatePresence>
               {unsortedImages.map((img, i) => (
@@ -327,7 +327,7 @@ export function AlbumManager() {
             <DialogTitle>{tx({ de: "Neues Album erstellen", en: "Create new album", es: "Crear nuevo álbum" })}</DialogTitle>
           </DialogHeader>
           <Input
-            placeholder="Album Name..."
+            placeholder={tx({ de: 'Album Name...', en: 'Album name...', es: 'Nombre del álbum...' })}
             value={newAlbumName}
             onChange={(e) => setNewAlbumName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && createAlbum()}
@@ -336,7 +336,7 @@ export function AlbumManager() {
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
             <Button onClick={createAlbum} disabled={creating || !newAlbumName.trim()}>
               {creating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FolderPlus className="h-4 w-4 mr-1" />}
-              Erstellen
+              {tx({ de: 'Erstellen', en: 'Create', es: 'Crear' })}
             </Button>
           </DialogFooter>
         </DialogContent>

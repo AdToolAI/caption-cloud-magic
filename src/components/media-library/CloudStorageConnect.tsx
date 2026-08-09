@@ -51,11 +51,10 @@ export const CloudStorageConnect = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Cloud className="h-5 w-5 text-primary" />
-            Cloud-Speicher verbinden
+            {tx({ de: "Cloud-Speicher verbinden", en: "Connect cloud storage", es: "Conectar almacenamiento en la nube" })}
           </CardTitle>
           <CardDescription>
-            Erweitere deinen Speicher, indem du Google Drive als externen Speicher anbindest.
-            Verschiebe ältere oder große Dateien dorthin.
+            {tx({ de: "Erweitere deinen Speicher, indem du Google Drive als externen Speicher anbindest. Verschiebe ältere oder große Dateien dorthin.", en: "Expand your storage by connecting Google Drive as external storage. Move older or large files there.", es: "Amplía tu almacenamiento conectando Google Drive como almacenamiento externo. Mueve allí archivos antiguos o grandes." })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -78,17 +77,17 @@ export const CloudStorageConnect = () => {
                 </div>
                 <div>
                   <p className="font-medium">Google Drive</p>
-                  <p className="text-xs text-muted-foreground">Verbinde deinen Google Drive Account</p>
+                  <p className="text-xs text-muted-foreground">{tx({ de: "Verbinde deinen Google Drive Account", en: "Connect your Google Drive account", es: "Conecta tu cuenta de Google Drive" })}</p>
                 </div>
               </div>
               <Button onClick={connectGoogleDrive} className="gap-2">
                 <Cloud className="h-4 w-4" />
-                Verbinden
+                {tx({ de: "Verbinden", en: "Connect", es: "Conectar" })}
               </Button>
             </div>
 
             <p className="text-xs text-muted-foreground">
-              ⓘ Es wird ein Ordner "AdTool Media" in deinem Google Drive erstellt. Nur Dateien in diesem Ordner werden verwaltet.
+              {tx({ de: 'ⓘ Es wird ein Ordner "AdTool Media" in deinem Google Drive erstellt. Nur Dateien in diesem Ordner werden verwaltet.', en: 'ⓘ A folder "AdTool Media" will be created in your Google Drive. Only files in this folder are managed.', es: 'ⓘ Se creará una carpeta "AdTool Media" en tu Google Drive. Solo se administran los archivos de esta carpeta.' })}
             </p>
           </motion.div>
         </CardContent>
@@ -107,11 +106,11 @@ export const CloudStorageConnect = () => {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Cloud className="h-5 w-5 text-primary" />
-            Cloud-Speicher
+            {tx({ de: "Cloud-Speicher", en: "Cloud storage", es: "Almacenamiento en la nube" })}
           </CardTitle>
           <Badge variant="outline" className="gap-1 text-green-500 border-green-500/30 bg-green-500/10">
             <Check className="h-3 w-3" />
-            Verbunden
+            {tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}
           </Badge>
         </div>
         <CardDescription>
@@ -124,7 +123,7 @@ export const CloudStorageConnect = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <HardDrive className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Google Drive Speicher</span>
+              <span className="text-sm font-medium">{tx({ de: "Google Drive Speicher", en: "Google Drive storage", es: "Almacenamiento de Google Drive" })}</span>
             </div>
             <span className="text-sm text-muted-foreground">
               {formatBytes(connection.used_bytes)} / {formatBytes(connection.quota_bytes)}
@@ -143,13 +142,13 @@ export const CloudStorageConnect = () => {
         {/* Folder */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <FolderOpen className="h-4 w-4" />
-          <span>Ordner: <strong className="text-foreground">{connection.folder_name || 'AdTool Media'}</strong></span>
+          <span>{tx({ de: "Ordner:", en: "Folder:", es: "Carpeta:" })} <strong className="text-foreground">{connection.folder_name || 'AdTool Media'}</strong></span>
         </div>
 
         {/* Auto-Sync Toggle */}
         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/10 border border-white/5">
           <div>
-            <Label className="text-sm font-medium">Auto-Sync</Label>
+            <Label className="text-sm font-medium">{tx({ de: "Auto-Sync", en: "Auto-sync", es: "Sincronización automática" })}</Label>
             <p className="text-xs text-muted-foreground">{tx({ de: "Neue Medien automatisch in die Cloud hochladen", en: "Automatically upload new media to the cloud", es: "Subir automáticamente nuevos medios a la nube" })}</p>
           </div>
           <Switch
@@ -168,7 +167,7 @@ export const CloudStorageConnect = () => {
             className="gap-2"
           >
             {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Synchronisieren
+            {tx({ de: "Synchronisieren", en: "Synchronize", es: "Sincronizar" })}
           </Button>
           <Button
             variant="ghost"
@@ -178,7 +177,7 @@ export const CloudStorageConnect = () => {
             className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
           >
             {disconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudOff className="h-4 w-4" />}
-            Trennen
+            {tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}
           </Button>
         </div>
       </CardContent>
