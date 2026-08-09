@@ -1413,16 +1413,16 @@ export default function ProductionPlanSheet({
                         return (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Dialog ({visible.length} Turn{visible.length === 1 ? '' : 's'})
+                            {tx({ de: `Dialog (${visible.length} Turn${visible.length === 1 ? '' : 's'})`, en: `Dialog (${visible.length} turn${visible.length === 1 ? '' : 's'})`, es: `Diálogo (${visible.length} turno${visible.length === 1 ? '' : 's'})` })}
                             {hiddenCount > 0 && (
                               <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
-                                · {hiddenCount} Regie-Notiz{hiddenCount === 1 ? '' : 'en'} ausgeblendet
+                                · {tx({ de: `${hiddenCount} Regie-Notiz${hiddenCount === 1 ? '' : 'en'} ausgeblendet`, en: `${hiddenCount} directing note${hiddenCount === 1 ? '' : 's'} hidden`, es: `${hiddenCount} nota${hiddenCount === 1 ? '' : 's'} de dirección oculta${hiddenCount === 1 ? '' : 's'}` })}
                               </span>
                             )}
                           </Label>
                           {visible.length === 0 ? (
                             <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 text-[11px] italic text-muted-foreground">
-                              Regie-Notizen ausgeblendet — Skript wird aus dem Briefing generiert.
+                              {tx({ de: 'Regie-Notizen ausgeblendet — Skript wird aus dem Briefing generiert.', en: 'Directing notes hidden — script is generated from the briefing.', es: 'Notas de dirección ocultas — el guion se genera a partir del briefing.' })}
                             </div>
                           ) : (
                           <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 space-y-1 font-mono text-[11px]">

@@ -152,7 +152,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       <Card className="p-8 text-center border-dashed">
         <SettingsIcon className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">
-          tx({ de: "Noch kein Brief erstellt — bitte zuerst beim ersten Aktivieren den Onboarding-Wizard durchlaufen.", en: "No brief created yet — please complete the onboarding wizard the first time you activate.", es: "Aún no se ha creado ningún briefing — completa primero el asistente de incorporación al activar por primera vez." })
+          {tx({ de: "Noch kein Brief erstellt — bitte zuerst beim ersten Aktivieren den Onboarding-Wizard durchlaufen.", en: "No brief created yet — please complete the onboarding wizard the first time you activate.", es: "Aún no se ha creado ningún briefing — completa primero el asistente de incorporación al activar por primera vez." })}
         </p>
       </Card>
     );
@@ -326,7 +326,7 @@ export function AutopilotStrategyEditor({ brief }: Props) {
           <div>
             <Label className="text-xs uppercase tracking-widest text-fuchsia-600">🎬 {tx({ de: "Video-Pipeline", en: "Video pipeline", es: "Pipeline de video" })}</Label>
             <p className="text-[11px] text-muted-foreground mt-1">
-              tx({ de: 'Wenn aktiv und Slot-Format „video / reel / short / tiktok / story" enthält, rendert der Autopilot ein echtes Video statt eines Bildes.', en: 'If active and the slot format contains "video / reel / short / tiktok / story", the autopilot renders a real video instead of an image.', es: 'Si está activo y el formato de la franja contiene "video / reel / short / tiktok / story", el autopilot renderiza un video real en lugar de una imagen.' })
+              {tx({ de: 'Wenn aktiv und Slot-Format „video / reel / short / tiktok / story" enthält, rendert der Autopilot ein echtes Video statt eines Bildes.', en: 'If active and the slot format contains "video / reel / short / tiktok / story", the autopilot renders a real video instead of an image.', es: 'Si está activo y el formato de la franja contiene "video / reel / short / tiktok / story", el autopilot renderiza un video real en lugar de una imagen.' })}
             </p>
           </div>
           <Switch checked={videoEnabled} onCheckedChange={setVideoEnabled} />

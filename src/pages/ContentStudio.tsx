@@ -52,13 +52,13 @@ function StudioBody({
           </div>
           <div className="ml-auto flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setTemplatesOpen(true)}>
-              <BookTemplate className="mr-1.5 h-4 w-4" /> Vorlagen
+              <BookTemplate className="mr-1.5 h-4 w-4" /> {tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCoachOpen(true)}>
-              <MessageSquare className="mr-1.5 h-4 w-4" /> Coach
+              <MessageSquare className="mr-1.5 h-4 w-4" /> {tx({ de: "Coach", en: "Coach", es: "Coach" })}
             </Button>
             <Button variant="ghost" size="sm" onClick={s.reset}>
-              <RotateCcw className="mr-1.5 h-4 w-4" /> Neu
+              <RotateCcw className="mr-1.5 h-4 w-4" /> {tx({ de: "Neu", en: "New", es: "Nuevo" })}
             </Button>
           </div>
         </div>
@@ -69,7 +69,7 @@ function StudioBody({
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-2.5 text-sm">
           <span className="text-foreground/80">{tx({ de: "Entwurf wiederhergestellt — du kannst dort weitermachen, wo du aufgehört hast.", en: "Draft restored — you can pick up where you left off.", es: "Borrador restaurado: puedes continuar donde lo dejaste." })}</span>
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={s.reset}>Verwerfen</Button>
+            <Button variant="ghost" size="sm" onClick={s.reset}>{tx({ de: "Verwerfen", en: "Discard", es: "Descartar" })}</Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={s.dismissRestored} aria-label={tx({ de: "Hinweis schließen", en: "Close note", es: "Cerrar nota" })}>
               <X className="h-4 w-4" />
             </Button>
@@ -81,7 +81,7 @@ function StudioBody({
         <Collapsible open={mobilePreview} onOpenChange={setMobilePreview} className="mb-5 lg:hidden">
           <CollapsibleTrigger asChild>
             <Button variant="outline" size="sm" className="w-full justify-between">
-              Vorschau {mobilePreview ? "ausblenden" : "anzeigen"}
+              {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })} {mobilePreview ? tx({ de: "ausblenden", en: "hide", es: "ocultar" }) : tx({ de: "anzeigen", en: "show", es: "mostrar" })}
               <ChevronDown className={`h-4 w-4 transition-transform ${mobilePreview ? "rotate-180" : ""}`} />
             </Button>
           </CollapsibleTrigger>

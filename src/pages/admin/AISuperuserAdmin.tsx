@@ -284,15 +284,15 @@ export function AISuperuserAdmin() {
           </Button>
           <Button onClick={triggerAnalysis} variant="outline" disabled={analyzing}>
             {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            KI-Analyse
+            {tx({ de: "KI-Analyse", en: "AI analysis", es: "Análisis de IA" })}
           </Button>
           <Button onClick={() => triggerRun('fast')} disabled={running} variant="outline">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Schnell-Test
+            {tx({ de: "Schnell-Test", en: "Quick test", es: "Prueba rápida" })}
           </Button>
           <Button onClick={() => triggerRun('full')} disabled={running}>
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Komplett-Test
+            {tx({ de: "Komplett-Test", en: "Full test", es: "Prueba completa" })}
           </Button>
           <Button onClick={trimHistory} variant="ghost" size="sm" title={tx({ de: "Behält die letzten 5 Runs pro Szenario", en: "Keeps the last 5 runs per scenario", es: "Conserva las últimas 5 ejecuciones por escenario" })}>
             {tx({ de: "Historie kürzen (letzte 5 behalten)", en: "Trim history (keep last 5)", es: "Recortar historial (mantener últimos 5)" })}
