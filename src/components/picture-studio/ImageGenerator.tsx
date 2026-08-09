@@ -98,6 +98,15 @@ export function ImageGenerator() {
     { value: '2:1', label: t('picStudio.arBanner') },
   ], [t]);
 
+  /** Vom jeweiligen Modell akzeptierte Seitenverhältnisse. */
+  const TIER_ASPECTS: Record<QualityTier, string[] | null> = {
+    standard: null, // keine Einschränkung
+    fast: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+    pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+    ultra: ['1:1', '4:3', '3:4', '4:5', '16:9', '9:16'],
+  };
+
+
   const cached = getCachedState();
 
   const [prompt, setPrompt] = useState(cached?.prompt ?? "");
@@ -114,6 +123,7 @@ export function ImageGenerator() {
   const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   const [replicateLoading, setReplicateLoading] = useState(false);
+  const [refUploading, setRefUploading] = useState(false);
 
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
@@ -135,6 +145,21 @@ export function ImageGenerator() {
   const currencySymbol = currency === 'USD' ? '$' : '€';
   const balance = wallet?.balance_euros ?? 0;
   const hasInsufficientCredits = cost > 0 && balance < cost;
+
+  // Nur Seitenverhältnisse anbieten, die das gewählte Modell akzeptiert.
+  const availableAspectRatios = useMemo(() => {
+    const allowed = TIER_ASPECTS[tier];
+    return allowed ? ASPECT_RATIOS.filter(r => allowed.includes(r.value)) : ASPECT_RATIOS;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier, ASPECT_RATIOS]);
+
+  useEffect(() => {
+    if (!availableAspectRatios.some(r => r.value === aspectRatio)) {
+      setAspectRatio(availableAspectRatios[0]?.value ?? '1:1');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableAspectRatios]);
+
 
   useEffect(() => {
     setCachedState({
@@ -167,22 +192,48 @@ export function ImageGenerator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  /**
+   * Referenzbilder gehen in den Storage (Pfad startet mit der User-ID) und
+   * werden als URL an das Modell geschickt. Base64-Daten-URLs sprengen sonst
+   * die Request-Grenzen von Replicate bei größeren Fotos.
+   */
+  const uploadReference = async (file: File, apply: (url: string | null) => void) => {
+    if (!user) { toast.error(t('picStudio.loginRequired')); return; }
+    // Sofortige lokale Vorschau
+    const localPreview = URL.createObjectURL(file);
+    apply(localPreview);
+    setRefUploading(true);
+    try {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const path = `${user.id}/picture-studio/refs/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage
+        .from('background-projects')
+        .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
+      if (error) throw error;
+      const { data } = supabase.storage.from('background-projects').getPublicUrl(path);
+      apply(data.publicUrl);
+    } catch (err: any) {
+      console.error('[ImageGenerator] reference upload failed:', err);
+      apply(null);
+      toast.error(tx({ de: 'Referenzbild konnte nicht hochgeladen werden', en: 'Reference image could not be uploaded', es: 'No se pudo subir la imagen de referencia' }));
+    } finally {
+      URL.revokeObjectURL(localPreview);
+      setRefUploading(false);
+    }
+  };
+
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setReferenceImage(reader.result as string);
-    reader.readAsDataURL(file);
+    void uploadReference(file, setReferenceImage);
   };
 
   const handleStyleRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setStyleReference(reader.result as string);
-    reader.readAsDataURL(file);
+    void uploadReference(file, setStyleReference);
   };
 
   const brandKitPayload = useBrandKit && activeBrandKit ? {
@@ -307,6 +358,7 @@ export function ImageGenerator() {
 
       let successCount = 0;
       let safetyFilteredMsg: string | null = null;
+      let firstErrorMsg: string | null = null;
       for (const r of results) {
         if (r.status === 'fulfilled' && r.value) {
           await handleGenerationSuccess(r.value);
@@ -321,6 +373,7 @@ export function ImageGenerator() {
           if ((r.reason as any)?.code === 'SAFETY_FILTERED') {
             safetyFilteredMsg = r.reason.message;
           }
+          if (!firstErrorMsg) firstErrorMsg = (r.reason as any)?.message ?? null;
           console.error('[ImageGenerator] variant failed:', r.reason);
         }
       }
@@ -340,7 +393,10 @@ export function ImageGenerator() {
             } : undefined,
           });
         } else {
-          toast.error(tx({ de: 'Bildgenerierung fehlgeschlagen', en: 'Image generation failed', es: 'Error al generar la imagen' }));
+          toast.error(tx({ de: 'Bildgenerierung fehlgeschlagen', en: 'Image generation failed', es: 'Error al generar la imagen' }), {
+            description: firstErrorMsg ?? undefined,
+            duration: 12000,
+          });
         }
       } else if (variantsCount > 1) {
         toast.success(tx({ de: `${successCount} von ${variantsCount} Varianten generiert`, en: `${successCount} of ${variantsCount} variants generated`, es: `${successCount} de ${variantsCount} variantes generadas` }));
@@ -607,7 +663,7 @@ export function ImageGenerator() {
               <Select value={aspectRatio} onValueChange={setAspectRatio}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {ASPECT_RATIOS.map(r => (
+                  {availableAspectRatios.map(r => (
                     <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -665,13 +721,18 @@ export function ImageGenerator() {
                 <button
                   type="button"
                   onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
-                  className="relative block w-full h-24 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
+                  className="relative block w-full rounded-md overflow-hidden border border-border bg-muted/30 hover:border-primary transition-colors"
                 >
                   <img
                     src={mode === 'transform' ? referenceImage! : styleReference!}
-                    className="h-full w-full object-cover"
+                    className="mx-auto max-h-56 w-auto max-w-full object-contain"
                     alt="Reference"
                   />
+                  {refUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-background/70 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Upload className="h-4 w-4" />
                   </div>

@@ -64,6 +64,40 @@ const STYLE_MODIFIERS: Record<string, string> = {
   editorial: 'editorial fashion photography, high-end magazine style, bold composition',
 };
 
+/**
+ * Allowed `aspect_ratio` values per Replicate model. Sending anything outside
+ * this list makes the model reject the whole request ("input validation"),
+ * which surfaced as a silent "Bildgenerierung fehlgeschlagen" in the UI.
+ */
+const ASPECT_SUPPORT: Record<string, string[]> = {
+  fast: ['1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
+  pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+  ultra: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
+};
+
+/** Maps an unsupported ratio to the closest supported one for that model. */
+function mapAspectRatio(tier: string, requested: string): string {
+  const allowed = ASPECT_SUPPORT[tier] ?? ASPECT_SUPPORT.fast;
+  if (allowed.includes(requested)) return requested;
+
+  const parse = (r: string) => {
+    const [w, h] = r.split(':').map(Number);
+    return w > 0 && h > 0 ? w / h : 1;
+  };
+  const target = parse(requested);
+  let best = allowed[0];
+  let bestDelta = Infinity;
+  for (const cand of allowed) {
+    const delta = Math.abs(parse(cand) - target);
+    if (delta < bestDelta) {
+      best = cand;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -196,37 +230,49 @@ serve(async (req) => {
     if (referenceImageUrl) imageInputs.push(referenceImageUrl);
     if (styleReferenceUrl) imageInputs.push(styleReferenceUrl);
 
+    const safeAspect = mapAspectRatio(tier, aspectRatio);
+    if (safeAspect !== aspectRatio) {
+      console.log(`[generate-image-replicate] aspect_ratio ${aspectRatio} not supported by ${tier} → using ${safeAspect}`);
+    }
+
     if (tier === 'fast') {
       // Seedream 4
-      replicateInput.aspect_ratio = aspectRatio;
+      replicateInput.aspect_ratio = safeAspect;
       replicateInput.size = '2K';
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     } else if (tier === 'pro') {
       // Imagen 4 Ultra (no image_input support — style ref only via prompt)
-      replicateInput.aspect_ratio = aspectRatio;
+      replicateInput.aspect_ratio = safeAspect;
       replicateInput.output_format = 'jpg';
       replicateInput.safety_filter_level = 'block_only_high';
     } else {
       // Nano Banana (ultra) — multi-image edit
-      replicateInput.aspect_ratio = aspectRatio;
+      replicateInput.aspect_ratio = safeAspect;
       replicateInput.output_format = 'jpg';
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     }
 
-    console.log(`[generate-image-replicate] Tier=${tier} Cost=${currencySymbol}${cost.toFixed(2)} Model=${modelRef}`);
+    console.log(`[generate-image-replicate] Tier=${tier} Cost=${currencySymbol}${cost.toFixed(2)} Model=${modelRef} aspect=${safeAspect} images=${imageInputs.length}`);
 
     let output: any;
     try {
       output = await replicate.run(modelRef as any, { input: replicateInput });
     } catch (replicateError: any) {
       console.error('[generate-image-replicate] Replicate error:', replicateError);
-      const msg = String(replicateError?.message ?? 'Unknown error');
+      const detail = String(
+        replicateError?.response?.data?.detail ??
+        replicateError?.detail ??
+        replicateError?.message ??
+        'Unknown error'
+      );
+      const msg = detail;
       const isSafety = /E005|flagged as sensitive|safety|nsfw/i.test(msg);
       return new Response(
         JSON.stringify({
           error: isSafety
             ? 'Das Referenzbild oder der Prompt wurde vom Sicherheitsfilter des Modells blockiert. Häufige Auslöser: viele Personen, religiöse, politische oder gewaltvolle Motive. Tipp: anderes Referenzbild wählen, Motiv im Prompt beschreiben statt vorzulegen, oder Tier „Pro" ohne Referenz testen.'
             : `Bildgenerierung fehlgeschlagen: ${msg}`,
+          provider_message: msg,
           code: isSafety ? 'SAFETY_FILTERED' : 'REPLICATE_ERROR',
         }),
         { status: isSafety ? 422 : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
