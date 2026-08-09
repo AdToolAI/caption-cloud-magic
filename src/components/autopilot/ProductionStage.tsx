@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Production stage — what the customer watches while the film is being made.
  *
@@ -22,7 +23,7 @@ const STAGE_LABEL: Record<string, string> = {
   treatment: 'Konzept',
   anchors: 'Bildfreigabe',
   motion: 'Animation',
-  scenes_ready: 'Szenen fertig',
+  scenes_ready: tx({ de: 'Szenen fertig', en: 'Scenes ready', es: 'Escenas listas' }),
   audio: 'Ton',
   lipsync: 'Lip-Sync',
   finalizing: 'Endschnitt',
@@ -51,7 +52,7 @@ function phaseIndex(stage: string): number {
 
 const SCENE_LABEL: Record<string, string> = {
   pending: 'Wartet',
-  anchor: 'Bild wird geprüft',
+  anchor: tx({ de: 'Bild wird geprüft', en: 'Checking image', es: 'Comprobando imagen' }),
   motion: 'Wird animiert',
   completed: 'Fertig',
   failed: 'Fehlgeschlagen',

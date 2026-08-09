@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
@@ -68,7 +69,7 @@ export function AudioDuckingPanel({
     return (
       <Card className="p-8 backdrop-blur-xl bg-card/60 border-border/50 text-center">
         <AudioLines className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-        <h3 className="text-lg font-semibold mb-2">Sprache + Musik benötigt</h3>
+        <h3 className="text-lg font-semibold mb-2">{tx({ de: "Sprache + Musik benötigt", en: "Voice + music required", es: "Se requiere voz + música" })}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           Lade ein Voiceover hoch <span className="text-primary">und</span> wähle einen
           Musik-Track (über AI Music, Beat-Sync oder die Bibliothek), um Audio Ducking zu nutzen.

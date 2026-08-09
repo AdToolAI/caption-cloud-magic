@@ -364,7 +364,7 @@ export function AISceneRemix({
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium flex items-center gap-2">
                 <Film className="w-4 h-4 text-primary" />
-                {isPreviewMode ? 'Vorschau der neuen Reihenfolge' : 'Aktuelle Reihenfolge'}
+                {isPreviewMode ? tx({ de: 'Vorschau der neuen Reihenfolge', en: 'Preview new order', es: 'Previsualizar nuevo orden' }) : 'Aktuelle Reihenfolge'}
               </h4>
               {!isPreviewMode && (
                 <Button size="sm" variant="outline" onClick={handlePreview}>

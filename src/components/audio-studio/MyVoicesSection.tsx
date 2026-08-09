@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Play, Loader2, Trash2, Pencil, Check, X, Plus, Sparkles } from 'lucide-react';
@@ -82,7 +83,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
         <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
           <Mic className="w-6 h-6 text-primary" />
         </div>
-        <h3 className="text-lg font-semibold mb-1">Noch keine eigenen Stimmen</h3>
+        <h3 className="text-lg font-semibold mb-1">{tx({ de: "Noch keine eigenen Stimmen", en: "No custom voices yet", es: "Aún no hay voces propias" })}</h3>
         <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
           Klone deine erste Stimme über das Voice Studio — Skript vorlesen, Mikrofon oder
           WhatsApp-Sprachnachricht.
@@ -250,7 +251,7 @@ export function MyVoicesSection({ onCreate }: MyVoicesSectionProps) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Stimme löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{tx({ de: "Stimme löschen?", en: "Delete voice?", es: "¿Eliminar voz?" })}</AlertDialogTitle>
             <AlertDialogDescription>
               Diese Aktion kann nicht rückgängig gemacht werden. Die geklonte Stimme wird aus deiner
               Bibliothek entfernt.

@@ -471,7 +471,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
           {options.lipSync && (
             <div className="mt-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Sprecher im Bild</span>
+                <span className="text-xs text-muted-foreground">{tx({ de: "Sprecher im Bild", en: "Speaker in picture", es: "Locutor en imagen" })}</span>
                 <span className="text-xs font-medium">{options.lipSyncSpeakers}</span>
               </div>
               <Slider

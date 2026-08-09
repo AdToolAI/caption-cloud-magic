@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * v384 — Zustandsmaschine für Composer-Szenen (Client-Seite).
  *
@@ -84,7 +85,7 @@ export const SCENE_STATE_LABEL: Record<SceneState, string> = {
   plate_ready: 'Clip fertig',
   audio_prep: 'Voiceover wird erzeugt',
   audio_ready: 'Voiceover fertig',
-  lipsync_dispatched: 'Lip-Sync wird gestartet',
+  lipsync_dispatched: tx({ de: 'Lip-Sync wird gestartet', en: 'Starting lip-sync', es: 'Iniciando sincronización labial' }),
   lipsync_running: 'Lip-Sync läuft',
   lipsync_muxing: 'Wird zusammengesetzt',
   complete: 'Fertig',

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -395,7 +396,7 @@ export function AddMediaDialog({
                   <Upload className="h-12 w-12 text-muted-foreground" />
                 )}
                 <div>
-                  <p className="font-medium">Video oder Bild hochladen</p>
+                  <p className="font-medium">{tx({ de: "Video oder Bild hochladen", en: "Upload video or image", es: "Subir video o imagen" })}</p>
                   <p className="text-sm text-muted-foreground">
                     Klicken oder Datei hierher ziehen
                   </p>

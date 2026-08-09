@@ -262,7 +262,7 @@ export const MediaEditor = ({
               ))
             ) : (
               <div className="col-span-3 text-center py-8 text-muted-foreground">
-                <p>Gib einen Suchbegriff ein, um Bilder zu finden</p>
+                <p>{tx({ de: "Gib einen Suchbegriff ein, um Bilder zu finden", en: "Enter a search term to find images", es: "Introduce un término de búsqueda para encontrar imágenes" })}</p>
               </div>
             )}
           </div>

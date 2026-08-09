@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Stage 4 — "Save as Character / Location" UI
 //
 // Drop-in dropdown menu used on any image (Frame-First variants, Picture
@@ -90,7 +91,7 @@ export default function SaveAsAssetMenu({
 
       toast.success(
         mode === 'character'
-          ? t(language, 'Character saved', 'Charakter gespeichert', 'Personaje guardado')
+          ? t(language, 'Character saved', tx({ de: 'Charakter gespeichert', en: 'Character saved', es: 'Personaje guardado' }), 'Personaje guardado')
           : t(language, 'Location saved', 'Location gespeichert', 'Ubicación guardada'),
       );
       setOpen(false);
@@ -133,7 +134,7 @@ export default function SaveAsAssetMenu({
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuItem onClick={() => start('character')}>
             <User className="h-3.5 w-3.5 mr-2" />
-            {t(language, 'Save as Character', 'Als Charakter speichern', 'Guardar como personaje')}
+            {t(language, 'Save as Character', tx({ de: 'Als Charakter speichern', en: 'Save as character', es: 'Guardar como personaje' }), 'Guardar como personaje')}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => start('location')}>
             <MapPin className="h-3.5 w-3.5 mr-2" />
@@ -147,7 +148,7 @@ export default function SaveAsAssetMenu({
           <DialogHeader>
             <DialogTitle>
               {mode === 'character'
-                ? t(language, 'Save as Character', 'Als Charakter speichern', 'Guardar como personaje')
+                ? t(language, 'Save as Character', tx({ de: 'Als Charakter speichern', en: 'Save as character', es: 'Guardar como personaje' }), 'Guardar como personaje')
                 : t(language, 'Save as Location', 'Als Location speichern', 'Guardar como ubicación')}
             </DialogTitle>
           </DialogHeader>

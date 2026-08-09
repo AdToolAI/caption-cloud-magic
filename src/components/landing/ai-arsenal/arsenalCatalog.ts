@@ -212,7 +212,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Seedance 2 Pro", "Seedance 2 Pro", "Seedance 2 Pro"],
     [
       "Pro-tier motion and character expression.",
-      "Pro-Motion und Charakter-Ausdruck.",
+      tx({ de: "Pro-Motion und Charakter-Ausdruck.", en: "Pro-motion and character expression.", es: "Pro-movimiento y expresión de personajes." }),
       "Movimiento y expresión a nivel Pro.",
     ],
     [T2V, I2V],
@@ -292,7 +292,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Vidu Q2 Reference", "Vidu Q2 Reference", "Vidu Q2 Reference"],
     [
       "Multi-reference for character consistency.",
-      "Multi-Referenz für Charakter-Konsistenz.",
+      tx({ de: "Multi-Referenz für Charakter-Konsistenz.", en: "Multi-reference for character consistency.", es: "Multireferencia para la consistencia del personaje." }),
       "Multi-referencia para consistencia de personajes.",
     ],
     [MULTIREF, I2V],
@@ -302,7 +302,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Vidu Q2 I2V", "Vidu Q2 I2V", "Vidu Q2 I2V"],
     [
       "Image-to-video with reference locking.",
-      "Bild-zu-Video mit Referenz-Lock.",
+      tx({ de: "Bild-zu-Video mit Referenz-Lock.", en: "Image-to-video with reference lock.", es: "Imagen a video con bloqueo de referencia." }),
       "Imagen a vídeo con anclaje de referencia.",
     ],
     [I2V, MULTIREF],
@@ -344,7 +344,7 @@ export const ARSENAL_CATALOG: ArsenalModel[] = [
     ["Gemini 3 Pro Image", "Gemini 3 Pro Image", "Gemini 3 Pro Image"],
     [
       "Google's next-gen image generation with typography-grade text.",
-      "Googles Next-Gen-Bild-Generation mit sauberer Typo.",
+      tx({ de: "Googles Next-Gen-Bild-Generation mit sauberer Typo.", en: "Google's next-gen image generation with clean typography.", es: "Generación de imágenes de próxima generación de Google con tipografía limpia." }),
       "Nueva generación de imágenes de Google con tipografía nítida.",
     ],
     [T2I, EDIT],

@@ -57,7 +57,7 @@ export function VoicePreviewButton({ voiceId, text, label }: Props) {
     } catch (err) {
       console.error('[VoicePreviewButton] failed:', err);
       toast({
-        title: 'Vorschau fehlgeschlagen',
+        title: tx({ de: 'Vorschau fehlgeschlagen', en: 'Preview failed', es: 'Error en la vista previa' }),
         description: err instanceof Error ? err.message : 'Unbekannter Fehler.',
         variant: 'destructive',
       });

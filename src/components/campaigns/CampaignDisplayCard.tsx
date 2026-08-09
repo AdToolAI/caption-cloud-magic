@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
@@ -486,7 +487,7 @@ export const CampaignDisplayCard = ({
                               className="gap-1.5 text-xs hover:bg-accent/10"
                             >
                               <Eye className="h-3 w-3" />
-                              {isPreviewOpen ? "Vorschau schließen" : "Plattform-Vorschau"}
+                              {isPreviewOpen ? tx({ de: "Vorschau schließen", en: "Close preview", es: "Cerrar vista previa" }) : "Plattform-Vorschau"}
                             </Button>
                             <Button
                               size="sm"

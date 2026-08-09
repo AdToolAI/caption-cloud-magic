@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Feasibility filter.
  *
@@ -107,7 +108,7 @@ export function assessIdea(input: AutopilotIdea, ctx: FeasibilityContext): Feasi
 
   if (idea.beats.length < minScenes) {
     score -= 6;
-    notes.push(`Auf ${minScenes} Szenen erweitert — einzelne Clips bleiben so unter ${MAX_SCENE_SECONDS}s.`);
+    notes.push(tx({ de: `Auf ${minScenes} Szenen erweitert — einzelne Clips bleiben so unter ${MAX_SCENE_SECONDS}s.`, en: `Extended to ${minScenes} scenes — individual clips remain under ${MAX_SCENE_SECONDS}s.`, es: `Ampliado a ${minScenes} escenas — los clips individuales permanecen por debajo de ${MAX_SCENE_SECONDS}s.` }));
     while (idea.beats.length < minScenes) {
       const source = idea.beats[idea.beats.length - 1] ?? {
         beat: 'benefit',

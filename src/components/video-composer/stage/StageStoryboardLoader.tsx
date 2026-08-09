@@ -39,7 +39,7 @@ const COPY: Record<Lang, {
     phases: [
       "Briefing wird analysiert…",
       "Cast wird besetzt…",
-      "Szenen-Bögen werden geplant…",
+      tx({ de: "Szenen-Bögen werden geplant…", en: "Scene arcs are being planned…", es: "Se están planificando los arcos de la escena…" }),
       "Skripte werden geschrieben…",
       "Kamera & Look werden gesetzt…",
       "Storyboard wird finalisiert…",

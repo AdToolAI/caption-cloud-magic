@@ -71,7 +71,7 @@ export const BatchVideoUpload = ({ templateId, requiredFields }: BatchVideoUploa
     if (csvData.length === 0) {
       toast({
         title: 'Keine Daten',
-        description: 'Bitte CSV-Datei hochladen',
+        description: tx({ de: 'Bitte CSV-Datei hochladen', en: 'Please upload CSV file', es: 'Por favor, sube un archivo CSV' }),
         variant: 'destructive'
       });
       return;

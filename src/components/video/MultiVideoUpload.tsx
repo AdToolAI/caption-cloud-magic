@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useRef } from 'react';
 import { Upload, X, GripVertical, Video as VideoIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -68,7 +69,7 @@ export function MultiVideoUpload({
     const videoFiles = fileArray.filter(file => file.type.startsWith('video/'));
 
     if (videoFiles.length === 0) {
-      toast.error('Bitte nur Videodateien hochladen');
+      toast.error(tx({ de: 'Bitte nur Videodateien hochladen', en: 'Please upload video files only', es: 'Por favor, sube solo archivos de video' }));
       return;
     }
 

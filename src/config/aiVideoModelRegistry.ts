@@ -611,7 +611,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     // Flat €0.66 / 5s ≈ €0.13/s for UI parity (real billing is flat per generation)
     costPerSecond: { EUR: 0.13, USD: 0.13 },
     badge: 'Multi-Ref',
-    tagline: 'Bis zu 7 Refs: Charakter + Produkt + Location in einer Szene',
+    tagline: tx({ de: 'Bis zu 7 Refs: Charakter + Produkt + Location in einer Szene', en: 'Up to 7 refs: character + product + location in one scene', es: 'Hasta 7 referencias: personaje + producto + ubicación en una escena' }),
     legacyRoute: '/vidu-studio',
   },
   {

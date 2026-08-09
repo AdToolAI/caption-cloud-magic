@@ -95,7 +95,7 @@ const T = {
     hints: {
       subjectFail: tx({ de: 'Füge mindestens ein Cast-Mitglied oder einen Brand-Character hinzu — Provider brauchen ein klares Subjekt.', en: 'Add at least one cast member or brand character — providers need a clear subject.', es: 'Añade al menos un miembro del reparto o un personaje de marca — los proveedores necesitan un sujeto claro.' }),
       subjectWarn: 'Nenne das On-Camera-Subjekt explizit (z. B. "@Anna" oder "die Gründerin").',
-      actionFail: 'Beschreibe konkret, was in der Szene physisch passiert (klares Verb).',
+      actionFail: tx({ de: 'Beschreibe konkret, was in der Szene physisch passiert (klares Verb).', en: 'Describe concretely what physically happens in the scene (clear verb).', es: 'Describe concretamente lo que sucede físicamente en la escena (verbo claro).' }),
       actionWarn: tx({ de: 'Ersetze abstrakte Verben ("zeigt", "fühlt") mit konkreten Aktionen ("läuft", "hebt").', en: 'Replace abstract verbs ("shows", "feels") with concrete actions ("walks", "lifts").', es: 'Reemplaza verbos abstractos ("muestra", "siente") con acciones concretas ("camina", "levanta").' }),
       shotFail: 'Wähle ein Shot-Director-Preset (Framing, Winkel, Bewegung, Licht).',
       shotWarn: 'Ergänze ein konkretes Linsen-/Bewegungs-Cue (z. B. "85mm langsamer Dolly-In").',

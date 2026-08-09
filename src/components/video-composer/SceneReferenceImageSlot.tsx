@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SceneReferenceImageSlot — pro-Szenen Referenzbild-Slot.
  *
@@ -122,7 +123,7 @@ export default function SceneReferenceImageSlot({ scene, onUpdate, className }: 
           className="w-full gap-2 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5"
         >
           <Upload className="h-3.5 w-3.5" />
-          {uploading ? 'Lädt hoch…' : 'Bild hochladen (PNG/JPG/WEBP · max. 10 MB)'}
+          {uploading ? 'Lädt hoch…' : tx({ de: 'Bild hochladen (PNG/JPG/WEBP · max. 10 MB)', en: 'Upload image (PNG/JPG/WEBP · max. 10 MB)', es: 'Subir imagen (PNG/JPG/WEBP · máx. 10 MB)' })}
         </Button>
       )}
     </div>

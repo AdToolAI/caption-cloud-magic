@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -176,7 +177,7 @@ export function TextOverlayEditor({
               <div className="text-center py-8 text-muted-foreground">
                 <Type className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p>Keine Overlays vorhanden</p>
-                <p className="text-sm">Füge Text, CTAs oder Watermarks hinzu</p>
+                <p className="text-sm">{tx({ de: "Füge Text, CTAs oder Watermarks hinzu", en: "Add text, CTAs or watermarks", es: "Añadir texto, CTAs o marcas de agua" })}</p>
               </div>
             ) : (
               <ScrollArea className="h-[200px]">

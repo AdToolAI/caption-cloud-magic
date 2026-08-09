@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -91,7 +92,7 @@ export function VoiceSlot({
           className="flex-1 justify-start h-9 font-normal bg-background/60 text-xs min-w-0"
         >
           <Mic className="h-3.5 w-3.5 mr-2 text-muted-foreground shrink-0" />
-          <span className="truncate">{voiceName || (voiceId ? 'Stimme aktiv' : 'Stimme wählen…')}</span>
+          <span className="truncate">{voiceName || (voiceId ? 'Stimme aktiv' : tx({ de: 'Stimme wählen…', en: 'Select voice…', es: 'Seleccionar voz…' }))}</span>
           <Library className="h-3.5 w-3.5 ml-auto text-primary shrink-0" />
         </Button>
 
@@ -120,7 +121,7 @@ export function VoiceSlot({
         category={category}
         enforceNative={enforceNative}
         currentVoiceId={voiceId ?? undefined}
-        title={pickerTitle || (label ? `Stimme für ${label}` : 'Voice-Bibliothek')}
+        title={pickerTitle || (label ? tx({ de: `Stimme für ${label}`, en: `Voice for ${label}`, es: `Voz para ${label}` }) : 'Voice-Bibliothek')}
         onSelect={(voice, resolvedLanguage) =>
           onChange({
             voiceId: voice.id,

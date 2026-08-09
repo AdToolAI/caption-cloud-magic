@@ -60,7 +60,7 @@ const FAQ = () => {
         answer: tx({ de: "Sie können alle Ihre Rechnungen über die Abrechnungsseite einsehen und herunterladen. Gehen Sie zu Konto > Abrechnung, um Ihren Rechnungsverlauf anzuzeigen.", en: "You can view and download all your invoices from the billing page. Go to Account > Billing to view your invoice history.", es: "Puedes ver y descargar todas tus facturas desde la página de facturación. Ve a Cuenta > Facturación para ver tu historial de facturas." })
       },
       {
-        question: "Was passiert, wenn ich meinen Plan herabstufe?",
+        question: tx({ de: "Was passiert, wenn ich meinen Plan herabstufe?", en: "What happens if I downgrade my plan?", es: "¿Qué sucede si cambio a un plan inferior?" }),
         answer: tx({ de: "Ihr Konto wird am Ende des aktuellen Abrechnungszeitraums herabgestuft. Sie behalten Premium-Funktionen bis dahin.", en: "Your account will be downgraded at the end of the current billing period. You will retain premium features until then.", es: "Tu cuenta será degradada al final del período de facturación actual. Conservarás las funciones premium hasta entonces." })
       },
       {

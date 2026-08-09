@@ -158,7 +158,7 @@ export const TimelineScriptEditor = ({
       if (!fullScript.trim()) {
         toast({
           title: "Keine Texte vorhanden",
-          description: "Füge Text zu deinen Segmenten hinzu",
+          description: tx({ de: "Füge Text zu deinen Segmenten hinzu", en: "Add text to your segments", es: "Añade texto a tus segmentos" }),
           variant: "destructive"
         });
         setIsAutoSyncing(false);

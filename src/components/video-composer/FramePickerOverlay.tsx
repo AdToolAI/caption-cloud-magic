@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useRef, useState } from 'react';
 import {
   Dialog,
@@ -103,7 +104,7 @@ export default function FramePickerOverlay({
       });
       toast({
         title: 'Frame übernommen ✨',
-        description: `Szene ${targetSceneIndex} startet jetzt bei ${time.toFixed(2)}s der Quelle.`,
+        description: tx({ de: `Szene ${targetSceneIndex} startet jetzt bei ${time.toFixed(2)}s der Quelle.`, en: `Scene ${targetSceneIndex} now starts at ${time.toFixed(2)}s of source.`, es: `La escena ${targetSceneIndex} ahora comienza en ${time.toFixed(2)}s de la fuente.` }),
       });
       onOpenChange(false);
     } finally {

@@ -42,7 +42,7 @@ const ResetPassword = () => {
     e.preventDefault();
 
     if (password.length < 6) {
-      toast.error("Passwort muss mindestens 6 Zeichen haben");
+      toast.error(tx({ de: "Passwort muss mindestens 6 Zeichen haben", en: "Password must be at least 6 characters long", es: "La contraseña debe tener al menos 6 caracteres" }));
       return;
     }
 

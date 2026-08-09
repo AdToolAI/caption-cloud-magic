@@ -230,7 +230,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
           >
             <SelectTrigger className="bg-muted/30 border-white/10">
               <SelectValue>
-                {selectedVoice ? `${selectedVoice.name} (${selectedVoice.gender})` : 'Stimme wählen'}
+                {selectedVoice ? `${selectedVoice.name} (${selectedVoice.gender})` : tx({ de: 'Stimme wählen', en: 'Select voice', es: 'Seleccionar voz' })}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>

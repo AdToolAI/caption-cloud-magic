@@ -576,7 +576,7 @@ export function DirectorsCut() {
             toast.success(`${result.scenes.length} Composer-Szenen importiert (Geometrie-Fallback)`);
           } else {
             toast.warning(
-              `${result.scenes.length} Composer-Szenen importiert (Dauern-Fallback). Für frame-genaue Übergänge bitte neu rendern.`
+              tx({ de: `${result.scenes.length} Composer-Szenen importiert (Dauern-Fallback). Für frame-genaue Übergänge bitte neu rendern.`, en: `${result.scenes.length} Composer scenes imported (duration fallback). For frame-accurate transitions, please re-render.`, es: `${result.scenes.length} escenas de Composer importadas (duración de reserva). Para transiciones precisas por fotograma, por favor, vuelve a renderizar.` })
             );
           }
         }
@@ -675,14 +675,14 @@ export function DirectorsCut() {
       });
     if (looksLikeEdl) {
       const ok = window.confirm(
-        'Dieses Video hat bereits frame-genaue Szenen. Auto-Cut würde sie überschreiben. Trotzdem fortfahren?'
+        tx({ de: 'Dieses Video hat bereits frame-genaue Szenen. Auto-Cut würde sie überschreiben. Trotzdem fortfahren?', en: 'This video already has frame-accurate scenes. Auto-Cut would overwrite them. Continue anyway?', es: 'Este vídeo ya tiene escenas precisas por fotograma. Auto-Cut las sobrescribiría. ¿Continuar de todos modos?' })
       );
       if (!ok) return;
       lastEdlBackupRef.current = {
         scenes: JSON.parse(JSON.stringify(scenes)),
         markers: JSON.parse(JSON.stringify(aiCutMarkers)),
       };
-      toast('Szenen werden überschrieben', {
+      toast(tx({ de: 'Szenen werden überschrieben', en: 'Scenes will be overwritten', es: 'Las escenas serán sobrescritas' }), {
         action: {
           label: 'Rückgängig',
           onClick: () => {
@@ -764,7 +764,7 @@ export function DirectorsCut() {
       let adaptiveCutTimes: number[] = [];
       let contentCutTimes: number[] = [];
       try {
-        toast.info(t('dc.detectingScenes', { defaultValue: 'Erkenne Szenen mit Dual-Detector…' } as any));
+        toast.info(t('dc.detectingScenes', { defaultValue: tx({ de: 'Erkenne Szenen mit Dual-Detector…', en: 'Detecting scenes with Dual-Detector…', es: 'Detectando escenas con Dual-Detector…' }) } as any));
         const { data: pyData, error: pyErr } = await supabase.functions.invoke('detect-scenes-pyscenedetect', {
           body: { video_url: selectedVideo.url },
         });

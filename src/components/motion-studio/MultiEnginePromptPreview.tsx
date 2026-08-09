@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Block K-6 — Multi-Engine Prompt Preview
 //
 // Lets the user preview how the same `PromptSlots` get composed for each of
@@ -233,7 +234,7 @@ export default function MultiEnginePromptPreview({
                       <span>
                         {t(
                           language,
-                          'KI-Komposition fehlgeschlagen — lokale Fallback-Stitch wird angezeigt.',
+                          tx({ de: 'KI-Komposition fehlgeschlagen — lokale Fallback-Stitch wird angezeigt.', en: 'AI composition failed — local fallback stitch will be shown.', es: 'La composición de IA falló — se mostrará la unión de respaldo local.' }),
                           'AI compose failed — showing local fallback stitch.',
                           'Falló la composición IA — mostrando stitch local de respaldo.'
                         )}

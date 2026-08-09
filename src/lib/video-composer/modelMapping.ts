@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Composer ↔ AI Video Toolkit Model Mapping
  * --------------------------------------------------------------
@@ -35,7 +36,7 @@ const IMAGE_TOOLKIT_MODEL: ToolkitModel = {
   aspectRatios: ['16:9', '9:16', '1:1'],
   costPerSecond: { EUR: 0.02, USD: 0.02 },
   badge: 'Bild',
-  tagline: 'Statisches KI-Bild mit Ken-Burns-Effekt',
+  tagline: tx({ de: 'Statisches KI-Bild mit Ken-Burns-Effekt', en: 'Static AI image with Ken Burns effect', es: 'Imagen estática de IA con efecto Ken Burns' }),
   legacyRoute: '/picture-studio',
 };
 

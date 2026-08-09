@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { Lock, Palette, Mic, Users, Sparkles, Clapperboard, Coins, Music4, Layers3, Guitar, HeartPulse, Library } from "lucide-react";
 
@@ -380,7 +381,7 @@ export const VoiceCloneVisual = () => (
     <div className="w-full max-w-md space-y-2 text-[11px] text-primary/70 leading-relaxed">
       {[
         "Sprecher 1: Willkommen bei AdTool AI.",
-        "Sprecher 2: Vier Stimmen, eine Szene.",
+        tx({ de: "Sprecher 2: Vier Stimmen, eine Szene.", en: "Speaker 2: Four voices, one scene.", es: "Orador 2: Cuatro voces, una escena." }),
         "Sprecher 3: Kein Lip-Sync verrutscht.",
         "Sprecher 4: Willkommen in der Beta.",
       ].map((line, i) => (

@@ -909,7 +909,7 @@ export default function MediaLibrary() {
     
     toast({
       title: "🎨 Media gesendet",
-      description: `Erstes Bild wird in Smart Background geladen...`,
+      description: tx({ de: `Erstes Bild wird in Smart Background geladen...`, en: `First image is loading into Smart Background...`, es: `La primera imagen se está cargando en Smart Background...` }),
     });
     
     navigate('/picture-studio?tab=background');

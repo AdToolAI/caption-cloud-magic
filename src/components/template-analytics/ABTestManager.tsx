@@ -75,7 +75,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
     if (success) {
       toast({
         title: "Test gestartet",
-        description: "A/B Test wurde gestartet",
+        description: tx({ de: "A/B Test wurde gestartet", en: "A/B Test started", es: "Prueba A/B iniciada" }),
       });
       fetchActiveTests(templateId);
     }
@@ -97,7 +97,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
     if (success) {
       toast({
         title: "Test abgeschlossen",
-        description: "A/B Test wurde abgeschlossen",
+        description: tx({ de: "A/B Test wurde abgeschlossen", en: "A/B Test completed", es: "Prueba A/B completada" }),
       });
       fetchActiveTests(templateId);
     }
@@ -219,7 +219,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">
-                        Gestartet: {test.started_at ? new Date(test.started_at).toLocaleDateString('de-DE') : 'Noch nicht gestartet'}
+                        Gestartet: {test.started_at ? new Date(test.started_at).toLocaleDateString('de-DE') : tx({ de: 'Noch nicht gestartet', en: 'Not started yet', es: 'Aún no iniciado' })}
                       </div>
                       <div className="flex gap-2">
                         {test.status === 'draft' && (

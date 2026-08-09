@@ -170,7 +170,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
             console.warn('[smart-reframe] analyze failed, falling back to center crop', analyzeErr);
             toast({
               title: 'Smart Reframe übersprungen',
-              description: 'Subjekt-Tracking fehlgeschlagen — es wird zentriert zugeschnitten.',
+              description: tx({ de: 'Subjekt-Tracking fehlgeschlagen — es wird zentriert zugeschnitten.', en: 'Subject tracking failed — cropping centrally.', es: 'Fallo en el seguimiento del sujeto — se está recortando centralmente.' }),
             });
           }
         } finally {

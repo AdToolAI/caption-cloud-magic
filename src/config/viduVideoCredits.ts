@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Vidu Pricing Reference (IDs heißen weiterhin q2-*, laufen real auf Vidu Q3)
  * --------------------------------------------------------------
@@ -20,7 +21,7 @@ export const VIDU_VIDEO_MODELS = {
     flatCostUSD: 0.66,
     fixedDuration: 5,
     maxReferences: 7,
-    description: 'Bis zu 7 Referenzbilder (Character + Produkt + Location) in einer 5s-Szene',
+    description: tx({ de: 'Bis zu 7 Referenzbilder (Character + Produkt + Location) in einer 5s-Szene', en: 'Up to 7 reference images (character + product + location) in a 5s scene', es: 'Hasta 7 imágenes de referencia (personaje + producto + ubicación) en una escena de 5 segundos' }),
     badge: 'Multi-Ref',
   },
   'vidu-q2-i2v': {

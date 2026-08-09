@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import {
   Dialog,
@@ -62,7 +63,7 @@ export default function AIDirectorBriefDialog({
 
   const generate = async () => {
     if (brief.trim().length < 10) {
-      toast.error('Brief zu kurz — bitte mindestens 10 Zeichen');
+      toast.error(tx({ de: 'Brief zu kurz — bitte mindestens 10 Zeichen', en: 'Brief too short — please use at least 10 characters', es: 'Breve demasiado corto — por favor, usa al menos 10 caracteres' }));
       return;
     }
     setLoading(true);

@@ -1078,7 +1078,7 @@ export default function SceneCard({
                       className="text-[9px] h-4 px-1.5 gap-1 border-primary/40 text-primary"
                       title={
                         lang === "de"
-                          ? "Hybrid-Szene: Frame-anker zur Quellszene"
+                          ? tx({ de: "Hybrid-Szene: Frame-anker zur Quellszene", en: "Hybrid scene: Frame anchor to source scene", es: "Escena híbrida: Anclaje de fotograma a la escena de origen" })
                           : lang === "es"
                             ? "Escena híbrida: anclada por frame a la escena fuente"
                             : "Hybrid scene: frame-anchored to source"
@@ -1238,7 +1238,7 @@ export default function SceneCard({
                       onClick={() => onHybridExtend("backward")}
                       title={
                         lang === "de"
-                          ? "Prequel — was passierte vor dieser Szene?"
+                          ? tx({ de: "Prequel — was passierte vor dieser Szene?", en: "Prequel — what happened before this scene?", es: "Precuela — ¿qué pasó antes de esta escena?" })
                           : lang === "es"
                             ? "Prequel — ¿qué pasó antes de esta escena?"
                             : "Prequel — what happened before this scene?"
@@ -1279,7 +1279,7 @@ export default function SceneCard({
                         onClick={() => onHybridExtend("bridge")}
                         title={
                           lang === "de"
-                            ? "Crossfade — morphender Übergang in eine andere Szene"
+                            ? tx({ de: "Crossfade — morphender Übergang in eine andere Szene", en: "Crossfade — morphing transition to another scene", es: "Fundido cruzado — transición de morphing a otra escena" })
                             : lang === "es"
                               ? "Crossfade — transición con morphing hacia otra escena"
                               : "Crossfade — morphing transition to another scene"
@@ -1300,7 +1300,7 @@ export default function SceneCard({
                       onClick={() => onHybridExtend("style-ref")}
                       title={
                         lang === "de"
-                          ? "Style-Echo — neue Szene, gleiche Bildsprache"
+                          ? tx({ de: "Style-Echo — neue Szene, gleiche Bildsprache", en: "Style Echo — new scene, same visual language", es: "Eco de estilo — nueva escena, mismo lenguaje visual" })
                           : lang === "es"
                             ? "Style-Echo — nueva escena, mismo lenguaje visual"
                             : "Style-Echo — new scene, same visual language"
@@ -2268,7 +2268,7 @@ export default function SceneCard({
                           .filter(Boolean) as string[];
                         const n = Math.max(2, new Set(speakerLines).size);
                         return lang === "de"
-                          ? `Szene in ${n} Einzel-Szenen aufteilen?`
+                          ? tx({ de: `Szene in ${n} Einzel-Szenen aufteilen?`, en: `Split scene into ${n} individual scenes?`, es: `¿Dividir la escena en ${n} escenas individuales?` })
                           : lang === "es"
                             ? `¿Dividir la escena en ${n} subescenas?`
                             : `Split scene into ${n} sub-scenes?`;
@@ -2290,7 +2290,7 @@ export default function SceneCard({
                         const n = Math.max(2, new Set(speakerLines).size);
                         const eur = estimateHeygenCostEur(n).toFixed(2);
                         return lang === "de"
-                          ? `Pro Sprecher entsteht ein eigener HeyGen-Lip-Sync-Clip im Storyboard. Die aktuelle Szene bleibt als Wrapper bestehen. Geschätzte Kosten: €${eur}.`
+                          ? tx({ de: `Pro Sprecher entsteht ein eigener HeyGen-Lip-Sync-Clip im Storyboard. Die aktuelle Szene bleibt als Wrapper bestehen. Geschätzte Kosten: €${eur}.`, en: `For each speaker, a separate HeyGen Lip-Sync clip is created in the storyboard. The current scene remains as a wrapper. Estimated costs: €${eur}.`, es: `Por cada orador, se crea un clip de HeyGen Lip-Sync separado en el guion gráfico. La escena actual permanece como un contenedor. Costo estimado: €${eur}.` })
                           : lang === "es"
                             ? `Cada hablante recibirá su propio clip HeyGen lip-sync en el storyboard. Coste estimado: €${eur}.`
                             : `Each speaker becomes its own HeyGen lip-sync clip in the storyboard. Estimated cost: €${eur}.`;
@@ -2375,7 +2375,7 @@ export default function SceneCard({
                         </span>
                         <span className="text-[9px] opacity-80">
                           {anchor.strategy === "first-frame-composed"
-                            ? "Charakter wird in die Szenen-Komposition gerendert (Nano Banana 2)"
+                            ? tx({ de: "Charakter wird in die Szenen-Komposition gerendert (Nano Banana 2)", en: "Character is rendered into the scene composition (Nano Banana 2)", es: "El personaje se renderiza en la composición de la escena (Nano Banana 2)" })
                             : anchor.strategy === "first-frame-direct"
                               ? tx({ de: "Porträt wird als erstes Bild gesetzt — Modell startet mit Gesicht", en: "Portrait is set as the first image — the model starts with the face", es: "El retrato se establece como primera imagen — el modelo comienza con la cara" })
                               : anchor.strategy === "subject-reference"
@@ -2430,7 +2430,7 @@ export default function SceneCard({
                           ? "border-border bg-muted/30 text-muted-foreground"
                           : "border-cyan-500/40 bg-cyan-500/10 text-cyan-200"
                       }`}
-                      title="Welche World-Assets fließen als Bild-Referenz in die Szenen-Komposition (Nano Banana 2)?"
+                      title={tx({ de: "Welche World-Assets fließen als Bild-Referenz in die Szenen-Komposition (Nano Banana 2)?", en: "Which World Assets are used as image reference in the scene composition (Nano Banana 2)?", es: "¿Qué World Assets se utilizan como referencia de imagen en la composición de la escena (Nano Banana 2)?" })}
                     >
                       <div className="flex flex-col">
                         <span className="text-[10px] font-semibold">
@@ -2440,8 +2440,8 @@ export default function SceneCard({
                         </span>
                         <span className="text-[9px] opacity-80">
                           {ignored
-                            ? "Locations / Buildings / Props nur als Text — keine Bild-Referenz"
-                            : "Diese World-Assets werden in die Szenen-Komposition gerendert"}
+                            ? tx({ de: "Locations / Buildings / Props nur als Text — keine Bild-Referenz", en: "Locations / Buildings / Props only as text — no image reference", es: "Ubicaciones / Edificios / Atrezzo solo como texto — sin referencia de imagen" })
+                            : tx({ de: "Diese World-Assets werden in die Szenen-Komposition gerendert", en: "These World Assets are rendered into the scene composition", es: "Estos World Assets se renderizan en la composición de la escena" })}
                         </span>
                       </div>
                       <button
@@ -2743,7 +2743,7 @@ export default function SceneCard({
                     language={lang}
                     label={
                       lang === "de"
-                        ? "Was passiert in der Szene? (überstimmt Director)"
+                        ? tx({ de: "Was passiert in der Szene? (überstimmt Director)", en: "What happens in the scene? (overrides Director)", es: "¿Qué sucede en la escena? (anula al Director)" })
                         : lang === "es"
                           ? "¿Qué pasa en la escena? (anula al Director)"
                           : "What happens in the scene? (overrides Director)"
@@ -2812,7 +2812,7 @@ export default function SceneCard({
                         <div className="flex items-center justify-between gap-2 pl-1">
                           <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic flex-1">
                             {lang === "de"
-                              ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
+                              ? tx({ de: 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.', en: 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voiceover & Subtitles" tab.', es: 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voiceover y Subtítulos".' })
                               : lang === "es"
                                 ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
                                 : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
@@ -2838,7 +2838,7 @@ export default function SceneCard({
                                 className={`shrink-0 inline-flex items-center gap-1 text-[10px] tabular-nums ${tone} transition-colors`}
                                 title={
                                   lang === 'de'
-                                    ? 'Mimik, Gestik, Blick und Energy pro Charakter setzen'
+                                    ? tx({ de: 'Mimik, Gestik, Blick und Energy pro Charakter setzen', en: 'Set facial expressions, gestures, gaze, and energy per character', es: 'Establecer expresiones faciales, gestos, mirada y energía por personaje' })
                                     : lang === 'es'
                                       ? 'Define expresión, gesto, mirada y energía por personaje'
                                       : 'Set expression, gesture, gaze and energy per character'
@@ -3086,7 +3086,7 @@ export default function SceneCard({
                     <p className="text-[10px] text-muted-foreground/80 leading-snug">
                       {isRunway
                         ? lang === "de"
-                          ? "Runway Aleph benötigt zwingend ein Referenzvideo — ohne fällt die Szene auf Hailuo zurück."
+                          ? tx({ de: "Runway Aleph benötigt zwingend ein Referenzvideo — ohne fällt die Szene auf Hailuo zurück.", en: "Runway Aleph absolutely requires a reference video — otherwise the scene will revert to Hailuo.", es: "Runway Aleph requiere obligatoriamente un video de referencia; de lo contrario, la escena volverá a Hailuo." })
                           : lang === "es"
                             ? "Runway Aleph requiere un video de referencia — sin él, la escena recurre a Hailuo."
                             : "Runway Aleph requires a reference video — without it the scene falls back to Hailuo."
@@ -3408,7 +3408,7 @@ export default function SceneCard({
                         : "Winner applied",
                   description:
                     lang === "de"
-                      ? "Das gewählte Video wurde der Szene zugewiesen."
+                      ? tx({ de: "Das gewählte Video wurde der Szene zugewiesen.", en: "The selected video has been assigned to the scene.", es: "El video seleccionado ha sido asignado a la escena." })
                       : lang === "es"
                         ? "El vídeo seleccionado se asignó a la escena."
                         : "The selected video has been assigned to the scene.",

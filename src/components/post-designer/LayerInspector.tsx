@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -306,7 +307,7 @@ export function LayerInspector({
 
         {layer.type === "logo" && (
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Ersatztext (ohne Logo-Datei)</Label>
+            <Label className="text-xs text-muted-foreground">{tx({ de: "Ersatztext (ohne Logo-Datei)", en: "Replacement text (without logo file)", es: "Texto de reemplazo (sin archivo de logo)" })}</Label>
             <Input
               value={(layer as LogoLayer).fallbackText ?? ""}
               onChange={(e) => onChange({ fallbackText: e.target.value } as Partial<Layer>)}

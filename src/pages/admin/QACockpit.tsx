@@ -220,7 +220,7 @@ export default function QACockpit() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      toast.error("Kopieren fehlgeschlagen — bitte manuell markieren.");
+      toast.error(tx({ de: "Kopieren fehlgeschlagen — bitte manuell markieren.", en: "Copy failed — please highlight manually.", es: "Error al copiar — resalte manualmente." }));
     }
   };
 

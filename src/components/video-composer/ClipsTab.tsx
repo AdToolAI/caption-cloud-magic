@@ -154,7 +154,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       onUpdateScenes(updated);
       toast({
         title: 'Continuity aktiviert ✨',
-        description: `Szene ${scenes.findIndex(s => s.id === nextScene.id) + 1} startet jetzt nahtlos.`,
+        description: tx({ de: `Szene ${scenes.findIndex(s => s.id === nextScene.id) + 1} startet jetzt nahtlos.`, en: `Scene ${scenes.findIndex(s => s.id === nextScene.id) + 1} starts seamlessly now.`, es: `La escena ${scenes.findIndex(s => s.id === nextScene.id) + 1} comienza ahora sin interrupciones.` }),
       });
     },
     [scenes, projectId, extractLastFrame, onUpdateScenes]
@@ -293,7 +293,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         // Toast on transition generating → ready
         if (scene.clipStatus === 'generating' && dbClipStatus === 'ready') {
 
-          toast({ title: `Szene ${idx + 1} fertig ✓`, description: SCENE_TYPE_LABELS[scene.sceneType]?.de });
+          toast({ title: tx({ de: `Szene ${idx + 1} fertig ✓`, en: `Scene ${idx + 1} finished ✓`, es: `Escena ${idx + 1} terminada ✓` }), description: SCENE_TYPE_LABELS[scene.sceneType]?.de });
           if (dbScene.clip_url) {
             justReady.push({ sceneId: scene.id, clipUrl: dbScene.clip_url });
           }
@@ -353,7 +353,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).lip_sync_status === 'done'
         ) {
           toast({
-            title: `🎬 Cinematic-Sync fertig — Szene ${idx + 1}`,
+            title: tx({ de: `🎬 Cinematic-Sync fertig — Szene ${idx + 1}`, en: `🎬 Cinematic-Sync ready — Scene ${idx + 1}`, es: `🎬 Cinematic-Sync listo — Escena ${idx + 1}` }),
             description: tx({ de: 'Charakter ist jetzt in der echten Szene und lip-synct.', en: 'The character is now in the real scene and lip-synced.', es: 'El personaje ya está en la escena real y con sincronización labial.' }),
           });
         }
@@ -521,7 +521,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             } else {
               toast({
                 title: 'Lip-Sync gestartet',
-                description: 'Charakter spricht gleich wortgenau in der Szene (~30s).',
+                description: tx({ de: 'Charakter spricht gleich wortgenau in der Szene (~30s).', en: 'Character speaks verbatim in the scene (~30s).', es: 'El personaje habla palabra por palabra en la escena (~30s).' }),
               });
             }
           });
@@ -1427,7 +1427,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         size="sm"
                         variant="outline"
                         className="gap-1 text-[10px] h-7 px-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
-                        title="Diese Szene neu generieren (kostet erneut Credits)"
+                        title={tx({ de: "Diese Szene neu generieren (kostet erneut Credits)", en: "Regenerate this scene (costs credits again)", es: "Regenerar esta escena (cuesta créditos de nuevo)" })}
                         disabled={isThisGenerating}
                         onClick={() => setRerollTarget(scene)}
                       >

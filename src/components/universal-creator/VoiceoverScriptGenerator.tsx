@@ -95,7 +95,7 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
                 ? 'Tell a coherent story that matches the storyboard scenes below.'
                 : language === 'es'
                 ? 'Cuenta una historia coherente que coincida con las escenas del guion gráfico.'
-                : 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.')
+                : tx({ de: 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.', en: 'Tell a coherent story that matches the storyboard scenes.', es: 'Cuenta una historia coherente que coincida con las escenas del storyboard.' }))
             : idea,
           targetDuration,
           tone,

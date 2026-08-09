@@ -181,7 +181,7 @@ export default function MotionStudioLibrary() {
               items={filteredChars}
               onEdit={openEditChar}
               onDelete={(id) => {
-                if (confirm('Diesen Charakter wirklich löschen?')) deleteCharacter(id);
+                if (confirm(tx({ de: 'Diesen Charakter wirklich löschen?', en: 'Really delete this character?', es: '¿Realmente quieres eliminar este personaje?' }))) deleteCharacter(id);
               }}
               onCreate={openNewChar}
             />

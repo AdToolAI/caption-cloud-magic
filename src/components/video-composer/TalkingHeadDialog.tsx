@@ -131,7 +131,7 @@ export default function TalkingHeadDialog({
   const pickCastCharacter = (c: ComposerCharacter) => {
     if (!c.referenceImageUrl) {
       toast({
-        title: 'Charakter ohne Foto',
+        title: tx({ de: 'Charakter ohne Foto', en: 'Character without photo', es: 'Personaje sin foto' }),
         description: tx({ de: `"${c.name}" hat noch kein Referenzbild. Lege eines im Briefing an oder importiere ihn aus der Avatar-Bibliothek.`, en: `"${c.name}" does not have a reference image yet. Create one in the briefing or import them from the avatar library.`, es: `"${c.name}" aún no tiene una imagen de referencia. Crea una en el briefing o impórtala de la biblioteca de avatares.` }),
         variant: 'destructive',
       });
@@ -205,7 +205,7 @@ export default function TalkingHeadDialog({
     if (!canAddToBriefing) return;
     const photo = av.portrait_url || av.reference_image_url;
     if (!photo) {
-      toast({ title: 'Avatar ohne Bild', variant: 'destructive' });
+      toast({ title: tx({ de: 'Avatar ohne Bild', en: 'Avatar without image', es: 'Avatar sin imagen' }), variant: 'destructive' });
       return;
     }
     // Re-use existing cast member if already linked
@@ -571,7 +571,7 @@ export default function TalkingHeadDialog({
                 <p className="text-xs text-muted-foreground mt-1">
                   {targetSceneId === '__none__'
                     ? 'Video erscheint nur in deiner Video-History.'
-                    : 'Video wird automatisch der gewählten Szene als Clip zugewiesen.'}
+                    : tx({ de: 'Video wird automatisch der gewählten Szene als Clip zugewiesen.', en: 'Video is automatically assigned to the selected scene as a clip.', es: 'El video se asigna automáticamente a la escena seleccionada como un clip.' })}
                 </p>
               </div>
             )}
@@ -808,7 +808,7 @@ function DialogModeTab({
   return (
     <div className="space-y-4">
       <Card className="p-3 bg-primary/5 border-primary/30">
-        <div className="text-sm font-medium mb-1">Drehbuch-Modus für Multi-Speaker-Szenen</div>
+        <div className="text-sm font-medium mb-1">{tx({ de: "Drehbuch-Modus für Multi-Speaker-Szenen", en: "Script mode for multi-speaker scenes", es: "Modo guion para escenas con varios oradores" })}</div>
         <p className="text-xs text-muted-foreground">
           Schreibe einen Dialog wie ein Drehbuch — pro Sprecher entsteht ein
           eigener Talking-Head-Clip. Im Director's Cut werden sie als
@@ -833,7 +833,7 @@ function DialogModeTab({
 
       {speakers.length > 0 && (
         <div className="space-y-2">
-          <Label>Stimme pro Sprecher</Label>
+          <Label>{tx({ de: "Stimme pro Sprecher", en: "Voice per speaker", es: "Voz por orador" })}</Label>
           <div className="space-y-2">
             {speakers.map((sp) => (
               <div key={sp.id} className="flex items-center gap-3 p-2 rounded-md border border-border/40 bg-muted/20">
@@ -844,7 +844,7 @@ function DialogModeTab({
                   onValueChange={(v) => setVoicePerSpeaker((prev) => ({ ...prev, [sp.id]: v }))}
                 >
                   <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Stimme wählen" />
+                    <SelectValue placeholder={tx({ de: "Stimme wählen", en: "Select voice", es: "Seleccionar voz" })} />
                   </SelectTrigger>
                   <SelectContent>
                     {voices.map((v) => (

@@ -972,10 +972,10 @@ export function useApplyProductionPlan() {
     const persistedNewRows = (verifyRows ?? []).filter((r: any) => newIds.has(String(r.id)));
     const warnings: string[] = [];
     if (persistedNewRows.length !== newScenes.length) {
-      throw new Error(`Plan nur teilweise gespeichert: ${persistedNewRows.length}/${newScenes.length} Szenen in der Datenbank gefunden.`);
+      throw new Error(tx({ de: `Plan nur teilweise gespeichert: ${persistedNewRows.length}/${newScenes.length} Szenen in der Datenbank gefunden.`, en: `Plan only partially saved: ${persistedNewRows.length}/${newScenes.length} scenes found in database.`, es: `Plan solo guardado parcialmente: ${persistedNewRows.length}/${newScenes.length} escenas encontradas en la base de datos.` }));
     }
     const fallbackRows = persistedNewRows.filter((r: any) => /Establishing shot: A relevant setting|Reveal beat for the brand|CTA beat for the brand/i.test(String(r.ai_prompt ?? '')));
-    if (fallbackRows.length > 0) warnings.push(`${fallbackRows.length} Szene(n) enthalten noch Fallback-Prompts.`);
+    if (fallbackRows.length > 0) warnings.push(tx({ de: `${fallbackRows.length} Szene(n) enthalten noch Fallback-Prompts.`, en: `${fallbackRows.length} scene(s) still contain fallback prompts.`, es: `${fallbackRows.length} escena(s) aún contienen prompts de respaldo.` }));
     // v225 — Voice-IDs werden bewusst leer gelassen und im Dialog-Studio
     // manuell zugewiesen. Kein „ohne Voice-ID"-Blocker mehr auf Plan-Apply.
 

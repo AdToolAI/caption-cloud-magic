@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect } from "react";
 
 /**
@@ -18,7 +19,7 @@ export default function TikTokOAuthCallback() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background text-foreground">
       <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      <p className="text-sm text-muted-foreground">TikTok-Verbindung wird abgeschlossen…</p>
+      <p className="text-sm text-muted-foreground">{tx({ de: "TikTok-Verbindung wird abgeschlossen…", en: "TikTok connection is being finalized…", es: "Se está finalizando la conexión con TikTok…" })}</p>
     </div>
   );
 }

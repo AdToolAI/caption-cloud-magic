@@ -257,7 +257,7 @@ const Pricing = () => {
                   <Check className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
                   <span>
                     {language === "de"
-                      ? "Deine Charaktere, Stimmen und Projekte bleiben erhalten."
+                      ? tx({ de: "Deine Charaktere, Stimmen und Projekte bleiben erhalten.", en: "Your characters, voices, and projects will be retained.", es: "Tus personajes, voces y proyectos se conservarán." })
                       : language === "es"
                       ? "Tus personajes, voces y proyectos se conservan."
                       : "Your characters, voices and projects stay."}

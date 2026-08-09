@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -171,7 +172,7 @@ export function AIColorGrading({
                 ) : (
                   <>
                     <Upload className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Bild hochladen</span>
+                    <span className="text-xs text-muted-foreground">{tx({ de: "Bild hochladen", en: "Upload image", es: "Subir imagen" })}</span>
                   </>
                 )}
               </label>

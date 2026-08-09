@@ -407,7 +407,7 @@ export function ImageGenerator() {
             const key = imageId || imgUrl;
             setCiScores(prev => ({ ...prev, [key]: score }));
             if (score < 60) {
-              toast.warning(`CI-Match nur ${score}% — Bild weicht vom Markenstil ab`);
+              toast.warning(tx({ de: `CI-Match nur ${score}% — Bild weicht vom Markenstil ab`, en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }));
             }
           })
           .catch(() => { /* silent */ });
@@ -647,7 +647,7 @@ export function ImageGenerator() {
               <div className="flex items-center justify-between">
                 <Label className="text-xs flex items-center gap-1.5">
                   {mode === 'transform' ? (
-                    <><ImageIcon className="h-3.5 w-3.5 text-primary" /> Vorlage-Bild (wird verwandelt)</>
+                    <><ImageIcon className="h-3.5 w-3.5 text-primary" /> {tx({ de: "Vorlage-Bild (wird verwandelt)", en: "Template image (will be transformed)", es: "Imagen de plantilla (se transformará)" })}</>
                   ) : (
                     <><Palette className="h-3.5 w-3.5 text-primary" /> Stil-Referenz (Farben/Mood)</>
                   )}

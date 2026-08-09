@@ -1011,7 +1011,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <ImagePlus className="h-6 w-6 text-muted-foreground" />
               )}
               <span className="text-xs text-muted-foreground">
-                {language === 'de' ? 'Bild hochladen für Image-to-Video' : 'Upload an image for Image-to-Video'}
+                {language === 'de' ? tx({ de: 'Bild hochladen für Image-to-Video', en: 'Upload image for Image-to-Video', es: 'Subir imagen para Imagen a Video' }) : 'Upload an image for Image-to-Video'}
               </span>
               <input
                 id="toolkit-image-upload"
@@ -1034,14 +1034,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   {
                     key: 'start' as const,
                     label: language === 'de' ? 'Am Anfang' : 'At start',
-                    hint: language === 'de' ? 'Bild ist der erste Frame' : 'Image is the first frame',
+                    hint: language === 'de' ? tx({ de: 'Bild ist der erste Frame', en: 'Image is the first frame', es: 'La imagen es el primer fotograma' }) : 'Image is the first frame',
                     supportedByCurrent: true,
                   },
                   {
                     key: 'end' as const,
                     label: language === 'de' ? 'Am Ende' : 'At end',
                     hint: model.capabilities.endFrame
-                      ? (language === 'de' ? 'Kamera fährt zum Bild hin' : 'Camera transitions to image')
+                      ? (language === 'de' ? tx({ de: 'Kamera fährt zum Bild hin', en: 'Camera moves to the image', es: 'La cámara se mueve a la imagen' }) : 'Camera transitions to image')
                       : (language === 'de' ? 'Nur mit Luma Ray 2 möglich' : 'Only available with Luma Ray 2'),
                     supportedByCurrent: !!model.capabilities.endFrame,
                   },
@@ -1315,7 +1315,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             const used = new Set(omniLines.map((r) => r.characterId));
             const next = libCharacters.find((c) => !used.has(c.id));
             if (!next) {
-              toast.info(language === 'de' ? 'Kein weiterer Charakter in Cast & World verfügbar.' : 'No further character available in Cast & World.');
+              toast.info(language === 'de' ? tx({ de: 'Kein weiterer Charakter in Cast & World verfügbar.', en: 'No other character available in Cast & World.', es: 'No hay otro personaje disponible en Cast & World.' }) : 'No further character available in Cast & World.');
               return;
             }
             const defaults: OmniVoicePreset[] = ['female-warm', 'male-warm', 'female-bright', 'male-deep'];
@@ -1532,14 +1532,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   onClick={addRow}
                   disabled={libCharacters.length <= omniLines.length}
                 >
-                  + {language === 'de' ? 'Charakter hinzufügen' : 'Add character'}
+                  + {language === 'de' ? tx({ de: 'Charakter hinzufügen', en: 'Add character', es: 'Añadir personaje' }) : 'Add character'}
                 </Button>
               )}
 
               {omniLines.length > 0 && (
                 <p className="text-[11px] leading-snug text-muted-foreground">
                   {language === 'de'
-                    ? `${omniLines.length} Charakter(e) im Anchor · ${withDialog}/${LIP_SYNC_MAX} mit Dialog · ${silent} stumme(r) Statist(en).`
+                    ? tx({ de: `${omniLines.length} Charakter(e) im Anchor · ${withDialog}/${LIP_SYNC_MAX} mit Dialog · ${silent} stumme(r) Statist(en).`, en: `${omniLines.length} character(s) in Anchor · ${withDialog}/${LIP_SYNC_MAX} with dialog · ${silent} silent extra(s).`, es: `${omniLines.length} personaje(s) en Ancla · ${withDialog}/${LIP_SYNC_MAX} con diálogo · ${silent} extra(s) mudo(s).` })
                     : `${omniLines.length} character(s) in anchor · ${withDialog}/${LIP_SYNC_MAX} with dialogue · ${silent} silent extra(s).`}
                 </p>
               )}
@@ -1612,7 +1612,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <AlertDialogTitle>
               {pendingPlacement?.placement === 'end'
                 ? (language === 'de' ? 'Endframe nur mit Luma Ray 2' : 'End-frame only with Luma Ray 2')
-                : (language === 'de' ? 'Anker-Modus benötigt Vidu Q2 oder Kling 3' : 'Anchor mode needs Vidu Q2 or Kling 3')}
+                : (language === 'de' ? tx({ de: 'Anker-Modus benötigt Vidu Q2 oder Kling 3', en: 'Anchor mode requires Vidu Q2 or Kling 3', es: 'El modo Ancla requiere Vidu Q2 o Kling 3' }) : 'Anchor mode needs Vidu Q2 or Kling 3')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingPlacement?.placement === 'end'
@@ -1680,7 +1680,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       {/* Discreet hint about alternative models */}
       <p className="text-center text-[11px] text-muted-foreground">
         {tx({
-          de: `${AI_VIDEO_TOOLKIT_MODELS.length} Modelle verfügbar — wechsle oben das Modell, dein Prompt bleibt erhalten.`,
+          de: tx({ de: `${AI_VIDEO_TOOLKIT_MODELS.length} Modelle verfügbar — wechsle oben das Modell, dein Prompt bleibt erhalten.`, en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch model above, your prompt will be kept.`, es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se mantendrá.` }),
           en: `${AI_VIDEO_TOOLKIT_MODELS.length} models available — switch the model above, your prompt is preserved.`,
           es: `${AI_VIDEO_TOOLKIT_MODELS.length} modelos disponibles — cambia el modelo arriba, tu prompt se conserva.`,
         })}

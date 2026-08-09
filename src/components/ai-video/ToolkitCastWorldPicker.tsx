@@ -212,7 +212,7 @@ export function ToolkitCastWorldPicker({
                 onPick={(c) => addChar(c.id)}
                 language={language}
                 emptyLabel={t('Noch keine Charaktere.', 'No characters yet.', 'Aún no hay personajes.')}
-                triggerLabel={t('Charakter hinzufügen', 'Add character', 'Añadir personaje')}
+                triggerLabel={t(tx({ de: 'Charakter hinzufügen', en: 'Add character', es: 'Añadir personaje' }), 'Add character', 'Añadir personaje')}
               />
             )}
           </div>
@@ -310,7 +310,7 @@ export function ToolkitCastWorldPicker({
           <div className="flex-1 text-[11px] leading-relaxed text-muted-foreground">
             {supportsImageInput
               ? t(
-                  `Charakter- & World-Referenzen werden automatisch in den Startframe komponiert (${info.mode}).`,
+                  tx({ de: `Charakter- & World-Referenzen werden automatisch in den Startframe komponiert (${info.mode}).`, en: `Character & World references are automatically composed into the start frame (${info.mode}).`, es: `Las referencias de Personaje y Mundo se componen automáticamente en el fotograma inicial (${info.mode}).` }),
                   `Character & world references are composed into the first frame automatically (${info.mode}).`,
                   `Referencias de personaje y mundo se componen automáticamente en el fotograma inicial (${info.mode}).`,
                 )

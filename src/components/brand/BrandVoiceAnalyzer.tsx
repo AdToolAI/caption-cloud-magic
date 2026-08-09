@@ -64,7 +64,7 @@ export function BrandVoiceAnalyzer({ brandKitId, existingVoice, onAnalysisComple
 
       toast({
         title: "Brand Voice analysiert! 🎉",
-        description: "Deine Marken-Stimme wurde erfolgreich erfasst",
+        description: tx({ de: "Deine Marken-Stimme wurde erfolgreich erfasst", en: "Your brand voice has been successfully captured", es: "Tu voz de marca ha sido capturada con éxito" }),
         duration: 5000
       });
 

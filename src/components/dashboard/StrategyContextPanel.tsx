@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Sparkles, Lightbulb, TrendingUp, Brain, Target, Clock, Flame } from "lucide-react";
 import { format } from "date-fns";
@@ -47,7 +48,7 @@ const DEFAULT_TIPS_BY_PLATFORM: Record<string, string[]> = {
     "Native Video > YouTube-Link",
   ],
   facebook: [
-    "Bilder > Links für Reichweite",
+    tx({ de: "Bilder > Links für Reichweite", en: "Images > Links for reach", es: "Imágenes > Enlaces para alcance" }),
     "Frage in der Caption für Engagement",
     "Posts mit 80–120 Zeichen performen am besten",
   ],

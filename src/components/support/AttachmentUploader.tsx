@@ -65,7 +65,7 @@ const STRINGS = {
     dropMeta: (max: number, mb: number) => `Bilder, Videos (MP4/MOV/WebM), PDF · max ${max} Dateien · bis ${mb} MB`,
     choose: "Dateien wählen",
     max: "Maximum erreicht",
-    maxDesc: (n: number) => `Du kannst maximal ${n} Dateien pro Ticket hochladen.`,
+    maxDesc: (n: number) => tx({ de: `Du kannst maximal ${n} Dateien pro Ticket hochladen.`, en: `You can upload a maximum of ${n} files per ticket.`, es: `Puedes subir un máximo de ${n} archivos por ticket.` }),
     tooLarge: "Datei zu groß",
     tooLargeDesc: (name: string, mb: number) => `${name} überschreitet ${mb} MB.`,
     unsupported: "Dateityp nicht unterstützt",

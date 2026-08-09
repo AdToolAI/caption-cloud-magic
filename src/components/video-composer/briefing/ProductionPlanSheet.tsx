@@ -914,7 +914,7 @@ export default function ProductionPlanSheet({
       toast({
         title: 'Location angelegt',
         description: matched > 1
-          ? `„${created.name}" — für ${matched} Szenen übernommen.`
+          ? tx({ de: `„${created.name}" — für ${matched} Szenen übernommen.`, en: `"${created.name}" — adopted for ${matched} scenes.`, es: `"${created.name}" — adoptado para ${matched} escenas.` })
           : tx({ de: `„${created.name}" ist jetzt in der Library.`, en: `"${created.name}" is now in the library.`, es: `"${created.name}" ahora está en la biblioteca.` }),
       });
     } catch (e: any) {
@@ -1112,7 +1112,7 @@ export default function ProductionPlanSheet({
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={`Füge dein komplettes Briefing ein.\nAuch lang ok — Tabellen, VO-Skript, Voice-Settings, Captions, Negative Prompt.\nDie KI extrahiert deterministisch alle Felder.`}
+              placeholder={tx({ de: `Füge dein komplettes Briefing ein.\\nAuch lang ok — Tabellen, VO-Skript, Voice-Settings, Captions, Negative Prompt.\\nDie KI extrahiert deterministisch alle Felder.`, en: `Paste your complete briefing.\\nLong is also fine — tables, VO script, voice settings, captions, negative prompt.\\nAI deterministically extracts all fields.`, es: `Pega tu briefing completo.\\nTambién está bien si es largo — tablas, guion de VO, ajustes de voz, subtítulos, prompt negativo.\\nLa IA extrae todos los campos de forma determinista.` })}
               className="flex-1 min-h-[320px] font-mono text-xs"
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -1236,7 +1236,7 @@ export default function ProductionPlanSheet({
                         <Badge
                           variant="outline"
                           className={`text-[10px] ${s.voiceover?.text ? 'border-emerald-400/40 text-emerald-300' : 'border-amber-400/40 text-amber-300'}`}
-                          title={s.voiceover?.text ? s.voiceover.text : 'Kein Skript im Plan — Szene würde ohne Voiceover/Lip-Sync rendern.'}
+                          title={s.voiceover?.text ? s.voiceover.text : tx({ de: 'Kein Skript im Plan — Szene würde ohne Voiceover/Lip-Sync rendern.', en: 'No script in the plan — scene would render without voiceover/lip-sync.', es: 'No hay guion en el plan — la escena se renderizaría sin voz en off/sincronización labial.' })}
                         >
                           {s.voiceover?.text ? '✓ Skript' : '— Skript'}
                         </Badge>
@@ -1433,7 +1433,7 @@ export default function ProductionPlanSheet({
                                     onValueChange={(v) => updateDialogTurnSpeaker(s.index, i, v === '__none__' ? null : v)}
                                   >
                                     <SelectTrigger className="h-7 min-w-[150px] max-w-[220px] text-[11px] font-sans">
-                                      <SelectValue placeholder="Sprecher wählen…" />
+                                      <SelectValue placeholder={tx({ de: "Sprecher wählen…", en: "Choose speaker…", es: "Elegir orador…" })} />
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="__none__">— Sprecher zuordnen —</SelectItem>
@@ -1581,7 +1581,7 @@ export default function ProductionPlanSheet({
                                   onValueChange={(v) => updateSceneCastChar(s.index, i, v === '__none__' ? null : v)}
                                 >
                                   <SelectTrigger className="h-7 text-xs flex-1 min-w-[140px]">
-                                    <SelectValue placeholder="Charakter wählen…" />
+                                    <SelectValue placeholder={tx({ de: "Charakter wählen…", en: "Choose character…", es: "Elegir personaje…" })} />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="__none__">— nicht zugeordnet —</SelectItem>

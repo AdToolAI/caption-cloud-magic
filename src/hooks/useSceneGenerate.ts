@@ -223,7 +223,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         }
         toast({
           title: 'Generierung gestartet',
-          description: `Szene ${(workingScene.orderIndex ?? 0) + 1} wird gebaut…`,
+          description: tx({ de: `Szene ${(workingScene.orderIndex ?? 0) + 1} wird gebaut…`, en: `Building scene ${(workingScene.orderIndex ?? 0) + 1}…`, es: `Construyendo escena ${(workingScene.orderIndex ?? 0) + 1}…` }),
         });
         // Intentionally do NOT emit clips:end on success — the server only
         // STARTED generation. Real `clipStatus === 'generating'` keeps the

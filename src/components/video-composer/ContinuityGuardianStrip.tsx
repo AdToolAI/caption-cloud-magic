@@ -198,7 +198,7 @@ export default function ContinuityGuardianStrip({
 
   const checkAll = async () => {
     if (pairs.length === 0) {
-      toast.info('Keine geeigneten Szenen-Paare zum Prüfen');
+      toast.info(tx({ de: 'Keine geeigneten Szenen-Paare zum Prüfen', en: 'No suitable scene pairs to check', es: 'No hay pares de escenas adecuados para comprobar' }));
       return;
     }
     setBulkRunning(true);

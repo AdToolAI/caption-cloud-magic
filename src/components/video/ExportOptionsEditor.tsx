@@ -22,7 +22,7 @@ interface ExportOptionsEditorProps {
 }
 
 const aspectRatioInfo = {
-  '16:9': { icon: Monitor, label: 'YouTube, Desktop', description: 'Standard für YouTube und Desktop' },
+  '16:9': { icon: Monitor, label: 'YouTube, Desktop', description: tx({ de: 'Standard für YouTube und Desktop', en: 'Standard for YouTube and desktop', es: 'Estándar para YouTube y escritorio' }) },
   '9:16': { icon: Smartphone, label: 'TikTok, Stories', description: 'Vertikal für Mobile' },
   '1:1': { icon: Instagram, label: 'Instagram Feed', description: 'Quadratisch für Instagram' },
   '4:5': { icon: Film, label: 'Instagram Portrait', description: 'Portrait für Instagram Feed' },

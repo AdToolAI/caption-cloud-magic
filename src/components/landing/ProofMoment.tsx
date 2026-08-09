@@ -28,7 +28,7 @@ const COPY = {
     resultLabel: "Das Ergebnis",
     steps: ["Skript & Cast", "Stimmen", "Lip-Sync", "Fertiger Clip"],
     meta: "8s · Deutsch · 4 Sprecher · Lip-Sync",
-    note: "Skript, Stimme, Kamera, Schnitt, Lip-Sync — sonst ein Team und mehrere Tage.",
+    note: tx({ de: "Skript, Stimme, Kamera, Schnitt, Lip-Sync — sonst ein Team und mehrere Tage.", en: "Script, voice, camera, editing, lip-sync — otherwise a team and several days.", es: "Guion, voz, cámara, edición, sincronización labial — de lo contrario, un equipo y varios días." }),
     cta: "Mit diesem Briefing starten",
     sound: "Ton",
     honest: tx({ de: "Echter Clip aus diesem Studio — kein Rendering im Browser.", en: "Real clip from this Studio — no rendering in the browser.", es: "Clip real de este Studio, sin renderizado en el navegador." }),

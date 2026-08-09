@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Headphones, Upload, Wand2, Mic, Music, Music2, Volume2, AudioLines, Sparkles, FileAudio, Play, Pause, Library, Film, Layers, MessageCircle, FileText, BookOpen } from 'lucide-react';
@@ -310,7 +311,7 @@ export default function AudioStudio() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
-                      <h3 className="text-lg font-bold">Eigene Stimme erstellen</h3>
+                      <h3 className="text-lg font-bold">{tx({ de: "Eigene Stimme erstellen", en: "Create your own voice", es: "Crea tu propia voz" })}</h3>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">Voice Studio</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -380,7 +381,7 @@ export default function AudioStudio() {
                   </motion.div>
 
                   <h3 className="text-2xl font-semibold mb-2">
-                    {isDragActive ? 'Datei hier ablegen' : 'Audio oder Video hochladen'}
+                    {isDragActive ? tx({ de: 'Datei hier ablegen', en: 'Drop file here', es: 'Arrastra el archivo aquí' }) : tx({ de: 'Audio oder Video hochladen', en: 'Upload audio or video', es: 'Subir audio o video' })}
                   </h3>
                   <p className="text-muted-foreground mb-6">
                     MP3, WAV, M4A, MP4, MOV • Max. 500MB

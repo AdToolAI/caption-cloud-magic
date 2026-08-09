@@ -320,7 +320,7 @@ function ToolsPanel() {
     { name: 'Video Composer', desc: 'Mehrszenige AI-Videos mit konsistenten Charakteren', status: 'verfügbar' },
     { name: 'Picture Studio', desc: 'AI-Bilder, Magic Edit, Style-Reference, Brand-Kit', status: 'verfügbar' },
     { name: 'Music Studio', desc: 'Hintergrundmusik via Stable Audio + MiniMax', status: 'verfügbar' },
-    { name: 'Talking Head Avatare', desc: 'Lippensynchrone Avatar-Videos mit Stimme', status: 'verfügbar' },
+    { name: 'Talking Head Avatare', desc: tx({ de: 'Lippensynchrone Avatar-Videos mit Stimme', en: 'Lip-sync avatar videos with voice', es: 'Vídeos de avatares con sincronización labial y voz' }), status: 'verfügbar' },
     { name: 'Trend Radar', desc: 'Lokalisierte Trends, alle 5 Stunden aktualisiert', status: 'live' },
     { name: 'Posting Berater', desc: 'Optimale Veröffentlichungszeiten pro Plattform/Sprache', status: 'verfügbar' },
     { name: 'KI-QA-Gate', desc: 'Vision-Check auf Brand-CI, Copyright, Deepfakes', status: 'aktiv' },

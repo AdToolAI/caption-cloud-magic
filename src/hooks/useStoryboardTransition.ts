@@ -1308,7 +1308,7 @@ export function useStoryboardTransition({
       }
       const issues = parsed.error.issues.slice(0, 2)
         .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`).join(' · ');
-      return { plan: null, dropped, error: `Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}` };
+      return { plan: null, dropped, error: tx({ de: `Plan-Validierung fehlgeschlagen — ${issues || 'unbekannter Fehler'}`, en: `Plan validation failed — ${issues || 'unknown error'}`, es: `Error en la validación del plan — ${issues || 'error desconocido'}` }) };
     };
 
     try {
@@ -1614,7 +1614,7 @@ export function useStoryboardTransition({
                     ? tx({ de: '✨ Vollständiger Plan nachgeladen — bitte erneut anwenden', en: '✨ Full plan reloaded — please apply again', es: '✨ Plan completo recargado — por favor, aplica de nuevo' })
                     : '✨ Vollständiger Plan nachgeladen',
                   description: sheetWasClosed
-                    ? 'Dein Briefing wurde im Hintergrund analysiert. Klicke „Plan anwenden", um Fallback-Szenen zu ersetzen.'
+                    ? tx({ de: 'Dein Briefing wurde im Hintergrund analysiert. Klicke „Plan anwenden", um Fallback-Szenen zu ersetzen.', en: 'Your briefing has been analyzed in the background. Click "Apply Plan" to replace fallback scenes.', es: 'Tu briefing ha sido analizado en segundo plano. Haz clic en "Aplicar plan" para reemplazar las escenas de respaldo.' })
                     : tx({ de: 'Der AI-generierte Plan ist jetzt verfügbar.', en: 'The AI-generated plan is now available.', es: 'El plan generado por IA ya está disponible.' }),
                 });
                 return { ...s, planSheetOpen: true, initialPlan: latePlan, activeProjectId };

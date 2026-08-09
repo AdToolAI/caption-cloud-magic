@@ -77,7 +77,7 @@ const LANGUAGES = [
 const TREATMENT_PHASES = [
   'Briefing wird gelesen …',
   'Konzept und Dramaturgie …',
-  'Szenen werden gebaut …',
+  tx({ de: 'Szenen werden gebaut …', en: 'Building scenes…', es: 'Creando escenas…' }),
   'Dialoge und Besetzung …',
   'Letzter Feinschliff …',
 ];
@@ -751,7 +751,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             </Button>
           </div>
 
-          {starting && <StageProgressBar label="Produktion wird gestartet …" />}
+          {starting && <StageProgressBar label={tx({ de: "Produktion wird gestartet …", en: "Starting production…", es: "Iniciando producción…" })} />}
 
         </Card>
       )}

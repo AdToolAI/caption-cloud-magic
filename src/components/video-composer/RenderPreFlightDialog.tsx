@@ -67,7 +67,7 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
       severity: 'blocker',
       icon: <XCircle className="h-3.5 w-3.5" />,
       title: 'Keine Szenen vorhanden',
-      detail: 'Füge mindestens eine Szene hinzu, bevor du renderst.',
+      detail: tx({ de: 'Füge mindestens eine Szene hinzu, bevor du renderst.', en: 'Add at least one scene before rendering.', es: 'Añade al menos una escena antes de renderizar.' }),
     });
     return out;
   }
@@ -90,7 +90,7 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
         sceneIndex: idx,
         icon: <TypeIcon className="h-3.5 w-3.5" />,
         title: `Szene ${idx}: Leer`,
-        detail: 'Weder Prompt noch Bild/Clip vorhanden — Render würde scheitern.',
+        detail: tx({ de: 'Weder Prompt noch Bild/Clip vorhanden — Render würde scheitern.', en: 'Neither prompt nor image/clip available — Render would fail.', es: 'Ni prompt ni imagen/clip disponibles — El render fallaría.' }),
       });
     }
 
@@ -113,8 +113,8 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
         severity: 'warning',
         sceneIndex: idx,
         icon: <AlertTriangle className="h-3.5 w-3.5" />,
-        title: `Szene ${idx}: Letzter Versuch fehlgeschlagen`,
-        detail: 'Diese Szene wird neu generiert. Prüfe Prompt / Modell-Wahl.',
+        title: tx({ de: `Szene ${idx}: Letzter Versuch fehlgeschlagen`, en: `Scene ${idx}: Last attempt failed`, es: `Escena ${idx}: Último intento fallido` }),
+        detail: tx({ de: 'Diese Szene wird neu generiert. Prüfe Prompt / Modell-Wahl.', en: 'This scene is being regenerated. Check prompt / model choice.', es: 'Esta escena se está regenerando. Comprueba el prompt / la elección del modelo.' }),
       });
     }
 

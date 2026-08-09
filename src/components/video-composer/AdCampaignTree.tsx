@@ -213,7 +213,7 @@ export default function AdCampaignTree({
 
       toast({
         title: 'Voiceover erstellt',
-        description: `Neue VO (${voiceCfg.voiceLabel}) für „${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`,
+        description: tx({ de: `Neue VO (${voiceCfg.voiceLabel}) für „${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`, en: `New VO (${voiceCfg.voiceLabel}) for "${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`, es: `Nueva VO (${voiceCfg.voiceLabel}) para "${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".` }),
       });
     } catch (err: any) {
       console.error('[AdCampaignTree] re-synth VO failed:', err);

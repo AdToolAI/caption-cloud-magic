@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo, useState } from 'react';
 import { Sparkles, Check, Eye, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -79,7 +80,7 @@ export default function CinematicStylePresets({ value, onApply, compact = false,
                   )}
                   title={m === 'identity'
                     ? (lang === 'de' ? 'Eigene Szene pro Look' : lang === 'es' ? 'Escena propia por look' : 'Distinct scene per look')
-                    : (lang === 'de' ? 'Gleiche Szene, alle Looks' : lang === 'es' ? 'Misma escena, todos los looks' : 'Same scene, all looks')}
+                    : (lang === 'de' ? tx({ de: 'Gleiche Szene, alle Looks', en: 'Same scene, all looks', es: 'Misma escena, todos los looks' }) : lang === 'es' ? 'Misma escena, todos los looks' : 'Same scene, all looks')}
                 >
                   <Icon className="h-2.5 w-2.5" />
                   <span>{modeLabels[m][lang]}</span>

@@ -55,7 +55,7 @@ export default function CastingVibeGrid({ character, onPrimaryChanged }: Casting
 
   const handleGenerate = useCallback(async () => {
     if (!character.description?.trim()) {
-      toast.error('Charakter braucht eine Beschreibung');
+      toast.error(tx({ de: 'Charakter braucht eine Beschreibung', en: 'Character needs a description', es: 'El personaje necesita una descripción' }));
       return;
     }
     setGenerating(true);

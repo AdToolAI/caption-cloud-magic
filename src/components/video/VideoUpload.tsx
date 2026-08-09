@@ -28,7 +28,7 @@ export function VideoUpload({
     if (!file || disabled) return;
 
     if (!file.type.startsWith('video/')) {
-      toast.error('Bitte nur Videodateien hochladen');
+      toast.error(tx({ de: 'Bitte nur Videodateien hochladen', en: 'Please upload video files only', es: 'Por favor, sube solo archivos de video' }));
       return;
     }
 

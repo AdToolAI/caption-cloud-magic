@@ -390,7 +390,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
               variant="secondary"
               onClick={() => setShowQuickPreview(true)}
               disabled={!script || loading}
-              title={mediaUrls.length === 0 ? "⚠️ Keine Medien - Vorschau zeigt nur Text/Audio" : "Schnelle kostenlose Vorschau deines Videos"}
+              title={mediaUrls.length === 0 ? tx({ de: "⚠️ Keine Medien - Vorschau zeigt nur Text/Audio", en: "⚠️ No media - preview shows text/audio only", es: "⚠️ Sin medios - la vista previa solo muestra texto/audio" }) : "Schnelle kostenlose Vorschau deines Videos"}
             >
               <Eye className="mr-2 h-4 w-4" />
               Schnelle Vorschau
