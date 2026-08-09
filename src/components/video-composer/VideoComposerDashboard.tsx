@@ -716,9 +716,9 @@ export default function VideoComposerDashboard() {
         if (cancelErr) throw cancelErr;
         const n = (data as any)?.canceled_scenes ?? 0;
         toast({
-          title: t('videoComposer.resetSuccessTitle') || 'Projekt zurückgesetzt',
+          title: t('videoComposer.resetSuccessTitle') || tx({ de: 'Projekt zurückgesetzt', en: 'Project reset', es: 'Proyecto reiniciado' }),
           description: n > 0
-            ? `${n} laufende Jobs gestoppt.`
+            ? tx({ de: `${n} laufende Jobs gestoppt.`, en: `${n} ongoing jobs stopped.`, es: `${n} trabajos en curso detenidos.` })
             : tx({ de: 'Keine laufenden Jobs.', en: 'No ongoing jobs.', es: 'No hay trabajos en curso.' }),
         });
       } catch (e) {

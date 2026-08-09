@@ -339,7 +339,7 @@ export function AITransitions({
 
         {/* Transition Types Grid - 2026 Design */}
         <div className="space-y-2">
-          <label className="text-xs font-medium">Übergangstypen wählen</label>
+          <label className="text-xs font-medium">{tx({ de: "Übergangstypen wählen", en: "Choose transition types", es: "Elegir tipos de transición" })}</label>
           <div className="grid grid-cols-3 gap-2">
             {TRANSITION_TYPES.map((transition) => {
               const isSelected = selectedTransition === transition.id;

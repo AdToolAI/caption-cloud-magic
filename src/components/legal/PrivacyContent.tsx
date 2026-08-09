@@ -68,7 +68,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
           </ul>
         </LegalSection>
 
-        <LegalSection title="4. Zweck der Datenverarbeitung" icon="shield" index={3}>
+        <LegalSection title={tx({ de: "4. Zweck der Datenverarbeitung", en: "4. Purpose of data processing", es: "4. Finalidad del tratamiento de datos" })} icon="shield" index={3}>
           <ul className="list-disc list-inside space-y-2">
             <li><strong className="text-foreground">Service-Bereitstellung:</strong> Caption-Generierung, Analytics, Scheduling</li>
             <li><strong className="text-foreground">Personalisierung:</strong> {tx({ de: "Empfehlungen basierend auf Ihrer Nutzung", en: "Recommendations based on your usage", es: "Recomendaciones basadas en su uso" })}</li>
@@ -186,7 +186,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
           <p>{tx({ de: "Unser Service richtet sich nicht an Personen unter 16 Jahren. Sollten wir feststellen, dass ein Minderjähriger ohne elterliche Zustimmung ein Konto erstellt hat, löschen wir dieses unverzüglich.", en: "Our service is not intended for persons under 16 years of age. Should we discover that a minor has created an account without parental consent, we will delete it immediately.", es: "Nuestro servicio no está dirigido a personas menores de 16 años. Si descubrimos que un menor ha creado una cuenta sin el consentimiento de sus padres, la eliminaremos de inmediato." })}</p>
         </LegalSection>
 
-        <LegalSection title="12. Änderungen der Datenschutzerklärung" icon="alert" index={11}>
+        <LegalSection title={tx({ de: "12. Änderungen der Datenschutzerklärung", en: "12. Changes to the privacy policy", es: "12. Cambios en la política de privacidad" })} icon="alert" index={11}>
           <p>{tx({ de: "Wir behalten uns vor, diese Datenschutzerklärung anzupassen. Wesentliche Änderungen werden Ihnen per E-Mail mitgeteilt.", en: "We reserve the right to amend this privacy policy. Significant changes will be communicated to you via email.", es: "Nos reservamos el derecho de modificar esta política de privacidad. Los cambios significativos se le comunicarán por correo electrónico." })}</p>
         </LegalSection>
 

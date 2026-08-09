@@ -37,7 +37,7 @@ export function useFrameContinuity() {
         // Auth: brauchen wir für den RLS-konformen Pfad
         const { data: authData, error: authErr } = await supabase.auth.getUser();
         if (authErr || !authData.user) {
-          throw new Error('Nicht eingeloggt');
+          throw new Error(tx({ de: 'Nicht eingeloggt', en: 'Not logged in', es: 'No has iniciado sesión' }));
         }
         const userId = authData.user.id;
 

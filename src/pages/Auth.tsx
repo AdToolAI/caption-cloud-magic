@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -321,7 +322,7 @@ const Auth = () => {
                   className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70"
                 >
                   <Shield className="h-3.5 w-3.5" />
-                  <span>Geschützt durch 2-Faktor-Authentifizierung</span>
+                  <span>{tx({ de: "Geschützt durch 2-Faktor-Authentifizierung", en: "Protected by two-factor authentication", es: "Protegido por autenticación de dos factores" })}</span>
                 </motion.div>
 
                 {/* Toggle Login/Signup */}

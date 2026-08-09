@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -67,18 +68,18 @@ export function PlannerToolbar({
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" onClick={onApplyRecommendations}>
           <Sparkles className="h-4 w-4 mr-2" />
-          AI-Empfehlungen
+          {tx({ de: "AI-Empfehlungen", en: "AI recommendations", es: "Recomendaciones de IA" })}
         </Button>
 
         <Button 
           variant="outline" 
           size="sm"
           onClick={async () => {
-            toast('⚡ Optimiere alle Draft-Posts...', { icon: '🤖' });
+            toast(tx({ de: '⚡ Optimiere alle Draft-Posts...', en: '⚡ Optimizing all draft posts...', es: '⚡ Optimizando todas las publicaciones en borrador...' }), { icon: '🤖' });
           }}
         >
           <Wand2 className="h-4 w-4 mr-2" />
-          Alle optimieren
+          {tx({ de: "Alle optimieren", en: "Optimize all", es: "Optimizar todo" })}
         </Button>
 
         <Button size="sm" onClick={onApprove}>

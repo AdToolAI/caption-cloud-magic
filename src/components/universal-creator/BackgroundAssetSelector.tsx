@@ -13,7 +13,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
-import { tx } from '@/lib/i18nText';
 import type { BackgroundAsset } from '@/types/background-assets';
 
 interface BackgroundAssetSelectorProps {

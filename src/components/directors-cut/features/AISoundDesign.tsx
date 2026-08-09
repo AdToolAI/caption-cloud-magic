@@ -10,7 +10,6 @@ import { Loader2, Volume2, Sparkles, Play, Pause, Trash2 } from 'lucide-react';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { tx } from '@/lib/i18nText';
 
 interface GeneratedSound {
   id: string;
