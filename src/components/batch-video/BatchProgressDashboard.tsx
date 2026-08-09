@@ -96,7 +96,7 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
     
     if (completedVideos.length === 0) {
       toast({
-        title: 'Keine fertigen Videos',
+        title: tx({ de: 'Keine fertigen Videos', en: 'No finished videos', es: 'No hay vídeos terminados.' }),
         description: tx({ de: 'Es gibt noch keine abgeschlossenen Videos zum Herunterladen.', en: 'There are no finished videos to download yet.', es: 'Aún no hay videos terminados para descargar.' }),
         variant: 'destructive'
       });
@@ -104,8 +104,8 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
     }
 
     toast({
-      title: 'Download gestartet',
-      description: `${completedVideos.length} Videos werden heruntergeladen...`
+      title: tx({ de: 'Download gestartet', en: 'Download started', es: 'Descarga iniciada' }),
+      description: tx({ de: `${completedVideos.length} Videos werden heruntergeladen...`, en: `${completedVideos.length} Downloading videos...`, es: `${completedVideos.length} Descargando vídeos...` })
     });
 
     // Download each video
@@ -205,9 +205,9 @@ export function BatchProgressDashboard({ batchJobId }: BatchProgressDashboardPro
                     {video.customizations?.title || video.customizations?.produkt_name || `Video ${index + 1}`}
                   </p>
                   <p className="text-muted-foreground text-xs">
-                    {video.status === 'completed' && 'Fertig'}
+                    {video.status === 'completed' && tx({ de: 'Fertig', en: 'Ready', es: 'Listo' })}
                     {video.status === 'rendering' && 'Wird erstellt...'}
-                    {video.status === 'failed' && `Fehler: ${video.error_message?.substring(0, 50)}`}
+                    {video.status === 'failed' && tx({ de: `Fehler: ${video.error_message?.substring(0, 50)}`, en: `Error: ${video.error_message?.substring(0, 50)}`, es: `Error: ${video.error_message?.substring(0, 50)}` })}
                     {video.status === 'pending' && 'Wartet...'}
                   </p>
                 </div>

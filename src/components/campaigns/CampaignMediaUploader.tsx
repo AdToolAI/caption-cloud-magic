@@ -52,12 +52,12 @@ export function CampaignMediaUploader({
       const isVideo = file.type.startsWith('video/');
       
       if (!isImage && !isVideo) {
-        toast.error(tr({ de: `${file.name} ist kein Bild oder Video`, en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un video` }));
+        toast.error(tr({ de: tx({ de: `${file.name} ist kein Bild oder Video`, en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un vídeo` }), en: `${file.name} is not an image or video`, es: `${file.name} no es una imagen ni un video` }));
         return;
       }
 
       if (file.size > 1024 * 1024 * 1024) { // 1GB limit
-        toast.error(`${file.name} ist zu groß (max. 1GB)`);
+        toast.error(tx({ de: `${file.name} ist zu groß (max. 1GB)`, en: `${file.name} is too large (max. 1GB)`, es: `${file.name} es demasiado grande (máx. 1 GB)` }));
         return;
       }
     }

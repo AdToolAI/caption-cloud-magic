@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * VideoBrowser — Stock-Videos tab. Re-uses `useStockVideoSearch`
  * (Pexels + Pixabay HD/4K) and the LicenseButton for auto-cert.
@@ -90,7 +91,7 @@ export default function VideoBrowser() {
           <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /> Lade Videos …
         </Card>
       ) : results.length === 0 ? (
-        <Card className="p-12 text-center text-sm text-muted-foreground">Keine Treffer.</Card>
+        <Card className="p-12 text-center text-sm text-muted-foreground">{tx({ de: "Keine Treffer.", en: "No hits.", es: "Sin aciertos." })}</Card>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {results.map((v) => (

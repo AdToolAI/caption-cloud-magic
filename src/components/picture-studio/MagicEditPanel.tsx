@@ -152,7 +152,7 @@ export function MagicEditPanel() {
       return;
     }
     if (!prompt.trim()) {
-      toast.error('Bitte Prompt eingeben');
+      toast.error(tx({ de: 'Bitte Prompt eingeben', en: 'Please enter prompt', es: 'Por favor ingrese el mensaje' }));
       return;
     }
     if (mode === 'inpaint' && !hasMaskPainted()) {
@@ -166,7 +166,7 @@ export function MagicEditPanel() {
       const { supabase } = await import('@/integrations/supabase/client');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error('Bitte einloggen');
+        toast.error(tx({ de: 'Bitte einloggen', en: 'Please log in', es: 'Por favor inicia sesión' }));
         return;
       }
       const ext = sourceFile.name.split('.').pop() || 'png';
@@ -175,7 +175,7 @@ export function MagicEditPanel() {
         .from('background-projects')
         .upload(path, sourceFile, { contentType: sourceFile.type, upsert: false });
       if (upErr) {
-        toast.error(`Upload fehlgeschlagen: ${upErr.message}`);
+        toast.error(tx({ de: `Upload fehlgeschlagen: ${upErr.message}`, en: `Upload failed: ${upErr.message}`, es: `Error al cargar: ${upErr.message}` }));
         return;
       }
       const { data: pub } = supabase.storage.from('background-projects').getPublicUrl(path);
@@ -256,7 +256,7 @@ export function MagicEditPanel() {
               <CardContent className="flex flex-col items-center justify-center py-16 px-6 text-center">
                 <Upload className="h-12 w-12 text-muted-foreground mb-3" />
                 <p className="font-semibold mb-1">{tx({ de: "Bild hochladen", en: "Upload image", es: "Subir imagen" })}</p>
-                <p className="text-sm text-muted-foreground">JPG, PNG oder WebP. Drag & Drop unterstützt.</p>
+                <p className="text-sm text-muted-foreground">{tx({ de: "JPG, PNG oder WebP. Drag & Drop unterstützt.", en: "JPG, PNG or WebP. Drag & Drop supported.", es: "JPG, PNG o WebP. Se admite arrastrar y soltar." })}</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -456,7 +456,7 @@ export function MagicEditPanel() {
                     <div className="flex items-center justify-center py-8 border-2 border-dashed border-border rounded-lg">
                       <div className="text-center text-muted-foreground">
                         <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">Ergebnis erscheint hier</p>
+                        <p className="text-sm">{tx({ de: "Ergebnis erscheint hier", en: "Result appears here", es: "El resultado aparece aquí" })}</p>
                       </div>
                     </div>
                   )}

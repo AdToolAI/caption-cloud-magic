@@ -150,7 +150,7 @@ export function BatchGeneratePanel() {
               Prompts (1 pro Zeile, max. 20)
             </Label>
             <Textarea
-              placeholder={`Modernes Office im skandinavischen Stil\nProduktfoto roter Sneaker auf weißem Hintergrund\nMacro Shot frische Kaffeebohnen mit Dampf\n…`}
+              placeholder={tx({ de: `Modernes Office im skandinavischen Stil\\nProduktfoto roter Sneaker auf weißem Hintergrund\\nMacro Shot frische Kaffeebohnen mit Dampf\\n…`, en: `Modern office in Scandinavian style\\nProduct photo of red sneakers on a white background\\nMacro shot of fresh coffee beans with steam\\n…`, es: `Oficina moderna en estilo escandinavo\\nFoto del producto de zapatillas rojas sobre un fondo blanco\\nFoto macro de granos de café frescos con vapor\\n...` })}
               value={rawPrompts}
               onChange={(e) => setRawPrompts(e.target.value)}
               className="min-h-[160px] bg-background/50 border-border/50 font-mono text-sm"

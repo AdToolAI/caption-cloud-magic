@@ -131,7 +131,7 @@ interface Caption {
 }
 
 const CAPTION_STYLES = [
-  { id: 'standard', name: 'Standard', description: 'Weiß auf Schwarz' },
+  { id: 'standard', name: 'Standard', description: tx({ de: 'Weiß auf Schwarz', en: 'White on black', es: 'blanco sobre negro' }) },
   { id: 'tiktok', name: 'TikTok', description: 'Bunt & animiert' },
   { id: 'subtitle', name: 'Untertitel', description: 'Klassisch' },
   { id: 'highlight', name: 'Highlight', description: 'Wort-Animation' },
@@ -1701,7 +1701,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   onChange={handleAudioFileSelect}
                 />
                 <FileAudio className="h-6 w-6 mx-auto text-white/40 mb-2" />
-                <p className="text-xs text-white/50">Voiceover oder Musik hierher ziehen</p>
+                <p className="text-xs text-white/50">{tx({ de: "Voiceover oder Musik hierher ziehen", en: "Drag voiceover or music here", es: "Arrastra voz en off o música aquí" })}</p>
                 <p className="text-[10px] text-white/30 mt-1">MP3, WAV, M4A (max. 50MB)</p>
               </div>
 

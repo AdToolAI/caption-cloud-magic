@@ -318,7 +318,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
               body={
                 goldenGap
                   ? `${DAY_LABELS_LONG_DE[goldenGap.day]} ${String(goldenGap.hour).padStart(2, "0")}:00 — Score ${goldenGap.score}, kein Post geplant.`
-                  : "Keine ungenutzten Top-Slots in den nächsten 14 Tagen."
+                  : tx({ de: "Keine ungenutzten Top-Slots in den nächsten 14 Tagen.", en: "No unused top slots in the next 14 days.", es: "No habrá primeros puestos no utilizados en los próximos 14 días." })
               }
               cta={
                 goldenGap
@@ -335,8 +335,8 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
               title="Konflikt-Warnung"
               body={
                 conflicts.length > 0
-                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — Reach cannibalizes itself.`, es: `${conflicts.length} Ranura${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones al mismo tiempo: el alcance se canibaliza a sí mismo.` })
-                  : "Keine Stau-Slots. Saubere Verteilung."
+                  ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — reach cannibalizes itself.`, es: `${conflicts.length} franja${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones a la vez: el alcance se canibaliza.` })
+                  : tx({ de: "Keine Stau-Slots. Saubere Verteilung.", en: "No traffic jam slots. Clean distribution.", es: "Sin espacios para atascos. Distribución limpia." })
               }
             />
             <InsightCard

@@ -29,7 +29,7 @@ const CONTENT_TYPE_PLACEHOLDERS: Record<string, string> = {
   ad: tx({ de: 'Beschreibe dein Produkt und Zielgruppe... z.B. "Innovative Fitness-App für vielbeschäftigte Berufstätige"', en: 'Describe your product and target audience... e.g. "Innovative fitness app for busy professionals"', es: 'Describe tu producto y público objetivo... p. ej. "Aplicación de fitness innovadora para profesionales ocupados"' }),
   story: tx({ de: 'Welche Story möchtest du erzählen? z.B. "Meine Morgenroutine als Entrepreneur"', en: 'What story do you want to tell? e.g. “My morning routine as an entrepreneur”', es: '¿Qué historia quieres contar? p.ej. “Mi rutina matutina como emprendedora”' }),
   reel: tx({ de: 'Was ist deine Hook-Idee? z.B. "3 Fehler, die jeder beim Kochen macht"', en: 'What\'s your hook idea? e.g. "3 mistakes everyone makes when cooking"', es: '¿Cuál es tu idea de gancho? p. ej. "3 errores que todo el mundo comete al cocinar"' }),
-  tutorial: 'Was soll das Tutorial zeigen? z.B. "Wie man in 5 Minuten professionelle Fotos macht"',
+  tutorial: tx({ de: 'Was soll das Tutorial zeigen? z.B. "Wie man in 5 Minuten professionelle Fotos macht"', en: 'What is the tutorial supposed to show? e.g. "How to take professional photos in 5 minutes"', es: '¿Qué se supone que debe mostrar el tutorial? p.ej. "Cómo hacer fotografías profesionales en 5 minutos"' }),
   testimonial: 'Beschreibe die Erfolgsgeschichte... z.B. "Wie ich 10kg in 3 Monaten abgenommen habe"',
   news: tx({ de: 'Was ist die Breaking News? z.B. "Neue KI-Technologie revolutioniert Marketing"', en: 'What\'s the breaking news? e.g. "New AI technology revolutionizes marketing"', es: '¿Cuál es la noticia de última hora? p. ej. "Nueva tecnología de IA revoluciona el marketing"' })
 };
@@ -139,7 +139,7 @@ ${script.cta}`;
 
       <div className="space-y-3">
         <div className="space-y-2">
-          <Label>Was soll das Video zeigen?</Label>
+          <Label>{tx({ de: "Was soll das Video zeigen?", en: "What should the video show?", es: "¿Qué debería mostrar el vídeo?" })}</Label>
           <Input
             placeholder={placeholder}
             value={prompt}

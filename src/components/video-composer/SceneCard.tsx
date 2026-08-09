@@ -1344,10 +1344,10 @@ export default function SceneCard({
                     id: "upload",
                     label:
                       lang === "de"
-                        ? "⬆ Eigenes"
+                        ? tx({ de: "⬆ Eigenes", en: "⬆ Own", es: "⬆ Propio" })
                         : lang === "es"
                           ? "⬆ Propio"
-                          : "⬆ Upload",
+                          : tx({ de: "⬆ Upload", en: "⬆ Upload", es: "⬆ Subir" }),
                   },
                 ];
 
@@ -1500,7 +1500,7 @@ export default function SceneCard({
                                       ? "6 modelos · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
                                       : "6 models · HappyHorse · Hailuo · Kling · Wan · Seedance · Luma (Sync.so)"
                                   : lang === "de"
-                                    ? "B-Roll-Modus · 11 Modelle verfügbar"
+                                    ? tx({ de: "B-Roll-Modus · 11 Modelle verfügbar", en: "B-roll mode · 11 models available", es: "Modo B-roll · 11 modelos disponibles" })
                                     : lang === "es"
                                       ? "Modo B-roll · 11 modelos disponibles"
                                       : "B-roll mode · 11 models available"}
@@ -1550,7 +1550,7 @@ export default function SceneCard({
                                     toast({
                                       title:
                                         lang === "de"
-                                          ? "Modell auf HappyHorse 1.0 gewechselt"
+                                          ? tx({ de: "Modell auf HappyHorse 1.0 gewechselt", en: "Model changed to HappyHorse 1.0", es: "Modelo cambiado a HappyHorse 1.0" })
                                           : lang === "es"
                                             ? "Modelo cambiado a HappyHorse 1.0"
                                             : "Switched to HappyHorse 1.0",
@@ -1681,13 +1681,13 @@ export default function SceneCard({
                                 : "With sound";
                           const offLabel =
                             lang === "de"
-                              ? "Ohne Sound"
+                              ? tx({ de: "Ohne Sound", en: "Without sound", es: "sin sonido" })
                               : lang === "es"
                                 ? "Sin sonido"
                                 : "No sound";
                           const tooltip =
                             lang === "de"
-                              ? "Natives KI-Audio aus dem Modell verwenden — sonst stumm."
+                              ? tx({ de: "Natives KI-Audio aus dem Modell verwenden — sonst stumm.", en: "Use native AI audio from the model — otherwise silent.", es: "Utilice audio AI nativo del modelo; de lo contrario, silencioso." })
                               : lang === "es"
                                 ? "Usar audio nativo del modelo IA — si no, silenciado."
                                 : "Use native AI audio from the model — otherwise muted.";
@@ -2289,7 +2289,7 @@ export default function SceneCard({
                   <AlertDialogFooter>
                     <AlertDialogCancel>
                       {lang === "de"
-                        ? "Abbrechen"
+                        ? tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })
                         : lang === "es"
                           ? "Cancelar"
                           : "Cancel"}
@@ -2424,7 +2424,7 @@ export default function SceneCard({
                       <div className="flex flex-col">
                         <span className="text-[10px] font-semibold">
                           {ignored
-                            ? "World-Refs: aus"
+                            ? tx({ de: "World-Refs: aus", en: "World Refs: off", es: "Árbitros mundiales: desactivado" })
                             : `World-Refs: 📍×${counts.loc} 🏛️×${counts.bld} 📦×${counts.prop}`}
                         </span>
                         <span className="text-[9px] opacity-80">
@@ -2914,7 +2914,7 @@ export default function SceneCard({
                       >
                         <Sparkles className="h-3 w-3" />
                         {lang === "de"
-                          ? "Prompt-Details ansehen"
+                          ? tx({ de: "Prompt-Details ansehen", en: "View prompt details", es: "Ver detalles del mensaje" })
                           : lang === "es"
                             ? "Ver detalles del prompt"
                             : "View prompt details"}
@@ -2963,7 +2963,7 @@ export default function SceneCard({
                   {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
                     block was removed. The same composed prompt + layer
                     breakdown now lives inside ScenePromptDetailsSheet, opened
-                    via the "Prompt-Details ansehen" button above. */}
+                    via the tx({ de: "Prompt-Details ansehen", en: "View prompt details", es: "Ver detalles del mensaje" }) button above. */}
                 </div>
               )}
 
@@ -3344,7 +3344,7 @@ export default function SceneCard({
             <DialogTitle className="flex items-center gap-2">
               <Beaker className="h-5 w-5 text-primary" />
               {lang === "de"
-                ? `Compare Lab — Szene ${index + 1}`
+                ? tx({ de: `Compare Lab — Szene ${index + 1}`, en: `Compare Lab — Scene ${index + 1}`, es: `Comparar laboratorio: escena ${index + 1}` })
                 : lang === "es"
                   ? `Compare Lab — Escena ${index + 1}`
                   : `Compare Lab — Scene ${index + 1}`}

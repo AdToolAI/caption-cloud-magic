@@ -19,10 +19,10 @@ export default function Alerts() {
     try {
       const { data, error } = await supabase.functions.invoke('health-alerter');
       if (error) throw error;
-      toast.success(`Check OK — ${data?.triggered ?? 0} neue Alerts, ${data?.auto_resolved?.length ?? 0} auto-resolved`);
+      toast.success(tx({ de: `Check OK — ${data?.triggered ?? 0} neue Alerts, ${data?.auto_resolved?.length ?? 0} auto-resolved`, en: `Check OK — ${data?.triggered ?? 0} new alerts, ${data?.auto_resolved?.length ?? 0} auto resolved`, es: `Marque Aceptar - ${data?.triggered ?? 0} nuevas alertas, ${data?.auto_resolved?.length ?? 0} resuelto automáticamente` }));
       setRefreshKey((k) => k + 1);
     } catch (e: any) {
-      toast.error(`Fehler: ${e?.message ?? 'unknown'}`);
+      toast.error(tx({ de: `Fehler: ${e?.message ?? 'unknown'}`, en: `Error: ${e?.message ?? 'unknown'}`, es: `Error: ${e?.message ?? 'desconocido'}` }));
     } finally {
       setRunning(false);
     }

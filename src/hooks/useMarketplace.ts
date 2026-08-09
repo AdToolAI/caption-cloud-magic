@@ -88,17 +88,17 @@ export function useTemplatePurchase() {
       if (!result.ok) {
         const msg =
           result.error === 'INSUFFICIENT_CREDITS'
-            ? tx({ de: `Nicht genug Credits — du brauchst ${result.required}, hast aber nur ${result.balance}.`, en: `Not enough credits — you need ${result.required}, but only have ${result.balance}.`, es: `Créditos insuficientes — necesitas ${result.required}, pero solo tienes ${result.balance}.` })
+            ? tx({ de: `Nicht genug Credits — du brauchst ${result.required}, hast aber nur ${result.balance}.`, en: `Not enough credits — you need ${result.required} but only have ${result.balance}.`, es: `No hay suficientes créditos: necesitas ${result.required} pero solo tienes ${result.balance}.` })
             : result.error === 'CANNOT_BUY_OWN_TEMPLATE'
             ? tx({ de: 'Du kannst dein eigenes Template nicht kaufen.', en: 'You cannot buy your own template.', es: 'No puedes comprar tu propia plantilla.' })
-            : tx({ de: `Kauf fehlgeschlagen: ${result.error}`, en: `Purchase failed: ${result.error}`, es: `Compra fallida: ${result.error}` });
+            : tx({ de: `Kauf fehlgeschlagen: ${result.error}`, en: `Purchase failed: ${result.error}`, es: `Error en la compra: ${result.error}` });
         toast({ title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }), description: msg, variant: 'destructive' });
         return;
       }
       if (result.already_owned) {
         toast({ title: 'Bereits gekauft', description: tx({ de: 'Du besitzt dieses Template bereits.', en: 'You already own this template.', es: 'Ya posees esta plantilla.' }) });
       } else if (result.price_credits === 0) {
-        toast({ title: 'Template hinzugefügt', description: tx({ de: 'Free-Template ist jetzt in deiner Bibliothek.', en: 'Free template is now in your library.', es: 'La plantilla gratuita ya está en tu biblioteca.' }) });
+        toast({ title: tx({ de: 'Template hinzugefügt', en: 'Added template', es: 'Plantilla agregada' }), description: tx({ de: 'Free-Template ist jetzt in deiner Bibliothek.', en: 'Free template is now in your library.', es: 'La plantilla gratuita ya está en tu biblioteca.' }) });
       } else {
         toast({
           title: tx({ de: 'Kauf erfolgreich', en: 'Purchase successful', es: 'Compra exitosa' }),
@@ -154,7 +154,7 @@ export function useSubmitTemplateToMarketplace() {
         title: isPublished ? 'Live im Marketplace' : 'Eingereicht',
         description: isPublished
           ? tx({ de: 'Dein Free-Template ist jetzt öffentlich verfügbar.', en: 'Your free template is now publicly available.', es: 'Tu plantilla gratuita ya está disponible públicamente.' })
-          : 'Dein Premium-Template wartet auf Admin-Freigabe.',
+          : tx({ de: 'Dein Premium-Template wartet auf Admin-Freigabe.', en: 'Your premium template is waiting for admin approval.', es: 'Su plantilla premium está esperando la aprobación del administrador.' }),
       });
       queryClient.invalidateQueries({ queryKey: ['my-marketplace-templates'] });
       queryClient.invalidateQueries({ queryKey: ['marketplace-templates'] });

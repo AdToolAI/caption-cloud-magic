@@ -719,7 +719,7 @@ export default function VideoComposerDashboard() {
           title: t('videoComposer.resetSuccessTitle') || 'Projekt zurückgesetzt',
           description: n > 0
             ? `${n} laufende Jobs gestoppt.`
-            : 'Keine laufenden Jobs.',
+            : tx({ de: 'Keine laufenden Jobs.', en: 'No ongoing jobs.', es: 'No hay trabajos en curso.' }),
         });
       } catch (e) {
         toast({
@@ -816,7 +816,7 @@ export default function VideoComposerDashboard() {
     incrementTemplateUsage.mutate(tpl.id);
 
     toast({
-      title: 'Template übernommen',
+      title: tx({ de: 'Template übernommen', en: 'Template adopted', es: 'Plantilla adoptada' }),
       description: tx({ de: `"${tpl.name}" mit ${newScenes.length} Szenen geladen. Vervollständige jetzt das Briefing.`, en: `"${tpl.name}" loaded with ${newScenes.length} scenes. Complete the briefing now.`, es: `"${tpl.name}" cargado con ${newScenes.length} escenas. Completa el briefing ahora.` }),
     });
   }, [incrementTemplateUsage]);
@@ -1806,7 +1806,7 @@ export default function VideoComposerDashboard() {
                       const hasCutdowns = spawned.some(s => s.kind === 'cutdown');
                       toast({
                         title: 'Kampagne erweitert 🎬',
-                        description: tx({ de: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, en: `${spawned.length} variant(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}`, es: `${spawned.length} variante(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.' : ''}` }),
+                        description: tx({ de: `${spawned.length} Variante(n): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? tx({ de: ' · Cutdowns ohne VO — bitte im Child neu synthetisieren.', en: '· Cutdowns without VO — please re-synthesize in the child.', es: '· Reducciones sin VO: vuelva a sintetizar en el niño.' }) : ''}`, en: `${spawned.length} variant(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns without VO — please re-synthesize in the child.' : ''}`, es: `${spawned.length} variante(s): ${spawned.map(s => s.label).join(', ')}${hasCutdowns ? ' · Cutdowns sin VO — por favor, vuelve a sintetizar en el hijo.' : ''}` }),
                       });
                       setActiveTab('campaign');
                     }

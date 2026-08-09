@@ -251,7 +251,7 @@ export function KanbanView({
       const limit = settings.limits[newStatus];
       const count = grouped[newStatus]?.length ?? 0;
       if (limit && count >= limit) {
-        toast.warning(`WIP-Limit ${count}/${limit} überschritten — Karte wurde trotzdem verschoben.`);
+        toast.warning(tx({ de: `WIP-Limit ${count}/${limit} überschritten — Karte wurde trotzdem verschoben.`, en: `WIP limit ${count}/${limit} exceeded — card was moved anyway.`, es: `Se excedió el límite WIP ${count}/${limit}; la tarjeta se movió de todos modos.` }));
       }
       onStatusChange(id, newStatus);
     },
@@ -302,7 +302,7 @@ export function KanbanView({
             <DropdownMenuLabel>Kanal-Filter</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {channels.length === 0 && (
-              <div className="px-2 py-1.5 text-xs text-muted-foreground">Noch keine Kanäle</div>
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">{tx({ de: "Noch keine Kanäle", en: "No channels yet", es: "Aún no hay canales" })}</div>
             )}
             {channels.map((c) => (
               <DropdownMenuCheckboxItem
@@ -459,7 +459,7 @@ function BoardEmptyState({
             <LayoutGrid className="h-7 w-7 text-[#F5C76A]" />
           </div>
         </div>
-        <h3 className="font-serif text-2xl tracking-tight text-foreground">Dein Content-Board ist bereit</h3>
+        <h3 className="font-serif text-2xl tracking-tight text-foreground">{tx({ de: "Dein Content-Board ist bereit", en: "Your content board is ready", es: "Tu tablero de contenido está listo" })}</h3>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm">
           Erstelle deinen ersten Post, um die Pipeline vom Briefing bis zur Veröffentlichung zu starten.
         </p>

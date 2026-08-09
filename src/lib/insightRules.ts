@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { LucideIcon, Clock, TrendingUp, Hash, Type, AlertTriangle, Target } from "lucide-react";
 
 export type InsightCardData = {
@@ -23,7 +24,7 @@ const i18n = {
   },
   bestTimeTitle: {
     en: (wd: string, h: string, p: string) => `Best time: ${wd} ${h}:00 for ${p}`,
-    de: (wd: string, h: string, p: string) => `Beste Zeit: ${wd} ${h}:00 für ${p}`,
+    de: (wd: string, h: string, p: string) => tx({ de: `Beste Zeit: ${wd} ${h}:00 für ${p}`, en: `Best time: ${wd} ${h}:00 for ${p}`, es: `Mejor momento: ${wd} ${h}:00 por ${p}` }),
     es: (wd: string, h: string, p: string) => `Mejor hora: ${wd} ${h}:00 para ${p}`,
   },
   avgEng: {
@@ -39,12 +40,12 @@ const i18n = {
   addToCalendar: { en: 'Add slot to calendar', de: 'Slot zu Kalender hinzufügen', es: 'Agregar al calendario' },
   postTypeTitle: {
     en: (t: string, p: string) => `${t} works better on ${p}`,
-    de: (t: string, p: string) => `${t} funktioniert besser auf ${p}`,
+    de: (t: string, p: string) => tx({ de: `${t} funktioniert besser auf ${p}`, en: `${t} works better on ${p}`, es: `${t} funciona mejor en ${p}` }),
     es: (t: string, p: string) => `${t} funciona mejor en ${p}`,
   },
   moreEngagement: {
     en: (p: number) => `${p}% more engagement`,
-    de: (p: number) => `${p}% mehr Engagement`,
+    de: (p: number) => tx({ de: `${p}% mehr Engagement`, en: `${p}% more engagement`, es: `${p}% más de participación` }),
     es: (p: number) => `${p}% más engagement`,
   },
   postsAnalyzed: {
@@ -77,14 +78,14 @@ const i18n = {
   },
   captionDelta: {
     en: (p: number, w: string) => `${p}% more than ${w}`,
-    de: (p: number, w: string) => `${p}% mehr als ${w}`,
+    de: (p: number, w: string) => tx({ de: `${p}% mehr als ${w}`, en: `${p}% more than ${w}`, es: `${p}% más que ${w}` }),
     es: (p: number, w: string) => `${p}% más que ${w}`,
   },
   openTemplate: { en: 'Open template', de: 'Vorlage öffnen', es: 'Abrir plantilla' },
   trendTitle: { en: '⚠️ Engagement is falling', de: '⚠️ Engagement fällt', es: '⚠️ El engagement está cayendo' },
   trendDelta: {
     en: (p: number) => `${p}% below baseline`,
-    de: (p: number) => `${p}% unter Baseline`,
+    de: (p: number) => tx({ de: `${p}% unter Baseline`, en: `${p}% below baseline`, es: `${p}% por debajo del valor inicial` }),
     es: (p: number) => `${p}% por debajo de la línea base`,
   },
   last7vs14: { en: 'Last 7 vs 14 days', de: 'Letzte 7 vs 14 Tage', es: 'Últimos 7 vs 14 días' },

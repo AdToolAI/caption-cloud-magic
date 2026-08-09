@@ -267,7 +267,7 @@ export function AnchorPreviewGate({
                   <AlertTriangle className="w-3.5 h-3.5" />
                 )}
                 {auditOk
-                  ? `Identität ok — ${audit?.face_count ?? "?"}/${audit?.expected_faces ?? "?"} Gesichter erkannt.`
+                  ? tx({ de: `Identität ok — ${audit?.face_count ?? "?"}/${audit?.expected_faces ?? "?"} Gesichter erkannt.`, en: `Identity ok — ${audit?.face_count ?? "?"}/${audit?.expected_faces ?? "?"} Faces detected.`, es: `Identidad correcta: ${audit?.face_count?? "?"}/${audit?.expected_faces ?? "?"} Rostros detectados.` })
                   : `Prüfung: ${auditReason}${missing.length ? ` · fehlend: ${missing.join(", ")}` : ""}${duplicated.length ? ` · doppelt: ${duplicated.join(", ")}` : ""}`}
               </div>
               {!auditOk && (

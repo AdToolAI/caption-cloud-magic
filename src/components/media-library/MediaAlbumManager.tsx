@@ -284,7 +284,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
         {albumImages.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>Keine Bilder in diesem Album</p>
+            <p>{tx({ de: "Keine Bilder in diesem Album", en: "No images in this album", es: "No hay imágenes en este álbum." })}</p>
             {selectedAlbum.is_system && (
               <p className="text-sm mt-1">{tx({ de: "Generiere Bilder im KI Picture Studio — sie erscheinen hier automatisch!", en: "Generate images in the AI Picture Studio — they'll appear here automatically!", es: "Genera imágenes en el AI Picture Studio — ¡aparecerán aquí automáticamente!" })}</p>
             )}
@@ -410,7 +410,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Neues Album erstellen</DialogTitle>
+            <DialogTitle>{tx({ de: "Neues Album erstellen", en: "Create new album", es: "Crear nuevo álbum" })}</DialogTitle>
           </DialogHeader>
           <Input
             placeholder="Album Name..."
@@ -419,7 +419,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
             onKeyDown={(e) => e.key === 'Enter' && createAlbum()}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Abbrechen</Button>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
             <Button onClick={createAlbum} disabled={creating || !newAlbumName.trim()}>
               {creating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FolderPlus className="h-4 w-4 mr-1" />}
               Erstellen

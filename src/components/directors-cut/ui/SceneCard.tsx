@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, Clock, Palette, Turtle, Rabbit } from 'lucide-react';
@@ -154,7 +155,7 @@ export function SceneCard({
 
         {/* Description */}
         <p className="text-sm font-medium line-clamp-2 text-foreground/90">
-          {scene.description || `Szene ${index + 1}`}
+          {scene.description || tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` })}
         </p>
 
         {/* AI Suggestions Preview */}

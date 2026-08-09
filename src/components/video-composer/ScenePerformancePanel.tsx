@@ -54,7 +54,7 @@ const T = {
   },
   de: {
     title: 'Performance pro Charakter',
-    subtitle: 'Optional — leer lassen wenn die Scene-Aktion reicht.',
+    subtitle: tx({ de: 'Optional — leer lassen wenn die Scene-Aktion reicht.', en: 'Optional — leave blank if the Scene action is sufficient.', es: 'Opcional: déjelo en blanco si la acción de la escena es suficiente.' }),
     expression: 'Mimik',
     gesture: 'Gestik',
     gaze: 'Blick',

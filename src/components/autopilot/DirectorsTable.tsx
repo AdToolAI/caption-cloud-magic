@@ -799,7 +799,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setConfirmOpen(false);

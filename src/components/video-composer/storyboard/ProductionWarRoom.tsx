@@ -35,7 +35,7 @@ const TRENDING_TAGS = [
 ];
 
 const PRO_TIPS = [
-  'Hooks unter 1.5s halten die ersten 3s der Watch-Time stabil.',
+  tx({ de: 'Hooks unter 1.5s halten die ersten 3s der Watch-Time stabil.', en: 'Hooks under 1.5s keep the first 3 seconds of the watch time stable.', es: 'Los ganchos de menos de 1,5 s mantienen estables los primeros 3 segundos del tiempo de visualización.' }),
   tx({ de: 'Cinematic-Sync rendert echte Wunsch-Szenen — kein Avatar-Bust mehr.', en: 'Cinematic-Sync renders real desired scenes — no more avatar bust.', es: 'Cinematic-Sync renderiza escenas deseadas reales, sin más bustos de avatar.' }),
   tx({ de: 'Brand-Charaktere mit Identity-Card sind über alle Provider konsistent.', en: 'Brand characters with Identity-Card are consistent across all providers.', es: 'Los personajes de marca con Identity-Card son consistentes en todos los proveedores.' }),
   tx({ de: 'Negative-Prompts werden auf Szenen-Ebene global injiziert.', en: 'Negative prompts are globally injected at the scene level.', es: 'Los prompts negativos se inyectan globalmente a nivel de escena.' }),

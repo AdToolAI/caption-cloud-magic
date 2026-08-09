@@ -217,7 +217,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
       return;
     }
     if (!startAt) {
-      toast.error("Bitte Zeitpunkt setzen");
+      toast.error(tx({ de: "Bitte Zeitpunkt setzen", en: "Please set a time", es: "Por favor establezca una hora" }));
       return;
     }
     const ts = new Date(startAt).getTime();

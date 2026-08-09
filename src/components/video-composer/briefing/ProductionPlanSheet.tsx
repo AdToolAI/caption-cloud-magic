@@ -664,7 +664,7 @@ export default function ProductionPlanSheet({
       const message = tx({ de: 'Projekt-ID fehlt — Plan wurde nicht angewendet.', en: 'Project ID missing — Plan was not applied.', es: 'Falta el ID del proyecto — El plan no se aplicó.' });
       setApplyResult({ ok: false, message, warnings: [] });
       toast({
-        title: 'Plan blockiert',
+        title: tx({ de: 'Plan blockiert', en: 'Plan blocked', es: 'Plan bloqueado' }),
         description: message,
         variant: 'destructive',
       });
@@ -673,7 +673,7 @@ export default function ProductionPlanSheet({
     if (durationInconsistent) {
       const message = tx({ de: 'Plan inkonsistent — Projekt-Gesamtdauer passt nicht zur Szenensumme.', en: 'Plan inconsistent — Project total duration does not match scene sum.', es: 'Plan inconsistente — La duración total del proyecto no coincide con la suma de las escenas.' });
       setApplyResult({ ok: false, message, warnings: [] });
-      toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
+      toast({ title: tx({ de: 'Plan blockiert', en: 'Plan blocked', es: 'Plan bloqueado' }), description: message, variant: 'destructive' });
       return;
     }
     // v225 — Sprecher-Zuordnung ist nicht mehr Apply-blockierend. Fehlende
@@ -697,7 +697,7 @@ export default function ProductionPlanSheet({
       if (!finalConsistent) {
         const message = `Plan inkonsistent — ${finalTarget || '—'}s Projekt vs. ${finalSum}s Szenensumme.`;
         setApplyResult({ ok: false, message, warnings: [] });
-        toast({ title: 'Plan blockiert', description: message, variant: 'destructive' });
+        toast({ title: tx({ de: 'Plan blockiert', en: 'Plan blocked', es: 'Plan bloqueado' }), description: message, variant: 'destructive' });
         return;
       }
       if (normalizedPlan !== plan) setPlan(normalizedPlan);
@@ -876,7 +876,7 @@ export default function ProductionPlanSheet({
         .insert({
           user_id: auth.user.id,
           name: trimmed,
-          description: `Stub angelegt aus Briefing — Referenzbild später ersetzen.`,
+          description: tx({ de: `Stub angelegt aus Briefing — Referenzbild später ersetzen.`, en: `Stub created from briefing — replace reference image later.`, es: `Stub creado a partir de una sesión informativa; reemplace la imagen de referencia más adelante.` }),
           reference_image_url: placeholder,
           tags: ['briefing-stub'],
         })
@@ -914,8 +914,8 @@ export default function ProductionPlanSheet({
       toast({
         title: 'Location angelegt',
         description: matched > 1
-          ? tx({ de: `„${created.name}" — für ${matched} Szenen übernommen.`, en: `"${created.name}" — adopted for ${matched} scenes.`, es: `"${created.name}" — adoptado para ${matched} escenas.` })
-          : tx({ de: `„${created.name}" ist jetzt in der Library.`, en: `"${created.name}" is now in the library.`, es: `"${created.name}" ahora está en la biblioteca.` }),
+          ? tx({ de: `„${created.name}tx({ de: " — für ${matched} Szenen übernommen.`, en: `", en: "— adopted for ${matched} scenes.`, en: `", es: "— adoptado para escenas ${matched}.`, en: `" })${created.name}" — adopted for ${matched} scenes.`, es: `"${created.name}" — adoptado para ${matched} escenas.` })
+          : tx({ de: `„${created.name}tx({ de: " ist jetzt in der Library.`, en: `", en: "is now in the library.`, en:`", es: "ahora está en la biblioteca.`, en:`" })${created.name}" is now in the library.`, es: `"${created.name}" ahora está en la biblioteca.` }),
       });
     } catch (e: any) {
       toast({ title: tx({ de: 'Konnte Location nicht anlegen', en: 'Could not create location', es: 'No se pudo crear la ubicación' }), description: e?.message || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }), variant: 'destructive' });
@@ -1112,7 +1112,7 @@ export default function ProductionPlanSheet({
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={tx({ de: `Füge dein komplettes Briefing ein.\\nAuch lang ok — Tabellen, VO-Skript, Voice-Settings, Captions, Negative Prompt.\\nDie KI extrahiert deterministisch alle Felder.`, en: `Paste your complete briefing.\\nLong is also fine — tables, VO script, voice settings, captions, negative prompt.\\nAI deterministically extracts all fields.`, es: `Pega tu briefing completo.\\nTambién está bien si es largo — tablas, guion de VO, ajustes de voz, subtítulos, prompt negativo.\\nLa IA extrae todos los campos de forma determinista.` })}
+              placeholder={tx({ de: `Füge dein komplettes Briefing ein.\\\\nAuch lang ok — Tabellen, VO-Skript, Voice-Settings, Captions, Negative Prompt.\\\\nDie KI extrahiert deterministisch alle Felder.`, en: `Insert your complete briefing.\\\\nAlso long ok - tables, VO script, voice settings, captions, negative prompt.\\\\nThe AI ​​deterministically extracts all fields.`, es: `Inserte su resumen completo.\\\\nTambién está bien: tablas, script de voz, configuración de voz, subtítulos, mensajes negativos.\\\\nLa IA extrae de manera determinista todos los campos.` })}
               className="flex-1 min-h-[320px] font-mono text-xs"
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -1192,13 +1192,13 @@ export default function ProductionPlanSheet({
                 <Row label="Plattformen" value={plan.project?.platforms?.join(', ')} />
                 <Row
                   label={tx({ de: "Summe Szenen", en: "Total scenes", es: "Total de escenas" })}
-                  value={`${totalPlanSec}s (${plan.scenes.length} Szenen)`}
+                  value={tx({ de: `${totalPlanSec}s (${plan.scenes.length} Szenen)`, en: `${totalPlanSec}s (${plan.scenes.length} scenes)`, es: `${totalPlanSec}s (${plan.scenes.length} escenas)` })}
                   highlight={plan.project?.totalDurationSec ? totalPlanSec !== plan.project.totalDurationSec : false}
                 />
               </SectionCard>
 
               {/* Szenen */}
-              <SectionCard title={`Szenen (${plan.scenes.length})`}>
+              <SectionCard title={tx({ de: `Szenen (${plan.scenes.length})`, en: `Scenes (${plan.scenes.length})`, es: `Escenas (${plan.scenes.length})` })}>
                 {plan.scenes.length === 0 ? (
                   <div className="rounded border border-amber-300/40 bg-amber-300/[0.05] p-4 text-xs space-y-2">
                     <div className="font-medium text-amber-300 flex items-center gap-1">
@@ -1246,7 +1246,7 @@ export default function ProductionPlanSheet({
                           title={
                             s.shotDirector
                               ? `framing=${s.shotDirector.framing ?? '—'} · angle=${s.shotDirector.angle ?? '—'} · movement=${s.shotDirector.movement ?? '—'} · lighting=${s.shotDirector.lighting ?? '—'}`
-                              : 'Keine Kameraführung im Plan.'
+                              : tx({ de: 'Keine Kameraführung im Plan.', en: 'No camera work in the plan.', es: 'No hay trabajo de cámara en el plan.' })
                           }
                         >
                           {s.shotDirector?.framing || s.shotDirector?.movement ? '✓ Shot-Director' : '— Shot-Director'}
@@ -1254,21 +1254,21 @@ export default function ProductionPlanSheet({
                         <Badge
                           variant="outline"
                           className={`text-[10px] ${(s.cast ?? []).length > 0 ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                          title={(s.cast ?? []).map((c) => c.mentionKey || c.characterName).join(', ') || 'Kein Cast im Plan.'}
+                          title={(s.cast ?? []).map((c) => c.mentionKey || c.characterName).join(', ') || tx({ de: 'Kein Cast im Plan.', en: 'No cast planned.', es: 'No hay reparto planeado.' })}
                         >
                           {(s.cast ?? []).length > 0 ? `✓ Cast (${(s.cast ?? []).length})` : '— Cast'}
                         </Badge>
                         <Badge
                           variant="outline"
                           className={`text-[10px] ${s.anchorPromptEN ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                          title={s.anchorPromptEN ?? 'Kein Anchor-Prompt im Plan.'}
+                          title={s.anchorPromptEN ?? tx({ de: 'Kein Anchor-Prompt im Plan.', en: 'No anchor prompt in the plan.', es: 'No hay aviso de anclaje en el plan.' })}
                         >
                           {s.anchorPromptEN ? '✓ Anchor-Prompt' : '— Anchor-Prompt'}
                         </Badge>
                         <Badge
                           variant="outline"
                           className={`text-[10px] ${s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick) ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                          title={s.performance ? `mimik=${s.performance.mimik ?? '—'} · gestik=${s.performance.gestik ?? '—'} · blick=${s.performance.blick ?? '—'} · energy=${s.performance.energy ?? '—'}` : 'Keine Performance-Anweisung.'}
+                          title={s.performance ? `mimik=${s.performance.mimik ?? '—'} · gestik=${s.performance.gestik ?? '—'} · blick=${s.performance.blick ?? '—'} · energy=${s.performance.energy ?? '—'}` : tx({ de: 'Keine Performance-Anweisung.', en: 'No performance statement.', es: 'Sin declaración de desempeño.' })}
                         >
                           {s.performance && (s.performance.mimik || s.performance.gestik || s.performance.blick) ? '✓ Performance' : '— Performance'}
                         </Badge>
@@ -1335,7 +1335,7 @@ export default function ProductionPlanSheet({
                                   ? `Overlay: "${s.textOverlay.text}" (${s.textOverlay.position ?? 'bottom'})`
                                   : '',
                                 `Overlay: "${s.textOverlay?.text ?? ''}"`,
-                                'Kein burnt-in Overlay (gewollt).',
+                                tx({ de: 'Kein burnt-in Overlay (gewollt).', en: 'No burnt-in overlay (intentional).', es: 'Sin superposición quemada (intencional).' }),
                               )}
                               {chip(
                                 'tone',
@@ -1584,7 +1584,7 @@ export default function ProductionPlanSheet({
                                     <SelectValue placeholder={tx({ de: "Charakter wählen…", en: "Choose character…", es: "Elegir personaje…" })} />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="__none__">— nicht zugeordnet —</SelectItem>
+                                    <SelectItem value="__none__">{tx({ de: "— nicht zugeordnet —", en: "— not assigned —", es: "- no asignado -" })}</SelectItem>
                                     {charOptions.map((o) => (
                                       <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
                                     ))}
@@ -1662,7 +1662,7 @@ export default function ProductionPlanSheet({
                                 <SelectValue placeholder="Library-Location wählen…" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="__none__">— nicht zugeordnet —</SelectItem>
+                                <SelectItem value="__none__">{tx({ de: "— nicht zugeordnet —", en: "— not assigned —", es: "- no asignado -" })}</SelectItem>
                                 {locOptions.map((o) => (
                                   <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
                                 ))}
@@ -1825,7 +1825,7 @@ export default function ProductionPlanSheet({
           )}
           {step === 'paste' && (
             <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
               <Button onClick={handleParse} disabled={text.length < 40} className="gap-2">
                 <Sparkles className="h-4 w-4" /> Briefing analysieren
               </Button>
@@ -1833,7 +1833,7 @@ export default function ProductionPlanSheet({
           )}
           {step === 'review' && safePlan && (
             <>
-              <Button variant="outline" onClick={() => setStep('paste')}>Zurück</Button>
+              <Button variant="outline" onClick={() => setStep('paste')}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
               <Button
                 onClick={handleApply}
                 disabled={applying || durationInconsistent}

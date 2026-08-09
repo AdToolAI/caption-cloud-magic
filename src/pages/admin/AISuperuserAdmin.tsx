@@ -118,8 +118,8 @@ export function AISuperuserAdmin() {
     setCreatingBugReport(true);
     try {
       const { error } = await supabase.from('bug_reports').insert({
-        title: `[KI Superuser] ${run.scenario_name} fehlgeschlagen`,
-        description: tx({ de: `Test-Szenario "${run.scenario_name}" ist fehlgeschlagen.\\n\\nHTTP: ${run.http_status}\\nLatenz: ${run.latency_ms}ms\\n\\nError: ${run.error_message || 'unknown'}\\n\\nRequest:\\n${JSON.stringify(run.full_request_json, null, 2)}\\n\\nResponse:\\n${JSON.stringify(run.full_response_json, null, 2)}`, en: `Test scenario "${run.scenario_name}" failed.\\n\\nHTTP: ${run.http_status}\\nLatency: ${run.latency_ms}ms\\n\\nError: ${run.error_message || 'unknown'}\\n\\nRequest:\\n${JSON.stringify(run.full_request_json, null, 2)}\\n\\nResponse:\\n${JSON.stringify(run.full_response_json, null, 2)}`, es: `El escenario de prueba "${run.scenario_name}" falló.\\n\\nHTTP: ${run.http_status}\\nLatencia: ${run.latency_ms}ms\\n\\nError: ${run.error_message || 'unknown'}\\n\\nSolicitud:\\n${JSON.stringify(run.full_request_json, null, 2)}\\n\\nRespuesta:\\n${JSON.stringify(run.full_response_json, null, 2)}` }),
+        title: tx({ de: `[KI Superuser] ${run.scenario_name} fehlgeschlagen`, en: `[KI Superuser] ${run.scenario_name} failed`, es: `[Superusuario de KI] ${run.scenario_name} falló` }),
+        description: tx({ de: `Test-Szenario "${run.scenario_name}" ist fehlgeschlagen.\\\\n\\\\nHTTP: ${run.http_status}\\\\nLatenz: ${run.latency_ms}ms\\\\n\\\\nError: ${run.error_message || 'unknown'}\\\\n\\\\nRequest:\\\\n${JSON.stringify(run.full_request_json, null, 2)}\\\\n\\\\nResponse:\\\\n${JSON.stringify(run.full_response_json, null, 2)}`, en: `Test scenario "${run.scenario_name}" failed.\\\\n\\\\nHTTP: ${run.http_status}\\\\nLatency: ${run.latency_ms}ms\\\\n\\\\nError: ${run.error_message || 'unknown'}\\\\n\\\\nRequest:\\\\n${JSON.stringify(run.full_request_json, null, 2)}\\\\n\\\\nResponse:\\\\n${JSON.stringify(run.full_response_json, null, 2)}`, es: `El escenario de prueba "${run.scenario_name}" falló.\\\\n\\\\nHTTP: ${run.http_status}\\\\nLatencia: ${run.latency_ms}ms\\\\n\\\\nError: ${run.error_message || 'desconocido'}\\\\n\\\\nSolicitud:\\\\n${JSON.stringify(run.full_request_json, null, 2)}\\\\n\\\\nRespuesta:\\\\n${JSON.stringify(run.full_response_json, null, 2)}` }),
         severity: run.status === 'fail' ? 'high' : 'medium',
         status: 'open',
         route: '/admin (KI Superuser)',
@@ -128,7 +128,7 @@ export function AISuperuserAdmin() {
       if (error) throw error;
       toast.success('Bug-Report erstellt');
     } catch (err) {
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`);
+      toast.error(tx({ de: `Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`, en: `Error: ${err instanceof Error ? err.message: 'Unknown'}`, es: `Error: ${err instanceof Error ? err.message : 'Desconocido'}` }));
     } finally {
       setCreatingBugReport(false);
     }
@@ -171,7 +171,7 @@ export function AISuperuserAdmin() {
       toast.success(tx({ de: `Tests abgeschlossen: ${data.summary?.passed || 0} bestanden, ${data.summary?.failed || 0} fehlgeschlagen`, en: `Tests completed: ${data.summary?.passed || 0} passed, ${data.summary?.failed || 0} failed`, es: `Pruebas completadas: ${data.summary?.passed || 0} aprobadas, ${data.summary?.failed || 0} fallidas` }));
       await fetchData();
     } catch (err) {
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`);
+      toast.error(tx({ de: `Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`, en: `Error: ${err instanceof Error ? err.message: 'Unknown'}`, es: `Error: ${err instanceof Error ? err.message : 'Desconocido'}` }));
     } finally {
       setRunning(false);
     }
@@ -182,10 +182,10 @@ export function AISuperuserAdmin() {
     try {
       const { data, error } = await supabase.functions.invoke('analyze-superuser-anomalies', {});
       if (error) throw error;
-      toast.success(`Analyse: ${data.anomaliesDetected} Anomalien erkannt, ${data.bugReportsCreated} Bug-Reports erstellt`);
+      toast.success(tx({ de: `Analyse: ${data.anomaliesDetected} Anomalien erkannt, ${data.bugReportsCreated} Bug-Reports erstellt`, en: `Analysis: ${data.anomaliesDetected} anomalies detected, ${data.bugReportsCreated} bug reports created`, es: `Análisis: ${data.anomaliesDetected} anomalías detectadas, ${data.bugReportsCreated} informes de errores creados` }));
       await fetchData();
     } catch (err) {
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`);
+      toast.error(tx({ de: `Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`, en: `Error: ${err instanceof Error ? err.message: 'Unknown'}`, es: `Error: ${err instanceof Error ? err.message : 'Desconocido'}` }));
     } finally {
       setAnalyzing(false);
     }
@@ -227,7 +227,7 @@ export function AISuperuserAdmin() {
     if (!confirm('Historie kürzen? Behält die letzten 5 Runs pro Szenario, löscht den Rest.')) return;
     const { data, error } = await supabase.rpc('cleanup_superuser_runs', { keep_per_scenario: 5 });
     if (error) {
-      toast.error(`Fehler: ${error.message}`);
+      toast.error(tx({ de: `Fehler: ${error.message}`, en: `Error: ${error.message}`, es: `Error: ${error.message}` }));
       return;
     }
     const count = (data as number) ?? 0;
@@ -243,7 +243,7 @@ export function AISuperuserAdmin() {
     if (!confirm(tx({ de: 'Komplett zurücksetzen? Behält nur den letzten Run pro Szenario, alles andere wird unwiderruflich gelöscht.', en: 'Reset completely? Keeps only the last run per scenario, everything else will be irrevocably deleted.', es: '¿Restablecer completamente? Conserva solo la última ejecución por escenario, todo lo demás se eliminará irrevocablemente.' }))) return;
     const { data, error } = await supabase.rpc('cleanup_superuser_runs', { keep_per_scenario: 1 });
     if (error) {
-      toast.error(`Fehler: ${error.message}`);
+      toast.error(tx({ de: `Fehler: ${error.message}`, en: `Error: ${error.message}`, es: `Error: ${error.message}` }));
       return;
     }
     const count = (data as number) ?? 0;
@@ -297,7 +297,7 @@ export function AISuperuserAdmin() {
           <Button onClick={trimHistory} variant="ghost" size="sm" title="Behält die letzten 5 Runs pro Szenario">
             Historie kürzen (letzte 5 behalten)
           </Button>
-          <Button onClick={resetPassRateHistory} variant="ghost" size="sm" title="Behält nur den letzten Run pro Szenario — Pass-Rate startet sofort bei 100% wenn grün">
+          <Button onClick={resetPassRateHistory} variant="ghost" size="sm" title={tx({ de: "Behält nur den letzten Run pro Szenario — Pass-Rate startet sofort bei 100% wenn grün", en: "Only keeps the last run per scenario — pass rate immediately starts at 100% when green", es: "Solo mantiene la última ejecución por escenario; la tasa de aprobación comienza inmediatamente al 100 % cuando está verde" })}>
             Komplett zurücksetzen (nur letzten Run behalten)
           </Button>
         </div>

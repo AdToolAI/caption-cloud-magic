@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Schach — Regeln über chess.js, Gegner über eine schlanke Material-Suche.
  * Kein Ranking, kein Speichern: nur, um Wartezeit zu überbrücken.
@@ -109,14 +110,14 @@ export default function ChessGame() {
   const status = game.isCheckmate()
     ? game.turn() === 'w'
       ? 'Schachmatt — die KI gewinnt.'
-      : 'Schachmatt — du gewinnst.'
+      : tx({ de: 'Schachmatt — du gewinnst.', en: 'Checkmate – you win.', es: 'Jaque mate: tú ganas.' })
     : game.isDraw()
       ? 'Remis.'
       : thinking
         ? 'Die KI überlegt…'
         : game.inCheck()
           ? 'Schach!'
-          : 'Du bist am Zug (Weiß).';
+          : tx({ de: 'Du bist am Zug (Weiß).', en: 'It\'s your turn (White).', es: 'Es tu turno (Blanco).' });
 
   return (
     <div className="space-y-3">

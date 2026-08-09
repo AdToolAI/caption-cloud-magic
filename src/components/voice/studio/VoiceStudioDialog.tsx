@@ -278,7 +278,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
         continue;
       }
       if (f.size > MAX_FILE_BYTES) {
-        toast.error(`Zu groß (>20 MB): ${f.name}`);
+        toast.error(tx({ de: `Zu groß (>20 MB): ${f.name}`, en: `Too large (>20 MB): ${f.name}`, es: `Demasiado grande (>20 MB): ${f.name}` }));
         continue;
       }
       const durationSec = await probeDuration(f);
@@ -629,7 +629,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                         size="icon"
                         variant="ghost"
                         onClick={() => removeSample(s.id)}
-                        aria-label="Löschen"
+                        aria-label={tx({ de: "Löschen", en: "Delete", es: "Borrar" })}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

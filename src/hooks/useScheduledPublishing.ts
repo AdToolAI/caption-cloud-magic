@@ -60,7 +60,7 @@ export function useScheduledPublishing() {
 
       toast({
         title: '⏰ Veröffentlichung geplant',
-        description: `Post wird am ${config.publishAt.toLocaleString('de-DE')} auf ${config.platform} veröffentlicht`,
+        description: tx({ de: `Post wird am ${config.publishAt.toLocaleString('de-DE')} auf ${config.platform} veröffentlicht`, en: `Post will be published on ${config.publishAt.toLocaleString('de-DE')} on ${config.platform}`, es: `La publicación se publicará en ${config.publishAt.toLocaleString('de-DE')} en ${config.platform}` }),
       });
 
       return true;

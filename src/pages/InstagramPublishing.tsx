@@ -60,7 +60,7 @@ export default function InstagramPublishing() {
     navigator.clipboard.writeText(text);
     toast({
       title: tx({ de: 'Kopiert!', en: 'Copied!', es: '¡Copiado!' }),
-      description: tx({ de: `${label} wurde in die Zwischenablage kopiert.`, en: `${label} was copied to the clipboard.`, es: `${label} se copió al portapapeles.` }),
+      description: tx({ de: `${label} wurde in die Zwischenablage kopiert.`, en: `${label} has been copied to the clipboard.`, es: `${label} se ha copiado al portapapeles.` }),
     });
   };
 
@@ -256,7 +256,7 @@ export default function InstagramPublishing() {
         const backupMsg = data.backup_created ? tx({ de: " Backup erstellt.", en: " Backup created.", es: " Copia de seguridad creada." }) : "";
         toast({
           title: tx({ de: "Erfolg!", en: "Success!", es: "¡Éxito!" }),
-          description: `${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`,
+          description: tx({ de: `${tx({ de: "Token erfolgreich erneuert und gespeichert!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, en: `${tx({ de: "Token successfully renewed and saved!", en: "Token successfully renewed and saved!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}`, es: `${tx({ de: "¡Token renovado y guardado exitosamente!", en: "¡Token renovado y guardado exitosamente!", es: "¡Token renovado y guardado correctamente!" })}${backupMsg}` }),
         });
         
         // Automatically refresh diagnostics after successful save
@@ -1097,7 +1097,7 @@ export default function InstagramPublishing() {
               size="lg"
             >
               {renewLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {renewLoading ? tx({ de: "Token wird geprüft und erneuert...", en: "Token is being checked and renewed...", es: "El token se está verificando y renovando..." }) : `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"} Token prüfen und speichern`}
+              {renewLoading ? tx({ de: "Token wird geprüft und erneuert...", en: "Token is being checked and renewed...", es: "El token se está verificando y renovando..." }) : tx({ de: `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"} Token prüfen und speichern`, en: `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"} Check and save tokens`, es: `3️⃣ ${tokenTypeChoice === "página"? "Página": "Usuario"} Verificar y guardar tokens` })}
             </Button>
 
             {/* Success Result */}
@@ -1219,7 +1219,7 @@ export default function InstagramPublishing() {
                     <Alert className="mt-3 border-orange-500">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription className="text-xs">
-                        <strong>💡 Tipp:</strong> {tx({ de: "Dieser Fehler tritt oft auf, wenn", en: "This error often occurs when", es: "Este error ocurre a menudo cuando" })} <code>pages_show_list</code> fehlt. Verwende stattdessen einen <strong>Page Token</strong> (Option 1 oben) - das ist einfacher!
+                        <strong>💡 Tipp:</strong> {tx({ de: "Dieser Fehler tritt oft auf, wenn", en: "This error often occurs when", es: "Este error ocurre a menudo cuando" })} <code>pages_show_list</code> {tx({ de: "fehlt. Verwende stattdessen einen", en: "missing. Use one instead", es: "desaparecido. Utilice uno en su lugar" })} <strong>Page Token</strong> (Option 1 oben) - das ist einfacher!
                       </AlertDescription>
                     </Alert>
                   )}

@@ -175,7 +175,7 @@ export function AITransitions({
         
         toast({
           title: tx({ de: 'AI Übergänge generiert', en: 'AI transitions generated', es: 'Transiciones de IA generadas' }),
-          description: `${generated.length} ${tx({ de: 'szenenspezifische Übergänge mit Confidence Scores.', en: 'scene-specific transitions with confidence scores.', es: 'transiciones específicas de escena con puntuaciones de confianza.' })}`,
+          description: tx({ de: `${generated.length} ${tx({ de: 'szenenspezifische Übergänge mit Confidence Scores.', en: 'scene-specific transitions with confidence scores.', es: 'transiciones específicas de escena con puntuaciones de confianza.' })}`, en: `${generated.length} ${tx({ de: 'scene-specific transitions with confidence scores.', en: 'scene-specific transitions with confidence scores.', es: 'transiciones específicas de escena con puntuaciones de confianza.' })}`, es: `${generated.length} ${tx({ de: 'transiciones específicas de escena con puntuaciones de confianza.', en: 'transiciones específicas de escena con puntuaciones de confianza.', es: 'transiciones específicas de escena con supervisión de confianza.' })}` }),
         });
       } else {
         throw new Error(tx({ de: 'Ungültige Antwort vom Server', en: 'Invalid response from server', es: 'Respuesta no válida del servidor' }));
@@ -200,7 +200,7 @@ export function AITransitions({
         if (matchingType) {
           transitionType = matchingType.id;
           confidence = matchingType.aiScore;
-          reasoning = `${matchingType.name} empfohlen für ${mood} Stimmung`;
+          reasoning = tx({ de: `${matchingType.name} empfohlen für ${mood} Stimmung`, en: `${matchingType.name} recommended for ${mood} mood`, es: `${matchingType.name} recomendado para el estado de ánimo ${mood}` });
         }
         
         generated.push({
@@ -287,7 +287,7 @@ export function AITransitions({
               {isGenerating ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Analysiere Szenen...</span>
+                  <span>{tx({ de: "Analysiere Szenen...", en: "Analyze scenes...", es: "Analizar escenas..." })}</span>
                 </>
               ) : (
                 <>

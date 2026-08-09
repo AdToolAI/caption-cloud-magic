@@ -663,7 +663,7 @@ export function SceneAnalysisStep({
                   const currentScene = getCurrentScene(currentVideoTime);
                   if (currentScene) {
                     const index = scenes.findIndex(s => s.id === currentScene.id);
-                    return `Szene ${index + 1}: ${currentScene.description}`;
+                    return tx({ de: `Szene ${index + 1}: ${currentScene.description}`, en: `Scene ${index + 1}: ${currentScene.description}`, es: `Escena ${index + 1}: ${currentScene.description}` });
                   }
                   return tx({ de: "Keine Szene", en: "No scene", es: "sin escena" });
                 })()}
@@ -705,7 +705,7 @@ export function SceneAnalysisStep({
                         <div
                           className={`${colors[index % colors.length]} rounded-l ${index === scenes.length - 1 ? 'rounded-r' : ''} cursor-pointer 
                             transition-all relative group flex-1 ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
-                          title={`Szene ${index + 1}: ${scene.description}`}
+                          title={tx({ de: `Szene ${index + 1}: ${scene.description}`, en: `Scene ${index + 1}: ${scene.description}`, es: `Escena ${index + 1}: ${scene.description}` })}
                         >
                           {hasEffects && (
                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white z-10" />
@@ -798,7 +798,7 @@ export function SceneAnalysisStep({
           {isAnalyzing ? (
             <div className="space-y-4">
               <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
-              <h3 className="text-lg font-semibold">KI analysiert dein Video...</h3>
+              <h3 className="text-lg font-semibold">{tx({ de: "KI analysiert dein Video...", en: "AI analyzes your video...", es: "La IA analiza tu vídeo..." })}</h3>
               <p className="text-muted-foreground">
                 Die KI erkennt Szenen und erstellt Verbesserungsvorschläge
               </p>
@@ -829,13 +829,13 @@ export function SceneAnalysisStep({
                 <Sparkles className="w-5 h-5 text-primary" />
                 {scenes.length} {scenes.length === 1 ? 'Szene' : tx({ de: "Szenen", en: "Scenes", es: "Escenas" })} erkannt
                 <Badge variant="outline" className="text-xs font-normal">
-                  {scenes.length === 1 ? 'Keine Schnitte erkannt' : 'Szenenanalyse'}
+                  {scenes.length === 1 ? tx({ de: 'Keine Schnitte erkannt', en: 'No cuts detected', es: 'No se detectaron cortes' }) : 'Szenenanalyse'}
                 </Badge>
               </h3>
               <p className="text-sm text-muted-foreground">
                 {scenes.length === 1 
                   ? tx({ de: "Kein Szenenwechsel im Video gefunden", en: "No scene change found in the video", es: "No se encontró ningún cambio de escena en el video." }) 
-                  : 'Szenengrenzen basieren auf visueller Videoanalyse'}
+                  : tx({ de: 'Szenengrenzen basieren auf visueller Videoanalyse', en: 'Scene boundaries are based on visual video analysis', es: 'Los límites de la escena se basan en el análisis de vídeo visual.' })}
               </p>
             </div>
             <Button variant="outline" onClick={applyAllSuggestions}>
@@ -1203,7 +1203,7 @@ export function SceneAnalysisStep({
                       end_time: cut.time,
                       original_start_time: prevTime,
                       original_end_time: cut.time,
-                      description: `Szene ${index + 1}`,
+                      description: tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` }),
                       mood: 'neutral',
                       playbackRate: 1.0,
                       suggested_effects: [],
@@ -1218,7 +1218,7 @@ export function SceneAnalysisStep({
                       end_time: videoDuration,
                       original_start_time: prevTime,
                       original_end_time: videoDuration,
-                      description: `Szene ${sortedCuts.length + 1}`,
+                      description: tx({ de: `Szene ${sortedCuts.length + 1}`, en: `Scene ${sortedCuts.length + 1}`, es: `Escena ${sortedCuts.length + 1}` }),
                       mood: 'neutral',
                       playbackRate: 1.0,
                       suggested_effects: [],

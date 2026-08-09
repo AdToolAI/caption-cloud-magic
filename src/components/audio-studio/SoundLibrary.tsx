@@ -177,7 +177,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success('Download gestartet');
+      toast.success(tx({ de: 'Download gestartet', en: 'Download started', es: 'Descarga iniciada' }));
     } catch (error) {
       console.error('Download error:', error);
       toast.error(tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Descarga fallida' }));
@@ -325,7 +325,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
             >
               <FileAudio className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
               <p className="text-muted-foreground">
-                {searchQuery ? 'Keine Ergebnisse gefunden' : tx({ de: 'Noch keine Sounds gespeichert', en: 'No sounds saved yet', es: 'Aún no hay sonidos guardados' })}
+                {searchQuery ? tx({ de: 'Keine Ergebnisse gefunden', en: 'No results found', es: 'No se encontraron resultados' }) : tx({ de: 'Noch keine Sounds gespeichert', en: 'No sounds saved yet', es: 'Aún no hay sonidos guardados' })}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Optimiere Audio und speichere es in der Bibliothek
@@ -442,7 +442,7 @@ export function SoundLibrary({ onLoadAudio, onSendToBeatSync, onStemsExtracted }
                       size="icon"
                       onClick={() => deleteSound(sound.id)}
                       className="w-9 h-9 hover:bg-destructive/10 hover:text-destructive"
-                      title="Löschen"
+                      title={tx({ de: "Löschen", en: "Delete", es: "Borrar" })}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

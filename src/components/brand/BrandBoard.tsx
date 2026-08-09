@@ -19,7 +19,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
     setCopiedColor(label);
     setTimeout(() => setCopiedColor(""), 2000);
     toast({
-      title: "Kopiert!",
+      title: tx({ de: "Kopiert!", en: "Copied!", es: "¡Copiado!" }),
       description: `${label}: ${text}`
     });
   };

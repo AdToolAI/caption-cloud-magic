@@ -77,7 +77,7 @@ interface ClipsTabProps {
 const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
   pending: { color: 'text-muted-foreground', bg: 'bg-muted/40 border-border/40', label: 'Ausstehend' },
   generating: { color: 'text-accent', bg: 'bg-accent/15 border-accent/40 animate-pulse', label: 'Generiert…' },
-  ready: { color: 'text-green-400', bg: 'bg-green-500/15 border-green-500/40', label: 'Fertig' },
+  ready: { color: 'text-green-400', bg: 'bg-green-500/15 border-green-500/40', label: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }) },
   failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
 };
 
@@ -344,7 +344,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           }
         }
         if (scene.clipStatus === 'generating' && dbClipStatus === 'failed') {
-          toast({ title: tx({ de: `Szene ${idx + 1} fehlgeschlagen`, en: `Scene ${idx + 1} failed`, es: `Escena ${idx + 1} falló` }), variant: 'destructive' });
+          toast({ title: tx({ de: `Szene ${idx + 1} fehlgeschlagen`, en: `Scene ${idx + 1} failed`, es: `La escena ${idx + 1} falló` }), variant: 'destructive' });
         }
         // Cinematic-Sync: notify when Sync.so step finishes
         if (
@@ -363,8 +363,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).lip_sync_status === 'failed'
         ) {
           toast({
-            title: tx({ de: `Cinematic-Sync Lip-Sync fehlgeschlagen`, en: `Cinematic Sync lip sync failed`, es: `Falló la sincronización labial de Cinematic Sync` }),
-            description: tx({ de: `Szene ${idx + 1}: Hailuo-Render ist fertig, aber Sync.so hatte einen Fehler. Credits wurden refundiert.`, en: `Scene ${idx + 1}: Hailuo render is done, but Sync.so had an error. Credits were refunded.`, es: `Escena ${idx + 1}: la renderización de Hailuo terminó, pero Sync.so tuvo un error. Se reembolsaron los créditos.` }),
+            title: tx({ de: `Cinematic-Sync Lip-Sync fehlgeschlagen`, en: `Cinematic sync lip sync failed`, es: `Error de sincronización de labios en la sincronización cinematográfica` }),
+            description: tx({ de: `Szene ${idx + 1}: Hailuo-Render ist fertig, aber Sync.so hatte einen Fehler. Credits wurden refundiert.`, en: `Scene ${idx + 1}: Hailuo render is finished, but Sync.so had an error. Credits have been refunded.`, es: `Escena ${idx + 1}: el renderizado de Hailuo finalizó, pero Sync.so tuvo un error. Los créditos han sido reembolsados.` }),
             variant: 'destructive',
           });
         }
@@ -374,7 +374,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           (dbScene as any).lip_sync_status === 'no_voiceover'
         ) {
           toast({
-            title: `Cinematic-Sync braucht ein Voiceover — Szene ${idx + 1}`,
+            title: tx({ de: `Cinematic-Sync braucht ein Voiceover — Szene ${idx + 1}`, en: `Cinematic sync needs a voiceover — scene ${idx + 1}`, es: `La sincronización cinematográfica necesita una voz en off: escena ${idx + 1}` }),
             description: tx({ de: 'Hailuo-Render ist fertig, aber es gibt kein Voiceover für den Lip-Sync. Bitte erst im Dialog/VO-Tab eine Stimme generieren, dann Cinematic-Sync erneut starten.', en: 'Hailuo render is done, but there is no voiceover for the lip sync. Please generate a voice in the Dialog/VO tab first, then start Cinematic Sync again.', es: 'La renderización de Hailuo terminó, pero no hay locución para la sincronización labial. Genera primero una voz en la pestaña Diálogo/VO y luego reinicia Cinematic Sync.' }),
             variant: 'destructive',
           });
@@ -520,7 +520,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
               console.warn(`[ClipsTab] lip-sync invoke failed for ${sceneId}`, lsErr);
             } else {
               toast({
-                title: 'Lip-Sync gestartet',
+                title: tx({ de: 'Lip-Sync gestartet', en: 'Lip sync started', es: 'Se inició la sincronización de labios' }),
                 description: tx({ de: 'Charakter spricht gleich wortgenau in der Szene (~30s).', en: 'Character speaks verbatim in the scene (~30s).', es: 'El personaje habla palabra por palabra en la escena (~30s).' }),
               });
             }
@@ -740,14 +740,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       if (failedResults.length > 0) {
         console.error('[ClipsTab] Failed clip details:', failedResults);
         toast({
-          title: tx({ de: `${failedResults.length} Clip(s) fehlgeschlagen`, en: `${failedResults.length} clip(s) failed`, es: `${failedResults.length} clip(s) fallaron` }),
+          title: tx({ de: `${failedResults.length} Clip(s) fehlgeschlagen`, en: `${failedResults.length} Clip(s) failed`, es: `${failedResults.length} Clip(s) fallidos` }),
           description: tx({ de: 'Generierung fehlgeschlagen — bitte erneut versuchen. Details in der Konsole.', en: 'Generation failed — please try again. Details in the console.', es: 'Error en la generación — inténtalo de nuevo. Detalles en la consola.' }),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Clip-Generierung gestartet',
-          description: `${data?.generatingCount || 0} KI-Clips werden generiert (€${remainingCost.toFixed(2)}).`,
+          title: tx({ de: 'Clip-Generierung gestartet', en: 'Clip generation started', es: 'Se inició la generación de clips' }),
+          description: tx({ de: `${data?.generatingCount || 0} KI-Clips werden generiert (€${remainingCost.toFixed(2)}).`, en: `${data?.generatingCount || 0} AI clips are generated (€${remainingCost.toFixed(2)}).`, es: `${data?.generatingCount || 0} Se generan clips de IA ($${remainingCost.toFixed(2)}).` }),
         });
       }
       // Trigger immediate poll
@@ -884,7 +884,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         });
         onUpdateScenes(updatedScenes);
       }
-      toast({ title: 'Generierung gestartet', description: `Szene ${(targetScene.orderIndex ?? 0) + 1}` });
+      toast({ title: tx({ de: 'Generierung gestartet', en: 'Generation started', es: 'Generacion comenzada' }), description: tx({ de: `Szene ${(targetScene.orderIndex ?? 0) + 1}`, en: `Scene ${(targetScene.orderIndex ?? 0) + 1}`, es: `Escena ${(targetScene.orderIndex ?? 0) + 1}` }) });
       setTimeout(pollScenes, 500);
     } catch (err: any) {
       // Roll back the optimistic 'generating' status so the spinner clears
@@ -1020,8 +1020,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       }
 
       toast({
-        title: '🎬 Cinematic-Sync gestartet',
-        description: tx({ de: `Szene ${(scene.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene (~60 s), danach läuft Sync.so Lip-Sync automatisch.`, en: `Scene ${(scene.orderIndex ?? 0) + 1}: Hailuo renders the real scene (~60 s), then Sync.so lip sync runs automatically.`, es: `Escena ${(scene.orderIndex ?? 0) + 1}: Hailuo renderiza la escena real (~60 s), luego se ejecuta automáticamente la sincronización labial de Sync.so.` }),
+        title: tx({ de: '🎬 Cinematic-Sync gestartet', en: '🎬 Cinematic sync started', es: '🎬 Se inició la sincronización cinematográfica' }),
+        description: tx({ de: `Szene ${(scene.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene (~60 s), danach läuft Sync.so Lip-Sync automatisch.`, en: `Scene ${(scene.orderIndex ?? 0) + 1}: Hailuo renders the real scene (~60 s), then Sync.so Lip-Sync runs automatically.`, es: `Escena ${(scene.orderIndex ?? 0) + 1}: Hailuo renderiza la escena real (~60 s), luego Sync.so Lip-Sync se ejecuta automáticamente.` }),
       });
       setTimeout(pollScenes, 800);
     } catch (err: any) {
@@ -1130,8 +1130,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             >
               {isGeneratingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
               {pendingScenes.length === 0
-                ? 'Alle Clips bereit'
-                : `Alle generieren (${pendingScenes.length} • €${remainingCost.toFixed(2)})`}
+                ? tx({ de: 'Alle Clips bereit', en: 'All clips ready', es: 'Todos los clips listos' })
+                : tx({ de: `Alle generieren (${pendingScenes.length} • €${remainingCost.toFixed(2)})`, en: `Generate all (${pendingScenes.length} • €${remainingCost.toFixed(2)})`, es: `Generar todo (${pendingScenes.length} • €${remainingCost.toFixed(2)})` })}
             </Button>
             <Button
               size="sm"
@@ -1172,7 +1172,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (rerollTarget) {
@@ -1239,7 +1239,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                  <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
                   {!isMultiSpeaker && (
                     <AlertDialogAction
                       onClick={() => {
@@ -1337,7 +1337,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         }}
                         title={scene.aiPrompt || scene.stockKeywords || ''}
                       >
-                        {scene.aiPrompt || scene.stockKeywords || (isUpload ? 'Eigener Upload' : 'Kein Prompt')}
+                        {scene.aiPrompt || scene.stockKeywords || (isUpload ? tx({ de: 'Eigener Upload', en: 'Own upload', es: 'Carga propia' }) : tx({ de: 'Kein Prompt', en: 'No prompt', es: 'Sin aviso' }))}
                       </p>
                       <p
                         className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1.5 flex-wrap overflow-hidden"
@@ -1472,7 +1472,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                           ) : (
                             <Save className="h-3 w-3" />
                           )}
-                          {isSaved ? 'Gespeichert' : 'In Mediathek'}
+                          {isSaved ? tx({ de: 'Gespeichert', en: 'Saved', es: 'Guardado' }) : 'In Mediathek'}
                         </Button>
                       );
                     })()}

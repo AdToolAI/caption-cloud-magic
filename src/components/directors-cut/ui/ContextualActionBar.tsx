@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { 
@@ -180,7 +181,7 @@ export function ContextualActionBar({
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
                         <span className="flex items-center gap-1">
-                          {multiSelectCount > 1 ? `${multiSelectCount} löschen` : 'Löschen'} <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">⌫</kbd>
+                          {multiSelectCount > 1 ? tx({ de: `${multiSelectCount} löschen`, en: `Delete ${multiSelectCount}`, es: `Eliminar ${multiSelectCount}` }) : tx({ de: 'Löschen', en: 'Delete', es: 'Borrar' })} <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">⌫</kbd>
                         </span>
                       </TooltipContent>
                     </Tooltip>

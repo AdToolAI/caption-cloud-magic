@@ -216,7 +216,7 @@ export function AudiobookPanel() {
                   <span className="text-[10px] text-muted-foreground w-5">{String(i + 1).padStart(2, '0')}</span>
                   <span className="text-sm flex-1 truncate">{chapter.title}</span>
                   {chapter.audio_url && <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400">MP3</Badge>}
-                  {chapter.render_status === 'failed' && <Badge variant="destructive" className="text-[10px]">Fehler</Badge>}
+                  {chapter.render_status === 'failed' && <Badge variant="destructive" className="text-[10px]">{tx({ de: "Fehler", en: "Mistake", es: "Error" })}</Badge>}
                 </div>
                 <div className="flex items-center gap-1 mt-1.5">
                   <span className="text-[10px] text-muted-foreground flex-1">

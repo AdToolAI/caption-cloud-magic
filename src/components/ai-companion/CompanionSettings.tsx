@@ -138,7 +138,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
     try {
       const { data, error } = await supabase.functions.invoke('preview-voice', {
         body: {
-          text: `Hallo! Ich bin ${settings.bot_name}, dein persönlicher AdTool-Assistent.`,
+          text: tx({ de: `Hallo! Ich bin ${settings.bot_name}, dein persönlicher AdTool-Assistent.`, en: `Hello! I'm ${settings.bot_name}, your personal AdTool assistant.`, es: `¡Hola! Soy ${settings.bot_name}, tu asistente personal de AdTool.` }),
           voiceId: settings.voice_id,
         }
       });

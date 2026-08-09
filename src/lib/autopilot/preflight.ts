@@ -158,7 +158,7 @@ export function preflightBeforeMotion(scene: SceneGrammar): PreflightFinding[] {
   const findings = preflightScene(scene);
   if (!scene.anchorUrl) {
     findings.push(
-      block('no_anchor', 'Kein freigegebenes Ankerbild — Animation würde ins Blaue gehen.', scene.id),
+      block('no_anchor', tx({ de: 'Kein freigegebenes Ankerbild — Animation würde ins Blaue gehen.', en: 'No shared anchor image — animation would go nowhere.', es: 'Sin imagen de anclaje compartida: la animación no iría a ninguna parte.' }), scene.id),
     );
   }
   return findings;

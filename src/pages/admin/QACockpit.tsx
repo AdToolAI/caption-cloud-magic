@@ -179,7 +179,7 @@ export default function QACockpit() {
     },
     onSuccess: (data) => {
       if (data?.ok) {
-        toast.success(`Mission gestartet: ${data.mission}`);
+        toast.success(tx({ de: `Mission gestartet: ${data.mission}`, en: `Mission started: ${data.mission}`, es: `Misión iniciada: ${data.mission}` }));
         queryClient.invalidateQueries({ queryKey: ["qa-runs"] });
       } else {
         toast.warning(`Übersprungen: ${data?.reason ?? "unbekannt"}`);
@@ -540,16 +540,16 @@ export default function QACockpit() {
                         </Card>
                       ))}
                       {(mutedPatterns.data ?? []).length === 0 && (
-                        <EmptyState label="Keine Patterns stummgeschaltet" />
+                        <EmptyState label={tx({ de: "Keine Patterns stummgeschaltet", en: "No patterns muted", es: "Sin patrones silenciados" })} />
                       )}
                     </div>
                   ) : list.length === 0 ? (
                     <EmptyState
                       label={
                         bugFilter === "action"
-                          ? "Keine kritischen Bugs offen — alles grün ✓"
+                          ? tx({ de: "Keine kritischen Bugs offen — alles grün ✓", en: "No critical bugs open — everything green ✓", es: "No se han abierto errores críticos: todo está verde ✓" })
                           : bugFilter === "warnings"
-                          ? "Keine Warnungen"
+                          ? tx({ de: "Keine Warnungen", en: "No warnings", es: "Sin advertencias" })
                           : "Noch nichts gelöst"
                       }
                     />
@@ -805,7 +805,7 @@ export default function QACockpit() {
               className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
               onClick={handleCopy}
             >
-              {copied ? <><Check className="h-4 w-4 mr-2" /> Kopiert</> : <><Copy className="h-4 w-4 mr-2" /> Passwort kopieren</>}
+              {copied ? <><Check className="h-4 w-4 mr-2" /> {tx({ de: "Kopiert", en: "Copied", es: "Copiado" })}</> : <><Copy className="h-4 w-4 mr-2" /> Passwort kopieren</>}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -972,7 +972,7 @@ export default function QACockpit() {
                 >
                   <Copy className="h-4 w-4 mr-2" /> Als Prompt kopieren
                 </Button>
-                <Button onClick={() => setSelectedBug(null)}>Schließen</Button>
+                <Button onClick={() => setSelectedBug(null)}>{tx({ de: "Schließen", en: "Close", es: "Cerrar" })}</Button>
               </DialogFooter>
             </>
           )}

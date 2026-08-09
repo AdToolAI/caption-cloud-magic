@@ -77,7 +77,7 @@ export function assessIdea(input: AutopilotIdea, ctx: FeasibilityContext): Feasi
   if (idea.speakingScenes > 0 && allowedSpeakers === 0) {
     idea.speakingScenes = 0;
     score -= 8;
-    notes.push('Ohne Lip-Sync umgesetzt — die Aussage trägt das Voiceover.');
+    notes.push(tx({ de: 'Ohne Lip-Sync umgesetzt — die Aussage trägt das Voiceover.', en: 'Implemented without lip sync - the voiceover carries the message.', es: 'Implementado sin sincronización de labios: la voz en off transmite el mensaje.' }));
   } else if (idea.speakingScenes > allowedSpeakers) {
     idea.speakingScenes = allowedSpeakers;
     score -= 5;

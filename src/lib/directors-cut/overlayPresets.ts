@@ -286,7 +286,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     id: 'callout-arrow',
     name: 'Callout',
     category: 'Callout',
-    description: 'Linie plus Label, markiert Details',
+    description: tx({ de: 'Linie plus Label, markiert Details', en: 'Line plus label, marks details', es: 'Línea más etiqueta, detalles de marcas.' }),
     kind: 'callout',
     build: () => base('callout', 'Hier ansetzen', { fill: 'rgba(10,10,15,0.85)', fontSizeRel: 0.03, align: 'left' }, { animation: 'wipe' }),
   },
