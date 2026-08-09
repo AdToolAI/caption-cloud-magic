@@ -149,8 +149,8 @@ export function AudiobookPanel() {
             </div>
           </div>
           <div className="text-right text-xs text-muted-foreground space-y-1">
-            <div><span className="text-foreground font-semibold">{chapters.length}</span> {tx({ de: "Kapitel", en: "Chapters", es: "Capítulos" })} + "</div>"
-            <div>{totals.chars.toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })} + "</div>"
+            <div><span className="text-foreground font-semibold">{chapters.length}</span> {tx({ de: "Kapitel", en: "Chapters", es: "Capítulos" })}</div>
+            <div>{totals.chars.toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}</div>
             <div>≈ {formatDuration(totals.duration)}</div>
             <div className="text-primary font-semibold">
               {totals.credits.toLocaleString('de-DE')} Cr · {totals.euros.toFixed(2)} €
@@ -220,7 +220,8 @@ export function AudiobookPanel() {
                 </div>
                 <div className="flex items-center gap-1 mt-1.5">
                   <span className="text-[10px] text-muted-foreground flex-1">
-                    {countChars(chapter.body).toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })} + "\n                  </span>"
+                    {countChars(chapter.body).toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}
+                  </span>
                   <Button size="icon" variant="ghost" className="h-6 w-6"
                     onClick={(e) => { e.stopPropagation(); void moveChapter(chapter.id, -1); }}>
                     <ChevronUp className="w-3.5 h-3.5" />
@@ -237,7 +238,7 @@ export function AudiobookPanel() {
               </div>
             ))}
             <Button variant="outline" size="sm" className="w-full" onClick={addChapter}>
-              <Plus className="w-4 h-4 mr-1.5" /> Kapitel
+              <Plus className="w-4 h-4 mr-1.5" /> {tx({ de: 'Kapitel', en: 'Chapter', es: 'Capítulo' })}
             </Button>
           </Card>
 
@@ -254,11 +255,11 @@ export function AudiobookPanel() {
                   value={active.body}
                   onChange={(e) => updateChapter(active.id, { body: e.target.value })}
                   className="min-h-[320px] text-sm leading-relaxed bg-background/40"
-                  placeholder={'Kapiteltext…\n\nEmma: Und dann leuchtete der Wald.'}
+                  placeholder={tx({ de: 'Kapiteltext…\n\nEmma: Und dann leuchtete der Wald.', en: 'Chapter text…\n\nEmma: And then the forest lit up.', es: 'Texto del capítulo…\n\nEmma: Y entonces el bosque se iluminó.' })}
                 />
 
                 <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                  <span>{countChars(active.body).toLocaleString('de-DE')} Zeichen</span>
+                  <span>{countChars(active.body).toLocaleString('de-DE')} {tx({ de: 'Zeichen', en: 'Characters', es: 'Caracteres' })}</span>
                   <span>≈ {formatDuration(estimateDurationSeconds(countChars(active.body)))}</span>
                   <span className="text-primary font-semibold">
                     {estimateCostCredits(countChars(active.body)).toLocaleString('de-DE')} Cr ·{' '}
@@ -315,7 +316,7 @@ export function AudiobookPanel() {
               <div className="flex items-center gap-3 flex-wrap">
                 <Button variant="outline" onClick={handleExportZip} disabled={exporting || totals.rendered === 0}>
                   {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                  ZIP-Export ({totals.rendered} Kapitel)
+                  ZIP-Export ({totals.rendered} {tx({ de: 'Kapitel', en: 'chapters', es: 'capítulos' })})
                 </Button>
                 <span className="text-xs text-muted-foreground">
                   {tx({ de: 'MP3 pro Kapitel, 44,1 kHz · Abrechnung über Media Credits', en: 'MP3 per chapter, 44.1 kHz · billing via Media Credits', es: 'MP3 por capítulo, 44,1 kHz · facturación mediante Media Credits' })}

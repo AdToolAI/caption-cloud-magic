@@ -205,18 +205,16 @@ export function DeepSweepTab() {
               </Badge>
             </div>
             <p className="text-sm text-slate-400">
-              6 echte End-to-End-Pipelines: Composer-Stitch, Director's Cut Lambda, Auto-Director,
-              Talking Head (HeyGen), Universal Video, Magic Edit. ~8–12 € pro Voll-Run.
+              {tx({ de: "6 echte End-to-End-Pipelines: Composer-Stitch, Director's Cut Lambda, Auto-Director, Talking Head (HeyGen), Universal Video, Magic Edit. ~8–12 € pro Voll-Run.", en: "6 real end-to-end pipelines: Composer stitch, Director's Cut Lambda, Auto-Director, Talking Head (HeyGen), Universal Video, Magic Edit. ~8–12 € per full run.", es: "6 pipelines reales de extremo a extremo: Composer Stitch, Director's Cut Lambda, Auto-Director, Talking Head (HeyGen), Universal Video, Magic Edit. ~8–12 € por ejecución completa." })}
             </p>
             <p className="text-xs text-amber-400/80 mt-1">
-              ⚠️ Vor dem ersten Run einmal in <strong>Live Sweep</strong> auf <em>"Bootstrap Assets"</em> klicken,
-              damit Sample-Video, -Bild, -Audio, -Portrait (für HeyGen) und PNG-Mask im qa-test-assets Bucket liegen.
+              {tx({ de: <>⚠️ Vor dem ersten Run einmal in <strong>Live Sweep</strong> auf <em>"Bootstrap Assets"</em> klicken, damit Sample-Video, -Bild, -Audio, -Portrait (für HeyGen) und PNG-Mask im qa-test-assets Bucket liegen.</>, en: <>⚠️ Before the first run, click on <em>"Bootstrap Assets"</em> in <strong>Live Sweep</strong> once so that sample video, image, audio, portrait (for HeyGen) and PNG mask are in the qa-test-assets bucket.</>, es: <>⚠️ Antes de la primera ejecución, haz clic una vez en <em>"Bootstrap Assets"</em> en <strong>Live Sweep</strong> para que el video, la imagen, el audio, el retrato (para HeyGen) y la máscara PNG de muestra estén en el bucket qa-test-assets.</> })}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-              Reload
+              {tx({ de: 'Reload', en: 'Reload', es: 'Recargar' })}
             </Button>
             {isStale && (
               <Button
@@ -231,7 +229,7 @@ export function DeepSweepTab() {
                 ) : (
                   <XCircle className="h-4 w-4 mr-1" />
                 )}
-                Run abbrechen ({Math.round(runAgeMinutes)} min)
+                {tx({ de: `Run abbrechen (${Math.round(runAgeMinutes)} min)`, en: `Cancel run (${Math.round(runAgeMinutes)} min)`, es: `Cancelar ejecución (${Math.round(runAgeMinutes)} min)` })}
               </Button>
             )}
             <AlertDialog>
@@ -245,18 +243,14 @@ export function DeepSweepTab() {
                   ) : (
                     <Play className="h-4 w-4 mr-1" />
                   )}
-                  {isRunning ? "Läuft..." : "Run Deep Sweep (50 €)"}
+                  {isRunning ? tx({ de: "Läuft...", en: "Running...", es: "En ejecución..." }) : tx({ de: "Run Deep Sweep (50 €)", en: "Run Deep Sweep (€50)", es: "Ejecutar Deep Sweep (50 €)" })}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>{tx({ de: "Deep Sweep mit echten Renders starten?", en: "Start Deep Sweep with real renders?", es: "¿Iniciar Deep Sweep con renders reales?" })}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Diese Aktion löst <strong>echte bezahlte API-Calls</strong> aus
-                    (Replicate, HeyGen, ElevenLabs, AWS Lambda). Erwarteter Verbrauch:
-                    ~12 €. Hard-Cap: 50 €. Dauer: 10-12 Minuten.
-                    <br /><br />
-                    Hard-Lock: Max 1 Sweep alle 6h.
+                    {tx({ de: <>Diese Aktion löst <strong>echte bezahlte API-Calls</strong> aus (Replicate, HeyGen, ElevenLabs, AWS Lambda). Erwarteter Verbrauch: ~12 €. Hard-Cap: 50 €. Dauer: 10-12 Minuten.<br /><br />Hard-Lock: Max 1 Sweep alle 6h.</>, en: <>This action triggers <strong>real paid API calls</strong> (Replicate, HeyGen, ElevenLabs, AWS Lambda). Expected consumption: ~€12. Hard cap: €50. Duration: 10-12 minutes.<br /><br />Hard lock: max 1 sweep every 6h.</>, es: <>Esta acción activa <strong>llamadas API reales de pago</strong> (Replicate, HeyGen, ElevenLabs, AWS Lambda). Consumo esperado: ~12 €. Límite máximo: 50 €. Duración: 10-12 minutos.<br /><br />Bloqueo estricto: máx. 1 barrido cada 6h.</> })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -265,7 +259,7 @@ export function DeepSweepTab() {
                     onClick={startSweep}
                     className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
                   >
-                    Sweep starten
+                    {tx({ de: 'Sweep starten', en: 'Start sweep', es: 'Iniciar barrido' })}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -276,17 +270,17 @@ export function DeepSweepTab() {
         {/* Live stats */}
         {latestRun && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-            <StatCard label="Status" value={latestRun.status} variant={latestRun.status} />
+            <StatCard label={tx({ de: "Status", en: "Status", es: "Estado" })} value={latestRun.status} variant={latestRun.status} />
             <StatCard
-              label="Pass Rate"
+              label={tx({ de: "Pass Rate", en: "Pass rate", es: "Tasa de éxito" })}
               value={`${latestRun.flows_succeeded}/${effectiveTotal} (${passRate}%)${timeoutCount > 0 ? ` · ${timeoutCount} timeout` : ""}`}
             />
             <StatCard
-              label="Verbraucht"
+              label={tx({ de: "Verbraucht", en: "Consumed", es: "Consumido" })}
               value={`${Number(latestRun.total_cost_eur).toFixed(2)} € / ${Number(latestRun.cap_eur).toFixed(0)} €`}
             />
             <StatCard
-              label="Skipped"
+              label={tx({ de: "Skipped", en: "Skipped", es: "Omitido" })}
               value={`${latestRun.flows_skipped}`}
             />
           </div>
@@ -299,7 +293,7 @@ export function DeepSweepTab() {
       {/* Live Flow Status */}
       <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
         <h4 className="text-sm font-semibold text-slate-300 mb-3">
-          Aktueller Run — 6 Flows
+          {tx({ de: 'Aktueller Run — 6 Flows', en: 'Current run — 6 flows', es: 'Ejecución actual — 6 flujos' })}
         </h4>
         <div className="space-y-2">
           {FLOW_NAMES.map((name, idx) => {
@@ -364,7 +358,7 @@ export function DeepSweepTab() {
                         ) : (
                           <RefreshCw className="h-3 w-3 mr-1" />
                         )}
-                        Portrait neu provisionieren
+                        {tx({ de: 'Portrait neu provisionieren', en: 'Re-provision portrait', es: 'Reaprovisionar retrato' })}
                       </Button>
                     )}
                   {flow?.flow_index === 6 &&
@@ -382,7 +376,7 @@ export function DeepSweepTab() {
                         ) : (
                           <RefreshCw className="h-3 w-3 mr-1" />
                         )}
-                        Bootstrap jetzt ausführen
+                        {tx({ de: 'Bootstrap jetzt ausführen', en: 'Run bootstrap now', es: 'Ejecutar bootstrap ahora' })}
                       </Button>
                     )}
                 </div>
@@ -393,7 +387,7 @@ export function DeepSweepTab() {
                     rel="noopener noreferrer"
                     className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
                   >
-                    Output <ExternalLink className="h-3 w-3" />
+                    {tx({ de: 'Output', en: 'Output', es: 'Salida' })} <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
               </div>
@@ -405,7 +399,7 @@ export function DeepSweepTab() {
       {/* History */}
       {history.length > 1 && (
         <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
-          <h4 className="text-sm font-semibold text-slate-300 mb-3">Letzte 10 Runs</h4>
+          <h4 className="text-sm font-semibold text-slate-300 mb-3">{tx({ de: 'Letzte 10 Runs', en: 'Last 10 runs', es: 'Últimas 10 ejecuciones' })}</h4>
           <div className="space-y-1.5">
             {history.slice(1).map((r) => {
               const pr = r.flows_total > 0

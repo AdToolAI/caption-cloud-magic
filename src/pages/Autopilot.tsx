@@ -45,17 +45,17 @@ export default function Autopilot() {
       features={[
         {
           icon: <Bot className="h-5 w-5" />,
-          title: 'Auto-Briefing & Strategie',
+          title: tx({ de: 'Auto-Briefing & Strategie', en: 'Auto briefing & strategy', es: 'Briefing y estrategia automáticos' }),
           description: tx({ de: 'Einmal die Strategie definieren — die KI plant 14 Tage Content im Voraus, abgestimmt auf Brand, Sprache und Plattform.', en: 'Define your strategy once — the AI plans 14 days of content ahead, matched to brand, language and platform.', es: 'Define la estrategia una vez: la IA planifica 14 días de contenido por adelantado, ajustado a marca, idioma y plataforma.' }),
         },
         {
           icon: <ShieldCheck className="h-5 w-5" />,
-          title: 'Legal Shield',
+          title: tx({ de: 'Legal Shield', en: 'Legal shield', es: 'Escudo legal' }),
           description: tx({ de: 'KI-QA prüft jeden Post auf Copyright, Deepfakes und Brand-CI. Strike-System verhindert Account-Risiko.', en: 'AI QA checks every post for copyright, deepfakes and brand CI. A strike system prevents account risk.', es: 'El control de calidad con IA revisa cada publicación por copyright, deepfakes e identidad de marca. El sistema de avisos evita riesgos para la cuenta.' }),
         },
         {
           icon: <Calendar className="h-5 w-5" />,
-          title: 'Wochenplan & Approval-Inbox',
+          title: tx({ de: 'Wochenplan & Approval-Inbox', en: 'Weekly plan & approval inbox', es: 'Plan semanal y bandeja de aprobación' }),
           description: tx({ de: 'Co-Pilot-Modus: Du genehmigst per Klick. Auto-Publish: Die KI veröffentlicht zu optimalen Zeiten.', en: 'Co-pilot mode: You approve with one click. Auto-Publish: The AI ​​publishes at optimal times.', es: 'Modo copiloto: Apruebas con un clic. Publicación automática: la IA publica en momentos óptimos.' }),
         },
       ]}
@@ -138,7 +138,7 @@ function AutopilotReal() {
                 )} />
                 <div>
                   <div className="font-semibold text-sm">
-                    {isLocked ? 'GESPERRT' : isPaused ? `PAUSIERT bis ${new Date(brief!.paused_until!).toLocaleString()}` : isActive ? 'AUTOPILOT AKTIV' : 'AUTOPILOT INAKTIV'}
+                    {isLocked ? tx({ de: 'GESPERRT', en: 'LOCKED', es: 'BLOQUEADO' }) : isPaused ? tx({ de: `PAUSIERT bis ${new Date(brief!.paused_until!).toLocaleString()}`, en: `PAUSED until ${new Date(brief!.paused_until!).toLocaleString()}`, es: `PAUSADO hasta ${new Date(brief!.paused_until!).toLocaleString()}` }) : isActive ? tx({ de: 'AUTOPILOT AKTIV', en: 'AUTOPILOT ACTIVE', es: 'PILOTO AUTOMÁTICO ACTIVO' }) : tx({ de: 'AUTOPILOT INAKTIV', en: 'AUTOPILOT INACTIVE', es: 'PILOTO AUTOMÁTICO INACTIVO' })}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {brief
@@ -181,10 +181,10 @@ function AutopilotReal() {
                 <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <div className="font-semibold text-destructive">
-                    {activeStrikes.length} aktive{activeStrikes.length === 1 ? 'r' : ''} Strike{activeStrikes.length === 1 ? '' : 's'}
+                    {tx({ de: `${activeStrikes.length} aktive${activeStrikes.length === 1 ? 'r' : ''} Strike${activeStrikes.length === 1 ? '' : 's'}`, en: `${activeStrikes.length} active strike${activeStrikes.length === 1 ? '' : 's'}`, es: `${activeStrikes.length} infracción(es) activa(s)` })}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Beim 2. Strike wird der Autopilot 7 Tage gesperrt. Beim 3. Strike dauerhaft. Critical-Strikes können zur fristlosen Account-Löschung führen.
+                    {tx({ de: "Beim 2. Strike wird der Autopilot 7 Tage gesperrt. Beim 3. Strike dauerhaft. Critical-Strikes können zur fristlosen Account-Löschung führen.", en: "On the 2nd strike, the autopilot is locked for 7 days. On the 3rd strike, permanently. Critical strikes can lead to immediate account termination.", es: "En la 2ª infracción, el piloto automático se bloquea durante 7 días. En la 3ª, de forma permanente. Las infracciones críticas pueden provocar la terminación inmediata de la cuenta." })}
                   </p>
                 </div>
                 <Link to="/legal/autopilot-aup" className="text-xs text-primary underline shrink-0">{tx({ de: "Regeln lesen", en: "Read rules", es: "Leer reglas" })}</Link>
@@ -195,8 +195,8 @@ function AutopilotReal() {
           {/* Tabs */}
           <Tabs defaultValue={inboxBadge > 0 ? 'inbox' : 'director'}>
             <TabsList className="mb-4">
-              <TabsTrigger value="director" className="gap-1.5"><Clapperboard className="h-3.5 w-3.5" /> Regietisch</TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-1.5"><Calendar className="h-3.5 w-3.5" /> Wochenplan</TabsTrigger>
+              <TabsTrigger value="director" className="gap-1.5"><Clapperboard className="h-3.5 w-3.5" /> {tx({ de: "Regietisch", en: "Director's desk", es: "Mesa de dirección" })}</TabsTrigger>
+              <TabsTrigger value="calendar" className="gap-1.5"><Calendar className="h-3.5 w-3.5" /> {tx({ de: "Wochenplan", en: "Weekly plan", es: "Plan semanal" })}</TabsTrigger>
               <TabsTrigger value="inbox" className="gap-1.5 relative">
                 <Inbox className="h-3.5 w-3.5" /> Inbox
                 {inboxBadge > 0 && (
@@ -205,11 +205,11 @@ function AutopilotReal() {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="strategy" className="gap-1.5"><Settings className="h-3.5 w-3.5" /> Strategie</TabsTrigger>
+              <TabsTrigger value="strategy" className="gap-1.5"><Settings className="h-3.5 w-3.5" /> {tx({ de: "Strategie", en: "Strategy", es: "Estrategia" })}</TabsTrigger>
               <TabsTrigger value="tools" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Tools</TabsTrigger>
               <TabsTrigger value="insights" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Insights</TabsTrigger>
               <TabsTrigger value="review" className="gap-1.5 relative">
-                <FileText className="h-3.5 w-3.5" /> Wochen-Review
+                <FileText className="h-3.5 w-3.5" /> {tx({ de: "Wochen-Review", en: "Weekly review", es: "Revisión semanal" })}
                 {brief?.briefing_required_until && new Date(brief.briefing_required_until) > new Date() && (
                   <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
                 )}
@@ -290,13 +290,13 @@ function ActivationToggle({
   if (isLocked) {
     return (
       <Button variant="outline" size="sm" disabled className="gap-1.5 border-destructive/50 text-destructive">
-        <Lock className="h-3.5 w-3.5" /> Gesperrt
+        <Lock className="h-3.5 w-3.5" /> {tx({ de: "Gesperrt", en: "Locked", es: "Bloqueado" })}
       </Button>
     );
   }
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground hidden md:inline">{isActive ? 'AKTIV' : 'INAKTIV'}</span>
+      <span className="text-xs text-muted-foreground hidden md:inline">{isActive ? tx({ de: 'AKTIV', en: 'ACTIVE', es: 'ACTIVO' }) : tx({ de: 'INAKTIV', en: 'INACTIVE', es: 'INACTIVO' })}</span>
       <Switch
         checked={isActive}
         disabled={isPending}
@@ -307,7 +307,7 @@ function ActivationToggle({
           }
           onDeactivate();
         }}
-        aria-label="Autopilot aktivieren"
+        aria-label={tx({ de: "Autopilot aktivieren", en: "Activate autopilot", es: "Activar piloto automático" })}
       />
       <Power className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
     </div>
@@ -363,7 +363,7 @@ function CompliancePanel({
   return (
     <div className="space-y-4">
       <Card className="p-5">
-        <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Compliance Score</div>
+        <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{tx({ de: "Compliance Score", en: "Compliance score", es: "Puntuación de cumplimiento" })}</div>
         <div className={cn(
           'text-5xl font-serif',
           score >= 90 ? 'text-emerald-400' : score >= 70 ? 'text-amber-400' : 'text-destructive',
@@ -405,9 +405,8 @@ function CompliancePanel({
       </Card>
 
       <Card className="p-4 border-destructive/30 bg-destructive/5 text-xs text-foreground/90">
-        <strong className="text-destructive">Wichtig:</strong> Critical-Strikes (Deepfake-Versuche, Copyright-Verletzungen,
-        Identitätstäuschung, Manipulation) können zur sofortigen fristlosen Löschung des Accounts ohne Rückerstattung führen.
-        Vollständige Regeln: <Link to="/legal/autopilot-aup" className="text-primary underline">Acceptable Use Policy</Link>.
+        <strong className="text-destructive">{tx({ de: "Wichtig:", en: "Important:", es: "Importante:" })}</strong> {tx({ de: "Critical-Strikes (Deepfake-Versuche, Copyright-Verletzungen, Identitätstäuschung, Manipulation) können zur sofortigen fristlosen Löschung des Accounts ohne Rückerstattung führen.", en: "Critical strikes (deepfake attempts, copyright violations, identity deception, manipulation) can lead to immediate termination of the account without notice and without refund.", es: "Las infracciones críticas (intentos de deepfake, violaciones de derechos de autor, suplantación de identidad, manipulación) pueden provocar la terminación inmediata de la cuenta sin previo aviso y sin reembolso." })}
+        {tx({ de: "Vollständige Regeln:", en: "Full rules:", es: "Reglas completas:" })} <Link to="/legal/autopilot-aup" className="text-primary underline">Acceptable Use Policy</Link>.
       </Card>
     </div>
   );

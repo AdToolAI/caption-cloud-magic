@@ -56,14 +56,14 @@ export default function UpgradeEnterprise() {
             Enterprise Upgrade
           </CardTitle>
           <CardDescription>
-            {tx({ de: "Upgrade auf Enterprise", en: "Upgrade to Enterprise", es: "Actualizar a Enterprise" })} Plan für unbegrenzte Features
+            {tx({ de: "Upgrade auf Enterprise Plan für unbegrenzte Features", en: "Upgrade to Enterprise plan for unlimited features", es: "Actualiza al plan Enterprise para funciones ilimitadas" })}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="space-y-2 text-sm">
-              <p>✅ Unbegrenzte Credits</p>
-              <p>✅ Team & Kalender Features</p>
+              <p>✅ {tx({ de: "Unbegrenzte Credits", en: "Unlimited credits", es: "Créditos ilimitados" })}</p>
+              <p>✅ {tx({ de: "Team & Kalender Features", en: "Team & calendar features", es: "Funciones de equipo y calendario" })}</p>
               <p>✅ Priority Support</p>
               <p>✅ API Access</p>
               <p>✅ White Labeling</p>
@@ -79,7 +79,7 @@ export default function UpgradeEnterprise() {
                   Upgrading...
                 </>
               ) : (
-                'Jetzt upgraden'
+                tx({ de: "Jetzt upgraden", en: "Upgrade now", es: "Actualizar ahora" })
               )}
             </Button>
           </div>

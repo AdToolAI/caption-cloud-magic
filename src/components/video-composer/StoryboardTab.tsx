@@ -573,7 +573,7 @@ export default function StoryboardTab({
               className="gap-1 text-xs"
               title={tx({ de: "Engine der ersten Szene auf alle anderen KI-Szenen übertragen", en: "Transfer the engine of the first scene to all other AI scenes", es: "Transferir el motor de la primera escena a todas las demás escenas de IA" })}
             >
-              <Sparkles className="h-3.5 w-3.5" /> Engine für alle
+              <Sparkles className="h-3.5 w-3.5" /> {tx({ de: "Engine für alle", en: "Engine for all", es: "Motor para todas" })}
             </Button>
           )}
           <Button

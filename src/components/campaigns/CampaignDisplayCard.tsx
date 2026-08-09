@@ -475,7 +475,7 @@ export const CampaignDisplayCard = ({
                               className="gap-1.5 text-xs border-primary/30 hover:border-primary hover:bg-primary/10"
                             >
                               <Sparkles className="h-3 w-3 text-primary" />
-                              Mit KI generieren
+                              {tx({ de: "Mit KI generieren", en: "Generate with AI", es: "Generar con IA" })}
                             </Button>
                             <Button
                               size="sm"
@@ -487,7 +487,7 @@ export const CampaignDisplayCard = ({
                               className="gap-1.5 text-xs hover:bg-accent/10"
                             >
                               <Eye className="h-3 w-3" />
-                              {isPreviewOpen ? tx({ de: "Vorschau schließen", en: "Close preview", es: "Cerrar vista previa" }) : "Plattform-Vorschau"}
+                              {isPreviewOpen ? tx({ de: "Vorschau schließen", en: "Close preview", es: "Cerrar vista previa" }) : tx({ de: "Plattform-Vorschau", en: "Platform preview", es: "Vista previa de plataforma" })}
                             </Button>
                             <Button
                               size="sm"

@@ -39,11 +39,11 @@ const platformMeta: Record<string, { icon: typeof Instagram; label: string; colo
 };
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  pending: { label: "Geplant", cls: "border-border" },
-  rescheduled: { label: "Neu geplant", cls: "border-primary/40 text-primary" },
-  completed: { label: "Veröffentlicht", cls: "border-success/40 text-success" },
-  missed: { label: "Verpasst", cls: "border-destructive/40 text-destructive" },
-  dismissed: { label: "Verworfen", cls: "border-muted-foreground/30 text-muted-foreground" },
+  pending: { label: tx({ de: "Geplant", en: "Scheduled", es: "Programado" }), cls: "border-border" },
+  rescheduled: { label: tx({ de: "Neu geplant", en: "Rescheduled", es: "Reprogramado" }), cls: "border-primary/40 text-primary" },
+  completed: { label: tx({ de: "Veröffentlicht", en: "Published", es: "Publicado" }), cls: "border-success/40 text-success" },
+  missed: { label: tx({ de: "Verpasst", en: "Missed", es: "Perdido" }), cls: "border-destructive/40 text-destructive" },
+  dismissed: { label: tx({ de: "Verworfen", en: "Dismissed", es: "Descartado" }), cls: "border-muted-foreground/30 text-muted-foreground" },
 };
 
 export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
@@ -138,7 +138,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
   };
 
   const handleAIGenerate = () => {
-    toast.info("Öffne KI Post Generator…");
+    toast.info(tx({ de: "Öffne KI Post Generator…", en: "Opening AI post generator…", es: "Abriendo el generador de publicaciones con IA…" }));
     navigate("/content-studio", { state: { prefill: { topic: post.content_idea, platform: post.platform } } });
   };
 
@@ -163,13 +163,13 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
         <Tabs defaultValue="preview" className="w-full">
           <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="preview" className="gap-1.5">
-              <Eye className="h-3.5 w-3.5" /> Vorschau
+              <Eye className="h-3.5 w-3.5" /> {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}
             </TabsTrigger>
             <TabsTrigger value="strategy" className="gap-1.5">
-              <Compass className="h-3.5 w-3.5" /> Strategie
+              <Compass className="h-3.5 w-3.5" /> {tx({ de: "Strategie", en: "Strategy", es: "Estrategia" })}
             </TabsTrigger>
             <TabsTrigger value="schedule" className="gap-1.5">
-              <CalendarIcon className="h-3.5 w-3.5" /> Zeitplan
+              <CalendarIcon className="h-3.5 w-3.5" /> {tx({ de: "Zeitplan", en: "Schedule", es: "Programación" })}
             </TabsTrigger>
           </TabsList>
 
@@ -196,19 +196,19 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                 />
                 <div className="flex gap-2 mt-2">
                   <Button variant="outline" size="sm" className="flex-1 text-[11px] h-8" onClick={() => navigate("/picture-studio")}>
-                    <Sparkles className="h-3 w-3 mr-1" /> Bild mit KI
+                    <Sparkles className="h-3 w-3 mr-1" /> {tx({ de: "Bild mit KI", en: "Image with AI", es: "Imagen con IA" })}
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1 text-[11px] h-8" onClick={() => navigate("/ai-video-studio")}>
-                    <Sparkles className="h-3 w-3 mr-1" /> Video mit KI
+                    <Sparkles className="h-3 w-3 mr-1" /> {tx({ de: "Video mit KI", en: "Video with AI", es: "Video con IA" })}
                   </Button>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <Label htmlFor="caption" className="text-xs">Caption</Label>
+                  <Label htmlFor="caption" className="text-xs">{tx({ de: "Caption", en: "Caption", es: "Título" })}</Label>
                   <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={handleAIGenerate}>
-                    <Wand2 className="h-3 w-3 mr-1" /> Mit KI verbessern
+                    <Wand2 className="h-3 w-3 mr-1" /> {tx({ de: "Mit KI verbessern", en: "Improve with AI", es: "Mejorar con IA" })}
                   </Button>
                 </div>
                 <Textarea
@@ -222,7 +222,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
               </div>
 
               <div>
-                <Label htmlFor="hashtags" className="text-xs">Hashtags</Label>
+                <Label htmlFor="hashtags" className="text-xs">{tx({ de: "Hashtags", en: "Hashtags", es: "Hashtags" })}</Label>
                 <Input
                   id="hashtags"
                   value={hashtags}
@@ -249,11 +249,11 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
           <TabsContent value="schedule" className="space-y-3 mt-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="date" className="text-xs">Datum</Label>
+                <Label htmlFor="date" className="text-xs">{tx({ de: "Datum", en: "Date", es: "Fecha" })}</Label>
                 <Input id="date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="time" className="text-xs">Uhrzeit</Label>
+                <Label htmlFor="time" className="text-xs">{tx({ de: "Uhrzeit", en: "Time", es: "Hora" })}</Label>
                 <Input id="time" type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} />
               </div>
             </div>
@@ -270,10 +270,10 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                   <div className="flex items-start gap-2 p-2.5 rounded-md border border-warning/40 bg-warning/10 text-xs">
                     <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
                     <div>
-                      <div className="font-semibold text-warning">Suboptimale Zeit (Score {evalResult.score})</div>
+                      <div className="font-semibold text-warning">{tx({ de: `Suboptimale Zeit (Score ${evalResult.score})`, en: `Suboptimal time (score ${evalResult.score})`, es: `Momento subóptimo (puntuación ${evalResult.score})` })}</div>
                       <div className="text-muted-foreground">
-                        Empfohlen: <span className="font-medium text-foreground">{String(evalResult.bestHour).padStart(2, "0")}:00</span> (Score {evalResult.bestScore})
-                        {original !== null && ` · KI-Vorschlag war Score ${original}`}
+                        {tx({ de: "Empfohlen:", en: "Recommended:", es: "Recomendado:" })} <span className="font-medium text-foreground">{String(evalResult.bestHour).padStart(2, "0")}:00</span> (Score {evalResult.bestScore})
+                        {original !== null && tx({ de: ` · KI-Vorschlag war Score ${original}`, en: ` · AI suggestion was score ${original}`, es: ` · La sugerencia de la IA fue puntuación ${original}` })}
                       </div>
                     </div>
                   </div>
@@ -283,7 +283,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                 return (
                   <div className="flex items-center gap-2 p-2.5 rounded-md border border-success/40 bg-success/10 text-xs">
                     <Sparkles className="h-3.5 w-3.5 text-success" />
-                    <span className="font-medium text-success">Top-Slot deiner Heatmap (Score {evalResult.score})</span>
+                    <span className="font-medium text-success">{tx({ de: `Top-Slot deiner Heatmap (Score ${evalResult.score})`, en: `Top slot in your heatmap (score ${evalResult.score})`, es: `Mejor horario de tu mapa de calor (puntuación ${evalResult.score})` })}</span>
                   </div>
                 );
               }
@@ -292,9 +292,9 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
 
             <div className="flex items-center justify-between p-3 rounded-md border border-border/50 bg-card/40">
               <div>
-                <div className="text-sm font-medium">Automatisch posten</div>
+                <div className="text-sm font-medium">{tx({ de: "Automatisch posten", en: "Post automatically", es: "Publicar automáticamente" })}</div>
                 <div className="text-[11px] text-muted-foreground">
-                  Wird zur geplanten Zeit automatisch auf {meta.label} veröffentlicht.
+                  {tx({ de: `Wird zur geplanten Zeit automatisch auf ${meta.label} veröffentlicht.`, en: `Will be automatically published on ${meta.label} at the scheduled time.`, es: `Se publicará automáticamente en ${meta.label} a la hora programada.` })}
                 </div>
               </div>
               <Switch checked={autoPublish} onCheckedChange={setAutoPublish} />
@@ -309,11 +309,11 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
             onClick={() => { dismiss(post.id); onOpenChange(false); }}
             className="text-destructive hover:text-destructive"
           >
-            <Trash2 className="h-4 w-4 mr-1" /> Verwerfen
+            <Trash2 className="h-4 w-4 mr-1" /> {tx({ de: "Verwerfen", en: "Discard", es: "Descartar" })}
           </Button>
           <div className="flex-1" />
           <Button variant="outline" size="sm" onClick={handleSave} disabled={isUpdating}>
-            <Save className="h-4 w-4 mr-1" /> Speichern
+            <Save className="h-4 w-4 mr-1" /> {tx({ de: "Speichern", en: "Save", es: "Guardar" })}
           </Button>
           <Button size="sm" onClick={handleSubmitToCalendar} disabled={isSubmittingToCalendar}>
             <CalendarPlus className="h-4 w-4 mr-1" />

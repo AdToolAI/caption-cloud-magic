@@ -141,7 +141,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
         </div>
 
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          <strong>FCPXML</strong> öffnet Resolve / Premiere / FCP mit allen Clips & Audio.{' '}
+          <strong>FCPXML</strong> {tx({ de: 'öffnet Resolve / Premiere / FCP mit allen Clips & Audio.', en: 'opens Resolve / Premiere / FCP with all clips & audio.', es: 'abre Resolve / Premiere / FCP con todos los clips y audio.' })}{' '}
           <strong>EDL</strong> {tx({ de: 'ist Legacy (Avid).', en: 'is legacy (Avid).', es: 'es heredado (Avid).' })} <strong>Bundle</strong> {tx({ de: 'packt alle Medien lokal in ein ZIP — ideal zum Verschicken oder Offline-Schnitt.', en: 'packs all media locally in a ZIP — ideal for sending or offline editing.', es: 'empaqueta todos los medios localmente en un ZIP, ideal para envío o edición fuera de línea.' })}
         </p>
 

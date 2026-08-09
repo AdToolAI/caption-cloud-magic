@@ -291,23 +291,23 @@ export default function TalkingHeadDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mic className="h-5 w-5 text-primary" />
-            Talking-Head erstellen
+            {tx({ de: "Talking-Head erstellen", en: "Create talking head", es: "Crear cabeza parlante" })}
           </DialogTitle>
           <DialogDescription>
-            Wähle einen Charakter aus deinem Briefing-Cast (oder lege einen neuen an), schreibe ein Skript und wähle eine Stimme — der Charakter spricht den Text mit Lip-Sync.
+            {tx({ de: "Wähle einen Charakter aus deinem Briefing-Cast (oder lege einen neuen an), schreibe ein Skript und wähle eine Stimme — der Charakter spricht den Text mit Lip-Sync.", en: "Choose a character from your briefing cast (or create a new one), write a script and pick a voice — the character speaks the text with lip-sync.", es: "Elige un personaje de tu elenco de briefing (o crea uno nuevo), escribe un guion y elige una voz — el personaje dirá el texto con sincronización labial." })}
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="character" className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="character">
-              <ImageIcon className="h-4 w-4 mr-2" /> Charakter
+              <ImageIcon className="h-4 w-4 mr-2" /> {tx({ de: "Charakter", en: "Character", es: "Personaje" })}
             </TabsTrigger>
             <TabsTrigger value="script" disabled={!imageUrl || !selectedCharId}>
-              <Sparkles className="h-4 w-4 mr-2" /> Skript & Stimme
+              <Sparkles className="h-4 w-4 mr-2" /> {tx({ de: "Skript & Stimme", en: "Script & voice", es: "Guion y voz" })}
             </TabsTrigger>
             <TabsTrigger value="dialog" disabled={cast.length < 2}>
-              <User className="h-4 w-4 mr-2" /> Dialog ({cast.length})
+              <User className="h-4 w-4 mr-2" /> {tx({ de: "Dialog", en: "Dialogue", es: "Diálogo" })} ({cast.length})
             </TabsTrigger>
           </TabsList>
 
@@ -317,10 +317,10 @@ export default function TalkingHeadDialog({
               <div className="flex items-center justify-between mb-2">
                 <Label className="flex items-center gap-2">
                   <User className="h-4 w-4 text-primary" />
-                  Briefing-Cast
+                  {tx({ de: "Briefing-Cast", en: "Briefing cast", es: "Elenco del briefing" })}
                 </Label>
                 {cast.length > 0 && (
-                  <span className="text-xs text-muted-foreground">{cast.length} Charakter{cast.length === 1 ? '' : 'e'}</span>
+                  <span className="text-xs text-muted-foreground">{cast.length} {tx({ de: 'Charakter' + (cast.length === 1 ? '' : 'e'), en: cast.length === 1 ? 'character' : 'characters', es: cast.length === 1 ? 'personaje' : 'personajes' })}</span>
                 )}
               </div>
 
@@ -363,7 +363,7 @@ export default function TalkingHeadDialog({
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Dein Briefing-Cast ist noch leer. Lege unten einen neuen Charakter an oder importiere einen aus deiner Avatar-Bibliothek.
+                  {tx({ de: "Dein Briefing-Cast ist noch leer. Lege unten einen neuen Charakter an oder importiere einen aus deiner Avatar-Bibliothek.", en: "Your briefing cast is still empty. Create a new character below or import one from your avatar library.", es: "Tu elenco del briefing aún está vacío. Crea un nuevo personaje abajo o impórtalo de tu biblioteca de avatares." })}
                 </p>
               )}
             </div>
@@ -377,7 +377,7 @@ export default function TalkingHeadDialog({
                   onClick={() => { setShowNewForm((v) => !v); setShowLibrary(false); }}
                 >
                   <Plus className="h-4 w-4 mr-1.5" />
-                  Neuen Charakter ins Briefing aufnehmen
+                  {tx({ de: "Neuen Charakter ins Briefing aufnehmen", en: "Add new character to briefing", es: "Añadir nuevo personaje al briefing" })}
                 </Button>
                 {unlinkedLibraryAvatars.length > 0 && (
                   <Button
@@ -386,7 +386,7 @@ export default function TalkingHeadDialog({
                     onClick={() => { setShowLibrary((v) => !v); setShowNewForm(false); }}
                   >
                     <Library className="h-4 w-4 mr-1.5" />
-                    Aus Avatar-Bibliothek importieren ({unlinkedLibraryAvatars.length})
+                    {tx({ de: "Aus Avatar-Bibliothek importieren", en: "Import from avatar library", es: "Importar de la biblioteca de avatares" })} ({unlinkedLibraryAvatars.length})
                   </Button>
                 )}
               </div>
@@ -397,16 +397,16 @@ export default function TalkingHeadDialog({
               <Card className="p-3 space-y-3 border-primary/30 bg-primary/5">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Plus className="h-4 w-4 text-primary" />
-                  Neuer Charakter
+                  {tx({ de: "Neuer Charakter", en: "New character", es: "Nuevo personaje" })}
                 </div>
                 <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
                   <div>
-                    <Label htmlFor="new-char-name" className="text-xs">Name</Label>
+                    <Label htmlFor="new-char-name" className="text-xs">{tx({ de: "Name", en: "Name", es: "Nombre" })}</Label>
                     <Input
                       id="new-char-name"
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      placeholder="z. B. Sarah"
+                      placeholder={tx({ de: "z. B. Sarah", en: "e.g. Sarah", es: "p. ej. Sarah" })}
                       className="mt-1"
                     />
                   </div>
@@ -425,14 +425,14 @@ export default function TalkingHeadDialog({
                   </label>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  Wird auch in der Cast Consistency Map und in anderen Szenen verfügbar.
+                  {tx({ de: "Wird auch in der Cast Consistency Map und in anderen Szenen verfügbar.", en: "Also available in the cast consistency map and other scenes.", es: "También disponible en el mapa de consistencia del elenco y otras escenas." })}
                 </p>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={commitNewCharacter} disabled={!newName.trim() || !newPhotoUrl}>
-                    Hinzufügen & auswählen
+                    {tx({ de: "Hinzufügen & auswählen", en: "Add & select", es: "Añadir y seleccionar" })}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowNewForm(false)}>
-                    Abbrechen
+                    {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
                   </Button>
                 </div>
               </Card>
@@ -443,7 +443,7 @@ export default function TalkingHeadDialog({
               <Card className="p-3 space-y-2 border-border/40">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Library className="h-4 w-4 text-primary" />
-                  Avatar-Bibliothek
+                  {tx({ de: "Avatar-Bibliothek", en: "Avatar library", es: "Biblioteca de avatares" })}
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto">
                   {unlinkedLibraryAvatars.map((av) => {
@@ -479,9 +479,9 @@ export default function TalkingHeadDialog({
                 <div className="flex items-start gap-3">
                   <img src={imageUrl} alt="Selected" className="w-20 h-20 rounded-md object-cover border border-border/40" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{selectedCharName || 'Charakter'}</div>
+                    <div className="text-sm font-medium">{selectedCharName || tx({ de: "Charakter", en: "Character", es: "Personaje" })}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      Bereit für Lip-Sync — wechsle in den Tab „Skript & Stimme".
+                      {tx({ de: 'Bereit für Lip-Sync — wechsle in den Tab „Skript & Stimme".', en: 'Ready for lip-sync — switch to the "Script & voice" tab.', es: 'Listo para sincronización labial — cambia a la pestaña "Guion y voz".' })}
                     </div>
                   </div>
                   <Button
@@ -493,7 +493,7 @@ export default function TalkingHeadDialog({
                       setSelectedCharName(null);
                     }}
                   >
-                    Wechseln
+                    {tx({ de: "Wechseln", en: "Change", es: "Cambiar" })}
                   </Button>
                 </div>
               </div>
@@ -502,7 +502,7 @@ export default function TalkingHeadDialog({
 
           <TabsContent value="script" className="space-y-4">
             <div>
-              <Label htmlFor="script">Skript</Label>
+              <Label htmlFor="script">{tx({ de: "Skript", en: "Script", es: "Guion" })}</Label>
               <Textarea
                 id="script"
                 value={script}
@@ -512,12 +512,12 @@ export default function TalkingHeadDialog({
                 className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {script.length} Zeichen • ~{estimatedDurationSec}s Dauer
+                {script.length} {tx({ de: "Zeichen", en: "characters", es: "caracteres" })} • ~{estimatedDurationSec}s {tx({ de: "Dauer", en: "duration", es: "duración" })}
               </p>
             </div>
 
             <div>
-              <Label>Stimme</Label>
+              <Label>{tx({ de: "Stimme", en: "Voice", es: "Voz" })}</Label>
               <VoiceSlot
                 voiceId={voiceId}
                 voiceName={voiceName}
@@ -533,7 +533,7 @@ export default function TalkingHeadDialog({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Format</Label>
+                <Label>{tx({ de: "Format", en: "Format", es: "Formato" })}</Label>
                 <Select value={aspectRatio} onValueChange={(v: '16:9' | '9:16' | '1:1') => setAspectRatio(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -544,12 +544,12 @@ export default function TalkingHeadDialog({
                 </Select>
               </div>
               <div>
-                <Label>Qualität</Label>
+                <Label>{tx({ de: "Qualität", en: "Quality", es: "Calidad" })}</Label>
                 <Select value={resolution} onValueChange={(v: '480p' | '720p') => setResolution(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="720p">720p HD</SelectItem>
-                    <SelectItem value="480p">480p (günstiger)</SelectItem>
+                    <SelectItem value="480p">480p ({tx({ de: "günstiger", en: "cheaper", es: "más económico" })})</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -557,11 +557,11 @@ export default function TalkingHeadDialog({
 
             {availableScenes && availableScenes.length > 0 && (
               <div>
-                <Label>Ziel <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Label>{tx({ de: "Ziel", en: "Target", es: "Objetivo" })} <span className="text-muted-foreground font-normal">({tx({ de: "optional", en: "optional", es: "opcional" })})</span></Label>
                 <Select value={targetSceneId} onValueChange={setTargetSceneId}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">Nur in Media Library</SelectItem>
+                    <SelectItem value="__none__">{tx({ de: "Nur in Media Library", en: "Media library only", es: "Solo en la biblioteca de medios" })}</SelectItem>
                     <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">{tx({ de: "An Szene anhängen", en: "Attach to scene", es: "Adjuntar a la escena" })}</div>
                     {availableScenes.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
@@ -570,7 +570,7 @@ export default function TalkingHeadDialog({
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
                   {targetSceneId === '__none__'
-                    ? 'Video erscheint nur in deiner Video-History.'
+                    ? tx({ de: 'Video erscheint nur in deiner Video-History.', en: 'Video will only appear in your video history.', es: 'El video solo aparecerá en tu historial de videos.' })
                     : tx({ de: 'Video wird automatisch der gewählten Szene als Clip zugewiesen.', en: 'Video is automatically assigned to the selected scene as a clip.', es: 'El video se asigna automáticamente a la escena seleccionada como un clip.' })}
                 </p>
               </div>
@@ -580,8 +580,8 @@ export default function TalkingHeadDialog({
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
                 <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
                 <div>
-                  Geschätzte Kosten: <span className="text-primary font-semibold">€{cost.toFixed(2)}</span> ·
-                  Generierung dauert 1–3 Minuten · Powered by HeyGen Photo-Avatar
+                  {tx({ de: "Geschätzte Kosten:", en: "Estimated cost:", es: "Costo estimado:" })} <span className="text-primary font-semibold">€{cost.toFixed(2)}</span> ·
+                  {tx({ de: "Generierung dauert 1–3 Minuten · Powered by HeyGen Photo-Avatar", en: "Generation takes 1-3 minutes · Powered by HeyGen Photo-Avatar", es: "La generación tarda de 1 a 3 minutos · Con tecnología de HeyGen Photo-Avatar" })}
                 </div>
               </div>
             </Card>
@@ -593,9 +593,9 @@ export default function TalkingHeadDialog({
               size="lg"
             >
               {loading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere …</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Generiere …', en: 'Generating …', es: 'Generando …' })}</>
               ) : (
-                <><Mic className="h-4 w-4 mr-2" /> Talking-Head generieren (€{cost.toFixed(2)})</>
+                <><Mic className="h-4 w-4 mr-2" /> {tx({ de: 'Talking-Head generieren', en: 'Generate talking head', es: 'Generar cabeza parlante' })} (€{cost.toFixed(2)})</>
               )}
             </Button>
           </TabsContent>
@@ -876,7 +876,7 @@ function DialogModeTab({
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="720p">720p HD</SelectItem>
-              <SelectItem value="480p">480p (günstiger)</SelectItem>
+              <SelectItem value="480p">480p ({tx({ de: "günstiger", en: "cheaper", es: "más económico" })})</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -888,15 +888,15 @@ function DialogModeTab({
           <Select value={targetSceneId} onValueChange={setTargetSceneId}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">Nur in Media Library</SelectItem>
+              <SelectItem value="__none__">{tx({ de: "Nur in Media Library", en: "Media library only", es: "Solo en la biblioteca de medios" })}</SelectItem>
               {availableScenes.map((s) => (
                 <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground mt-1">
-            Alle Dialog-Clips werden in der Reihenfolge an diese Szene angehängt.
-            Wechsle danach in den Director's Cut für Shot-Reverse-Shot-Schnitt.
+            {tx({ de: "Alle Dialog-Clips werden in der Reihenfolge an diese Szene angehängt.", en: "All dialog clips are appended to this scene in order.", es: "Todos los clips de diálogo se añaden a esta escena en orden." })}{' '}
+            {tx({ de: "Wechsle danach in den Director's Cut für Shot-Reverse-Shot-Schnitt.", en: "Then switch to Director's Cut for shot-reverse-shot editing.", es: "Luego cambia a Director's Cut para la edición de plano contraplano." })}
           </p>
         </div>
       )}

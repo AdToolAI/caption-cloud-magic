@@ -181,7 +181,7 @@ export default function MusicStudio() {
                   Music Studio
                 </h1>
                 <p className="text-muted-foreground mt-2 max-w-xl">
-                  Fünf KI-Engines für Background-Loops, polierte Instrumentals und Songs mit Vocals — alles in einem Studio.
+                  {tx({ de: "Fünf KI-Engines für Background-Loops, polierte Instrumentals und Songs mit Vocals — alles in einem Studio.", en: "Five AI engines for background loops, polished instrumentals and songs with vocals — all in one studio.", es: "Cinco motores de IA para bucles de fondo, instrumentales pulidos y canciones con voces — todo en un solo estudio." })}
                 </p>
               </motion.div>
 
@@ -201,7 +201,7 @@ export default function MusicStudio() {
                   className="border-primary/40 text-primary hover:bg-primary/10"
                   onClick={() => navigate('/ai-video-purchase-credits')}
                 >
-                  Aufladen
+                  {tx({ de: "Aufladen", en: "Top up", es: "Recargar" })}
                 </Button>
               </Card>
             </div>
@@ -235,16 +235,16 @@ export default function MusicStudio() {
                 <Sparkles className="h-3.5 w-3.5" /> Generate
               </TabsTrigger>
               <TabsTrigger value="tracks" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
-                <Library className="h-3.5 w-3.5" /> Meine Tracks
+                <Library className="h-3.5 w-3.5" /> {tx({ de: "Meine Tracks", en: "My tracks", es: "Mis pistas" })}
               </TabsTrigger>
               <TabsTrigger value="stock" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
-                <Search className="h-3.5 w-3.5" /> Stock-Suche
+                <Search className="h-3.5 w-3.5" /> {tx({ de: "Stock-Suche", en: "Stock search", es: "Búsqueda de stock" })}
               </TabsTrigger>
               <TabsTrigger value="beat" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
-                <Activity className="h-3.5 w-3.5" /> Beat-Sync
+                <Activity className="h-3.5 w-3.5" /> {tx({ de: "Beat-Sync", en: "Beat sync", es: "Sincronización de ritmo" })}
               </TabsTrigger>
               <TabsTrigger value="licensed" className="relative data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))] gap-1.5 uppercase tracking-widest text-[11px]">
-                <Lock className="h-3.5 w-3.5" /> Lizenziert
+                <Lock className="h-3.5 w-3.5" /> {tx({ de: "Lizenziert", en: "Licensed", es: "Con licencia" })}
               </TabsTrigger>
             </TabsList>
 
@@ -265,7 +265,7 @@ export default function MusicStudio() {
                     className="border-primary/30 text-primary hover:bg-primary/10 gap-1.5 shrink-0"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
-                    Neues Projekt
+                    {tx({ de: "Neues Projekt", en: "New project", es: "Nuevo proyecto" })}
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 mt-1">
@@ -286,7 +286,7 @@ export default function MusicStudio() {
                 <Card className="lg:col-span-2 p-5 bg-background/40 backdrop-blur-md border-primary/15 space-y-5">
                   <div>
                     <Label htmlFor="prompt" className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2 block">
-                      Beschreibe den Track
+                      {tx({ de: "Beschreibe den Track", en: "Describe the track", es: "Describe la pista" })}
                     </Label>
                     <div className="relative group">
                       {/* Viewfinder corners */}
@@ -354,7 +354,7 @@ export default function MusicStudio() {
 
                   <div className="p-3 rounded-lg bg-background/40 border border-primary/10">
                     <p className="text-[11px] text-muted-foreground">
-                      <span className="text-primary font-medium">Songlänge</span> wird automatisch durch die Lyrics & den Provider bestimmt (typisch 1–3 min bei Vocal-Tracks, {maxDur}s Cap bei Instrumentals).
+                      <span className="text-primary font-medium">{tx({ de: "Songlänge", en: "Song length", es: "Duración de la canción" })}</span> {tx({ de: `wird automatisch durch die Lyrics & den Provider bestimmt (typisch 1–3 min bei Vocal-Tracks, ${maxDur}s Cap bei Instrumentals).`, en: `is determined automatically by the lyrics & provider (typically 1–3 min for vocal tracks, ${maxDur}s cap for instrumentals).`, es: `se determina automáticamente por la letra y el proveedor (normalmente 1–3 min para pistas con voz, ${maxDur}s de límite para instrumentales).` })}
                     </p>
                   </div>
 
@@ -363,7 +363,7 @@ export default function MusicStudio() {
                     <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
                       <div>
                         <Label htmlFor="loop" className="text-sm text-foreground">Seamless Loop</Label>
-                        <p className="text-[11px] text-muted-foreground">Track auf nahtloses Looping optimieren (kein Fade)</p>
+                        <p className="text-[11px] text-muted-foreground">{tx({ de: "Track auf nahtloses Looping optimieren (kein Fade)", en: "Optimize track for seamless looping (no fade)", es: "Optimizar la pista para bucles continuos (sin fundido)" })}</p>
                       </div>
                       <Switch id="loop" checked={loop} onCheckedChange={setLoop} />
                     </div>
@@ -373,7 +373,7 @@ export default function MusicStudio() {
                     <div className="flex items-center justify-between p-3 rounded-lg bg-background/40 border border-primary/10">
                       <div>
                         <Label htmlFor="instr" className="text-sm text-foreground">Instrumental</Label>
-                        <p className="text-[11px] text-muted-foreground">Ohne Gesang generieren</p>
+                        <p className="text-[11px] text-muted-foreground">{tx({ de: "Ohne Gesang generieren", en: "Generate without vocals", es: "Generar sin voces" })}</p>
                       </div>
                       <Switch id="instr" checked={instrumental} onCheckedChange={setInstrumental} />
                     </div>
@@ -382,7 +382,7 @@ export default function MusicStudio() {
                   {engine.supportsStyleField && (
                     <div>
                       <Label htmlFor="style-tags" className="text-sm text-foreground mb-1.5 block">
-                        Style-Tags <span className="text-muted-foreground text-[11px]">(Suno-Style, kommagetrennt)</span>
+                        {tx({ de: "Style-Tags", en: "Style tags", es: "Etiquetas de estilo" })} <span className="text-muted-foreground text-[11px]">{tx({ de: "(Suno-Style, kommagetrennt)", en: "(Suno-style, comma-separated)", es: "(estilo Suno, separado por comas)" })}</span>
                       </Label>
                       <Input
                         id="style-tags"
@@ -400,7 +400,7 @@ export default function MusicStudio() {
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <Label htmlFor="vocal-lang" className="text-sm text-foreground">Gesangssprache</Label>
-                          <p className="text-[11px] text-muted-foreground">Nur Sprachen, die dieser Provider sauber singt</p>
+                          <p className="text-[11px] text-muted-foreground">{tx({ de: "Nur Sprachen, die dieser Provider sauber singt", en: "Only languages this provider sings cleanly", es: "Solo idiomas que este proveedor canta con claridad" })}</p>
                         </div>
                         <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">
                           {engine.provider}
@@ -422,7 +422,7 @@ export default function MusicStudio() {
 
                   {!showLanguagePicker && engine.supportsInstrumentalToggle && instrumental && (
                     <p className="text-[11px] text-muted-foreground italic">
-                      Instrumental aktiv — keine Sprachauswahl nötig. Deaktiviere „Instrumental" für Gesang.
+                      {tx({ de: 'Instrumental aktiv — keine Sprachauswahl nötig. Deaktiviere „Instrumental" für Gesang.', en: 'Instrumental active — no language selection needed. Disable "Instrumental" for vocals.', es: 'Instrumental activo — no se necesita seleccionar idioma. Desactiva "Instrumental" para voces.' })}
                     </p>
                   )}
 
@@ -510,15 +510,15 @@ export default function MusicStudio() {
                       )}
                     >
                       {loading ? (
-                        <><Loader2 className="h-4 w-4 animate-spin" /> Rendering…</>
+                        <><Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: "Rendering…", en: "Rendering…", es: "Renderizando…" })}</>
                       ) : (
-                        <><Sparkles className="h-4 w-4" /> Track generieren</>
+                        <><Sparkles className="h-4 w-4" /> {tx({ de: "Track generieren", en: "Generate track", es: "Generar pista" })}</>
                       )}
                     </Button>
 
                     {insufficient && (
                       <div className="text-[11px] text-destructive text-center">
-                        Nicht genug Credits. Lade dein Wallet auf.
+                        {tx({ de: "Nicht genug Credits. Lade dein Wallet auf.", en: "Not enough credits. Top up your wallet.", es: "Créditos insuficientes. Recarga tu monedero." })}
                       </div>
                     )}
 
@@ -551,16 +551,16 @@ export default function MusicStudio() {
             <TabsContent value="stock">
               <Card className="p-12 text-center bg-background/40 backdrop-blur-md border-primary/15">
                 <Search className="h-10 w-10 text-primary/50 mx-auto mb-3" />
-                <h3 className="font-display text-xl text-foreground mb-2">Stock-Music-Suche</h3>
+                <h3 className="font-display text-xl text-foreground mb-2">{tx({ de: "Stock-Music-Suche", en: "Stock music search", es: "Búsqueda de música de stock" })}</h3>
                 <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-                  Live-Suche in Jamendo + Pixabay direkt im AI Video Composer und Director's Cut verfügbar — über die Music-Library im jeweiligen Editor.
+                  {tx({ de: "Live-Suche in Jamendo + Pixabay direkt im AI Video Composer und Director's Cut verfügbar — über die Music-Library im jeweiligen Editor.", en: "Live search in Jamendo + Pixabay available directly in AI Video Composer and Director's Cut — via the music library in the respective editor.", es: "Búsqueda en vivo en Jamendo + Pixabay disponible directamente en AI Video Composer y Director's Cut — a través de la biblioteca de música del editor correspondiente." })}
                 </p>
                 <div className="flex justify-center gap-2">
                   <Button variant="outline" onClick={() => navigate('/video-composer')} className="border-primary/30">
-                    Video Composer öffnen
+                    {tx({ de: "Video Composer öffnen", en: "Open Video Composer", es: "Abrir Video Composer" })}
                   </Button>
                   <Button variant="outline" onClick={() => navigate('/universal-directors-cut')} className="border-primary/30">
-                    Director's Cut öffnen
+                    {tx({ de: "Director's Cut öffnen", en: "Open Director's Cut", es: "Abrir Director's Cut" })}
                   </Button>
                 </div>
               </Card>
@@ -570,12 +570,12 @@ export default function MusicStudio() {
             <TabsContent value="beat">
               <Card className="p-12 text-center bg-background/40 backdrop-blur-md border-primary/15">
                 <Activity className="h-10 w-10 text-primary/50 mx-auto mb-3" />
-                <h3 className="font-display text-xl text-foreground mb-2">Beat-Sync & Auto-Match</h3>
+                <h3 className="font-display text-xl text-foreground mb-2">{tx({ de: "Beat-Sync & Auto-Match", en: "Beat sync & auto-match", es: "Sincronización de ritmo y coincidencia automática" })}</h3>
                 <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-                  Lade ein Video hoch und lass die Engine BPM analysieren und passende Musik vorschlagen — verfügbar im Audio Studio unter dem Auto-Match-Tab.
+                  {tx({ de: "Lade ein Video hoch und lass die Engine BPM analysieren und passende Musik vorschlagen — verfügbar im Audio Studio unter dem Auto-Match-Tab.", en: "Upload a video and let the engine analyze BPM and suggest matching music — available in Audio Studio under the auto-match tab.", es: "Sube un video y deja que el motor analice el BPM y sugiera música adecuada — disponible en Audio Studio en la pestaña de coincidencia automática." })}
                 </p>
                 <Button variant="outline" onClick={() => navigate('/audio-studio')} className="border-primary/30">
-                  Audio Studio öffnen
+                  {tx({ de: "Audio Studio öffnen", en: "Open Audio Studio", es: "Abrir Audio Studio" })}
                 </Button>
               </Card>
             </TabsContent>
@@ -584,10 +584,10 @@ export default function MusicStudio() {
             <TabsContent value="licensed">
               <Card className="p-12 text-center bg-background/40 backdrop-blur-md border-primary/15">
                 <Lock className="h-10 w-10 text-primary/50 mx-auto mb-3" />
-                <h3 className="font-display text-xl text-foreground mb-2">Lizenzierte Music Library</h3>
+                <h3 className="font-display text-xl text-foreground mb-2">{tx({ de: "Lizenzierte Music Library", en: "Licensed music library", es: "Biblioteca de música con licencia" })}</h3>
                 <Badge variant="outline" className="border-primary/40 text-primary mb-3">Coming Soon</Badge>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Kuratierte royalty-free Tracks mit Lizenz-Metadaten und PDF-Lizenzdokumenten — perfekt für kommerzielle Kampagnen.
+                  {tx({ de: "Kuratierte royalty-free Tracks mit Lizenz-Metadaten und PDF-Lizenzdokumenten — perfekt für kommerzielle Kampagnen.", en: "Curated royalty-free tracks with license metadata and PDF license documents — perfect for commercial campaigns.", es: "Pistas libres de regalías curadas con metadatos de licencia y documentos de licencia en PDF — perfectas para campañas comerciales." })}
                 </p>
               </Card>
             </TabsContent>

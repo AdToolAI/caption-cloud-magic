@@ -284,15 +284,15 @@ export function AISuperuserAdmin() {
           </Button>
           <Button onClick={triggerAnalysis} variant="outline" disabled={analyzing}>
             {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            KI-Analyse
+            {tx({ de: "KI-Analyse", en: "AI analysis", es: "Análisis de IA" })}
           </Button>
           <Button onClick={() => triggerRun('fast')} disabled={running} variant="outline">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Schnell-Test
+            {tx({ de: "Schnell-Test", en: "Quick test", es: "Prueba rápida" })}
           </Button>
           <Button onClick={() => triggerRun('full')} disabled={running}>
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Komplett-Test
+            {tx({ de: "Komplett-Test", en: "Full test", es: "Prueba completa" })}
           </Button>
           <Button onClick={trimHistory} variant="ghost" size="sm" title={tx({ de: "Behält die letzten 5 Runs pro Szenario", en: "Keeps the last 5 runs per scenario", es: "Conserva las últimas 5 ejecuciones por escenario" })}>
             {tx({ de: "Historie kürzen (letzte 5 behalten)", en: "Trim history (keep last 5)", es: "Recortar historial (mantener últimos 5)" })}
@@ -421,11 +421,11 @@ export function AISuperuserAdmin() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12"></TableHead>
-                <TableHead>Szenario</TableHead>
-                <TableHead>Letzter Run</TableHead>
-                <TableHead>Pass-Rate</TableHead>
+                <TableHead>{tx({ de: "Szenario", en: "Scenario", es: "Escenario" })}</TableHead>
+                <TableHead>{tx({ de: "Letzter Run", en: "Last run", es: "Última ejecución" })}</TableHead>
+                <TableHead>{tx({ de: "Pass-Rate", en: "Pass rate", es: "Tasa de aprobación" })}</TableHead>
                 <TableHead title={tx({ de: "Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal.", en: "True Edge Function latency including AI model response time. 5–10s are normal for image/multi-step generation.", es: "Latencia real de Edge Function, incluido el tiempo de respuesta del modelo de IA. 5–10 s son normales para la generación de imágenes/varios pasos." })}>{tx({ de: "Latenz", en: "Latency", es: "Latencia" })}</TableHead>
-                <TableHead>Runs</TableHead>
+                <TableHead>{tx({ de: "Runs", en: "Runs", es: "Ejecuciones" })}</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -454,7 +454,7 @@ export function AISuperuserAdmin() {
                   <TableCell>
                     {s.lastRun && (
                       <Button size="sm" variant="ghost" onClick={() => setSelectedRun(s.lastRun!)}>
-                        Details
+                        {tx({ de: "Details", en: "Details", es: "Detalles" })}
                       </Button>
                     )}
                   </TableCell>
@@ -463,7 +463,7 @@ export function AISuperuserAdmin() {
               {scenarios.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    Noch keine Test-Runs. Klicke auf „Schnell-Test" um zu starten.
+                    {tx({ de: 'Noch keine Test-Runs. Klicke auf „Schnell-Test" um zu starten.', en: 'No test runs yet. Click "Quick test" to start.', es: 'Aún no hay ejecuciones de prueba. Haz clic en "Prueba rápida" para empezar.' })}
                   </TableCell>
                 </TableRow>
               )}
@@ -512,7 +512,7 @@ export function AISuperuserAdmin() {
                       size="sm"
                     >
                       {creatingBugReport ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
-                      Als Bug-Report melden
+                      {tx({ de: "Als Bug-Report melden", en: "Report as bug", es: "Reportar como error" })}
                     </Button>
                   </div>
                 )}

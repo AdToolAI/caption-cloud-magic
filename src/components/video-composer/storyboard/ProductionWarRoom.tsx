@@ -99,17 +99,16 @@ export default function ProductionWarRoom({ open, progress, phaseLabel, phase, o
                 Production War Room
               </div>
               <h2 className="mt-2 font-serif text-2xl text-amber-100">
-                Briefing wird zum Drehplan
+                {tx({ de: "Briefing wird zum Drehplan", en: "Turning the briefing into a shooting plan", es: "El briefing se convierte en plan de rodaje" })}
               </h2>
               <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                Die KI analysiert dein vollständiges Briefing in zwei Pässen, extrahiert Szenen,
-                Cast, Voice & Captions und legt einen editierbaren Plan an. Qualität geht vor Tempo.
+                {tx({ de: "Die KI analysiert dein vollständiges Briefing in zwei Pässen, extrahiert Szenen, Cast, Voice & Captions und legt einen editierbaren Plan an. Qualität geht vor Tempo.", en: "The AI analyzes your full briefing in two passes, extracts scenes, cast, voice & captions and creates an editable plan. Quality over speed.", es: "La IA analiza tu briefing completo en dos pasadas, extrae escenas, reparto, voz y subtítulos, y crea un plan editable. La calidad antes que la velocidad." })}
               </p>
             </div>
             <div className="text-right text-[11px] font-mono text-amber-300/80">
               <div>{mmss} / ~02:00</div>
               <div className="flex items-center gap-1 mt-1 text-emerald-400/80">
-                <ShieldCheck className="h-3 w-3" /> Lip-Sync sicher
+                <ShieldCheck className="h-3 w-3" /> {tx({ de: "Lip-Sync sicher", en: "Lip-sync safe", es: "Sincronización labial segura" })}
               </div>
               {onCancel && phase !== 'done' && (
                 <Button
@@ -118,7 +117,7 @@ export default function ProductionWarRoom({ open, progress, phaseLabel, phase, o
                   className="mt-2 h-7 text-[10px] text-muted-foreground hover:text-foreground"
                   onClick={onCancel}
                 >
-                  <X className="h-3 w-3 mr-1" /> Abbrechen
+                  <X className="h-3 w-3 mr-1" /> {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
                 </Button>
               )}
             </div>
@@ -128,13 +127,13 @@ export default function ProductionWarRoom({ open, progress, phaseLabel, phase, o
         {/* Progress phases */}
         <div className="px-6 pt-5 space-y-3">
           <ProgressRow
-            label="Pass A · Briefing → Manifest"
+            label={tx({ de: "Pass A · Briefing → Manifest", en: "Pass A · Briefing → Manifest", es: "Pase A · Briefing → Manifiesto" })}
             value={passA}
             active={phase === 'A'}
             done={phase !== 'A'}
           />
           <ProgressRow
-            label="Pass B · Cast & Locations auflösen"
+            label={tx({ de: "Pass B · Cast & Locations auflösen", en: "Pass B · Resolving cast & locations", es: "Pase B · Resolviendo reparto y ubicaciones" })}
             value={passB}
             active={phase === 'B'}
             done={phase === 'done'}
@@ -149,7 +148,7 @@ export default function ProductionWarRoom({ open, progress, phaseLabel, phase, o
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
           <div className="rounded-xl border border-amber-300/15 bg-white/[0.02] p-4 backdrop-blur-sm">
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-amber-300/70 mb-3">
-              <Radio className="h-3 w-3" /> News Radar
+              <Radio className="h-3 w-3" /> {tx({ de: "News Radar", en: "News Radar", es: "Radar de noticias" })}
             </div>
             <div className="space-y-2 min-h-[120px]">
               {news.slice(0, 6).map((n, i) => (
@@ -172,7 +171,7 @@ export default function ProductionWarRoom({ open, progress, phaseLabel, phase, o
 
           <div className="rounded-xl border border-cyan-300/15 bg-white/[0.02] p-4 backdrop-blur-sm">
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-cyan-300/70 mb-3">
-              <TrendingUp className="h-3 w-3" /> Trend Radar
+              <TrendingUp className="h-3 w-3" /> {tx({ de: "Trend Radar", en: "Trend Radar", es: "Radar de tendencias" })}
             </div>
             <div className="space-y-2">
               {TRENDING_TAGS.map((t) => (
@@ -188,7 +187,7 @@ export default function ProductionWarRoom({ open, progress, phaseLabel, phase, o
         {/* Pro tip */}
         <div className="px-6 pb-5">
           <div className="rounded-lg border border-amber-300/10 bg-amber-300/[0.03] p-3 text-[11px] italic text-amber-100/70 transition-all duration-500">
-            "While we build your plan — {PRO_TIPS[tipIdx]}"
+{tx({ de: `„Während wir deinen Plan erstellen — ${PRO_TIPS[tipIdx]}"`, en: `"While we build your plan — ${PRO_TIPS[tipIdx]}"`, es: `"Mientras creamos tu plan — ${PRO_TIPS[tipIdx]}"` })}
           </div>
         </div>
       </DialogContent>

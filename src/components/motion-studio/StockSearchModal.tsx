@@ -158,10 +158,10 @@ export default function StockSearchPanel({
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'video' | 'image')}>
         <TabsList className="grid grid-cols-2 w-full max-w-xs">
           <TabsTrigger value="video" className="gap-1.5 text-xs">
-            <Video className="h-3.5 w-3.5" /> Videos
+            <Video className="h-3.5 w-3.5" /> {tx({ de: "Videos", en: "Videos", es: "Videos" })}
           </TabsTrigger>
           <TabsTrigger value="image" className="gap-1.5 text-xs">
-            <ImageIcon className="h-3.5 w-3.5" /> Bilder
+            <ImageIcon className="h-3.5 w-3.5" /> {tx({ de: "Bilder", en: "Images", es: "Imágenes" })}
           </TabsTrigger>
         </TabsList>
 
@@ -174,13 +174,13 @@ export default function StockSearchPanel({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') runSearch(query, tab);
               }}
-              placeholder={tab === 'video' ? 'Stock-Videos suchen (z. B. "drone city")' : tx({ de: 'Stock-Bilder suchen (z. B. "minimal desk")', en: 'Search stock images (e.g. "minimal desk")', es: 'Buscar imágenes de archivo (por ejemplo, "escritorio mínimo")' })}
+              placeholder={tab === 'video' ? tx({ de: 'Stock-Videos suchen (z. B. "drone city")', en: 'Search stock videos (e.g. "drone city")', es: 'Buscar videos de archivo (por ejemplo, "drone city")' }) : tx({ de: 'Stock-Bilder suchen (z. B. "minimal desk")', en: 'Search stock images (e.g. "minimal desk")', es: 'Buscar imágenes de archivo (por ejemplo, "escritorio mínimo")' })}
               className="pl-8 h-9 text-sm bg-background/60"
             />
           </div>
           <Button size="sm" className="h-9 gap-1.5" onClick={() => runSearch(query, tab)} disabled={loading || !query.trim()}>
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
-            Suchen
+            {tx({ de: "Suchen", en: "Search", es: "Buscar" })}
           </Button>
         </div>
 
@@ -199,7 +199,7 @@ export default function StockSearchPanel({
           ))}
           {cached && (
             <Badge variant="outline" className="text-[9px] gap-1 border-emerald-500/40 text-emerald-400">
-              <Sparkles className="h-2.5 w-2.5" /> aus Cache
+              <Sparkles className="h-2.5 w-2.5" /> {tx({ de: "aus Cache", en: "from cache", es: "desde caché" })}
             </Badge>
           )}
         </div>
@@ -252,7 +252,7 @@ export default function StockSearchPanel({
       </Tabs>
 
       <p className="text-[9.5px] text-muted-foreground border-t border-border/30 pt-2">
-        Stock-Material via <a href="https://pexels.com" target="_blank" rel="noreferrer" className="underline">Pexels</a> &amp; <a href="https://pixabay.com" target="_blank" rel="noreferrer" className="underline">Pixabay</a>. Royalty-free für kommerzielle Nutzung. Attribution wird im Asset gespeichert.
+        {tx({ de: "Stock-Material via", en: "Stock material via", es: "Material de archivo vía" })} <a href="https://pexels.com" target="_blank" rel="noreferrer" className="underline">Pexels</a> &amp; <a href="https://pixabay.com" target="_blank" rel="noreferrer" className="underline">Pixabay</a>. {tx({ de: "Royalty-free für kommerzielle Nutzung. Attribution wird im Asset gespeichert.", en: "Royalty-free for commercial use. Attribution is stored with the asset.", es: "Libre de regalías para uso comercial. La atribución se guarda con el recurso." })}
       </p>
     </div>
   );
@@ -262,7 +262,7 @@ function EmptyHint({ mediaType }: { mediaType: 'video' | 'image' }) {
   return (
     <div className="rounded-md border border-dashed border-border/60 p-6 text-center text-[11px] text-muted-foreground">
       <Film className="h-5 w-5 mx-auto mb-1 opacity-60" />
-      Suche {mediaType === 'video' ? 'Stock-Videos' : 'Stock-Bilder'} oder wähle einen Quick-Chip oben.
+      {tx({ de: `Suche ${mediaType === 'video' ? 'Stock-Videos' : 'Stock-Bilder'} oder wähle einen Quick-Chip oben.`, en: `Search ${mediaType === 'video' ? 'stock videos' : 'stock images'} or choose a quick chip above.`, es: `Busca ${mediaType === 'video' ? 'videos de archivo' : 'imágenes de archivo'} o elige un chip rápido arriba.` })}
     </div>
   );
 }

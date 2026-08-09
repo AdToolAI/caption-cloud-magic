@@ -53,19 +53,19 @@ const remixOptions: RemixOption[] = [
     description: tx({ de: 'Spannendste Szene zuerst für maximale Aufmerksamkeit', en: 'Most exciting scene first for maximum attention', es: 'La escena más emocionante primero para máxima atención' }),
     icon: <Zap className="w-5 h-5" />,
     color: 'from-amber-500 to-orange-500',
-    badge: 'Empfohlen',
+    badge: tx({ de: 'Empfohlen', en: 'Recommended', es: 'Recomendado' }),
   },
   {
     id: 'emotional-arc',
     name: 'Emotional Arc',
-    description: 'Aufbau → Höhepunkt → emotionaler Abschluss',
+    description: tx({ de: 'Aufbau → Höhepunkt → emotionaler Abschluss', en: 'Build-up → climax → emotional resolution', es: 'Desarrollo → clímax → resolución emocional' }),
     icon: <TrendingUp className="w-5 h-5" />,
     color: 'from-purple-500 to-pink-500',
   },
   {
     id: 'chronological',
     name: 'Chronologisch',
-    description: 'Original-Reihenfolge beibehalten',
+    description: tx({ de: 'Original-Reihenfolge beibehalten', en: 'Keep original order', es: 'Mantener el orden original' }),
     icon: <Clock className="w-5 h-5" />,
     color: 'from-slate-500 to-slate-600',
   },
@@ -85,7 +85,7 @@ const platformOptions: RemixOption[] = [
     description: tx({ de: 'Hook in ersten 3 Sekunden, schnelle Cuts', en: 'Hook in the first 3 seconds, fast cuts', es: 'Gancho en los primeros 3 segundos, cortes rápidos' }),
     icon: <Target className="w-5 h-5" />,
     color: 'from-pink-500 to-rose-500',
-    badge: 'Viral',
+    badge: tx({ de: 'Viral', en: 'Viral', es: 'Viral' }),
   },
   {
     id: 'youtube',
@@ -97,7 +97,7 @@ const platformOptions: RemixOption[] = [
   {
     id: 'instagram',
     name: 'Instagram Aesthetic',
-    description: 'Visueller Flow, ästhetische Übergänge',
+    description: tx({ de: 'Visueller Flow, ästhetische Übergänge', en: 'Visual flow, aesthetic transitions', es: 'Flujo visual, transiciones estéticas' }),
     icon: <Sparkles className="w-5 h-5" />,
     color: 'from-purple-500 to-pink-500',
   },
@@ -252,7 +252,7 @@ export function AISceneRemix({
             AI Scene Remix
           </DialogTitle>
           <DialogDescription>
-            Lass die KI deine Szenen intelligent neu anordnen für maximale Wirkung
+            {tx({ de: 'Lass die KI deine Szenen intelligent neu anordnen für maximale Wirkung', en: 'Let the AI intelligently rearrange your scenes for maximum impact', es: 'Deja que la IA reorganice inteligentemente tus escenas para lograr el máximo impacto' })}
           </DialogDescription>
         </DialogHeader>
 
@@ -261,7 +261,7 @@ export function AISceneRemix({
           <div className="space-y-3">
             <h4 className="text-sm font-medium flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-primary" />
-              Remix-Strategie
+              {tx({ de: "Remix-Strategie", en: "Remix strategy", es: "Estrategia de remix" })}
             </h4>
             <div className="grid grid-cols-2 gap-2">
               {remixOptions.map((option) => (
@@ -316,7 +316,7 @@ export function AISceneRemix({
           <div className="space-y-3">
             <h4 className="text-sm font-medium flex items-center gap-2">
               <Target className="w-4 h-4 text-primary" />
-              Platform-Optimierung
+              {tx({ de: "Platform-Optimierung", en: "Platform optimization", es: "Optimización de plataforma" })}
             </h4>
             <div className="grid grid-cols-3 gap-2">
               {platformOptions.map((option) => (
@@ -364,12 +364,12 @@ export function AISceneRemix({
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium flex items-center gap-2">
                 <Film className="w-4 h-4 text-primary" />
-                {isPreviewMode ? tx({ de: 'Vorschau der neuen Reihenfolge', en: 'Preview new order', es: 'Previsualizar nuevo orden' }) : 'Aktuelle Reihenfolge'}
+                {isPreviewMode ? tx({ de: 'Vorschau der neuen Reihenfolge', en: 'Preview new order', es: 'Previsualizar nuevo orden' }) : tx({ de: 'Aktuelle Reihenfolge', en: 'Current order', es: 'Orden actual' })}
               </h4>
               {!isPreviewMode && (
                 <Button size="sm" variant="outline" onClick={handlePreview}>
                   <Play className="w-3.5 h-3.5 mr-1.5" />
-                  Vorschau
+                  {tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}
                 </Button>
               )}
             </div>
@@ -420,7 +420,7 @@ export function AISceneRemix({
                 animate={{ opacity: 1, y: 0 }}
                 className="p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-sm text-green-700 dark:text-green-400"
               >
-                ✓ Vorschau aktiv - Klicke "Anwenden" um die neue Reihenfolge zu übernehmen
+                {tx({ de: '✓ Vorschau aktiv - Klicke "Anwenden" um die neue Reihenfolge zu übernehmen', en: '✓ Preview active - Click "Apply" to adopt the new order', es: '✓ Vista previa activa - Haz clic en "Aplicar" para adoptar el nuevo orden' })}
               </motion.div>
             )}
           </div>
@@ -431,11 +431,11 @@ export function AISceneRemix({
             onOpenChange(false);
             setIsPreviewMode(false);
           }}>
-            Abbrechen
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button onClick={handleApply} className="bg-gradient-to-r from-purple-500 to-pink-500">
             <Sparkles className="w-4 h-4 mr-1.5" />
-            {isPreviewMode ? 'Anwenden' : 'Remix & Anwenden'}
+            {isPreviewMode ? tx({ de: 'Anwenden', en: 'Apply', es: 'Aplicar' }) : tx({ de: 'Remix & Anwenden', en: 'Remix & apply', es: 'Remix y aplicar' })}
             <ArrowRight className="w-4 h-4 ml-1.5" />
           </Button>
         </DialogFooter>

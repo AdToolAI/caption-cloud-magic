@@ -340,7 +340,7 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
       }
 
       toast.success(tx({ de: 'Mix gespeichert', en: 'Mix saved', es: 'Mezcla guardada' }), {
-        description: `${formatDuration(duration)} · in der Bibliothek`,
+        description: tx({ de: `${formatDuration(duration)} · in der Bibliothek`, en: `${formatDuration(duration)} · in the library`, es: `${formatDuration(duration)} · en la biblioteca` }),
       });
       return { url: publicUrl, assetId };
     } catch (err: any) {
@@ -368,7 +368,7 @@ export function useStemMixer({ stems, state, masterVolume }: UseStemMixerArgs) {
       a.download = `${type}_${Date.now()}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`${STEM_META[type].label} heruntergeladen`);
+      toast.success(tx({ de: `${STEM_META[type].label} heruntergeladen`, en: `${STEM_META[type].label} downloaded`, es: `${STEM_META[type].label} descargado` }));
     } catch (err: any) {
       console.error('[useStemMixer] downloadStem failed:', err);
       toast.error(tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Descarga fallida' }), { description: err.message });

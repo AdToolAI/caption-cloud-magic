@@ -136,8 +136,8 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl flex items-center gap-2">
-            {step === 1 && <><Sparkles className="h-5 w-5 text-primary" /> Brand Brief</>}
-            {step === 2 && <><ShieldCheck className="h-5 w-5 text-emerald-400" /> Acceptable Use Policy</>}
+            {step === 1 && <><Sparkles className="h-5 w-5 text-primary" /> {tx({ de: "Brand Brief", en: "Brand brief", es: "Brief de marca" })}</>}
+            {step === 2 && <><ShieldCheck className="h-5 w-5 text-emerald-400" /> {tx({ de: "Acceptable Use Policy", en: "Acceptable Use Policy", es: "Política de Uso Aceptable" })}</>}
             {step === 3 && <><Lock className="h-5 w-5 text-destructive" /> {tx({ de: 'Aktivierung bestätigen', en: 'Confirm activation', es: 'Confirmar activación' })}</>}
           </DialogTitle>
           <DialogDescription>
@@ -168,20 +168,20 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             </div>
 
             <div className="border-t pt-4">
-              <div className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">Inhaltliche Strategie</div>
+              <div className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">{tx({ de: "Inhaltliche Strategie", en: "Content strategy", es: "Estrategia de contenido" })}</div>
             <div>
-              <Label htmlFor="pillars">Themen-Pillars (kommagetrennt) *</Label>
+              <Label htmlFor="pillars">{tx({ de: "Themen-Pillars (kommagetrennt) *", en: "Topic pillars (comma-separated) *", es: "Pilares temáticos (separados por comas) *" })}</Label>
               <Input id="pillars" value={pillarsText} onChange={(e) => setPillarsText(e.target.value)}
-                placeholder="z.B. Productivity, AI Tools, Marketing Tipps" />
-              <p className="text-[11px] text-muted-foreground mt-1">3-6 Hauptthemen, an denen sich die KI orientiert.</p>
+                placeholder={tx({ de: "z.B. Productivity, AI Tools, Marketing Tipps", en: "e.g. Productivity, AI Tools, Marketing Tips", es: "p.ej. Productividad, Herramientas IA, Consejos de marketing" })} />
+              <p className="text-[11px] text-muted-foreground mt-1">{tx({ de: "3-6 Hauptthemen, an denen sich die KI orientiert.", en: "3-6 main topics the AI uses as guidance.", es: "3-6 temas principales que guían a la IA." })}</p>
             </div>
             <div>
-              <Label htmlFor="forbidden">Verbots-Themen (optional)</Label>
+              <Label htmlFor="forbidden">{tx({ de: "Verbots-Themen (optional)", en: "Forbidden topics (optional)", es: "Temas prohibidos (opcional)" })}</Label>
               <Input id="forbidden" value={forbiddenText} onChange={(e) => setForbiddenText(e.target.value)}
-                placeholder="z.B. Politik, Religion, Konkurrenten" />
+                placeholder={tx({ de: "z.B. Politik, Religion, Konkurrenten", en: "e.g. Politics, religion, competitors", es: "p.ej. Política, religión, competidores" })} />
             </div>
             <div>
-              <Label>Tonalität</Label>
+              <Label>{tx({ de: "Tonalität", en: "Tonality", es: "Tonalidad" })}</Label>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {TONALITIES.map((t) => (
                   <Badge key={t} variant={tonality === t ? 'default' : 'outline'}
@@ -190,7 +190,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               </div>
             </div>
             <div>
-              <Label>Plattformen *</Label>
+              <Label>{tx({ de: "Plattformen *", en: "Platforms *", es: "Plataformas *" })}</Label>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {PLATFORMS.map((p) => (
                   <Badge key={p} variant={platforms.includes(p) ? 'default' : 'outline'}
@@ -199,7 +199,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               </div>
             </div>
             <div>
-              <Label>Sprachen *</Label>
+              <Label>{tx({ de: "Sprachen *", en: "Languages *", es: "Idiomas *" })}</Label>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {LANGUAGES.map((l) => (
                   <Badge key={l} variant={languages.includes(l) ? 'default' : 'outline'}
@@ -209,21 +209,21 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="ppw">Posts pro Woche/Plattform</Label>
+                <Label htmlFor="ppw">{tx({ de: "Posts pro Woche/Plattform", en: "Posts per week/platform", es: "Publicaciones por semana/plataforma" })}</Label>
                 <Input id="ppw" type="number" min={1} max={21} value={postsPerWeek}
                   onChange={(e) => setPostsPerWeek(Math.max(1, Math.min(21, parseInt(e.target.value) || 1)))} />
               </div>
               <div>
-                <Label htmlFor="budget">Wochen-Budget (Credits)</Label>
+                <Label htmlFor="budget">{tx({ de: "Wochen-Budget (Credits)", en: "Weekly budget (credits)", es: "Presupuesto semanal (créditos)" })}</Label>
                 <Input id="budget" type="number" min={100} step={100} value={budget}
                   onChange={(e) => setBudget(Math.max(100, parseInt(e.target.value) || 100))} />
               </div>
             </div>
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
-                <div className="text-sm font-medium">Auto-Publish</div>
+                <div className="text-sm font-medium">{tx({ de: "Auto-Publish", en: "Auto-publish", es: "Publicación automática" })}</div>
                 <div className="text-[11px] text-muted-foreground">
-                  AN = vollautomatisch · AUS = Co-Pilot (du gibst jeden Slot frei)
+                  {tx({ de: "AN = vollautomatisch · AUS = Co-Pilot (du gibst jeden Slot frei)", en: "ON = fully automatic · OFF = co-pilot (you approve every slot)", es: "ACTIVADO = totalmente automático · DESACTIVADO = copiloto (apruebas cada slot)" })}
                 </div>
               </div>
               <Switch checked={autoPublish} onCheckedChange={setAutoPublish} />
@@ -231,13 +231,13 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             </div>
             {!goalValid && (
               <p className="text-[11px] text-amber-500 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" /> Bitte Channel-Ziel, Budget, Zielgruppe und USP ausfüllen.
+                <AlertTriangle className="h-3 w-3" /> {tx({ de: "Bitte Channel-Ziel, Budget, Zielgruppe und USP ausfüllen.", en: "Please fill in channel goal, budget, target audience and USP.", es: "Por favor, completa el objetivo del canal, presupuesto, público objetivo y USP." })}
               </p>
             )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => onOpenChange(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
               <Button disabled={!briefValid || !goalValid || upsert.isPending} onClick={handleSaveBrief} className="gap-1.5">
-                Weiter <ChevronRight className="h-4 w-4" />
+                {tx({ de: "Weiter", en: "Next", es: "Siguiente" })} <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -257,7 +257,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             </ScrollArea>
             {!scrolled && (
               <p className="text-[11px] text-amber-400 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" /> Bitte komplett bis zum Ende scrollen.
+                <AlertTriangle className="h-3 w-3" /> {tx({ de: "Bitte komplett bis zum Ende scrollen.", en: "Please scroll all the way to the end.", es: "Por favor, desplázate hasta el final." })}
               </p>
             )}
 
@@ -285,7 +285,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
             <div className="flex justify-between gap-2 pt-2">
               <Button variant="ghost" onClick={() => setStep(1)}>{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
               <Button disabled={!aupValid} onClick={() => setStep(3)} className="gap-1.5">
-                Weiter <ChevronRight className="h-4 w-4" />
+                {tx({ de: "Weiter", en: "Next", es: "Siguiente" })} <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -298,9 +298,11 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               <div className="flex items-start gap-2">
                 <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                 <div className="text-sm">
-                  <strong className="text-destructive">Letzte Bestätigung.</strong> Mit Aktivierung beauftragst du die KI,
-                  in deinem Namen Inhalte zu erstellen und auf deinen verbundenen Accounts zu veröffentlichen.
-                  Du kannst den Autopilot jederzeit pausieren oder deaktivieren.
+                  {tx({
+                    de: <><strong className="text-destructive">Letzte Bestätigung.</strong> Mit Aktivierung beauftragst du die KI, in deinem Namen Inhalte zu erstellen und auf deinen verbundenen Accounts zu veröffentlichen. Du kannst den Autopilot jederzeit pausieren oder deaktivieren.</>,
+                    en: <><strong className="text-destructive">Final confirmation.</strong> By activating, you instruct the AI to create content on your behalf and publish it on your connected accounts. You can pause or deactivate the autopilot at any time.</>,
+                    es: <><strong className="text-destructive">Confirmación final.</strong> Al activar, encargas a la IA que cree contenido en tu nombre y lo publique en tus cuentas conectadas. Puedes pausar o desactivar el autopiloto en cualquier momento.</>,
+                  })}
                 </div>
               </div>
             </div>
@@ -324,14 +326,13 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
                 onClick={handleActivate}
                 className="gap-1.5 bg-primary hover:bg-primary/90"
               >
-                {toggle.isPending ? 'Aktiviere…' : 'Autopilot aktivieren'}
+                {toggle.isPending ? tx({ de: "Aktiviere…", en: "Activating…", es: "Activando…" }) : tx({ de: "Autopilot aktivieren", en: "Activate autopilot", es: "Activar autopiloto" })}
                 <ShieldCheck className="h-4 w-4" />
               </Button>
             </div>
 
             <p className="text-[10px] text-muted-foreground text-center pt-1">
-              Edge-Function-Backend (Plan-Generierung, QA-Gate, Auto-Publish) wird in Session B aktiviert.
-              Bis dahin bleibt der Cockpit-State persistiert, ohne reale Posts zu publizieren.
+              {tx({ de: "Edge-Function-Backend (Plan-Generierung, QA-Gate, Auto-Publish) wird in Session B aktiviert. Bis dahin bleibt der Cockpit-State persistiert, ohne reale Posts zu publizieren.", en: "The edge-function backend (plan generation, QA gate, auto-publish) will be activated in Session B. Until then, the cockpit state stays persisted without publishing real posts.", es: "El backend de edge functions (generación de planes, QA gate, auto-publicación) se activará en la Sesión B. Hasta entonces, el estado del cockpit se mantiene guardado sin publicar publicaciones reales." })}
             </p>
           </div>
         )}

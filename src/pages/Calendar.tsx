@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
@@ -712,7 +713,7 @@ export default function Calendar({ embedded }: { embedded?: boolean } = {}) {
           {/* Day Cockpit hint — only on date-based views */}
           {selectedWorkspace && (currentView === "month" || currentView === "week") && (
             <div className="mt-8 text-center text-xs text-muted-foreground/70 tracking-wider uppercase">
-              {t('calendar.quickSchedule')} & {t('calendar.publishQueue')} → Klick auf einen Tag
+              {t('calendar.quickSchedule')} & {t('calendar.publishQueue')} {tx({ de: '→ Klick auf einen Tag', en: '→ Click on a day', es: '→ Haz clic en un día' })}
             </div>
           )}
 

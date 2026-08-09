@@ -27,12 +27,12 @@ interface AutoDirectorWizardProps {
 type Step = 'idea' | 'preview' | 'confirm';
 
 const MOOD_OPTIONS: Array<{ id: AutoDirectorMood; label: string; emoji: string; desc: string }> = [
-  { id: 'cinematic', label: 'Cinematic', emoji: '🎬', desc: 'Episch & filmisch' },
-  { id: 'hype', label: 'Hype', emoji: '⚡', desc: 'Schnell & energetisch' },
-  { id: 'calm', label: 'Calm', emoji: '🌊', desc: 'Ruhig & entspannt' },
-  { id: 'corporate', label: 'Corporate', emoji: '💼', desc: 'Professionell & klar' },
-  { id: 'playful', label: 'Playful', emoji: '🎨', desc: 'Verspielt & bunt' },
-  { id: 'dramatic', label: 'Dramatic', emoji: '🔥', desc: 'Spannungsgeladen' },
+  { id: 'cinematic', label: 'Cinematic', emoji: '🎬', desc: tx({ de: 'Episch & filmisch', en: 'Epic & cinematic', es: 'Épico y cinematográfico' }) },
+  { id: 'hype', label: 'Hype', emoji: '⚡', desc: tx({ de: 'Schnell & energetisch', en: 'Fast & energetic', es: 'Rápido y enérgico' }) },
+  { id: 'calm', label: 'Calm', emoji: '🌊', desc: tx({ de: 'Ruhig & entspannt', en: 'Calm & relaxed', es: 'Tranquilo y relajado' }) },
+  { id: 'corporate', label: 'Corporate', emoji: '💼', desc: tx({ de: 'Professionell & klar', en: 'Professional & clear', es: 'Profesional y claro' }) },
+  { id: 'playful', label: 'Playful', emoji: '🎨', desc: tx({ de: 'Verspielt & bunt', en: 'Playful & colorful', es: 'Divertido y colorido' }) },
+  { id: 'dramatic', label: 'Dramatic', emoji: '🔥', desc: tx({ de: 'Spannungsgeladen', en: 'Tension-filled', es: 'Cargado de tensión' }) },
 ];
 
 const DURATION_OPTIONS: Array<{ value: 15 | 30 | 60; label: string }> = [
@@ -43,8 +43,8 @@ const DURATION_OPTIONS: Array<{ value: 15 | 30 | 60; label: string }> = [
 
 const ENGINE_OPTIONS: Array<{ id: AutoDirectorEnginePref; label: string; desc: string }> = [
   { id: 'auto', label: '🎯 Auto-Mix', desc: tx({ de: "KI wählt optimale Engines pro Szene", en: "AI selects optimal engines per scene", es: "La IA selecciona los motores óptimos por escena" }) },
-  { id: 'premium', label: '💎 Premium', desc: 'Kling, Luma, Sora — höchste Qualität' },
-  { id: 'budget', label: '💰 Budget', desc: 'Wan, Seedance — günstig & schnell' },
+  { id: 'premium', label: '💎 Premium', desc: tx({ de: 'Kling, Luma, Sora — höchste Qualität', en: 'Kling, Luma, Sora — highest quality', es: 'Kling, Luma, Sora — máxima calidad' }) },
+  { id: 'budget', label: '💰 Budget', desc: tx({ de: 'Wan, Seedance — günstig & schnell', en: 'Wan, Seedance — cheap & fast', es: 'Wan, Seedance — barato y rápido' }) },
 ];
 
 const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProjectCreated }: AutoDirectorWizardProps) => {
@@ -136,10 +136,10 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <Sparkles className="h-6 w-6 text-primary" />
-            Auto-Director · 1-Klick Movie
+            {tx({ de: 'Auto-Director · 1-Klick Movie', en: 'Auto-Director · 1-Click Movie', es: 'Auto-Director · Película en 1 clic' })}
           </DialogTitle>
           <DialogDescription>
-            Beschreibe deine Idee — die KI baut Storyboard, generiert Szenen und liefert ein fertiges Video.
+            {tx({ de: 'Beschreibe deine Idee — die KI baut Storyboard, generiert Szenen und liefert ein fertiges Video.', en: 'Describe your idea — the AI builds a storyboard, generates scenes and delivers a finished video.', es: 'Describe tu idea — la IA crea un guion gráfico, genera escenas y entrega un video terminado.' })}
           </DialogDescription>
         </DialogHeader>
 
@@ -166,7 +166,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
         {step === 'idea' && (
           <div className="space-y-6 py-4">
             <div>
-              <Label htmlFor="idea" className="text-base font-semibold">Deine Video-Idee</Label>
+              <Label htmlFor="idea" className="text-base font-semibold">{tx({ de: "Deine Video-Idee", en: "Your video idea", es: "Tu idea de video" })}</Label>
               <Textarea
                 id="idea"
                 value={idea}
@@ -176,11 +176,11 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
                 className="mt-2"
                 maxLength={500}
               />
-              <p className="text-xs text-muted-foreground mt-1">{idea.length}/500 Zeichen · mind. 5</p>
+              <p className="text-xs text-muted-foreground mt-1">{idea.length}/500 {tx({ de: "Zeichen · mind. 5", en: "characters · min. 5", es: "caracteres · mín. 5" })}</p>
             </div>
 
             <div>
-              <Label className="text-base font-semibold mb-2 block">Stimmung</Label>
+              <Label className="text-base font-semibold mb-2 block">{tx({ de: "Stimmung", en: "Mood", es: "Estado de ánimo" })}</Label>
               <div className="grid grid-cols-3 gap-2">
                 {MOOD_OPTIONS.map((m) => (
                   <button
@@ -201,7 +201,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
             </div>
 
             <div>
-              <Label className="text-base font-semibold mb-2 block">Ziel-Dauer</Label>
+              <Label className="text-base font-semibold mb-2 block">{tx({ de: "Ziel-Dauer", en: "Target duration", es: "Duración objetivo" })}</Label>
               <div className="grid grid-cols-3 gap-2">
                 {DURATION_OPTIONS.map((d) => (
                   <button
@@ -220,7 +220,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
             </div>
 
             <div>
-              <Label className="text-base font-semibold mb-2 block">Engine-Strategie</Label>
+              <Label className="text-base font-semibold mb-2 block">{tx({ de: "Engine-Strategie", en: "Engine strategy", es: "Estrategia de motor" })}</Label>
               <div className="space-y-2">
                 {ENGINE_OPTIONS.map((e) => (
                   <button
@@ -249,7 +249,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge className="bg-amber-500 text-amber-950 hover:bg-amber-400">
-                      ✨ Brand aktiv
+                      ✨ {tx({ de: "Brand aktiv", en: "Brand active", es: "Marca activa" })}
                     </Badge>
                     <span className="text-sm font-medium">{plan.brandContext.brandName}</span>
                     {plan.brandContext.primaryColor && (
@@ -267,7 +267,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
                       />
                     )}
                     <span className="text-xs text-muted-foreground ml-auto">
-                      Wird automatisch auf alle Szenen angewendet
+                      {tx({ de: "Wird automatisch auf alle Szenen angewendet", en: "Automatically applied to all scenes", es: "Se aplica automáticamente a todas las escenas" })}
                     </span>
                   </div>
                 </CardContent>
@@ -286,10 +286,10 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
             )}
 
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">{editedScenes.length} Szenen · ~{totalEstimate.toFixed(2)}€</h3>
+              <h3 className="font-semibold">{editedScenes.length} {tx({ de: "Szenen", en: "scenes", es: "escenas" })} · ~{totalEstimate.toFixed(2)}€</h3>
               <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={planning}>
                 {planning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                Plan neu generieren
+                {tx({ de: "Plan neu generieren", en: "Regenerate plan", es: "Regenerar plan" })}
               </Button>
             </div>
 
@@ -299,7 +299,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
                   <CardContent className="pt-4 pb-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline">Szene {idx + 1}</Badge>
+                        <Badge variant="outline">{tx({ de: "Szene", en: "Scene", es: "Escena" })} {idx + 1}</Badge>
                         <Badge variant="secondary">{scene.sceneType}</Badge>
                         <Badge>{scene.recommendedEngine.replace('ai-', '')}</Badge>
                       </div>
@@ -313,7 +313,7 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
                     />
                     {scene.textOverlay?.text && (
                       <div className="text-xs text-muted-foreground">
-                        💬 Text-Overlay: "{scene.textOverlay.text}" ({scene.textOverlay.position})
+                        💬 {tx({ de: "Text-Overlay", en: "Text overlay", es: "Superposición de texto" })}: "{scene.textOverlay.text}" ({scene.textOverlay.position})
                       </div>
                     )}
                   </CardContent>
@@ -330,24 +330,24 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
               <CardContent className="pt-6 space-y-3">
                 <div className="flex items-center gap-2">
                   <Film className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">Bereit zur Generierung</h3>
+                  <h3 className="font-semibold">{tx({ de: "Bereit zur Generierung", en: "Ready to generate", es: "Listo para generar" })}</h3>
                 </div>
                 <dl className="grid grid-cols-2 gap-2 text-sm">
-                  <dt className="text-muted-foreground">Idee:</dt>
+                  <dt className="text-muted-foreground">{tx({ de: "Idee:", en: "Idea:", es: "Idea:" })}</dt>
                   <dd className="font-medium truncate">{idea}</dd>
-                  <dt className="text-muted-foreground">Stimmung:</dt>
+                  <dt className="text-muted-foreground">{tx({ de: "Stimmung:", en: "Mood:", es: "Estado de ánimo:" })}</dt>
                   <dd className="font-medium">{MOOD_OPTIONS.find((m) => m.id === mood)?.label}</dd>
-                  <dt className="text-muted-foreground">Dauer:</dt>
-                  <dd className="font-medium">{duration}s ({editedScenes.length} Szenen)</dd>
-                  <dt className="text-muted-foreground">Engine:</dt>
+                  <dt className="text-muted-foreground">{tx({ de: "Dauer:", en: "Duration:", es: "Duración:" })}</dt>
+                  <dd className="font-medium">{duration}s ({editedScenes.length} {tx({ de: "Szenen", en: "scenes", es: "escenas" })})</dd>
+                  <dt className="text-muted-foreground">{tx({ de: "Engine:", en: "Engine:", es: "Motor:" })}</dt>
                   <dd className="font-medium">{ENGINE_OPTIONS.find((e) => e.id === enginePref)?.label}</dd>
-                  <dt className="text-muted-foreground">Geschätzte Kosten:</dt>
+                  <dt className="text-muted-foreground">{tx({ de: "Geschätzte Kosten:", en: "Estimated cost:", es: "Costo estimado:" })}</dt>
                   <dd className="font-bold text-primary">{totalEstimate.toFixed(2)} €</dd>
                 </dl>
               </CardContent>
             </Card>
             <p className="text-xs text-muted-foreground text-center">
-              Nach Klick werden alle Szenen parallel generiert. Du wirst direkt zum Composer weitergeleitet, wo du den Fortschritt verfolgst.
+              {tx({ de: "Nach Klick werden alle Szenen parallel generiert. Du wirst direkt zum Composer weitergeleitet, wo du den Fortschritt verfolgst.", en: "After clicking, all scenes are generated in parallel. You will be redirected directly to the composer where you can track progress.", es: "Al hacer clic, todas las escenas se generan en paralelo. Serás redirigido directamente al compositor donde podrás seguir el progreso." })}
             </p>
           </div>
         )}
@@ -359,24 +359,24 @@ const AutoDirectorWizard = ({ open, onOpenChange, defaultLanguage = 'de', onProj
               onClick={() => setStep(step === 'confirm' ? 'preview' : 'idea')}
               disabled={planning || executing}
             >
-              <ChevronLeft className="h-4 w-4 mr-1" /> Zurück
+              <ChevronLeft className="h-4 w-4 mr-1" /> {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
             </Button>
           )}
           {step === 'idea' && (
             <Button onClick={handleGeneratePlan} disabled={!ideaValid || planning} className="ml-auto">
               {planning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />}
-              Plan generieren
+              {tx({ de: "Plan generieren", en: "Generate plan", es: "Generar plan" })}
             </Button>
           )}
           {step === 'preview' && (
             <Button onClick={() => setStep('confirm')} disabled={editedScenes.length === 0} className="ml-auto">
-              Weiter <ArrowRight className="h-4 w-4 ml-1" />
+              {tx({ de: "Weiter", en: "Next", es: "Siguiente" })} <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           )}
           {step === 'confirm' && (
             <Button onClick={handleExecute} disabled={executing} className="ml-auto">
               {executing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-              Movie generieren
+              {tx({ de: "Movie generieren", en: "Generate movie", es: "Generar película" })}
             </Button>
           )}
         </DialogFooter>

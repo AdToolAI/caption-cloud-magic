@@ -9,6 +9,7 @@
 // Visual style follows the James Bond 2028 design system (semantic tokens
 // only — no hard-coded colors).
 
+import { tx } from '@/lib/i18nText';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -358,9 +359,8 @@ export default function PromptMentionEditor({
           className="absolute left-0 right-0 mt-1 z-50 rounded-md border border-dashed border-border/60 bg-popover/95 px-3 py-2 text-[10px] text-muted-foreground"
           onMouseDown={(e) => e.preventDefault()}
         >
-          Keine Library-Treffer für „@{trigger.query}". Lege Charaktere,
-          Locations, Buildings & Props unter{' '}
-          <span className="text-primary">/library</span> an.
+          {tx({ de: 'Keine Library-Treffer für', en: 'No library matches for', es: 'Sin coincidencias en la biblioteca para' })} „@{trigger.query}". {tx({ de: 'Lege Charaktere, Locations, Buildings & Props unter', en: 'Create characters, locations, buildings & props under', es: 'Crea personajes, ubicaciones, edificios y accesorios en' })}{' '}
+          <span className="text-primary">/library</span> {tx({ de: 'an.', en: '.', es: '.' })}
         </div>
       )}
     </div>

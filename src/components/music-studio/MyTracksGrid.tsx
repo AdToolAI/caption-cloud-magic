@@ -79,7 +79,7 @@ export function MyTracksGrid() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin mr-2" /> Lade deine Tracks…
+        <Loader2 className="h-5 w-5 animate-spin mr-2" /> {tx({ de: "Lade deine Tracks…", en: "Loading your tracks…", es: "Cargando tus pistas…" })}
       </div>
     );
   }
@@ -90,7 +90,7 @@ export function MyTracksGrid() {
         <Music2 className="h-10 w-10 text-primary/40 mx-auto mb-3" />
         <p className="text-foreground font-medium">{tx({ de: "Noch keine generierten Tracks", en: "No generated tracks yet", es: "Aún no hay pistas generadas" })}</p>
         <p className="text-sm text-muted-foreground mt-1">
-          Wechsel zum Generate-Tab und erschaffe deinen ersten Track.
+          {tx({ de: "Wechsel zum Generate-Tab und erschaffe deinen ersten Track.", en: "Switch to the Generate tab and create your first track.", es: "Cambia a la pestaña Generar y crea tu primera pista." })}
         </p>
       </Card>
     );
@@ -129,7 +129,7 @@ export function MyTracksGrid() {
                 className="flex-1 gap-1.5 border-primary/30 hover:bg-primary/10"
               >
                 {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                {isPlaying ? 'Pause' : 'Abspielen'}
+                {isPlaying ? tx({ de: 'Pause', en: 'Pause', es: 'Pausa' }) : tx({ de: 'Abspielen', en: 'Play', es: 'Reproducir' })}
               </Button>
               <Button
                 size="sm"
@@ -145,7 +145,7 @@ export function MyTracksGrid() {
                 size="sm"
                 variant="ghost"
                 className="hover:bg-primary/10"
-                label="Lizenz"
+                label={tx({ de: "Lizenz", en: "License", es: "Licencia" })}
                 asset_type="music"
                 asset_id={track.id}
                 asset_title={track.title}

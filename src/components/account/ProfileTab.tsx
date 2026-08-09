@@ -347,7 +347,7 @@ const restartCopy: Record<string, { title: string; desc: string; cta: string; to
   },
   de: {
     title: "Produkt-Tour",
-    desc: "Starte die geführte Onboarding-Tour erneut, um die Plattform neu zu entdecken.",
+    desc: tx({ de: "Starte die geführte Onboarding-Tour erneut, um die Plattform neu zu entdecken.", en: "Restart the guided onboarding tour to rediscover the platform.", es: "Reinicia el tour guiado para redescubrir la plataforma." }),
     cta: tx({ de: "Tour erneut starten", en: "Restart tour", es: "Reiniciar tour" }),
     toast: tx({ de: "Tour startet auf dem Dashboard", en: "Tour starts on the dashboard", es: "El recorrido comienza en el tablero." }),
   },

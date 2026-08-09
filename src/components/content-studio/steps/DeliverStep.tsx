@@ -68,7 +68,7 @@ export function DeliverStep() {
         for (let i = 0; i < s.design.slides.length; i += 1) blobs.push(await renderSlideToBlob(i));
         downloadBlob(await slidesToZip(blobs, name), `${name}.zip`);
       }
-      toast.success("Export fertig");
+      toast.success(tx({ de: "Export fertig", en: "Export finished", es: "Exportación finalizada" }));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tx({ de: "Export fehlgeschlagen", en: "Export failed", es: "Exportación fallida" }));
     } finally {
@@ -107,7 +107,7 @@ export function DeliverStep() {
     try {
       const { error } = await supabase.from("post_designs").insert({
         user_id: user.id,
-        title: s.design.title || "Neuer Post",
+        title: s.design.title || tx({ de: "Neuer Post", en: "New post", es: "Nueva publicación" }),
         format: s.design.format,
         design: JSON.parse(JSON.stringify(s.design)),
         brand_kit_id: (s.brandKit?.id as string) ?? null,
@@ -137,7 +137,7 @@ export function DeliverStep() {
       const workspaceId = await resolveWorkspaceId(user.id);
       if (workspaceId) {
         const events = await seriesToCalendar(result.campaignId, workspaceId);
-        toast.success(`${events} Termine im Kalender eingeplant`);
+        toast.success(tx({ de: `${events} Termine im Kalender eingeplant`, en: `${events} dates scheduled in the calendar`, es: `${events} fechas programadas en el calendario` }));
       }
       setSeriesDone(true);
     } catch (error) {
@@ -176,7 +176,7 @@ export function DeliverStep() {
             />
             <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-              Als Vorlage sichern
+              {tx({ de: "Als Vorlage sichern", en: "Save as template", es: "Guardar como plantilla" })}
             </Button>
             <ExportActionBar size="sm" downloading={exporting} onDownload={handleExport} resolveHandoff={resolvePublishHandoff} />
           </div>
@@ -192,7 +192,7 @@ export function DeliverStep() {
         <div className="flex items-center justify-between">
           <div>
             <Label className="flex items-center gap-2 text-sm">
-              <Layers className="h-4 w-4 text-primary" /> Serie statt Einzelpost
+              <Layers className="h-4 w-4 text-primary" /> {tx({ de: "Serie statt Einzelpost", en: "Series instead of single post", es: "Serie en lugar de publicación única" })}
             </Label>
             <p className="text-xs text-muted-foreground">
               {tx({ de: "Aus demselben Briefing entsteht eine Kampagne mit Terminvorschlägen.", en: "The same briefing creates a campaign with suggested dates.", es: "El mismo briefing crea una campaña con fechas sugeridas." })}
@@ -204,17 +204,17 @@ export function DeliverStep() {
         {series && (
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Wochen</Label>
+              <Label className="text-xs">{tx({ de: "Wochen", en: "Weeks", es: "Semanas" })}</Label>
               <Input type="number" min={1} max={12} value={weeks} onChange={(e) => setWeeks(Number(e.target.value) || 1)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Beiträge pro Woche</Label>
+              <Label className="text-xs">{tx({ de: "Beiträge pro Woche", en: "Posts per week", es: "Publicaciones por semana" })}</Label>
               <Input type="number" min={1} max={7} value={perWeek} onChange={(e) => setPerWeek(Number(e.target.value) || 1)} />
             </div>
             <div className="flex items-end">
               <Button className="w-full" onClick={handleSeries} disabled={seriesBusy || !s.brief.trim()}>
                 {seriesBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarPlus className="mr-2 h-4 w-4" />}
-                Serie erzeugen & einplanen
+                {tx({ de: "Serie erzeugen & einplanen", en: "Generate & schedule series", es: "Generar y programar serie" })}
               </Button>
             </div>
           </div>
@@ -222,13 +222,13 @@ export function DeliverStep() {
 
         {series && seriesDone && (
           <Button variant="outline" size="sm" onClick={() => navigate("/command-center?view=calendar")}>
-            <CalendarPlus className="mr-1.5 h-4 w-4" /> Im Kalender ansehen
+            <CalendarPlus className="mr-1.5 h-4 w-4" /> {tx({ de: "Im Kalender ansehen", en: "View in calendar", es: "Ver en el calendario" })}
           </Button>
         )}
       </div>
 
       <Button variant="ghost" size="sm" onClick={s.back}>
-        <ArrowLeft className="mr-1.5 h-4 w-4" /> Zurück
+        <ArrowLeft className="mr-1.5 h-4 w-4" /> {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
       </Button>
     </motion.div>
   );

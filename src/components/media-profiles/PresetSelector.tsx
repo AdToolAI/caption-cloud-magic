@@ -3,6 +3,7 @@ import { getPresetsForPlatform, PLATFORM_PRESETS } from '@/lib/mediaProfilePrese
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sparkles } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface PresetSelectorProps {
   platform: Platform;
@@ -19,7 +20,7 @@ export function PresetSelector({ platform, onSelectPreset, disabled }: PresetSel
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">Presets für {platform}</label>
+      <label className="text-sm font-medium">{tx({ de: `Presets für ${platform}`, en: `Presets for ${platform}`, es: `Presets para ${platform}` })}</label>
       <div className="flex flex-wrap gap-2">
         {presets.map((preset, idx) => {
           const presetKey = Object.keys(PLATFORM_PRESETS[platform])[idx];

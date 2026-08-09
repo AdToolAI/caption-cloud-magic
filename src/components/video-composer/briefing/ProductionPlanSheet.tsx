@@ -715,14 +715,22 @@ export default function ProductionPlanSheet({
       const warnings = result.warnings ?? [];
       setApplyResult({
         ok: warnings.length === 0,
-        message: `DB-verifiziert: ${result.scenesNew} neu · ${result.scenesReplaced} ersetzt · ${result.scenesProtected} geschützt`,
+        message: tx({
+          de: `DB-verifiziert: ${result.scenesNew} neu · ${result.scenesReplaced} ersetzt · ${result.scenesProtected} geschützt`,
+          en: `DB-verified: ${result.scenesNew} new · ${result.scenesReplaced} replaced · ${result.scenesProtected} protected`,
+          es: `Verificado en BD: ${result.scenesNew} nuevas · ${result.scenesReplaced} reemplazadas · ${result.scenesProtected} protegidas`,
+        }),
         warnings,
       });
       toast({
         title: warnings.length ? tx({ de: 'Plan übernommen — bitte Hinweise prüfen', en: 'Plan applied — please check notes', es: 'Plan aplicado — revisa las notas' }) : tx({ de: 'Plan übernommen und verifiziert', en: 'Plan applied and verified', es: 'Plan aplicado y verificado' }),
         description: warnings.length
           ? warnings.join(' · ')
-          : `${result.scenesNew} neu · ${result.scenesReplaced} ersetzt · ${result.scenesProtected} geschützt`,
+          : tx({
+              de: `${result.scenesNew} neu · ${result.scenesReplaced} ersetzt · ${result.scenesProtected} geschützt`,
+              en: `${result.scenesNew} new · ${result.scenesReplaced} replaced · ${result.scenesProtected} protected`,
+              es: `${result.scenesNew} nuevas · ${result.scenesReplaced} reemplazadas · ${result.scenesProtected} protegidas`,
+            }),
         variant: warnings.length ? 'destructive' : undefined,
       });
       if (warnings.length === 0) {
@@ -1117,12 +1125,11 @@ export default function ProductionPlanSheet({
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                {text.length.toLocaleString()} Zeichen ·
-                ~{Math.ceil(text.length / 4).toLocaleString()} Tokens
-                {text.length > 120_000 && <span className="text-destructive ml-2">— zu lang (max ~120k)</span>}
+                {tx({ de: `${text.length.toLocaleString()} Zeichen · ~${Math.ceil(text.length / 4).toLocaleString()} Tokens`, en: `${text.length.toLocaleString()} characters · ~${Math.ceil(text.length / 4).toLocaleString()} tokens`, es: `${text.length.toLocaleString()} caracteres · ~${Math.ceil(text.length / 4).toLocaleString()} tokens` })}
+                {text.length > 120_000 && <span className="text-destructive ml-2">{tx({ de: '— zu lang (max ~120k)', en: '— too long (max ~120k)', es: '— demasiado largo (máx ~120k)' })}</span>}
               </span>
               <span className="flex items-center gap-1">
-                <Shield className="h-3 w-3" /> Lip-Sync-Pipeline geschützt
+                <Shield className="h-3 w-3" /> {tx({ de: 'Lip-Sync-Pipeline geschützt', en: 'Lip-sync pipeline protected', es: 'Pipeline de sincronización labial protegido' })}
               </span>
             </div>
           </div>
@@ -1133,13 +1140,12 @@ export default function ProductionPlanSheet({
             <Loader2 className="h-10 w-10 animate-spin text-amber-300" />
             <div className="text-sm font-medium">{progressLabel}</div>
             <div className="text-xs text-muted-foreground max-w-md text-center">
-              Die KI liest dein Briefing in zwei Durchgängen. Das kann 1–2 Minuten dauern —
-              Qualität geht vor Geschwindigkeit.
+              {tx({ de: 'Die KI liest dein Briefing in zwei Durchgängen. Das kann 1–2 Minuten dauern — Qualität geht vor Geschwindigkeit.', en: 'The AI reads your briefing in two passes. This can take 1–2 minutes — quality over speed.', es: 'La IA lee tu briefing en dos pasadas. Esto puede tardar 1–2 minutos — calidad antes que velocidad.' })}
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <Badge variant={progress === 'A' ? 'default' : 'outline'}>A · Extraktion</Badge>
+              <Badge variant={progress === 'A' ? 'default' : 'outline'}>{tx({ de: 'A · Extraktion', en: 'A · Extraction', es: 'A · Extracción' })}</Badge>
               <span className="text-muted-foreground">→</span>
-              <Badge variant={progress === 'B' ? 'default' : 'outline'}>B · Resolver</Badge>
+              <Badge variant={progress === 'B' ? 'default' : 'outline'}>{tx({ de: 'B · Resolver', en: 'B · Resolver', es: 'B · Resolutor' })}</Badge>
             </div>
           </div>
         )}
@@ -1155,12 +1161,14 @@ export default function ProductionPlanSheet({
                 <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
                   <div className="flex items-center gap-2 font-medium text-destructive">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    Plan inkonsistent — Apply blockiert
+                    {tx({ de: 'Plan inkonsistent — Apply blockiert', en: 'Plan inconsistent — apply blocked', es: 'Plan inconsistente — aplicar bloqueado' })}
                   </div>
                   <div className="text-muted-foreground">
-                    Projekt-Gesamtdauer <b>{plan.project?.totalDurationSec}s</b> passt nicht
-                    zur Szenensumme <b>{totalPlanSec}s ({plan.scenes.length} Szenen)</b>.
-                    Bitte Szenendauern korrigieren oder das Briefing neu analysieren.
+                    {tx({
+                      de: <>Projekt-Gesamtdauer <b>{plan.project?.totalDurationSec}s</b> passt nicht zur Szenensumme <b>{totalPlanSec}s ({plan.scenes.length} Szenen)</b>. Bitte Szenendauern korrigieren oder das Briefing neu analysieren.</>,
+                      en: <>Project total duration <b>{plan.project?.totalDurationSec}s</b> doesn't match the scene sum <b>{totalPlanSec}s ({plan.scenes.length} scenes)</b>. Please correct the scene durations or re-analyze the briefing.</>,
+                      es: <>La duración total del proyecto <b>{plan.project?.totalDurationSec}s</b> no coincide con la suma de escenas <b>{totalPlanSec}s ({plan.scenes.length} escenas)</b>. Corrige las duraciones de las escenas o vuelve a analizar el briefing.</>,
+                    })}
                   </div>
                 </div>
               )}
@@ -1168,11 +1176,14 @@ export default function ProductionPlanSheet({
                 <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-1.5">
                   <div className="flex items-center gap-2 font-medium text-amber-400">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    Sprecher-Zuordnung offen (optional)
+                    {tx({ de: 'Sprecher-Zuordnung offen (optional)', en: 'Speaker assignment open (optional)', es: 'Asignación de orador pendiente (opcional)' })}
                   </div>
                   <div className="text-muted-foreground">
-                    {dialogBindingIssues.length} Dialog-Turn{dialogBindingIssues.length === 1 ? '' : 's'} noch ohne Charakter.
-                    Skript & Sprecher werden trotzdem übernommen — die Stimme wählst du im Storyboard pro Sprecher.
+                    {tx({
+                      de: `${dialogBindingIssues.length} Dialog-Turn${dialogBindingIssues.length === 1 ? '' : 's'} noch ohne Charakter. Skript & Sprecher werden trotzdem übernommen — die Stimme wählst du im Storyboard pro Sprecher.`,
+                      en: `${dialogBindingIssues.length} dialog turn${dialogBindingIssues.length === 1 ? '' : 's'} still without a character. Script & speaker will be adopted anyway — you choose the voice per speaker in the storyboard.`,
+                      es: `${dialogBindingIssues.length} turno${dialogBindingIssues.length === 1 ? '' : 's'} de diálogo aún sin personaje. El guion y el orador se adoptarán de todos modos — eliges la voz por orador en el storyboard.`,
+                    })}
                   </div>
                 </div>
               )}
@@ -1184,7 +1195,7 @@ export default function ProductionPlanSheet({
               )}
 
               {/* Projekt */}
-              <SectionCard title="Projekt">
+              <SectionCard title={tx({ de: "Projekt", en: "Project", es: "Proyecto" })}>
                 <Row label="Name" value={plan.project?.name} />
                 <Row label="Format" value={plan.project?.aspectRatio} />
                 <Row label="FPS" value={plan.project?.fps?.toString()} />
@@ -1202,15 +1213,17 @@ export default function ProductionPlanSheet({
                 {plan.scenes.length === 0 ? (
                   <div className="rounded border border-amber-300/40 bg-amber-300/[0.05] p-4 text-xs space-y-2">
                     <div className="font-medium text-amber-300 flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" /> Briefing zu dünn — keine Szenen geplant
+                      <AlertTriangle className="h-3 w-3" /> {tx({ de: 'Briefing zu dünn — keine Szenen geplant', en: 'Briefing too thin — no scenes planned', es: 'Briefing demasiado escueto — no se planificaron escenas' })}
                     </div>
                     <div className="text-muted-foreground">
-                      Bitte zurück zum Briefing gehen und mindestens Produktname + 1–2 USPs oder
-                      eine Szenenbeschreibung ergänzen. Optional ein oder mehrere Charaktere im
-                      Briefing auswählen — die KI plant dann automatisch ein vollständiges Drehbuch.
+                      {tx({
+                        de: 'Bitte zurück zum Briefing gehen und mindestens Produktname + 1–2 USPs oder eine Szenenbeschreibung ergänzen. Optional ein oder mehrere Charaktere im Briefing auswählen — die KI plant dann automatisch ein vollständiges Drehbuch.',
+                        en: 'Please go back to the briefing and add at least a product name + 1–2 USPs or a scene description. Optionally select one or more characters in the briefing — the AI will then automatically plan a complete script.',
+                        es: 'Vuelve al briefing y añade al menos el nombre del producto + 1–2 USPs o una descripción de escena. Opcionalmente selecciona uno o más personajes en el briefing — la IA planificará automáticamente un guion completo.',
+                      })}
                     </div>
                     <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
-                      Zurück zu Briefing
+                      {tx({ de: 'Zurück zu Briefing', en: 'Back to briefing', es: 'Volver al briefing' })}
                     </Button>
                   </div>
                 ) : (
@@ -1238,7 +1251,7 @@ export default function ProductionPlanSheet({
                           className={`text-[10px] ${s.voiceover?.text ? 'border-emerald-400/40 text-emerald-300' : 'border-amber-400/40 text-amber-300'}`}
                           title={s.voiceover?.text ? s.voiceover.text : tx({ de: 'Kein Skript im Plan — Szene würde ohne Voiceover/Lip-Sync rendern.', en: 'No script in the plan — scene would render without voiceover/lip-sync.', es: 'No hay guion en el plan — la escena se renderizaría sin voz en off/sincronización labial.' })}
                         >
-                          {s.voiceover?.text ? '✓ Skript' : '— Skript'}
+                          {s.voiceover?.text ? tx({ de: '✓ Skript', en: '✓ Script', es: '✓ Guion' }) : tx({ de: '— Skript', en: '— Script', es: '— Guion' })}
                         </Badge>
                         <Badge
                           variant="outline"
@@ -1275,7 +1288,7 @@ export default function ProductionPlanSheet({
                         <Badge
                           variant="outline"
                           className={`text-[10px] ${s.lipSync ? 'border-amber-400/40 text-amber-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                          title={s.lipSync ? 'Lip-Sync aktiv — HappyHorse Primary, Hailuo Fallback.' : 'B-Roll/HeyGen-Modus.'}
+                          title={s.lipSync ? tx({ de: 'Lip-Sync aktiv — HappyHorse Primary, Hailuo Fallback.', en: 'Lip-sync active — HappyHorse primary, Hailuo fallback.', es: 'Sincronización labial activa — HappyHorse primario, Hailuo alternativo.' }) : tx({ de: 'B-Roll/HeyGen-Modus.', en: 'B-roll/HeyGen mode.', es: 'Modo B-roll/HeyGen.' })}
                         >
                           {s.lipSync ? '✓ Lip-Sync' : 'B-Roll'}
                         </Badge>
@@ -1302,7 +1315,7 @@ export default function ProductionPlanSheet({
                                 : 'border-muted-foreground/30 text-muted-foreground';
                             const icon = explicit ? '✓' : inferred ? '✨' : '—';
                             const titleSuffix = explicit
-                              ? ' · explizit im Briefing'
+                              ? tx({ de: ' · explizit im Briefing', en: ' · explicit in briefing', es: ' · explícito en el briefing' })
                               : inferred
                                 ? tx({ de: ' · von KI ergänzt', en: ' · added by AI', es: ' · añadido por IA' })
                                 : '';
@@ -1400,16 +1413,16 @@ export default function ProductionPlanSheet({
                         return (
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Dialog ({visible.length} Turn{visible.length === 1 ? '' : 's'})
+                            {tx({ de: `Dialog (${visible.length} Turn${visible.length === 1 ? '' : 's'})`, en: `Dialog (${visible.length} turn${visible.length === 1 ? '' : 's'})`, es: `Diálogo (${visible.length} turno${visible.length === 1 ? '' : 's'})` })}
                             {hiddenCount > 0 && (
                               <span className="ml-2 normal-case tracking-normal text-muted-foreground/70">
-                                · {hiddenCount} Regie-Notiz{hiddenCount === 1 ? '' : 'en'} ausgeblendet
+                                · {tx({ de: `${hiddenCount} Regie-Notiz${hiddenCount === 1 ? '' : 'en'} ausgeblendet`, en: `${hiddenCount} directing note${hiddenCount === 1 ? '' : 's'} hidden`, es: `${hiddenCount} nota${hiddenCount === 1 ? '' : 's'} de dirección oculta${hiddenCount === 1 ? '' : 's'}` })}
                               </span>
                             )}
                           </Label>
                           {visible.length === 0 ? (
                             <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 text-[11px] italic text-muted-foreground">
-                              Regie-Notizen ausgeblendet — Skript wird aus dem Briefing generiert.
+                              {tx({ de: 'Regie-Notizen ausgeblendet — Skript wird aus dem Briefing generiert.', en: 'Directing notes hidden — script is generated from the briefing.', es: 'Notas de dirección ocultas — el guion se genera a partir del briefing.' })}
                             </div>
                           ) : (
                           <div className="rounded border border-amber-300/20 bg-amber-300/[0.04] p-2 space-y-1 font-mono text-[11px]">
@@ -1436,7 +1449,7 @@ export default function ProductionPlanSheet({
                                       <SelectValue placeholder={tx({ de: "Sprecher wählen…", en: "Choose speaker…", es: "Elegir orador…" })} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="__none__">— Sprecher zuordnen —</SelectItem>
+                                      <SelectItem value="__none__">{tx({ de: '— Sprecher zuordnen —', en: '— Assign speaker —', es: '— Asignar orador —' })}</SelectItem>
                                       {charOptions.map((o) => (
                                         <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
                                       ))}
@@ -1444,7 +1457,7 @@ export default function ProductionPlanSheet({
                                   </Select>
                                   {!isBound && (
                                     <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-500">
-                                      Sprecher noch offen
+                                      {tx({ de: 'Sprecher noch offen', en: 'Speaker still open', es: 'Orador aún pendiente' })}
                                     </Badge>
                                   )}
                                 </div>
@@ -1462,13 +1475,13 @@ export default function ProductionPlanSheet({
                       {/* Stage-2 plan extras: brollHints / brandAnchor / continuity / music / per-scene negative */}
                       {(s.brollHints?.length || s.brandAnchor || s.musicCue || s.continuityHint || s.negativePromptScene) && (
                         <div className="space-y-1">
-                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Plan-Extras</Label>
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{tx({ de: 'Plan-Extras', en: 'Plan extras', es: 'Extras del plan' })}</Label>
                           <div className="flex flex-wrap gap-1">
                             {(s.brollHints ?? []).map((h, i) => (
                               <Badge key={`br-${i}`} variant="outline" className="text-[10px]">B-Roll: {h}</Badge>
                             ))}
                             {s.brandAnchor?.logoEndcard && (
-                              <Badge variant="outline" className="text-[10px] border-amber-300/40 text-amber-300">Logo-Endcard</Badge>
+                              <Badge variant="outline" className="text-[10px] border-amber-300/40 text-amber-300">{tx({ de: 'Logo-Endcard', en: 'Logo endcard', es: 'Tarjeta final de logo' })}</Badge>
                             )}
                             {s.brandAnchor?.primaryColorOverride && (
                               <Badge variant="outline" className="text-[10px]">Brand-Color: {s.brandAnchor.primaryColorOverride}</Badge>
@@ -1487,7 +1500,7 @@ export default function ProductionPlanSheet({
                             )}
                           </div>
                           {s.brandAnchor?.note && (
-                            <div className="text-[11px] italic text-muted-foreground">Brand-Note: {s.brandAnchor.note}</div>
+                            <div className="text-[11px] italic text-muted-foreground">{tx({ de: 'Brand-Notiz', en: 'Brand note', es: 'Nota de marca' })}: {s.brandAnchor.note}</div>
                           )}
                           {s.musicCue?.note && (
                             <div className="text-[11px] italic text-muted-foreground">Music: {s.musicCue.note}</div>
@@ -1505,7 +1518,7 @@ export default function ProductionPlanSheet({
                               <CatalogChip axis="framing"      id={(s.shotDirector as any)?.framingId}     raw={s.shotDirector?.framing}     label="Framing" />
                               <CatalogChip axis="angle"        id={(s.shotDirector as any)?.angleId}       raw={s.shotDirector?.angle}       label="Angle" />
                               <CatalogChip axis="movement"     id={(s.shotDirector as any)?.movementId}    raw={s.shotDirector?.movement}    label="Move" />
-                              <CatalogChip axis="lighting"     id={(s.shotDirector as any)?.lightingId}    raw={s.shotDirector?.lighting}    label="Licht" />
+                              <CatalogChip axis="lighting"     id={(s.shotDirector as any)?.lightingId}    raw={s.shotDirector?.lighting}    label={tx({ de: "Licht", en: "Light", es: "Luz" })} />
                               <CatalogChip axis="style_preset" id={(s.shotDirector as any)?.stylePresetId} raw={(s.shotDirector as any)?.stylePreset} label="Style" />
                             </div>
                           </div>
@@ -1534,7 +1547,7 @@ export default function ProductionPlanSheet({
                                 }}
                                 title={tx({ de: "Weiteren Charakter-Slot zu dieser Szene hinzufügen", en: "Add another character slot to this scene", es: "Añadir otra ranura de personaje a esta escena" })}
                               >
-                                <Plus className="h-3 w-3" /> Cast-Slot
+                                <Plus className="h-3 w-3" /> {tx({ de: "Cast-Slot", en: "Cast slot", es: "Ranura de reparto" })}
                               </Button>
                             )}
                           </div>
@@ -1596,12 +1609,12 @@ export default function ProductionPlanSheet({
                                       <SelectValue placeholder="Outfit…" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="__default__">Standard-Look</SelectItem>
+                                      <SelectItem value="__default__">{tx({ de: 'Standard-Look', en: 'Default look', es: 'Look predeterminado' })}</SelectItem>
                                       {librarylooks.length > 0 && (
                                         <>
                                           <SelectSeparator />
                                           <SelectGroup>
-                                            <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">Meine Looks</SelectLabel>
+                                            <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">{tx({ de: 'Meine Looks', en: 'My looks', es: 'Mis looks' })}</SelectLabel>
                                             {librarylooks.map((o) => (
                                               <SelectItem key={`look-${o.lookId}`} value={`look:${o.lookId}`}>{o.name}</SelectItem>
                                             ))}
@@ -1632,7 +1645,7 @@ export default function ProductionPlanSheet({
                                       <VoicePreviewButton
                                         voiceId={c.voiceId}
                                         text={s.voiceover?.text ?? undefined}
-                                        label={`Stimme ${c.voiceName ?? ''} anhören`.trim()}
+                                        label={tx({ de: `Stimme ${c.voiceName ?? ''} anhören`, en: `Listen to voice ${c.voiceName ?? ''}`, es: `Escuchar voz ${c.voiceName ?? ''}` }).trim()}
                                       />
                                     )}
                                   </div>
@@ -1682,13 +1695,13 @@ export default function ProductionPlanSheet({
                                 ) : (
                                   <Plus className="h-3 w-3" />
                                 )}
-                                Anlegen
+                                {tx({ de: "Anlegen", en: "Create", es: "Crear" })}
                               </Button>
                             )}
                           </div>
                           {!selectedLocation && (loc as any)?.description && (
                             <div className="text-[10px] text-muted-foreground italic pl-1 line-clamp-2">
-                              Setting: {(loc as any).description}
+                              {tx({ de: 'Setting', en: 'Setting', es: 'Ambientación' })}: {(loc as any).description}
                             </div>
                           )}
                         </div>
@@ -1698,7 +1711,7 @@ export default function ProductionPlanSheet({
                       {/* Per-scene quick edits */}
                       <div className="grid grid-cols-2 gap-2 pt-1">
                         <div>
-                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Dauer (s)</Label>
+                          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">{tx({ de: 'Dauer (s)', en: 'Duration (s)', es: 'Duración (s)' })}</Label>
                           <Input
                             type="number" min={1} max={60}
                             value={s.durationSec}
@@ -1731,7 +1744,7 @@ export default function ProductionPlanSheet({
 
               {/* Voice */}
               {plan.voice && (
-                <SectionCard title="Voiceover (ElevenLabs)">
+                <SectionCard title={tx({ de: "Voiceover (ElevenLabs)", en: "Voiceover (ElevenLabs)", es: "Locución (ElevenLabs)" })}>
                   <Row label="Voice" value={plan.voice.voiceName ?? plan.voice.voiceId} />
                   <Row label="Model" value={plan.voice.model} />
                   <Row label="Stability" value={plan.voice.stability?.toString()} />
@@ -1770,11 +1783,14 @@ export default function ProductionPlanSheet({
               {protectedSceneIds.size > 0 && (
                 <div className="rounded-lg border border-amber-300/40 bg-amber-300/[0.06] p-3 text-xs space-y-1">
                   <div className="flex items-center gap-1 font-medium text-amber-300">
-                    <Shield className="h-3 w-3" /> {protectedSceneIds.size} bestehende Szene{protectedSceneIds.size === 1 ? '' : 'n'} geschützt
+                    <Shield className="h-3 w-3" /> {tx({ de: `${protectedSceneIds.size} bestehende Szene${protectedSceneIds.size === 1 ? '' : 'n'} geschützt`, en: `${protectedSceneIds.size} existing scene${protectedSceneIds.size === 1 ? '' : 's'} protected`, es: `${protectedSceneIds.size} escena${protectedSceneIds.size === 1 ? '' : 's'} existente${protectedSceneIds.size === 1 ? '' : 's'} protegida${protectedSceneIds.size === 1 ? '' : 's'}` })}
                   </div>
                   <div className="text-muted-foreground">
-                    Diese Szenen sind bereits gerendert oder Lip-Sync-aktiv und werden vom Plan nicht überschrieben.
-                    Die neuen Plan-Szenen werden dahinter angefügt.
+                    {tx({
+                      de: 'Diese Szenen sind bereits gerendert oder Lip-Sync-aktiv und werden vom Plan nicht überschrieben. Die neuen Plan-Szenen werden dahinter angefügt.',
+                      en: 'These scenes are already rendered or lip-sync active and will not be overwritten by the plan. The new plan scenes will be appended after them.',
+                      es: 'Estas escenas ya están renderizadas o con sincronización labial activa y no serán sobrescritas por el plan. Las nuevas escenas del plan se añadirán después.',
+                    })}
                   </div>
                 </div>
               )}
@@ -1784,10 +1800,10 @@ export default function ProductionPlanSheet({
                 <div className="rounded-lg border border-amber-400/40 bg-amber-400/5 p-3 space-y-2 text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-medium text-amber-300 flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" /> {liveUnresolved.length} offene{liveUnresolved.length === 1 ? 'r' : ''} Punkt{liveUnresolved.length === 1 ? '' : 'e'}
+                      <AlertTriangle className="h-3 w-3" /> {tx({ de: `${liveUnresolved.length} offene${liveUnresolved.length === 1 ? 'r' : ''} Punkt${liveUnresolved.length === 1 ? '' : 'e'}`, en: `${liveUnresolved.length} open item${liveUnresolved.length === 1 ? '' : 's'}`, es: `${liveUnresolved.length} punto${liveUnresolved.length === 1 ? '' : 's'} pendiente${liveUnresolved.length === 1 ? '' : 's'}` })}
                     </div>
                     <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={handleAutoResolve}>
-                      Auto-Resolve
+                      {tx({ de: 'Auto-Resolve', en: 'Auto-resolve', es: 'Auto-resolver' })}
                     </Button>
                   </div>
                   <ul className="space-y-1">
@@ -1827,7 +1843,7 @@ export default function ProductionPlanSheet({
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</Button>
               <Button onClick={handleParse} disabled={text.length < 40} className="gap-2">
-                <Sparkles className="h-4 w-4" /> Briefing analysieren
+                <Sparkles className="h-4 w-4" /> {tx({ de: 'Briefing analysieren', en: 'Analyze briefing', es: 'Analizar briefing' })}
               </Button>
             </>
           )}
@@ -1841,7 +1857,7 @@ export default function ProductionPlanSheet({
                 title={durationInconsistent ? tx({ de: 'Projekt-Gesamtdauer passt nicht zur Szenensumme.', en: 'Project total duration does not match scene sum.', es: 'La duración total del proyecto no coincide con la suma de las escenas.' }) : undefined}
               >
                 {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Plan anwenden
+                {tx({ de: 'Plan anwenden', en: 'Apply plan', es: 'Aplicar plan' })}
               </Button>
             </>
           )}

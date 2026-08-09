@@ -1905,7 +1905,7 @@ export default function VideoComposerDashboard() {
             <AlertDialogTitle>{t('videoComposer.confirmResetTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
               {t('videoComposer.confirmResetDesc')}
-              {' '}Das aktuelle Projekt wird endgültig gelöscht, alle laufenden Renders und Lip-Sync-Jobs werden abgebrochen — bereits verbrauchte Credits werden nicht refundiert.
+              {' '}{tx({ de: 'Das aktuelle Projekt wird endgültig gelöscht, alle laufenden Renders und Lip-Sync-Jobs werden abgebrochen — bereits verbrauchte Credits werden nicht refundiert.', en: 'The current project will be permanently deleted, all running renders and lip-sync jobs will be canceled — credits already used will not be refunded.', es: 'El proyecto actual se eliminará permanentemente, se cancelarán todos los renders y trabajos de sincronización labial en curso — los créditos ya consumidos no se reembolsarán.' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

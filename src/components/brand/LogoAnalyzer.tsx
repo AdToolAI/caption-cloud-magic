@@ -97,10 +97,9 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Eye className="h-5 w-5" /> {tx({ de: 'KI Logo-Analyse', en: 'AI Logo Analysis', es: 'Análisis de logo por IA' })}
-          KI Logo-Analyse
         </CardTitle>
         <CardDescription>
-          {tx({ de: 'Lade dein Logo hoch und lass die KI Farben, Stil Lade dein Logo hoch und lass die KI Farben, Stil & Stimmung extrahieren Stimmung extrahieren', en: 'Upload your logo and let AI extract colors, style Lade dein Logo hoch und lass die KI Farben, Stil & Stimmung extrahieren mood', es: 'Sube tu logotipo y deja que la IA extraiga colores, estilo y estado de ánimo' })}
+          {tx({ de: 'Lade dein Logo hoch und lass die KI Farben, Stil & Stimmung extrahieren', en: 'Upload your logo and let AI extract colors, style & mood', es: 'Sube tu logotipo y deja que la IA extraiga colores, estilo y estado de ánimo' })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

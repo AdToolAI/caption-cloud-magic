@@ -90,7 +90,7 @@ export const useCloudStorage = () => {
     } catch (err) {
       console.error('Error starting OAuth:', err);
       toast({
-        title: 'Verbindungsfehler',
+        title: tx({ de: "Verbindungsfehler", en: "Connection error", es: "Error de conexión" }),
         description: tx({ de: 'Google Drive konnte nicht verbunden werden.', en: 'Google Drive could not be connected.', es: 'No se pudo conectar Google Drive.' }),
         variant: 'destructive',
       });
@@ -120,15 +120,15 @@ export const useCloudStorage = () => {
       await fetchConnection();
 
       toast({
-        title: '✅ Google Drive verbunden',
-        description: `Verbunden als ${data.connection?.account_email}`,
+        title: tx({ de: "✅ Google Drive verbunden", en: "✅ Google Drive connected", es: "✅ Google Drive conectado" }),
+        description: tx({ de: `Verbunden als ${data.connection?.account_email}`, en: `Connected as ${data.connection?.account_email}`, es: `Conectado como ${data.connection?.account_email}` }),
       });
 
       return data.connection;
     } catch (err) {
       console.error('Error exchanging code:', err);
       toast({
-        title: 'Verbindungsfehler',
+        title: tx({ de: "Verbindungsfehler", en: "Connection error", es: "Error de conexión" }),
         description: tx({ de: 'Der OAuth-Code konnte nicht verarbeitet werden.', en: 'The OAuth code could not be processed.', es: 'No se pudo procesar el código OAuth.' }),
         variant: 'destructive',
       });
@@ -209,7 +209,7 @@ export const useCloudStorage = () => {
       if (error) throw error;
 
       toast({
-        title: '☁️ In Cloud hochgeladen',
+        title: tx({ de: "☁️ In Cloud hochgeladen", en: "☁️ Uploaded to cloud", es: "☁️ Subido a la nube" }),
         description: tx({ de: `${fileName} wurde in Google Drive gespeichert.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }),
       });
 
@@ -272,7 +272,7 @@ export const useCloudStorage = () => {
       setConnection(prev => prev ? { ...prev, auto_sync: enabled } : null);
 
       toast({
-        title: enabled ? 'Auto-Sync aktiviert' : 'Auto-Sync deaktiviert',
+        title: enabled ? tx({ de: "Auto-Sync aktiviert", en: "Auto-sync enabled", es: "Sincronización automática activada" }) : tx({ de: "Auto-Sync deaktiviert", en: "Auto-sync disabled", es: "Sincronización automática desactivada" }),
         description: enabled 
           ? tx({ de: 'Neue Medien werden automatisch in Google Drive gespeichert.', en: 'New media is automatically saved to Google Drive.', es: 'Los nuevos medios se guardan automáticamente en Google Drive.' })
           : tx({ de: 'Medien werden nicht mehr automatisch hochgeladen.', en: 'Media is no longer uploaded automatically.', es: 'Los medios ya no se suben automáticamente.' }),

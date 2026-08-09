@@ -81,7 +81,7 @@ export default function LibraryPicker({
             {title}
           </DialogTitle>
           <DialogDescription>
-            Wähle gespeicherte {modes.includes('character') && modes.includes('location') ? tx({ de: 'Charaktere und Locations', en: 'Characters and locations', es: 'Personajes y ubicaciones' }) : modes[0] === 'character' ? 'Charaktere' : 'Locations'} oder lege neue in der Library an.
+            {tx({ de: 'Wähle gespeicherte', en: 'Choose saved', es: 'Elige' })} {modes.includes('character') && modes.includes('location') ? tx({ de: 'Charaktere und Locations', en: 'Characters and locations', es: 'Personajes y ubicaciones' }) : modes[0] === 'character' ? tx({ de: 'Charaktere', en: 'Characters', es: 'Personajes' }) : tx({ de: 'Locations', en: 'Locations', es: 'Ubicaciones' })} {tx({ de: 'oder lege neue in der Library an.', en: 'or create new ones in the library.', es: 'o crea nuevos en la biblioteca.' })}
           </DialogDescription>
         </DialogHeader>
 
@@ -91,7 +91,7 @@ export default function LibraryPicker({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Suchen..."
+              placeholder={tx({ de: "Suchen...", en: "Search...", es: "Buscar..." })}
               className="pl-8 bg-background/60 border-border/40 h-9"
               autoFocus
             />
@@ -99,7 +99,7 @@ export default function LibraryPicker({
           <Link to="/motion-studio/library" onClick={() => onOpenChange(false)}>
             <Button variant="outline" size="sm" className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
-              Library öffnen
+              {tx({ de: "Library öffnen", en: "Open library", es: "Abrir biblioteca" })}
             </Button>
           </Link>
         </div>
@@ -122,7 +122,7 @@ export default function LibraryPicker({
                 <Link to="/motion-studio/library" onClick={() => onOpenChange(false)}>
                   <Button size="sm" className="gap-1.5">
                     <Plus className="h-3.5 w-3.5" />
-                    Library öffnen & anlegen
+                    {tx({ de: "Library öffnen & anlegen", en: "Open & create in library", es: "Abrir biblioteca y crear" })}
                   </Button>
                 </Link>
               )}
@@ -161,7 +161,7 @@ export default function LibraryPicker({
                         variant="secondary"
                         className="absolute top-1.5 left-1.5 text-[9px] h-4 px-1.5 backdrop-blur bg-background/80"
                       >
-                        {item.kind === 'character' ? '👤 Char' : '📍 Loc'}
+                        {item.kind === 'character' ? tx({ de: '👤 Char', en: '👤 Char', es: '👤 Char' }) : tx({ de: '📍 Loc', en: '📍 Loc', es: '📍 Loc' })}
                       </Badge>
                       {selected && (
                         <div className="absolute top-1.5 right-1.5 bg-primary text-primary-foreground rounded-full p-1">

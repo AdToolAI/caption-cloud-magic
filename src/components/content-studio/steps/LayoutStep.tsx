@@ -35,7 +35,7 @@ export function LayoutStep() {
           <div>
             <h2 className="font-display text-3xl tracking-tight">{tx({ de: "Wähle deine Richtung", en: "Choose your direction", es: "Elige tu dirección" })}</h2>
             <p className="text-sm text-muted-foreground">
-              {s.imageBusy ? tx({ de: "Motiv wird gerendert — die Layouts stehen schon.", en: "Motif is rendering — layouts are already available.", es: "El motivo se está renderizando — los diseños ya están disponibles." }) : "Alles bleibt danach frei editierbar."}
+              {s.imageBusy ? tx({ de: "Motiv wird gerendert — die Layouts stehen schon.", en: "Motif is rendering — layouts are already available.", es: "El motivo se está renderizando — los diseños ya están disponibles." }) : tx({ de: "Alles bleibt danach frei editierbar.", en: "Everything remains freely editable afterwards.", es: "Todo permanece libremente editable después." })}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -65,10 +65,10 @@ export function LayoutStep() {
               ))}
             </div>
             <Button variant="outline" size="sm" onClick={s.moreVariants}>
-              <Sparkles className="mr-1.5 h-4 w-4" /> Mehr Richtungen
+              <Sparkles className="mr-1.5 h-4 w-4" /> {tx({ de: "Mehr Richtungen", en: "More directions", es: "Más direcciones" })}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setTemplateDialog(true)}>
-              <LayoutTemplate className="mr-1.5 h-4 w-4" /> Alle Vorlagen
+              <LayoutTemplate className="mr-1.5 h-4 w-4" /> {tx({ de: "Alle Vorlagen", en: "All templates", es: "Todas las plantillas" })}
             </Button>
           </div>
         </div>
@@ -103,7 +103,7 @@ export function LayoutStep() {
       <aside className="hidden w-56 shrink-0 space-y-4 xl:block">
         <div className="rounded-xl border border-border/60 bg-card/60 p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <LayersIcon className="h-3.5 w-3.5" /> Ebenen
+            <LayersIcon className="h-3.5 w-3.5" /> {tx({ de: "Ebenen", en: "Layers", es: "Capas" })}
           </div>
           <ScrollArea className="h-[280px] pr-2">
             <div className="space-y-1">
@@ -127,10 +127,10 @@ export function LayoutStep() {
 
         <div className="space-y-3 rounded-xl border border-border/60 bg-card/60 p-3">
           <Button variant="outline" size="sm" className="w-full" onClick={() => setTemplateDialog(true)}>
-            <LayoutTemplate className="mr-1.5 h-4 w-4" /> Vorlage wechseln
+            <LayoutTemplate className="mr-1.5 h-4 w-4" /> {tx({ de: "Vorlage wechseln", en: "Change template", es: "Cambiar plantilla" })}
           </Button>
           <Button variant="outline" size="sm" className="w-full" onClick={() => setImageDialog("background")}>
-            <ImageIcon className="mr-1.5 h-4 w-4" /> Bild tauschen
+            <ImageIcon className="mr-1.5 h-4 w-4" /> {tx({ de: "Bild tauschen", en: "Swap image", es: "Cambiar imagen" })}
           </Button>
           <Button
             variant="outline"
@@ -140,18 +140,18 @@ export function LayoutStep() {
             disabled={s.imageBusy}
           >
             {s.imageBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
-            Motiv neu denken
+            {tx({ de: "Motiv neu denken", en: "Rethink motif", es: "Repensar motivo" })}
           </Button>
           <div className="flex items-center justify-between pt-1">
             <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Ruler className="h-3.5 w-3.5" /> Sicherheitszone
+              <Ruler className="h-3.5 w-3.5" /> {tx({ de: "Sicherheitszone", en: "Safe zone", es: "Zona segura" })}
             </Label>
             <Switch checked={showSafeZone} onCheckedChange={setShowSafeZone} />
           </div>
         </div>
 
         <Button variant="ghost" size="sm" className="w-full" onClick={() => s.openDesign(s.variants[0] ?? s.design)}>
-          Andere Richtung wählen
+          {tx({ de: "Andere Richtung wählen", en: "Choose another direction", es: "Elegir otra dirección" })}
         </Button>
       </aside>
 
@@ -201,10 +201,10 @@ export function LayoutStep() {
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="ghost" onClick={s.back}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Zurück
+            <ArrowLeft className="mr-2 h-4 w-4" /> {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
           </Button>
           <Button onClick={() => s.goTo("deliver")}>
-            Weiter zum Ausspielen <ArrowRight className="ml-2 h-4 w-4" />
+            {tx({ de: "Weiter zum Ausspielen", en: "Continue to output", es: "Continuar a la salida" })} <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </section>

@@ -360,11 +360,11 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
           <TabsContent value="export" className="mt-4"><ExportOptionsEditor options={exportOptions} onChange={setExportOptions} /></TabsContent>
           <TabsContent value="options" className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Untertitel</Label>
+              <Label>{tx({ de: "Untertitel", en: "Subtitles", es: "Subtítulos" })}</Label>
               <Switch checked={subtitles} onCheckedChange={setSubtitles} />
             </div>
             <div className="space-y-2">
-              <Label>Video-Qualität</Label>
+              <Label>{tx({ de: "Video-Qualität", en: "Video quality", es: "Calidad del video" })}</Label>
               <Select value={quality} onValueChange={setQuality}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -378,22 +378,22 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
 
         <DialogFooter className="flex justify-between items-center border-t pt-4">
           <Button variant="outline" onClick={() => setShowBatchEdit(true)}>
-            Batch-Edit
+            {tx({ de: "Batch-Edit", en: "Batch edit", es: "Edición por lotes" })}
           </Button>
           
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleClose}>
-              Abbrechen
+              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
             </Button>
             
             <Button 
               variant="secondary"
               onClick={() => setShowQuickPreview(true)}
               disabled={!script || loading}
-              title={mediaUrls.length === 0 ? tx({ de: "⚠️ Keine Medien - Vorschau zeigt nur Text/Audio", en: "⚠️ No media - preview shows text/audio only", es: "⚠️ Sin medios - la vista previa solo muestra texto/audio" }) : "Schnelle kostenlose Vorschau deines Videos"}
+              title={mediaUrls.length === 0 ? tx({ de: "⚠️ Keine Medien - Vorschau zeigt nur Text/Audio", en: "⚠️ No media - preview shows text/audio only", es: "⚠️ Sin medios - la vista previa solo muestra texto/audio" }) : tx({ de: "Schnelle kostenlose Vorschau deines Videos", en: "Quick free preview of your video", es: "Vista previa rápida y gratuita de tu video" })}
             >
               <Eye className="mr-2 h-4 w-4" />
-              Schnelle Vorschau
+              {tx({ de: "Schnelle Vorschau", en: "Quick preview", es: "Vista previa rápida" })}
             </Button>
             
             <Button onClick={handleSave} disabled={loading || !hasChanges}>
@@ -445,7 +445,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
               variant="outline" 
               onClick={() => setShowQuickPreview(false)}
             >
-              Zurück zum Editor
+              {tx({ de: "Zurück zum Editor", en: "Back to editor", es: "Volver al editor" })}
             </Button>
             <Button 
               onClick={() => {
@@ -455,7 +455,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
               disabled={!hasChanges}
             >
               <Check className="mr-2 h-4 w-4" />
-              Sieht gut aus - Jetzt rendern ({estimatedCost} Credits)
+              {tx({ de: `Sieht gut aus - Jetzt rendern (${estimatedCost} Credits)`, en: `Looks good - Render now (${estimatedCost} credits)`, es: `Se ve bien - Renderizar ahora (${estimatedCost} créditos)` })}
             </Button>
           </DialogFooter>
         </DialogContent>

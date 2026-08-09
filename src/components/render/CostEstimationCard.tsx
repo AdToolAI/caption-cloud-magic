@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, TrendingDown, Zap } from 'lucide-react';
@@ -53,7 +54,7 @@ export const CostEstimationCard = ({ estimation }: CostEstimationCardProps) => {
             <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
               <TrendingDown className="w-4 h-4 text-green-600" />
               <span className="text-sm text-green-700">
-                Spare <strong>{estimation.savings} Credits</strong> mit {estimation.recommended === 'remotion' ? 'Remotion' : 'Shotstack'}
+                {tx({ de: <>Spare <strong>{estimation.savings} Credits</strong> mit {estimation.recommended === 'remotion' ? 'Remotion' : 'Shotstack'}</>, en: <>Save <strong>{estimation.savings} credits</strong> with {estimation.recommended === 'remotion' ? 'Remotion' : 'Shotstack'}</>, es: <>Ahorra <strong>{estimation.savings} créditos</strong> con {estimation.recommended === 'remotion' ? 'Remotion' : 'Shotstack'}</> })}
               </span>
             </div>
           )}
