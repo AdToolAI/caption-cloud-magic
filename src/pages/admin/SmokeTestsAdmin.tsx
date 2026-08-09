@@ -90,7 +90,7 @@ export function SmokeTestsAdmin() {
       const { data, error } = await supabase.functions.invoke('daily-smoke-test');
       if (error) throw error;
       toast.success(
-        `Smoke-Test fertig — ${data?.passed ?? 0} ✅ / ${data?.failed ?? 0} ❌`
+        tx({ de: `Smoke-Test fertig — ${data?.passed ?? 0} ✅ / ${data?.failed ?? 0} ❌`, en: `Smoke test done — ${data?.passed ?? 0} ✅ / ${data?.failed ?? 0} ❌`, es: `Smoke test terminado — ${data?.passed ?? 0} ✅ / ${data?.failed ?? 0} ❌` })
       );
       await load();
     } catch (e: unknown) {

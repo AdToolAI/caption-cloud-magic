@@ -49,7 +49,7 @@ export function ContextualActionBar({
   onApplyEffect,
   onAddScene,
   currentSpeed = 1,
-  sceneName = 'Szene',
+  sceneName = tx({ de: 'Szene', en: 'Scene', es: 'Escena' }),
   multiSelectCount = 0,
   cutSegmentMode = false,
   onToggleCutSegment,
@@ -87,7 +87,7 @@ export function ContextualActionBar({
                     className="h-7 px-2 text-xs bg-destructive hover:bg-destructive/90"
                   >
                     <Check className="w-3 h-3 mr-1" />
-                    Entfernen
+                    {tx({ de: "Entfernen", en: "Remove", es: "Eliminar" })}
                   </Button>
                 )}
                 <Button
