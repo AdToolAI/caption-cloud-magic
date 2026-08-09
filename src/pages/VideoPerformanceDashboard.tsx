@@ -124,7 +124,7 @@ export default function VideoPerformanceDashboard() {
   if (loading || !stats) {
     return (
       <div className="container py-8">
-        <div className="text-center">Lade Performance-Daten...</div>
+        <div className="text-center">{tx({ de: "Lade Performance-Daten...", en: "Loading performance data...", es: "Cargando datos de rendimiento..." })}</div>
       </div>
     );
   }
@@ -145,7 +145,7 @@ export default function VideoPerformanceDashboard() {
             className="cursor-pointer"
             onClick={() => setPeriod(p)}
           >
-            {p === '24h' ? '24 Stunden' : p === '7d' ? '7 Tage' : '30 Tage'}
+            {p === '24h' ? tx({ de: '24 Stunden', en: '24 hours', es: '24 horas' }) : p === '7d' ? tx({ de: '7 Tage', en: '7 days', es: '7 días' }) : tx({ de: '30 Tage', en: '30 days', es: '30 días' })}
           </Badge>
         ))}
       </div>
@@ -154,52 +154,52 @@ export default function VideoPerformanceDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gesamt Renders</CardTitle>
+            <CardTitle className="text-sm font-medium">{tx({ de: "Gesamt Renders", en: "Total renders", es: "Renderizados totales" })}</CardTitle>
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total_renders}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.by_status.completed} abgeschlossen
+              {stats.by_status.completed} {tx({ de: "abgeschlossen", en: "completed", es: "completado" })}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Erfolgsrate</CardTitle>
+            <CardTitle className="text-sm font-medium">{tx({ de: "Erfolgsrate", en: "Success rate", es: "Tasa de éxito" })}</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.success_rate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
-              {stats.by_status.failed} fehlgeschlagen
+              {stats.by_status.failed} {tx({ de: "fehlgeschlagen", en: "failed", es: "fallido" })}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ø Render-Zeit</CardTitle>
+            <CardTitle className="text-sm font-medium">{tx({ de: "Ø Render-Zeit", en: "Avg. render time", es: "Tiempo de renderizado prom." })}</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.avg_render_time_sec}s</div>
             <p className="text-xs text-muted-foreground">
-              Pro Video
+              {tx({ de: "Pro Video", en: "Per video", es: "Por video" })}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Credits verwendet</CardTitle>
+            <CardTitle className="text-sm font-medium">{tx({ de: "Credits verwendet", en: "Credits used", es: "Créditos usados" })}</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total_credits_used}</div>
             <p className="text-xs text-muted-foreground">
-              Im gewählten Zeitraum
+              {tx({ de: "Im gewählten Zeitraum", en: "In the selected period", es: "En el período seleccionado" })}
             </p>
           </CardContent>
         </Card>
@@ -208,25 +208,25 @@ export default function VideoPerformanceDashboard() {
       {/* Status Distribution */}
       <Card>
         <CardHeader>
-          <CardTitle>Status-Verteilung</CardTitle>
+          <CardTitle>{tx({ de: "Status-Verteilung", en: "Status distribution", es: "Distribución de estado" })}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-4 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-500">{stats.by_status.completed}</div>
-              <div className="text-sm text-muted-foreground">Abgeschlossen</div>
+              <div className="text-sm text-muted-foreground">{tx({ de: "Abgeschlossen", en: "Completed", es: "Completado" })}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-500">{stats.by_status.failed}</div>
-              <div className="text-sm text-muted-foreground">Fehlgeschlagen</div>
+              <div className="text-sm text-muted-foreground">{tx({ de: "Fehlgeschlagen", en: "Failed", es: "Fallido" })}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-500">{stats.by_status.processing}</div>
-              <div className="text-sm text-muted-foreground">In Bearbeitung</div>
+              <div className="text-sm text-muted-foreground">{tx({ de: "In Bearbeitung", en: "Processing", es: "Procesando" })}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-500">{stats.by_status.queued}</div>
-              <div className="text-sm text-muted-foreground">In Warteschlange</div>
+              <div className="text-sm text-muted-foreground">{tx({ de: "In Warteschlange", en: "Queued", es: "En cola" })}</div>
             </div>
           </div>
         </CardContent>
@@ -240,7 +240,7 @@ export default function VideoPerformanceDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mb-2">{stats.by_engine.remotion.count}</div>
-            <p className="text-sm text-muted-foreground">Renders</p>
+            <p className="text-sm text-muted-foreground">{tx({ de: "Renders", en: "Renders", es: "Renderizados" })}</p>
           </CardContent>
         </Card>
 
@@ -250,7 +250,7 @@ export default function VideoPerformanceDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mb-2">{stats.by_engine.shotstack.count}</div>
-            <p className="text-sm text-muted-foreground">Renders</p>
+            <p className="text-sm text-muted-foreground">{tx({ de: "Renders", en: "Renders", es: "Renderizados" })}</p>
           </CardContent>
         </Card>
       </div>
@@ -260,12 +260,12 @@ export default function VideoPerformanceDashboard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <HardDrive className="h-5 w-5" />
-            Storage-Nutzung
+            {tx({ de: "Storage-Nutzung", en: "Storage usage", es: "Uso de almacenamiento" })}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold mb-2">{stats.storage_used_gb} GB</div>
-          <p className="text-sm text-muted-foreground">Gesamt verwendeter Speicherplatz</p>
+          <p className="text-sm text-muted-foreground">{tx({ de: "Gesamt verwendeter Speicherplatz", en: "Total storage used", es: "Almacenamiento total usado" })}</p>
         </CardContent>
       </Card>
     </div>

@@ -201,7 +201,7 @@ const Legal = () => {
 
               <LegalSection title={tx({ de: '9. Schlussbestimmungen', en: '9. Final Provisions', es: '9. Disposiciones finales' })} icon="scale" index={8}>
                 <ul className="list-disc list-inside space-y-2">
-                  <li>Es gilt deutsches Recht</li>
+                  <li>{tx({ de: "Es gilt deutsches Recht", en: "German law applies", es: "Se aplica la legislación alemana" })}</li>
                   <li>Gerichtsstand: München, Deutschland</li>
                   <li>{tx({ de: 'Änderungen werden per E-Mail mitgeteilt', en: 'Changes will be communicated via email', es: 'Los cambios se comunicarán por correo electrónico' })}</li>
                 </ul>
@@ -263,33 +263,33 @@ const Legal = () => {
 
               <LegalSection title={tx({ de: '§ 3 Art und Zweck der Verarbeitung', en: '§ 3 Type and Purpose of Processing', es: '§ 3 Tipo y finalidad del tratamiento' })} icon="database" index={2}>
                 <div className="space-y-3">
-                  <p className="font-medium text-foreground">Zweck der Verarbeitung:</p>
+                  <p className="font-medium text-foreground">{tx({ de: "Zweck der Verarbeitung:", en: "Purpose of processing:", es: "Finalidad del tratamiento:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li>Bereitstellung der AdTool AI SaaS-Plattform</li>
+                    <li>{tx({ de: "Bereitstellung der AdTool AI SaaS-Plattform", en: "Provision of the AdTool AI SaaS platform", es: "Prestación de la plataforma SaaS AdTool AI" })}</li>
                     <li>{tx({ de: "KI-gestützte Content-Generierung und -Optimierung", en: "AI-powered content generation and optimization", es: "Generación y optimización de contenido impulsada por IA" })}</li>
                     <li>{tx({ de: "Social Media Account-Verbindungen und Posting", en: "Social media account connections and posting", es: "Conexiones y publicaciones de cuentas de redes sociales" })}</li>
                     <li>{tx({ de: "Analytics und Performance-Tracking", en: "Analytics and performance tracking", es: "Análisis y seguimiento del rendimiento." })}</li>
                     <li>{tx({ de: "Nutzer-Authentifizierung und Account-Verwaltung", en: "User authentication and account management", es: "Autenticación de usuarios y gestión de cuentas." })}</li>
                   </ul>
-                  <p className="font-medium text-foreground mt-4">Art der Verarbeitung:</p>
-                  <p className="text-muted-foreground">Erhebung, Speicherung, Nutzung, Übermittlung, Löschung von Daten gemäß den technischen Anforderungen der Plattform.</p>
+                  <p className="font-medium text-foreground mt-4">{tx({ de: "Art der Verarbeitung:", en: "Type of processing:", es: "Tipo de tratamiento:" })}</p>
+                  <p className="text-muted-foreground">{tx({ de: 'Erhebung, Speicherung, Nutzung, Übermittlung, Löschung von Daten gemäß den technischen Anforderungen der Plattform.', en: "Collection, storage, use, transmission, deletion of data according to the platform's technical requirements.", es: 'Recopilación, almacenamiento, uso, transmisión y eliminación de datos conforme a los requisitos técnicos de la plataforma.' })}</p>
                 </div>
               </LegalSection>
 
               <LegalSection title={tx({ de: '§ 4 Kategorien betroffener Personen und Daten', en: '§ 4 Categories of Data Subjects and Data', es: '§ 4 Categorías de interesados y datos' })} icon="users" index={3}>
                 <div className="space-y-3">
-                  <p className="font-medium text-foreground">Kategorien betroffener Personen:</p>
+                  <p className="font-medium text-foreground">{tx({ de: "Kategorien betroffener Personen:", en: "Categories of data subjects:", es: "Categorías de interesados:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li>Nutzer der AdTool AI Plattform</li>
+                    <li>{tx({ de: "Nutzer der AdTool AI Plattform", en: "Users of the AdTool AI platform", es: "Usuarios de la plataforma AdTool AI" })}</li>
                     <li>{tx({ de: "Follower und Kontakte auf verbundenen Social Media Accounts", en: "Followers and contacts on connected social media accounts", es: "Seguidores y contactos en cuentas de redes sociales conectadas" })}</li>
                     <li>{tx({ de: "Personen, die in hochgeladenen Medien dargestellt werden", en: "People featured in uploaded media", es: "Personas que aparecen en los medios subidos" })}</li>
                   </ul>
-                  <p className="font-medium text-foreground mt-4">Kategorien personenbezogener Daten:</p>
+                  <p className="font-medium text-foreground mt-4">{tx({ de: "Kategorien personenbezogener Daten:", en: "Categories of personal data:", es: "Categorías de datos personales:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li>Kontaktdaten (Name, E-Mail)</li>
-                    <li>Account-Daten (Benutzername, Passwort-Hash)</li>
+                    <li>{tx({ de: "Kontaktdaten (Name, E-Mail)", en: "Contact data (name, email)", es: "Datos de contacto (nombre, correo electrónico)" })}</li>
+                    <li>{tx({ de: "Account-Daten (Benutzername, Passwort-Hash)", en: "Account data (username, password hash)", es: "Datos de cuenta (nombre de usuario, hash de contraseña)" })}</li>
                     <li>{tx({ de: "Social Media Account-Tokens und -Metadaten", en: "Social media account tokens and metadata", es: "Tokens y metadatos de cuentas de redes sociales" })}</li>
-                    <li>Hochgeladene Medien (Bilder, Videos)</li>
+                    <li>{tx({ de: "Hochgeladene Medien (Bilder, Videos)", en: "Uploaded media (images, videos)", es: "Medios subidos (imágenes, vídeos)" })}</li>
                     <li>{tx({ de: "Nutzungsdaten und Analytics", en: "Usage data and analytics", es: "Datos de uso y análisis" })}</li>
                   </ul>
                 </div>
@@ -309,14 +309,14 @@ const Legal = () => {
 
               <LegalSection title={tx({ de: '§ 6 Pflichten des Auftragsverarbeiters', en: '§ 6 Obligations of the Processor', es: '§ 6 Obligaciones del encargado' })} icon="lock" index={5}>
                 <div className="space-y-3">
-                  <p>Der Auftragsverarbeiter verpflichtet sich:</p>
+                  <p>{tx({ de: "Der Auftragsverarbeiter verpflichtet sich:", en: "The processor commits to:", es: "El encargado se compromete a:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li>Daten nur gemäß dokumentierten Weisungen zu verarbeiten</li>
-                    <li>Zur Vertraulichkeit verpflichtete Mitarbeiter einzusetzen</li>
+                    <li>{tx({ de: "Daten nur gemäß dokumentierten Weisungen zu verarbeiten", en: "Process data only in accordance with documented instructions", es: "Procesar los datos únicamente conforme a instrucciones documentadas" })}</li>
+                    <li>{tx({ de: "Zur Vertraulichkeit verpflichtete Mitarbeiter einzusetzen", en: "Employ staff who are bound to confidentiality", es: "Emplear personal comprometido con la confidencialidad" })}</li>
                     <li>{tx({ de: "Angemessene technische und organisatorische Maßnahmen zu implementieren", en: "Implement appropriate technical and organizational measures", es: "Implementar medidas técnicas y organizativas apropiadas." })}</li>
                     <li>{tx({ de: "Subunternehmer nur mit vorheriger Genehmigung einzusetzen", en: "Only use subcontractors with prior approval", es: "Utilice únicamente subcontratistas con aprobación previa." })}</li>
-                    <li>Den Verantwortlichen bei Anfragen Betroffener zu unterstützen</li>
-                    <li>Datenschutzverletzungen unverzüglich zu melden</li>
+                    <li>{tx({ de: "Den Verantwortlichen bei Anfragen Betroffener zu unterstützen", en: "Assist the controller with requests from data subjects", es: "Ayudar al responsable con las solicitudes de los interesados" })}</li>
+                    <li>{tx({ de: "Datenschutzverletzungen unverzüglich zu melden", en: "Report data breaches without undue delay", es: "Notificar sin demora las violaciones de datos" })}</li>
                     <li>{tx({ de: 'Nach Beendigung alle Daten zu löschen oder zurückzugeben', en: 'Delete or return all data after termination', es: 'Eliminar o devolver todos los datos tras la finalización' })}</li>
                   </ul>
                 </div>
@@ -324,13 +324,13 @@ const Legal = () => {
 
               <LegalSection title={tx({ de: '§ 7 Technische und organisatorische Maßnahmen (TOMs)', en: '§ 7 Technical and Organizational Measures (TOMs)', es: '§ 7 Medidas técnicas y organizativas (TOM)' })} icon="shield" index={6}>
                 <div className="space-y-3">
-                  <p>Der Auftragsverarbeiter gewährleistet folgende Maßnahmen gemäß Art. 32 DSGVO:</p>
+                  <p>{tx({ de: "Der Auftragsverarbeiter gewährleistet folgende Maßnahmen gemäß Art. 32 DSGVO:", en: "The processor guarantees the following measures in accordance with Art. 32 GDPR:", es: "El encargado garantiza las siguientes medidas conforme al art. 32 del RGPD:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li><strong className="text-foreground">Vertraulichkeit:</strong> Zugriffskontrolle, Verschlüsselung, Pseudonymisierung</li>
-                    <li><strong className="text-foreground">Integrität:</strong> Eingabekontrolle, Weitergabekontrolle</li>
-                    <li><strong className="text-foreground">Verfügbarkeit:</strong> Backup-Systeme, Disaster Recovery</li>
-                    <li><strong className="text-foreground">Belastbarkeit:</strong> Skalierbare Infrastruktur, Monitoring</li>
-                    <li><strong className="text-foreground">Wiederherstellung:</strong> Regelmäßige Tests der Wiederherstellungsverfahren</li>
+                    <li><strong className="text-foreground">{tx({ de: "Vertraulichkeit:", en: "Confidentiality:", es: "Confidencialidad:" })}</strong> {tx({ de: "Zugriffskontrolle, Verschlüsselung, Pseudonymisierung", en: "Access control, encryption, pseudonymization", es: "Control de acceso, cifrado, seudonimización" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: "Integrität:", en: "Integrity:", es: "Integridad:" })}</strong> {tx({ de: "Eingabekontrolle, Weitergabekontrolle", en: "Input control, transfer control", es: "Control de entrada, control de transferencia" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: "Verfügbarkeit:", en: "Availability:", es: "Disponibilidad:" })}</strong> {tx({ de: "Backup-Systeme, Disaster Recovery", en: "Backup systems, disaster recovery", es: "Sistemas de respaldo, recuperación ante desastres" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: "Belastbarkeit:", en: "Resilience:", es: "Resiliencia:" })}</strong> {tx({ de: "Skalierbare Infrastruktur, Monitoring", en: "Scalable infrastructure, monitoring", es: "Infraestructura escalable, monitorización" })}</li>
+                    <li><strong className="text-foreground">{tx({ de: "Wiederherstellung:", en: "Recovery:", es: "Recuperación:" })}</strong> {tx({ de: "Regelmäßige Tests der Wiederherstellungsverfahren", en: "Regular tests of recovery procedures", es: "Pruebas periódicas de los procedimientos de recuperación" })}</li>
                   </ul>
                   <p className="mt-3 text-primary/80">{tx({ de: 'Die Infrastruktur wird über Supabase (Frankfurt, DE) und Cloudflare bereitgestellt.', en: 'The infrastructure is provided via Supabase (Frankfurt, DE) and Cloudflare.', es: 'La infraestructura se proporciona a través de Supabase (Fráncfort, DE) y Cloudflare.' })}</p>
                 </div>
@@ -352,14 +352,14 @@ const Legal = () => {
 
               <LegalSection title={tx({ de: '§ 9 Rechte der betroffenen Personen', en: '§ 9 Rights of Data Subjects', es: '§ 9 Derechos de los interesados' })} icon="users" index={8}>
                 <div className="space-y-3">
-                  <p>Der Auftragsverarbeiter unterstützt den Verantwortlichen bei der Erfüllung von Betroffenenrechten:</p>
+                  <p>{tx({ de: "Der Auftragsverarbeiter unterstützt den Verantwortlichen bei der Erfüllung von Betroffenenrechten:", en: "The processor supports the controller in fulfilling data subject rights:", es: "El encargado apoya al responsable en el cumplimiento de los derechos de los interesados:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li>Auskunftsrecht (Art. 15 DSGVO)</li>
-                    <li>Berichtigungsrecht (Art. 16 DSGVO)</li>
-                    <li>Löschungsrecht (Art. 17 DSGVO)</li>
-                    <li>Einschränkung der Verarbeitung (Art. 18 DSGVO)</li>
-                    <li>Datenübertragbarkeit (Art. 20 DSGVO)</li>
-                    <li>Widerspruchsrecht (Art. 21 DSGVO)</li>
+                    <li>{tx({ de: "Auskunftsrecht (Art. 15 DSGVO)", en: "Right of access (Art. 15 GDPR)", es: "Derecho de acceso (art. 15 RGPD)" })}</li>
+                    <li>{tx({ de: "Berichtigungsrecht (Art. 16 DSGVO)", en: "Right to rectification (Art. 16 GDPR)", es: "Derecho de rectificación (art. 16 RGPD)" })}</li>
+                    <li>{tx({ de: "Löschungsrecht (Art. 17 DSGVO)", en: "Right to erasure (Art. 17 GDPR)", es: "Derecho de supresión (art. 17 RGPD)" })}</li>
+                    <li>{tx({ de: "Einschränkung der Verarbeitung (Art. 18 DSGVO)", en: "Restriction of processing (Art. 18 GDPR)", es: "Limitación del tratamiento (art. 18 RGPD)" })}</li>
+                    <li>{tx({ de: "Datenübertragbarkeit (Art. 20 DSGVO)", en: "Data portability (Art. 20 GDPR)", es: "Portabilidad de los datos (art. 20 RGPD)" })}</li>
+                    <li>{tx({ de: "Widerspruchsrecht (Art. 21 DSGVO)", en: "Right to object (Art. 21 GDPR)", es: "Derecho de oposición (art. 21 RGPD)" })}</li>
                   </ul>
                   <p className="mt-3">{tx({ de: "Anfragen werden innerhalb von 72 Stunden bearbeitet.", en: "Requests will be processed within 72 hours.", es: "Las solicitudes se procesarán dentro de las 72 horas." })}</p>
                 </div>
@@ -370,8 +370,8 @@ const Legal = () => {
                   <p>{tx({ de: "Nach Beendigung der Auftragsverarbeitung wird der Auftragsverarbeiter:", en: "After completion of order processing, the processor will:", es: "Una vez finalizado el procesamiento del pedido, el procesador:" })}</p>
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
                     <li>{tx({ de: 'Alle personenbezogenen Daten löschen oder zurückgeben (nach Wahl des Verantwortlichen)', en: "Delete or return all personal data (at the controller's discretion)", es: 'Eliminar o devolver todos los datos personales (a elección del responsable)' })}</li>
-                    <li>Bestehende Kopien vernichten</li>
-                    <li>Die Löschung schriftlich bestätigen</li>
+                    <li>{tx({ de: "Bestehende Kopien vernichten", en: "Destroy existing copies", es: "Destruir las copias existentes" })}</li>
+                    <li>{tx({ de: "Die Löschung schriftlich bestätigen", en: "Confirm the deletion in writing", es: "Confirmar por escrito la eliminación" })}</li>
                   </ul>
                   <p className="mt-3">{tx({ de: 'Gesetzliche Aufbewahrungspflichten bleiben unberührt. Nutzer können ihre Daten jederzeit über die Kontoeinstellungen exportieren.', en: 'Statutory retention obligations remain unaffected. Users can export their data at any time via the account settings.', es: 'Las obligaciones legales de conservación permanecen inalteradas. Los usuarios pueden exportar sus datos en cualquier momento desde la configuración de la cuenta.' })}</p>
                 </div>
@@ -387,12 +387,12 @@ const Legal = () => {
               <LegalSection title={tx({ de: '§ 12 Schlussbestimmungen', en: '§ 12 Final Provisions', es: '§ 12 Disposiciones finales' })} icon="scale" index={11}>
                 <div className="space-y-3">
                   <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
-                    <li>Es gilt deutsches Recht</li>
+                    <li>{tx({ de: "Es gilt deutsches Recht", en: "German law applies", es: "Se aplica la legislación alemana" })}</li>
                     <li>{tx({ de: "Gerichtsstand ist München, Deutschland", en: "The place of jurisdiction is Munich, Germany", es: "El lugar de jurisdicción es Munich, Alemania." })}</li>
-                    <li>Änderungen bedürfen der Schriftform</li>
-                    <li>Sollten einzelne Bestimmungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt</li>
+                    <li>{tx({ de: "Änderungen bedürfen der Schriftform", en: "Amendments require written form", es: "Las modificaciones requieren forma escrita" })}</li>
+                    <li>{tx({ de: "Sollten einzelne Bestimmungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt", en: "Should individual provisions be invalid, the validity of the remaining provisions remains unaffected", es: "Si alguna disposición fuera inválida, la validez de las demás disposiciones no se verá afectada" })}</li>
                   </ul>
-                  <p className="mt-4 font-medium text-foreground">Stand: Dezember 2025</p>
+                  <p className="mt-4 font-medium text-foreground">{tx({ de: "Stand: Dezember 2025", en: "Last updated: December 2025", es: "Última actualización: diciembre de 2025" })}</p>
                 </div>
               </LegalSection>
             </motion.div>

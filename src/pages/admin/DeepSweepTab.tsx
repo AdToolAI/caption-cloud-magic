@@ -156,7 +156,7 @@ export function DeepSweepTab() {
         body: { run_id: latestRun.id },
       });
       if (error) throw error;
-      toast.success("Run als gescheitert markiert.");
+      toast.success(tx({ de: "Run als gescheitert markiert.", en: "Run marked as failed.", es: "Ejecución marcada como fallida." }));
       await load();
     } catch (e: any) {
       toast.error(`Finalize failed: ${e?.message ?? String(e)}`);
