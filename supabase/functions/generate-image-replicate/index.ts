@@ -242,9 +242,68 @@ serve(async (req) => {
 
     const enhancedPrompt = `${prompt.trim()}. Style: ${styleModifier}.${brandSuffix}${styleRefSuffix}`;
 
+    const safeAspect = mapAspectRatio(tier, aspectRatio);
+    if (safeAspect !== aspectRatio) {
+      console.log(`[generate-image-replicate] aspect_ratio ${aspectRatio} not supported by ${tier} → using ${safeAspect}`);
+    }
+
+    // Build image inputs (Subject + Style references)
+    const imageInputs: string[] = [];
+    if (referenceImageUrl) imageInputs.push(referenceImageUrl);
+    if (styleReferenceUrl) imageInputs.push(styleReferenceUrl);
+
+    // GPT-Image-2 (the model ChatGPT uses) runs on the Lovable AI Gateway,
+    // not on Replicate — fixed pixel sizes instead of ratio strings.
+    let gptImageDataUrl: string | null = null;
+    if (tier === 'gptimage') {
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      if (!LOVABLE_API_KEY) {
+        return new Response(
+          JSON.stringify({ error: "LOVABLE_API_KEY not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const gptRes = await fetch('https://ai.gateway.lovable.dev/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-image-2',
+          prompt: enhancedPrompt,
+          size: GPT_IMAGE_SIZES[safeAspect] ?? '1024x1024',
+          quality: 'low',
+          n: 1,
+        }),
+      });
+      if (!gptRes.ok) {
+        const errBody = await gptRes.text();
+        console.error(`[generate-image-replicate] GPT-Image failed [${gptRes.status}]: ${errBody}`);
+        return new Response(
+          JSON.stringify({
+            error: `Bildgenerierung fehlgeschlagen: ${errBody}`,
+            provider_message: errBody,
+            code: 'GPT_IMAGE_ERROR',
+          }),
+          { status: gptRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const gptJson = await gptRes.json();
+      const b64 = gptJson?.data?.[0]?.b64_json;
+      if (!b64) {
+        console.error('[generate-image-replicate] GPT-Image returned no image:', JSON.stringify(gptJson).slice(0, 500));
+        return new Response(
+          JSON.stringify({ error: "No image returned from model", code: "NO_OUTPUT" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      gptImageDataUrl = `data:image/png;base64,${b64}`;
+    }
+
     // Replicate
     const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
-    if (!REPLICATE_API_KEY) {
+    if (!REPLICATE_API_KEY && tier !== 'gptimage') {
       return new Response(
         JSON.stringify({ error: "REPLICATE_API_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -257,16 +316,6 @@ serve(async (req) => {
     // Per-model input shape
     const replicateInput: Record<string, any> = { prompt: enhancedPrompt };
 
-    // Build image inputs (Subject + Style references)
-    const imageInputs: string[] = [];
-    if (referenceImageUrl) imageInputs.push(referenceImageUrl);
-    if (styleReferenceUrl) imageInputs.push(styleReferenceUrl);
-
-    const safeAspect = mapAspectRatio(tier, aspectRatio);
-    if (safeAspect !== aspectRatio) {
-      console.log(`[generate-image-replicate] aspect_ratio ${aspectRatio} not supported by ${tier} → using ${safeAspect}`);
-    }
-
     if (tier === 'fast') {
       // Seedream 4
       replicateInput.aspect_ratio = safeAspect;
@@ -277,12 +326,31 @@ serve(async (req) => {
       replicateInput.aspect_ratio = safeAspect;
       replicateInput.output_format = 'jpg';
       replicateInput.safety_filter_level = 'block_only_high';
-    } else {
+    } else if (tier === 'flux') {
+      // FLUX 1.1 Pro Ultra
+      replicateInput.aspect_ratio = safeAspect;
+      replicateInput.output_format = 'jpg';
+      replicateInput.safety_tolerance = 5;
+      if (imageInputs.length) replicateInput.image_prompt = imageInputs[0];
+    } else if (tier === 'ideogram') {
+      // Ideogram v3 Turbo
+      replicateInput.aspect_ratio = safeAspect;
+      if (imageInputs.length) replicateInput.style_reference_images = imageInputs;
+    } else if (tier === 'recraft') {
+      // Recraft v3 — fixed sizes
+      replicateInput.size = RECRAFT_SIZES[safeAspect] ?? '1024x1024';
+    } else if (tier === 'qwen') {
+      // Qwen Image
+      replicateInput.aspect_ratio = safeAspect;
+      replicateInput.output_format = 'jpg';
+      if (imageInputs.length) replicateInput.image = imageInputs[0];
+    } else if (tier === 'ultra') {
       // Nano Banana (ultra) — multi-image edit
       replicateInput.aspect_ratio = safeAspect;
       replicateInput.output_format = 'jpg';
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     }
+
 
     console.log(`[generate-image-replicate] Tier=${tier} Cost=${currencySymbol}${cost.toFixed(2)} Model=${modelRef} aspect=${safeAspect} images=${imageInputs.length}`);
 
