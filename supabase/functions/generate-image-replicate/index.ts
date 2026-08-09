@@ -196,19 +196,24 @@ serve(async (req) => {
     if (referenceImageUrl) imageInputs.push(referenceImageUrl);
     if (styleReferenceUrl) imageInputs.push(styleReferenceUrl);
 
+    const safeAspect = mapAspectRatio(tier, aspectRatio);
+    if (safeAspect !== aspectRatio) {
+      console.log(`[generate-image-replicate] aspect_ratio ${aspectRatio} not supported by ${tier} → using ${safeAspect}`);
+    }
+
     if (tier === 'fast') {
       // Seedream 4
-      replicateInput.aspect_ratio = aspectRatio;
+      replicateInput.aspect_ratio = safeAspect;
       replicateInput.size = '2K';
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     } else if (tier === 'pro') {
       // Imagen 4 Ultra (no image_input support — style ref only via prompt)
-      replicateInput.aspect_ratio = aspectRatio;
+      replicateInput.aspect_ratio = safeAspect;
       replicateInput.output_format = 'jpg';
       replicateInput.safety_filter_level = 'block_only_high';
     } else {
       // Nano Banana (ultra) — multi-image edit
-      replicateInput.aspect_ratio = aspectRatio;
+      replicateInput.aspect_ratio = safeAspect;
       replicateInput.output_format = 'jpg';
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     }
