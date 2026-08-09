@@ -66,6 +66,7 @@ import {
 } from '@/lib/shotDirector/spawnCoverageScenes';
 import type { ShotSelection } from '@/config/shotDirector';
 import { Sparkles as SparklesIcon, Play, Clapperboard } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 import type {
   ComposerCharacter,
   ComposerScene,
@@ -1760,7 +1761,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           };
           toast({
             title: 'Dialog länger als Szene',
-            description: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`,
+            description:
+              language === 'de'
+                ? `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`
+                : language === 'es'
+                ? `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} dura ${masterDuration}s. Sync.so recorta el final (cut_off). Para el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.`
+                : `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts off the end (cut_off). For the full dialog, increase scene duration or pick a provider with a larger duration window.`,
           });
         }
 
@@ -1806,7 +1812,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             onUpdate({ clipStatus: 'pending', pipelineState: 'idle' });
             toast({
               title: t.failed,
-              description: 'Projekt konnte nicht gespeichert werden — bitte erneut versuchen.',
+              description: tx({ de: 'Projekt konnte nicht gespeichert werden — bitte erneut versuchen.', en: 'Project could not be saved — please try again.', es: 'No se pudo guardar el proyecto — inténtalo de nuevo.' }),
               variant: 'destructive',
             });
             return;

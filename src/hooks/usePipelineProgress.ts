@@ -15,6 +15,7 @@ import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import { subscribePipelineEvents, type PipelinePhaseId } from '@/lib/pipelineEvents';
 import { isLipSyncIntentional } from '@/lib/video-composer/lipSyncIntent';
 import { countSceneSpeakers } from '@/lib/composer/countSceneSpeakers';
+import { tx } from '@/lib/i18nText';
 
 export interface PipelinePhaseState {
   id: PipelinePhaseId;
@@ -882,7 +883,7 @@ export function usePipelineProgress({
     hasFailure,
     isStalled,
     stallHint: isStalled
-      ? 'Pipeline scheint zu hängen — bitte erneut auf „Alle generieren" klicken.'
+      ? tx({ de: 'Pipeline scheint zu hängen — bitte erneut auf „Alle generieren" klicken.', en: 'Pipeline seems to be stuck — please click "Generate all" again.', es: 'La canalización parece estar bloqueada — haz clic de nuevo en "Generar todo".' })
       : null,
   };
 }

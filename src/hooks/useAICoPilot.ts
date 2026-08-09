@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { tx } from '@/lib/i18nText';
 
 export interface CoPilotSuggestion {
   id: string;
@@ -293,7 +294,7 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
 
       let responseContent = typeof data?.response === 'string' 
         ? data.response 
-        : data?.raw || 'Ich kann dir bei der Videobearbeitung helfen. Frag mich etwas!';
+        : data?.raw || tx({ de: 'Ich kann dir bei der Videobearbeitung helfen. Frag mich etwas!', en: "I can help with your video editing. Ask me something!", es: '¡Puedo ayudarte con la edición de video. Pregúntame algo!' });
 
       // Check if AI detected a command
       if (typeof data?.response === 'object' && data.response?.command) {
@@ -377,7 +378,7 @@ function generateContextualResponse(input: string, context: CoPilotContext): str
     if (!context.hasTransitions) {
       return '💡 Tipp: Probiere KI-Übergänge - sie wählen automatisch passende Effekte.';
     }
-    return '💡 Dein Video sieht gut aus! Experimentiere mit Style Transfer für einen einzigartigen Look.';
+    return tx({ de: '💡 Dein Video sieht gut aus! Experimentiere mit Style Transfer für einen einzigartigen Look.', en: '💡 Your video looks great! Experiment with style transfer for a unique look.', es: '💡 ¡Tu video se ve genial! Experimenta con la transferencia de estilo para un look único.' });
   }
 
   if (lowerInput.includes('shortcut') || lowerInput.includes('tastatur')) {
@@ -390,5 +391,5 @@ function generateContextualResponse(input: string, context: CoPilotContext): str
 • 1-6 - Schnell Übergang wählen`;
   }
 
-  return 'Ich verstehe deine Anfrage. Versuche einen Befehl wie "Analysiere Szenen" oder frage nach "Hilfe" für alle Optionen.';
+  return tx({ de: 'Ich verstehe deine Anfrage. Versuche einen Befehl wie "Analysiere Szenen" oder frage nach "Hilfe" für alle Optionen.', en: 'I understand your request. Try a command like "Analyze scenes" or ask for "Help" to see all options.', es: 'Entiendo tu solicitud. Prueba un comando como "Analizar escenas" o pide "Ayuda" para ver todas las opciones.' });
 }

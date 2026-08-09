@@ -11,6 +11,7 @@ import { useFounderStatus } from "@/hooks/useFounderStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, AlertTriangle, ArrowLeft, FileDown, Trash2, ShieldAlert, Crown } from "lucide-react";
+import { tx } from "@/lib/i18nText";
 
 const DeleteAccount = () => {
   const { user, signOut } = useAuth();
@@ -67,7 +68,7 @@ const DeleteAccount = () => {
     try {
       toast({
         title: "Löschanfrage gesendet",
-        description: "Ihr Konto wird innerhalb von 30 Tagen gelöscht. Sie erhalten eine Bestätigungs-E-Mail. Innerhalb dieser Frist können Sie die Löschung widerrufen.",
+        description: tx({ de: "Ihr Konto wird innerhalb von 30 Tagen gelöscht. Sie erhalten eine Bestätigungs-E-Mail. Innerhalb dieser Frist können Sie die Löschung widerrufen.", en: "Your account will be deleted within 30 days. You will receive a confirmation email. You can revoke the deletion within this period.", es: "Tu cuenta se eliminará en un plazo de 30 días. Recibirás un correo de confirmación. Puedes revocar la eliminación dentro de ese plazo." }),
       });
       await signOut();
       navigate("/");
@@ -107,7 +108,7 @@ const DeleteAccount = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Account unwiderruflich löschen</h1>
-              <p className="text-muted-foreground text-sm">Dieser Vorgang kann nicht rückgängig gemacht werden.</p>
+              <p className="text-muted-foreground text-sm">{tx({ de: "Dieser Vorgang kann nicht rückgängig gemacht werden.", en: "This action cannot be undone.", es: "Esta acción no se puede deshacer." })}</p>
             </div>
           </div>
 
@@ -117,7 +118,7 @@ const DeleteAccount = () => {
               <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
               <div className="text-sm text-muted-foreground">
                 <p className="font-medium text-amber-400 mb-1">30-Tage-Widerrufsfrist</p>
-                <p>Nach Absenden der Löschanfrage haben Sie 30 Tage Zeit, die Löschung zu widerrufen. Danach werden alle Daten unwiderruflich entfernt.</p>
+                <p>{tx({ de: "Nach Absenden der Löschanfrage haben Sie 30 Tage Zeit, die Löschung zu widerrufen. Danach werden alle Daten unwiderruflich entfernt.", en: "After submitting the deletion request you have 30 days to revoke it. After that, all data is removed irreversibly.", es: "Tras enviar la solicitud de eliminación dispones de 30 días para revocarla. Después, todos los datos se eliminan de forma irreversible." })}</p>
               </div>
             </CardContent>
           </Card>
@@ -129,7 +130,7 @@ const DeleteAccount = () => {
                 <Crown className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div className="text-sm text-muted-foreground">
                   <p className="font-medium text-primary mb-1">Sie verlieren Ihren Gründer-Status</p>
-                  <p>Mit der Löschung endet Ihr 24-Monats-Founders-Vorteil (20&nbsp;% Rabatt auf alle KI-Credits). Ihr Slot wird für einen neuen Nutzer freigegeben und kann nicht wiederhergestellt werden.</p>
+                  <p>{tx({ de: "Mit der Löschung endet Ihr 24-Monats-Founders-Vorteil (20 % Rabatt auf alle KI-Credits). Ihr Slot wird für einen neuen Nutzer freigegeben und kann nicht wiederhergestellt werden.", en: "Deleting your account ends your 24-month founders benefit (20% off all AI credits). Your slot is released to a new user and cannot be restored.", es: "Al eliminar la cuenta finaliza tu ventaja de fundador de 24 meses (20 % de descuento en todos los créditos de IA). Tu plaza se libera para otro usuario y no se puede recuperar." })}</p>
                 </div>
               </CardContent>
             </Card>
@@ -145,9 +146,9 @@ const DeleteAccount = () => {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">• Alle Projekte und Medien</li>
-                <li className="flex items-center gap-2">• Alle Credits und Transaktionen</li>
-                <li className="flex items-center gap-2">• Persönliche Einstellungen und Profile</li>
+                <li className="flex items-center gap-2">• {tx({ de: "Alle Projekte und Medien", en: "All projects and media", es: "Todos los proyectos y medios" })}</li>
+                <li className="flex items-center gap-2">• {tx({ de: "Alle Credits und Transaktionen", en: "All credits and transactions", es: "Todos los créditos y transacciones" })}</li>
+                <li className="flex items-center gap-2">• {tx({ de: "Persönliche Einstellungen und Profile", en: "Personal settings and profiles", es: "Ajustes personales y perfiles" })}</li>
                 <li className="flex items-center gap-2">• Aktives Abonnement wird gekündigt</li>
                 <li className="flex items-center gap-2">• Verknüpfte Social-Media-Verbindungen</li>
               </ul>

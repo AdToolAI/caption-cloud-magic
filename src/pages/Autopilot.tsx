@@ -30,6 +30,7 @@ import { ComingSoonScreen } from '@/components/common/ComingSoonScreen';
 import { AutopilotStudio } from '@/components/autopilot/AutopilotStudio';
 
 import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+import { tx } from "@/lib/i18nText";
 
 export default function Autopilot() {
   useTrackPageFeature("autopilot");
@@ -37,20 +38,20 @@ export default function Autopilot() {
     <ComingSoonScreen
       eyebrow="KI Autopilot"
       title="Deine KI führt den Account"
-      subtitle="Vollautonome Content-Pipeline mit Wochenplan, Compliance-Score und Legal-Shield gegen Deepfakes und Copyright-Verstöße. Du briefst, die KI generiert, prüft, plant und veröffentlicht."
-      reason="Wir härten gerade das Compliance-Gate und die Approval-Inbox für Production-Workloads."
+      subtitle={tx({ de: "Vollautonome Content-Pipeline mit Wochenplan, Compliance-Score und Legal-Shield gegen Deepfakes und Copyright-Verstöße. Du briefst, die KI generiert, prüft, plant und veröffentlicht.", en: "Fully autonomous content pipeline with weekly plan, compliance score and legal shield against deepfakes and copyright violations. You brief, the AI generates, checks, schedules and publishes.", es: "Pipeline de contenido totalmente autónoma con plan semanal, puntuación de cumplimiento y escudo legal contra deepfakes e infracciones de copyright. Tú das el briefing; la IA genera, revisa, planifica y publica." })}
+      reason={tx({ de: "Wir härten gerade das Compliance-Gate und die Approval-Inbox für Production-Workloads.", en: "We are currently hardening the compliance gate and approval inbox for production workloads.", es: "Estamos reforzando la puerta de cumplimiento y la bandeja de aprobación para cargas de producción." })}
       backHref="/home"
       adminPreview={<AutopilotReal />}
       features={[
         {
           icon: <Bot className="h-5 w-5" />,
           title: 'Auto-Briefing & Strategie',
-          description: 'Einmal die Strategie definieren — die KI plant 14 Tage Content im Voraus, abgestimmt auf Brand, Sprache und Plattform.',
+          description: tx({ de: 'Einmal die Strategie definieren — die KI plant 14 Tage Content im Voraus, abgestimmt auf Brand, Sprache und Plattform.', en: 'Define your strategy once — the AI plans 14 days of content ahead, matched to brand, language and platform.', es: 'Define la estrategia una vez: la IA planifica 14 días de contenido por adelantado, ajustado a marca, idioma y plataforma.' }),
         },
         {
           icon: <ShieldCheck className="h-5 w-5" />,
           title: 'Legal Shield',
-          description: 'KI-QA prüft jeden Post auf Copyright, Deepfakes und Brand-CI. Strike-System verhindert Account-Risiko.',
+          description: tx({ de: 'KI-QA prüft jeden Post auf Copyright, Deepfakes und Brand-CI. Strike-System verhindert Account-Risiko.', en: 'AI QA checks every post for copyright, deepfakes and brand CI. A strike system prevents account risk.', es: 'El control de calidad con IA revisa cada publicación por copyright, deepfakes e identidad de marca. El sistema de avisos evita riesgos para la cuenta.' }),
         },
         {
           icon: <Calendar className="h-5 w-5" />,
@@ -95,7 +96,7 @@ function AutopilotReal() {
     <>
       <Helmet>
         <title>Autopilot Cockpit — KI-gesteuerter Account | useadtool</title>
-        <meta name="description" content="Cockpit für deinen KI-Autopilot: Wochenplan, Compliance-Score, Strike-Status und Live-Activity. Mit hartem Legal-Shield gegen Deepfakes und Copyright-Verstöße." />
+        <meta name="description" content={tx({ de: "Cockpit für deinen KI-Autopilot: Wochenplan, Compliance-Score, Strike-Status und Live-Activity. Mit hartem Legal-Shield gegen Deepfakes und Copyright-Verstöße.", en: "Cockpit for your AI autopilot: weekly plan, compliance score, strike status and live activity. With a hard legal shield against deepfakes and copyright violations.", es: "Cockpit para tu autopiloto de IA: plan semanal, puntuación de cumplimiento, estado de avisos y actividad en vivo. Con escudo legal frente a deepfakes e infracciones de copyright." })} />
       </Helmet>
 
       <div className="min-h-screen bg-background">
@@ -142,7 +143,7 @@ function AutopilotReal() {
                   <div className="text-xs text-muted-foreground">
                     {brief
                       ? `Compliance ${brief.compliance_score}/100 · Budget ${brief.weekly_credits_spent}/${brief.weekly_credit_budget} cr · Auto-Publish ${brief.auto_publish_enabled ? 'ON' : 'OFF'}`
-                      : 'Noch kein Brief — beim ersten Aktivieren öffnet sich der Onboarding-Wizard.'}
+                      : tx({ de: 'Noch kein Brief — beim ersten Aktivieren öffnet sich der Onboarding-Wizard.', en: 'No brief yet — the onboarding wizard opens the first time you activate.', es: 'Aún no hay briefing: el asistente de incorporación se abre al activarlo por primera vez.' })}
                   </div>
                 </div>
               </div>
@@ -417,7 +418,7 @@ function ActivityPanel({ entries }: { entries: ReturnType<typeof useAutopilotAct
     return (
       <Card className="p-8 text-center border-dashed">
         <Activity className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">Noch keine KI-Aktivität — wird sichtbar, sobald der Autopilot aktiv ist.</p>
+        <p className="text-sm text-muted-foreground">{tx({ de: "Noch keine KI-Aktivität — wird sichtbar, sobald der Autopilot aktiv ist.", en: "No AI activity yet — it appears as soon as the autopilot is active.", es: "Aún no hay actividad de IA: aparecerá en cuanto el autopiloto esté activo." })}</p>
       </Card>
     );
   }

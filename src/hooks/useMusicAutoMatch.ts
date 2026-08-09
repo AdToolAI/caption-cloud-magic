@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { tx } from '@/lib/i18nText';
 
 export interface AutoMatchRecommendation {
   bpm: number;
@@ -65,7 +66,7 @@ async function extractFramesAndCuts(file: File): Promise<ExtractedFrames> {
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) throw new Error('Canvas-Kontext nicht verfügbar');
+    if (!ctx) throw new Error(tx({ de: 'Canvas-Kontext nicht verfügbar', en: 'Canvas context not available', es: 'Contexto de canvas no disponible' }));
 
     const frames: { dataUrl: string; pixels: Uint8ClampedArray }[] = [];
 
@@ -140,7 +141,7 @@ export function useMusicAutoMatch() {
     try {
       // Validate
       if (!file.type.startsWith('video/')) {
-        throw new Error('Bitte eine Video-Datei auswählen (mp4, mov, webm)');
+        throw new Error(tx({ de: 'Bitte eine Video-Datei auswählen (mp4, mov, webm)', en: 'Please select a video file (mp4, mov, webm)', es: 'Selecciona un archivo de video (mp4, mov, webm)' }));
       }
       if (file.size > 200 * 1024 * 1024) {
         throw new Error('Video zu groß (max. 200 MB)');

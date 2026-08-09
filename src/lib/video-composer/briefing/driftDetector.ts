@@ -11,6 +11,7 @@
 
 import type { TProductionPlan, TPlanScene } from './productionPlan';
 import type { ComposerScene } from '@/types/video-composer';
+import { tx } from '@/lib/i18nText';
 
 export type DriftSeverity = 'info' | 'warn' | 'error';
 
@@ -81,7 +82,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
       sceneIndex: null,
       field: 'scenes.count',
       severity: 'warn',
-      message: 'Anzahl der Szenen weicht vom Plan ab.',
+      message: tx({ de: 'Anzahl der Szenen weicht vom Plan ab.', en: 'Scene count differs from the plan.', es: 'El número de escenas difiere del plan.' }),
       expected: `${planScenes.length}`,
       actual: `${sortedScenes.length}`,
     });
@@ -102,7 +103,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         sceneIndex: idx,
         field: 'durationSec',
         severity: 'info',
-        message: 'Dauer weicht vom Plan ab.',
+        message: tx({ de: 'Dauer weicht vom Plan ab.', en: 'Duration differs from the plan.', es: 'La duración difiere del plan.' }),
         expected: `${planDur}s`,
         actual: `${sceneDur}s`,
       });
@@ -121,10 +122,10 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         severity: 'warn',
         message:
           missing.length && extra.length
-            ? `Cast weicht ab — fehlend: ${missing.length}, zusätzlich: ${extra.length}.`
+            ? tx({ de: `Cast weicht ab — fehlend: ${missing.length}, zusätzlich: ${extra.length}.`, en: `Cast differs — missing: ${missing.length}, extra: ${extra.length}.`, es: `El reparto difiere — faltan: ${missing.length}, adicionales: ${extra.length}.` })
             : missing.length
-              ? `Cast unvollständig — ${missing.length} Charakter(e) aus dem Plan fehlen.`
-              : `Cast erweitert — ${extra.length} zusätzliche(r) Charakter(e) im Storyboard.`,
+              ? tx({ de: `Cast unvollständig — ${missing.length} Charakter(e) aus dem Plan fehlen.`, en: `Cast incomplete — ${missing.length} character(s) from the plan are missing.`, es: `Reparto incompleto — faltan ${missing.length} personaje(s) del plan.` })
+              : tx({ de: `Cast erweitert — ${extra.length} zusätzliche(r) Charakter(e) im Storyboard.`, en: `Cast extended — ${extra.length} additional character(s) in the storyboard.`, es: `Reparto ampliado — ${extra.length} personaje(s) adicionales en el storyboard.` }),
         expected: planCast.join(', ') || '—',
         actual: sceneCast.join(', ') || '—',
       });
@@ -140,8 +141,8 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         field: 'lipSync',
         severity: 'warn',
         message: planLs
-          ? 'Plan verlangt Lip-Sync, Szene ist aber B-Roll/HeyGen.'
-          : 'Plan ist B-Roll, Szene rendert aber mit Lip-Sync.',
+          ? tx({ de: 'Plan verlangt Lip-Sync, Szene ist aber B-Roll/HeyGen.', en: 'Plan requires lip-sync, but the scene is B-roll/HeyGen.', es: 'El plan requiere sincronización labial, pero la escena es B-roll/HeyGen.' })
+          : tx({ de: 'Plan ist B-Roll, Szene rendert aber mit Lip-Sync.', en: 'Plan is B-roll, but the scene renders with lip-sync.', es: 'El plan es B-roll, pero la escena se renderiza con sincronización labial.' }),
         expected: planLs ? 'lipsync' : 'broll',
         actual: sceneLs ? 'lipsync' : 'broll',
       });
@@ -163,7 +164,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         sceneIndex: idx,
         field: 'voiceover.text',
         severity: 'error',
-        message: 'Skript aus dem Plan wurde NICHT in die Szene übernommen.',
+        message: tx({ de: 'Skript aus dem Plan wurde NICHT in die Szene übernommen.', en: 'Script from the plan was NOT applied to the scene.', es: 'El guion del plan NO se aplicó a la escena.' }),
         expected: planVo.slice(0, 80) + (planVo.length > 80 ? '…' : ''),
         actual: '—',
       });
@@ -180,7 +181,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         sceneIndex: idx,
         field: 'shotDirector',
         severity: 'warn',
-        message: `Shot-Director-Felder fehlen in der Szene: ${sdMissing.join(', ')}.`,
+        message: tx({ de: `Shot-Director-Felder fehlen in der Szene: ${sdMissing.join(', ')}.`, en: `Shot-director fields are missing in the scene: ${sdMissing.join(', ')}.`, es: `Faltan campos de shot-director en la escena: ${sdMissing.join(', ')}.` }),
         expected: sdMissing.map((f) => `${f}=${planSD[f]}`).join(' · '),
         actual: sdMissing.map((f) => `${f}=${sceneSD[f as string] ?? '—'}`).join(' · '),
       });
@@ -195,7 +196,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         sceneIndex: idx,
         field: 'aiPrompt',
         severity: 'info',
-        message: 'Kein AI-Prompt in der Szene, obwohl der Plan einen Anchor-Prompt hat.',
+        message: tx({ de: 'Kein AI-Prompt in der Szene, obwohl der Plan einen Anchor-Prompt hat.', en: 'No AI prompt in the scene, even though the plan has an anchor prompt.', es: 'No hay prompt de IA en la escena, aunque el plan tiene un prompt ancla.' }),
         expected: planAnchor.slice(0, 80) + (planAnchor.length > 80 ? '…' : ''),
       });
       severity = escalate(severity, 'info');
@@ -220,8 +221,8 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         field: 'transition.type',
         severity: sev,
         message: aiFilled.has('transition.type')
-          ? 'Übergangstyp war KI-Vorschlag — Composer-Default greift, OK.'
-          : 'Übergangstyp aus dem Plan wurde nicht 1:1 übernommen.',
+          ? tx({ de: 'Übergangstyp war KI-Vorschlag — Composer-Default greift, OK.', en: 'Transition type was an AI suggestion — composer default applies, OK.', es: 'El tipo de transición era una sugerencia de la IA — se aplica el valor predeterminado, OK.' })
+          : tx({ de: 'Übergangstyp aus dem Plan wurde nicht 1:1 übernommen.', en: 'Transition type from the plan was not applied 1:1.', es: 'El tipo de transición del plan no se aplicó tal cual.' }),
         expected: planTrans,
         actual: sceneTrans,
       });
@@ -238,8 +239,8 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         field: 'textOverlay.text',
         severity: sev,
         message: aiFilled.has('textOverlay.text')
-          ? 'Overlay war KI-Vorschlag und kam nicht durch — Composer rendert ohne, OK.'
-          : 'Burnt-in Text-Overlay aus dem Plan fehlt in der Szene.',
+          ? tx({ de: 'Overlay war KI-Vorschlag und kam nicht durch — Composer rendert ohne, OK.', en: 'Overlay was an AI suggestion and did not come through — composer renders without it, OK.', es: 'La superposición era una sugerencia de la IA y no se aplicó — el composer renderiza sin ella, OK.' })
+          : tx({ de: 'Burnt-in Text-Overlay aus dem Plan fehlt in der Szene.', en: 'Burnt-in text overlay from the plan is missing in the scene.', es: 'Falta la superposición de texto incrustada del plan en la escena.' }),
         expected: planOverlay.slice(0, 80) + (planOverlay.length > 80 ? '…' : ''),
         actual: '—',
       });
@@ -254,7 +255,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         sceneIndex: idx,
         field: 'seed',
         severity: 'warn',
-        message: 'Plan-Seed weicht vom Storyboard-Seed ab — Render wäre nicht reproduzierbar.',
+        message: tx({ de: 'Plan-Seed weicht vom Storyboard-Seed ab — Render wäre nicht reproduzierbar.', en: 'Plan seed differs from the storyboard seed — the render would not be reproducible.', es: 'La semilla del plan difiere de la del storyboard — el render no sería reproducible.' }),
         expected: String(planSeed),
         actual: String(sceneSeed),
       });
@@ -276,7 +277,7 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
           sceneIndex: idx,
           field: 'cast.shotType',
           severity: 'info',
-          message: 'Per-Cast Shot-Typ aus dem Plan wurde nicht übernommen.',
+          message: tx({ de: 'Per-Cast Shot-Typ aus dem Plan wurde nicht übernommen.', en: 'Per-cast shot type from the plan was not applied.', es: 'El tipo de plano por personaje del plan no se aplicó.' }),
           expected: missing.map((m) => `${m.id.slice(0, 8)}=${m.shotType}`).join(' · '),
         });
         severity = escalate(severity, 'info');
@@ -292,8 +293,8 @@ export function detectPlanDrift(plan: TProductionPlan, scenes: ComposerScene[]):
         field: 'tone',
         severity: 'info',
         message: aiFilled.has('tone')
-          ? 'Tone war KI-Vorschlag — kein Realism-Preset gemappt, Composer-Default greift.'
-          : 'Szene-Tone aus dem Plan ergab keinen Realism-Preset.',
+          ? tx({ de: 'Tone war KI-Vorschlag — kein Realism-Preset gemappt, Composer-Default greift.', en: 'Tone was an AI suggestion — no realism preset mapped, composer default applies.', es: 'El tono era una sugerencia de la IA — no se asignó un preset de realismo, se aplica el valor predeterminado.' })
+          : tx({ de: 'Szene-Tone aus dem Plan ergab keinen Realism-Preset.', en: 'Scene tone from the plan did not yield a realism preset.', es: 'El tono de la escena del plan no generó un preset de realismo.' }),
         expected: planTone,
       });
       severity = escalate(severity, 'info');

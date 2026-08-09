@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { tx } from '@/lib/i18nText';
 
 export const useTemplateVersion = (templateId?: string) => {
   const { toast } = useToast();
@@ -85,13 +86,13 @@ export const useTemplateVersion = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-versions'] });
       toast({
         title: 'Version erstellt',
-        description: 'Eine neue Template-Version wurde gespeichert.',
+        description: tx({ de: 'Eine neue Template-Version wurde gespeichert.', en: 'A new template version has been saved.', es: 'Se ha guardado una nueva versión de la plantilla.' }),
       });
     },
     onError: (error) => {
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Version konnte nicht erstellt werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Version konnte nicht erstellt werden', en: 'Version could not be created', es: 'No se pudo crear la versión' }),
         variant: 'destructive',
       });
     },
@@ -134,13 +135,13 @@ export const useTemplateVersion = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-versions'] });
       toast({
         title: 'Version wiederhergestellt',
-        description: 'Das Template wurde auf diese Version zurückgesetzt.',
+        description: tx({ de: 'Das Template wurde auf diese Version zurückgesetzt.', en: 'The template has been reset to this version.', es: 'La plantilla se ha restablecido a esta versión.' }),
       });
     },
     onError: (error) => {
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Version konnte nicht wiederhergestellt werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Version konnte nicht wiederhergestellt werden', en: 'Version could not be restored', es: 'No se pudo restaurar la versión' }),
         variant: 'destructive',
       });
     },
@@ -160,13 +161,13 @@ export const useTemplateVersion = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-versions'] });
       toast({
         title: 'Version veröffentlicht',
-        description: 'Die Version ist jetzt öffentlich sichtbar.',
+        description: tx({ de: 'Die Version ist jetzt öffentlich sichtbar.', en: 'The version is now publicly visible.', es: 'La versión ahora es visible públicamente.' }),
       });
     },
     onError: (error) => {
       toast({
         title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Version konnte nicht veröffentlicht werden',
+        description: error instanceof Error ? error.message : tx({ de: 'Version konnte nicht veröffentlicht werden', en: 'Version could not be published', es: 'No se pudo publicar la versión' }),
         variant: 'destructive',
       });
     },

@@ -4,6 +4,8 @@
  * Two-pass: coarse global scan → fine refinement around candidates.
  */
 
+import { tx } from '@/lib/i18nText';
+
 export interface TimestampedFrame {
   time: number;
   image: string; // base64 data URL
@@ -41,12 +43,12 @@ export async function extractTimestampedFrames(
 
     const timeout = setTimeout(() => {
       video.src = '';
-      reject(new Error('Frame-Extraktion Timeout'));
+      reject(new Error(tx({ de: 'Frame-Extraktion Timeout', en: 'Frame extraction timeout', es: 'Tiempo de espera agotado al extraer fotogramas' })));
     }, 60000);
 
     video.onerror = () => {
       clearTimeout(timeout);
-      reject(new Error('Video konnte nicht geladen werden'));
+      reject(new Error(tx({ de: 'Video konnte nicht geladen werden', en: 'Video could not be loaded', es: 'No se pudo cargar el video' })));
     };
 
     video.onloadedmetadata = async () => {
@@ -64,7 +66,7 @@ export async function extractTimestampedFrames(
       const ctx = canvas.getContext('2d');
 
       if (!ctx) {
-        reject(new Error('Canvas context nicht verfügbar'));
+        reject(new Error(tx({ de: 'Canvas context nicht verfügbar', en: 'Canvas context not available', es: 'Contexto de canvas no disponible' })));
         return;
       }
 
@@ -128,7 +130,7 @@ export async function extractRefinementFrames(
 
     const timeout = setTimeout(() => {
       video.src = '';
-      reject(new Error('Refinement Timeout'));
+      reject(new Error(tx({ de: 'Refinement Timeout', en: 'Refinement timeout', es: 'Tiempo de espera agotado en el refinamiento' })));
     }, 30000);
 
     video.onerror = () => { clearTimeout(timeout); reject(new Error('Video error')); };
