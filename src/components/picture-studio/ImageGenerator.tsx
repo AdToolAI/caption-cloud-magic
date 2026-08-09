@@ -399,8 +399,6 @@ export function ImageGenerator() {
           });
         }
       } else if (variantsCount > 1) {
-        }
-      } else if (variantsCount > 1) {
         toast.success(tx({ de: `${successCount} von ${variantsCount} Varianten generiert`, en: `${successCount} of ${variantsCount} variants generated`, es: `${successCount} de ${variantsCount} variantes generadas` }));
       }
     } catch (error: any) {
