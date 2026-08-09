@@ -129,16 +129,16 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     build: () =>
       base(
         'banner',
-        'Jetzt testen',
+        tx({ de: 'Jetzt testen', en: 'Try now', es: 'Pruébalo ahora' }),
         { fill: 'rgba(10,10,15,0.85)' },
-        { animation: 'slideRight', box: { x: 0.04, y: 0.78, w: 0.52, h: 0.13 }, slots: { subtitle: '14 Tage kostenlos' } },
+        { animation: 'slideRight', box: { x: 0.04, y: 0.78, w: 0.52, h: 0.13 }, slots: { subtitle: tx({ de: '14 Tage kostenlos', en: '14 days for free', es: '14 días gratis' }) } },
       ),
   },
 
   // ---- Störer / Badges ----
   {
     id: 'badge-discount',
-    name: 'Störer — Rabatt',
+    name: tx({ de: 'Störer — Rabatt', en: 'Badge — Discount', es: 'Insignia — Descuento' }),
     category: 'Störer',
     description: 'Runder Preis-Störer',
     kind: 'badge',
@@ -146,7 +146,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   },
   {
     id: 'badge-new',
-    name: 'Störer — NEU',
+    name: tx({ de: 'Störer — NEU', en: 'Badge — NEW', es: 'Insignia — NUEVO' }),
     category: 'Störer',
     description: tx({ de: 'Pill-Badge für Neuheiten', en: 'Pill badge for new products', es: 'Insignia de píldora para nuevos productos.' }),
     kind: 'badge',
@@ -160,7 +160,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   },
   {
     id: 'badge-limited',
-    name: 'Störer — Limitiert',
+    name: tx({ de: 'Störer — Limitiert', en: 'Badge — Limited', es: 'Insignia — Limitado' }),
     category: 'Störer',
     description: 'Dringlichkeit erzeugen',
     kind: 'badge',
@@ -176,21 +176,21 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   // ---- Schilder / Karten ----
   {
     id: 'card-info',
-    name: 'Schild — Info',
+    name: tx({ de: 'Schild — Info', en: 'Card — Info', es: 'Tarjeta — Información' }),
     category: 'Schild',
     description: tx({ de: 'Karte mit Titel und Unterzeile', en: 'Card with title and subtitle', es: 'Tarjeta con título y subtítulo' }),
     kind: 'card',
     build: () =>
       base(
         'card',
-        'Öffnungszeiten',
+        tx({ de: 'Öffnungszeiten', en: 'Opening hours', es: 'Horario' }),
         { fill: 'rgba(10,10,15,0.8)', align: 'left', fontSizeRel: 0.036 },
-        { animation: 'slideRight', slots: { title: 'Öffnungszeiten', subtitle: 'Mo–Fr 9–18 Uhr' } },
+        { animation: 'slideRight', slots: { title: tx({ de: 'Öffnungszeiten', en: 'Opening hours', es: 'Horario' }), subtitle: tx({ de: 'Mo–Fr 9–18 Uhr', en: 'Mon–Fri 9am–6pm', es: 'Lun–Vie 9am–6pm' }) } },
       ),
   },
   {
     id: 'card-feature',
-    name: 'Schild — Feature',
+    name: tx({ de: 'Schild — Feature', en: 'Card — Feature', es: 'Tarjeta — Característica' }),
     category: 'Schild',
     description: tx({ de: 'Produktvorteil mit Bildplatz', en: 'Product advantage with image space', es: 'Ventaja del producto con espacio de imagen' }),
     kind: 'card',
@@ -204,7 +204,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   },
   {
     id: 'card-price',
-    name: 'Schild — Preis',
+    name: tx({ de: 'Schild — Preis', en: 'Card — Price', es: 'Tarjeta — Precio' }),
     category: 'Schild',
     description: 'Preisangabe hervorheben',
     kind: 'card',
@@ -213,29 +213,29 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
         'card',
         '14,99 € / Monat',
         { fill: 'rgba(10,10,15,0.85)', color: GOLD, align: 'left', fontSizeRel: 0.042 },
-        { animation: 'pop', box: { x: 0.08, y: 0.62, w: 0.4, h: 0.18 }, slots: { title: '14,99 € / Monat', subtitle: 'jederzeit kündbar' } },
+        { animation: 'pop', box: { x: 0.08, y: 0.62, w: 0.4, h: 0.18 }, slots: { title: '14,99 € / Monat', subtitle: tx({ de: 'jederzeit kündbar', en: 'cancel at any time', es: 'cancelable en cualquier momento' }) } },
       ),
   },
 
   // ---- CTA ----
   {
     id: 'cta-gold',
-    name: 'CTA — Gold',
+    name: tx({ de: 'CTA — Gold', en: 'CTA — Gold', es: 'CTA — Oro' }),
     category: 'CTA',
     description: tx({ de: 'Button-Optik mit Pfeil', en: 'Button look with arrow', es: 'Botón con flecha' }),
     kind: 'cta',
-    build: () => base('cta', 'Jetzt starten', { fill: GOLD, color: INK, uppercase: true, fontSizeRel: 0.036 }, { animation: 'pop' }),
+    build: () => base('cta', tx({ de: 'Jetzt starten', en: 'Start now', es: 'Empezar ahora' }), { fill: GOLD, color: INK, uppercase: true, fontSizeRel: 0.036 }, { animation: 'pop' }),
   },
   {
     id: 'cta-outline',
-    name: 'CTA — Outline',
+    name: tx({ de: 'CTA — Outline', en: 'CTA — Outline', es: 'CTA — Contorno' }),
     category: 'CTA',
-    description: 'Dezenter Rahmen-Button',
+    description: tx({ de: 'Dezenter Rahmen-Button', en: 'Subtle border button', es: 'Botón de borde sutil' }),
     kind: 'cta',
     build: () =>
       base(
         'cta',
-        'Mehr erfahren',
+        tx({ de: 'Mehr erfahren', en: 'Learn more', es: 'Saber más' }),
         { fill: 'transparent', color: '#FFFFFF', borderWidth: 0.002, borderColor: '#FFFFFF', fontSizeRel: 0.034 },
         { animation: 'fadeIn' },
       ),
@@ -244,9 +244,9 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   // ---- Ticker ----
   {
     id: 'ticker-news',
-    name: 'Ticker',
+    name: tx({ de: 'Ticker', en: 'Ticker', es: 'Teletipo' }),
     category: 'Ticker',
-    description: 'Durchlaufendes Band unten',
+    description: tx({ de: 'Durchlaufendes Band unten', en: 'Scrolling band at the bottom', es: 'Banda de desplazamiento en la parte inferior' }),
     kind: 'ticker',
     build: () =>
       base(
@@ -260,17 +260,17 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   // ---- Marke ----
   {
     id: 'logo-bug',
-    name: 'Logo-Bug',
+    name: tx({ de: 'Logo-Bug', en: 'Logo Bug', es: 'Logo Bug' }),
     category: 'Marke',
-    description: 'Logo oben rechts, dauerhaft',
+    description: tx({ de: 'Logo oben rechts, dauerhaft', en: 'Logo top right, permanent', es: 'Logotipo arriba a la derecha, permanente' }),
     kind: 'logo',
     build: () => base('logo', '@deinbrand', { fontSizeRel: 0.024, fontWeight: 600 }, { animation: 'fadeIn', slots: { imageUrl: null } }),
   },
   {
     id: 'watermark',
-    name: 'Wasserzeichen',
+    name: tx({ de: 'Wasserzeichen', en: 'Watermark', es: 'Marca de agua' }),
     category: 'Marke',
-    description: 'Dezentes Handle unten rechts',
+    description: tx({ de: 'Dezentes Handle unten rechts', en: 'Subtle handle bottom right', es: 'Mango sutil abajo a la derecha' }),
     kind: 'logo',
     build: () =>
       base(
@@ -284,17 +284,17 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   // ---- Callout ----
   {
     id: 'callout-arrow',
-    name: 'Callout',
+    name: tx({ de: 'Callout', en: 'Callout', es: 'Llamada' }),
     category: 'Callout',
     description: tx({ de: 'Linie plus Label, markiert Details', en: 'Line plus label, marks details', es: 'Línea más etiqueta, detalles de marcas.' }),
     kind: 'callout',
-    build: () => base('callout', 'Hier ansetzen', { fill: 'rgba(10,10,15,0.85)', fontSizeRel: 0.03, align: 'left' }, { animation: 'wipe' }),
+    build: () => base('callout', tx({ de: 'Hier ansetzen', en: 'Start here', es: 'Empezar aquí' }), { fill: 'rgba(10,10,15,0.85)', fontSizeRel: 0.03, align: 'left' }, { animation: 'wipe' }),
   },
 
   // ---- Zitat ----
   {
     id: 'quote-classic',
-    name: 'Zitat',
+    name: tx({ de: 'Zitat', en: 'Quote', es: 'Cita' }),
     category: 'Zitat',
     description: tx({ de: 'Aussage mit Quellenzeile', en: 'Statement with source line', es: 'Declaración con línea fuente' }),
     kind: 'quote',
@@ -303,16 +303,16 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
         'quote',
         tx({ de: 'Das spart uns jede Woche einen ganzen Drehtag.', en: 'This saves us a whole day of shooting every week.', es: 'Esto nos ahorra un día entero de rodaje cada semana.' }),
         { fontSizeRel: 0.05, fontWeight: 600, align: 'center' },
-        { animation: 'stagger', slots: { subtitle: 'Lena, Agenturinhaberin' } },
+        { animation: 'stagger', slots: { subtitle: tx({ de: 'Lena, Agenturinhaberin', en: 'Lena, Agency Owner', es: 'Lena, Propietaria de Agencia' }) } },
       ),
   },
 
   // ---- Info ----
   {
     id: 'progress-bar',
-    name: 'Fortschritt',
+    name: tx({ de: 'Fortschritt', en: 'Progress', es: 'Progreso' }),
     category: 'Info',
-    description: 'Mitlaufender Balken am unteren Rand',
+    description: tx({ de: 'Mitlaufender Balken am unteren Rand', en: 'Scrolling bar at the bottom', es: 'Barra de desplazamiento en el borde inferior' }),
     kind: 'progress',
     build: () => base('progress', '', { fill: 'rgba(255,255,255,0.18)', radius: 0 }, { animation: 'none', enter: 'none' }),
   },
@@ -320,22 +320,22 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
   // ---- Text ----
   {
     id: 'text-headline',
-    name: 'Headline',
+    name: tx({ de: 'Headline', en: 'Headline', es: 'Encabezado' }),
     category: 'Text',
-    description: 'Große freie Aussage',
+    description: tx({ de: 'Große freie Aussage', en: 'Big free statement', es: 'Gran declaración libre' }),
     kind: 'text',
-    build: () => base('text', 'Deine Aussage', { fontSizeRel: 0.07, fontWeight: 800, backgroundColor: 'transparent' }, { animation: 'stagger' }),
+    build: () => base('text', tx({ de: 'Deine Aussage', en: 'Your statement', es: 'Tu declaración' }), { fontSizeRel: 0.07, fontWeight: 800, backgroundColor: 'transparent' }, { animation: 'stagger' }),
   },
   {
     id: 'text-kicker',
-    name: 'Kicker',
+    name: tx({ de: 'Kicker', en: 'Kicker', es: 'Kicker' }),
     category: 'Text',
     description: tx({ de: 'Kleine Zeile über der Headline', en: 'Small line above the headline', es: 'Pequeña línea encima del título' }),
     kind: 'text',
     build: () =>
       base(
         'text',
-        'EIN CREATOR. EIN GANZES STUDIO.',
+        tx({ de: 'EIN CREATOR. EIN GANZES STUDIO.', en: 'ONE CREATOR. ONE WHOLE STUDIO.', es: 'UN CREADOR. UN ESTUDIO COMPLETO.' }),
         { fontSizeRel: 0.026, fontWeight: 600, uppercase: true, letterSpacing: 0.12, color: GOLD },
         { animation: 'fadeIn', box: { x: 0.1, y: 0.32, w: 0.8, h: 0.08 } },
       ),

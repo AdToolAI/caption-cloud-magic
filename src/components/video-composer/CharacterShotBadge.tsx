@@ -12,24 +12,24 @@ import { Button } from '@/components/ui/button';
 import type { CharacterShot, CharacterShotType, ComposerCharacter } from '@/types/video-composer';
 
 type Lang = 'en' | 'de' | 'es';
-const REMOVE_LABEL: Record<Lang, string> = {
-  en: 'Remove character from this scene',
-  de: 'Charakter aus dieser Szene entfernen',
-  es: 'Quitar personaje de esta escena',
-};
+const // REMOVE_LABEL was here
+
+
+
+
 
 export const SHOT_TYPE_META: Record<
   CharacterShotType,
   { label: string; icon: any; hint: string; tone: string }
 > = {
-  full:       { label: 'Voll', icon: User,        hint: 'Full Shot — Gesicht & Körper sichtbar (Establishing).', tone: 'text-amber-400 border-amber-500/40 bg-amber-500/10' },
+  full:       { label: tx({ de: 'Voll', en: 'Full', es: 'Completo' }), icon: User,        hint: tx({ de: 'Full Shot — Gesicht & Körper sichtbar (Establishing).', en: 'Full Shot — Face & body visible (Establishing).', es: 'Plano general: cara y cuerpo visibles (establecimiento).' }), tone: 'text-amber-400 border-amber-500/40 bg-amber-500/10' },
   profile:    { label: 'Profil', icon: UserSquare2, hint: tx({ de: 'Profil/Seitenansicht — Konsistenz über Kleidung.', en: 'Profile/Side View — Consistency over clothing.', es: 'Vista de perfil/lateral: consistencia sobre la ropa.' }), tone: 'text-sky-400 border-sky-500/40 bg-sky-500/10' },
   back:       { label: 'Rücken', icon: Footprints,  hint: tx({ de: 'Rückenansicht / über die Schulter.', en: 'Back view / over the shoulder.', es: 'Vista posterior/sobre el hombro.' }), tone: 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10' },
   detail:     { label: 'Detail', icon: Hand,        hint: 'Detail-Shot (Hände, Schwert, Krone) — sehr konsistent.', tone: 'text-violet-400 border-violet-500/40 bg-violet-500/10' },
   pov:        { label: 'POV',    icon: Eye,         hint: tx({ de: 'POV — Charakter unsichtbar, zeigt was er sieht.', en: 'POV — Character invisible, shows what he sees.', es: 'POV: personaje invisible, muestra lo que ve.' }), tone: 'text-cyan-400 border-cyan-500/40 bg-cyan-500/10' },
-  silhouette: { label: 'Silhouette', icon: Sun,     hint: 'Silhouette / Gegenlicht — Identifier statt Gesicht.', tone: 'text-orange-400 border-orange-500/40 bg-orange-500/10' },
-  absent:     { label: 'Ohne',   icon: Minus,       hint: tx({ de: 'Charakter nicht in dieser Szene.', en: 'Character not in this scene.', es: 'Personaje no en esta escena.' }), tone: 'text-muted-foreground border-border/40 bg-muted/40' },
-};
+  silhouette: { label: 'Silhouette', icon: Sun,     hint: tx({ de: 'Silhouette / Gegenlicht — Identifier statt Gesicht.', en: 'Silhouette / Backlight — Identifier instead of face.', es: 'Silueta / Contraluz — Identificador en lugar de cara.' }), tone: 'text-orange-400 border-orange-500/40 bg-orange-500/10' },
+  absent:     { label: tx({ de: 'Ohne', en: 'None', es: 'Ninguno' }),   icon: Minus,       hint: tx({ de: 'Charakter nicht in dieser Szene.', en: 'Character not in this scene.', es: 'Personaje no en esta escena.' }), tone: 'text-muted-foreground border-border/40 bg-muted/40' },
+
 
 const SHOT_ORDER: CharacterShotType[] = ['full', 'profile', 'back', 'detail', 'pov', 'silhouette', 'absent'];
 
@@ -54,10 +54,10 @@ export function CharacterShotBadge({ shot, characterName }: BadgeProps) {
           </span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-[260px] text-xs">
-          <p className="font-medium mb-1">Shot-Strategie: {meta.label}</p>
+          <p className="font-medium mb-1">{tx({ de: 'Shot-Strategie:', en: 'Shot strategy:', es: 'Estrategia de toma:' })} {meta.label}</p>
           <p className="text-muted-foreground">{meta.hint}</p>
           <p className="text-[10px] text-muted-foreground/80 mt-1.5 italic">
-            Weniger Gesichts-Closeups → konsistentere Charakter-Wahrnehmung.
+            {tx({ de: 'Weniger Gesichts-Closeups → konsistentere Charakter-Wahrnehmung.', en: 'Fewer facial close-ups → more consistent character perception.', es: 'Menos primeros planos faciales → percepción del personaje más consistente.' })}
           </p>
         </TooltipContent>
       </Tooltip>
@@ -83,8 +83,8 @@ export function CharacterShotPicker({ characters, value, onChange, language = 'e
   const charId = value?.characterId || '__none__';
   const shotType: CharacterShotType = value?.shotType || 'absent';
   const hasCharacter = charId !== '__none__';
-  const noneLabel = lang === 'de' ? '— keiner —' : lang === 'es' ? '— ninguno —' : '— none —';
-  const characterLabel = lang === 'de' ? 'Charakter:' : lang === 'es' ? 'Personaje:' : 'Character:';
+  const noneLabel = tx({ de: '— keiner —', en: '— none —', es: '— ninguno —' });
+  const characterLabel = tx({ de: 'Charakter:', en: 'Character:', es: 'Personaje:' });
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -146,13 +146,13 @@ export function CharacterShotPicker({ characters, value, onChange, language = 'e
                   variant="ghost"
                   className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                   onClick={() => onChange(undefined)}
-                  aria-label={REMOVE_LABEL[lang]}
+                  aria-label={tx({ de: 'Charakter aus dieser Szene entfernen', en: 'Remove character from this scene', es: 'Quitar personaje de esta escena' })}
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
-                {REMOVE_LABEL[lang]}
+                {tx({ de: 'Charakter aus dieser Szene entfernen', en: 'Remove character from this scene', es: 'Quitar personaje de esta escena' })}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

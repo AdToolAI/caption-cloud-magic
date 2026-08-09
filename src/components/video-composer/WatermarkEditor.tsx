@@ -26,9 +26,9 @@ const POSITIONS: Array<{ id: WatermarkPosition; label: string }> = [
 ];
 
 const SIZES: Array<{ id: WatermarkSize; label: string; px: number }> = [
-  { id: 'small', label: 'Klein', px: 16 },
-  { id: 'medium', label: 'Mittel', px: 24 },
-  { id: 'large', label: 'Groß', px: 36 },
+  { id: 'small', label: tx({ de: 'Klein', en: 'Small', es: 'Pequeño' }), px: 16 },
+  { id: 'medium', label: tx({ de: 'Mittel', en: 'Medium', es: 'Medio' }), px: 24 },
+  { id: 'large', label: tx({ de: 'Groß', en: 'Large', es: 'Grande' }), px: 36 },
 ];
 
 export default function WatermarkEditor({ value, onChange }: WatermarkEditorProps) {
@@ -59,16 +59,16 @@ export default function WatermarkEditor({ value, onChange }: WatermarkEditorProp
     <Card className="border-border/40 bg-card/80">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <Stamp className="h-4 w-4 text-primary" /> Wasserzeichen
+          <Stamp className="h-4 w-4 text-primary" /> {tx({ de: 'Wasserzeichen', en: 'Watermark', es: 'Marca de agua' })}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Enable */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium">Wasserzeichen anzeigen</p>
+            <p className="text-sm font-medium">{tx({ de: 'Wasserzeichen anzeigen', en: 'Show Watermark', es: 'Mostrar marca de agua' })}</p>
             <p className="text-[10px] text-muted-foreground">
-              Eigener Text-Stempel über dem ganzen Video
+              {tx({ de: 'Eigener Text-Stempel über dem ganzen Video', en: 'Custom text stamp over the entire video', es: 'Sello de texto personalizado sobre todo el video' })}
             </p>
           </div>
           <Switch
@@ -92,7 +92,7 @@ export default function WatermarkEditor({ value, onChange }: WatermarkEditorProp
 
             {/* Position */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Position</Label>
+              <Label className="text-xs">{tx({ de: 'Position', en: 'Position', es: 'Posición' })}</Label>
               <div className="grid grid-cols-5 gap-2">
                 {POSITIONS.map((p) => (
                   <button
@@ -115,7 +115,7 @@ export default function WatermarkEditor({ value, onChange }: WatermarkEditorProp
 
             {/* Size */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Größe</Label>
+              <Label className="text-xs">{tx({ de: 'Größe', en: 'Size', es: 'Tamaño' })}</Label>
               <div className="grid grid-cols-3 gap-2">
                 {SIZES.map((s) => (
                   <button
@@ -138,7 +138,7 @@ export default function WatermarkEditor({ value, onChange }: WatermarkEditorProp
             {/* Opacity */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">Deckkraft</Label>
+                <Label className="text-xs">{tx({ de: 'Deckkraft', en: 'Opacity', es: 'Opacidad' })}</Label>
                 <span className="text-[10px] tabular-nums text-muted-foreground">
                   {Math.round(config.opacity * 100)}%
                 </span>
@@ -154,7 +154,7 @@ export default function WatermarkEditor({ value, onChange }: WatermarkEditorProp
 
             {/* Live preview */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Vorschau</Label>
+              <Label className="text-xs">{tx({ de: 'Vorschau', en: 'Preview', es: 'Vista previa' })}</Label>
               <div
                 className="relative w-full h-32 rounded-md overflow-hidden border border-border/40 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 flex p-3"
                 style={previewAlign}
@@ -169,7 +169,7 @@ export default function WatermarkEditor({ value, onChange }: WatermarkEditorProp
                     fontFamily: 'Inter, sans-serif',
                   }}
                 >
-                  {config.text || 'Dein Watermark'}
+                  {config.text || tx({ de: 'Dein Watermark', en: 'Your Watermark', es: 'Tu marca de agua' })}
                 </span>
               </div>
             </div>

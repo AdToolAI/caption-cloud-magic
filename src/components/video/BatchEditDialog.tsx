@@ -24,8 +24,8 @@ interface Variation {
 
 export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogProps) => {
   const [variations, setVariations] = useState<Variation[]>([
-    { name: 'Variante A', customizations: {} },
-    { name: 'Variante B', customizations: {} },
+    { name: tx({ de: 'Variante A', en: 'Variant A', es: 'Variante A' }), customizations: {} },
+    { name: tx({ de: 'Variante B', en: 'Variant B', es: 'Variante B' }), customizations: {} },
   ]);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
@@ -33,14 +33,14 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
   const addVariation = () => {
     setVariations([
       ...variations,
-      { name: `Variante ${String.fromCharCode(65 + variations.length)}`, customizations: {} }
+      { name: tx({ de: `Variante ${String.fromCharCode(65 + variations.length)}`, en: `Variant ${String.fromCharCode(65 + variations.length)}`, es: `Variante ${String.fromCharCode(65 + variations.length)}` }), customizations: {} }
     ]);
   };
 
   const removeVariation = (index: number) => {
     if (variations.length <= 2) {
       toast({
-        title: "Mindestanzahl erreicht",
+        title: tx({ de: "Mindestanzahl erreicht", en: "Minimum number reached", es: "Se alcanzó el número mínimo" }),
         description: tx({ de: "Du benötigst mindestens 2 Varianten für A/B-Testing.", en: "You need at least 2 variants for A/B testing.", es: "Necesitas al menos 2 variantes para pruebas A/B." }),
         variant: "destructive",
       });
@@ -79,7 +79,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
 
       if (data?.success) {
         toast({
-          title: "✅ Batch-Generierung gestartet",
+          title: tx({ de: "✅ Batch-Generierung gestartet", en: "✅ Batch generation started", es: "✅ Generación de lotes iniciada" }),
           description: tx({ de: `${variations.length} Varianten werden erstellt. Kosten: ${data.totalCost} Credits`, en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }),
         });
         onOpenChange(false);
@@ -102,9 +102,9 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Batch-Edit: A/B-Testing Varianten</DialogTitle>
+          <DialogTitle>{tx({ de: "Batch-Edit: A/B-Testing Varianten", en: "Batch Edit: A/B Testing Variants", es: "Edición por lotes: variantes de prueba A/B" })}</DialogTitle>
           <DialogDescription>
-            Erstelle mehrere Versionen gleichzeitig für A/B-Testing
+            tx({ de: "Erstelle mehrere Versionen gleichzeitig für A/B-Testing", en: "Create multiple versions simultaneously for A/B testing", es: "Cree varias versiones simultáneamente para pruebas A/B" })
           </DialogDescription>
         </DialogHeader>
 
@@ -133,7 +133,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Skript-Anpassung</Label>
+                  <Label>{tx({ de: "Skript-Anpassung", en: "Script adjustment", es: "Ajuste del guión" })}</Label>
                   <Textarea
                     placeholder={tx({ de: "Optional: Individueller Skript-Text für diese Variante", en: "Optional: Individual script text for this variant", es: "Opcional: Texto de guion individual para esta variante" })}
                     value={variation.customizations.script_text || ''}
@@ -143,9 +143,9 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
                 </div>
 
                 <div className="space-y-2">
-                  <Label>CTA-Text</Label>
+                  <Label>{tx({ de: "CTA-Text", en: "CTA text", es: "Texto CTA" })}</Label>
                   <Input
-                    placeholder="z.B. 'Jetzt kaufen!'"
+                    placeholder={tx({ de: "z.B. 'Jetzt kaufen!'", en: "e.g. 'Buy now!'", es: "p. ej. '¡Comprar ahora!'" })}
                     value={variation.customizations.cta_text || ''}
                     onChange={(e) => updateVariation(index, 'cta_text', e.target.value)}
                   />
@@ -153,7 +153,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
               </div>
 
               <div className="text-xs text-muted-foreground">
-                💡 Ändere nur die Felder, die sich vom Original unterscheiden sollen
+                tx({ de: "💡 Ändere nur die Felder, die sich vom Original unterscheiden sollen", en: "💡 Only change fields that should differ from the original", es: "💡 Solo cambie los campos que deban diferir del original" })
               </div>
             </div>
           ))}
@@ -165,16 +165,16 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
             disabled={variations.length >= 5}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Weitere Variante hinzufügen
+            tx({ de: "Weitere Variante hinzufügen", en: "Add another variant", es: "Agregar otra variante" })
           </Button>
         </div>
 
         <div className="p-4 bg-muted rounded-lg space-y-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Batch-Generierung</p>
+              <p className="font-medium">{tx({ de: "Batch-Generierung", en: "Batch generation", es: "Generación por lotes" })}</p>
               <p className="text-sm text-muted-foreground">
-                {variations.length} Varianten à 5 Credits
+                tx({ de: `${variations.length} Varianten à 5 Credits`, en: `${variations.length} variants at 5 credits each`, es: `${variations.length} variantes a 5 créditos cada una` })
               </p>
             </div>
             <div className="text-right">
@@ -185,25 +185,25 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
 
           <div className="text-xs text-muted-foreground space-y-1">
             <p>{tx({ de: "✅ Perfekt für A/B-Testing verschiedener CTAs", en: "✅ Perfect for A/B testing different CTAs", es: "✅ Perfecto para realizar pruebas A/B de diferentes CTA" })}</p>
-            <p>✅ Teste mehrere Skript-Varianten parallel</p>
-            <p>✅ Vergleiche Performance in Analytics</p>
+            <p>tx({ de: "✅ Teste mehrere Skript-Varianten parallel", en: "✅ Test multiple script variants in parallel", es: "✅ Pruebe varias variantes de guiones en paralelo" })</p>
+            <p>tx({ de: "✅ Vergleiche Performance in Analytics", en: "✅ Compare performance in analytics", es: "✅ Comparar rendimiento en análisis" })</p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
+            tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })
           </Button>
           <Button onClick={handleGenerate} disabled={isGenerating}>
             {isGenerating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generiere {variations.length} Varianten...
+                tx({ de: `Generiere ${variations.length} Varianten...`, en: `Generating ${variations.length} variants...`, es: `Generando ${variations.length} variantes...` })
               </>
             ) : (
               <>
                 <Copy className="mr-2 h-4 w-4" />
-                Alle Varianten generieren
+                tx({ de: "Alle Varianten generieren", en: "Generate all variants", es: "Generar todas las variantes" })
               </>
             )}
           </Button>

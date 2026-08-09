@@ -55,27 +55,27 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
     <Sheet open={!!block} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-[400px] sm:w-[540px]">
         <SheetHeader>
-          <SheetTitle>Post bearbeiten</SheetTitle>
+          <SheetTitle>{tx({ de: 'Post bearbeiten', en: 'Edit post', es: 'Editar publicación' })}</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-4 mt-6">
           <div>
-            <Label>Titel</Label>
+            <Label>{tx({ de: 'Titel', en: 'Title', es: 'Título' })}</Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={60}
-              placeholder="Max. 60 Zeichen"
+              placeholder={tx({ de: 'Max. 60 Zeichen', en: 'Max. 60 characters', es: 'Máx. 60 caracteres' })}
             />
           </div>
 
           <div>
-            <Label>Caption</Label>
+            <Label>{tx({ de: 'Caption', en: 'Caption', es: 'Subtítulo' })}</Label>
             <Textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               rows={6}
-              placeholder="Post-Text..."
+              placeholder={tx({ de: 'Post-Text...', en: 'Post text...', es: 'Texto de la publicación...' })}
             />
           </div>
 
@@ -90,7 +90,7 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
             </div>
 
             <div>
-              <Label>Plattform</Label>
+              <Label>{tx({ de: 'Plattform', en: 'Platform', es: 'Plataforma' })}</Label>
               <Select value={platform} onValueChange={setPlatform}>
                 <SelectTrigger>
                   <SelectValue />
@@ -107,7 +107,7 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
           </div>
 
           <div>
-            <Label>Status</Label>
+            <Label>{tx({ de: 'Status', en: 'Status', es: 'Estado' })}</Label>
             <div className="flex gap-2 mt-2 flex-wrap">
               {["draft", "scheduled", "approved"].map((s) => (
                 <Badge
@@ -116,9 +116,9 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
                   className="cursor-pointer"
                   onClick={() => setStatus(s)}
                 >
-                  {s === "draft" && "Entwurf"}
-                  {s === "scheduled" && "Geplant"}
-                  {s === "approved" && "Genehmigt"}
+                  {s === "draft" && tx({ de: 'Entwurf', en: 'Draft', es: 'Borrador' })}
+                  {s === "scheduled" && tx({ de: 'Geplant', en: 'Scheduled', es: 'Programado' })}
+                  {s === "approved" && tx({ de: 'Genehmigt', en: 'Approved', es: 'Aprobado' })}
                 </Badge>
               ))}
             </div>
@@ -130,17 +130,17 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
               <div className="text-xs text-muted-foreground">
                 {block.content_items.title}
                 <br />
-                Quelle: {block.content_items.source}
+                tx({ de: 'Quelle:', en: 'Source:', es: 'Fuente:' }) {block.content_items.source}
               </div>
             </div>
           )}
 
           <div className="flex gap-2 pt-4">
             <Button onClick={handleSave} className="flex-1">
-              Speichern
+              tx({ de: 'Speichern', en: 'Save', es: 'Guardar' })
             </Button>
             <Button variant="outline" onClick={onClose}>
-              Abbrechen
+              tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })
             </Button>
           </div>
 
@@ -151,7 +151,7 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
               className="w-full"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Post löschen
+              tx({ de: 'Post löschen', en: 'Delete post', es: 'Eliminar publicación' })
             </Button>
           </div>
         </div>
@@ -160,13 +160,13 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Post löschen?</AlertDialogTitle>
+            <AlertDialogTitle>tx({ de: 'Post löschen', en: 'Delete post', es: 'Eliminar publicación' })?</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+              tx({ de: 'Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', en: 'Do you really want to delete this scheduled post? This action cannot be undone.', es: '¿Realmente quieres eliminar esta publicación programada? Esta acción no se puede deshacer.' })
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (block?.id) {
@@ -176,7 +176,7 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Löschen
+              tx({ de: 'Löschen', en: 'Delete', es: 'Eliminar' })
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

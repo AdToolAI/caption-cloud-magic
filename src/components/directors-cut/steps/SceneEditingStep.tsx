@@ -355,7 +355,7 @@ export function SceneEditingStep({
     
     toast({
       title: `Speed: ${speed}x`,
-      description: speed < 1 ? 'Zeitlupe aktiviert' : speed === 1 ? 'Normale Geschwindigkeit' : 'Zeitraffer aktiviert',
+      description: speed < 1 ? tx({ de: "Zeitlupe aktiviert", en: "Slow motion activated", es: "Cámara lenta activada" }) : speed === 1 ? tx({ de: "Normale Geschwindigkeit", en: "Normal speed", es: "Velocidad normal" }) : tx({ de: "Zeitraffer aktiviert", en: "Time lapse activated", es: "Cámara rápida activada" }),
     });
   }, [selectedSceneId, scenes, handleSceneDurationChange, toast]);
 
@@ -382,14 +382,14 @@ export function SceneEditingStep({
       id: `${scene.id}-a`,
       end_time: splitPoint,
       original_end_time: originalSplitPoint,
-      description: `${scene.description} (Teil 1)`,
+      description: `${scene.description} (${tx({ de: "Teil 1", en: "Part 1", es: "Parte 1" })})`,
     };
     const secondHalf: SceneAnalysis = {
       ...scene,
       id: `${scene.id}-b`,
       start_time: splitPoint,
       original_start_time: originalSplitPoint,
-      description: `${scene.description} (Teil 2)`,
+      description: `${scene.description} (${tx({ de: "Teil 2", en: "Part 2", es: "Parte 2" })})`,
     };
     
     newScenes.splice(sceneIndex, 1, firstHalf, secondHalf);
@@ -419,7 +419,7 @@ export function SceneEditingStep({
       id: `${scene.id}-copy-${Date.now()}`,
       start_time: lastScene.end_time,
       end_time: lastScene.end_time + duration,
-      description: `${scene.description} (Kopie)`,
+      description: `${scene.description} (${tx({ de: "Kopie", en: "Copy", es: "Copia" })})`,
     };
     
     onScenesUpdate([...scenes, copiedScene]);

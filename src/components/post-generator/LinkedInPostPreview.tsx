@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,8 +23,8 @@ export const LinkedInPostPreview = ({
   caption,
   hook,
   hashtags = [],
-  profileName = "Ihr Name",
-  jobTitle = "Position",
+  profileName = tx({ de: "Ihr Name", en: "Your name", es: "Tu nombre" }),
+  jobTitle = tx({ de: "Position", en: "Position", es: "Puesto" }),
   profileImage,
 }: LinkedInPostPreviewProps) => {
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -55,7 +56,7 @@ export const LinkedInPostPreview = ({
               <span className="font-semibold text-sm">{profileName}</span>
               <span className="text-xs text-muted-foreground">{jobTitle}</span>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                <span>vor 2 Std.</span>
+                <span>{tx({ de: "vor 2 Std.", en: "2h ago", es: "hace 2 h" })}</span>
                 <span>·</span>
                 <span>🌍</span>
               </div>
@@ -77,7 +78,7 @@ export const LinkedInPostPreview = ({
               onClick={() => setShowFullCaption(!showFullCaption)}
               className="text-muted-foreground hover:text-primary ml-1 font-medium"
             >
-              {showFullCaption ? '...weniger anzeigen' : '...mehr anzeigen'}
+              {showFullCaption ? tx({ de: '...weniger anzeigen', en: '...show less', es: '...ver menos' }) : tx({ de: '...mehr anzeigen', en: '...show more', es: '...ver más' })}
             </button>
           )}
           {hashtags.length > 0 && (
@@ -129,7 +130,7 @@ export const LinkedInPostPreview = ({
         </div>
         {comments > 0 && (
           <div className="text-xs text-muted-foreground mt-1">
-            {comments} Kommentare
+            {comments} tx({ de: " Kommentare", en: " comments", es: " comentarios" })
           </div>
         )}
       </div>
@@ -140,19 +141,19 @@ export const LinkedInPostPreview = ({
       <div className="px-2 py-1.5 grid grid-cols-4 gap-1">
         <Button variant="ghost" className="flex items-center gap-2 justify-center">
           <ThumbsUp className="h-5 w-5" />
-          <span className="text-sm font-medium">Gefällt mir</span>
+          <span className="text-sm font-medium">{tx({ de: "Gefällt mir", en: "Like", es: "Me gusta" })}</span>
         </Button>
         <Button variant="ghost" className="flex items-center gap-2 justify-center">
           <MessageCircle className="h-5 w-5" />
-          <span className="text-sm font-medium">Kommentieren</span>
+          <span className="text-sm font-medium">{tx({ de: "Kommentieren", en: "Comment", es: "Comentar" })}</span>
         </Button>
         <Button variant="ghost" className="flex items-center gap-2 justify-center">
           <Repeat2 className="h-5 w-5" />
-          <span className="text-sm font-medium">Teilen</span>
+          <span className="text-sm font-medium">{tx({ de: "Teilen", en: "Share", es: "Compartir" })}</span>
         </Button>
         <Button variant="ghost" className="flex items-center gap-2 justify-center">
           <Send className="h-5 w-5" />
-          <span className="text-sm font-medium">Senden</span>
+          <span className="text-sm font-medium">{tx({ de: "Senden", en: "Send", es: "Enviar" })}</span>
         </Button>
       </div>
     </Card>

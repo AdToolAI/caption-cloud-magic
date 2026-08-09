@@ -71,7 +71,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
     if (!slot) return;
     try {
       await supabase.functions.invoke('autopilot-generate-slot', { body: { slot_id: slot.id, force: true } });
-      toast({ title: tx({ de: 'Neugenerierung gestartet', en: 'Regeneration started', es: 'La regeneración comenzó' }), description: 'Die KI erstellt diesen Slot frisch.' });
+      toast({ title: tx({ de: 'Neugenerierung gestartet', en: 'Regeneration started', es: 'La regeneración comenzó' }), description: tx({ de: 'Die KI erstellt diesen Slot frisch.', en: 'The AI is creating this slot from scratch.', es: 'La IA está creando este espacio desde cero.' }) });
       qc.invalidateQueries({ queryKey: ['autopilot-queue'] });
     } catch {
       toast({
@@ -92,10 +92,10 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
             <StatusChip status={slot.status} />
           </div>
           <SheetTitle className="font-serif text-2xl">
-            {slot.topic_hint || 'Slot-Vorschau'}
+            {slot.topic_hint || tx({ de: 'Slot-Vorschau', en: 'Slot Preview', es: 'Vista previa del espacio' })}
           </SheetTitle>
           <SheetDescription>
-            Geplant für {new Date(slot.scheduled_at).toLocaleString()}
+            {tx({ de: 'Geplant für', en: 'Scheduled for', es: 'Programado para' })} {new Date(slot.scheduled_at).toLocaleString()}
           </SheetDescription>
         </SheetHeader>
 
@@ -126,19 +126,19 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
                     </div>
                   )}
                   <div className="text-[11px] text-muted-foreground mt-2">
-                    Typisch 1–5 Min. Seite kann geschlossen werden — bei Fertigstellung kommt eine Benachrichtigung.
+                    {tx({ de: 'Typisch 1–5 Min. Seite kann geschlossen werden — bei Fertigstellung kommt eine Benachrichtigung.', en: 'Typically 1-5 min. Page can be closed — a notification will appear upon completion.', es: 'Normalmente de 1 a 5 min. La página se puede cerrar; aparecerá una notificación al finalizar.' })}
                   </div>
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground p-6">
                   <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                  <div className="text-sm">{slot.status === 'generating' ? 'Wird generiert…' : tx({ de: 'Noch kein Asset erstellt', en: 'No asset created yet', es: 'Aún no se ha creado ningún activo' })}</div>
+                  <div className="text-sm">{slot.status === 'generating' ? tx({ de: 'Wird generiert…', en: 'Generating…', es: 'Generando…' }) : tx({ de: 'Noch kein Asset erstellt', en: 'No asset created yet', es: 'Aún no se ha creado ningún activo' })}</div>
                 </div>
               )}
             </Card>
             {slot.video_error && slot.status === 'failed' && (
               <div className="mt-2 text-[11px] text-destructive bg-destructive/5 border border-destructive/30 rounded p-2">
-                Render-Fehler: {slot.video_error} (Credits zurückerstattet)
+                {tx({ de: 'Render-Fehler', en: 'Render error', es: 'Error de renderizado' })}: {slot.video_error} ({tx({ de: 'Credits zurückerstattet', en: 'Credits refunded', es: 'Créditos reembolsados' })})
               </div>
             )}
           </div>
@@ -153,7 +153,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
               disabled={!isEditable}
               rows={5}
               className="mt-2 font-mono text-sm"
-              placeholder={slot.status === 'generating' ? 'Wird generiert…' : tx({ de: "Noch keine Caption", en: "No caption yet", es: "Aún no hay subtítulos" })}
+              placeholder={slot.status === 'generating' ? tx({ de: 'Wird generiert…', en: 'Generating…', es: 'Generando…' }) : tx({ de: "Noch keine Caption", en: "No caption yet", es: "Aún no hay subtítulos" })}
             />
             {slot.hashtags && slot.hashtags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
@@ -188,7 +188,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
             )}>
               <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck className="h-4 w-4 text-primary" />
-                <span className="font-semibold text-sm">QA-Gate Befund</span>
+                <span className="font-semibold text-sm">{tx({ de: 'QA-Gate Befund', en: 'QA-Gate Finding', es: 'Hallazgo de QA-Gate' })}</span>
                 {slot.qa_score !== null && (
                   <Badge variant="outline" className="ml-auto">Score {slot.qa_score}/100</Badge>
                 )}
@@ -215,18 +215,18 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
             if (!trendAnchor && !source) return null;
             return (
               <Card className="p-3 bg-primary/5 border-primary/20 space-y-1.5">
-                <div className="text-[10px] uppercase tracking-widest text-primary/80">Plan-Kontext</div>
+                <div className="text-[10px] uppercase tracking-widest text-primary/80">{tx({ de: 'Plan-Kontext', en: 'Plan Context', es: 'Contexto del plan' })}</div>
                 {trendAnchor && (
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Trend-Anker: </span>
+                    <span className="text-muted-foreground">{tx({ de: 'Trend-Anker', en: 'Trend Anchor', es: 'Ancla de tendencia' })}: </span>
                     <span>{trendAnchor}</span>
                   </div>
                 )}
                 {source && (
                   <div className="text-xs flex items-center gap-1.5">
-                    <span className="text-muted-foreground">Slot-Wahl:</span>
+                    <span className="text-muted-foreground">{tx({ de: 'Slot-Wahl', en: 'Slot Choice', es: 'Elección de espacio' })}:</span>
                     <Badge variant="outline" className="text-[10px]">
-                      {source === 'posting_slots' ? '📈 Optimaler Zeit-Slot' : '⏱️ Standard-Fallback'}
+                      {source === 'posting_slots' ? tx({ de: '📈 Optimaler Zeit-Slot', en: '📈 Optimal Time Slot', es: '📈 Espacio de tiempo óptimo' }) : tx({ de: '⏱️ Standard-Fallback', en: '⏱️ Standard Fallback', es: '⏱️ Respaldo estándar' })}
                     </Badge>
                   </div>
                 )}
@@ -236,10 +236,10 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
 
           {/* Meta */}
           <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-            <div>Erstellt: {new Date(slot.created_at).toLocaleString()}</div>
-            <div>Kosten: {slot.generation_cost_credits} cr</div>
-            {slot.posted_at && <div>Gepostet: {new Date(slot.posted_at).toLocaleString()}</div>}
-            {slot.social_post_id && <div>Post-ID: {slot.social_post_id}</div>}
+            <div>{tx({ de: 'Erstellt', en: 'Created', es: 'Creado' })}: {new Date(slot.created_at).toLocaleString()}</div>
+            <div>{tx({ de: 'Kosten', en: 'Costs', es: 'Costos' })}: {slot.generation_cost_credits} cr</div>
+            {slot.posted_at && <div>{tx({ de: 'Gepostet', en: 'Posted', es: 'Publicado' })}: {new Date(slot.posted_at).toLocaleString()}</div>}
+            {slot.social_post_id && <div>{tx({ de: 'Post-ID', en: 'Post ID', es: 'ID de publicación' })}: {slot.social_post_id}</div>}
           </div>
 
           <Separator />
@@ -248,7 +248,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
           <div className="flex flex-wrap gap-2">
             {isEditable && (
               <Button onClick={saveEdits} disabled={savingEdits} variant="outline" size="sm" className="gap-1.5">
-                <Save className="h-3.5 w-3.5" /> Speichern
+                <Save className="h-3.5 w-3.5" /> {tx({ de: 'Speichern', en: 'Save', es: 'Guardar' })}
               </Button>
             )}
             {(slot.status === 'qa_review' || slot.status === 'draft') && (
@@ -258,7 +258,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
                 size="sm"
                 className="gap-1.5"
               >
-                <CheckCircle2 className="h-3.5 w-3.5" /> Freigeben & einplanen
+                <CheckCircle2 className="h-3.5 w-3.5" /> {tx({ de: 'Freigeben 3.5" /> Freigeben & einplanen einplanen', en: 'Approve 3.5" /> Freigeben & einplanen Schedule', es: 'Aprobar y programar' })}
               </Button>
             )}
             {(slot.status === 'qa_review' || slot.status === 'draft' || slot.status === 'scheduled') && (
@@ -269,17 +269,17 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
                 size="sm"
                 className="gap-1.5"
               >
-                <SkipForward className="h-3.5 w-3.5" /> Überspringen
+                <SkipForward className="h-3.5 w-3.5" /> {tx({ de: 'Überspringen', en: 'Skip', es: 'Saltar' })}
               </Button>
             )}
             {(slot.status === 'failed' || slot.status === 'blocked') && (
               <Button onClick={regenerate} variant="outline" size="sm" className="gap-1.5">
-                <Sparkles className="h-3.5 w-3.5" /> Neu generieren
+                <Sparkles className="h-3.5 w-3.5" /> {tx({ de: 'Neu generieren', en: 'Regenerate', es: 'Regenerar' })}
               </Button>
             )}
             {slot.status === 'posted' && slot.social_post_id && (
               <Badge variant="outline" className="text-xs gap-1">
-                <CheckCircle2 className="h-3 w-3 text-emerald-500" /> Veröffentlicht
+                <CheckCircle2 className="h-3 w-3 text-emerald-500" /> {tx({ de: 'Veröffentlicht', en: 'Published', es: 'Publicado' })}
               </Badge>
             )}
           </div>
@@ -300,15 +300,15 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
 
 function StatusChip({ status }: { status: AutopilotSlot['status'] }) {
   const map: Record<AutopilotSlot['status'], { label: string; cls: string; icon: typeof Clock }> = {
-    draft:      { label: 'Entwurf',      cls: 'bg-muted text-foreground',                          icon: Clock },
-    generating: { label: 'Generiere…',   cls: 'bg-primary/15 text-primary animate-pulse',          icon: Sparkles },
+    draft:      { label: tx({ de: 'Entwurf', en: 'Draft', es: 'Borrador' }),      cls: 'bg-muted text-foreground',                          icon: Clock },
+    generating: { label: tx({ de: 'Generiere…', en: 'Generating…', es: 'Generando…' }),   cls: 'bg-primary/15 text-primary animate-pulse',          icon: Sparkles },
     generating_video: { label: tx({ de: "Video rendert…", en: "Video renders...", es: "Vídeo renderizado..." }), cls: 'bg-fuchsia-500/15 text-fuchsia-600 animate-pulse', icon: Sparkles },
-    qa_review:  { label: 'QA-Review',    cls: 'bg-amber-500/15 text-amber-600',                    icon: AlertTriangle },
-    scheduled:  { label: 'Geplant',      cls: 'bg-primary/20 text-primary',                        icon: Clock },
-    posted:     { label: 'Live',         cls: 'bg-emerald-500/15 text-emerald-600',                icon: CheckCircle2 },
-    blocked:    { label: 'Blockiert',    cls: 'bg-destructive/15 text-destructive',                icon: AlertTriangle },
+    qa_review:  { label: tx({ de: 'QA-Review', en: 'QA Review', es: 'Revisión de QA' }),    cls: 'bg-amber-500/15 text-amber-600',                    icon: AlertTriangle },
+    scheduled:  { label: tx({ de: 'Geplant', en: 'Scheduled', es: 'Programado' }),      cls: 'bg-primary/20 text-primary',                        icon: Clock },
+    posted:     { label: tx({ de: 'Live', en: 'Live', es: 'En vivo' }),         cls: 'bg-emerald-500/15 text-emerald-600',                icon: CheckCircle2 },
+    blocked:    { label: tx({ de: 'Blockiert', en: 'Blocked', es: 'Bloqueado' }),    cls: 'bg-destructive/15 text-destructive',                icon: AlertTriangle },
     failed:     { label: tx({ de: "Fehler", en: "Mistake", es: "Error" }),       cls: 'bg-destructive/10 text-destructive',                icon: AlertTriangle },
-    skipped:    { label: 'Übersprungen', cls: 'bg-muted/60 text-muted-foreground',                 icon: SkipForward },
+    skipped:    { label: tx({ de: 'Übersprungen', en: 'Skipped', es: 'Saltado' }), cls: 'bg-muted/60 text-muted-foreground',                 icon: SkipForward },
   };
   const m = map[status];
   const Icon = m.icon;

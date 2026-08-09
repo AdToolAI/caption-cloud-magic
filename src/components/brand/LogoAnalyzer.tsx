@@ -25,8 +25,8 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
 
     if (file.size > 5 * 1024 * 1024) {
       toast({
-        title: "Datei zu groß",
-        description: "Logo muss kleiner als 5MB sein",
+        title: tx({ de: 'Datei zu groß', en: 'File too large', es: 'Archivo demasiado grande' }),
+        description: tx({ de: 'Logo muss kleiner als 5MB sein', en: 'Logo must be smaller than 5MB', es: 'El logotipo debe tener menos de 5MB' }),
         variant: "destructive"
       });
       return;
@@ -75,7 +75,7 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
       onAnalysisComplete(logoAnalysis);
 
       toast({
-        title: "Logo analysiert! 🎨",
+        title: tx({ de: 'Logo analysiert! 🎨', en: 'Logo analyzed! 🎨', es: '¡Logo analizado! 🎨' }),
         description: tx({ de: "KI hat dein Logo ausgewertet", en: "AI has evaluated your logo", es: "La IA ha evaluado tu logo" }),
         duration: 4000
       });
@@ -96,11 +96,11 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
     <Card className="border-2 border-dashed">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Eye className="h-5 w-5" />
+          <Eye className="h-5 w-5" /> {tx({ de: 'KI Logo-Analyse', en: 'AI Logo Analysis', es: 'Análisis de logo por IA' })}
           KI Logo-Analyse
         </CardTitle>
         <CardDescription>
-          Lade dein Logo hoch und lass die KI Farben, Stil & Stimmung extrahieren
+          {tx({ de: 'Lade dein Logo hoch und lass die KI Farben, Stil Lade dein Logo hoch und lass die KI Farben, Stil & Stimmung extrahieren Stimmung extrahieren', en: 'Upload your logo and let AI extract colors, style Lade dein Logo hoch und lass die KI Farben, Stil & Stimmung extrahieren mood', es: 'Sube tu logotipo y deja que la IA extraiga colores, estilo y estado de ánimo' })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -110,7 +110,7 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
             className="flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors hover:bg-muted/30"
           >
             <Upload className="h-12 w-12 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">Logo hochladen</p>
+            <p className="text-sm text-muted-foreground">{tx({ de: 'Logo hochladen', en: 'Upload logo', es: 'Subir logotipo' })}</p>
             <p className="text-xs text-muted-foreground mt-1">PNG, JPG, SVG • Max 5MB</p>
             <input
               id="logo-upload"
@@ -139,12 +139,12 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
               {isAnalyzing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analysiere Logo...
+                  {tx({ de: 'Analysiere Logo...', en: 'Analyzing logo...', es: 'Analizando logotipo...' })}
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Mit KI analysieren
+                  {tx({ de: 'Mit KI analysieren', en: 'Analyze with AI', es: 'Analizar con IA' })}
                 </>
               )}
             </Button>
@@ -154,7 +154,7 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Palette className="h-4 w-4" />
-                    <p className="text-sm font-medium">Extrahierte Farben</p>
+                    <p className="text-sm font-medium">{tx({ de: 'Extrahierte Farben', en: 'Extracted Colors', es: 'Colores extraídos' })}</p>
                   </div>
                   <div className="flex gap-2">
                     {analysis.colors?.palette?.map((color: string, idx: number) => (
@@ -172,7 +172,7 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Type className="h-4 w-4" />
-                    <p className="text-sm font-medium">Font-Empfehlungen</p>
+                    <p className="text-sm font-medium">{tx({ de: 'Font-Empfehlungen', en: 'Font Recommendations', es: 'Recomendaciones de fuentes' })}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm">
@@ -185,7 +185,7 @@ export function LogoAnalyzer({ onAnalysisComplete }: LogoAnalyzerProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Stil & Charakter</p>
+                  <p className="text-sm font-medium">{tx({ de: 'Stil p className="text-sm font-medium">Stil & Charakter Charakter', en: 'Style p className="text-sm font-medium">Stil & Charakter Character', es: 'Estilo y carácter' })}</p>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">{analysis.style}</Badge>
                     <Badge variant="secondary">{analysis.mood}</Badge>

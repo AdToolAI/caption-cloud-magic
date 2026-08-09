@@ -155,9 +155,9 @@ export function ConversionFunnel() {
         </div>
         <Tabs value={String(days)} onValueChange={(v) => setDays(Number(v))}>
           <TabsList>
-            <TabsTrigger value="1">Heute</TabsTrigger>
-            <TabsTrigger value="7">7 Tage</TabsTrigger>
-            <TabsTrigger value="30">30 Tage</TabsTrigger>
+            <TabsTrigger value="1">{tx({ de: "Heute", en: "Today", es: "Hoy" })}</TabsTrigger>
+            <TabsTrigger value="7">{tx({ de: "7 Tage", en: "7 days", es: "7 días" })}</TabsTrigger>
+            <TabsTrigger value="30">{tx({ de: "30 Tage", en: "30 days", es: "30 días" })}</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -173,7 +173,7 @@ export function ConversionFunnel() {
         />
         <StageCard
           icon={Mail}
-          label="Verifiziert"
+          label={tx({ de: "Verifiziert", en: "Verified", es: "Verificado" })}
           value={data.verified}
           rate={verifyRate}
           prevValue={data.prev_verified}
@@ -191,7 +191,7 @@ export function ConversionFunnel() {
         />
         <StageCard
           icon={Sparkles}
-          label="Upgrade Paid"
+          label={tx({ de: "Upgrade Paid", en: "Upgrade Paid", es: "Upgrade de pago" })}
           value={data.paid}
           rate={paidRate}
           prevValue={data.prev_paid}
@@ -208,18 +208,18 @@ export function ConversionFunnel() {
               <Clock className="h-4 w-4 text-primary" />
             </div>
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-              Ø Zeit bis Bestätigung
+              tx({ de: "Ø Zeit bis Bestätigung", en: "Avg. time to verify", es: "Tiempo promedio de verificación" })
             </span>
           </div>
           <div className="text-3xl font-bold">{formatHours(data.avg_hours_to_verify)}</div>
           <p className="text-xs text-muted-foreground mt-2">
             {data.avg_hours_to_verify < 1
-              ? "🎉 Blitzschnell"
+              ? "tx({ de: "🎉 Blitzschnell", en: "🎉 Lightning fast", es: "🎉 Muy rápido" })"
               : data.avg_hours_to_verify < 6
-              ? "✅ Sehr gut"
+              ? "tx({ de: "✅ Sehr gut", en: "✅ Very good", es: "✅ Muy bueno" })"
               : data.avg_hours_to_verify < 24
-              ? "👍 Solide"
-              : "⚠️ Verbesserungspotenzial"}
+              ? "tx({ de: "👍 Solide", en: "👍 Solid", es: "👍 Sólido" })"
+              : "tx({ de: "⚠️ Verbesserungspotenzial", en: "⚠️ Potential for improvement", es: "⚠️ Potencial de mejora" })"}
           </p>
         </Card>
 
@@ -229,16 +229,16 @@ export function ConversionFunnel() {
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-              Ø Verify → 1. Video
+              tx({ de: "Ø Verify → 1. Video", en: "Avg. Verify → 1st Video", es: "Promedio Verificación → 1.er Video" })
             </span>
           </div>
           <div className="text-3xl font-bold">{formatHours(data.avg_hours_to_first_video)}</div>
           <p className="text-xs text-muted-foreground mt-2">
             {data.avg_hours_to_first_video < 1
-              ? "🎉 Sofort-Aktivierung"
+              ? "tx({ de: "🎉 Sofort-Aktivierung", en: "🎉 Immediate Activation", es: "🎉 Activación inmediata" })"
               : data.avg_hours_to_first_video < 24
-              ? "✅ Same-day Activation"
-              : "⚠️ Onboarding straffen"}
+              ? "tx({ de: "✅ Same-day Activation", en: "✅ Same-day Activation", es: "✅ Activación en el mismo día" })"
+              : "tx({ de: "⚠️ Onboarding straffen", en: "⚠️ Streamline onboarding", es: "⚠️ Optimizar el proceso de incorporación" })"}
           </p>
         </Card>
 
@@ -248,7 +248,7 @@ export function ConversionFunnel() {
               <Mail className="h-4 w-4 text-primary" />
             </div>
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-              Reminder-Wirksamkeit
+              tx({ de: "Reminder-Wirksamkeit", en: "Reminder effectiveness", es: "Eficacia de los recordatorios" })
             </span>
           </div>
           <div className="text-3xl font-bold">
@@ -258,7 +258,7 @@ export function ConversionFunnel() {
           <p className="text-xs text-muted-foreground mt-2">
             {data.reminders_sent === 0
               ? tx({ de: "Noch keine Reminder versendet", en: "No reminders sent yet", es: "Aún no se han enviado recordatorios" })
-              : `${reminderRate.toFixed(1)}% verifizierten nach Reminder`}
+              : tx({ de: `${reminderRate.toFixed(1)}% verifizierten nach Reminder`, en: `${reminderRate.toFixed(1)}% verified after reminder`, es: `${reminderRate.toFixed(1)}% verificado tras recordatorio` })}
           </p>
         </Card>
       </div>

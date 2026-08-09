@@ -227,13 +227,13 @@ export function AICompanionWidget() {
             responseContent = formatStatusResponse(data);
             break;
           case 'credits':
-            responseContent = `💳 **Deine Credits:**\n\n**Balance:** ${data?.creditBalance ?? 0} Credits\n\n[Credits aufladen](/credits)`;
+            responseContent = tx({ de: `💳 **Deine Credits:**\n\n**Balance:** ${data?.creditBalance ?? 0} Credits\n\n[Credits aufladen](/credits)`, en: `💳 **Your Credits:**\n\n**Balance:** ${data?.creditBalance ?? 0} credits\n\n[Top up credits](/credits)`, es: `💳 **Tus créditos:**\n\n**Balance:** ${data?.creditBalance ?? 0} créditos\n\n[Recargar créditos](/credits)` }); //\n\n**Balance:** ${data?.creditBalance ?? 0} Credits\n\n[Credits aufladen](/credits)`;
             break;
           case 'render':
             responseContent = formatRenderResponse(data);
             break;
           case 'calendar':
-            responseContent = `📅 **Kalender-Übersicht:**\n\n${data?.scheduledPosts?.length || 0} geplante Posts\n\n[Kalender öffnen](/calendar)`;
+            responseContent = tx({ de: `📅 **Kalender-Übersicht:**\n\n${data?.scheduledPosts?.length || 0} geplante Posts\n\n[Kalender öffnen](/calendar)`, en: `📅 **Calendar Overview:**\n\n${data?.scheduledPosts?.length || 0} scheduled posts\n\n[Open calendar](/calendar)`, es: `📅 **Resumen del calendario:**\n\n${data?.scheduledPosts?.length || 0} publicaciones programadas\n\n[Abrir calendario](/calendar)` }); //\n\n${data?.scheduledPosts?.length || 0} geplante Posts\n\n[Kalender öffnen](/calendar)`;
             break;
           case 'tips':
             responseContent = formatTipsResponse(data);
@@ -337,7 +337,7 @@ export function AICompanionWidget() {
     if (activeRenders.length === 0) {
       return '🎬 **Keine aktiven Renderings**\n\nAlle Video-Renderings sind abgeschlossen.';
     }
-    let response = `🎬 **Aktive Renderings:** ${activeRenders.length}\n\n`;
+    let response = tx({ de: `🎬 **Aktive Renderings:** ${activeRenders.length}\n\n`, en: `🎬 **Active Renderings:** ${activeRenders.length}\n\n`, es: `🎬 **Renderizados activos:** ${activeRenders.length}\n\n` }); // ${activeRenders.length}\n\n`;
     activeRenders.forEach((r: any) => { response += `• ${r.message}\n`; });
     return response;
   };

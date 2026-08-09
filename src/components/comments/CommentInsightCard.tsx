@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ interface CommentInsightCardProps {
   evidence: string;
   interpretation: string;
   action: string;
-  impact: 'hoch' | 'mittel' | 'niedrig';
+  impact: tx({ de: "hoch", en: "high", es: "alto" }) | tx({ de: "mittel", en: "medium", es: "medio" }) | tx({ de: "niedrig", en: "low", es: "bajo" });
 }
 
 export function CommentInsightCard({ 
@@ -47,23 +48,23 @@ export function CommentInsightCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">Beleg</p>
+          <p className="text-sm font-medium text-muted-foreground">{tx({ de: "Beleg", en: "Evidence", es: "Evidencia" })}</p>
           <p className="text-sm">{evidence}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-muted-foreground">Interpretation</p>
+          <p className="text-sm font-medium text-muted-foreground">{tx({ de: "Interpretation", en: "Interpretation", es: "Interpretación" })}</p>
           <p className="text-sm">{interpretation}</p>
         </div>
         <div className="bg-muted/50 p-3 rounded-lg">
-          <p className="text-sm font-medium mb-2">📋 Empfohlene Maßnahme</p>
+          <p className="text-sm font-medium mb-2">{tx({ de: "📋 Empfohlene Maßnahme", en: "📋 Recommended action", es: "📋 Acción recomendada" })}</p>
           <p className="text-sm">{action}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="text-xs">
-            Als Aufgabe speichern
+            {tx({ de: "Als Aufgabe speichern", en: "Save as task", es: "Guardar como tarea" })}
           </Button>
           <Button size="sm" variant="ghost" className="text-xs">
-            In CSV exportieren
+            {tx({ de: "In CSV exportieren", en: "Export to CSV", es: "Exportar a CSV" })}
           </Button>
         </div>
       </CardContent>

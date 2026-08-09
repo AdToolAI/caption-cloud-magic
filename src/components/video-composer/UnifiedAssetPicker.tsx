@@ -325,10 +325,10 @@ export function UnifiedAssetPicker({
                   >
                     <Plus className="h-3.5 w-3.5" />
                     {lang === 'de'
-                      ? 'In der Library öffnen…'
+                      ? tx({ de: 'In der Library öffnen…', en: tx({ de: 'In der Library öffnen…', en: 'Open in Library…', es: 'Abrir en la biblioteca…' }), es: 'Abrir en la biblioteca…' })
                       : lang === 'es'
-                      ? 'Abrir en librería…'
-                      : 'Open in Library…'}
+                      ? tx({ de: 'In der Library öffnen…', en: tx({ de: 'In der Library öffnen…', en: 'Open in Library…', es: 'Abrir en la biblioteca…' }), es: 'Abrir en la biblioteca…' })
+                      : tx({ de: 'In der Library öffnen…', en: 'Open in Library…', es: 'Abrir en la biblioteca…' })}
                   </a>
                 </PopoverContent>
               </Popover>
@@ -344,10 +344,10 @@ export function UnifiedAssetPicker({
               >
                 <Sparkles className="h-3 w-3" />
                 {lang === 'de'
-                  ? 'Aus Foto (KI)'
+                  ? tx({ de: 'Aus Foto (KI)', en: 'From Photo (AI)', es: tx({ de: 'Aus Foto (KI)', en: 'From Photo (AI)', es: 'Desde foto (IA)' }) })
                   : lang === 'es'
-                  ? 'Desde foto (IA)'
-                  : 'From photo (AI)'}
+                  ? tx({ de: 'Aus Foto (KI)', en: 'From Photo (AI)', es: 'Desde foto (IA)' })
+                  : tx({ de: 'Aus Foto (KI)', en: 'From Photo (AI)', es: 'Desde foto (IA)' })}
               </Button>
             )}
           </div>

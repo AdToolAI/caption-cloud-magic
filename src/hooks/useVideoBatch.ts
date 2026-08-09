@@ -30,7 +30,7 @@ export const useVideoBatch = () => {
       if (!data.ok) {
         if (data.error === 'INSUFFICIENT_CREDITS') {
           toast({
-            title: 'Nicht genügend Credits',
+            title: tx({ de: 'Nicht genügend Credits', en: 'Insufficient credits', es: 'Créditos insuficientes' }),
             description: data.message,
             variant: 'destructive'
           });
@@ -40,7 +40,7 @@ export const useVideoBatch = () => {
       }
 
       toast({
-        title: 'Batch-Rendering gestartet',
+        title: tx({ de: 'Batch-Rendering gestartet', en: 'Batch rendering started', es: 'Renderizado por lotes iniciado' }),
         description: tx({ de: `${batchData.length} Videos werden erstellt. Das dauert einige Minuten.`, en: `${batchData.length} videos are being created. This will take a few minutes.`, es: `Se están creando ${batchData.length} videos. Esto tardará unos minutos.` })
       });
 

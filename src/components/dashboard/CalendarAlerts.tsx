@@ -30,7 +30,7 @@ export function CalendarAlerts({
           color: "text-destructive",
           bgColor: "bg-destructive/10",
           priority: "high",
-          action: "Konflikt lösen",
+          action: tx({ de: "Konflikt lösen", en: "Resolve conflict", es: "Resolver conflicto" }),
           onAction: onResolveConflict,
         };
       case 'overdue':
@@ -39,7 +39,7 @@ export function CalendarAlerts({
           color: "text-warning",
           bgColor: "bg-warning/10",
           priority: "medium",
-          action: "Jetzt veröffentlichen",
+          action: tx({ de: "Jetzt veröffentlichen", en: "Publish now", es: "Publicar ahora" }),
         };
       case 'empty':
         return {
@@ -47,7 +47,7 @@ export function CalendarAlerts({
           color: "text-primary",
           bgColor: "bg-primary/10",
           priority: "low",
-          action: "Auto-Planung starten",
+          action: tx({ de: "Auto-Planung starten", en: "Start auto-scheduling", es: "Iniciar programación automática" }),
           onAction: onAutoSchedule,
         };
       default:
@@ -62,9 +62,9 @@ export function CalendarAlerts({
 
   const getPriorityBadge = (priority: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
-      high: { variant: "destructive", label: "Hoch" },
-      medium: { variant: "default", label: "Mittel" },
-      low: { variant: "secondary", label: "Niedrig" },
+      high: { variant: "destructive", label: tx({ de: "Hoch", en: "High", es: "Alto" }) },
+      medium: { variant: "default", label: tx({ de: "Mittel", en: "Medium", es: "Medio" }) },
+      low: { variant: "secondary", label: tx({ de: "Niedrig", en: "Low", es: "Bajo" }) },
     };
     const config = variants[priority] || variants.low;
     return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -74,7 +74,7 @@ export function CalendarAlerts({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Warnungen & Aufgaben</CardTitle>
+          <CardTitle>{tx({ de: "Warnungen & Aufgaben", en: "Warnings & Tasks", es: "Advertencias y tareas" })}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -91,13 +91,13 @@ export function CalendarAlerts({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Warnungen & Aufgaben</CardTitle>
+          <CardTitle>{tx({ de: "Warnungen & Aufgaben", en: "Warnings & Tasks", es: "Advertencias y tareas" })}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
             <Info className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p className="font-medium">Alles im grünen Bereich! ✅</p>
-            <p className="text-sm mt-1">Keine Warnungen oder offenen Aufgaben.</p>
+            <p className="font-medium">tx({ de: "Alles im grünen Bereich! ✅", en: "Everything is fine! ✅", es: "¡Todo está bien! ✅" })</p>
+            <p className="text-sm mt-1">tx({ de: "Keine Warnungen oder offenen Aufgaben.", en: "No warnings or open tasks.", es: "Sin advertencias ni tareas abiertas." })</p>
           </div>
         </CardContent>
       </Card>
@@ -107,7 +107,7 @@ export function CalendarAlerts({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Warnungen & Aufgaben</CardTitle>
+        <CardTitle>{tx({ de: "Warnungen & Aufgaben", en: "Warnings & Tasks", es: "Advertencias y tareas" })}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -126,9 +126,9 @@ export function CalendarAlerts({
                       <div className="flex items-center gap-2 mb-2">
                         {getPriorityBadge(config.priority)}
                         <span className={`text-sm font-medium ${config.color}`}>
-                          {alert.type === 'conflict' ? 'Konflikt erkannt' : 
-                           alert.type === 'overdue' ? 'Überfällig' : 
-                           'Leere Tage'}
+                          {alert.type === 'conflict' ? 'Konflikt erkannt' : tx({ de: 'Konflikt erkannt', en: 'Conflict detected', es: 'Conflicto detectado' }) : 
+                           alert.type === 'overdue' ? 'Überfällig' : tx({ de: 'Überfällig', en: 'Overdue', es: 'Vencido' }) : 
+                           tx({ de: 'Leere Tage', en: 'Empty days', es: 'Días vacíos' })}
                         </span>
                       </div>
                       <p className="text-sm text-foreground mb-3">{alert.message}</p>

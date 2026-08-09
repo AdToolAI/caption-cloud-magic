@@ -16,8 +16,8 @@ const GLYPH: Record<string, string> = {
 
 const VALUE: Record<string, number> = { p: 1, n: 3, b: 3.2, r: 5, q: 9, k: 0 };
 
-type Level = 'leicht' | 'mittel' | 'schwer';
-const DEPTH: Record<Level, number> = { leicht: 0, mittel: 1, schwer: 2 };
+type Level = string;
+const DEPTH: Record<Level, number> = {  [tx({ de: 'leicht', en: 'easy', es: 'fácil' })]: 0, [tx({ de: 'mittel', en: 'medium', es: 'medio' })]: 1, [tx({ de: 'schwer', en: 'hard', es: 'difícil' })]: 2  };
 
 function evaluate(game: Chess): number {
   // Positiv = gut für Schwarz (die KI spielt Schwarz).
@@ -71,7 +71,7 @@ export default function ChessGame() {
   const [game] = useState(() => new Chess());
   const [fen, setFen] = useState(game.fen());
   const [from, setFrom] = useState<Square | null>(null);
-  const [level, setLevel] = useState<Level>('mittel');
+  const [level, setLevel] = useState<string>(tx({ de: 'mittel', en: 'medium', es: 'medio' }));
   const [thinking, setThinking] = useState(false);
 
   const board = useMemo(() => new Chess(fen).board(), [fen]);
@@ -109,21 +109,21 @@ export default function ChessGame() {
 
   const status = game.isCheckmate()
     ? game.turn() === 'w'
-      ? 'Schachmatt — die KI gewinnt.'
+      ? tx({ de: 'Schachmatt — die KI gewinnt.', en: 'Checkmate – the AI wins.', es: 'Jaque mate: la IA gana.' })
       : tx({ de: 'Schachmatt — du gewinnst.', en: 'Checkmate – you win.', es: 'Jaque mate: tú ganas.' })
     : game.isDraw()
-      ? 'Remis.'
+      ? tx({ de: 'Remis.', en: 'Draw.', es: 'Tablas.' })
       : thinking
-        ? 'Die KI überlegt…'
+        ? tx({ de: 'Die KI überlegt…', en: 'The AI is thinking...', es: 'La IA está pensando...' })
         : game.inCheck()
-          ? 'Schach!'
+          ? tx({ de: 'Schach!', en: 'Check!', es: '¡Jaque!' })
           : tx({ de: 'Du bist am Zug (Weiß).', en: 'It\'s your turn (White).', es: 'Es tu turno (Blanco).' });
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 text-xs">
         <div className="flex gap-1">
-          {(['leicht', 'mittel', 'schwer'] as Level[]).map((l) => (
+          {([tx({ de: 'leicht', en: 'easy', es: 'fácil' }), tx({ de: 'mittel', en: 'medium', es: 'medio' }), tx({ de: 'schwer', en: 'hard', es: 'difícil' })]).map((l) => (
             <button
               key={l}
               type="button"

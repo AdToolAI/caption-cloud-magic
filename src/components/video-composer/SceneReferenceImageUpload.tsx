@@ -46,7 +46,7 @@ export default function SceneReferenceImageUpload({
       }
       if (file.size > MAX_IMAGE_BYTES) {
         toast.error(
-          `Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximal 20 MB erlaubt.`
+          tx({ de: `Datei zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximal 20 MB erlaubt.`, en: `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum 20 MB allowed.`, es: `Archivo demasiado grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Máximo 20 MB permitidos.` })
         );
         return;
       }
@@ -59,7 +59,7 @@ export default function SceneReferenceImageUpload({
           data: { user },
           error: authErr,
         } = await supabase.auth.getUser();
-        if (authErr || !user) throw new Error('Nicht angemeldet');
+        if (authErr || !user) throw new Error(tr({ de: 'Nicht angemeldet', en: 'Not logged in', es: 'No has iniciado sesión' }));
 
         const projectFolder = projectId || 'draft';
         const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
@@ -114,7 +114,7 @@ export default function SceneReferenceImageUpload({
       console.warn('[SceneReferenceImageUpload] Storage remove failed (ignored):', err);
     }
     onChange(null);
-    toast.success('Referenzbild entfernt');
+    toast.success(tr({ de: 'Referenzbild entfernt', en: 'Reference image removed', es: 'Imagen de referencia eliminada' }));
   }, [referenceImageUrl, onChange]);
 
   const handleDrop = useCallback(
@@ -143,14 +143,14 @@ export default function SceneReferenceImageUpload({
             onClick={handleRemove}
             disabled={disabled}
           >
-            <X className="h-3 w-3 mr-1" /> Entfernen
+            <X className="h-3 w-3 mr-1" /> {tr({ de: 'Entfernen', en: 'Remove', es: 'Eliminar' })}
           </Button>
         </div>
         <div className="flex items-start gap-2">
           <div className="relative w-20 h-20 rounded-md overflow-hidden border border-primary/30 bg-black flex-shrink-0">
             <img
               src={referenceImageUrl}
-              alt="KI-Referenzbild"
+              alt={tr({ de: "KI-Referenzbild", en: "AI reference image", es: "Imagen de referencia de IA" })}
               className="w-full h-full object-cover"
             />
           </div>

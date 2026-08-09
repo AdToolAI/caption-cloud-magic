@@ -46,11 +46,11 @@ interface UniversalVoiceLibraryPickerProps {
 
 
 const TIER_LABEL: Record<string, { label: string; className: string }> = {
-  cloned:    { label: 'Meine Stimme',      className: 'bg-[#F5C76A]/20 text-[#F5C76A] border-[#F5C76A]/40' },
-  premium:   { label: 'Premium',            className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-  standard:  { label: 'Workspace',          className: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
-  custom:    { label: 'Custom',             className: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
-  community: { label: 'Community',          className: 'bg-white/5 text-white/60 border-white/10' },
+  cloned:    { label: tx({ de: "Meine Stimme", en: "My Voice", es: "Mi voz" }),      className: 'bg-[#F5C76A]/20 text-[#F5C76A] border-[#F5C76A]/40' },
+  premium:   { label: tx({ de: "Premium", en: "Premium", es: "Premium" }),            className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  standard:  { label: tx({ de: "Workspace", en: "Workspace", es: "Workspace" }),          className: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
+  custom:    { label: tx({ de: "Custom", en: "Custom", es: "Personalizado" }),             className: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
+  community: { label: tx({ de: "Community", en: "Community", es: "Comunidad" }),          className: 'bg-white/5 text-white/60 border-white/10' },
 };
 
 /** Glas-Pille für alle Filter-Dropdowns (Cinematic Glass Noir). */
@@ -63,7 +63,7 @@ export function UniversalVoiceLibraryPicker({
   onSelect,
   language: languageProp = 'all',
   currentVoiceId,
-  title = 'Voice-Bibliothek',
+  title = tx({ de: "Voice-Bibliothek", en: "Voice Library", es: "Biblioteca de voces" }),
   enforceNative = true,
   allowLanguageChange = true,
   category: categoryProp = 'all',
@@ -127,10 +127,10 @@ export function UniversalVoiceLibraryPicker({
         .filter((c) => !search.trim() || c.name?.toLowerCase().includes(search.trim().toLowerCase()))
         .map((c) => ({
           id: c.elevenlabs_voice_id!,
-          name: c.name || 'Meine Stimme',
+          name: c.name || tx({ de: "Meine Stimme", en: "My Voice", es: "Mi voz" }),
           language: c.language || language,
           tier: 'cloned',
-          description: 'Eigener Voice-Clone',
+          description: tx({ de: "Eigener Voice-Clone", en: "Own voice clone", es: "Clon de voz propio" }),
         } as unknown as VoiceMeta)),
     [customVoices, search, language],
   );
@@ -183,9 +183,9 @@ export function UniversalVoiceLibraryPicker({
             )}
           </DialogTitle>
           <DialogDescription className="text-[11px] uppercase tracking-[0.15em] text-white/45">
-            {total.toLocaleString('de-DE')} Stimmen
+            {total.toLocaleString()} {tx({ de: "Stimmen", en: "Voices", es: "Voces" })}
             {language !== 'all' && <> in <span className="text-cyan">{voiceLanguageLabel(language)}</span></>}
-            {nativeSensitive && nativeOnly && ` · nur native Sprecher`}
+            {nativeSensitive && nativeOnly && ` · ${tx({ de: "nur native Sprecher", en: "native speakers only", es: "solo hablantes nativos" })}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -194,7 +194,7 @@ export function UniversalVoiceLibraryPicker({
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/25 transition-colors group-focus-within:text-gold" />
             <Input
-              placeholder="Name, Beschreibung, Akzent…"
+              placeholder={tx({ de: "Name, Beschreibung, Akzent…", en: "Name, description, accent…", es: "Nombre, descripción, acento…" })}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-12 pl-11 rounded-lg bg-white/5 border-white/10 placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-gold/50 focus-visible:border-gold/50"
@@ -205,9 +205,9 @@ export function UniversalVoiceLibraryPicker({
           <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
             {allowLanguageChange && (
               <Select value={language} onValueChange={setLanguage}>
-                <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Sprache" /></SelectTrigger>
+                <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder={tx({ de: "Sprache", en: "Language", es: "Idioma" })} /></SelectTrigger>
                 <SelectContent className="max-h-[320px]">
-                  <SelectItem value="all">🌍 Alle Sprachen</SelectItem>
+                  <SelectItem value="all">🌍 {tx({ de: "Alle Sprachen", en: "All languages", es: "Todos los idiomas" })}</SelectItem>
                   {VOICE_LANGUAGES.map((l) => (
                     <SelectItem key={l.code} value={l.code}>{l.flag} {l.label}</SelectItem>
                   ))}
@@ -216,29 +216,29 @@ export function UniversalVoiceLibraryPicker({
             )}
 
             <Select value={gender} onValueChange={(v) => setGender(v as typeof gender)}>
-              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Geschlecht" /></SelectTrigger>
+              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder={tx({ de: "Geschlecht", en: "Gender", es: "Género" })} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Alle Geschlechter</SelectItem>
-                <SelectItem value="female">Weiblich</SelectItem>
-                <SelectItem value="male">Männlich</SelectItem>
-                <SelectItem value="neutral">Neutral</SelectItem>
+                <SelectItem value="all">{tx({ de: "Alle Geschlechter", en: "All genders", es: "Todos los géneros" })}</SelectItem>
+                <SelectItem value="female">{tx({ de: "Weiblich", en: "Female", es: "Femenino" })}</SelectItem>
+                <SelectItem value="male">{tx({ de: "Männlich", en: "Male", es: "Masculino" })}</SelectItem>
+                <SelectItem value="neutral">{tx({ de: "Neutral", en: "Neutral", es: "Neutral" })}</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={age} onValueChange={(v) => setAge(v as typeof age)}>
-              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Alter" /></SelectTrigger>
+              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder={tx({ de: "Alter", en: "Age", es: "Edad" })} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Alle Alter</SelectItem>
-                <SelectItem value="young">Jung</SelectItem>
-                <SelectItem value="middle_aged">Mittel</SelectItem>
-                <SelectItem value="old">Reif</SelectItem>
+                <SelectItem value="all">{tx({ de: "Alle Alter", en: "All ages", es: "Todas las edades" })}</SelectItem>
+                <SelectItem value="young">{tx({ de: "Jung", en: "Young", es: "Joven" })}</SelectItem>
+                <SelectItem value="middle_aged">{tx({ de: "Mittel", en: "Middle", es: "Medio" })}</SelectItem>
+                <SelectItem value="old">{tx({ de: "Reif", en: "Old", es: "Viejo" })}</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={useCase} onValueChange={(v) => setUseCase(v as typeof useCase)}>
-              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Einsatz" /></SelectTrigger>
+              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder={tx({ de: "Einsatz", en: "Use case", es: "Uso" })} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Alle Einsätze</SelectItem>
+                <SelectItem value="all">{tx({ de: "Alle Einsätze", en: "All uses", es: "Todos los usos" })}</SelectItem>
                 <SelectItem value="narration">Narration</SelectItem>
                 <SelectItem value="conversational">Konversation</SelectItem>
                 <SelectItem value="characters">Charaktere</SelectItem>
@@ -248,17 +248,17 @@ export function UniversalVoiceLibraryPicker({
             </Select>
 
             <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
-              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder="Sortierung" /></SelectTrigger>
+              <SelectTrigger className={FILTER_TRIGGER}><SelectValue placeholder={tx({ de: "Sortierung", en: "Sort", es: "Clasificación" })} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="popularity">Beliebtheit</SelectItem>
-                <SelectItem value="name">Name (A–Z)</SelectItem>
+                <SelectItem value="popularity">{tx({ de: "Beliebtheit", en: "Popularity", es: "Popularidad" })}</SelectItem>
+                <SelectItem value="name">{tx({ de: "Name (A–Z)", en: "Name (A–Z)", es: "Nombre (A–Z)" })}</SelectItem>
               </SelectContent>
             </Select>
 
             {nativeSensitive && (
               <div className="flex items-center gap-2.5 px-3 rounded-md bg-white/5 border border-white/10">
                 <ShieldCheck className="h-4 w-4 text-gold shrink-0" />
-                <Label htmlFor="native-only" className="text-[10px] font-bold uppercase tracking-widest text-white/45 flex-1 cursor-pointer">Nur nativ</Label>
+                <Label htmlFor="native-only" className="text-[10px] font-bold uppercase tracking-widest text-white/45 flex-1 cursor-pointer">tx({ de: "Nur nativ", en: "Native only", es: "Solo nativo" })</Label>
                 <Switch id="native-only" checked={nativeOnly} onCheckedChange={setNativeOnly} />
               </div>
             )}
@@ -292,10 +292,10 @@ export function UniversalVoiceLibraryPicker({
           </div>
 
 
-          {/* Zuletzt verwendet */}
+          {/* tx({ de: "Zuletzt", en: "Recent", es: "Reciente" }) verwendet */}
           {visibleRecent.length > 0 && category !== 'mine' && !search.trim() && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-              <span className="shrink-0 text-[10px] uppercase tracking-wider text-white/35 pr-1">Zuletzt</span>
+              <span className="shrink-0 text-[10px] uppercase tracking-wider text-white/35 pr-1">tx({ de: "Zuletzt", en: "Recent", es: "Reciente" })</span>
               {visibleRecent.map((r) => (
                 <button
                   key={r.id}
@@ -319,10 +319,10 @@ export function UniversalVoiceLibraryPicker({
         <ScrollArea type="always" className="min-h-0 h-full flex-1 -mx-6 px-6 [&_[data-radix-scroll-area-thumb]]:bg-gold/40 [&_[data-radix-scroll-area-thumb]]:hover:bg-gold/70">
           {isLoading ? (
             <div className="flex items-center justify-center py-16 text-white/50">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Lade Stimmen…
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> {tx({ de: "Lade Stimmen…", en: "Loading voices…", es: "Cargando voces…" })}
             </div>
           ) : voices.length === 0 ? (
-            <div className="text-center py-16 text-white/50">Keine Stimmen gefunden. Filter anpassen.</div>
+            <div className="text-center py-16 text-white/50">{tx({ de: "Keine Stimmen gefunden. Filter anpassen.", en: "No voices found. Adjust filter.", es: "No se encontraron voces. Ajustar el filtro." })}</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
               {voices.map((v) => {

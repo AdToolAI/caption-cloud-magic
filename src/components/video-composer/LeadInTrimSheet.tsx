@@ -51,7 +51,7 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
       const { trimSeconds } = await detectLeadInTrim(scene.clipUrl);
       setTrim(trimSeconds);
       toast({
-        title: trimSeconds > 0 ? `✂️ Lead-In erkannt: ${trimSeconds}s` : 'Kein Freeze erkannt',
+        title: trimSeconds > 0 ? tx({ de: `✂️ Lead-In erkannt: ${trimSeconds}s`, en: `✂️ Lead-in detected: ${trimSeconds}s`, es: `✂️ Lead-in detectado: ${trimSeconds}s` }) : tx({ de: "Kein Freeze erkannt", en: "No freeze detected", es: "No se detectó congelamiento" }),
         description: trimSeconds > 0
           ? tx({ de: 'Slider angepasst. „Speichern" zum Übernehmen.', en: 'Slider adjusted. "Save" to apply.', es: 'Control deslizante ajustado. "Guardar" para aplicar.' })
           : tx({ de: 'Der Clip startet sauber mit Bewegung.', en: 'The clip starts cleanly with movement.', es: 'El clip comienza limpiamente con movimiento.' }),
@@ -99,7 +99,7 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
             Smart-Trim · Lead-In
           </SheetTitle>
           <SheetDescription>
-            Schneidet eingefrorene Anfangsframes ab, die i2v-Modelle (Hailuo, Kling, Wan, …) zwischen Referenzbild und erster Bewegung produzieren.
+            tx({ de: "Schneidet eingefrorene Anfangsframes ab, die i2v-Modelle (Hailuo, Kling, Wan, …) zwischen Referenzbild und erster Bewegung produzieren.", en: "Cuts off frozen start frames produced by i2v models (Hailuo, Kling, Wan, ...) between reference image and first movement.", es: "Corta los fotogramas iniciales congelados que producen los modelos i2v (Hailuo, Kling, Wan, ...) entre la imagen de referencia y el primer movimiento." })
           </SheetDescription>
         </SheetHeader>
 
@@ -123,7 +123,7 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Trim am Anfang</span>
+            <span className="text-xs text-muted-foreground">{tx({ de: "Trim am Anfang", en: "Trim at start", es: "Recortar al principio" })}</span>
             <span className="text-sm font-mono text-amber-300 tabular-nums">{trim.toFixed(2)}s</span>
           </div>
           <Slider

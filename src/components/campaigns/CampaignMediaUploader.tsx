@@ -42,7 +42,7 @@ export function CampaignMediaUploader({
     
     // Validate file count
     if (uploadedMedia.length + files.length > maxFiles) {
-      toast.error(`Maximal ${maxFiles} Dateien erlaubt`);
+      toast.error(tx({ de: `Maximal ${maxFiles} Dateien erlaubt`, en: `Maximum ${maxFiles} files allowed`, es: `Máximo ${maxFiles} archivos permitidos` }));
       return;
     }
 
@@ -88,7 +88,7 @@ export function CampaignMediaUploader({
       setUploadedMedia(updated);
       onMediaChange(updated);
       
-      toast.success(`${files.length} Datei(en) hinzugefügt`);
+      toast.success(tx({ de: `${files.length} Datei(en) hinzugefügt`, en: `${files.length} file(s) added`, es: `${files.length} archivo(s) añadido(s)` }));
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(tr({ de: 'Fehler beim Hochladen', en: 'Error uploading', es: 'Error al subir' }));
@@ -192,7 +192,7 @@ export function CampaignMediaUploader({
       <Dialog open={titleDialogOpen} onOpenChange={setTitleDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Titel bearbeiten</DialogTitle>
+            <DialogTitle>{tr({ de: "Titel bearbeiten", en: "Edit title", es: "Editar título" })}</DialogTitle>
           </DialogHeader>
           
           {editingMedia && (
@@ -212,17 +212,17 @@ export function CampaignMediaUploader({
               </div>
               
               <div>
-                <Label>Titel</Label>
+                <Label>{tr({ de: "Titel", en: "Title", es: "Título" })}</Label>
                 <Input
                   value={editingMedia.title}
                   onChange={(e) => {
                     setEditingMedia({ ...editingMedia, title: e.target.value });
                   }}
-                  placeholder="z.B. 'Produktvorstellung Sommer 2025'"
+                  placeholder={tr({ de: "z.B. 'Produktvorstellung Sommer 2025'", en: "e.g. 'Product presentation summer 2025'", es: "p. ej. 'Presentación de producto verano 2025'" })}
                   className="mt-2"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Dateiname: {editingMedia.fileName}
+                  {tr({ de: "Dateiname", en: "Filename", es: "Nombre de archivo" })}: {editingMedia.fileName}
                 </p>
               </div>
             </div>
@@ -243,7 +243,7 @@ export function CampaignMediaUploader({
                 setUploadedMedia(updated);
                 onMediaChange(updated);
                 setTitleDialogOpen(false);
-                toast.success('Titel aktualisiert');
+                toast.success(tr({ de: "Titel aktualisiert", en: "Title updated", es: "Título actualizado" }));
               }
             }}>
               Speichern

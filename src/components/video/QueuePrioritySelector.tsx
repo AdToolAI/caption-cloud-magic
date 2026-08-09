@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUp, ArrowDown, Minus, Zap } from 'lucide-react';
@@ -12,32 +13,32 @@ interface QueuePrioritySelectorProps {
 
 const PRIORITY_CONFIG = {
   low: {
-    label: 'Niedrig',
+    label: tx({ de: 'Niedrig', en: 'Low', es: 'Bajo' }),
     icon: ArrowDown,
     color: 'text-muted-foreground',
     badgeVariant: 'secondary' as const,
-    description: 'Wird später verarbeitet'
+    description: tx({ de: 'Wird später verarbeitet', en: 'Processed later', es: 'Se procesará más tarde' })
   },
   normal: {
-    label: 'Normal',
+    label: tx({ de: 'Normal', en: 'Normal', es: 'Normal' }),
     icon: Minus,
     color: 'text-foreground',
     badgeVariant: 'outline' as const,
-    description: 'Standard Priorität'
+    description: tx({ de: 'Standard Priorität', en: 'Standard priority', es: 'Prioridad estándar' })
   },
   high: {
-    label: 'Hoch',
+    label: tx({ de: 'Hoch', en: 'High', es: 'Alto' }),
     icon: ArrowUp,
     color: 'text-orange-500',
     badgeVariant: 'default' as const,
-    description: 'Wird bevorzugt verarbeitet'
+    description: tx({ de: 'Wird bevorzugt verarbeitet', en: 'Prioritized processing', es: 'Procesamiento prioritario' })
   },
   urgent: {
-    label: 'Dringend',
+    label: tx({ de: 'Dringend', en: 'Urgent', es: 'Urgente' }),
     icon: Zap,
     color: 'text-red-500',
     badgeVariant: 'destructive' as const,
-    description: 'Höchste Priorität'
+    description: tx({ de: 'Höchste Priorität', en: 'Highest priority', es: 'Máxima prioridad' })
   }
 };
 

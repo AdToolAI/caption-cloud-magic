@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X, ArrowRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,8 +54,8 @@ export function ProactiveAlertBanner() {
             <div className="flex items-center gap-2 mb-1">
               <h4 className="font-semibold text-foreground">
                 {errorCount > 0 
-                  ? `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'} erkannt`
-                  : `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}`
+                  ? `${errorCount} kritische${{errorCount > 1 ? tx({ de: ' Probleme', en: ' problems', es: ' problemas' }) : tx({ de: 's Problem', en: ' problem', es: ' problema' })}} tx({ de: 'erkannt', en: 'detected', es: 'detectado' })`
+                  : `${warningCount} tx({ de: 'Warnung', en: 'Warning', es: 'Advertencia' })${{warningCount > 1 ? tx({ de: 'en', en: 's', es: 's' }) : ''}}`
                 }
               </h4>
               {isLoading && (
@@ -86,7 +87,7 @@ export function ProactiveAlertBanner() {
                 ))}
                 {diagnostics.length > 3 && (
                   <span className="text-xs px-2 py-1 text-muted-foreground">
-                    +{diagnostics.length - 3} weitere
+                    +{diagnostics.length - 3} {tx({ de: 'weitere', en: 'more', es: 'más' })}
                   </span>
                 )}
               </div>
@@ -101,7 +102,7 @@ export function ProactiveAlertBanner() {
                   className="gap-1"
                   onClick={() => navigate(criticalIssue.action!)}
                 >
-                  {criticalIssue.actionLabel || 'Jetzt beheben'}
+                  {criticalIssue.actionLabel || tx({ de: 'Jetzt beheben', en: 'Fix now', es: 'Corregir ahora' })}
                   <ArrowRight className="w-3 h-3" />
                 </Button>
               )}
@@ -112,7 +113,7 @@ export function ProactiveAlertBanner() {
                 disabled={isLoading}
               >
                 <RefreshCw className={cn("w-3 h-3 mr-1", isLoading && "animate-spin")} />
-                Prüfen
+                {tx({ de: 'Prüfen', en: 'Check', es: 'Comprobar' })}
               </Button>
             </div>
           </div>

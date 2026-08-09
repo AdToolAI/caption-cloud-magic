@@ -46,9 +46,9 @@ type StepId = 'cast' | 'location' | 'storyboard' | 'render';
 
 const STEPS: { id: StepId; title: string; subtitle: string; icon: typeof Users }[] = [
   { id: 'cast', title: 'Cast', subtitle: tx({ de: 'Wer spielt mit?', en: 'Who is playing?', es: '¿Quién está jugando?' }), icon: Users },
-  { id: 'location', title: 'Location', subtitle: 'Wo spielt es?', icon: MapPin },
-  { id: 'storyboard', title: 'Storyboard', subtitle: 'Was passiert?', icon: Clapperboard },
-  { id: 'render', title: 'Render', subtitle: 'Jetzt produzieren', icon: Sparkles },
+  { id: 'location', title: 'Location', subtitle: tx({ de: "Wo spielt es?", en: "Where is it playing?", es: "¿Dónde se está reproduciendo?" }), icon: MapPin },
+  { id: 'storyboard', title: 'Storyboard', subtitle: tx({ de: "Was passiert?", en: "What happens?", es: "¿Qué pasa?" }), icon: Clapperboard },
+  { id: 'render', title: 'Render', subtitle: tx({ de: "Jetzt produzieren", en: "Produce now", es: "Producir ahora" }), icon: Sparkles },
 ];
 
 interface DraftScene {
@@ -156,7 +156,7 @@ export default function StudioMode() {
     if (snippet.location_id && !selectedLocationId) {
       setSelectedLocationId(snippet.location_id);
     }
-    toast.success(`„${snippet.name}" eingefügt`);
+    toast.success(tx({ de: `„${snippet.name}" eingefügt`, en: `"${snippet.name}" inserted`, es: `"${snippet.name}" insertado` }));
   };
 
   const launchInComposer = async () => {
@@ -263,7 +263,7 @@ export default function StudioMode() {
         console.warn('[studio-mode] scene seed failed:', scErr);
       }
 
-      toast.success('Studio-Projekt angelegt – willkommen im Composer ✨');
+      toast.success(tx({ de: 'Studio-Projekt angelegt – willkommen im Composer ✨', en: 'Studio project created – welcome to Composer ✨', es: 'Proyecto de estudio creado: bienvenido a Composer ✨' }));
       navigate(`/video-composer?project=${inserted.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
@@ -367,7 +367,7 @@ export default function StudioMode() {
               Zurück
             </Button>
             <div className="text-xs text-muted-foreground hidden sm:block">
-              Schritt {stepIndex + 1} von {STEPS.length} · {STEPS[stepIndex].title}
+              Schritt {stepIndex + 1} tx({ de: "von", en: "of", es: "de" }) {STEPS.length} · {STEPS[stepIndex].title}
             </div>
             {!isLast ? (
               <Button onClick={goNext} disabled={!canAdvance} className="gap-2">

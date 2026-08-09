@@ -49,7 +49,7 @@ export function useRecurringEvents(workspace_id?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurring-event-rules'] });
       toast({
-        title: '✅ Recurring Rule erstellt',
+        title: tx({ de: '✅ Recurring Rule erstellt', en: '✅ Recurring Rule created', es: '✅ Regla recurrente creada' }),
         description: tx({ de: 'Automatische Events werden jetzt generiert', en: 'Automatic events are now being generated', es: 'Se están generando eventos automáticos' }),
       });
     },
@@ -75,8 +75,8 @@ export function useRecurringEvents(workspace_id?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurring-event-rules'] });
       toast({
-        title: 'Status geändert',
-        description: 'Recurring Rule aktualisiert',
+        title: tx({ de: 'Status geändert', en: 'Status changed', es: 'Estado cambiado' }),
+        description: tx({ de: 'Recurring Rule aktualisiert', en: 'Recurring Rule updated', es: 'Regla recurrente actualizada' }),
       });
     },
   });
@@ -94,7 +94,7 @@ export function useRecurringEvents(workspace_id?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurring-event-rules'] });
       toast({
-        title: '🗑️ Regel gelöscht',
+        title: tx({ de: '🗑️ Regel gelöscht', en: '🗑️ Rule deleted', es: '🗑️ Regla eliminada' }),
         description: tx({ de: 'Recurring Rule wurde entfernt', en: 'Recurring Rule has been removed', es: 'Se ha eliminado la regla recurrente.' }),
       });
     },

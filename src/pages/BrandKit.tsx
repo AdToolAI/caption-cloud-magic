@@ -270,7 +270,7 @@ const BrandKit = () => {
   const handleExportPDF = () => {
     toast({
       title: tx({ de: "Export wird vorbereitet", en: "Export is being prepared", es: "Se está preparando la exportación." }),
-      description: "PDF-Export kommt in Kürze"
+      description: tx({ de: 'PDF-Export kommt in Kürze', en: 'PDF export coming soon', es: 'La exportación a PDF estará disponible pronto' })
     });
   };
 
@@ -286,7 +286,7 @@ const BrandKit = () => {
       brandValues: dna.values?.length ? dna.values : prev.brandValues,
     }));
     toast({
-      title: "Brand DNA übernommen",
+      title: tx({ de: 'Brand DNA übernommen', en: 'Brand DNA applied', es: 'Brand DNA aplicado' }),
       description: tx({ de: "Das Formular wurde mit den extrahierten Werten vorausgefüllt.", en: "The form was pre-filled with the extracted values.", es: "El formulario se rellenó con los valores extraídos." }),
     });
   };
@@ -446,23 +446,23 @@ const BrandKit = () => {
                   <div className="p-6 border-b border-white/10">
                     <h3 className="text-xl font-semibold">{tx({ de: "Neues Marken-Set erstellen", en: "Create a new brand set", es: "Crear un nuevo conjunto de marcas" })}</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Fülle die Informationen aus oder nutze den Wizard
+                      {tx({ de: 'Fülle die Informationen aus oder nutze den Wizard', en: 'Fill in the information or use the wizard', es: 'Completa la información o usa el asistente' })}
                     </p>
                   </div>
                   <div className="p-6 space-y-5">
                     <div>
-                      <Label htmlFor="brandName" className="text-sm font-medium">Markenname *</Label>
+                      <Label htmlFor="brandName" className="text-sm font-medium">{tx({ de: 'Markenname *', en: 'Brand name *', es: 'Nombre de la marca *' })}</Label>
                       <Input
                         id="brandName"
                         value={formData.brandName}
                         onChange={(e) => setFormData({ ...formData, brandName: e.target.value })}
-                        placeholder="z.B. Fashion Studio Berlin"
+                        placeholder={tx({ de: 'z.B. Fashion Studio Berlin', en: 'e.g. Fashion Studio Berlin', es: 'p. ej. Fashion Studio Berlin' })}
                         className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
                       />
                     </div>
 
                     <div>
-                      <Label htmlFor="logo">Logo hochladen</Label>
+                      <Label htmlFor="logo">{tx({ de: 'Logo hochladen', en: 'Upload logo', es: 'Subir logo' })}</Label>
                       <div className="mt-2">
                         {logoPreview ? (
                           <div className="relative w-32 h-32 rounded-xl overflow-hidden border-2 border-primary/30 shadow-[0_0_15px_hsla(43,90%,68%,0.15)]">

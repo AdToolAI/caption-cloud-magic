@@ -167,7 +167,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
     if (error) {
       toast.error(tx({ de: "Fehler beim Erstellen", en: "Error creating", es: "Error al crear" }));
     } else {
-      toast.success("Album erstellt! 📁");
+      toast.success(tx({ de: 'Album erstellt! 📁', en: 'Album created! 📁', es: '¡Álbum creado! 📁' }));
       setNewAlbumName("");
       setShowCreateDialog(false);
       loadAlbums();
@@ -183,7 +183,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
     }
     const { error } = await supabase.from('studio_albums').delete().eq('id', albumId);
     if (!error) {
-      toast.success("Album gelöscht");
+      toast.success(tx({ de: 'Album gelöscht', en: 'Album deleted', es: 'Álbum eliminado' }));
       setSelectedAlbum(null);
       loadAlbums();
     }
@@ -264,7 +264,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => setSelectedAlbum(null)}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Zurück
+            <ArrowLeft className="h-4 w-4 mr-1" /> {tx({ de: 'Zurück', en: 'Back', es: 'Atrás' })}
           </Button>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             {selectedAlbum.name}
@@ -319,9 +319,9 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Meine Alben</h3>
+        <h3 className="text-lg font-semibold">{tx({ de: 'Meine Alben', en: 'My Albums', es: 'Mis álbumes' })}</h3>
         <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
-          <FolderPlus className="h-4 w-4 mr-1" /> Neues Album
+          <FolderPlus className="h-4 w-4 mr-1" /> {tx({ de: 'Neues Album', en: 'New Album', es: 'Nuevo álbum' })}
         </Button>
       </div>
 
@@ -370,7 +370,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
               </div>
               <CardContent className="p-3">
                 <p className="font-medium text-sm truncate">{album.name}</p>
-                <p className="text-xs text-muted-foreground">{album.image_count || 0} Bilder</p>
+                <p className="text-xs text-muted-foreground">{album.image_count || 0} {tx({ de: 'Bilder', en: 'Images', es: 'Imágenes' })}</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -380,7 +380,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       {/* Unsorted Images */}
       {unsortedImages.length > 0 && (
         <div>
-          <h4 className="text-md font-medium mb-3 text-muted-foreground">Unsortierte Bilder ({unsortedImages.length})</h4>
+          <h4 className="text-md font-medium mb-3 text-muted-foreground">tx({ de: 'Unsortierte Bilder', en: 'Unsorted Images', es: 'Imágenes sin clasificar' }) ({unsortedImages.length})</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <AnimatePresence>
               {unsortedImages.map((img, i) => (

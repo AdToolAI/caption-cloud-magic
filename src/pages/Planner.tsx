@@ -114,7 +114,7 @@ export default function Planner() {
       const { data: newWorkspace, error } = await supabase
         .from("workspaces")
         .insert({
-          name: "Mein Workspace",
+          name: tx({ de: "Mein Workspace", en: "My Workspace", es: "Mi espacio de trabajo" }),
           owner_id: user?.id,
         })
         .select()
@@ -131,7 +131,7 @@ export default function Planner() {
         });
 
       setWorkspaceId(newWorkspace.id);
-      toast.success("Workspace erstellt");
+      toast.success(tx({ de: "Workspace erstellt", en: "Workspace created", es: "Espacio de trabajo creado" }));
     } catch (error: any) {
       console.error("Error creating workspace:", error);
       toast.error(tx({ de: "Fehler beim Erstellen des Workspace", en: "Failed to create workspace", es: "Error al crear el workspace" }));
@@ -165,7 +165,7 @@ export default function Planner() {
         const { data, error } = await supabase.functions.invoke("planner-upsert-weekplan", {
           body: {
             workspace_id: workspaceId,
-            name: "Mein Content Plan",
+            name: tx({ de: "Mein Content Plan", en: "My Content Plan", es: "Mi plan de contenido" }),
             start_date: startDate.toISOString().split("T")[0],
             weeks: 2,
             timezone: "Europe/Berlin",
@@ -182,7 +182,7 @@ export default function Planner() {
             .from("weekplans")
             .insert({
               workspace_id: workspaceId,
-              name: "Mein Content Plan",
+              name: tx({ de: "Mein Content Plan", en: "My Content Plan", es: "Mi plan de contenido" }),
               start_date: startDate.toISOString().split("T")[0],
               weeks: 2,
               timezone: "Europe/Berlin",
@@ -201,13 +201,13 @@ export default function Planner() {
             console.log("Weekplan created successfully:", newPlan.id);
             setWeekplan(newPlan);
             setBlocks([]);
-            toast.success("Content Plan erstellt");
+            toast.success(tx({ de: "Content Plan erstellt", en: "Content Plan created", es: "Plan de contenido creado" }));
           }
         } else if (data) {
           console.log("Weekplan created via edge function:", data.id);
           setWeekplan(data);
           setBlocks([]);
-          toast.success("Content Plan erstellt");
+          toast.success(tx({ de: "Content Plan erstellt", en: "Content Plan created", es: "Plan de contenido creado" }));
         }
       }
     } catch (error: any) {
@@ -271,7 +271,7 @@ export default function Planner() {
     if (result) {
       trackProjectCreate('post', weekplan.id);
       loadBlocks(weekplan.id);
-      toast.success("Post geplant");
+      toast.success(tx({ de: "Post geplant", en: "Post scheduled", es: "Publicación programada" }));
     } else {
       toast.error(tx({ de: "Unerwartetes Problem beim Speichern", en: "Unexpected problem saving", es: "Problema inesperado al guardar" }));
     }
@@ -300,7 +300,7 @@ export default function Planner() {
   const handleBlockDelete = async (blockId: string) => {
     if (!workspaceId || !weekplan) return;
 
-    const loadingToast = toast.loading("Lösche Post...");
+    const loadingToast = toast.loading(tx({ de: "Lösche Post...", en: "Deleting post...", es: "Eliminando publicación..." }));
 
     try {
       const { error } = await supabase
@@ -346,7 +346,7 @@ export default function Planner() {
 
     if (data) {
       setWeekplan(data);
-      toast.success("Zeitraum aktualisiert");
+      toast.success(tx({ de: "Zeitraum aktualisiert", en: "Period updated", es: "Período actualizado" }));
     }
   };
 
@@ -387,7 +387,7 @@ export default function Planner() {
     const mode = hasExistingBlocks ? "redistribute" : "new";
 
     const loadingToast = toast.loading(
-      mode === "redistribute" ? "Verteile Posts neu..." : "Lade AI-Empfehlungen..."
+      mode === "redistribute" ? tx({ de: "Verteile Posts neu...", en: "Redistributing posts...", es: "Redistribuyendo publicaciones..." }) : tx({ de: "Lade AI-Empfehlungen...", en: "Loading AI recommendations...", es: "Cargando recomendaciones de IA..." })
     );
 
     try {

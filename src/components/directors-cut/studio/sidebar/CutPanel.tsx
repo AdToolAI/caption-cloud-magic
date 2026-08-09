@@ -58,7 +58,7 @@ const formatTime = (s: number) => {
 };
 
 const TRANSITION_TYPES: { id: TransitionId; name: string }[] = [
-  { id: 'none', name: 'Keine' },
+  { id: 'none', name: tx({ de: 'Keine', en: 'None', es: 'Ninguno' }) },
   { id: 'fade', name: 'Fade' },
   { id: 'crossfade', name: 'Crossfade' },
   { id: 'slide', name: 'Slide' },
@@ -175,7 +175,7 @@ const TransitionBlock: React.FC<{
                     onClick={() => applyDuration(activeDuration - 0.1)}
                     disabled={activeDuration <= MIN_TRANSITION_DURATION}
                     className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-sm leading-none flex items-center justify-center"
-                    aria-label="Kürzer"
+                    aria-label={tx({ de: "Kürzer", en: "Shorter", es: "Más corto" })}
                   >
                     −
                   </button>
@@ -205,7 +205,7 @@ const TransitionBlock: React.FC<{
                     onClick={() => applyDuration(activeDuration + 0.1)}
                     disabled={activeDuration >= MAX_TRANSITION_DURATION}
                     className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-sm leading-none flex items-center justify-center"
-                    aria-label="Länger"
+                    aria-label={tx({ de: "Länger", en: "Longer", es: "Más largo" })}
                   >
                     +
                   </button>
@@ -228,14 +228,14 @@ const TransitionBlock: React.FC<{
               {/* Visual transition window preview */}
               <div className="pt-1">
                 <div className="flex items-center justify-between text-[8px] text-white/30 mb-1 uppercase tracking-wider">
-                  <span>Übergangsfenster</span>
+                  <span>{tx({ de: "Übergangsfenster", en: "Transition window", es: "Ventana de transición" })}</span>
                   <span className={cn(
                     "rounded px-1 py-0.5 normal-case tracking-normal",
                     resolvedTransition?.placement === 'centered'
                       ? "bg-emerald-500/10 text-emerald-300"
                       : "bg-cyan-500/10 text-cyan-300"
                   )}>
-                    {resolvedTransition?.placement === 'centered' ? 'NLE-zentriert' : 'ab Schnittkante'}
+                    {resolvedTransition?.placement === 'centered' ? tx({ de: 'NLE-zentriert', en: 'NLE centered', es: 'Centrado en NLE' }) : tx({ de: 'ab Schnittkante', en: 'From cut edge', es: 'Desde el borde del corte' })}
                   </span>
                 </div>
                 <div className="relative h-4 rounded overflow-hidden bg-black/40 border border-white/5">
@@ -251,7 +251,7 @@ const TransitionBlock: React.FC<{
                 </div>
                 {resolvedTransition?.placement !== 'centered' && (
                   <p className="mt-1 text-[8px] leading-snug text-white/35">
-                    Keine freien Handles erkannt – deshalb sauberer Edge-Übergang statt zu frühem Vorziehen.
+                    tx({ de: "Keine freien Handles erkannt – deshalb sauberer Edge-Übergang statt zu frühem Vorziehen.", en: "No free handles detected – therefore clean edge transition instead of premature pull-forward.", es: "No se detectaron tiradores libres; por lo tanto, transición de borde limpia en lugar de adelantamiento prematuro." })
                   </p>
                 )}
               </div>

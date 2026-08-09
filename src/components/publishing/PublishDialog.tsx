@@ -87,7 +87,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>🚀 Auf Social Media veröffentlichen</DialogTitle>
+          <DialogTitle>{tx({ de: '🚀 Auf Social Media veröffentlichen', en: '🚀 Publish on social media', es: '🚀 Publicar en redes sociales' })}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -121,7 +121,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
 
           {/* Video Preview */}
           <div>
-            <Label className="mb-2 block">Video Vorschau</Label>
+            <Label className="mb-2 block">{tx({ de: 'Video Vorschau', en: 'Video preview', es: 'Vista previa de vídeo' })}</Label>
             <video
               src={videoUrl}
               controls
@@ -132,10 +132,10 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
           {/* Content Fields */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Titel (YouTube)</Label>
+              <Label htmlFor="title">{tx({ de: 'Titel (YouTube)', en: 'Title (YouTube)', es: 'Título (YouTube)' })}</Label>
               <Input
                 id="title"
-                placeholder="Video Titel..."
+                placeholder={tx({ de: "Video Titel...", en: "Video title...", es: "Título del vídeo..." })}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={100}
@@ -144,10 +144,10 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="caption">Caption / Beschreibung</Label>
+              <Label htmlFor="caption">{tx({ de: 'Caption / Beschreibung', en: 'Caption / Description', es: 'Subtítulo / Descripción' })}</Label>
               <Textarea
                 id="caption"
-                placeholder="Deine Caption..."
+                placeholder={tx({ de: "Deine Caption...", en: "Your caption...", es: "Tu subtítulo..." })}
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
                 rows={4}
@@ -157,7 +157,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Erweiterte Beschreibung (YouTube)</Label>
+              <Label htmlFor="description">{tx({ de: 'Erweiterte Beschreibung (YouTube)', en: 'Enhanced description (YouTube)', es: 'Descripción mejorada (YouTube)' })}</Label>
               <Textarea
                 id="description"
                 placeholder={tx({ de: "Detaillierte Beschreibung für YouTube...", en: "Detailed description for YouTube...", es: "Descripción detallada de YouTube..." })}
@@ -168,7 +168,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="hashtags">Hashtags</Label>
+              <Label htmlFor="hashtags">{tx({ de: 'Hashtags', en: 'Hashtags', es: 'Hashtags' })}</Label>
               <Input
                 id="hashtags"
                 placeholder="#hashtag1 #hashtag2 #hashtag3"
@@ -184,7 +184,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="aspect-ratio">Aspect Ratio (Instagram)</Label>
+                <Label htmlFor="aspect-ratio">{tx({ de: 'Aspect Ratio (Instagram)', en: 'Aspect ratio (Instagram)', es: 'Relación de aspecto (Instagram)' })}</Label>
                 <Select value={aspectRatio} onValueChange={setAspectRatio}>
                   <SelectTrigger>
                     <SelectValue />
@@ -199,17 +199,17 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="privacy">Sichtbarkeit</Label>
+                <Label htmlFor="privacy">{tx({ de: 'Sichtbarkeit', en: 'Visibility', es: 'Visibilidad' })}</Label>
                 <Select value={privacyLevel} onValueChange={setPrivacyLevel}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PUBLIC">Öffentlich</SelectItem>
-                    <SelectItem value="PRIVATE">Privat</SelectItem>
-                    <SelectItem value="FRIENDS">Freunde (TikTok)</SelectItem>
-                    <SelectItem value="CONNECTIONS">Kontakte (LinkedIn)</SelectItem>
-                    <SelectItem value="unlisted">Nicht gelistet (YouTube)</SelectItem>
+                    <SelectItem value="PUBLIC">{tx({ de: 'Öffentlich', en: 'Public', es: 'Público' })}</SelectItem>
+                    <SelectItem value="PRIVATE">{tx({ de: 'Privat', en: 'Private', es: 'Privado' })}</SelectItem>
+                    <SelectItem value="FRIENDS">{tx({ de: 'Freunde (TikTok)', en: 'Friends (TikTok)', es: 'Amigos (TikTok)' })}</SelectItem>
+                    <SelectItem value="CONNECTIONS">{tx({ de: 'Kontakte (LinkedIn)', en: 'Contacts (LinkedIn)', es: 'Contactos (LinkedIn)' })}</SelectItem>
+                    <SelectItem value="unlisted">{tx({ de: 'Nicht gelistet (YouTube)', en: 'Unlisted (YouTube)', es: 'No listado (YouTube)' })}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -233,7 +233,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  Auf {selectedPlatforms.length} {selectedPlatforms.length === 1 ? 'Plattform' : 'Plattformen'} veröffentlichen
+                  tx({ de: `Auf ${selectedPlatforms.length} Plattform${selectedPlatforms.length === 1 ? '' : 'en'} veröffentlichen`, en: `Publish on ${selectedPlatforms.length} platform${selectedPlatforms.length === 1 ? '' : 's'}`, es: `Publicar en ${selectedPlatforms.length} plataforma${selectedPlatforms.length === 1 ? '' : 's'}` })
                 </>
               )}
             </Button>

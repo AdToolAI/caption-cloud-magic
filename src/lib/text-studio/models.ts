@@ -49,9 +49,9 @@ export const PROVIDER_LABELS: Record<TextProviderKey, string> = {
 };
 
 export const TIER_LABELS: Record<TextTier, string> = {
-  fast: "Schnell",
-  balanced: "Ausgewogen",
-  max: "Maximum",
+  fast: tx({ de: 'Schnell', en: 'Fast', es: 'Rápido' }),
+  balanced: tx({ de: 'Ausgewogen', en: 'Balanced', es: 'Equilibrado' }),
+  max: tx({ de: 'Maximum', en: 'Maximum', es: 'Máximo' }),
 };
 
 export const TIER_DESCRIPTIONS: Record<TextTier, string> = {
@@ -199,17 +199,17 @@ export function resolveModelId(id: string | null | undefined): TextModelId {
 export type ReasoningEffort = "none" | "low" | "medium" | "high";
 export const REASONING_EFFORT_OPTIONS: ReasoningEffort[] = ["none", "low", "medium", "high"];
 export const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = {
-  none: "Aus",
-  low: "Leicht",
-  medium: "Mittel",
-  high: "Tief",
+  none: tx({ de: 'Aus', en: 'Off', es: 'Desactivado' }),
+  low: tx({ de: 'Leicht', en: 'Low', es: 'Bajo' }),
+  medium: tx({ de: 'Mittel', en: 'Medium', es: 'Medio' }),
+  high: tx({ de: 'Tief', en: 'High', es: 'Alto' }),
 };
 
 export type ResponseLength = "short" | "normal" | "long";
 export const RESPONSE_LENGTH_LABELS: Record<ResponseLength, string> = {
-  short: "Kurz",
-  normal: "Normal",
-  long: "Ausführlich",
+  short: tx({ de: 'Kurz', en: 'Short', es: 'Corto' }),
+  normal: tx({ de: 'Normal', en: 'Normal', es: 'Normal' }),
+  long: tx({ de: 'Ausführlich', en: 'Long', es: 'Extenso' }),
 };
 export const RESPONSE_LENGTH_TOKENS: Record<ResponseLength, number> = {
   short: 600,
@@ -219,9 +219,9 @@ export const RESPONSE_LENGTH_TOKENS: Record<ResponseLength, number> = {
 
 export type CreativityLevel = "precise" | "balanced" | "creative";
 export const CREATIVITY_LABELS: Record<CreativityLevel, string> = {
-  precise: "Präzise",
-  balanced: "Ausgewogen",
-  creative: "Kreativ",
+  precise: tx({ de: 'Präzise', en: 'Precise', es: 'Preciso' }),
+  balanced: tx({ de: 'Ausgewogen', en: 'Balanced', es: 'Equilibrado' }),
+  creative: tx({ de: 'Kreativ', en: 'Creative', es: 'Creativo' }),
 };
 export const CREATIVITY_TEMPERATURE: Record<CreativityLevel, number> = {
   precise: 0.2,

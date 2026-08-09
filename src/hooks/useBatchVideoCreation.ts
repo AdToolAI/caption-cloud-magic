@@ -35,7 +35,7 @@ export const useBatchVideoCreation = () => {
       if (!data.ok) {
         if (data.error === 'INSUFFICIENT_CREDITS') {
           toast({
-            title: 'Nicht genügend Credits',
+            title: tx({ de: "Nicht genügend Credits", en: "Insufficient credits", es: "Créditos insuficientes" }),
             description: data.message,
             variant: 'destructive'
           });
@@ -43,7 +43,7 @@ export const useBatchVideoCreation = () => {
         }
         if (data.error === 'VALIDATION_ERROR') {
           toast({
-            title: 'CSV Validierungsfehler',
+            title: tx({ de: "CSV Validierungsfehler", en: "CSV validation error", es: "Error de validación de CSV" }),
             description: tx({ de: `${data.message}. Erste Fehler: ${data.details?.join(', ')}`, en: `${data.message}. First error: ${data.details?.join(', ')}`, es: `${data.message}. Primer error: ${data.details?.join(', ')}` }),
             variant: 'destructive'
           });

@@ -30,7 +30,7 @@ export default function DirectorBar() {
           <div className="flex items-center gap-2">
             <div className="h-1.5 w-1.5 rounded-full bg-[hsl(43_90%_68%)] animate-pulse" />
             <span className="font-mono text-[10px] uppercase tracking-[0.35em] text-[hsl(43_90%_68%)]/80">
-              Sound Stage · Live
+              {tx({ de: "Sound Stage · Live", en: "Sound Stage · Live", es: "Plató de sonido · En vivo" })}
             </span>
           </div>
         </div>
@@ -78,9 +78,9 @@ function ModeSwitch({
   onChange: (m: EditorMode) => void;
 }) {
   const modes: { id: EditorMode; label: string; hint: string }[] = [
-    { id: "quick", label: "Quick", hint: "Ein Prompt, fertig" },
-    { id: "direct", label: "Direct", hint: "Cast + Style + Dauer" },
-    { id: "studio", label: "Studio", hint: "Volle Regie" },
+    { id: "quick", label: "Quick", hint: tx({ de: "Ein Prompt, fertig", en: "One prompt, done", es: "Un prompt, listo" }) },
+    { id: "direct", label: "Direct", hint: tx({ de: "Cast + Style + Dauer", en: "Cast + Style + Duration", es: "Elenco + Estilo + Duración" }) },
+    { id: "studio", label: "Studio", hint: tx({ de: "Volle Regie", en: "Full Direction", es: "Dirección completa" }) },
   ];
 
   return (

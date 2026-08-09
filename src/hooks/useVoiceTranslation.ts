@@ -32,7 +32,7 @@ export function useVoiceTranslation() {
       });
 
       toast({
-        title: 'Übersetzung & Voiceover erstellt',
+        title: tx({ de: "Übersetzung & Voiceover erstellt", en: "Translation & voiceover created", es: "Traducción y voz en off creadas" }),
         description: tx({ de: `Text wurde nach ${params.target_language} übersetzt`, en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }),
       });
 

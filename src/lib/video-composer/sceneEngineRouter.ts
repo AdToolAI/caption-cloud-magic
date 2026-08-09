@@ -109,23 +109,23 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
   if (override === 'broll') {
     return {
       engine: 'broll',
-      label: '🎬 B-Roll (manuell)',
-      reason: 'Vom Nutzer erzwungen — kein Lip-Sync, klassischer B-Roll-Render.',
+      label: tx({ de: '🎬 B-Roll (manuell)', en: '🎬 B-roll (manual)', es: '🎬 B-roll (manual)' }),
+      reason: tx({ de: 'Vom Nutzer erzwungen — kein Lip-Sync, klassischer B-Roll-Render.', en: 'Enforced by user — no lip sync, classic B-roll render.', es: 'Forzado por el usuario: sin sincronización labial, renderizado B-roll clásico.' }),
       extraCostEur: 0,
     };
   }
   if (override === 'sync-polish') {
     return {
       engine: 'sync-polish',
-      label: '✨ Sync.so Polish (manuell)',
-      reason: 'Vom Nutzer erzwungen — Hailuo + Sync.so Polish-Pass.',
+      label: tx({ de: '✨ Sync.so Polish (manuell)', en: '✨ Sync.so Polish (manual)', es: '✨ Sync.so Polish (manual)' }),
+      reason: tx({ de: 'Vom Nutzer erzwungen — Hailuo + Sync.so Polish-Pass.', en: 'Enforced by user — Hailuo + Sync.so Polish pass.', es: 'Forzado por el usuario — pase de pulido de Hailuo + Sync.so.' }),
       extraCostEur: 0.05,
     };
   }
   if (override === 'cinematic-sync' || override === 'sync-segments') {
     return {
       engine: 'sync-segments',
-      label: speakers >= 2 ? `⚡ Fast Dialog · ${speakers} Sprecher (1-Call)` : '⚡ Fast Dialog · 1-Call',
+      label: speakers >= 2 ? tx({ de: `⚡ Fast Dialog · ${speakers} Sprecher (1-Call)`, en: `⚡ Fast Dialog · ${speakers} speakers (1-call)`, es: `⚡ Diálogo rápido · ${speakers} oradores (1 llamada)` }) : tx({ de: '⚡ Fast Dialog · 1-Call', en: '⚡ Fast Dialog · 1-call', es: '⚡ Diálogo rápido · 1 llamada' }),
       reason:
         tx({ de: 'Sync.so Segments API: ein einziger Lipsync-Call über die Action-Plate mit segments[] pro Sprecher-Turn.', en: 'Sync.so Segments API: a single Lipsync call via the Action-Plate with segments[] per speaker turn.', es: 'API de segmentos de Sync.so: una sola llamada de Lipsync a través de la Action-Plate con segments[] por turno de orador.' }),
       extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
@@ -140,7 +140,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
     if (speakers >= 2) {
       return {
         engine: 'sync-segments',
-        label: `🎬 Action + Lip-Sync · ${speakers} Sprecher`,
+        label: tx({ de: `🎬 Action + Lip-Sync · ${speakers} Sprecher`, en: `🎬 Action + lip sync · ${speakers} speakers`, es: `🎬 Acción + sincronización labial · ${speakers} oradores` }),
         reason:
           tx({ de: 'Sync.so Segments API auf einer Hailuo/HappyHorse-Action-Plate — ein Lipsync-Call mit segments[] pro Sprecher-Turn.', en: 'Sync.so Segments API on a Hailuo/HappyHorse Action-Plate — a Lipsync call with segments[] per speaker turn.', es: 'API de segmentos de Sync.so en una Action-Plate de Hailuo/HappyHorse — una llamada de Lipsync con segments[] por turno de orador.' }),
         extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
@@ -148,7 +148,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
     }
     return {
       engine: 'sync-polish',
-      label: '✨ Sync.so Polish',
+      label: tx({ de: '✨ Sync.so Polish', en: '✨ Sync.so Polish', es: '✨ Sync.so Polish' }),
       reason:
         tx({ de: 'Hailuo/HappyHorse-Plate mit Sync.so Polish-Pass — echte Mundbewegung auf KI-Gesicht.', en: 'Hailuo/HappyHorse Plate with Sync.so Polish Pass — real mouth movement on AI face.', es: 'Hailuo/HappyHorse Plate con Sync.so Polish Pass: movimiento real de la boca en la cara de la IA.' }),
       extraCostEur: 0.05,
@@ -158,7 +158,7 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
   void isStatic;
   return {
     engine: 'broll',
-    label: '🎬 B-Roll',
+    label: tx({ de: '🎬 B-Roll', en: '🎬 B-roll', es: '🎬 B-roll' }),
     reason:
       hasDialog && hasCast
         ? tx({ de: 'Off-Screen-Narration — aktiviere den Lip-Sync-Toggle für echte Mundbewegung.', en: 'Off-screen narration — activate the lip sync toggle for real mouth movement.', es: 'Narración fuera de pantalla: activa la sincronización de labios para un movimiento real de la boca.' })

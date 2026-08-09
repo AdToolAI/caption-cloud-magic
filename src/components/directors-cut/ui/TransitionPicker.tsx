@@ -18,15 +18,15 @@ interface TransitionType {
 const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'none', 
-    name: 'Kein', 
-    description: 'Harter Schnitt',
+    name: tx({ de: "Kein", en: "None", es: "Ninguno" }), 
+    description: tx({ de: "Harter Schnitt", en: "Hard cut", es: "Corte duro" }),
     icon: '—',
     gradient: 'from-slate-500 to-slate-600'
   },
   { 
     id: 'crossfade', 
     name: 'Crossfade', 
-    description: 'Sanfte Überblendung',
+    description: tx({ de: "Sanfte Überblendung", en: "Smooth blend", es: "Mezcla suave" }),
     icon: '✦',
     gradient: 'from-blue-500 to-cyan-500',
     aiScore: 0.92
@@ -34,7 +34,7 @@ const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'fade', 
     name: 'Fade', 
-    description: 'Fade to Black',
+    description: tx({ de: "Fade to Black", en: "Fade to Black", es: "Fundido a negro" }),
     icon: '◐',
     gradient: 'from-slate-700 to-black',
     aiScore: 0.85
@@ -42,7 +42,7 @@ const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'dissolve', 
     name: 'Dissolve', 
-    description: 'Auflösungs-Effekt',
+    description: tx({ de: "Auflösungs-Effekt", en: "Dissolve effect", es: "Efecto de disolución" }),
     icon: '✧',
     gradient: 'from-purple-500 to-pink-500',
     aiScore: 0.88
@@ -50,7 +50,7 @@ const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'wipe', 
     name: 'Wipe', 
-    description: 'Horizontaler Wisch',
+    description: tx({ de: "Horizontaler Wisch", en: "Horizontal wipe", es: "Barrido horizontal" }),
     icon: '▶',
     gradient: 'from-green-500 to-emerald-500',
     aiScore: 0.75
@@ -58,7 +58,7 @@ const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'slide', 
     name: 'Slide', 
-    description: 'Schiebe-Effekt',
+    description: tx({ de: "Schiebe-Effekt", en: "Slide effect", es: "Efecto de diapositiva" }),
     icon: '→',
     gradient: 'from-orange-500 to-amber-500',
     aiScore: 0.70
@@ -66,7 +66,7 @@ const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'blur', 
     name: 'Blur', 
-    description: 'Weichzeichner-Übergang',
+    description: tx({ de: "Weichzeichner-Übergang", en: "Blur transition", es: "Transición de desenfoque" }),
     icon: '◎',
     gradient: 'from-indigo-500 to-blue-500',
     aiScore: 0.78
@@ -74,7 +74,7 @@ const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'zoom', 
     name: 'Zoom', 
-    description: 'Zoom-Übergang',
+    description: tx({ de: "Zoom-Übergang", en: "Zoom transition", es: "Transición de zoom" }),
     icon: '⊕',
     gradient: 'from-teal-500 to-cyan-500',
     aiScore: 0.72
@@ -82,7 +82,7 @@ const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'push', 
     name: 'Push', 
-    description: 'Schub-Effekt',
+    description: tx({ de: "Schub-Effekt", en: "Push effect", es: "Efecto de empuje" }),
     icon: '⇒',
     gradient: 'from-amber-500 to-yellow-500',
     aiScore: 0.68
@@ -90,7 +90,7 @@ const TRANSITION_TYPES: TransitionType[] = [
   { 
     id: 'morph', 
     name: 'AI Morph', 
-    description: 'KI-generierter Übergang',
+    description: tx({ de: "KI-generierter Übergang", en: "AI-generated transition", es: "Transición generada por IA" }),
     icon: '∞',
     gradient: 'from-violet-500 to-fuchsia-500',
     aiScore: 0.95
@@ -137,7 +137,7 @@ export function TransitionPicker({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-semibold text-primary">AI Empfehlung</span>
+                <span className="text-xs font-semibold text-primary">tx({ de: "AI Empfehlung", en: "AI Recommendation", es: "Recomendación de IA" })</span>
                 {aiConfidence && (
                   <Badge 
                     variant="secondary" 
@@ -161,7 +161,7 @@ export function TransitionPicker({
               onClick={() => onTypeChange(aiRecommendation)}
               className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium"
             >
-              Anwenden
+              tx({ de: "Anwenden", en: "Apply", es: "Aplicar" })
             </motion.button>
           </div>
           
@@ -244,8 +244,8 @@ export function TransitionPicker({
           />
           <div className="flex justify-between text-[10px] text-muted-foreground">
             <span>0.1s</span>
-            <span>Schnell</span>
-            <span>Langsam</span>
+            <span>{tx({ de: "Schnell", en: "Fast", es: "Rápido" })}</span>
+            <span>{tx({ de: "Langsam", en: "Slow", es: "Lento" })}</span>
             <span>3.0s</span>
           </div>
         </motion.div>
@@ -262,7 +262,7 @@ export function TransitionPicker({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Timing anpassen</span>
+              <span className="text-sm font-medium">tx({ de: "Timing anpassen", en: "Adjust timing", es: "Ajustar tiempo" })</span>
             </div>
             <Badge variant="outline" className="font-mono">
               {offsetSeconds >= 0 ? '+' : ''}{offsetSeconds.toFixed(1)}s
@@ -278,8 +278,8 @@ export function TransitionPicker({
           />
           <div className="flex justify-between text-[10px] text-muted-foreground">
             <span>-2.0s</span>
-            <span>Früher</span>
-            <span>Später</span>
+            <span>{tx({ de: "Früher", en: "Earlier", es: "Antes" })}</span>
+            <span>{tx({ de: "Später", en: "Later", es: "Después" })}</span>
             <span>+2.0s</span>
           </div>
         </motion.div>

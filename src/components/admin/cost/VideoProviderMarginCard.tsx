@@ -27,10 +27,10 @@ export function VideoProviderMarginCard() {
         <div>
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-amber-300" />
-            <h3 className="text-base font-semibold tracking-tight">Video-Provider Live-Marge</h3>
+            <h3 className="text-base font-semibold tracking-tight">{tx({ de: 'Video-Provider Live-Marge', en: 'Video Provider Live Margin', es: 'Margen en vivo del proveedor de video' })}</h3>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Verkaufspreis vs. Replicate-Cost · alle 11 Video-Provider · Lipsync/Audio nicht enthalten
+            {tx({ de: 'Verkaufspreis vs. Replicate-Cost · alle 11 Video-Provider · Lipsync/Audio nicht enthalten', en: 'Selling price vs. Replicate cost · all 11 video providers · lipsync/audio not included', es: 'Precio de venta frente a coste de réplica · los 11 proveedores de vídeo · sincronización labial/audio no incluidos' })}
           </p>
         </div>
         <div className="text-right">
@@ -42,7 +42,7 @@ export function VideoProviderMarginCard() {
       {lowCount > 0 && (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
           <AlertTriangle className="h-3.5 w-3.5" />
-          {lowCount} {lowCount === 1 ? 'Provider liegt' : 'Provider liegen'} unter dem 60%-Marge-Boden.
+          {lowCount} {lowCount === 1 ? 'tx({ de: lowCount === 1 ? 'Provider liegt' : 'Provider liegen', en: lowCount === 1 ? 'provider is' : 'providers are', es: lowCount === 1 ? 'proveedor está' : 'proveedores están' })} {tx({ de: 'unter dem 60%-Marge-Boden.', en: 'below the 60% margin floor.', es: 'por debajo del suelo de margen del 60%.' })}
         </div>
       )}
 
@@ -50,10 +50,10 @@ export function VideoProviderMarginCard() {
         <table className="w-full text-xs">
           <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
             <tr>
-              <th className="text-left font-medium px-2 py-1.5">Provider</th>
-              <th className="text-right font-medium px-2 py-1.5">Verkauf</th>
-              <th className="text-right font-medium px-2 py-1.5">Cost</th>
-              <th className="text-right font-medium px-2 py-1.5">Marge</th>
+              <th className="text-left font-medium px-2 py-1.5">{tx({ de: 'Provider', en: 'Provider', es: 'Proveedor' })}</th>
+              <th className="text-right font-medium px-2 py-1.5">{tx({ de: 'Verkauf', en: 'Sell', es: 'Vender' })}</th>
+              <th className="text-right font-medium px-2 py-1.5">{tx({ de: 'Cost', en: 'Cost', es: 'Costo' })}</th>
+              <th className="text-right font-medium px-2 py-1.5">{tx({ de: 'Marge', en: 'Margin', es: 'Margen' })}</th>
             </tr>
           </thead>
           <tbody>
@@ -67,7 +67,7 @@ export function VideoProviderMarginCard() {
                       {r.tier === 'premium-engine' && (
                         <span
                           className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-400/5 px-1.5 py-0.5 text-[9px] font-medium text-amber-300"
-                          title="Premium-Engine: echte Provider-Kosten an User durchgereicht"
+                          title="tx({ de: 'Premium-Engine: echte Provider-Kosten an User durchgereicht', en: 'Premium engine: real provider costs passed through to user', es: 'Motor premium: los costos reales del proveedor se transfieren al usuario' })"
                         >
                           <Crown className="h-2.5 w-2.5" />
                           Premium
@@ -75,7 +75,7 @@ export function VideoProviderMarginCard() {
                       )}
                     </div>
                     <div className="text-[10px] text-muted-foreground">
-                      {r.unit === 'per-second' ? '€/Sekunde' : '€/Clip (5s flat)'}
+                      {r.unit === 'per-second' ? 'tx({ de: r.unit === 'per-second' ? '€/Sekunde' : '€/Clip (5s flat)', en: r.unit === 'per-second' ? '€/second' : '€/clip (5s flat)', es: r.unit === 'per-second' ? '€/segundo' : '€/clip (5s flat)' })}
                     </div>
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{eur(r.sellEUR)}</td>
@@ -101,8 +101,8 @@ export function VideoProviderMarginCard() {
       </div>
 
       <p className="mt-3 text-[10px] text-muted-foreground/70 leading-relaxed">
-        Quelle: Replicate / Runway Listenpreise (Juni 2026). Stückkosten sind Schätzungen.
-        Lipsync (Sync.so), HeyGen, ElevenLabs, Music & Picture Studio bleiben unverändert.
+        {tx({ de: 'Quelle: Replicate / Runway Listenpreise (Juni 2026). Stückkosten sind Schätzungen.', en: 'Source: Replicate / Runway list prices (June 2026). Unit costs are estimates.', es: 'Fuente: Precios de lista de Replicate / Runway (junio de 2026). Los costos unitarios son estimaciones.' })}
+        {tx({ de: 'Lipsync (Sync.so), HeyGen, ElevenLabs, Music & Picture Studio bleiben unverändert.', en: 'Lipsync (Sync.so), HeyGen, ElevenLabs, Music & Picture Studio remain unchanged.', es: 'Lipsync (Sync.so), HeyGen, ElevenLabs, Music & Picture Studio permanecen sin cambios.' })}
       </p>
     </div>
   );

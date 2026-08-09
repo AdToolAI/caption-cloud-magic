@@ -108,9 +108,9 @@ function AutopilotReal() {
                 <Bot className="h-4 w-4" />
                 <span className="tracking-widest uppercase">Autopilot Cockpit</span>
               </div>
-              <h1 className="font-serif text-4xl md:text-5xl">Deine KI führt den Account</h1>
+              <h1 className="font-serif text-4xl md:text-5xl">{tx({ de: "Deine KI führt den Account", en: "Your AI runs the account", es: "Tu IA gestiona la cuenta" })}</h1>
               <p className="text-muted-foreground mt-2 max-w-2xl">
-                Volle Transparenz darüber, was die KI plant, wie sie es prüft und wann sie postet — mit hartem Legal-Shield gegen Deepfakes, Copyright-Verstöße und Missbrauch.
+                {tx({ de: "Volle Transparenz darüber, was die KI plant, wie sie es prüft und wann sie postet — mit hartem Legal-Shield gegen Deepfakes, Copyright-Verstöße und Missbrauch.", en: "Full transparency about what the AI ​​plans, how it checks it and when it posts — with a hard legal shield against deepfakes, copyright violations and abuse.", es: "Transparencia total sobre lo que planea la IA, cómo lo revisa y cuándo publica, con un sólido escudo legal contra deepfakes, infracciones de copyright y abusos." })}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -158,7 +158,7 @@ function AutopilotReal() {
                       onClick={() => pause.mutate({ hours: isPaused ? null : 24 })}
                       className="gap-1.5"
                     >
-                      <Pause className="h-3.5 w-3.5" /> {isPaused ? 'Pause aufheben' : 'Pause 24h'}
+                      <Pause className="h-3.5 w-3.5" /> {isPaused ? 'tx({ de: "Pause aufheben", en: "Resume", es: "Reanudar" })' : 'tx({ de: "Pause 24h", en: "Pause 24h", es: "Pausar 24h" })'}
                     </Button>
                   </>
                 )}
@@ -187,7 +187,7 @@ function AutopilotReal() {
                     Beim 2. Strike wird der Autopilot 7 Tage gesperrt. Beim 3. Strike dauerhaft. Critical-Strikes können zur fristlosen Account-Löschung führen.
                   </p>
                 </div>
-                <Link to="/legal/autopilot-aup" className="text-xs text-primary underline shrink-0">Regeln lesen</Link>
+                <Link to="/legal/autopilot-aup" className="text-xs text-primary underline shrink-0">tx({ de: "Regeln lesen", en: "Read rules", es: "Leer reglas" })</Link>
               </div>
             </Card>
           )}
@@ -317,14 +317,14 @@ function ActivationToggle({
 
 function ToolsPanel() {
   const tools = [
-    { name: 'Video Composer', desc: tx({ de: 'Mehrszenige AI-Videos mit konsistenten Charakteren', en: 'Multi-scene AI videos with consistent characters', es: 'Vídeos de IA de múltiples escenas con personajes consistentes' }), status: 'verfügbar' },
-    { name: 'Picture Studio', desc: tx({ de: 'AI-Bilder, Magic Edit, Style-Reference, Brand-Kit', en: 'AI images, magic edit, style reference, brand kit', es: 'Imágenes AI, edición mágica, referencia de estilo, kit de marca' }), status: 'verfügbar' },
-    { name: 'Music Studio', desc: 'Hintergrundmusik via Stable Audio + MiniMax', status: 'verfügbar' },
-    { name: 'Talking Head Avatare', desc: tx({ de: 'Lippensynchrone Avatar-Videos mit Stimme', en: 'Lip-sync avatar videos with voice', es: 'Vídeos de avatares con sincronización labial y voz' }), status: 'verfügbar' },
-    { name: 'Trend Radar', desc: tx({ de: 'Lokalisierte Trends, alle 5 Stunden aktualisiert', en: 'Localized trends, updated every 5 hours', es: 'Tendencias localizadas, actualizadas cada 5 horas.' }), status: 'live' },
-    { name: 'Posting Berater', desc: 'Optimale Veröffentlichungszeiten pro Plattform/Sprache', status: 'verfügbar' },
-    { name: 'KI-QA-Gate', desc: tx({ de: 'Vision-Check auf Brand-CI, Copyright, Deepfakes', en: 'Vision check for brand CI, copyright, deepfakes', es: 'Verificación de visión para CI de marca, derechos de autor y deepfakes' }), status: 'aktiv' },
-    { name: 'Performance-Loop', desc: 'Lernende Optimierung — kommt in Stufe 2', status: 'geplant' },
+    { name: 'Video Composer', desc: tx({ de: 'Mehrszenige AI-Videos mit konsistenten Charakteren', en: 'Multi-scene AI videos with consistent characters', es: 'Vídeos de IA de múltiples escenas con personajes consistentes' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Picture Studio', desc: tx({ de: 'AI-Bilder, Magic Edit, Style-Reference, Brand-Kit', en: 'AI images, magic edit, style reference, brand kit', es: 'Imágenes AI, edición mágica, referencia de estilo, kit de marca' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Music Studio', desc: 'tx({ de: "Hintergrundmusik via Stable Audio + MiniMax", en: "Background music via Stable Audio + MiniMax", es: "Música de fondo a través de Stable Audio + MiniMax" })', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Talking Head Avatare', desc: tx({ de: 'Lippensynchrone Avatar-Videos mit Stimme', en: 'Lip-sync avatar videos with voice', es: 'Vídeos de avatares con sincronización labial y voz' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Trend Radar', desc: tx({ de: 'Lokalisierte Trends, alle 5 Stunden aktualisiert', en: 'Localized trends, updated every 5 hours', es: 'Tendencias localizadas, actualizadas cada 5 horas.' }), status: tx({ de: 'live', en: 'live', es: 'en vivo' }) },
+    { name: 'Posting Berater', desc: 'tx({ de: "Optimale Veröffentlichungszeiten pro Plattform/Sprache", en: "Optimal posting times per platform/language", es: "Tiempos de publicación óptimos por plataforma/idioma" })', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'KI-QA-Gate', desc: tx({ de: 'Vision-Check auf Brand-CI, Copyright, Deepfakes', en: 'Vision check for brand CI, copyright, deepfakes', es: 'Verificación de visión para CI de marca, derechos de autor y deepfakes' }), status: tx({ de: 'aktiv', en: 'active', es: 'activo' }) },
+    { name: 'Performance-Loop', desc: 'tx({ de: "Lernende Optimierung — kommt in Stufe 2", en: "Learning optimization — coming in Stage 2", es: "Optimización del aprendizaje: llegará en la Etapa 2" })', status: tx({ de: 'geplant', en: 'planned', es: 'planificado' }) },
   ];
   return (
     <div className="grid md:grid-cols-2 gap-3">

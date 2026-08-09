@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -47,14 +48,14 @@ export const useRenderCostEstimation = () => {
     if (!estimation) return [];
 
     return [
-      { label: 'Basis-Kosten', value: estimation.breakdown.baseCost },
-      { label: 'Dauer-Kosten', value: estimation.breakdown.durationCost },
+      { label: tx({ de: 'Basis-Kosten', en: 'Base Costs', es: 'Costos base' }), value: estimation.breakdown.baseCost },
+      { label: tx({ de: 'Dauer-Kosten', en: 'Duration Costs', es: 'Costos por duración' }), value: estimation.breakdown.durationCost },
       { 
-        label: 'Auflösungs-Multiplikator', 
+        label: tx({ de: 'Auflösungs-Multiplikator', en: 'Resolution Multiplier', es: 'Multiplicador de resolución' }), 
         value: `${estimation.breakdown.resolutionMultiplier}x` 
       },
       { 
-        label: 'Komplexitäts-Multiplikator', 
+        label: tx({ de: 'Komplexitäts-Multiplikator', en: 'Complexity Multiplier', es: 'Multiplicador de complejidad' }), 
         value: `${estimation.breakdown.complexityMultiplier}x` 
       },
     ];

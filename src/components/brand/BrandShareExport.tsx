@@ -30,7 +30,7 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
       if (error) throw error;
       setToken(data.token);
       onTokenChange?.(data.token);
-      toast({ title: "Share-Link erstellt", description: "Gültig 30 Tage." });
+      toast({ title: tx({ de: "Share-Link erstellt", en: "Share link created", es: "Enlace compartido creado" }), description: tx({ de: "Gültig 30 Tage.", en: "Valid for 30 days.", es: "Válido por 30 días." }) });
     } catch (e: any) {
       toast({ title: tx({ de: "Fehler", en: "Mistake", es: "Error" }), description: e.message, variant: "destructive" });
     } finally {
@@ -46,7 +46,7 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
       });
       setToken(null);
       onTokenChange?.(null);
-      toast({ title: "Share-Link widerrufen" });
+      toast({ title: tx({ de: "Share-Link widerrufen", en: "Share link revoked", es: "Enlace compartido revocado" }) });
     } finally {
       setSharing(false);
     }
@@ -60,7 +60,7 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
       });
       if (error) throw error;
       window.open(data.url, "_blank");
-      toast({ title: "PDF erstellt" });
+      toast({ title: tx({ de: "PDF erstellt", en: "PDF created", es: "PDF creado" }) });
     } catch (e: any) {
       toast({ title: tx({ de: "Export fehlgeschlagen", en: "Export failed", es: "Error de exportación" }), description: e.message, variant: "destructive" });
     } finally {
@@ -99,14 +99,14 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
         ) : (
           <Button onClick={handleShare} disabled={sharing} className="w-full">
             {sharing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Share2 className="h-4 w-4 mr-2" />}
-            Share-Link erstellen (30 Tage)
+            {tx({ de: "Share-Link erstellen (30 Tage)", en: "Create share link (30 days)", es: "Crear enlace compartido (30 días)" })}
           </Button>
         )}
 
         <div className="pt-3 border-t border-white/10">
           <Button onClick={handleExportPdf} disabled={exporting} variant="outline" className="w-full">
             {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-            Brand-Guidelines PDF exportieren
+            {tx({ de: "Brand-Guidelines PDF exportieren", en: "Export Brand Guidelines PDF", es: "Exportar PDF de directrices de marca" })}
           </Button>
         </div>
       </CardContent>

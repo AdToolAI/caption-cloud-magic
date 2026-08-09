@@ -97,8 +97,8 @@ export function AutoMatchPanel({
 
   const phaseLabels: Record<string, string> = {
     uploading: tx({ de: "Lade Video hoch…", en: "Upload video...", es: "Subir vídeo..." }),
-    extracting: 'Extrahiere Frames & analysiere Schnitte…',
-    analyzing: 'KI analysiert Mood & empfiehlt Sound…',
+    extracting: tx({ de: 'Extrahiere Frames & analysiere Schnitte…', en: 'Extracting frames & analyzing cuts…', es: 'Extrayendo fotogramas y analizando cortes…' }),
+    analyzing: tx({ de: 'KI analysiert Mood & empfiehlt Sound…', en: 'AI analyzes mood & recommends sound…', es: 'La IA analiza el ambiente y recomienda sonido…' }),
   };
 
   return (

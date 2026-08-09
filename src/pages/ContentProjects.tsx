@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Download, Play, RefreshCw, Loader2, Film, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { tx({ de: "Download", en: "Download", es: "Descargar" }), Play, RefreshCw, Loader2, Film, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -41,8 +41,8 @@ export default function ContentProjects() {
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      draft: { variant: "secondary" as const, icon: Clock, label: "Entwurf", className: "" },
-      rendering: { variant: "default" as const, icon: RefreshCw, label: "Wird gerendert...", className: "" },
+      draft: { variant: "secondary" as const, icon: Clock, label: tx({ de: "Entwurf", en: "Draft", es: "Borrador" }), className: "" },
+      rendering: { variant: "default" as const, icon: RefreshCw, label: tx({ de: "Wird gerendert...", en: "Rendering...", es: "Renderizando..." }), className: "" },
       completed: { variant: "outline" as const, icon: CheckCircle2, label: tx({ de: "Fertig", en: "Ready", es: "Listo" }), className: "border-green-500 text-green-700" },
       failed: { variant: "destructive" as const, icon: XCircle, label: tx({ de: "Fehler", en: "Mistake", es: "Error" }), className: "" },
     };
@@ -58,7 +58,7 @@ export default function ContentProjects() {
     );
   };
 
-  const handleDownload = async (url: string, filename: string) => {
+  const handletx({ de: "Download", en: "Download", es: "Descargar" }) = async (url: string, filename: string) => {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -72,7 +72,7 @@ export default function ContentProjects() {
       window.URL.revokeObjectURL(downloadUrl);
       toast.success(tx({ de: "Video wird heruntergeladen", en: "Video is downloading", es: "El vídeo se está descargando." }));
     } catch (error) {
-      console.error("Download error:", error);
+      console.error("tx({ de: "Download", en: "Download", es: "Descargar" }) error:", error);
       toast.error(tx({ de: "Fehler beim Herunterladen", en: "Error downloading", es: "Error al descargar" }));
     }
   };
@@ -111,7 +111,7 @@ export default function ContentProjects() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Gesamt</CardDescription>
+              <CardDescription>{tx({ de: "Gesamt", en: "Total", es: "Total" })}</CardDescription>
               <CardTitle className="text-3xl">{statusCounts.all}</CardTitle>
             </CardHeader>
           </Card>
@@ -123,13 +123,13 @@ export default function ContentProjects() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>In Bearbeitung</CardDescription>
+              <CardDescription>{tx({ de: "In Bearbeitung", en: "In progress", es: "En progreso" })}</CardDescription>
               <CardTitle className="text-3xl text-blue-600">{statusCounts.rendering}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Entwürfe</CardDescription>
+              <CardDescription>{tx({ de: "Entwürfe", en: "Drafts", es: "Borradores" })}</CardDescription>
               <CardTitle className="text-3xl text-gray-600">{statusCounts.draft}</CardTitle>
             </CardHeader>
           </Card>
@@ -138,11 +138,11 @@ export default function ContentProjects() {
         {/* Filter Tabs */}
         <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">Alle ({statusCounts.all})</TabsTrigger>
-            <TabsTrigger value="completed">Fertig ({statusCounts.completed})</TabsTrigger>
-            <TabsTrigger value="rendering">Rendering ({statusCounts.rendering})</TabsTrigger>
-            <TabsTrigger value="draft">Entwürfe ({statusCounts.draft})</TabsTrigger>
-            <TabsTrigger value="failed">Fehler ({statusCounts.failed})</TabsTrigger>
+            <TabsTrigger value="all">{tx({ de: "Alle", en: "All", es: "Todo" })} ({statusCounts.all})</TabsTrigger>
+            <TabsTrigger value="completed">{tx({ de: "Fertig", en: "Ready", es: "Listo" })} ({statusCounts.completed})</TabsTrigger>
+            <TabsTrigger value="rendering">{tx({ de: "Rendering", en: "Rendering", es: "Renderizado" })} ({statusCounts.rendering})</TabsTrigger>
+            <TabsTrigger value="draft">{tx({ de: "Entwürfe", en: "Drafts", es: "Borradores" })} ({statusCounts.draft})</TabsTrigger>
+            <TabsTrigger value="failed">{tx({ de: "Fehler", en: "Error", es: "Error" })} ({statusCounts.failed})</TabsTrigger>
           </TabsList>
 
           <TabsContent value={selectedStatus} className="mt-6">
@@ -193,15 +193,15 @@ export default function ContentProjects() {
                               onClick={() => window.open(outputUrls[0], "_blank")}
                             >
                               <Play className="h-4 w-4 mr-2" />
-                              Ansehen
+                              tx({ de: "Ansehen", en: "View", es: "Ver" })
                             </Button>
                             <Button
                               size="sm"
                               className="flex-1"
-                              onClick={() => handleDownload(outputUrls[0], `${project.project_name}.mp4`)}
+                              onClick={() => handletx({ de: "Download", en: "Download", es: "Descargar" })(outputUrls[0], `${project.project_name}.mp4`)}
                             >
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
+                              <tx({ de: "Download", en: "Download", es: "Descargar" }) className="h-4 w-4 mr-2" />
+                              tx({ de: "Download", en: "Download", es: "Descargar" })
                             </Button>
                           </div>
                         )}
@@ -227,7 +227,7 @@ export default function ContentProjects() {
                       : tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>
-                    Zum Content Studio
+                    tx({ de: "Zum Content Studio", en: "To Content Studio", es: "Al Content Studio" })
                   </Button>
                 </CardContent>
               </Card>

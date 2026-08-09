@@ -6,15 +6,15 @@ import { Check, TrendingUp, ShoppingCart, Palette } from "lucide-react";
 import { tx, useTx } from "@/lib/i18nText";
 
 const goals = [
-  { id: "grow_audience", label: "Reichweite aufbauen", icon: TrendingUp, desc: tx({ de: "Videos, die neue Zuschauer erreichen", en: "Videos that reach new viewers", es: "Vídeos que llegan a nuevos espectadores" }) },
-  { id: "sell_products", label: "Werbevideos produzieren", icon: ShoppingCart, desc: "Ads, die Produkte verkaufen" },
-  { id: "build_brand", label: "Marke inszenieren", icon: Palette, desc: "Wiedererkennbarer Cast & Look in jedem Video" },
+  { id: "grow_audience", label: tx({ de: "Reichweite aufbauen", en: "Build reach", es: "Aumentar el alcance" }), icon: TrendingUp, desc: tx({ de: "Videos, die neue Zuschauer erreichen", en: "Videos that reach new viewers", es: "Vídeos que llegan a nuevos espectadores" }) },
+  { id: "sell_products", label: tx({ de: "Werbevideos produzieren", en: "Produce advertising videos", es: "Producir videos publicitarios" }), icon: ShoppingCart, desc: tx({ de: "Ads, die Produkte verkaufen", en: "Ads that sell products", es: "Anuncios que venden productos" }) },
+  { id: "build_brand", label: tx({ de: "Marke inszenieren", en: "Stage brand", es: "Escenificar marca" }), icon: Palette, desc: tx({ de: "Wiedererkennbarer Cast & Look in jedem Video", en: "Recognizable cast & look in every video", es: "Reparto y apariencia reconocibles en cada video" }) },
 ];
 
 const levels = [
-  { id: "beginner", label: "Anfänger", desc: "Erste eigene Videoproduktion" },
-  { id: "intermediate", label: "Fortgeschritten", desc: "Produziert regelmäßig, will optimieren" },
-  { id: "advanced", label: "Profi", desc: "Erfahren, sucht Skalierung" },
+  { id: "beginner", label: tx({ de: "Anfänger", en: "Beginner", es: "Principiante" }), desc: tx({ de: "Erste eigene Videoproduktion", en: "First own video production", es: "Primera producción de video propia" }) },
+  { id: "intermediate", label: tx({ de: "Fortgeschritten", en: "Intermediate", es: "Avanzado" }), desc: tx({ de: "Produziert regelmäßig, will optimieren", en: "Produces regularly, wants to optimize", es: "Produce regularmente, quiere optimizar" }) },
+  { id: "advanced", label: tx({ de: "Profi", en: "Pro", es: "Profesional" }), desc: tx({ de: "Erfahren, sucht Skalierung", en: "Experienced, looking for scaling", es: "Experimentado, busca escalabilidad" }) },
 ];
 
 interface GoalsStepProps {
@@ -61,7 +61,7 @@ export function GoalsStep({
       </div>
 
       <div className="space-y-3">
-        <Label>Veröffentlichungen pro Woche: <span className="font-bold text-primary">{postsPerWeek}</span></Label>
+        <Label>tx({ de: "Veröffentlichungen pro Woche:", en: "Posts per week:", es: "Publicaciones por semana:" }) <span className="font-bold text-primary">{postsPerWeek}</span></Label>
         <Slider
           value={[postsPerWeek]}
           onValueChange={(v) => onPostsPerWeekChange(v[0])}
@@ -70,14 +70,14 @@ export function GoalsStep({
           step={1}
         />
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>3 (entspannt)</span>
-          <span>5 (regelmäßig)</span>
-          <span>7 (intensiv)</span>
+          <span>{tx({ de: "3 (entspannt)", en: "3 (relaxed)", es: "3 (relajado)" })}</span>
+          <span>{tx({ de: "5 (regelmäßig)", en: "5 (regular)", es: "5 (regular)" })}</span>
+          <span>{tx({ de: "7 (intensiv)", en: "7 (intensive)", es: "7 (intensivo)" })}</span>
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label>Erfahrungslevel</Label>
+        <Label>{tx({ de: "Erfahrungslevel", en: "Experience level", es: "Nivel de experiencia" })}</Label>
         <div className="grid grid-cols-3 gap-2">
           {levels.map((l) => (
             <button
@@ -99,7 +99,7 @@ export function GoalsStep({
       <div className="flex gap-4">
         <Button onClick={onBack} variant="outline" size="lg" className="w-full">{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
         <Button onClick={onNext} size="lg" className="w-full" disabled={!postingGoal || !experienceLevel}>
-          Weiter
+          tx({ de: "Weiter", en: "Continue", es: "Siguiente" })
         </Button>
       </div>
     </div>

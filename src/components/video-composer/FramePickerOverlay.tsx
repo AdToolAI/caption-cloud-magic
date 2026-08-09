@@ -85,7 +85,7 @@ export default function FramePickerOverlay({
 
   const handleApply = async () => {
     if (!sourceScene.clipUrl) {
-      toast({ title: 'Kein Clip vorhanden', variant: 'destructive' });
+      toast({ title: tx({ de: "Kein Clip vorhanden", en: "No clip available", es: "No hay clip disponible" }), variant: 'destructive' });
       return;
     }
     setIsApplying(true);
@@ -103,7 +103,7 @@ export default function FramePickerOverlay({
         continuationSourceSceneId: sourceScene.id,
       });
       toast({
-        title: 'Frame übernommen ✨',
+        title: tx({ de: "Frame übernommen ✨", en: "Frame applied ✨", es: "Frame aplicado ✨" }),
         description: tx({ de: `Szene ${targetSceneIndex} startet jetzt bei ${time.toFixed(2)}s der Quelle.`, en: `Scene ${targetSceneIndex} now starts at ${time.toFixed(2)}s of source.`, es: `La escena ${targetSceneIndex} ahora comienza en ${time.toFixed(2)}s de la fuente.` }),
       });
       onOpenChange(false);
@@ -118,7 +118,7 @@ export default function FramePickerOverlay({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-4 w-4 text-primary" />
-            Frame wählen → Szene {targetSceneIndex}
+            {tx({ de: "Frame wählen", en: "Pick frame", es: "Elegir fotograma" })} → {tx({ de: "Szene", en: "Scene", es: "Escena" })} {targetSceneIndex}
           </DialogTitle>
           <DialogDescription>
             Scrubbe durch den Clip und wähle den exakten Frame, der als nahtloses
@@ -154,18 +154,18 @@ export default function FramePickerOverlay({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isApplying}>
-            Abbrechen
+            tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })
           </Button>
           <Button onClick={handleApply} disabled={isApplying || !sourceScene.clipUrl}>
             {isApplying ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Übernehme…
+                tx({ de: "Übernehme…", en: "Applying…", es: "Aplicando…" })
               </>
             ) : (
               <>
                 <Link2 className="mr-2 h-4 w-4" />
-                Als Startbild übernehmen
+                tx({ de: "Als Startbild übernehmen", en: "Apply as starting image", es: "Aplicar como imagen de inicio" })
               </>
             )}
           </Button>

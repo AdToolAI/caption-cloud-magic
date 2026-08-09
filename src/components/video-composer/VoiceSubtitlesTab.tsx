@@ -338,8 +338,8 @@ export default function VoiceSubtitlesTab({
           },
         });
         toast({
-          title: 'Multi-Speaker VO erzeugt',
-          description: `${parsedSegments.length} Segmente · ${stitched.durationSeconds.toFixed(1)}s`,
+          title: tx({ de: "Multi-Speaker VO erzeugt", en: "Multi-speaker VO generated", es: "VO multihablante generada" }),
+          description: tx({ de: `${parsedSegments.length} Segmente · ${stitched.durationSeconds.toFixed(1)}s`, en: `${parsedSegments.length} segments · ${stitched.durationSeconds.toFixed(1)}s`, es: `${parsedSegments.length} segmentos · ${stitched.durationSeconds.toFixed(1)}s` }),
         });
         return;
       }

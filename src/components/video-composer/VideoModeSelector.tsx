@@ -23,17 +23,17 @@ const MODES: Array<{
     icon: Film,
     badge: { label: { de: 'Premium', en: 'Premium', es: 'Premium' }, tone: 'gold' },
     title: {
-      de: 'KI Video-Clips',
+      de: tx({ de: "KI Video-Clips", en: "AI video clips", es: "Videoclips de IA" }),
       en: tx({ de: "AI Video Clips", en: "AI video clips", es: "videoclips de IA" }),
       es: 'Clips de Video IA',
     },
     desc: {
-      de: 'Echte AI-Videoclips (Hailuo / Kling / Sora). Höchste Qualität, dynamische Bewegung.',
+      de: tx({ de: "Echte AI-Videoclips (Hailuo / Kling / Sora). Höchste Qualität, dynamische Bewegung.", en: "Real AI video clips (Hailuo / Kling / Sora). Top quality, dynamic motion.", es: "Clips de vídeo IA reales (Hailuo / Kling / Sora). Máxima calidad, movimiento dinámico." }),
       en: 'Real AI video clips (Hailuo / Kling / Sora). Top quality, dynamic motion.',
       es: 'Clips de video IA reales (Hailuo / Kling / Sora). Máxima calidad y movimiento dinámico.',
     },
     cost: {
-      de: '~€0.15 – 0.53 / Sek',
+      de: tx({ de: "~€0.15 – 0.53 / Sek", en: "~€0.15 – 0.53 / sec", es: "~€0.15 – 0.53 / seg" }),
       en: '~€0.15 – 0.53 / sec',
       es: '~€0.15 – 0.53 / seg',
     },
@@ -43,17 +43,17 @@ const MODES: Array<{
     icon: ImageIcon,
     badge: { label: { de: 'Günstig', en: 'Budget', es: 'Económico' }, tone: 'green' },
     title: {
-      de: 'KI Bild-Szenen',
+      de: tx({ de: "KI Bild-Szenen", en: "AI image scenes", es: "Escenas de imagen de IA" }),
       en: 'AI Image Scenes',
       es: 'Escenas de Imagen IA',
     },
     desc: {
-      de: 'Gemini-Bilder mit cineastischer Ken-Burns-Animation und Glow-Effekten. ~6× günstiger.',
+      de: tx({ de: "Gemini-Bilder mit cineastischer Ken-Burns-Animation und Glow-Effekten. ~6× günstiger.", en: "Gemini images with cinematic Ken-Burns animation and glow effects. ~6× cheaper.", es: "Imágenes de Gemini con animación Ken-Burns cinematográfica y efectos de brillo. ~6 veces más barato." }),
       en: 'Gemini images with cinematic Ken-Burns animation and glow effects. ~6× cheaper.',
       es: 'Imágenes de Gemini con animación Ken-Burns cinematográfica y efectos de brillo. ~6× más barato.',
     },
     cost: {
-      de: '~€0.05 / Szene',
+      de: tx({ de: "~€0.05 / Szene", en: "~€0.05 / scene", es: "~€0.05 / escena" }),
       en: '~€0.05 / scene',
       es: '~€0.05 / escena',
     },
@@ -68,12 +68,12 @@ const MODES: Array<{
       es: 'Modo Mixto',
     },
     desc: {
-      de: 'Hero-Szenen (Hook & CTA) als Video, Rest als animierte Bilder. Beste Balance.',
+      de: tx({ de: "Hero-Szenen (Hook & CTA) als Video, Rest als animierte Bilder. Beste Balance.", en: "Hero scenes (hook & CTA) as video, rest as animated images. Best balance.", es: "Escenas hero (hook y CTA) como vídeo, el resto como imágenes animadas. El mejor equilibrio." }),
       en: 'Hero scenes (hook & CTA) as video, rest as animated images. Best balance.',
       es: 'Escenas hero (hook y CTA) como video, el resto como imágenes animadas. Mejor balance.',
     },
     cost: {
-      de: '~50 % Ersparnis',
+      de: tx({ de: "~50 % Ersparnis", en: "~50% savings", es: "~50% de ahorro" }),
       en: '~50% savings',
       es: '~50% de ahorro',
     },

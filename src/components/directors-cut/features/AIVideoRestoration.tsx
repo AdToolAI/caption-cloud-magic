@@ -72,7 +72,7 @@ export function AIVideoRestoration({
 
       if (data?.error === 'INSUFFICIENT_CREDITS') {
         toast({
-          title: 'Nicht genügend Credits',
+          title: tx({ de: 'Nicht genügend Credits', en: 'Insufficient credits', es: 'Créditos insuficientes' }),
           description: data.message,
           variant: 'destructive'
         });
@@ -82,7 +82,7 @@ export function AIVideoRestoration({
       if (data?.success) {
         toast({
           title: tx({ de: 'Video-Restaurierung gestartet', en: 'Video restoration started', es: 'Restauración de vídeo iniciada' }),
-          description: `${data.active_features} Features aktiv. ${data.credits_required} Credits reserviert.`
+          description: tx({ de: `${data.active_features} Features aktiv. ${data.credits_required} Credits reserviert.`, en: `${data.active_features} features active. ${data.credits_required} credits reserved.`, es: `${data.active_features} funciones activas. ${data.credits_required} créditos reservados.` })
         });
         onRestorationComplete?.(data);
       }
@@ -114,8 +114,8 @@ export function AIVideoRestoration({
   const restorationFeatures = [
     {
       id: 'removeGrain',
-      label: 'Filmkorn entfernen',
-      description: 'Entfernt analoges Filmkorn',
+      label: tx({ de: 'Filmkorn entfernen', en: 'Remove film grain', es: 'Eliminar el grano de la película' }),
+      description: tx({ de: 'Entfernt analoges Filmkorn', en: 'Removes analog film grain', es: 'Elimina el grano de película analógico' }),
       icon: ScanLine,
       hasStrength: true,
       strengthKey: 'grainStrength',
@@ -123,8 +123,8 @@ export function AIVideoRestoration({
     },
     {
       id: 'removeScratches',
-      label: 'Kratzer & Staub entfernen',
-      description: 'Repariert physische Beschädigungen',
+      label: tx({ de: 'Kratzer & Staub entfernen', en: 'Remove scratches & dust', es: 'Eliminar arañazos y polvo' }),
+      description: tx({ de: 'Repariert physische Beschädigungen', en: 'Repairs physical damage', es: 'Repara daños físicos' }),
       icon: Focus,
       hasStrength: true,
       strengthKey: 'scratchDetection',
@@ -132,8 +132,8 @@ export function AIVideoRestoration({
     },
     {
       id: 'stabilizeFootage',
-      label: 'Bildstabilisierung',
-      description: 'Korrigiert verwackeltes Material',
+      label: tx({ de: 'Bildstabilisierung', en: 'Image stabilization', es: 'Estabilización de imagen' }),
+      description: tx({ de: 'Korrigiert verwackeltes Material', en: 'Corrects shaky material', es: 'Corrige material inestable' }),
       icon: Focus,
       hasStrength: true,
       strengthKey: 'stabilizationStrength',
@@ -141,8 +141,8 @@ export function AIVideoRestoration({
     },
     {
       id: 'colorCorrection',
-      label: 'Farbrestaurierung',
-      description: 'Stellt verblasste Farben wieder her',
+      label: tx({ de: 'Farbrestaurierung', en: 'Color restoration', es: 'Restauración de color' }),
+      description: tx({ de: 'Stellt verblasste Farben wieder her', en: 'Restores faded colors', es: 'Restaura los colores desvaídos' }),
       icon: Palette,
       hasStrength: false,
       credits: 3,
@@ -154,7 +154,7 @@ export function AIVideoRestoration({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold">AI Video Restoration</h3>
+          <h3 className="font-semibold">{tx({ de: "AI Video Restaurierung", en: "AI Video Restoration", es: "Restauración de vídeo por IA" })}</h3>
         </div>
         <Switch
           checked={settings.enabled}
@@ -207,7 +207,7 @@ export function AIVideoRestoration({
           ))}
 
           <div className="border-t pt-4 space-y-3">
-            <Label className="text-sm font-medium">Zusätzliche Optionen</Label>
+            <Label className="text-sm font-medium">{tx({ de: "Zusätzliche Optionen", en: "Additional options", es: "Opciones adicionales" })}</Label>
             
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -219,7 +219,7 @@ export function AIVideoRestoration({
                   }
                 />
                 <Label htmlFor="enhanceFaces" className="text-sm cursor-pointer">
-                  KI Gesichtsverbesserung
+                  tx({ de: "KI Gesichtsverbesserung", en: "AI face enhancement", es: "Mejora facial por IA" })
                 </Label>
               </div>
               <span className="text-xs text-primary">+5</span>
@@ -235,7 +235,7 @@ export function AIVideoRestoration({
                   }
                 />
                 <Label htmlFor="deinterlace" className="text-sm cursor-pointer">
-                  Deinterlacing (für alte TV-Aufnahmen)
+                  tx({ de: "Deinterlacing (für alte TV-Aufnahmen)", en: "Deinterlacing (for old TV recordings)", es: "Desentrelazado (para grabaciones de TV antiguas)" })
                 </Label>
               </div>
               <span className="text-xs text-primary">+2</span>
@@ -257,12 +257,12 @@ export function AIVideoRestoration({
             {isProcessing ? (
               <>
                 <Zap className="h-4 w-4 animate-pulse" />
-                Restaurierung läuft...
+                tx({ de: "Restaurierung läuft...", en: "Restoration in progress...", es: "Restauración en curso..." })
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Restaurierung starten ({calculateCredits()} Credits)
+                tx({ de: `Restaurierung starten (${calculateCredits()} Credits)`, en: `Start restoration (${calculateCredits()} credits)`, es: `Iniciar restauración (${calculateCredits()} créditos)` })
               </>
             )}
           </Button>

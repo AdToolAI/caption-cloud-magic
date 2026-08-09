@@ -68,7 +68,7 @@ export const useQualityPresets = () => {
 
       if (error) throw error;
 
-      toast.success('Preset erstellt!');
+      toast.success(tx({ de: 'Preset erstellt!', en: 'Preset created!', es: '¡Ajuste preestablecido creado!' }));
       await fetchPresets();
       return data;
     } catch (error: any) {
@@ -87,7 +87,7 @@ export const useQualityPresets = () => {
 
       if (error) throw error;
 
-      toast.success('Preset aktualisiert!');
+      toast.success(tx({ de: 'Preset aktualisiert!', en: 'Preset updated!', es: '¡Ajuste preestablecido actualizado!' }));
       await fetchPresets();
       return true;
     } catch (error: any) {
@@ -106,7 +106,7 @@ export const useQualityPresets = () => {
 
       if (error) throw error;
 
-      toast.success('Preset gelöscht!');
+      toast.success(tx({ de: 'Preset gelöscht!', en: 'Preset deleted!', es: '¡Ajuste preestablecido eliminado!' }));
       await fetchPresets();
       return true;
     } catch (error: any) {

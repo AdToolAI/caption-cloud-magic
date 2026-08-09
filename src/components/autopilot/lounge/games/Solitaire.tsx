@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Klondike-Solitär — Klick-Steuerung (Karte wählen, Ziel wählen).
  * Bewusst schlank: keine Drag-Bibliothek, kein Persistieren.
@@ -170,7 +171,7 @@ export default function Solitaire() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{won ? 'Gewonnen — sauber gespielt.' : 'Karte antippen, dann Ziel antippen.'}</span>
+        <span>{won ? tx({ de: 'Gewonnen — sauber gespielt.', en: 'Won — cleanly played.', es: 'Ganaste, bien jugado.' }) : tx({ de: 'Karte antippen, dann Ziel antippen.', en: 'Tap card, then tap target.', es: 'Toque la tarjeta, luego toque el destino.' })}</span>
         <Button
           size="sm"
           variant="outline"
@@ -184,7 +185,7 @@ export default function Solitaire() {
       </div>
 
       <div className="flex items-start gap-2">
-        <button type="button" onClick={drawStock} aria-label="Karte ziehen">
+        <button type="button" onClick={drawStock} aria-label={tx({ de: 'Karte ziehen', en: 'Draw card', es: 'Sacar carta' })}>
           {state.stock.length > 0 ? (
             <CardFace card={{ id: 'back', suit: '♠', rank: 1, faceUp: false }} />
           ) : (
@@ -197,7 +198,7 @@ export default function Solitaire() {
         <button
           type="button"
           onClick={() => state.waste.length > 0 && setSource({ kind: 'waste' })}
-          aria-label="Ablage"
+          aria-label={tx({ de: 'Ablage', en: 'Waste', es: 'Desperdicio' })}
         >
           {state.waste.length > 0 ? (
             <CardFace
@@ -215,7 +216,7 @@ export default function Solitaire() {
               key={i}
               type="button"
               onClick={() => (source ? moveToFoundation(i) : setSource({ kind: 'foundation', pile: i }))}
-              aria-label={`Ass-Stapel ${i + 1}`}
+              aria-label={tx({ de: `Ass-Stapel ${i + 1}`, en: `Foundation ${i + 1}`, es: `Base ${i + 1}` })}
             >
               {pile.length > 0 ? (
                 <CardFace card={pile[pile.length - 1]} />
@@ -243,7 +244,7 @@ export default function Solitaire() {
                 type="button"
                 onClick={() => moveToTableau(pileIndex)}
                 className="h-14 w-10 rounded-md border border-dashed border-white/15"
-                aria-label="Leerer Stapel"
+                aria-label={tx({ de: 'Leerer Stapel', en: 'Empty pile', es: 'Pila vacía' })}
               />
             )}
             {pile.map((card, index) => {

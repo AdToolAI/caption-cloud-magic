@@ -20,7 +20,7 @@ const copy = {
       tx({ de: "Autopilot: von der Idee bis zum fertigen Clip", en: "Autopilot: from the idea to the finished clip", es: "Piloto automático: de la idea al clip terminado" }),
       tx({ de: "Cast & World: eigene Charaktere mit fester Identität", en: "Cast & World: own characters with a fixed identity", es: "Cast & World: personajes propios con una identidad fija" }),
       tx({ de: "Lip-Sync in Deutsch, Englisch und Spanisch", en: "Lip sync in German, English and Spanish", es: "Sincronización labial en alemán, inglés y español." }),
-      "Director's Cut: Schnitt, Untertitel, Musik, Export in 1080p",
+      tx({ de: "Director's Cut: Schnitt, Untertitel, Musik, Export in 1080p", en: "Director's Cut: editing, subtitles, music, 1080p export", es: "Director's Cut: edición, subtítulos, música, exportación a 1080p" }),
     ],
     cta: "Ersten Clip bauen",
     secondary: "Abo & Rechnungen ansehen",

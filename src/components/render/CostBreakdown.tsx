@@ -10,22 +10,22 @@ interface CostBreakdownProps {
 export const CostBreakdown = ({ estimation }: CostBreakdownProps) => {
   const items = [
     {
-      label: 'Basis-Kosten',
+      label: tx({ de: "Basis-Kosten", en: "Base cost", es: "Coste base" }),
       value: `${estimation.breakdown.baseCost} Credits`,
-      description: 'Grundkosten pro Render'
+      description: tx({ de: "Grundkosten pro Render", en: "Base cost per render", es: "Coste base por render" })
     },
     {
-      label: 'Dauer-Kosten',
+      label: tx({ de: "Dauer-Kosten", en: "Duration cost", es: "Coste de duración" }),
       value: `${estimation.breakdown.durationCost} Credits`,
       description: tx({ de: 'Basierend auf Video-Länge', en: 'Based on video length', es: 'Basado en la duración del video' })
     },
     {
-      label: 'Auflösungs-Faktor',
+      label: tx({ de: "Auflösungs-Faktor", en: "Resolution factor", es: "Factor de resolución" }),
       value: `×${estimation.breakdown.resolutionMultiplier}`,
       description: tx({ de: 'Multiplikator für höhere Auflösung', en: 'Multiplier for higher resolution', es: 'Multiplicador para mayor resolución' })
     },
     {
-      label: 'Komplexitäts-Faktor',
+      label: tx({ de: "Komplexitäts-Faktor", en: "Complexity factor", es: "Factor de complejidad" }),
       value: `×${estimation.breakdown.complexityMultiplier}`,
       description: tx({ de: 'Multiplikator für Animations-Komplexität', en: 'Animation complexity multiplier', es: 'Multiplicador de complejidad de animación' })
     },
@@ -36,10 +36,10 @@ export const CostBreakdown = ({ estimation }: CostBreakdownProps) => {
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Info className="w-4 h-4" />
-          Kosten-Aufschlüsselung
+          tx({ de: "Kosten-Aufschlüsselung", en: "Cost breakdown", es: "Desglose de costes" })
         </CardTitle>
         <CardDescription>
-          Detaillierte Berechnung
+          tx({ de: "Detaillierte Berechnung", en: "Detailed calculation", es: "Cálculo detallado" })
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -61,7 +61,7 @@ export const CostBreakdown = ({ estimation }: CostBreakdownProps) => {
 
           <div className="pt-3 border-t mt-4">
             <div className="flex items-center justify-between">
-              <span className="font-semibold">Gesamt ({estimation.recommended})</span>
+              <span className="font-semibold">{tx({ de: "Gesamt", en: "Total", es: "Total" })} ({estimation.recommended})</span>
               <span className="text-lg font-bold">
                 {estimation.recommended === 'remotion' ? estimation.remotion : estimation.shotstack} Credits
               </span>

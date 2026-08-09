@@ -18,7 +18,7 @@ export const SignalCockpit = () => {
   return (
     <div
       role="img"
-      aria-label="Performance-Signal Vorschau"
+      aria-label={tx({ de: "Performance-Signal Vorschau", en: "Performance signal preview", es: "Vista previa de la señal de rendimiento" })}
       className="relative h-[170px] w-full rounded-xl border border-border/40 bg-gradient-to-br from-background/40 to-card/20 p-3 overflow-hidden"
     >
       {/* Sparkline */}

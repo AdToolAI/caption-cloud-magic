@@ -134,7 +134,7 @@ export default function AdCampaignTree({
     if (!adMeta?.tonality) {
       toast({
         title: tx({ de: 'Voiceover nicht möglich', en: 'Voiceover not possible', es: 'No es posible la voz en off' }),
-        description: 'Tonalität fehlt im Kampagnen-Meta.',
+        description: tx({ de: 'Tonalität fehlt im Kampagnen-Meta.', en: 'Tonality missing in campaign meta.', es: 'Falta la tonalidad en los metadatos de la campaña.' }),
         variant: 'destructive',
       });
       return;
@@ -212,7 +212,7 @@ export default function AdCampaignTree({
       );
 
       toast({
-        title: 'Voiceover erstellt',
+        title: tx({ de: 'Voiceover erstellt', en: 'Voiceover created', es: 'Voz en off creada' }),
         description: tx({ de: `Neue VO (${voiceCfg.voiceLabel}) für „${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`, en: `New VO (${voiceCfg.voiceLabel}) for "${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`, es: `Nueva VO (${voiceCfg.voiceLabel}) para "${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".` }),
       });
     } catch (err: any) {
@@ -231,9 +231,9 @@ export default function AdCampaignTree({
     return (
       <Card className="border-border/40 bg-card/60 p-8 text-center">
         <Megaphone className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
-        <h3 className="text-base font-semibold mb-1">Keine Kampagne aktiv</h3>
+        <h3 className="text-base font-semibold mb-1">{tx({ de: 'Keine Kampagne aktiv', en: 'No active campaign', es: 'Ninguna campaña activa' })}</h3>
         <p className="text-sm text-muted-foreground">
-          Starte den <strong>Ad Director</strong>, um eine Kampagne mit Cutdowns, A/B-Varianten und Multi-Format zu erstellen.
+          {tx({ de: 'Starte den Ad Director, um eine Kampagne mit Cutdowns, A/B-Varianten und Multi-Format zu erstellen.', en: 'Start the Ad Director to create a campaign with cutdowns, A/B variants, and multi-format.', es: 'Inicia el Ad Director para crear una campaña con versiones reducidas, variantes A/B y multiformato.' })}
         </p>
       </Card>
     );
@@ -245,10 +245,10 @@ export default function AdCampaignTree({
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Megaphone className="h-5 w-5 text-amber-400" />
-          Kampagnen-Übersicht
+          tx({ de: '{tx({ de: 'Kampagnen-Übersicht', en: 'Campaign Overview', es: 'Resumen de la campaña' })}', en: 'Campaign Overview', es: 'Resumen de la campaña' })
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Master-Spot + automatisch erzeugte Cutdowns, A/B-Varianten &amp; Format-Klone.
+          tx({ de: 'Master-Spot + automatisch erzeugte Cutdowns, A/B-Varianten & Format-Klone.', en: 'Master spot + automatically generated cutdowns, A/B variants & format clones.', es: 'Spot maestro + versiones reducidas generadas automáticamente, variantes A/B y clones de formato.' })
         </p>
       </div>
 
@@ -280,7 +280,7 @@ export default function AdCampaignTree({
           {masterOutputUrl && (
             <Button asChild size="sm" variant="outline">
               <a href={masterOutputUrl} target="_blank" rel="noreferrer">
-                <Play className="h-3.5 w-3.5 mr-1.5" /> Ansehen
+                <Play className="h-3.5 w-3.5 mr-1.5" /> {tx({ de: 'Ansehen', en: 'Watch', es: 'Ver' })}
               </a>
             </Button>
           )}
@@ -290,10 +290,10 @@ export default function AdCampaignTree({
       {/* Cutdowns */}
       <section>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Scissors className="h-4 w-4" />
-          Cutdowns ({cutdowns.length})
+          <Scissors className="h-4 w-4" /> {tx({ de: 'Cutdowns', en: 'Cutdowns', es: 'Versiones reducidas' })}
+          
         </h3>
-        {loading && <p className="text-xs text-muted-foreground">Lade …</p>}
+        {loading && <p className="text-xs text-muted-foreground">{tx({ de: 'Lade …', en: 'Loading …', es: 'Cargando …' })}</p>}
         {!loading && cutdowns.length === 0 && (
           <p className="text-xs text-muted-foreground italic">
             {tx({ de: 'Keine Cutdowns konfiguriert. Aktiviere im Ad Director „15s“ oder „6s Hook“.', en: 'No cutdowns configured. Enable “15s” or “6s Hook” in the Ad Director.', es: 'No hay cutdowns configurados. Activa «15s» o «6s Hook» en el Ad Director.' })}
@@ -317,11 +317,11 @@ export default function AdCampaignTree({
       <section>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4" />
-          A/B-Varianten ({variants.length})
+          {tx({ de: 'A/B-Varianten', en: 'A/B Variants', es: 'Variantes A/B' })} ({variants.length})
         </h3>
         {!loading && variants.length === 0 && (
           <p className="text-xs text-muted-foreground italic">
-            Keine zusätzlichen Skript-Varianten. Aktiviere im Ad Director „Alle Varianten rendern".
+            {tx({ de: 'Keine zusätzlichen Skript-Varianten. Aktiviere im Ad Director „Alle Varianten rendern".', en: 'No additional script variants. Enable "Render all variants" in the Ad Director.', es: 'No hay variantes de guion adicionales. Activa «Renderizar todas las variantes» en el Ad Director.' })}
           </p>
         )}
         <div className="grid sm:grid-cols-2 gap-3">
@@ -335,11 +335,11 @@ export default function AdCampaignTree({
       <section>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
           <Crop className="h-4 w-4" />
-          Format-Klone ({aspects.length})
+          {tx({ de: 'Format-Klone', en: 'Format Clones', es: 'Clones de formato' })} ({aspects.length})
         </h3>
         {!loading && aspects.length === 0 && (
           <p className="text-xs text-muted-foreground italic">
-            Keine zusätzlichen Formate. Aktiviere im Ad Director „Multi-Format-Bundling" (9:16, 1:1, 4:5).
+            {tx({ de: 'Keine zusätzlichen Formate. Aktiviere im Ad Director „Multi-Format-Bundling" (9:16, 1:1, 4:5).', en: 'No additional formats. Enable "Multi-format bundling" (9:16, 1:1, 4:5) in the Ad Director.', es: 'No hay formatos adicionales. Activa «Agrupación multiformato» (9:16, 1:1, 4:5) en el Ad Director.' })}
           </p>
         )}
         <div className="grid sm:grid-cols-2 gap-3">
@@ -392,7 +392,7 @@ function ChildCard({
       <div className="flex flex-wrap gap-2">
         {onOpen && (
           <Button size="sm" variant="outline" className="flex-1 min-w-[100px]" onClick={() => onOpen(child.id)}>
-            <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Öffnen
+            <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> {tx({ de: 'Öffnen', en: 'Open', es: 'Abrir' })}
           </Button>
         )}
         {showResynthVO && onResynthVO && (
@@ -408,7 +408,7 @@ function ChildCard({
             ) : (
               <Mic className="h-3.5 w-3.5" />
             )}
-            <span className="ml-1.5 text-xs">{hasVO ? 'VO neu' : 'VO erzeugen'}</span>
+            <span className="ml-1.5 text-xs">{hasVO ? tx({ de: 'VO neu', en: 'VO new', es: 'VO nueva' }) : tx({ de: 'VO erzeugen', en: 'Generate VO', es: 'Generar VO' })}</span>
           </Button>
         )}
         {child.output_url && (

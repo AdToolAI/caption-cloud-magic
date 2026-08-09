@@ -8,11 +8,11 @@ import { cn } from '@/lib/utils';
 import { Target, TrendingUp, MousePointerClick, Mail, ShoppingCart } from 'lucide-react';
 
 const GOALS = [
-  { id: 'awareness', label: 'Reichweite', desc: 'Neue Follower & Views', icon: TrendingUp },
-  { id: 'engagement', label: 'Engagement', desc: 'Likes, Kommentare, Saves', icon: Target },
+  { id: 'awareness', label: tx({ de: 'Reichweite', en: 'Reach', es: 'Alcance' }), desc: tx({ de: 'Neue Follower & Views', en: 'New followers & views', es: 'Nuevos seguidores y vistas' }), icon: TrendingUp },
+  { id: 'engagement', label: tx({ de: 'Engagement', en: 'Engagement', es: 'Compromiso' }), desc: tx({ de: 'Likes, Kommentare, Saves', en: 'Likes, comments, saves', es: 'Me gusta, comentarios, guardados' }), icon: Target },
   { id: 'traffic', label: 'Traffic', desc: tx({ de: 'Klicks auf Link in Bio', en: 'Click on link in bio', es: 'Haz clic en el enlace de la biografía' }), icon: MousePointerClick },
-  { id: 'leads', label: 'Leads', desc: 'E-Mails / DMs / Anfragen', icon: Mail },
-  { id: 'sales', label: 'Verkäufe', desc: 'Direkter Produktverkauf', icon: ShoppingCart },
+  { id: 'leads', label: tx({ de: 'Leads', en: 'Leads', es: 'Prospectos' }), desc: tx({ de: 'E-Mails / DMs / Anfragen', en: 'Emails / DMs / Requests', es: 'Correos electrónicos / DM / Solicitudes' }), icon: Mail },
+  { id: 'sales', label: tx({ de: 'Verkäufe', en: 'Sales', es: 'Ventas' }), desc: tx({ de: 'Direkter Produktverkauf', en: 'Direct product sale', es: 'Venta directa de productos' }), icon: ShoppingCart },
 ] as const;
 
 const BUDGETS = [10, 25, 50, 100, 250] as const;
@@ -78,7 +78,7 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
       {/* Budget */}
       <div>
         <Label className="text-base font-semibold mb-3 block">
-          Wochen-Budget: <span className="text-primary">{value.weekly_budget_eur} €</span>
+          tx({ de: "Wochen-Budget:", en: "Weekly budget:", es: "Presupuesto semanal:" }) <span className="text-primary">{value.weekly_budget_eur} €</span>
         </Label>
         <div className="flex flex-wrap gap-2 mb-3">
           {BUDGETS.map((b) => (
@@ -115,10 +115,10 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
 
       {/* Content Mix */}
       <div>
-        <Label className="text-base font-semibold mb-3 block">Content-Mix</Label>
+        <Label className="text-base font-semibold mb-3 block">{tx({ de: "Content-Mix", en: "Content mix", es: "Mezcla de contenido" })}</Label>
         <div className="space-y-3">
           {([
-            { key: 'ai_video', label: 'KI-Videos (teuer)', color: 'bg-rose-500' },
+            { key: 'ai_video', label: tx({ de: 'KI-Videos (teuer)', en: 'AI videos (expensive)', es: 'Videos de IA (caros)' }), color: 'bg-rose-500' },
             { key: 'stock_reel', label: tx({ de: 'Stock + KI-Bild Reels (mittel)', en: 'Stock + AI Image Reels (medium)', es: 'Carretes de imágenes de stock + AI (mediano)' }), color: 'bg-amber-500' },
             { key: 'static', label: tx({ de: 'Statische Bild-Posts (günstig)', en: 'Static image posts (cheap)', es: 'Publicaciones de imágenes estáticas (baratas)' }), color: 'bg-emerald-500' },
           ] as const).map((row) => (
@@ -142,10 +142,10 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
       {/* Audience & USP */}
       <div className="grid md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="audience">Zielgruppe</Label>
+          <Label htmlFor="audience">{tx({ de: "Zielgruppe", en: "Target audience", es: "Público objetivo" })}</Label>
           <Textarea
             id="audience"
-            placeholder="z.B. Selbstständige Coaches in DACH, 30–45, Instagram-affin"
+            placeholder={tx({ de: "z.B. Selbstständige Coaches in DACH, 30–45, Instagram-affin", en: "e.g. self-employed coaches in DACH, 30–45, Instagram-savvy", es: "p. ej. entrenadores autónomos en DACH, 30–45, expertos en Instagram" })}
             maxLength={280}
             value={value.target_audience}
             onChange={(e) => set({ target_audience: e.target.value })}

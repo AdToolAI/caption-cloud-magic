@@ -292,7 +292,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                       {customVoices.filter((c) => c.is_active && c.elevenlabs_voice_id).length > 0 && (
                         <>
                           <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                            {language === 'de' ? 'Meine Stimmen' : 'My Voices'}
+                            {tx({ de: 'Meine Stimmen', en: 'My Voices', es: 'Mis voces' })}
                           </div>
                           {customVoices
                             .filter((c) => c.is_active && c.elevenlabs_voice_id)
@@ -300,7 +300,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                               <SelectItem key={c.id} value={c.elevenlabs_voice_id!}>
                                 <span className="flex items-center gap-2">
                                   <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-primary/15 text-primary border-primary/20">
-                                    {language === 'de' ? 'Eigene' : 'Custom'}
+                                    {tx({ de: 'Eigene', en: 'Custom', es: 'Propio' })}
                                   </Badge>
                                   <span>{c.name}</span>
                                 </span>
@@ -335,7 +335,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                     title={t('uc.chooseAVoice')}
                   >
                     <Library className="h-3.5 w-3.5" />
-                    {language === 'de' ? 'Bibliothek' : 'Library'}
+                    {tx({ de: 'Bibliothek', en: 'Library', es: 'Biblioteca' })}
                   </Button>
                 </div>
               </div>

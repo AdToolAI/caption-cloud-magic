@@ -30,7 +30,7 @@ export interface EtaResult {
 }
 
 function humanize(seconds: number): string {
-  if (seconds <= 60) return 'gleich fertig';
+  if (seconds <= 60) return tx({ de: 'gleich fertig', en: 'almost done', es: 'casi listo' });
   const minutes = Math.round(seconds / 60);
   if (minutes <= 2) return tx({ de: 'noch ca. 2 Min.', en: 'about 2 more minutes.', es: 'unos 2 minutos más.' });
   if (minutes >= 45) return tx({ de: 'noch ca. 45+ Min.', en: 'about 45+ minutes left', es: 'quedan unos 45+ minutos' });
@@ -44,7 +44,7 @@ export function estimateRemaining(
   scenes: ProductionSceneRow[],
 ): EtaResult {
   if (!production) return { seconds: null, label: '' };
-  if (production.status === 'completed') return { seconds: 0, label: 'fertig' };
+  if (production.status === 'completed') return { seconds: 0, label: tx({ de: 'fertig', en: 'done', es: 'listo' }) };
   if (production.status === 'failed' || production.status === 'cancelled') {
     return { seconds: null, label: '' };
   }

@@ -220,7 +220,7 @@ export function ImageGenerator() {
       if (base.toLowerCase().includes('photorealistic')) return base;
       return base ? `${base}, ${suffix}` : `Photorealistic recreation of the reference scene, ${suffix}`;
     });
-    toast.success('Realistic-Reproduction-Preset gesetzt');
+    toast.success(tx({ de: 'Realistic-Reproduction-Preset gesetzt', en: 'Realistic reproduction preset set', es: 'Ajuste preestablecido de reproducción realista establecido' }));
   };
 
   const handleHelperApply = (result: PromptHelperResult, chosenPrompt: string) => {
@@ -343,7 +343,7 @@ export function ImageGenerator() {
           toast.error(tx({ de: 'Bildgenerierung fehlgeschlagen', en: 'Image generation failed', es: 'Error al generar la imagen' }));
         }
       } else if (variantsCount > 1) {
-        toast.success(`${successCount} von ${variantsCount} Varianten generiert`);
+        toast.success(tx({ de: `${successCount} von ${variantsCount} Varianten generiert`, en: `${successCount} of ${variantsCount} variants generated`, es: `${successCount} de ${variantsCount} variantes generadas` }));
       }
     } catch (error: any) {
       toast.error(error.message || t('picStudio.imageGenerationError'));

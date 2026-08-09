@@ -69,7 +69,7 @@ export function useMentorSlots(channelId?: string | null) {
       return;
     }
 
-    toast.success("Mentor-Slot gebucht!");
+    toast.success(tx({ de: "Mentor-Slot gebucht!", en: "Mentor slot booked!", es: "¡Espacio de mentor reservado!" }));
 
     // Audit log
     await supabase.from("community_audit_log").insert({
@@ -102,7 +102,7 @@ export function useMentorSlots(channelId?: string | null) {
       return;
     }
 
-    toast.success("Mentor-Slot erstellt!");
+    toast.success(tx({ de: "Mentor-Slot erstellt!", en: "Mentor slot created!", es: "¡Espacio de mentor creado!" }));
     fetchSlots();
   };
 

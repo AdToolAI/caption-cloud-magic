@@ -117,7 +117,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "bold-statement",
     name: "Bold Statement",
-    category: "Aussage",
+    category: tx({ de: "Aussage", en: "Statement", es: "Declaración" }),
     build: ({ image }) =>
       base(
         [{
@@ -136,7 +136,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "editorial",
     name: "Editorial",
-    category: "Magazin",
+    category: tx({ de: "Magazin", en: "Magazine", es: "Revista" }),
     build: ({ image }) =>
       base(
         [{
@@ -155,7 +155,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "split",
     name: "Split Layout",
-    category: "Produkt",
+    category: tx({ de: "Produkt", en: "Product", es: "Producto" }),
     build: ({ image }) =>
       base(
         [{
@@ -175,7 +175,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "minimal-overlay",
     name: "Minimal Overlay",
-    category: "Minimal",
+    category: tx({ de: "Minimal", en: "Minimal", es: "Mínimo" }),
     build: ({ image }) =>
       base(
         [{
@@ -192,8 +192,8 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "quote",
-    name: "Zitat",
-    category: "Zitat",
+    name: tx({ de: "Zitat", en: "Quote", es: "Cita" }),
+    category: tx({ de: "Zitat", en: "Quote", es: "Cita" }),
     build: ({ image }) =>
       base(
         [{
@@ -210,8 +210,8 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   },
   {
     id: "offer",
-    name: "Angebot",
-    category: "Angebot",
+    name: tx({ de: "Angebot", en: "Offer", es: "Oferta" }),
+    category: tx({ de: "Angebot", en: "Offer", es: "Oferta" }),
     build: ({ image }) =>
       base(
         [{
@@ -230,7 +230,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "tips",
     name: "Tipp-Liste",
-    category: "Wissen",
+    category: tx({ de: "Wissen", en: "Knowledge", es: "Conocimiento" }),
     build: ({ image }) =>
       base(
         [{
@@ -249,7 +249,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "before-after",
     name: "Vorher / Nachher",
-    category: "Beweis",
+    category: tx({ de: "Beweis", en: "Proof", es: "Prueba" }),
     build: ({ image }) =>
       base(
         [{
@@ -268,7 +268,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "launch",
     name: "Produkt-Launch",
-    category: "Launch",
+    category: tx({ de: "Launch", en: "Launch", es: "Lanzamiento" }),
     build: ({ image }) =>
       base(
         [{
@@ -287,7 +287,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "testimonial",
     name: "Testimonial",
-    category: "Beweis",
+    category: tx({ de: "Beweis", en: "Proof", es: "Prueba" }),
     build: ({ image }) =>
       base(
         [{
@@ -305,7 +305,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "event",
     name: "Event",
-    category: "Event",
+    category: tx({ de: "Event", en: "Event", es: "Evento" }),
     build: ({ image }) =>
       base(
         [{
@@ -324,7 +324,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "stat",
     name: "Zahl im Fokus",
-    category: "Wissen",
+    category: tx({ de: "Wissen", en: "Knowledge", es: "Conocimiento" }),
     build: ({ image }) =>
       base(
         [{
@@ -342,7 +342,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "framed",
     name: "Rahmen",
-    category: "Minimal",
+    category: tx({ de: "Minimal", en: "Minimal", es: "Mínimo" }),
     build: ({ image }) =>
       base(
         [{
@@ -359,7 +359,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "question",
     name: "Frage",
-    category: "Engagement",
+    category: tx({ de: "Engagement", en: "Engagement", es: "Compromiso" }),
     build: ({ image }) =>
       base(
         [{
@@ -377,7 +377,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "checklist",
     name: "Checkliste",
-    category: "Wissen",
+    category: tx({ de: "Wissen", en: "Knowledge", es: "Conocimiento" }),
     build: ({ image }) =>
       base(
         [{
@@ -395,7 +395,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "duotone",
     name: "Duoton",
-    category: "Aussage",
+    category: tx({ de: "Aussage", en: "Statement", es: "Declaración" }),
     build: ({ image }) =>
       base(
         [{
@@ -413,7 +413,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "steps",
     name: "3 Schritte",
-    category: "Wissen",
+    category: tx({ de: "Wissen", en: "Knowledge", es: "Conocimiento" }),
     build: ({ image }) =>
       base(
         [{
@@ -451,7 +451,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "poster",
     name: "Poster",
-    category: "Aussage",
+    category: tx({ de: "Aussage", en: "Statement", es: "Declaración" }),
     build: ({ image }) =>
       base(
         [{
@@ -469,7 +469,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "spotlight",
     name: "Spotlight",
-    category: "Produkt",
+    category: tx({ de: "Produkt", en: "Product", es: "Producto" }),
     build: ({ image }) =>
       base(
         [{
@@ -487,7 +487,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "announcement",
     name: "Ankündigung",
-    category: "Launch",
+    category: tx({ de: "Launch", en: "Launch", es: "Lanzamiento" }),
     build: ({ image }) =>
       base(
         [{
@@ -505,7 +505,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   {
     id: "grid-type",
     name: "Typo-Raster",
-    category: "Minimal",
+    category: tx({ de: "Minimal", en: "Minimal", es: "Mínimo" }),
     build: ({ image }) =>
       base(
         [{

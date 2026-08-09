@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Function Smoke Matrix — Cockpit Tab
 //
 // 1-click "Run Sweep" über alle in SMOKE_REGISTRY hinterlegten Edge-Functions.
@@ -141,10 +142,10 @@ export function FunctionMatrixTab() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <CardTitle className="text-base">Function Smoke Matrix</CardTitle>
+              <CardTitle className="text-base">{tx({ de: 'Function Smoke Matrix', en: 'Function Smoke Matrix', es: 'Matriz de humo de función' })}</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Ruft alle registrierten Edge-Functions im Mock-Modus auf (kostenlos). Aktuell{" "}
-                <span className="font-semibold text-foreground">467 / 473 Functions in 32 Kategorien</span> (≤25 pro Kategorie, Rate-Limit-safe) — bitte kategorieweise sweepen.
+                {tx({ de: 'Ruft alle registrierten Edge-Functions im Mock-Modus auf (kostenlos).', en: 'Calls all registered edge functions in mock mode (free).', es: 'Llama a todas las funciones perimetrales registradas en modo simulado (gratis).' })} Aktuell{" "}
+                <span className="font-semibold text-foreground">467 / 473 Functions in 32 Kategorien</span> (≤25 pro Kategorie, Rate-Limit-safe) — {tx({ de: 'bitte kategorieweise sweepen.', en: 'please sweep by category.', es: 'por favor barra por categoría.' })}
               </p>
             </div>
             <div className="flex gap-2 items-center">
@@ -153,7 +154,7 @@ export function FunctionMatrixTab() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Alle Kategorien</SelectItem>
+                  <SelectItem value="all">{tx({ de: 'Alle Kategorien', en: 'All Categories', es: 'Todas las categorías' })}</SelectItem>
                   {categories.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
                   ))}
@@ -161,7 +162,7 @@ export function FunctionMatrixTab() {
               </Select>
               <Button onClick={() => runSweep.mutate()} disabled={running} size="sm">
                 {running ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-                Sweep starten
+                {tx({ de: 'Sweep starten', en: 'Start Sweep', es: 'Iniciar barrido' })}
               </Button>
               <Button
                 variant="outline"
@@ -213,7 +214,7 @@ export function FunctionMatrixTab() {
           {/* Matrix */}
           {!activeSweepId && (
             <div className="text-sm text-muted-foreground py-12 text-center border border-dashed rounded">
-              Noch kein Sweep gelaufen. Klick auf <span className="font-semibold">„Sweep starten"</span>.
+              {tx({ de: 'Noch kein Sweep gelaufen. Klick auf', en: 'No sweep run yet. Click on', es: 'Aún no se ha realizado ningún barrido. Haga clic en' })} <span className="font-semibold">„{tx({ de: 'Sweep starten', en: 'Start Sweep', es: 'Iniciar barrido' })}"</span>.
             </div>
           )}
 

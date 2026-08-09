@@ -118,7 +118,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
     }
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      toast.error("Nicht eingeloggt");
+      toast.error(tx({ de: "Nicht eingeloggt", en: "Not logged in", es: "No has iniciado sesión" }));
       return null;
     }
     const { data, error } = await supabase.functions.invoke("generate-post-v2", {
@@ -156,7 +156,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
       setCaption(combined);
       if (tags.length) setHashtags(tags);
       await onPatch({ caption: combined, hashtags: tags });
-      toast.success("Post generiert ✨");
+      toast.success(tx({ de: "Post generiert ✨", en: "Post generated ✨", es: "Post generado ✨" }));
     } finally {
       setGenerating(false);
     }
@@ -172,7 +172,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
       const combined = newHook ? `${newHook}\n\n${baseCaption}` : baseCaption;
       setCaption(combined);
       await onPatch({ caption: combined });
-      toast.success("Caption umgeschrieben 🪄");
+      toast.success(tx({ de: "Caption umgeschrieben 🪄", en: "Caption rewritten 🪄", es: "Subtítulo reescrito 🪄" }));
     } finally {
       setRewriting(false);
     }
@@ -209,7 +209,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
 
   const handleReadyToPublish = async () => {
     if (!caption.trim()) {
-      toast.error("Caption fehlt");
+      toast.error(tx({ de: "Caption fehlt", en: "Caption missing", es: "Falta el subtítulo" }));
       return;
     }
     if (channels.length === 0) {
@@ -222,7 +222,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
     }
     const ts = new Date(startAt).getTime();
     if (ts < Date.now()) {
-      toast.error("Zeitpunkt liegt in der Vergangenheit");
+      toast.error(tx({ de: "Zeitpunkt liegt in der Vergangenheit", en: "Time is in the past", es: "La hora está en el pasado" }));
       return;
     }
     await onPatch({
@@ -237,7 +237,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     toast.success(
-      `🚀 Eingeplant — wird in ${h > 0 ? `${h}h ` : ""}${m}min automatisch veröffentlicht`,
+      tx({ de: `🚀 Eingeplant — wird in ${h > 0 ? `${h}h ` : ""}${m}min automatisch veröffentlicht`, en: `🚀 Scheduled — will be published automatically in ${h > 0 ? `${h}h ` : ""}${m}min`, es: `🚀 Programado — se publicará automáticamente en ${h > 0 ? `${h}h ` : ""}${m}min` }),
     );
     setAutoPublish(true);
   };
@@ -286,11 +286,11 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
       {/* LEFT — Composer */}
       <div className="space-y-4">
         {/* Briefing (collapsible glass section) */}
-        <Section title="Briefing" accent="primary" icon={<Sparkles className="h-3.5 w-3.5 text-[hsl(var(--primary))]" />}>
+        <Section title={tx({ de: 'Briefing', en: 'Briefing', es: 'Instrucciones' })} accent="primary" icon={<Sparkles className="h-3.5 w-3.5 text-[hsl(var(--primary))]" />}>
           <Collapsible open={briefOpen} onOpenChange={setBriefOpen}>
             <CollapsibleTrigger asChild>
               <button className="flex items-center justify-between w-full text-left text-xs text-muted-foreground hover:text-[hsl(var(--primary))] transition">
-                <span>{briefOpen ? "Ausblenden" : "Briefing bearbeiten"}</span>
+                <span>{briefOpen ? tx({ de: 'Ausblenden', en: 'Hide', es: 'Ocultar' }) : tx({ de: 'Briefing bearbeiten', en: 'Edit briefing', es: 'Editar instrucciones' })}</span>
                 <ChevronDown className={cn("h-3.5 w-3.5 transition", briefOpen && "rotate-180")} />
               </button>
             </CollapsibleTrigger>
@@ -300,7 +300,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
                 onChange={(e) => setBrief(e.target.value)}
                 onBlur={() => onUpdate("brief", brief)}
                 rows={3}
-                placeholder="Was soll der Post aussagen?"
+                placeholder={tx({ de: 'Was soll der Post aussagen?', en: 'What should the post say?', es: '¿Qué debería decir la publicación?' })}
                 className="bg-[#050816]/60 border-white/10 focus:border-[hsl(var(--primary))]/40 text-sm"
               />
             </CollapsibleContent>
@@ -319,7 +319,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
             className="bg-[hsl(var(--primary))] text-black font-semibold hover:bg-[hsl(var(--primary))]/90 shadow-[0_0_18px_-4px_hsla(43,90%,68%,0.7)]"
           >
             {generating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
-            Generieren
+            {tx({ de: 'Generieren', en: 'Generate', es: 'Generar' })}
           </Button>
           <select
             value={tonality}
@@ -336,7 +336,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
             className="border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-[hsl(var(--primary))]/40"
           >
             {rewriting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1.5" />}
-            Umschreiben
+            {tx({ de: 'Umschreiben', en: 'Rewrite', es: 'Reescribir' })}
           </Button>
         </div>
 
@@ -366,7 +366,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
         {/* Caption */}
         <Section title="Caption" icon={<Wand2 className="h-3.5 w-3.5 text-[hsl(var(--primary))]/70" />}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-muted-foreground">Plattform-Limit: {PLATFORMS.find(p=>p.id===previewPlatform)?.name}</span>
+            <span className="text-[10px] text-muted-foreground">{tx({ de: 'Plattform-Limit:', en: 'Platform limit:', es: 'Límite de la plataforma:' })} {PLATFORMS.find(p=>p.id===previewPlatform)?.name}</span>
             <span className={cn("text-[10px] tabular-nums font-mono", overLimit ? "text-destructive" : "text-muted-foreground")}>
               {caption.length} / {currentLimit}
             </span>
@@ -388,7 +388,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
 
         {/* Hashtag groups */}
         {Object.keys(hashtagGroups).length > 0 && (
-          <Section title="Hashtag-Gruppen">
+          <Section title={tx({ de: 'Hashtag-Gruppen', en: 'Hashtag Groups', es: 'Grupos de etiquetas' })}>
             <Tabs defaultValue={Object.keys(hashtagGroups)[0]}>
               <TabsList className="bg-[#050816]/60 border border-white/[0.06]">
                 {Object.keys(hashtagGroups).map((g) => (
