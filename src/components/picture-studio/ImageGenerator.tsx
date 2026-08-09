@@ -161,19 +161,22 @@ export function ImageGenerator() {
   const balance = wallet?.balance_euros ?? 0;
   const hasInsufficientCredits = cost > 0 && balance < cost;
 
-  // Nur Seitenverhältnisse anbieten, die das gewählte Modell akzeptiert.
+  // Nur Seitenverhältnisse anbieten, die das gewählte Modell wirklich akzeptiert.
   const availableAspectRatios = useMemo(() => {
-    const allowed = TIER_ASPECTS[tier];
+    const allowed = aspectRatiosForTier(tier);
     return allowed ? ASPECT_RATIOS.filter(r => allowed.includes(r.value)) : ASPECT_RATIOS;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, ASPECT_RATIOS]);
 
+  // Beim Modellwechsel auf das nächstliegende erlaubte Verhältnis springen.
   useEffect(() => {
     if (!availableAspectRatios.some(r => r.value === aspectRatio)) {
-      setAspectRatio(availableAspectRatios[0]?.value ?? '1:1');
+      const next = closestAspectRatio(tier, aspectRatio);
+      setAspectRatio(availableAspectRatios.some(r => r.value === next) ? next : (availableAspectRatios[0]?.value ?? '1:1'));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableAspectRatios]);
+
 
 
   useEffect(() => {
