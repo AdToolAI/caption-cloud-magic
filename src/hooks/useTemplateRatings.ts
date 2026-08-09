@@ -64,7 +64,7 @@ export const useSubmitRating = () => {
       reviewText?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Nicht angemeldet');
+      if (!user) throw new Error(tx({ de: 'Nicht angemeldet', en: 'Not signed in', es: 'No has iniciado sesión' }));
 
       const { data, error } = await supabase
         .from('template_ratings')
@@ -90,13 +90,13 @@ export const useSubmitRating = () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       queryClient.invalidateQueries({ queryKey: ['content-templates'] });
       toast({
-        title: 'Bewertung gespeichert',
+        title: tx({ de: 'Bewertung gespeichert', en: 'Rating saved', es: 'Valoración guardada' }),
         description: tx({ de: 'Ihre Bewertung wurde erfolgreich gespeichert.', en: 'Your rating has been saved successfully.', es: 'Tu valoración se ha guardado correctamente.' }),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Bewertung konnte nicht gespeichert werden', en: 'Rating could not be saved', es: 'No se pudo guardar la calificación' }),
         variant: 'destructive',
       });
