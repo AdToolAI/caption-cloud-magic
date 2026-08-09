@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Check, TrendingUp, ShoppingCart, Palette } from "lucide-react";
-import { useTx } from "@/lib/i18nText";
+import { tx, useTx } from "@/lib/i18nText";
 
 const goals = [
   { id: "grow_audience", label: "Reichweite aufbauen", icon: TrendingUp, desc: tx({ de: "Videos, die neue Zuschauer erreichen", en: "Videos that reach new viewers", es: "Vídeos que llegan a nuevos espectadores" }) },
