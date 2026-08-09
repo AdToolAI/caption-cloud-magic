@@ -51,12 +51,12 @@ import {
   type DialogTurn,
 } from "../_shared/scene-dialog-turns.ts";
 import {
-import { tl, withLang } from "../_shared/i18n.ts";
   ensureSceneAssetsForScene,
   readSceneAssetsRequired,
   summarizeSceneAssets,
   type AssetRef,
 } from "../_shared/asset-ref.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const ANCHOR_AUDIT_VERSION = 15;
 
 const corsHeaders = {

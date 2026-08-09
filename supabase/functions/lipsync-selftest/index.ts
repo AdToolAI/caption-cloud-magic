@@ -22,12 +22,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 import {
-import { tl, withLang } from "../_shared/i18n.ts";
   LIPSYNC_CONTRACT_VERSION,
   PRECLIP,
   PROVIDER,
   WATCHDOG_MS,
 } from "../_shared/lipsync-frozen-contract.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const GOLDEN_SCENE_ID = "c934a823-47de-49b7-a62e-a116b49ca3b2";
 

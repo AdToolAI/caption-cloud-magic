@@ -23,12 +23,12 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import {
-import { tl, withLang } from "../_shared/i18n.ts";
   ensureDialogTurnsForScene,
   normalizeTurns,
   readIdOnlyEnabled,
   type DialogTurn,
 } from "../_shared/scene-dialog-turns.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",

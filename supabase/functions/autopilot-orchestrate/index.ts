@@ -26,13 +26,13 @@ import {
   upsertBridgeScene,
 } from "../_shared/autopilotComposerBridge.ts";
 import {
-import { tl, withLang } from "../_shared/i18n.ts";
   FALLBACK_STILL,
   isFramingFailure,
   MAX_SCENE_ATTEMPTS,
   repairAnchorPrompt,
   repairMotionPrompt,
 } from "../_shared/autopilotRetry.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 
 

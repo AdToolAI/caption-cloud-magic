@@ -2,13 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import {
-import { tl, withLang } from "../_shared/i18n.ts";
   ALL_EFFECT_IDS,
   EFFECT_DESCRIPTIONS,
   getDefaultEffects,
   sanitizeEffects,
   type SceneEffectId,
 } from "../_shared/composer-effects.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

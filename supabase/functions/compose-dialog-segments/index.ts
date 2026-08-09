@@ -56,7 +56,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
-import { tl, withLang } from "../_shared/i18n.ts";
   classifySyncError,
   detectVoicedFrames,
   detectVoicedRange,
@@ -117,6 +116,7 @@ import { rehostPlate } from "../_shared/rehostPlate.ts";
 
 
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
