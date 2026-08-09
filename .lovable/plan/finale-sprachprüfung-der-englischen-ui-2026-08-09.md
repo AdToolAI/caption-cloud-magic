@@ -1,31 +1,30 @@
 # Finale Sprachprüfung der englischen UI
 
-Der automatische Konsistenz-Check (`scripts/check-i18n-consistency.mjs`) läuft grün, ein eigener Roh-Scan über `src/` findet aber weiterhin **368 verdächtige deutsche Textstellen in 205 Dateien**. Diese Reste erscheinen in der englischen UI weiterhin auf Deutsch.
+Der letzte Durchlauf hat den Großteil der deutschen Texte lokalisiert. Der aktuelle Scan meldet noch 23 Dateien mit 46 Treffern — die Stichprobe zeigt, dass die meisten davon Fehlalarme sind (deutsche Sprachvarianten in bereits dreisprachigen Blöcken, Stoppwortlisten, Konsolen-Logs). Um belastbar sagen zu können "die englische UI ist sauber", braucht es einen strengeren Prüflauf, der auch die Fälle findet, die der bisherige Scanner nicht sieht.
 
-## Was noch offen ist (belegt durch Scan)
+## Was geprüft wird
 
-Beispiele aus dem Scan:
-
-- `src/components/video-composer/SceneDialogStudio.tsx` (14 Stellen)
-- `src/components/ai-video/ToolkitGenerator.tsx` (10)
-- `src/pages/legal/AutopilotAUP.tsx` (9), `src/pages/legal/AIVideoRefundPolicy.tsx` (5)
-- `src/lib/autopilot/preflight.ts` (8), `src/components/video-composer/ClipsTab.tsx` (8)
-- `src/pages/MediaLibrary.tsx` (7), `src/components/directors-cut/steps/SceneAnalysisStep.tsx` (7)
-- Toasts wie `Carousel erfolgreich erstellt!` (`src/pages/Carousel.tsx`), `Fehler beim Laden` (`src/components/admin/RenderLoadWidget.tsx`), `placeholder="(keine)"` (`src/pages/AITextStudio.tsx`), `aria-label="Löschen"` (`SceneSnippetPicker.tsx`), `"Speichern & Auto-Publish"` (`PlatformRingDialog.tsx`)
-
-Zusätzlich gibt es lokale `t()`-Helfer mit unterschiedlicher Argument-Reihenfolge. In `StylePresetPicker.tsx` ist die Signatur `t(lang, de, en, es)`; in `SaveAsAssetMenu.tsx` stehen Aufrufe wie `t(language, 'Cancel', 'Abbrechen', 'Cancelar')`. Eine der beiden Reihenfolgen ist falsch — das muss pro Datei gegen die dort importierte/definierte Signatur geprüft werden, sonst sieht die englische UI Deutsch und umgekehrt.
+1. **Verbleibende 23 Dateien** einzeln durchgehen und die echten Fundstellen lokalisieren; Fehlalarme dokumentieren, damit sie nicht erneut auftauchen.
+2. **Falsch übersetzte Stellen** (nicht nur fehlende): Prüfen, ob in `en`-Feldern versehentlich deutscher Text steht, ob `de`/`en` vertauscht sind und ob lokale `t(language, ...)`-Helfer überall dieselbe Argumentreihenfolge nutzen.
+3. **Bisher nicht abgedeckte Textquellen**:
+   - Attribute: `placeholder`, `aria-label`, `title`, `alt`
+   - Toasts und Fehlermeldungen (`toast.*`, `throw new Error`), soweit sie im UI landen
+   - Auswahl-/Optionslisten und Konstanten-Arrays (wie zuletzt die Prompt-Helper-Chips)
+   - Leerzustände, Ladehinweise, Validierungstexte
+   - E-Mail-Templates und Edge-Function-Antworten, die dem Nutzer angezeigt werden
+   - `index.html` (Title/Meta) und Rechtstexte unter `src/pages/legal/*`
+4. **Sichtprüfung im Browser**: Die wichtigsten Oberflächen mit erzwungener Sprache `en` aufrufen und per Screenshot gegenprüfen (Landing, Dashboard, Video Composer, AI Video Studio, Picture/Motion/Audio Studio, Content Studio, Account/Billing, Admin, Auth, Rechtstexte).
 
 ## Vorgehen
 
-1. **Vollständiges Inventar erstellen**: Scanner-Skript über `src/` (Komponenten, Seiten, Hooks, Lib) laufen lassen und alle Treffer als JSON-Inventar ablegen (Datei, Zeile, Text). Kommentare, `de:`-Felder des Wörterbuchs und Tests werden ausgeschlossen.
-2. **Signatur-Audit der `t()`-Helfer**: Alle lokalen `t(lang, …)`-Definitionen einsammeln und jeden Aufruf gegen die richtige Reihenfolge prüfen; vertauschte Aufrufe korrigieren.
-3. **Lokalisierung in Paketen**: Das Inventar in ~10 Pakete aufteilen und parallel abarbeiten. Jeder deutsche String wird auf `tx({ de, en, es })` bzw. das vorhandene Wörterbuch umgestellt — inklusive Toasts, Placeholders, `aria-label`, `title`, Select-Optionen und leeren Zuständen.
-4. **Rechtstexte** (`src/pages/legal/*`) gesondert behandeln: vollständige EN/ES-Fassungen statt Wort-für-Wort-Ersetzungen.
-5. **Verifikation**: Roh-Scan erneut ausführen (Ziel: 0 Treffer), `check-i18n-consistency.mjs`, Typecheck und Build. Anschließend Stichproben-Durchgang der Hauptrouten im Browser auf `en`, mit Screenshots der wichtigsten Seiten (Dashboard, AI Video Studio, Video Composer, Director's Cut, Media Library, Account, Legal).
+- Erweiterter Scanner, der Attribute, Toasts, String-Arrays und vertauschte Sprachfelder erfasst; Ergebnis als Inventar (Datei, Zeile, Text, Grund).
+- Abarbeitung in parallelen Paketen; jede Fundstelle bekommt DE/EN/ES über den bestehenden `tx`-Helfer bzw. das vorhandene `t(language, …)`-Muster.
+- Visuelle Prüfung der Hauptrouten in `en`, Korrektur der dabei gefundenen Reste.
+- Abschluss: erneuter Scan (Ziel: nur noch belegte Fehlalarme), `bunx tsgo --noEmit` und Build.
 
 ## Technische Details
 
-- Zentrale Helfer bleiben `src/lib/i18nText.ts` (`tx`) und `src/lib/translations.ts`.
-- Keine Änderungen an Logik oder Datenflüssen — reine Text-/Präsentationsebene.
-- Visuelle Prompts für KI-Modelle bleiben laut Projektregel auf Englisch; deutsche Prompt-Strings in Generator-Code werden nur dann angefasst, wenn sie sichtbare UI-Texte sind.
-- Nach der Wave wird der Scanner als Skript im Repo belassen, damit neue deutsche Literale künftig auffallen.
+- Zentraler Helfer bleibt `src/lib/i18nText.ts` (`tx` / `useTx`, JSX-fähig über Generics).
+- Konsistenzprüfung `scripts/check-i18n-consistency.mjs` wird um die neuen Muster (Attribute, vertauschte Sprachfelder) erweitert, damit künftige Regressionen im Check auffallen.
+- Prompts an KI-Modelle bleiben bewusst englisch — sie werden vom Scan ausgenommen.
+- Reine Konsolen-Logs und interne Debug-Strings werden nicht übersetzt.
