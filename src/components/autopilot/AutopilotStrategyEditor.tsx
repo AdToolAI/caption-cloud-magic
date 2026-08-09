@@ -33,6 +33,7 @@ const VIDEO_RATIOS: { id: string; label: string }[] = [
 ];
 
 export function AutopilotStrategyEditor({ brief }: Props) {
+  const tx = useTx();
   const upsert = useUpsertAutopilotBrief();
   const [pillars, setPillars] = useState<string[]>([]);
   const [forbidden, setForbidden] = useState<string[]>([]);
