@@ -40,7 +40,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
       .then(({ data }) => {
         const items = (data ?? [])
           .filter((row) => (row.file_type ?? "").startsWith("image") || /\.(png|jpe?g|webp)$/i.test(row.file_url ?? ""))
-          .map((row) => ({ url: row.file_url as string, name: (row.file_name as string) ?? "Bild" }));
+          .map((row) => ({ url: row.file_url as string, name: (row.file_name as string) ?? tx({ de: "Bild", en: "Image", es: "Imagen" }) }));
         setLibraryItems(items);
         setLoadingLibrary(false);
       });
@@ -134,7 +134,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
             >
               {uploading ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : <Upload className="h-6 w-6 text-primary" />}
               <span className="text-sm">{tx({ de: "Bild hierher klicken und auswählen", en: "Click here to select an image", es: "Haz clic aquí para seleccionar una imagen" })}</span>
-              <span className="text-xs text-muted-foreground">JPG, PNG oder WEBP bis 10 MB</span>
+              <span className="text-xs text-muted-foreground">{tx({ de: "JPG, PNG oder WEBP bis 10 MB", en: "JPG, PNG, or WEBP up to 10 MB", es: "JPG, PNG o WEBP hasta 10 MB" })}</span>
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
           </TabsContent>

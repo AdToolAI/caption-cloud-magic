@@ -178,9 +178,11 @@ export const OUTCOMES: Record<OutcomeKey, OutcomeMeta> = {
           ["Schritt 05 · Insight-Cards", "Step 05 · Insight cards", "Paso 05 · Insight cards"],
           [tx({ de: "Konkrete Anweisungen, keine Charts.", en: "Concrete instructions, no charts.", es: "Instrucciones concretas, sin gráficos." }), "Concrete actions, not just charts.", "Instrucciones concretas, no solo gráficos."],
           [
-            "Statt Charts liefert AdTool AI klare Anweisungen: Hook @0,8s stärker, CTA @6,2s, Cut @12s. Umsetzen, veröffentlichen, weiter.",
-            "Instead of charts, AdTool AI gives concrete calls: sharper hook @0.8s, CTA @6.2s, cut @12s. Apply, publish, move on.",
-            "En vez de gráficos, AdTool AI da instrucciones claras: hook @0,8s más fuerte, CTA @6,2s, corte @12s. Aplicar, publicar, seguir.",
+            tx({
+              de: "Statt Charts liefert AdTool AI klare Anweisungen: Hook @0,8s stärker, CTA @6,2s, Cut @12s. Umsetzen, veröffentlichen, weiter.",
+              en: "Instead of charts, AdTool AI gives concrete calls: sharper hook @0.8s, CTA @6.2s, cut @12s. Apply, publish, move on.",
+              es: "En vez de gráficos, AdTool AI da instrucciones claras: hook @0,8s más fuerte, CTA @6,2s, corte @12s. Aplicar, publicar, seguir.",
+            }),
           ],
         ),
       },

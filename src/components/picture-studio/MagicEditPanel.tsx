@@ -12,6 +12,7 @@ import { Brush, Eraser, Undo2, Upload, Wand2, Loader2, Image as ImageIcon, Maxim
 import { useMagicEdit } from "@/hooks/useMagicEdit";
 import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
 import { toast } from "sonner";
+import { tx } from "@/lib/i18nText";
 
 type Direction = 'left' | 'right' | 'top' | 'bottom' | 'all';
 
@@ -273,7 +274,7 @@ export function MagicEditPanel() {
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-semibold">
-                      {mode === 'inpaint' ? '1. Bereich markieren' : '1. Vorschau'}
+                      {mode === 'inpaint' ? tx({ de: '1. Bereich markieren', en: '1. Mark area', es: '1. Marcar zona' }) : tx({ de: '1. Vorschau', en: '1. Preview', es: '1. Vista previa' })}
                     </Label>
                     <Button
                       variant="ghost"
