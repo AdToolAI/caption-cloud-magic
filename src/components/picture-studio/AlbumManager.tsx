@@ -117,7 +117,7 @@ export function AlbumManager() {
   const deleteAlbum = async (albumId: string) => {
     const { error } = await supabase.from('studio_albums').delete().eq('id', albumId);
     if (!error) {
-      toast.success("Album gelöscht");
+      toast.success(tx({ de: "Album gelöscht", en: "Album deleted", es: "Álbum eliminado" }));
       setSelectedAlbum(null);
       loadAlbums();
     }

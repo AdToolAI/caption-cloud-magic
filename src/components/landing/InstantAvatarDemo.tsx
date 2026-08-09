@@ -280,7 +280,7 @@ export const InstantAvatarDemo = () => {
                 <CornerTicks />
                 <img
                   src={sourceUrl}
-                  alt="Dein hochgeladenes Foto"
+                  alt={tx({ de: "Dein hochgeladenes Foto", en: "Your uploaded photo", es: "Tu foto subida" })}
                   className="w-full h-full object-contain"
                 />
                 <button

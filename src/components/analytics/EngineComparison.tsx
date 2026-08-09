@@ -207,11 +207,11 @@ export function EngineComparison({ engineData }: Props) {
         <h3 className="text-lg font-semibold mb-3">💡 Empfehlung</h3>
         <div className="space-y-2 text-sm">
           <p>
-            <strong>Für schnelle, einfache Videos:</strong> Nutze Shotstack - 
+            <strong>{tx({ de: 'Für schnelle, einfache Videos:', en: 'For fast, simple videos:', es: 'Para videos rápidos y sencillos:' })}</strong> {tx({ de: 'Nutze Shotstack -', en: 'Use Shotstack -', es: 'Usa Shotstack -' })} 
             {engineData.shotstack.avg_render_time}s Renderzeit und {engineData.shotstack.success_rate}% Erfolgsrate
           </p>
           <p>
-            <strong>Für komplexe, hochwertige Animationen:</strong> Nutze Remotion - 
+            <strong>{tx({ de: 'Für komplexe, hochwertige Animationen:', en: 'For complex, high-quality animations:', es: 'Para animaciones complejas de alta calidad:' })}</strong> {tx({ de: 'Nutze Remotion -', en: 'Use Remotion -', es: 'Usa Remotion -' })} 
             Mehr Flexibilität und React-Power, trotz {engineData.remotion.avg_render_time}s Renderzeit
           </p>
           <p className="text-muted-foreground mt-3">

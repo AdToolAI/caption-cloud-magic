@@ -112,7 +112,7 @@ export default function FeatureFlags() {
     setFlags({});
     localStorage.removeItem('feature_flags_override');
     toast({
-      title: 'Feature Flags zurückgesetzt',
+      title: tx({ de: 'Feature Flags zurückgesetzt', en: 'Feature flags reset', es: 'Marcas de funciones restablecidas' }),
       description: tx({ de: 'Alle Flags verwenden jetzt die Standard-Werte.', en: 'All flags now use default values.', es: 'Todas las banderas ahora usan los valores predeterminados.' }),
     });
     setHasChanges(false);

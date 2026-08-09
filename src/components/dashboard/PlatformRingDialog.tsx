@@ -216,7 +216,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   rows={5}
-                  placeholder="Schreibe deinen Post …"
+                  placeholder={tx({ de: "Schreibe deinen Post …", en: "Write your post …", es: "Escribe tu publicación …" })}
                   className="resize-none"
                 />
               </div>

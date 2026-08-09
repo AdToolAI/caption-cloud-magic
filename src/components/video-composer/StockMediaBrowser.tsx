@@ -184,7 +184,7 @@ export default function StockMediaBrowser({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-media-library'] });
-      toast({ title: t('videoComposer.stock.saved') || 'Gespeichert in deiner Bibliothek' });
+      toast({ title: t('videoComposer.stock.saved') || tx({ de: 'Gespeichert in deiner Bibliothek', en: 'Saved to your library', es: 'Guardado en tu biblioteca' }) });
     },
     onError: (err) => toast({ title: tx({ de: 'Fehler beim Speichern', en: 'Error saving', es: 'Error al guardar' }), description: String(err), variant: 'destructive' }),
   });
@@ -292,7 +292,7 @@ export default function StockMediaBrowser({
               {isLoading && (
                 <div className="flex items-center justify-center py-16 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  {t('common.loading') || 'Lädt…'}
+                  {t('common.loading') || tx({ de: 'Lädt…', en: 'Loading…', es: 'Cargando…' })}
                 </div>
               )}
 

@@ -81,7 +81,7 @@ const Index = () => {
     <PageWrapper>
       <div className="min-h-screen flex flex-col bg-background">
         <SEO
-          title="Ein Creator. Ein ganzes Studio. — KI-Videoproduktion"
+          title={tx({ de: "Ein Creator. Ein ganzes Studio. — KI-Videoproduktion", en: "One Creator. One Whole Studio. — AI Video Production", es: "Un Creador. Todo un Estudio. — Producción de Video con IA" })}
           description={tx({ de: "Alle führenden KI-Modelle, Stimmen und präziser Lip-Sync in einem durchgängigen Workflow. Von der Idee zum fertigen Video — ohne Filmteam.", en: "All leading AI models, voices, and precise lip-sync in a continuous workflow. From idea to finished video — without a film crew.", es: "Todos los modelos de IA líderes, voces y sincronización labial precisa en un flujo de trabajo continuo. De la idea al video terminado — sin equipo de filmación." })}
           canonical="https://useadtool.ai/"
           lang={language}

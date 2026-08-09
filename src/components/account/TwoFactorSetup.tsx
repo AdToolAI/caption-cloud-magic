@@ -196,12 +196,12 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                 <div className="p-4 bg-muted/30 rounded-xl border border-border/50 space-y-3">
                   <h4 className="font-medium flex items-center gap-2">
                     <Smartphone className="h-4 w-4 text-primary" />
-                    So funktioniert es:
+                    {tx({ de: "So funktioniert es:", en: "How it works:", es: "Cómo funciona:" })}
                   </h4>
                   <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-2">
                     <li>{tx({ de: "Lade eine Authenticator-App herunter (Google Authenticator, Authy, etc.)", en: "Download an authenticator app (Google Authenticator, Authy, etc.)", es: "Descargue una aplicación de autenticación (Google Authenticator, Authy, etc.)" })}</li>
                     <li>{tx({ de: "Scanne den QR-Code mit der App", en: "Scan the QR code with the app", es: "Escanea el código QR con la aplicación" })}</li>
-                    <li>Gib den generierten Code ein, um die Einrichtung abzuschließen</li>
+                    <li>{tx({ de: "Gib den generierten Code ein, um die Einrichtung abzuschließen", en: "Enter the generated code to complete the setup", es: "Introduce el código generado para completar la configuración" })}</li>
                   </ol>
                 </div>
                 <Button 
@@ -211,7 +211,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                 >
                   <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                   {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  <span className="relative">Einrichtung starten</span>
+                  <span className="relative">{tx({ de: "Einrichtung starten", en: "Start setup", es: "Iniciar configuración" })}</span>
                 </Button>
               </motion.div>
             )}
@@ -350,9 +350,9 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4, duration: 0.3 }}
                 >
-                  <h3 className="font-semibold text-lg">Erfolgreich aktiviert!</h3>
+                  <h3 className="font-semibold text-lg">{tx({ de: "Erfolgreich aktiviert!", en: "Successfully activated!", es: "¡Activado con éxito!" })}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Dein Konto ist jetzt zusätzlich geschützt
+                    {tx({ de: "Dein Konto ist jetzt zusätzlich geschützt", en: "Your account is now additionally protected", es: "Tu cuenta ahora está protegida adicionalmente" })}
                   </p>
                 </motion.div>
               </motion.div>

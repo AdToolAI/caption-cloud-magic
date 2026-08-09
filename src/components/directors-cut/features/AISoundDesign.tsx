@@ -10,6 +10,7 @@ import { Loader2, Volume2, Sparkles, Play, Pause, Trash2 } from 'lucide-react';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { tx } from '@/lib/i18nText';
 
 interface GeneratedSound {
   id: string;
@@ -138,7 +139,7 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
       console.error('Sound Design error:', error);
       
       if (error?.context?.status === 402) {
-        toast.error('Nicht genügend Credits', {
+        toast.error(tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'Créditos insuficientes' }), {
           description: tx({ de: `Du benötigst ${CREDITS_COST} Credits für AI Sound Design`, en: `You need ${CREDITS_COST} credits for AI Sound Design`, es: `Necesitas ${CREDITS_COST} créditos para diseño de sonido con IA` }),
         });
       } else {

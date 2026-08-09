@@ -41,7 +41,7 @@ interface RecentProject {
 const QUICK_ACTIONS = [
   {
     title: 'Studio Mode',
-    desc: 'Geführter 4-Schritt-Flow: Cast → Location → Storyboard → Render',
+    desc: tx({ de: 'Geführter 4-Schritt-Flow: Cast → Location → Storyboard → Render', en: 'Guided 4-step flow: Cast → Location → Storyboard → Render', es: 'Flujo guiado de 4 pasos: Cast → Ubicación → Storyboard → Render' }),
     icon: Wand2,
     href: '/motion-studio/studio',
     accent: 'from-primary/40 to-accent/15',
@@ -81,7 +81,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'AI Video Studios',
-    desc: 'Sora, Kling, Luma, Wan, Hailuo & Seedance direkt ansprechen',
+    desc: tx({ de: 'Sora, Kling, Luma, Wan, Hailuo & Seedance direkt ansprechen', en: 'Access Sora, Kling, Luma, Wan, Hailuo & Seedance directly', es: 'Acceder directamente a Sora, Kling, Luma, Wan, Hailuo y Seedance' }),
     icon: Sparkles,
     href: '/ai-video-studio',
     accent: 'from-primary/20 to-accent/10',
@@ -89,7 +89,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'Compare Lab',
-    desc: 'Ein Prompt — bis zu 6 Engines parallel. AI-Judge wählt den Sieger.',
+    desc: tx({ de: 'Ein Prompt — bis zu 6 Engines parallel. AI-Judge wählt den Sieger.', en: 'One prompt — up to 6 engines in parallel. AI judge picks the winner.', es: 'Un prompt — hasta 6 motores en paralelo. El juez de IA elige al ganador.' }),
     icon: Sparkles,
     href: '/compare-lab',
     accent: 'from-accent/30 to-primary/10',

@@ -174,7 +174,7 @@ export default function AIMonitoring() {
                   </p>
                 </>
               ) : (
-                <div className="text-sm text-muted-foreground">Keine Daten</div>
+                <div className="text-sm text-muted-foreground">{tx({ de: "Keine Daten", en: "No data", es: "Sin datos" })}</div>
               )}
             </CardContent>
           </Card>
@@ -209,7 +209,7 @@ export default function AIMonitoring() {
               {loading ? (
                 <div className="text-sm text-muted-foreground">Lade...</div>
               ) : recentCalls.length === 0 ? (
-                <div className="text-sm text-muted-foreground">Keine AI Calls gefunden</div>
+                <div className="text-sm text-muted-foreground">{tx({ de: "Keine AI Calls gefunden", en: "No AI calls found", es: "No se encontraron llamadas de IA" })}</div>
               ) : (
                 recentCalls.map((call) => (
                   <div

@@ -1045,7 +1045,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     key: 'anchor' as const,
                     label: language === 'de' ? 'Nur Anker' : 'Anchor only',
                     hint: model.capabilities.anchorOnly
-                      ? (language === 'de' ? 'Nur Identitäts-Referenz, kein fester Frame' : 'Identity reference only, no forced frame')
+                      ? tx({ de: 'Nur Identitäts-Referenz, kein fester Frame', en: 'Identity reference only, no forced frame', es: 'Solo referencia de identidad, sin fotograma fijo' })
                       : (language === 'de' ? tx({ de: 'Nur mit Vidu Q2 oder Kling 3 möglich', en: 'Only possible with Vidu Q2 or Kling 3', es: 'Solo es posible con Vidu Q2 o Kling 3' }) : 'Only available with Vidu Q2 or Kling 3'),
                     supportedByCurrent: !!model.capabilities.anchorOnly,
                   },

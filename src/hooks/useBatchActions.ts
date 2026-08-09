@@ -87,7 +87,7 @@ export const useBatchActions = () => {
     try {
       await supabase.from('video_creations').delete().eq('batch_job_id', batchJobId);
       await supabase.from('batch_jobs').delete().eq('id', batchJobId);
-      toast.success('Batch gelöscht');
+      toast.success(tx({ de: 'Batch gelöscht', en: 'Batch deleted', es: 'Lote eliminado' }));
     } catch (error) {
       toast.error(tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' }));
     } finally {

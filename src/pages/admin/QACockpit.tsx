@@ -98,7 +98,7 @@ export default function QACockpit() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Als behoben markiert");
+      toast.success(tx({ de: "Als behoben markiert", en: "Marked as resolved", es: "Marcado como resuelto" }));
       queryClient.invalidateQueries({ queryKey: ["qa-bugs"] });
       setSelectedBug(null);
     },
@@ -550,7 +550,7 @@ export default function QACockpit() {
                           ? tx({ de: "Keine kritischen Bugs offen — alles grün ✓", en: "No critical bugs open — everything green ✓", es: "No se han abierto errores críticos: todo está verde ✓" })
                           : bugFilter === "warnings"
                           ? tx({ de: "Keine Warnungen", en: "No warnings", es: "Sin advertencias" })
-                          : "Noch nichts gelöst"
+                          : tx({ de: "Noch nichts gelöst", en: "Nothing resolved yet", es: "Aún no se ha resuelto nada" })
                       }
                     />
                   ) : (
@@ -896,7 +896,7 @@ export default function QACockpit() {
                 )}
 
                 {Array.isArray(selectedBug.network_trace?.heartbeats) && selectedBug.network_trace.heartbeats.length > 0 && (
-                  <Section title="Skript-Heartbeats (wo blieb das Skript stehen?)">
+                  <Section title={tx({ de: "Skript-Heartbeats (wo blieb das Skript stehen?)", en: "Script heartbeats (where did the script stop?)", es: "Latidos del script (¿dónde se detuvo el script?)" })}>
                     <ol className="text-xs space-y-1 bg-black/40 p-3 rounded border border-[#F5C76A]/10 font-mono">
                       {selectedBug.network_trace.heartbeats.map((h: any, i: number) => (
                         <li key={i} className={h.label === "aborted" ? "text-red-300" : "text-cyan-300"}>
@@ -967,7 +967,7 @@ export default function QACockpit() {
                   onClick={() => {
                     const md = `# Bug: ${selectedBug.title}\n\n**Mission:** ${selectedBug.mission_name}\n**Severity:** ${selectedBug.severity}\n**Category:** ${selectedBug.category}\n${selectedBug.route ? `**Route:** ${selectedBug.route}\n` : ""}\n## Beschreibung\n\`\`\`\n${selectedBug.description ?? ""}\n\`\`\`\n\n${selectedBug.network_trace ? `## Network Trace\n\`\`\`json\n${JSON.stringify(selectedBug.network_trace, null, 2)}\n\`\`\`\n` : ""}${Array.isArray(selectedBug.console_log) && selectedBug.console_log.length ? `\n## Console\n\`\`\`\n${selectedBug.console_log.map((c: any) => `[${c.type}] ${c.text}${c.url ? ` @ ${c.url}:${c.line ?? "?"}` : ""}${c.stack ? `\n${c.stack}` : ""}`).join("\n")}\n\`\`\`\n` : ""}`;
                     navigator.clipboard.writeText(md);
-                    toast.success("Bug-Context als Markdown kopiert — direkt im Chat einfügen");
+                    toast.success(tx({ de: "Bug-Context als Markdown kopiert — direkt im Chat einfügen", en: "Bug context copied as Markdown — paste directly into chat", es: "Contexto del error copiado como Markdown — pégalo directamente en el chat" }));
                   }}
                 >
                   <Copy className="h-4 w-4 mr-2" /> Als Prompt kopieren

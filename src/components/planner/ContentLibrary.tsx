@@ -186,7 +186,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {loading ? (
-          <div className="text-center text-sm text-muted-foreground">Lädt...</div>
+          <div className="text-center text-sm text-muted-foreground">{tx({ de: "Lädt...", en: "Loading...", es: "Cargando..." })}</div>
         ) : items.length === 0 ? (
           <EmptyContentLibrary campaignFilter={!!campaignId} />
         ) : (
@@ -279,7 +279,7 @@ function EmptyContentLibrary({ campaignFilter }: { campaignFilter: boolean }) {
         <FolderOpen className="h-8 w-8 text-muted-foreground" />
       </div>
       <h3 className="font-semibold text-sm mb-2">
-        {campaignFilter ? "Keine Kampagnen-Inhalte" : "Keine Inhalte gefunden"}
+        {campaignFilter ? tx({ de: "Keine Kampagnen-Inhalte", en: "No campaign content", es: "Sin contenido de campaña" }) : tx({ de: "Keine Inhalte gefunden", en: "No content found", es: "No se encontró contenido" })}
       </h3>
       <p className="text-xs text-muted-foreground mb-4 max-w-xs">
         {campaignFilter 

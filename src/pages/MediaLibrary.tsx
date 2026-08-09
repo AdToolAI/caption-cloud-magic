@@ -424,7 +424,7 @@ export default function MediaLibrary() {
           source: 'video-creator' as const,
           type: 'video' as const,
           title: 'Demo Video — Universal Creator',
-          caption: 'Dein erstes Video könnte so aussehen',
+          caption: tx({ de: 'Dein erstes Video könnte so aussehen', en: 'Your first video could look like this', es: 'Tu primer video podría verse así' }),
           url: DEMO_VIDEO.output_url,
           thumbUrl: DEMO_VIDEO.output_url,
           createdAt: DEMO_VIDEO.created_at,
@@ -715,7 +715,7 @@ export default function MediaLibrary() {
       }
 
       toast({
-        title: 'Gelöscht',
+        title: tx({ de: 'Gelöscht', en: 'Deleted', es: 'Eliminado' }),
         description: tx({ de: 'Medium erfolgreich gelöscht', en: 'Media deleted successfully', es: 'Medios eliminados correctamente' }),
       });
 

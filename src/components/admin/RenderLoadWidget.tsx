@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Activity, Crown, Loader2, RefreshCw, Timer, Zap } from 'lucide-react';
+import { tx } from "@/lib/i18nText";
 import { formatDistanceToNowStrict } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -214,7 +215,7 @@ export function RenderLoadWidget() {
                   Ältester: {formatDistanceToNowStrict(new Date(oldestQueuedAge), { locale: de, addSuffix: false })}
                 </span>
               ) : (
-                <span>Keine wartenden Jobs</span>
+                <span>{tx({ de: "Keine wartenden Jobs", en: "No pending jobs", es: "Sin trabajos pendientes" })}</span>
               )}
             </div>
             {data.founderQueued > 0 && (
@@ -241,7 +242,7 @@ export function RenderLoadWidget() {
       {/* Active jobs table */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Live-Jobs (Top 20 nach Priorität)</CardTitle>
+          <CardTitle className="text-base">{tx({ de: "Live-Jobs (Top 20 nach Priorität)", en: "Live jobs (top 20 by priority)", es: "Trabajos en vivo (top 20 por prioridad)" })}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

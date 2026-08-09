@@ -163,7 +163,7 @@ export default function SfxBrowser() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Suche nach SFX (z.B. whoosh, glass, footstep)…"
+            placeholder={tx({ de: "Suche nach SFX (z.B. whoosh, glass, footstep)…", en: "Search SFX (e.g. whoosh, glass, footstep)…", es: "Buscar SFX (p. ej. whoosh, glass, footstep)…" })}
             className="pl-9"
           />
         </div>

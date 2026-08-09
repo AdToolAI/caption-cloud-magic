@@ -50,9 +50,9 @@ export function PlatformStep({ selectedPlatforms, onToggle, onNext, onBack }: Pl
       </div>
 
       <div className="flex gap-4">
-        <Button onClick={onBack} variant="outline" size="lg" className="w-full">Zurück</Button>
+        <Button onClick={onBack} variant="outline" size="lg" className="w-full">{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
         <Button onClick={onNext} size="lg" className="w-full" disabled={selectedPlatforms.length === 0}>
-          Weiter
+          {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
         </Button>
       </div>
     </div>

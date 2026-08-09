@@ -311,7 +311,7 @@ export function AddMediaDialog({
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <Film className="h-12 w-12 mb-2 opacity-50" />
-                  <p className="text-sm">Keine Videos in der Mediathek</p>
+                  <p className="text-sm">{tx({ de: "Keine Videos in der Mediathek", en: "No videos in the media library", es: "No hay vídeos en la biblioteca multimedia" })}</p>
                 </div>
               )}
             </ScrollArea>
@@ -353,7 +353,7 @@ export function AddMediaDialog({
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <Image className="h-12 w-12 mb-2 opacity-50" />
-                  <p className="text-sm">Keine Bilder in der Mediathek</p>
+                  <p className="text-sm">{tx({ de: "Keine Bilder in der Mediathek", en: "No images in the media library", es: "No hay imágenes en la biblioteca multimedia" })}</p>
                 </div>
               )}
             </ScrollArea>

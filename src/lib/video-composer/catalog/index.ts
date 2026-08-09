@@ -116,7 +116,7 @@ const BLICK: CatalogEntry[] = [
   entry('blick', 'side_left',     'Links',            'Looking left',  'gaze to the left'),
   entry('blick', 'side_right',    'Rechts',           'Looking right', 'gaze to the right'),
   entry('blick', 'at_object',     'Auf Objekt',       'At object',     'gaze on a held object', [tx({ de: 'auf produkt', en: 'on product', es: 'en el producto' }),'at product']),
-  entry('blick', 'at_partner',    'Auf Gegenüber',    'At partner',    'gaze at scene partner', ['interlocutor','gegenüber']),
+  entry('blick', 'at_partner',    tx({ de: 'Auf Gegenüber', en: 'At partner', es: 'Hacia el interlocutor' }),    'At partner',    'gaze at scene partner', ['interlocutor','gegenüber']),
 ];
 
 const ENERGY: CatalogEntry[] = [
