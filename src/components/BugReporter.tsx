@@ -32,7 +32,7 @@ export function BugReporter() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Screenshot zu groß (max 5MB)');
+      toast.error(tx({ de: "Screenshot zu groß (max 5MB)", en: "Screenshot too large (max 5MB)", es: "Captura demasiado grande (máx. 5MB)" }));
       return;
     }
     setScreenshot(file);
@@ -103,11 +103,11 @@ export function BugReporter() {
     <>
       <button
         onClick={() => setOpen(true)}
-        aria-label="Bug melden"
+        aria-label={tx({ de: "Bug melden", en: "Report bug", es: "Reportar error" })}
         className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-destructive px-4 py-3 text-destructive-foreground shadow-lg hover:bg-destructive/90 hover:scale-105 transition-all duration-200"
       >
         <Bug className="h-4 w-4" />
-        <span className="text-sm font-medium hidden sm:inline">Bug melden</span>
+        <span className="text-sm font-medium hidden sm:inline">{tx({ de: "Bug melden", en: "Report bug", es: "Reportar error" })}</span>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -115,16 +115,16 @@ export function BugReporter() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bug className="h-5 w-5 text-destructive" />
-              Bug melden
+              {tx({ de: "Bug melden", en: "Report bug", es: "Reportar error" })}
             </DialogTitle>
             <DialogDescription>
-              Hilf uns, die App zu verbessern. Aktuelle Seite: <code className="text-xs">{location.pathname}</code>
+              {tx({ de: <>Hilf uns, die App zu verbessern. Aktuelle Seite: <code className="text-xs">{location.pathname}</code></>, en: <>Help us improve the app. Current page: <code className="text-xs">{location.pathname}</code></>, es: <>Ayúdanos a mejorar la app. Página actual: <code className="text-xs">{location.pathname}</code></> })}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="bug-title">Kurzer Titel *</Label>
+              <Label htmlFor="bug-title">{tx({ de: "Kurzer Titel *", en: "Short title *", es: "Título corto *" })}</Label>
               <Input
                 id="bug-title"
                 value={title}
@@ -147,22 +147,22 @@ export function BugReporter() {
             </div>
 
             <div>
-              <Label htmlFor="bug-severity">Wie kritisch?</Label>
+              <Label htmlFor="bug-severity">{tx({ de: "Wie kritisch?", en: "How critical?", es: "¿Qué tan crítico?" })}</Label>
               <Select value={severity} onValueChange={(v) => setSeverity(v as typeof severity)}>
                 <SelectTrigger id="bug-severity">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">🟢 Niedrig — kosmetisch</SelectItem>
-                  <SelectItem value="medium">🟡 Mittel — unschön</SelectItem>
-                  <SelectItem value="high">🟠 Hoch — Funktion blockiert</SelectItem>
-                  <SelectItem value="critical">🔴 Kritisch — App unbenutzbar</SelectItem>
+                  <SelectItem value="low">{tx({ de: "🟢 Niedrig — kosmetisch", en: "🟢 Low — cosmetic", es: "🟢 Bajo — cosmético" })}</SelectItem>
+                  <SelectItem value="medium">{tx({ de: "🟡 Mittel — unschön", en: "🟡 Medium — unpleasant", es: "🟡 Medio — molesto" })}</SelectItem>
+                  <SelectItem value="high">{tx({ de: "🟠 Hoch — Funktion blockiert", en: "🟠 High — feature blocked", es: "🟠 Alto — función bloqueada" })}</SelectItem>
+                  <SelectItem value="critical">{tx({ de: "🔴 Kritisch — App unbenutzbar", en: "🔴 Critical — app unusable", es: "🔴 Crítico — app inutilizable" })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label>Screenshot (optional)</Label>
+              <Label>{tx({ de: "Screenshot (optional)", en: "Screenshot (optional)", es: "Captura (opcional)" })}</Label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -179,7 +179,7 @@ export function BugReporter() {
                       setScreenshotPreview(null);
                     }}
                     className="absolute top-1 right-1 bg-background/80 rounded-full p-1 hover:bg-background"
-                    aria-label="Screenshot entfernen"
+                    aria-label={tx({ de: "Screenshot entfernen", en: "Remove screenshot", es: "Eliminar captura" })}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -193,7 +193,7 @@ export function BugReporter() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Camera className="h-4 w-4 mr-2" />
-                  Screenshot anhängen
+                  {tx({ de: "Screenshot anhängen", en: "Attach screenshot", es: "Adjuntar captura" })}
                 </Button>
               )}
             </div>
@@ -201,7 +201,7 @@ export function BugReporter() {
 
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
-              Abbrechen
+              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
             </Button>
             <Button onClick={submit} disabled={submitting || !title.trim() || !description.trim()}>
               {submitting ? (
@@ -209,7 +209,7 @@ export function BugReporter() {
               ) : (
                 <Send className="h-4 w-4 mr-2" />
               )}
-              Senden
+              {tx({ de: "Senden", en: "Send", es: "Enviar" })}
             </Button>
           </div>
         </DialogContent>
