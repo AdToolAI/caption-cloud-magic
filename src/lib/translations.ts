@@ -19741,6 +19741,8 @@ Object.assign(translations.en, {
     tiktokSandbox: 'TikTok runs in {env} mode — only test accounts can connect.',
     redirectMismatch: 'Redirect URI does not point at the backend callback — reconnect will fail.',
     publishPending: 'Connect works, posting permission still pending approval.',
+    ytChannel: 'Channel: {name}',
+    ytNoRefreshToken: 'No refresh token stored — reconnect YouTube, otherwise uploads stop after 1 hour.',
     metaAppTitle: 'Meta app basics',
     metaAppComplete: 'Complete',
     metaAppIncomplete: 'Fields missing',
