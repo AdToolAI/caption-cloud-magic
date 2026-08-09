@@ -117,12 +117,12 @@ export default function PhotoBrowser() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Suche nach Photos (z.B. mountain, coffee, office)…"
+            placeholder={tx({ de: "Suche nach Photos (z.B. mountain, coffee, office)…", en: "Search photos (e.g. mountain, coffee, office)…", es: "Buscar fotos (p. ej. mountain, coffee, office)…" })}
             className="pl-9"
           />
         </div>
         <Button type="submit" disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Suchen'}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : tx({ de: 'Suchen', en: 'Search', es: 'Buscar' })}
         </Button>
       </form>
 

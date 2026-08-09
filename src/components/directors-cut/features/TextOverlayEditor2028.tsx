@@ -29,12 +29,12 @@ interface TextOverlayEditor2028Props {
 
 // Animation definitions with CSS keyframes for live preview
 const ANIMATIONS = [
-  { id: 'fadeIn', name: 'Fade In', description: 'Sanftes Einblenden' },
-  { id: 'scaleUp', name: 'Scale Up', description: 'Vergrößern von klein' },
-  { id: 'bounce', name: 'Bounce', description: 'Hüpfende Animation' },
-  { id: 'typewriter', name: 'Typewriter', description: 'Schreibmaschine' },
-  { id: 'highlight', name: 'Highlight', description: 'Marker-Effekt' },
-  { id: 'glitch', name: 'Glitch', description: 'Digitaler Störeffekt' },
+  { id: 'fadeIn', name: 'Fade In', description: tx({ de: 'Sanftes Einblenden', en: 'Smooth fade-in', es: 'Aparición suave' }) },
+  { id: 'scaleUp', name: 'Scale Up', description: tx({ de: 'Vergrößern von klein', en: 'Grow from small', es: 'Crecer desde pequeño' }) },
+  { id: 'bounce', name: 'Bounce', description: tx({ de: 'Hüpfende Animation', en: 'Bouncing animation', es: 'Animación de rebote' }) },
+  { id: 'typewriter', name: 'Typewriter', description: tx({ de: 'Schreibmaschine', en: 'Typewriter', es: 'Máquina de escribir' }) },
+  { id: 'highlight', name: 'Highlight', description: tx({ de: 'Marker-Effekt', en: 'Marker effect', es: 'Efecto de marcador' }) },
+  { id: 'glitch', name: 'Glitch', description: tx({ de: 'Digitaler Störeffekt', en: 'Digital glitch effect', es: 'Efecto de interferencia digital' }) },
 ] as const;
 
 const POSITIONS = [
@@ -812,9 +812,9 @@ export function TextOverlayEditor2028({
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 mx-auto mb-4 flex items-center justify-center">
               <Type className="h-8 w-8 text-primary/60" />
             </div>
-            <p className="font-medium break-words [overflow-wrap:anywhere]">Keine Text-Overlays</p>
+            <p className="font-medium break-words [overflow-wrap:anywhere]">{tx({ de: "Keine Text-Overlays", en: "No text overlays", es: "Sin superposiciones de texto" })}</p>
             <p className="text-sm text-muted-foreground mt-1 break-words [overflow-wrap:anywhere]">
-              Füge CTAs, Hashtags oder Titel hinzu
+              {tx({ de: "Füge CTAs, Hashtags oder Titel hinzu", en: "Add CTAs, hashtags or titles", es: "Agrega CTAs, hashtags o títulos" })}
             </p>
             <Button
               variant="outline"

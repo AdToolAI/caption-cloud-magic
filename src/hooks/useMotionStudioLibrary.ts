@@ -505,7 +505,7 @@ export function useMotionStudioLibrary() {
       toast.error(tx({ de: `${tx({ de: 'Löschen fehlgeschlagen', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, en: `${tx({ de: 'Delete failed', en: 'Delete failed', es: 'Error al eliminar' })}: ${error.message}`, es: `${tx({ de: 'Error al eliminar', en: 'Error al eliminar', es: 'Error al eliminar' })}: ${error.message}` }));
       return false;
     }
-    toast.success('Snippet gelöscht');
+    toast.success(tx({ de: 'Snippet gelöscht', en: 'Snippet deleted', es: 'Fragmento eliminado' }));
     return true;
   }, []);
 

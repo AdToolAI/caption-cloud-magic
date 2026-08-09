@@ -307,9 +307,9 @@ export function AIToolsSidebarExpanded({
             </div>
 
             <div className="pt-2 border-t">
-              <Label className="text-xs">KI Sound Generator</Label>
+              <Label className="text-xs">{tx({ de: "KI Sound Generator", en: "AI Sound Generator", es: "Generador de sonido IA" })}</Label>
               <div className="flex gap-2 mt-1">
-                <Input placeholder="Beschreibe den Sound..." className="text-sm" />
+                <Input placeholder={tx({ de: "Beschreibe den Sound...", en: "Describe the sound...", es: "Describe el sonido..." })} className="text-sm" />
                 <Button size="sm">
                   <Sparkles className="h-4 w-4" />
                 </Button>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -108,14 +109,14 @@ export function AutopilotInsightsPanel() {
               ))}
             </ol>
           ) : (
-            <p className="text-xs text-muted-foreground">Keine klare Pillar-Korrelation erkannt.</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: "Keine klare Pillar-Korrelation erkannt.", en: "No clear pillar correlation detected.", es: "No se detectó una correlación clara de pilares." })}</p>
           )}
         </Card>
 
         <Card className="p-5 border-amber-500/30 bg-amber-500/5">
           <div className="flex items-center gap-2 mb-3">
             <TrendingDown className="h-4 w-4 text-amber-600" />
-            <h3 className="font-semibold text-sm">Schwächste Themen</h3>
+            <h3 className="font-semibold text-sm">{tx({ de: "Schwächste Themen", en: "Weakest topics", es: "Temas más débiles" })}</h3>
           </div>
           {insights.weakest_pillars.length > 0 ? (
             <ol className="space-y-2">
@@ -127,7 +128,7 @@ export function AutopilotInsightsPanel() {
               ))}
             </ol>
           ) : (
-            <p className="text-xs text-muted-foreground">Alle Themen performen ähnlich gut.</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: "Alle Themen performen ähnlich gut.", en: "All topics perform similarly well.", es: "Todos los temas rinden de forma similar." })}</p>
           )}
         </Card>
       </div>

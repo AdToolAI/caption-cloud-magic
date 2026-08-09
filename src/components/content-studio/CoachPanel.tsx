@@ -77,9 +77,9 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
   };
 
   const quick = [
-    "Ist die Headline stark genug?",
-    "Passt der Ton zur Plattform?",
-    "Wie mache ich den CTA konkreter?",
+    tx({ de: "Ist die Headline stark genug?", en: "Is the headline strong enough?", es: "¿Es lo bastante fuerte el titular?" }),
+    tx({ de: "Passt der Ton zur Plattform?", en: "Does the tone fit the platform?", es: "¿Encaja el tono con la plataforma?" }),
+    tx({ de: "Wie mache ich den CTA konkreter?", en: "How do I make the CTA more concrete?", es: "¿Cómo hago el CTA más concreto?" }),
   ];
 
   return (
@@ -121,7 +121,7 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
             ))}
             {busy && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> denkt nach …
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> {tx({ de: "denkt nach …", en: "thinking …", es: "pensando …" })}
               </div>
             )}
             <div ref={endRef} />
@@ -135,7 +135,7 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
             send(input);
           }}
         >
-          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Frag den Coach …" />
+          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={tx({ de: "Frag den Coach …", en: "Ask the coach …", es: "Pregunta al coach …" })} />
           <Button type="submit" size="icon" disabled={busy}>
             <Send className="h-4 w-4" />
           </Button>

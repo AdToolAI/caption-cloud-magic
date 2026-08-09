@@ -134,8 +134,8 @@ export const TimelineScriptEditor = ({
     setSelectedSegmentId(newSegment.id);
     
     toast({
-      title: "Segment hinzugefügt",
-      description: "Neues Segment zur Timeline hinzugefügt"
+      title: tx({ de: "Segment hinzugefügt", en: "Segment added", es: "Segmento añadido" }),
+      description: tx({ de: "Neues Segment zur Timeline hinzugefügt", en: "New segment added to the timeline", es: "Nuevo segmento añadido a la línea de tiempo" })
     });
   };
 
@@ -313,8 +313,8 @@ export const TimelineScriptEditor = ({
     }
     
     toast({
-      title: "Segment gelöscht",
-      description: "Segment von der Timeline entfernt"
+      title: tx({ de: "Segment gelöscht", en: "Segment deleted", es: "Segmento eliminado" }),
+      description: tx({ de: "Segment von der Timeline entfernt", en: "Segment removed from the timeline", es: "Segmento eliminado de la línea de tiempo" })
     });
   };
 

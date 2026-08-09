@@ -1073,7 +1073,7 @@ export default function ProductionPlanSheet({
     });
     const fixed = castFixed + locationFixed;
     toast({
-      title: fixed > 0 ? `${fixed} Zuordnung${fixed === 1 ? '' : 'en'} automatisch repariert` : 'Keine weiteren Auto-Matches',
+      title: fixed > 0 ? tx({ de: `${fixed} Zuordnung${fixed === 1 ? '' : 'en'} automatisch repariert`, en: `${fixed} assignment${fixed === 1 ? '' : 's'} auto-fixed`, es: `${fixed} asignación${fixed === 1 ? '' : 'es'} corregida${fixed === 1 ? '' : 's'} automáticamente` }) : tx({ de: 'Keine weiteren Auto-Matches', en: 'No more auto-matches', es: 'No hay más coincidencias automáticas' }),
       description: fixed > 0
         ? tx({ de: `${castFixed} Cast · ${locationFixed} Location — du kannst alles im Dropdown noch anpassen.`, en: `${castFixed} Cast · ${locationFixed} Location — you can still adjust everything in the dropdown.`, es: `${castFixed} Elenco · ${locationFixed} Ubicación — aún puedes ajustar todo en el menú desplegable.` })
         : undefined,
@@ -1087,10 +1087,10 @@ export default function ProductionPlanSheet({
         <DialogHeader className="space-y-1 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileText className="h-4 w-4 text-amber-300" />
-            Production Plan — Briefing analysieren & übernehmen
+            {tx({ de: "Production Plan — Briefing analysieren & übernehmen", en: "Production Plan — analyze & apply briefing", es: "Plan de producción — analizar y aplicar el briefing" })}
             {safePlan?._meta?.source === 'local-fallback' && (
               <Badge variant="outline" className="ml-auto text-[10px] border-amber-400/40 text-amber-300 bg-amber-400/[0.06]">
-                Basis-Plan — AI-Analyse fehlgeschlagen
+                {tx({ de: "Basis-Plan — AI-Analyse fehlgeschlagen", en: "Base plan — AI analysis failed", es: "Plan base — el análisis de IA falló" })}
               </Badge>
             )}
             {safePlan?._meta?.source === 'ai-recovered' && (
@@ -1188,8 +1188,8 @@ export default function ProductionPlanSheet({
                 <Row label="Name" value={plan.project?.name} />
                 <Row label="Format" value={plan.project?.aspectRatio} />
                 <Row label="FPS" value={plan.project?.fps?.toString()} />
-                <Row label="Gesamtdauer" value={plan.project?.totalDurationSec ? `${plan.project.totalDurationSec}s` : undefined} />
-                <Row label="Plattformen" value={plan.project?.platforms?.join(', ')} />
+                <Row label={tx({ de: "Gesamtdauer", en: "Total duration", es: "Duración total" })} value={plan.project?.totalDurationSec ? `${plan.project.totalDurationSec}s` : undefined} />
+                <Row label={tx({ de: "Plattformen", en: "Platforms", es: "Plataformas" })} value={plan.project?.platforms?.join(', ')} />
                 <Row
                   label={tx({ de: "Summe Szenen", en: "Total scenes", es: "Total de escenas" })}
                   value={tx({ de: `${totalPlanSec}s (${plan.scenes.length} Szenen)`, en: `${totalPlanSec}s (${plan.scenes.length} scenes)`, es: `${totalPlanSec}s (${plan.scenes.length} escenas)` })}
@@ -1304,7 +1304,7 @@ export default function ProductionPlanSheet({
                             const titleSuffix = explicit
                               ? ' · explizit im Briefing'
                               : inferred
-                                ? ' · von KI ergänzt'
+                                ? tx({ de: ' · von KI ergänzt', en: ' · added by AI', es: ' · añadido por IA' })
                                 : '';
                             return (
                               <Badge
@@ -1342,7 +1342,7 @@ export default function ProductionPlanSheet({
                                 !!s.tone,
                                 `Tone: ${s.tone}`,
                                 `Tone: ${s.tone}`,
-                                'Briefing-Tone fällt durch (gewollt).',
+                                tx({ de: 'Briefing-Tone fällt durch (gewollt).', en: 'Briefing tone is unset (intentional).', es: 'El tono del briefing no está definido (intencional).' }),
                               )}
                               <Badge
                                 variant="outline"
@@ -1625,7 +1625,7 @@ export default function ProductionPlanSheet({
                                     <Badge variant="secondary" className="text-[10px]">
                                       🎙 {c.voiceName ?? (c.voiceId ? tx({ de: 'Stimme', en: 'Voice', es: 'Voz' }) : tx({ de: 'Auto-Voice beim Anwenden', en: 'Auto voice on apply', es: 'Voz automática al aplicar' }))}
                                       {((c as any).voiceAutoAssigned || (!c.voiceId && !c.voiceName && baseId)) && (
-                                        <span className="ml-1 text-amber-300" title="Stimme automatisch von der KI zugeordnet">⚡ AI</span>
+                                        <span className="ml-1 text-amber-300" title={tx({ de: "Stimme automatisch von der KI zugeordnet", en: "Voice automatically assigned by AI", es: "Voz asignada automáticamente por la IA" })}>⚡ AI</span>
                                       )}
                                     </Badge>
                                     {c.voiceId && (
@@ -1659,7 +1659,7 @@ export default function ProductionPlanSheet({
                               onValueChange={(v) => updateSceneLocation(s.index, v === '__none__' ? null : v)}
                             >
                               <SelectTrigger className="h-7 text-xs">
-                                <SelectValue placeholder="Library-Location wählen…" />
+                                <SelectValue placeholder={tx({ de: "Library-Location wählen…", en: "Choose library location…", es: "Elegir ubicación de biblioteca…" })} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none__">{tx({ de: "— nicht zugeordnet —", en: "— not assigned —", es: "- no asignado -" })}</SelectItem>
@@ -1739,7 +1739,7 @@ export default function ProductionPlanSheet({
                   <Row label="Style" value={plan.voice.style?.toString()} />
                   <Row label="Speaker Boost" value={plan.voice.speakerBoost?.toString()} />
                   <Row label="Speed" value={plan.voice.speed?.toString()} />
-                  <Row label="Request-Stitching" value={plan.voice.requestStitching ? 'an' : 'aus'} />
+                  <Row label="Request-Stitching" value={plan.voice.requestStitching ? tx({ de: 'an', en: 'on', es: 'activado' }) : tx({ de: 'aus', en: 'off', es: 'desactivado' })} />
                 </SectionCard>
               )}
 
@@ -1748,11 +1748,11 @@ export default function ProductionPlanSheet({
                 <SectionCard title="Captions">
                   <Row label="Font" value={plan.captions.font} />
                   <Row label={tx({ de: "Größe", en: "Size", es: "Tamaño" })} value={plan.captions.sizePx ? `${plan.captions.sizePx}px` : undefined} />
-                  <Row label="Farbe" value={plan.captions.color} />
+                  <Row label={tx({ de: "Farbe", en: "Color", es: "Color" })} value={plan.captions.color} />
                   <Row label="Highlight" value={plan.captions.highlightColor} />
                   <Row label="Position" value={plan.captions.position} />
                   <Row label="Safe-Zone" value={plan.captions.safeZonePct ? `${plan.captions.safeZonePct}%` : undefined} />
-                  <Row label="Burn-In" value={plan.captions.burnIn ? 'an' : 'aus'} />
+                  <Row label="Burn-In" value={plan.captions.burnIn ? tx({ de: 'an', en: 'on', es: 'activado' }) : tx({ de: 'aus', en: 'off', es: 'desactivado' })} />
                   {!!plan.captions.highlightWords?.length && (
                     <Row label="Highlight-Words" value={plan.captions.highlightWords.join(', ')} />
                   )}

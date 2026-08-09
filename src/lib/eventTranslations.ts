@@ -13,7 +13,7 @@ export const eventTranslations = {
     commentsImported: "Kommentare importiert",
     autoRepliesSent: "Auto-Antworten gesendet",
     recentActivity: "Letzte Aktivitäten",
-    recentActivityDesc: "Deine neuesten Content-Erstellungsaktivitäten",
+    recentActivityDesc: tx({ de: "Deine neuesten Content-Erstellungsaktivitäten", en: "Your latest content creation activities", es: "Tus últimas actividades de creación de contenido" }),
     noActivity: tx({ de: "Noch keine Aktivität. Beginne mit dem Erstellen, um deinen Feed zu sehen!", en: "No activity yet. Start creating to see your feed!", es: "Aún no hay actividad. ¡Empieza a crear para ver tu feed!" }),
     activitiesToday: "Aktivitäten heute",
     startCreating: tx({ de: "Beginne mit dem Erstellen, um deine Aktivität zu sehen", en: "Start creating to see your activity", es: "Empieza a crear para ver tu actividad" }),

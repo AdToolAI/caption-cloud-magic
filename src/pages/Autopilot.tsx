@@ -36,8 +36,8 @@ export default function Autopilot() {
   useTrackPageFeature("autopilot");
   return (
     <ComingSoonScreen
-      eyebrow="KI Autopilot"
-      title="Deine KI führt den Account"
+      eyebrow={tx({ de: "KI Autopilot", en: "AI Autopilot", es: "Piloto automático de IA" })}
+      title={tx({ de: "Deine KI führt den Account", en: "Your AI runs the account", es: "Tu IA gestiona la cuenta" })}
       subtitle={tx({ de: "Vollautonome Content-Pipeline mit Wochenplan, Compliance-Score und Legal-Shield gegen Deepfakes und Copyright-Verstöße. Du briefst, die KI generiert, prüft, plant und veröffentlicht.", en: "Fully autonomous content pipeline with weekly plan, compliance score and legal shield against deepfakes and copyright violations. You brief, the AI generates, checks, schedules and publishes.", es: "Pipeline de contenido totalmente autónoma con plan semanal, puntuación de cumplimiento y escudo legal contra deepfakes e infracciones de copyright. Tú das el briefing; la IA genera, revisa, planifica y publica." })}
       reason={tx({ de: "Wir härten gerade das Compliance-Gate und die Approval-Inbox für Production-Workloads.", en: "We are currently hardening the compliance gate and approval inbox for production workloads.", es: "Estamos reforzando la puerta de cumplimiento y la bandeja de aprobación para cargas de producción." })}
       backHref="/home"
@@ -377,13 +377,13 @@ function CompliancePanel({
       </Card>
 
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Soft-Strikes" value={String(counts.soft)} sub="Hinweise, kein Limit" />
-        <StatCard label="Hard-Strikes (aktiv)" value={String(counts.hard)} sub="Bei 2 → 7 Tage Sperre" />
-        <StatCard label="Critical-Strikes (aktiv)" value={String(counts.critical)} sub="Kann zur Termination führen" highlight={counts.critical > 0} />
+        <StatCard label={tx({ de: "Soft-Strikes", en: "Soft strikes", es: "Infracciones leves" })} value={String(counts.soft)} sub={tx({ de: "Hinweise, kein Limit", en: "Notices, no limit", es: "Avisos, sin límite" })} />
+        <StatCard label={tx({ de: "Hard-Strikes (aktiv)", en: "Hard strikes (active)", es: "Infracciones graves (activas)" })} value={String(counts.hard)} sub={tx({ de: "Bei 2 → 7 Tage Sperre", en: "At 2 → 7-day lock", es: "Con 2 → bloqueo de 7 días" })} />
+        <StatCard label={tx({ de: "Critical-Strikes (aktiv)", en: "Critical strikes (active)", es: "Infracciones críticas (activas)" })} value={String(counts.critical)} sub={tx({ de: "Kann zur Termination führen", en: "Can lead to termination", es: "Puede llevar a la terminación" })} highlight={counts.critical > 0} />
       </div>
 
       <Card className="p-5 bg-muted/30">
-        <h4 className="font-serif text-lg mb-2">Aktive Verstöße</h4>
+        <h4 className="font-serif text-lg mb-2">{tx({ de: "Aktive Verstöße", en: "Active violations", es: "Infracciones activas" })}</h4>
         {!strikes || strikes.length === 0 ? (
           <p className="text-sm text-muted-foreground">{tx({ de: "Keine Verstöße — sauberer Account.", en: "No violations — clean account.", es: "Sin infracciones: cuenta limpia." })}</p>
         ) : (

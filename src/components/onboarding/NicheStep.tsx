@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { tx } from "@/lib/i18nText";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,16 +7,28 @@ import { Label } from "@/components/ui/label";
 import { Check, Building2, Camera, Users, Briefcase } from "lucide-react";
 
 const businessTypes = [
-  { id: "creator", label: "Creator", icon: Camera, desc: "Content Creator / Influencer" },
-  { id: "agency", label: "Agentur", icon: Users, desc: "Social Media Agentur" },
-  { id: "smb", label: "KMU", icon: Building2, desc: "Kleines / Mittleres Unternehmen" },
-  { id: "freelancer", label: "Freelancer", icon: Briefcase, desc: "Selbstständig / Freiberufler" },
+  { id: "creator", label: "Creator", icon: Camera, desc: tx({ de: "Content Creator / Influencer", en: "Content creator / Influencer", es: "Creador de contenido / Influencer" }) },
+  { id: "agency", label: tx({ de: "Agentur", en: "Agency", es: "Agencia" }), icon: Users, desc: tx({ de: "Social Media Agentur", en: "Social media agency", es: "Agencia de redes sociales" }) },
+  { id: "smb", label: tx({ de: "KMU", en: "SMB", es: "PyME" }), icon: Building2, desc: tx({ de: "Kleines / Mittleres Unternehmen", en: "Small / medium business", es: "Pequeña / Mediana empresa" }) },
+  { id: "freelancer", label: "Freelancer", icon: Briefcase, desc: tx({ de: "Selbstständig / Freiberufler", en: "Self-employed / Freelancer", es: "Autónomo / Freelancer" }) },
 ];
 
 const nicheSuggestions = [
-  "Fitness", "E-Commerce", "Fotografie", "Food & Rezepte", "Mode & Fashion",
-  "Tech & Gadgets", "Reisen", "Beauty & Skincare", "Coaching", "Handwerk & DIY",
-  "Immobilien", "Musik", "Bildung", "Gaming", "Gesundheit",
+  tx({ de: "Fitness", en: "Fitness", es: "Fitness" }),
+  tx({ de: "E-Commerce", en: "E-Commerce", es: "E-Commerce" }),
+  tx({ de: "Fotografie", en: "Photography", es: "Fotografía" }),
+  tx({ de: "Food & Rezepte", en: "Food & Recipes", es: "Comida y recetas" }),
+  tx({ de: "Mode & Fashion", en: "Fashion", es: "Moda" }),
+  tx({ de: "Tech & Gadgets", en: "Tech & Gadgets", es: "Tecnología y gadgets" }),
+  tx({ de: "Reisen", en: "Travel", es: "Viajes" }),
+  tx({ de: "Beauty & Skincare", en: "Beauty & Skincare", es: "Belleza y cuidado de la piel" }),
+  tx({ de: "Coaching", en: "Coaching", es: "Coaching" }),
+  tx({ de: "Handwerk & DIY", en: "Crafts & DIY", es: "Manualidades y bricolaje" }),
+  tx({ de: "Immobilien", en: "Real Estate", es: "Bienes raíces" }),
+  tx({ de: "Musik", en: "Music", es: "Música" }),
+  tx({ de: "Bildung", en: "Education", es: "Educación" }),
+  tx({ de: "Gaming", en: "Gaming", es: "Gaming" }),
+  tx({ de: "Gesundheit", en: "Health", es: "Salud" }),
 ];
 
 interface NicheStepProps {
@@ -33,7 +46,7 @@ export function NicheStep({ businessType, niche, onBusinessTypeChange, onNicheCh
 
   return (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-center">Was beschreibt dich am besten?</h3>
+      <h3 className="text-xl font-semibold text-center">{tx({ de: "Was beschreibt dich am besten?", en: "What describes you best?", es: "¿Qué te describe mejor?" })}</h3>
       
       <div className="grid grid-cols-2 gap-3">
         {businessTypes.map((bt) => {
@@ -58,11 +71,11 @@ export function NicheStep({ businessType, niche, onBusinessTypeChange, onNicheCh
       </div>
 
       <div className="space-y-2">
-        <Label>Deine Nische / Branche</Label>
+        <Label>{tx({ de: "Deine Nische / Branche", en: "Your niche / industry", es: "Tu nicho / industria" })}</Label>
         <Input
           value={niche}
           onChange={(e) => onNicheChange(e.target.value)}
-          placeholder="z.B. Fitness, E-Commerce, Fotografie..."
+          placeholder={tx({ de: "z.B. Fitness, E-Commerce, Fotografie...", en: "e.g. Fitness, E-Commerce, Photography...", es: "p. ej. Fitness, E-Commerce, Fotografía..." })}
         />
         <div className="flex flex-wrap gap-2 mt-2">
           {displayedNiches.map((n) => (
@@ -83,16 +96,16 @@ export function NicheStep({ businessType, niche, onBusinessTypeChange, onNicheCh
               onClick={() => setShowAllNiches(true)}
               className="px-3 py-1 text-sm rounded-full border border-dashed border-border text-muted-foreground hover:text-foreground"
             >
-              +{nicheSuggestions.length - 8} mehr
+              +{nicheSuggestions.length - 8} {tx({ de: "mehr", en: "more", es: "más" })}
             </button>
           )}
         </div>
       </div>
 
       <div className="flex gap-4">
-        <Button onClick={onBack} variant="outline" size="lg" className="w-full">Zurück</Button>
+        <Button onClick={onBack} variant="outline" size="lg" className="w-full">{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
         <Button onClick={onNext} size="lg" className="w-full" disabled={!businessType || !niche}>
-          Weiter
+          {tx({ de: "Weiter", en: "Next", es: "Siguiente" })}
         </Button>
       </div>
     </div>

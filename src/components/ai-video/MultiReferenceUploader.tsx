@@ -253,7 +253,7 @@ export function MultiReferenceUploader({
                 <ImagePlus className="h-5 w-5 text-muted-foreground" />
               )}
               <span className="text-[9px] text-muted-foreground text-center">
-                {language === 'de' ? 'Hinzufügen' : language === 'es' ? 'Añadir' : 'Add'}
+                {tx({ de: 'Hinzufügen', en: 'Add', es: 'Añadir' })}
               </span>
             </label>
           </div>

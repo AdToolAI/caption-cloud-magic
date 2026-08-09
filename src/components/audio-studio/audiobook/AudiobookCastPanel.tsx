@@ -48,35 +48,34 @@ export function AudiobookCastPanel({ cast, language, onChange }: Props) {
     <Card className="p-5 space-y-5 bg-card/60 backdrop-blur-xl border-primary/20">
       <div>
         <h3 className="text-sm font-semibold flex items-center gap-2">
-          <UserRound className="w-4 h-4 text-primary" /> Besetzung
+          <UserRound className="w-4 h-4 text-primary" /> {tx({ de: "Besetzung", en: "Cast", es: "Reparto" })}
         </h3>
         <p className="text-xs text-muted-foreground mt-1">
-          Absätze im Format <span className="font-mono">Figur: Text</span> bekommen automatisch die
-          Stimme der Figur — alles andere spricht der Erzähler.
+          {tx({ de: "Absätze im Format", en: "Paragraphs in the format", es: "Párrafos en el formato" })} <span className="font-mono">{tx({ de: "Figur: Text", en: "Character: Text", es: "Personaje: Texto" })}</span> {tx({ de: "bekommen automatisch die Stimme der Figur — alles andere spricht der Erzähler.", en: "automatically get the character\u2019s voice — everything else is spoken by the narrator.", es: "reciben automáticamente la voz del personaje; todo lo demás lo narra el narrador." })}
         </p>
       </div>
 
-      {/* Erzähler */}
+      {/* Narrator */}
       <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-background/40 p-3">
-        <Badge variant="outline" className="border-primary/40 text-primary shrink-0">Erzähler</Badge>
+        <Badge variant="outline" className="border-primary/40 text-primary shrink-0">{tx({ de: "Erzähler", en: "Narrator", es: "Narrador" })}</Badge>
         <span className="text-sm flex-1 truncate">
-          {cast.narrator?.voiceName || <span className="text-muted-foreground">Keine Stimme gewählt</span>}
+          {cast.narrator?.voiceName || <span className="text-muted-foreground">{tx({ de: "Keine Stimme gewählt", en: "No voice selected", es: "Ninguna voz seleccionada" })}</span>}
         </span>
         <Button size="sm" variant="outline" onClick={() => setTarget({ kind: 'narrator' })}>
-          <Mic className="w-3.5 h-3.5 mr-1.5" /> Stimme wählen
+          <Mic className="w-3.5 h-3.5 mr-1.5" /> {tx({ de: "Stimme wählen", en: "Choose voice", es: "Elegir voz" })}
         </Button>
       </div>
 
-      {/* Figuren */}
+      {/* Characters */}
       <div className="space-y-2">
         {cast.characters.map((character, index) => (
           <div key={character.name} className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/30 p-3">
             <Badge variant="outline" className="shrink-0 max-w-[9rem] truncate">{character.name}</Badge>
             <span className="text-sm flex-1 truncate">
-              {character.voiceName || <span className="text-muted-foreground">Keine Stimme</span>}
+              {character.voiceName || <span className="text-muted-foreground">{tx({ de: "Keine Stimme", en: "No voice", es: "Sin voz" })}</span>}
             </span>
             <Button size="sm" variant="outline" onClick={() => setTarget({ kind: 'character', index })}>
-              <Mic className="w-3.5 h-3.5 mr-1.5" /> Stimme
+              <Mic className="w-3.5 h-3.5 mr-1.5" /> {tx({ de: "Stimme", en: "Voice", es: "Voz" })}
             </Button>
             <Button
               size="icon"
@@ -102,7 +101,7 @@ export function AudiobookCastPanel({ cast, language, onChange }: Props) {
           className="h-9 text-sm"
         />
         <Button size="sm" variant="outline" onClick={addCharacter} disabled={!newName.trim()}>
-          <Plus className="w-4 h-4 mr-1" /> Figur
+          <Plus className="w-4 h-4 mr-1" /> {tx({ de: "Figur", en: "Character", es: "Personaje" })}
         </Button>
       </div>
 
