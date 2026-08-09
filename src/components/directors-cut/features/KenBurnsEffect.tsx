@@ -167,7 +167,7 @@ export function KenBurnsEffect({
           <div className="flex items-center gap-2">
             {hasEffect && (
               <Badge variant="secondary" className="text-xs">
-                tx({ de: 'Aktiv', en: 'Active', es: 'Activo' })
+                {tx({ de: 'Aktiv', en: 'Active', es: 'Activo' })}
               </Badge>
             )}
             <Badge variant="outline" className="text-xs">
@@ -176,7 +176,7 @@ export function KenBurnsEffect({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          tx({ de: "Professionelle Kamerabewegungen mit Zoom und Pan", en: "Professional camera movements with zoom and pan", es: "Movimientos de cámara profesionales con zoom y panorámica" })
+          {tx({ de: "Professionelle Kamerabewegungen mit Zoom und Pan", en: "Professional camera movements with zoom and pan", es: "Movimientos de cámara profesionales con zoom y panorámica" })}
         </p>
       </CardHeader>
       
@@ -378,7 +378,7 @@ export function KenBurnsEffect({
                   className="flex-1 text-xs"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
-                  tx({ de: "Zurücksetzen", en: "Reset", es: "Reiniciar" })
+                  {tx({ de: "Zurücksetzen", en: "Reset", es: "Reiniciar" })}
                 </Button>
                 <Button
                   size="sm"
@@ -386,7 +386,7 @@ export function KenBurnsEffect({
                   onClick={removeEffect}
                   className="text-xs"
                 >
-                  tx({ de: "Entfernen", en: "Remove", es: "Eliminar" })
+                  {tx({ de: "Entfernen", en: "Remove", es: "Eliminar" })}
                 </Button>
               </div>
             </motion.div>

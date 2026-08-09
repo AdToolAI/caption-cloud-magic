@@ -177,7 +177,7 @@ const DeleteAccount = () => {
               <div className="flex items-start gap-3">
                 <Checkbox id="check-data" checked={checkDataLoss} onCheckedChange={(v) => setCheckDataLoss(v === true)} />
                 <Label htmlFor="check-data" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                  tx({ de: "Ich verstehe, dass alle meine Daten nach Ablauf der 30-Tage-Frist unwiderruflich gelöscht werden und nicht wiederhergestellt werden können.", en: "I understand that all my data will be irreversibly deleted after the 30-day period and cannot be restored.", es: "Entiendo que todos mis datos se eliminarán de forma irreversible tras el plazo de 30 días y no se podrán recuperar." })
+                  {tx({ de: "Ich verstehe, dass alle meine Daten nach Ablauf der 30-Tage-Frist unwiderruflich gelöscht werden und nicht wiederhergestellt werden können.", en: "I understand that all my data will be irreversibly deleted after the 30-day period and cannot be restored.", es: "Entiendo que todos mis datos se eliminarán de forma irreversible tras el plazo de 30 días y no se podrán recuperar." })}
                 </Label>
               </div>
 
@@ -188,14 +188,14 @@ const DeleteAccount = () => {
                   <Link to="/legal/terms" className="text-primary underline">AGB</Link>{" "}
                   und{" "}
                   <Link to="/privacy" className="text-primary underline">Datenschutzbestimmungen</Link>{" "}
-                  tx({ de: "zur Kenntnis genommen.", en: "noticed.", es: "avisos." })
+                  {tx({ de: "zur Kenntnis genommen.", en: "noticed.", es: "avisos." })}
                 </Label>
               </div>
 
               <div className="flex items-start gap-3">
                 <Checkbox id="check-sub" checked={checkSubscription} onCheckedChange={(v) => setCheckSubscription(v === true)} />
                 <Label htmlFor="check-sub" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                  tx({ de: "Ich bestätige, dass mein aktives Abonnement gekündigt wird und verbleibende Credits verfallen.", en: "I confirm that my active subscription will be canceled and remaining credits will expire.", es: "Confirmo que se cancelará mi suscripción activa y que los créditos restantes caducarán." })
+                  {tx({ de: "Ich bestätige, dass mein aktives Abonnement gekündigt wird und verbleibende Credits verfallen.", en: "I confirm that my active subscription will be canceled and remaining credits will expire.", es: "Confirmo que se cancelará mi suscripción activa y que los créditos restantes caducarán." })}
                 </Label>
               </div>
             </CardContent>

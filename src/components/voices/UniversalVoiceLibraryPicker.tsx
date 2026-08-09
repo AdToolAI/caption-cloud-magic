@@ -258,7 +258,7 @@ export function UniversalVoiceLibraryPicker({
             {nativeSensitive && (
               <div className="flex items-center gap-2.5 px-3 rounded-md bg-white/5 border border-white/10">
                 <ShieldCheck className="h-4 w-4 text-gold shrink-0" />
-                <Label htmlFor="native-only" className="text-[10px] font-bold uppercase tracking-widest text-white/45 flex-1 cursor-pointer">tx({ de: "Nur nativ", en: "Native only", es: "Solo nativo" })</Label>
+                <Label htmlFor="native-only" className="text-[10px] font-bold uppercase tracking-widest text-white/45 flex-1 cursor-pointer">{tx({ de: "Nur nativ", en: "Native only", es: "Solo nativo" })}</Label>
                 <Switch id="native-only" checked={nativeOnly} onCheckedChange={setNativeOnly} />
               </div>
             )}
@@ -295,7 +295,7 @@ export function UniversalVoiceLibraryPicker({
           {/* tx({ de: "Zuletzt", en: "Recent", es: "Reciente" }) verwendet */}
           {visibleRecent.length > 0 && category !== 'mine' && !search.trim() && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-              <span className="shrink-0 text-[10px] uppercase tracking-wider text-white/35 pr-1">tx({ de: "Zuletzt", en: "Recent", es: "Reciente" })</span>
+              <span className="shrink-0 text-[10px] uppercase tracking-wider text-white/35 pr-1">{tx({ de: "Zuletzt", en: "Recent", es: "Reciente" })}</span>
               {visibleRecent.map((r) => (
                 <button
                   key={r.id}

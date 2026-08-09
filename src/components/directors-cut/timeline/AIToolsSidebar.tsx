@@ -41,10 +41,10 @@ const VOICE_OPTIONS = [
 
 // Sound effect categories
 const SFX_CATEGORIES = [
-  { id: 'transitions', name: 'Übergänge', emoji: '✨' },
+  { id: 'transitions', name: tx({ de: 'Übergänge', en: 'Transitions', es: 'Transiciones' }), emoji: '✨' },
   { id: 'impacts', name: 'Impacts', emoji: '💥' },
   { id: 'ui', name: 'UI Sounds', emoji: '🔔' },
-  { id: 'nature', name: 'Natur', emoji: '🌿' },
+  { id: 'nature', name: tx({ de: 'Natur', en: 'Nature', es: 'Naturaleza' }), emoji: '🌿' },
   { id: 'tech', name: 'Tech', emoji: '🤖' },
 ];
 
@@ -111,7 +111,7 @@ export function AIToolsSidebar({
       });
       
       toast({
-        title: 'Voice-Over erstellt',
+        title: tx({ de: 'Voice-Over erstellt', en: 'Voice-over created', es: 'Voz en off creada' }),
         description: tx({ de: 'Audio wurde zur Timeline hinzugefügt', en: 'Audio added to timeline', es: 'Audio añadido a la línea de tiempo' }),
       });
       
@@ -144,7 +144,7 @@ export function AIToolsSidebar({
     });
     setMusicBrowserOpen(false);
     toast({
-      title: 'Musik hinzugefügt',
+      title: tx({ de: 'Musik hinzugefügt', en: 'Music added', es: 'Música añadida' }),
       description: tx({ de: `"${track.title}" wurde zur Timeline hinzugefügt`, en: `"${track.title}" added to timeline`, es: `"${track.title}" añadido a la línea de tiempo` }),
     });
   };
@@ -187,7 +187,7 @@ export function AIToolsSidebar({
       });
       
       toast({
-        title: 'Sound Effect erstellt',
+        title: tx({ de: 'Sound Effect erstellt', en: 'Sound effect created', es: 'Efecto de sonido creado' }),
         description: tx({ de: 'Audio wurde zur Timeline hinzugefügt', en: 'Audio added to timeline', es: 'Audio añadido a la línea de tiempo' }),
       });
       
@@ -213,7 +213,7 @@ export function AIToolsSidebar({
           AI Audio Tools
         </h3>
         <p className="text-xs text-muted-foreground mt-1">
-          Voice-Over, Musik & Sound Effects
+          {tx({ de: 'Voice-Over, Musik & Sound Effects', en: 'Voice-over, music & sound effects', es: 'Voz en off, música y efectos de sonido' })}
         </p>
       </div>
       
@@ -242,7 +242,7 @@ export function AIToolsSidebar({
           <TabsContent value="voiceover" className="p-4 space-y-4 mt-0">
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label className="text-xs">Stimme</Label>
+                <Label className="text-xs">{tx({ de: 'Stimme', en: 'Voice', es: 'Voz' })}</Label>
                 <Select value={selectedVoice} onValueChange={setSelectedVoice}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
@@ -258,7 +258,7 @@ export function AIToolsSidebar({
               </div>
               
               <div className="space-y-2">
-                <Label className="text-xs">Geschwindigkeit: {voiceSpeed.toFixed(1)}x</Label>
+                <Label className="text-xs">tx({ de: 'Geschwindigkeit:', en: 'Speed:', es: 'Velocidad:' }) {voiceSpeed.toFixed(1)}x</Label>
                 <Slider
                   value={[voiceSpeed]}
                   onValueChange={([v]) => setVoiceSpeed(v)}
@@ -269,7 +269,7 @@ export function AIToolsSidebar({
               </div>
               
               <div className="space-y-2">
-                <Label className="text-xs">Text</Label>
+                <Label className="text-xs">{tx({ de: 'Text', en: 'Text', es: 'Texto' })}</Label>
                 <Textarea
                   value={voiceoverText}
                   onChange={(e) => setVoiceoverText(e.target.value)}
@@ -277,7 +277,7 @@ export function AIToolsSidebar({
                   className="min-h-[100px] text-sm resize-none"
                 />
                 <div className="text-xs text-muted-foreground text-right">
-                  {voiceoverText.length} Zeichen
+                  {voiceoverText.length} tx({ de: 'Zeichen', en: 'characters', es: 'caracteres' })
                 </div>
               </div>
               
@@ -295,7 +295,7 @@ export function AIToolsSidebar({
                 ) : (
                   <>
                     <Mic className="h-4 w-4 mr-2" />
-                    Voice-Over erstellen
+                    {tx({ de: 'Voice-Over erstellen', en: 'Create voice-over', es: 'Crear voz en off' })}
                   </>
                 )}
               </Button>
@@ -325,7 +325,7 @@ export function AIToolsSidebar({
               <CardContent>
                 <Button size="sm" className="w-full gap-2" onClick={() => setMusicBrowserOpen(true)}>
                   <Search className="h-4 w-4" />
-                  Bibliothek durchsuchen
+                  {tx({ de: 'Bibliothek durchsuchen', en: 'Search library', es: 'Buscar en la biblioteca' })}
                 </Button>
               </CardContent>
             </Card>
@@ -348,7 +348,7 @@ export function AIToolsSidebar({
             
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label className="text-xs">KI Sound Generator</Label>
+                <Label className="text-xs">{tx({ de: 'KI Sound Generator', en: 'AI Sound Generator', es: 'Generador de sonido IA' })}</Label>
                 <Textarea
                   value={sfxPrompt}
                   onChange={(e) => setSfxPrompt(e.target.value)}
@@ -371,7 +371,7 @@ export function AIToolsSidebar({
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Sound generieren
+                    {tx({ de: 'Sound generieren', en: 'Generate sound', es: 'Generar sonido' })}
                   </>
                 )}
               </Button>
@@ -379,7 +379,7 @@ export function AIToolsSidebar({
             
             {/* Quick SFX presets */}
             <div className="pt-4 border-t">
-              <Label className="text-xs text-muted-foreground mb-2 block">Schnellauswahl</Label>
+              <Label className="text-xs text-muted-foreground mb-2 block">{tx({ de: 'Schnellauswahl', en: 'Quick selection', es: 'Selección rápida' })}</Label>
               <div className="grid grid-cols-2 gap-2">
                 {['Whoosh', 'Click', 'Ding', 'Pop', 'Swoosh', 'Chime'].map(sfx => (
                   <Button
@@ -402,13 +402,13 @@ export function AIToolsSidebar({
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-sm">Noise Reduction</CardTitle>
                 <CardDescription className="text-xs">
-                  Entferne Hintergrundgeräusche
+                  {tx({ de: 'Entferne Hintergrundgeräusche', en: 'Remove background noise', es: 'Eliminar ruido de fondo' })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="py-2 px-4">
                 <Button variant="outline" size="sm" className="w-full">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Auf Original anwenden
+                  {tx({ de: 'Auf Original anwenden', en: 'Apply to original', es: 'Aplicar al original' })}
                 </Button>
               </CardContent>
             </Card>
@@ -417,13 +417,13 @@ export function AIToolsSidebar({
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-sm">Voice Enhancement</CardTitle>
                 <CardDescription className="text-xs">
-                  Verbessere Sprachqualität
+                  {tx({ de: 'Verbessere Sprachqualität', en: 'Improve speech quality', es: 'Mejorar calidad de voz' })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="py-2 px-4">
                 <Button variant="outline" size="sm" className="w-full">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Stimme optimieren
+                  {tx({ de: 'Stimme optimieren', en: 'Optimize voice', es: 'Optimizar voz' })}
                 </Button>
               </CardContent>
             </Card>
@@ -432,13 +432,13 @@ export function AIToolsSidebar({
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-sm">Auto-Ducking</CardTitle>
                 <CardDescription className="text-xs">
-                  Musik automatisch leiser bei Sprache
+                  {tx({ de: 'Musik automatisch leiser bei Sprache', en: 'Music automatically quieter during speech', es: 'Música automáticamente más baja durante el habla' })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="py-2 px-4">
                 <Button variant="outline" size="sm" className="w-full">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Auto-Ducking aktivieren
+                  {tx({ de: 'Auto-Ducking aktivieren', en: 'Enable auto-ducking', es: 'Activar auto-ducking' })}
                 </Button>
               </CardContent>
             </Card>
@@ -447,13 +447,13 @@ export function AIToolsSidebar({
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-sm">Beat-Sync</CardTitle>
                 <CardDescription className="text-xs">
-                  Analysiere Beats für Schnitte
+                  {tx({ de: 'Analysiere Beats für Schnitte', en: 'Analyze beats for cuts', es: 'Analizar ritmos para cortes' })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="py-2 px-4">
                 <Button variant="outline" size="sm" className="w-full">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Beats analysieren
+                  {tx({ de: 'Beats analysieren', en: 'Analyze beats', es: 'Analizar ritmos' })}
                 </Button>
               </CardContent>
             </Card>

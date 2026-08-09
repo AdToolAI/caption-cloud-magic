@@ -219,7 +219,7 @@ export function AIVideoRestoration({
                   }
                 />
                 <Label htmlFor="enhanceFaces" className="text-sm cursor-pointer">
-                  tx({ de: "KI Gesichtsverbesserung", en: "AI face enhancement", es: "Mejora facial por IA" })
+                  {tx({ de: "KI Gesichtsverbesserung", en: "AI face enhancement", es: "Mejora facial por IA" })}
                 </Label>
               </div>
               <span className="text-xs text-primary">+5</span>
@@ -235,7 +235,7 @@ export function AIVideoRestoration({
                   }
                 />
                 <Label htmlFor="deinterlace" className="text-sm cursor-pointer">
-                  tx({ de: "Deinterlacing (für alte TV-Aufnahmen)", en: "Deinterlacing (for old TV recordings)", es: "Desentrelazado (para grabaciones de TV antiguas)" })
+                  {tx({ de: "Deinterlacing (für alte TV-Aufnahmen)", en: "Deinterlacing (for old TV recordings)", es: "Desentrelazado (para grabaciones de TV antiguas)" })}
                 </Label>
               </div>
               <span className="text-xs text-primary">+2</span>
@@ -257,12 +257,12 @@ export function AIVideoRestoration({
             {isProcessing ? (
               <>
                 <Zap className="h-4 w-4 animate-pulse" />
-                tx({ de: "Restaurierung läuft...", en: "Restoration in progress...", es: "Restauración en curso..." })
+                {tx({ de: "Restaurierung läuft...", en: "Restoration in progress...", es: "Restauración en curso..." })}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                tx({ de: `Restaurierung starten (${calculateCredits()} Credits)`, en: `Start restoration (${calculateCredits()} credits)`, es: `Iniciar restauración (${calculateCredits()} créditos)` })
+                {tx({ de: `Restaurierung starten (${calculateCredits()} Credits)`, en: `Start restoration (${calculateCredits()} credits)`, es: `Iniciar restauración (${calculateCredits()} créditos)` })}
               </>
             )}
           </Button>

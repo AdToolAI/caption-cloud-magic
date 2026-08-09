@@ -50,7 +50,7 @@ export const AI_VIDEO_CREDIT_PACKS = {
     },
     badge: '+2% Bonus' as string | undefined,
     description: {
-      EUR: 'Für regelmäßige Nutzung',
+      EUR: tx({ de: 'Für regelmäßige Nutzung', en: 'For regular use', es: 'Para uso regular' }),
       USD: 'For regular use',
     },
     popular: false,
@@ -78,7 +78,7 @@ export const AI_VIDEO_CREDIT_PACKS = {
     badge: '+6% Bonus' as string | undefined,
     popular: true,
     description: {
-      EUR: 'Beste Preis-Leistung',
+      EUR: tx({ de: 'Beste Preis-Leistung', en: 'Best value', es: 'Mejor precio-rendimiento' }),
       USD: 'Best value',
     },
     bestValue: false,
@@ -105,7 +105,7 @@ export const AI_VIDEO_CREDIT_PACKS = {
     badge: '+15% Bonus' as string | undefined,
     bestValue: true,
     description: {
-      EUR: 'Maximaler Bonus',
+      EUR: tx({ de: 'Maximaler Bonus', en: 'Maximum bonus', es: 'Bonificación máxima' }),
       USD: 'Maximum bonus',
     },
     popular: false,

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { Check, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -15,12 +16,12 @@ interface DetailedProgressBarProps {
 }
 
 const stages: ProgressStage[] = [
-  { name: 'queued', label: 'In Warteschlange', percentage: 0 },
-  { name: 'initializing', label: 'Initialisierung', percentage: 10 },
-  { name: 'rendering', label: 'Rendering', percentage: 50 },
-  { name: 'compressing', label: 'Komprimierung', percentage: 75 },
-  { name: 'uploading', label: 'Upload', percentage: 90 },
-  { name: 'completed', label: 'Abgeschlossen', percentage: 100 },
+  { name: 'queued', label: tx({ de: 'In Warteschlange', en: 'In queue', es: 'En cola' }), percentage: 0 },
+  { name: 'initializing', label: tx({ de: 'Initialisierung', en: 'Initialization', es: 'Inicialización' }), percentage: 10 },
+  { name: 'rendering', label: tx({ de: 'Rendering', en: 'Rendering', es: 'Representación' }), percentage: 50 },
+  { name: 'compressing', label: tx({ de: 'Komprimierung', en: 'Compression', es: 'Compresión' }), percentage: 75 },
+  { name: 'uploading', label: tx({ de: 'Upload', en: 'Upload', es: 'Subir' }), percentage: 90 },
+  { name: 'completed', label: tx({ de: 'Abgeschlossen', en: 'Completed', es: 'Completado' }), percentage: 100 },
 ];
 
 export const DetailedProgressBar = ({
@@ -95,7 +96,7 @@ export const DetailedProgressBar = ({
       {/* Current progress text */}
       <div className="text-center">
         <p className="text-sm text-muted-foreground">
-          {progress}% abgeschlossen
+          {progress}% tx({ de: 'abgeschlossen', en: 'completed', es: 'completado' })
         </p>
       </div>
     </div>

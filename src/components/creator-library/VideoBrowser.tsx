@@ -56,7 +56,7 @@ export default function VideoBrowser() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Suche nach Stock-Videos (z.B. ocean, coffee, drone)…"
+            placeholder={tx({ de: "Suche nach Stock-Videos (z.B. ocean, coffee, drone)…", en: "Search for stock videos (e.g. ocean, coffee, drone)…", es: "Busque vídeos de archivo (por ejemplo, océano, café, dron)…" })}
             className="pl-9"
           />
         </div>

@@ -450,12 +450,12 @@ export function PostHogEventTester() {
               {isLoadingJobs ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  tx({ de: "Erstelle Jobs...", en: "Creating jobs...", es: "Creando trabajos..." })
+                  {tx({ de: "Erstelle Jobs...", en: "Creating jobs...", es: "Creando trabajos..." })}
                 </>
               ) : (
                 <>
                   <Database className="mr-2 h-4 w-4" />
-                  tx({ de: "Test-Jobs erstellen", en: "Create test jobs", es: "Crear trabajos de prueba" })
+                  {tx({ de: "Test-Jobs erstellen", en: "Create test jobs", es: "Crear trabajos de prueba" })}
                 </>
               )}
             </Button>
@@ -481,9 +481,9 @@ export function PostHogEventTester() {
           <CardTitle className="flex items-center gap-2">
             tx({ de: "PostHog Status", en: "PostHog Status", es: "Estado de PostHog" })
             {isPostHogConfigured ? (
-              <Badge variant="default" className="ml-2">tx({ de: "Konfiguriert", en: "Configured", es: "Configurado" })</Badge>
+              <Badge variant="default" className="ml-2">{tx({ de: "Konfiguriert", en: "Configured", es: "Configurado" })}</Badge>
             ) : (
-              <Badge variant="destructive" className="ml-2">tx({ de: "Nicht konfiguriert", en: "Not configured", es: "No configurado" })</Badge>
+              <Badge variant="destructive" className="ml-2">{tx({ de: "Nicht konfiguriert", en: "Not configured", es: "No configurado" })}</Badge>
             )}
           </CardTitle>
           <CardDescription>

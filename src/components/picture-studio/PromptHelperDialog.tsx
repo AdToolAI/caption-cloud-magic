@@ -129,7 +129,7 @@ export function PromptHelperDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wand2 className="h-5 w-5 text-primary" />
-            tx({ de: 'Prompt-Helfer', en: 'Prompt Helper', es: 'Ayudante de prompts' })
+            {tx({ de: 'Prompt-Helfer', en: 'Prompt Helper', es: 'Ayudante de prompts' })}
           </DialogTitle>
           <DialogDescription>
             tx({ de: "Sag mir mit deinen Worten was du willst — ich baue daraus den perfekten Prompt", en: "Tell me in your own words what you want — I'll use it to build the perfect prompt", es: "Dime en tus propias palabras lo que quieres — lo usaré para construir el prompt perfecto" })
@@ -178,8 +178,8 @@ export function PromptHelperDialog({
             </div>
 
             <Button onClick={() => handleGenerate()} disabled={loading || !userText.trim()} className="w-full">
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> tx({ de: "Analysiere…", en: "Analyzing…", es: "Analizando…" })</>
-                       : <><Sparkles className="h-4 w-4 mr-2" /> tx({ de: "Prompt bauen", en: "Build prompt", es: "Construir prompt" })</>}
+              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: "Analysiere…", en: "Analyzing…", es: "Analizando…" })}</>
+                       : <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: "Prompt bauen", en: "Build prompt", es: "Construir prompt" })}</>}
             </Button>
 
             {result && (

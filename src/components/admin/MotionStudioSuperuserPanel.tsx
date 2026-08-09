@@ -341,7 +341,7 @@ function ScenarioRow({ name, run }: { name: string; run: Run | undefined }) {
       <div className="flex items-center justify-between rounded-md border border-dashed border-muted px-3 py-2">
         <span className="text-sm text-muted-foreground">{name}</span>
         <Badge variant="outline" className="text-xs">
-          tx({ de: "Noch nicht ausgeführt", en: "Not executed yet", es: "Aún no ejecutado" })
+          {tx({ de: "Noch nicht ausgeführt", en: "Not executed yet", es: "Aún no ejecutado" })}
         </Badge>
       </div>
     );

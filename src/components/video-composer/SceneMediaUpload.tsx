@@ -204,13 +204,13 @@ export default function SceneMediaUpload({
               <Film className="h-4 w-4 text-muted-foreground/60" />
             </div>
             <p className="text-[11px] text-foreground font-medium">
-              tx({ de: "Video hierher ziehen", en: "Drag video here", es: "Arrastra el vídeo aquí" })
+              {tx({ de: "Video hierher ziehen", en: "Drag video here", es: "Arrastra el vídeo aquí" })}
             </p>
             <p className="text-[9px] text-muted-foreground mt-0.5">
               MP4, MOV, WEBM · max. 200 MB
             </p>
             <p className="text-[9px] text-muted-foreground/60 mt-1">
-              tx({ de: "💡 Bilder gehören zur KI-Referenz (im KI-Tab)", en: "💡 Images belong to the AI reference (in the AI tab)", es: "💡 Las imágenes pertenecen a la referencia de IA (en la pestaña de IA)" })
+              {tx({ de: "💡 Bilder gehören zur KI-Referenz (im KI-Tab)", en: "💡 Images belong to the AI reference (in the AI tab)", es: "💡 Las imágenes pertenecen a la referencia de IA (en la pestaña de IA)" })}
             </p>
           </>
         )}

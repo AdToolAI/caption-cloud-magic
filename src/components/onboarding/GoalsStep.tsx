@@ -61,7 +61,7 @@ export function GoalsStep({
       </div>
 
       <div className="space-y-3">
-        <Label>tx({ de: "Veröffentlichungen pro Woche:", en: "Posts per week:", es: "Publicaciones por semana:" }) <span className="font-bold text-primary">{postsPerWeek}</span></Label>
+        <Label>{tx({ de: "Veröffentlichungen pro Woche:", en: "Posts per week:", es: "Publicaciones por semana:" })} <span className="font-bold text-primary">{postsPerWeek}</span></Label>
         <Slider
           value={[postsPerWeek]}
           onValueChange={(v) => onPostsPerWeekChange(v[0])}
@@ -99,7 +99,7 @@ export function GoalsStep({
       <div className="flex gap-4">
         <Button onClick={onBack} variant="outline" size="lg" className="w-full">{tx({ de: "Zurück", en: "Back", es: "Atrás" })}</Button>
         <Button onClick={onNext} size="lg" className="w-full" disabled={!postingGoal || !experienceLevel}>
-          tx({ de: "Weiter", en: "Continue", es: "Siguiente" })
+          {tx({ de: "Weiter", en: "Continue", es: "Siguiente" })}
         </Button>
       </div>
     </div>

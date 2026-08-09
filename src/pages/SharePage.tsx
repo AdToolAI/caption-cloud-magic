@@ -92,7 +92,7 @@ export default function SharePage() {
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">{error}</p>
               <Button onClick={() => navigate('/')} className="w-full">
-                tx({ de: "Zur Startseite", en: "Back to home", es: "Volver al inicio" })
+                {tx({ de: "Zur Startseite", en: "Back to home", es: "Volver al inicio" })}
               </Button>
             </CardContent>
           </Card>

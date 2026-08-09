@@ -98,7 +98,7 @@ export function useMagicEdit() {
       if (data?.image) {
         const sym = data.currency === 'USD' ? '$' : '€';
         toast.success(
-          `${params.mode === 'inpaint' ? 'Magic Edit' : 'Outpaint'} fertig! Verbleibend: ${sym}${(data.newBalance ?? 0).toFixed(2)}`
+         tx({ de: `${params.mode === 'inpaint' ? 'Magic Edit' : 'Outpaint'} fertig! Verbleibend: ${sym}${(data.newBalance ?? 0).toFixed(2)}`, en: `${params.mode === 'inpaint' ? 'Magic Edit' : 'Outpaint'} finished! Remaining: ${sym}${(data.newBalance ?? 0).toFixed(2)}`, es: `${params.mode === 'inpaint' ? 'Magic Edit' : 'Outpaint'} ¡listo! Restante: ${sym}${(data.newBalance ?? 0).toFixed(2)}` })
         );
         return data.image as MagicEditResult;
       }

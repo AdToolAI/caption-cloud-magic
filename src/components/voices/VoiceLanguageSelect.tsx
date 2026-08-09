@@ -30,7 +30,7 @@ export function VoiceLanguageSelect({
         <SelectValue placeholder={tx({ de: 'Sprache', en: 'Language', es: 'Idioma' })} />
       </SelectTrigger>
       <SelectContent className="max-h-[320px]">
-        {allowAll && <SelectItem value="all">tx({ de: '🌍 Alle Sprachen', en: '🌍 All languages', es: '🌍 Todos los idiomas' })</SelectItem>}
+        {allowAll && <SelectItem value="all">{tx({ de: '🌍 Alle Sprachen', en: '🌍 All languages', es: '🌍 Todos los idiomas' })}</SelectItem>}
         {VOICE_LANGUAGES.map((l) => (
           <SelectItem key={l.code} value={l.code}>
             {l.flag} {l.label}

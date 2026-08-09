@@ -286,7 +286,7 @@ export default function MotionStudioHub() {
                           <p className="text-sm text-muted-foreground mt-1">{a.desc}</p>
                         </div>
                         <div className="flex items-center text-sm text-primary group-hover:gap-2 transition-all">
-                          tx({ de: "Öffnen", en: "Open", es: "Abrir" })
+                          {tx({ de: "Öffnen", en: "Open", es: "Abrir" })}
                           <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
@@ -302,7 +302,7 @@ export default function MotionStudioHub() {
             {/* Recent projects */}
             <Card className="lg:col-span-2 p-6 backdrop-blur-xl bg-card/60 border-border/50">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">tx({ de: "Letzte Composer-Projekte", en: "Recent Composer projects", es: "Últimos proyectos de Composer" })</h3>
+                <h3 className="text-lg font-semibold">{tx({ de: "Letzte Composer-Projekte", en: "Recent Composer projects", es: "Últimos proyectos de Composer" })}</h3>
                 <Button asChild variant="ghost" size="sm">
                   <Link to="/video-composer">{tx({ de: "Alle anzeigen", en: "View all", es: "Ver todo" })}</Link>
                 </Button>
@@ -320,7 +320,7 @@ export default function MotionStudioHub() {
                   <Button asChild className="mt-4 gap-2">
                     <Link to="/video-composer">
                       <Plus className="h-4 w-4" />
-                      tx({ de: "Projekt erstellen", en: "Create project", es: "Crear proyecto" })
+                      {tx({ de: "Projekt erstellen", en: "Create project", es: "Crear proyecto" })}
                     </Link>
                   </Button>
                 </div>

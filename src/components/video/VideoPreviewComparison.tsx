@@ -110,9 +110,9 @@ export const VideoPreviewComparison = ({
     
     if (error) {
       switch (error.code) {
-        case 1: errorMessage = 'Download abgebrochen'; break;
-        case 2: errorMessage = 'Netzwerkfehler'; break;
-        case 3: errorMessage = 'Dekodierungsfehler'; break;
+        case 1: errorMessage = tx({ de: 'Download abgebrochen', en: 'Download cancelled', es: 'Descarga cancelada' }); break;
+        case 2: errorMessage = tx({ de: 'Netzwerkfehler', en: 'Network error', es: 'Error de red' }); break;
+        case 3: errorMessage = tx({ de: 'Dekodierungsfehler', en: 'Decoding error', es: 'Error de decodificación' }); break;
         case 4: errorMessage = tx({ de: 'Format nicht unterstützt', en: 'Format not supported', es: 'Formato no compatible' }); break;
       }
     }
@@ -246,7 +246,7 @@ export const VideoPreviewComparison = ({
             <Play className="h-12 w-12 text-white drop-shadow-lg" />
           </div>
           <div className="absolute bottom-3 right-3 text-xs bg-black/70 text-white px-2 py-1 rounded">
-            Klicken zum Laden
+            {tx({ de: "Klicken zum Laden", en: "Click to load", es: "Clic para cargar" })}
           </div>
         </button>
       );
@@ -256,7 +256,7 @@ export const VideoPreviewComparison = ({
       return (
         <div className="flex flex-col items-center justify-center h-full p-4 bg-muted gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Video lädt...</p>
+          <p className="text-sm text-muted-foreground">{tx({ de: "Video lädt...", en: "Video loading...", es: "Cargando video..." })}</p>
         </div>
       );
     }

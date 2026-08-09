@@ -199,7 +199,7 @@ export default function SfxBrowser() {
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
-          tx({ de: 'Keine Treffer.', en: 'No results.', es: 'Sin resultados.' })
+          {tx({ de: 'Keine Treffer.', en: 'No results.', es: 'Sin resultados.' })}
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

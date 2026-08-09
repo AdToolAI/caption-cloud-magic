@@ -160,7 +160,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[10px] uppercase tracking-[0.2em] text-[hsl(var(--primary))]/70 font-semibold">
-                      tx({ de: "Post-Studio", en: "Post Studio", es: "Post-Studio" })
+                      {tx({ de: "Post-Studio", en: "Post Studio", es: "Post-Studio" })}
                     </span>
                     <span className="text-[10px] text-muted-foreground">·</span>
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">

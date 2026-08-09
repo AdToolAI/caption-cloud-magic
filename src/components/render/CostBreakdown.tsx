@@ -36,10 +36,10 @@ export const CostBreakdown = ({ estimation }: CostBreakdownProps) => {
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Info className="w-4 h-4" />
-          tx({ de: "Kosten-Aufschlüsselung", en: "Cost breakdown", es: "Desglose de costes" })
+          {tx({ de: "Kosten-Aufschlüsselung", en: "Cost breakdown", es: "Desglose de costes" })}
         </CardTitle>
         <CardDescription>
-          tx({ de: "Detaillierte Berechnung", en: "Detailed calculation", es: "Cálculo detallado" })
+          {tx({ de: "Detaillierte Berechnung", en: "Detailed calculation", es: "Cálculo detallado" })}
         </CardDescription>
       </CardHeader>
       <CardContent>

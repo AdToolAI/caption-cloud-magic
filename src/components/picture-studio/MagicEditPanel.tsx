@@ -364,7 +364,7 @@ export function MagicEditPanel() {
                   {/* Outpaint direction */}
                   {mode === 'outpaint' && (
                     <div className="space-y-2 pt-2">
-                      <Label className="text-xs text-muted-foreground">Erweiterungsrichtung</Label>
+                      <Label className="text-xs text-muted-foreground">{tx({ de: 'Erweiterungsrichtung', en: 'Expansion direction', es: 'Dirección de expansión' })}</Label>
                       <div className="grid grid-cols-5 gap-2">
                         {(['all', 'left', 'right', 'top', 'bottom'] as Direction[]).map((d) => (
                           <Button
@@ -386,7 +386,7 @@ export function MagicEditPanel() {
               <Card>
                 <CardContent className="p-4 space-y-4">
                   <div>
-                    <Label className="text-sm font-semibold">2. Beschreibung</Label>
+                    <Label className="text-sm font-semibold">{tx({ de: '2. Beschreibung', en: '2. Description', es: '2. Descripción' })}</Label>
                     <Textarea
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}

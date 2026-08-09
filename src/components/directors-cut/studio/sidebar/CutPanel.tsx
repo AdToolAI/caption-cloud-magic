@@ -251,7 +251,7 @@ const TransitionBlock: React.FC<{
                 </div>
                 {resolvedTransition?.placement !== 'centered' && (
                   <p className="mt-1 text-[8px] leading-snug text-white/35">
-                    tx({ de: "Keine freien Handles erkannt – deshalb sauberer Edge-Übergang statt zu frühem Vorziehen.", en: "No free handles detected – therefore clean edge transition instead of premature pull-forward.", es: "No se detectaron tiradores libres; por lo tanto, transición de borde limpia en lugar de adelantamiento prematuro." })
+                    {tx({ de: "Keine freien Handles erkannt – deshalb sauberer Edge-Übergang statt zu frühem Vorziehen.", en: "No free handles detected – therefore clean edge transition instead of premature pull-forward.", es: "No se detectaron tiradores libres; por lo tanto, transición de borde limpia en lugar de adelantamiento prematuro." })}
                   </p>
                 )}
               </div>

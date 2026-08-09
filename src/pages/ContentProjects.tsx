@@ -193,7 +193,7 @@ export default function ContentProjects() {
                               onClick={() => window.open(outputUrls[0], "_blank")}
                             >
                               <Play className="h-4 w-4 mr-2" />
-                              tx({ de: "Ansehen", en: "View", es: "Ver" })
+                              {tx({ de: "Ansehen", en: "View", es: "Ver" })}
                             </Button>
                             <Button
                               size="sm"
@@ -201,7 +201,7 @@ export default function ContentProjects() {
                               onClick={() => handletx({ de: "Download", en: "Download", es: "Descargar" })(outputUrls[0], `${project.project_name}.mp4`)}
                             >
                               <tx({ de: "Download", en: "Download", es: "Descargar" }) className="h-4 w-4 mr-2" />
-                              tx({ de: "Download", en: "Download", es: "Descargar" })
+                              {tx({ de: "Download", en: "Download", es: "Descargar" })}
                             </Button>
                           </div>
                         )}
@@ -227,7 +227,7 @@ export default function ContentProjects() {
                       : tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>
-                    tx({ de: "Zum Content Studio", en: "To Content Studio", es: "Al Content Studio" })
+                    {tx({ de: "Zum Content Studio", en: "To Content Studio", es: "Al Content Studio" })}
                   </Button>
                 </CardContent>
               </Card>

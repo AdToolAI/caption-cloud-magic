@@ -154,18 +154,18 @@ export default function FramePickerOverlay({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isApplying}>
-            tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button onClick={handleApply} disabled={isApplying || !sourceScene.clipUrl}>
             {isApplying ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                tx({ de: "Übernehme…", en: "Applying…", es: "Aplicando…" })
+                {tx({ de: "Übernehme…", en: "Applying…", es: "Aplicando…" })}
               </>
             ) : (
               <>
                 <Link2 className="mr-2 h-4 w-4" />
-                tx({ de: "Als Startbild übernehmen", en: "Apply as starting image", es: "Aplicar como imagen de inicio" })
+                {tx({ de: "Als Startbild übernehmen", en: "Apply as starting image", es: "Aplicar como imagen de inicio" })}
               </>
             )}
           </Button>

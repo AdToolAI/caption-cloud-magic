@@ -208,7 +208,7 @@ export function ConversionFunnel() {
               <Clock className="h-4 w-4 text-primary" />
             </div>
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-              tx({ de: "Ø Zeit bis Bestätigung", en: "Avg. time to verify", es: "Tiempo promedio de verificación" })
+              {tx({ de: "Ø Zeit bis Bestätigung", en: "Avg. time to verify", es: "Tiempo promedio de verificación" })}
             </span>
           </div>
           <div className="text-3xl font-bold">{formatHours(data.avg_hours_to_verify)}</div>
@@ -229,7 +229,7 @@ export function ConversionFunnel() {
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-              tx({ de: "Ø Verify → 1. Video", en: "Avg. Verify → 1st Video", es: "Promedio Verificación → 1.er Video" })
+              {tx({ de: "Ø Verify → 1. Video", en: "Avg. Verify → 1st Video", es: "Promedio Verificación → 1.er Video" })}
             </span>
           </div>
           <div className="text-3xl font-bold">{formatHours(data.avg_hours_to_first_video)}</div>
@@ -248,7 +248,7 @@ export function ConversionFunnel() {
               <Mail className="h-4 w-4 text-primary" />
             </div>
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-              tx({ de: "Reminder-Wirksamkeit", en: "Reminder effectiveness", es: "Eficacia de los recordatorios" })
+              {tx({ de: "Reminder-Wirksamkeit", en: "Reminder effectiveness", es: "Eficacia de los recordatorios" })}
             </span>
           </div>
           <div className="text-3xl font-bold">

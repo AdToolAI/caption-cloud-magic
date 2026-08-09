@@ -356,7 +356,7 @@ export const TimelineScriptEditor = ({
             <div>
               <CardTitle>{tx({ de: "Timeline Script Editor", en: "Timeline Script Editor", es: "Editor de guiones de línea de tiempo" })}</CardTitle>
               <CardDescription>
-                tx({ de: "Platziere Text-tx({ de: "Segment", en: "Segment", es: "Segmento" })e präzise auf der Zeitachse", en: "Place text segments precisely on the timeline", es: "Coloque segmentos de texto con precisión en la línea de tiempo" })
+                {tx({ de: "Platziere Text-tx({ de: "Segment", en: "Segment", es: "Segmento" })e präzise auf der Zeitachse", en: "Place text segments precisely on the timeline", es: "Coloque segmentos de texto con precisión en la línea de tiempo" })}
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -383,18 +383,18 @@ export const TimelineScriptEditor = ({
                 {isAutoSyncing ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    tx({ de: "Synchronisiere...", en: "Syncing...", es: "Sincronizando..." })
+                    {tx({ de: "Synchronisiere...", en: "Syncing...", es: "Sincronizando..." })}
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4 mr-2" />
-                    tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" })
+                    {tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" })}
                   </>
                 )}
               </Button>
               <Button onClick={addtx({ de: "Segment", en: "Segment", es: "Segmento" })} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                tx({ de: "Segment", en: "Segment", es: "Segmento" })
+                {tx({ de: "Segment", en: "Segment", es: "Segmento" })}
               </Button>
             </div>
           </div>
@@ -402,7 +402,7 @@ export const TimelineScriptEditor = ({
         <CardContent className="space-y-6">
           {/* Timeline Ruler */}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">tx({ de: "Zeitachse (Gesamt: ${totalDuration}s)", en: "Timeline (Total: ${totalDuration}s)", es: "Línea de tiempo (Total: ${totalDuration}s)" })</Label>
+            <Label className="text-xs text-muted-foreground">{tx({ de: "Zeitachse (Gesamt: ${totalDuration}s)", en: "Timeline (Total: ${totalDuration}s)", es: "Línea de tiempo (Total: ${totalDuration}s)" })}</Label>
             <div className="relative border rounded-lg p-4 bg-muted/30 min-h-32">
               {/* Time marks */}
               <div className="absolute top-0 left-0 right-0 h-6 border-b flex items-end">
@@ -459,9 +459,9 @@ export const TimelineScriptEditor = ({
                       onClick={() => updatetx({ de: "Segment", en: "Segment", es: "Segmento" })(selectedtx({ de: "Segment", en: "Segment", es: "Segmento" }).id, { locked: !selectedtx({ de: "Segment", en: "Segment", es: "Segmento" }).locked })}
                     >
                       {selectedtx({ de: "Segment", en: "Segment", es: "Segmento" }).locked ? (
-                        <><Lock className="h-4 w-4 mr-2" /> tx({ de: "Entsperren", en: "Unlock", es: "Desbloquear" })</>
+                        <><Lock className="h-4 w-4 mr-2" /> {tx({ de: "Entsperren", en: "Unlock", es: "Desbloquear" })}</>
                       ) : (
-                        <><Unlock className="h-4 w-4 mr-2" /> tx({ de: "Sperren", en: "Lock", es: "Bloquear" })</>
+                        <><Unlock className="h-4 w-4 mr-2" /> {tx({ de: "Sperren", en: "Lock", es: "Bloquear" })}</>
                       )}
                     </Button>
                     <Button

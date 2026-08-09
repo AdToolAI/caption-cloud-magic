@@ -233,7 +233,7 @@ export function PublishDialog({ videoUrl, defaultCaption = '', defaultHashtags =
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  tx({ de: `Auf ${selectedPlatforms.length} Plattform${selectedPlatforms.length === 1 ? '' : 'en'} veröffentlichen`, en: `Publish on ${selectedPlatforms.length} platform${selectedPlatforms.length === 1 ? '' : 's'}`, es: `Publicar en ${selectedPlatforms.length} plataforma${selectedPlatforms.length === 1 ? '' : 's'}` })
+                  {tx({ de: `Auf ${selectedPlatforms.length} Plattform${selectedPlatforms.length === 1 ? '' : 'en'} veröffentlichen`, en: `Publish on ${selectedPlatforms.length} platform${selectedPlatforms.length === 1 ? '' : 's'}`, es: `Publicar en ${selectedPlatforms.length} plataforma${selectedPlatforms.length === 1 ? '' : 's'}` })}
                 </>
               )}
             </Button>

@@ -83,7 +83,7 @@ export const useAutoDirector = () => {
         throw new Error(data?.message || data?.error || 'Execution failed');
       }
       toast({
-        title: '✨ Auto-Director gestartet',
+        title: tx({ de: '✨ Auto-Director gestartet', en: '✨ Auto director started', es: '✨ Director automático iniciado' }),
         description: tx({ de: `${data.sceneCount} Szenen werden generiert (~${data.estimatedCostEuros.toFixed(2)}€).`, en: `${data.sceneCount} scenes will be generated (~${data.estimatedCostEuros.toFixed(2)}€).`, es: `Se generarán ${data.sceneCount} escenas (~${data.estimatedCostEuros.toFixed(2)}€).` }),
       });
       return { projectId: data.projectId };

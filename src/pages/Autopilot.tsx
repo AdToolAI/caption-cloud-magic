@@ -187,7 +187,7 @@ function AutopilotReal() {
                     Beim 2. Strike wird der Autopilot 7 Tage gesperrt. Beim 3. Strike dauerhaft. Critical-Strikes können zur fristlosen Account-Löschung führen.
                   </p>
                 </div>
-                <Link to="/legal/autopilot-aup" className="text-xs text-primary underline shrink-0">tx({ de: "Regeln lesen", en: "Read rules", es: "Leer reglas" })</Link>
+                <Link to="/legal/autopilot-aup" className="text-xs text-primary underline shrink-0">{tx({ de: "Regeln lesen", en: "Read rules", es: "Leer reglas" })}</Link>
               </div>
             </Card>
           )}

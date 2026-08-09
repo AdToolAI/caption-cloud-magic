@@ -291,10 +291,10 @@ export default function TalkingHeadDialog({
         <DialogHeader>
           <DialogTitle classtx({ de: "Name", en: "Name", es: "Nombre" })="flex items-center gap-2">
             <Mic classtx({ de: "Name", en: "Name", es: "Nombre" })="h-5 w-5 text-primary" />
-            tx({ de: "Talking-Head erstellen", en: "Create talking head", es: "Crear cabeza parlante" })
+            {tx({ de: "Talking-Head erstellen", en: "Create talking head", es: "Crear cabeza parlante" })}
           </DialogTitle>
           <DialogDescription>
-            tx({ de: "Wähle einen tx({ de: "Charakter", en: "Character", es: "Personaje" }) aus deinem tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" }) (oder lege einen neuen an), schreibe ein Skript und wähle eine Stimme — der tx({ de: "Charakter", en: "Character", es: "Personaje" }) spricht den Text mit Lip-Sync.", en: "Select a character from your briefing cast (or create a new one), write a script and choose a voice — the character speaks the text with lip sync.", es: "Selecciona un personaje de tu elenco de briefing (o crea uno nuevo), escribe un guión y elige una voz; el personaje pronunciará el texto con sincronización de labios." })
+            {tx({ de: "Wähle einen tx({ de: "Charakter", en: "Character", es: "Personaje" }) aus deinem tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" }) (oder lege einen neuen an), schreibe ein Skript und wähle eine Stimme — der tx({ de: "Charakter", en: "Character", es: "Personaje" }) spricht den Text mit Lip-Sync.", en: "Select a character from your briefing cast (or create a new one), write a script and choose a voice — the character speaks the text with lip sync.", es: "Selecciona un personaje de tu elenco de briefing (o crea uno nuevo), escribe un guión y elige una voz; el personaje pronunciará el texto con sincronización de labios." })}
           </DialogDescription>
         </DialogHeader>
 
@@ -317,7 +317,7 @@ export default function TalkingHeadDialog({
               <div classtx({ de: "Name", en: "Name", es: "Nombre" })="flex items-center justify-between mb-2">
                 <Label classtx({ de: "Name", en: "Name", es: "Nombre" })="flex items-center gap-2">
                   <User classtx({ de: "Name", en: "Name", es: "Nombre" })="h-4 w-4 text-primary" />
-                  tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" })
+                  {tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" })}
                 </Label>
                 {cast.length > 0 && (
                   <span classtx({ de: "Name", en: "Name", es: "Nombre" })="text-xs text-muted-foreground">{cast.length} tx({ de: "Charakter", en: "Character", es: "Personaje" }){cast.length === 1 ? '' : 'e'}</span>
@@ -386,7 +386,7 @@ export default function TalkingHeadDialog({
                     onClick={() => { setShowLibrary((v) => !v); setShowNewForm(false); }}
                   >
                     <Library classtx({ de: "Name", en: "Name", es: "Nombre" })="h-4 w-4 mr-1.5" />
-                    tx({ de: `Aus Avatar-Bibliothek importieren (${unlinkedLibraryAvatars.length})`, en: `Import from avatar library (${unlinkedLibraryAvatars.length})`, es: `Importar de la biblioteca de avatares (${unlinkedLibraryAvatars.length})` })
+                    {tx({ de: `Aus Avatar-Bibliothek importieren (${unlinkedLibraryAvatars.length})`, en: `Import from avatar library (${unlinkedLibraryAvatars.length})`, es: `Importar de la biblioteca de avatares (${unlinkedLibraryAvatars.length})` })}
                   </Button>
                 )}
               </div>
@@ -401,7 +401,7 @@ export default function TalkingHeadDialog({
                 </div>
                 <div classtx({ de: "Name", en: "Name", es: "Nombre" })="grid grid-cols-[1fr_auto] gap-3 items-end">
                   <div>
-                    <Label htmlFor="new-char-name" classtx({ de: "Name", en: "Name", es: "Nombre" })="text-xs">tx({ de: "Name", en: "Name", es: "Nombre" })</Label>
+                    <Label htmlFor="new-char-name" classtx({ de: "Name", en: "Name", es: "Nombre" })="text-xs">{tx({ de: "Name", en: "Name", es: "Nombre" })}</Label>
                     <Input
                       id="new-char-name"
                       value={newtx({ de: "Name", en: "Name", es: "Nombre" })}

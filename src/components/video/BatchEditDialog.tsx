@@ -104,7 +104,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
         <DialogHeader>
           <DialogTitle>{tx({ de: "Batch-Edit: A/B-Testing Varianten", en: "Batch Edit: A/B Testing Variants", es: "Edición por lotes: variantes de prueba A/B" })}</DialogTitle>
           <DialogDescription>
-            tx({ de: "Erstelle mehrere Versionen gleichzeitig für A/B-Testing", en: "Create multiple versions simultaneously for A/B testing", es: "Cree varias versiones simultáneamente para pruebas A/B" })
+            {tx({ de: "Erstelle mehrere Versionen gleichzeitig für A/B-Testing", en: "Create multiple versions simultaneously for A/B testing", es: "Cree varias versiones simultáneamente para pruebas A/B" })}
           </DialogDescription>
         </DialogHeader>
 
@@ -153,7 +153,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
               </div>
 
               <div className="text-xs text-muted-foreground">
-                tx({ de: "💡 Ändere nur die Felder, die sich vom Original unterscheiden sollen", en: "💡 Only change fields that should differ from the original", es: "💡 Solo cambie los campos que deban diferir del original" })
+                {tx({ de: "💡 Ändere nur die Felder, die sich vom Original unterscheiden sollen", en: "💡 Only change fields that should differ from the original", es: "💡 Solo cambie los campos que deban diferir del original" })}
               </div>
             </div>
           ))}
@@ -165,7 +165,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
             disabled={variations.length >= 5}
           >
             <Plus className="h-4 w-4 mr-2" />
-            tx({ de: "Weitere Variante hinzufügen", en: "Add another variant", es: "Agregar otra variante" })
+            {tx({ de: "Weitere Variante hinzufügen", en: "Add another variant", es: "Agregar otra variante" })}
           </Button>
         </div>
 
@@ -174,7 +174,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
             <div>
               <p className="font-medium">{tx({ de: "Batch-Generierung", en: "Batch generation", es: "Generación por lotes" })}</p>
               <p className="text-sm text-muted-foreground">
-                tx({ de: `${variations.length} Varianten à 5 Credits`, en: `${variations.length} variants at 5 credits each`, es: `${variations.length} variantes a 5 créditos cada una` })
+                {tx({ de: `${variations.length} Varianten à 5 Credits`, en: `${variations.length} variants at 5 credits each`, es: `${variations.length} variantes a 5 créditos cada una` })}
               </p>
             </div>
             <div className="text-right">
@@ -185,25 +185,25 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
 
           <div className="text-xs text-muted-foreground space-y-1">
             <p>{tx({ de: "✅ Perfekt für A/B-Testing verschiedener CTAs", en: "✅ Perfect for A/B testing different CTAs", es: "✅ Perfecto para realizar pruebas A/B de diferentes CTA" })}</p>
-            <p>tx({ de: "✅ Teste mehrere Skript-Varianten parallel", en: "✅ Test multiple script variants in parallel", es: "✅ Pruebe varias variantes de guiones en paralelo" })</p>
-            <p>tx({ de: "✅ Vergleiche Performance in Analytics", en: "✅ Compare performance in analytics", es: "✅ Comparar rendimiento en análisis" })</p>
+            <p>{tx({ de: "✅ Teste mehrere Skript-Varianten parallel", en: "✅ Test multiple script variants in parallel", es: "✅ Pruebe varias variantes de guiones en paralelo" })}</p>
+            <p>{tx({ de: "✅ Vergleiche Performance in Analytics", en: "✅ Compare performance in analytics", es: "✅ Comparar rendimiento en análisis" })}</p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button onClick={handleGenerate} disabled={isGenerating}>
             {isGenerating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                tx({ de: `Generiere ${variations.length} Varianten...`, en: `Generating ${variations.length} variants...`, es: `Generando ${variations.length} variantes...` })
+                {tx({ de: `Generiere ${variations.length} Varianten...`, en: `Generating ${variations.length} variants...`, es: `Generando ${variations.length} variantes...` })}
               </>
             ) : (
               <>
                 <Copy className="mr-2 h-4 w-4" />
-                tx({ de: "Alle Varianten generieren", en: "Generate all variants", es: "Generar todas las variantes" })
+                {tx({ de: "Alle Varianten generieren", en: "Generate all variants", es: "Generar todas las variantes" })}
               </>
             )}
           </Button>

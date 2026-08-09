@@ -152,7 +152,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
           Diese werden im finalen Render automatisch unter die Voiceover-Spur gemischt (Auto-Ducking, -14 LUFS).
         </p>
         <p className="text-[11px] text-muted-foreground/80 italic">
-          tx({ de: "Hinweis:", en: "Note:", es: "Nota:" }) tx({ de: "Lip-Sync für sprechende Charaktere wird im <strong>Talking-Head-Dialog</strong> erstellt — der Sound-Mix mischt nur Atmo, SFX und Musik.", en: "Lip-sync for speaking characters is created in the <strong>Talking Head Dialog</strong> — the sound mix only mixes atmo, SFX and music.", es: "La sincronización de labios para personajes que hablan se crea en el <strong>diálogo de cabeza parlante</strong>: la mezcla de sonido solo mezcla atmo, efectos de sonido y música." })
+          {tx({ de: "Hinweis:", en: "Note:", es: "Nota:" }) tx({ de: "Lip-Sync für sprechende Charaktere wird im <strong>Talking-Head-Dialog</strong> erstellt — der Sound-Mix mischt nur Atmo, SFX und Musik.", en: "Lip-sync for speaking characters is created in the <strong>Talking Head Dialog</strong> — the sound mix only mixes atmo, SFX and music.", es: "La sincronización de labios para personajes que hablan se crea en el <strong>diálogo de cabeza parlante</strong>: la mezcla de sonido solo mezcla atmo, efectos de sonido y música." })}
         </p>
 
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}

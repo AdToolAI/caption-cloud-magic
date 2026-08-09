@@ -183,11 +183,11 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
           <TabsList className="grid w-full grid-cols-2 bg-muted/30">
             <TabsTrigger value="enhance" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <Wand2 className="w-4 h-4 mr-2" />
-              tx({ de: "Audio-Verbesserung", en: "Audio enhancement", es: "Mejora de audio" })
+              {tx({ de: "Audio-Verbesserung", en: "Audio enhancement", es: "Mejora de audio" })}
             </TabsTrigger>
             <TabsTrigger value="isolate" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400">
               <Mic className="w-4 h-4 mr-2" />
-              tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" })
+              {tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" })}
             </TabsTrigger>
           </TabsList>
 
@@ -286,17 +286,17 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               {isProcessing ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  tx({ de: "Optimiere Audio...", en: "Optimizing audio...", es: "Optimizando audio..." })
+                  {tx({ de: "Optimiere Audio...", en: "Optimizing audio...", es: "Optimizando audio..." })}
                 </>
               ) : processedUrl && activeMode === 'enhance' ? (
                 <>
                   <Check className="w-5 h-5 mr-2" />
-                  tx({ de: "Erneut optimieren", en: "Optimize again", es: "Optimizar de nuevo" })
+                  {tx({ de: "Erneut optimieren", en: "Optimize again", es: "Optimizar de nuevo" })}
                 </>
               ) : (
                 <>
                   <Wand2 className="w-5 h-5 mr-2" />
-                  tx({ de: "Audio verbessern", en: "Improve audio", es: "Mejorar el audio" })
+                  {tx({ de: "Audio verbessern", en: "Improve audio", es: "Mejorar el audio" })}
                 </>
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
@@ -305,8 +305,8 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
             {/* Info box */}
             <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
               <p className="text-xs text-muted-foreground">
-                <strong>tx({ de: "Audio-Verbesserung", en: "Audio enhancement", es: "Mejora de audio" })</strong> optimiert die Gesamtqualität: Rauschen wird reduziert, 
-                tx({ de: "Stimmen werden klarer, und die Lautstärke wird normalisiert. Musik und alle Sounds bleiben erhalten.", en: "Voices become clearer and the volume is normalized. Music and all sounds are preserved.", es: "Las voces se vuelven más claras y el volumen se normaliza. Se conservan la música y todos los sonidos." })
+                <strong>{tx({ de: "Audio-Verbesserung", en: "Audio enhancement", es: "Mejora de audio" })}</strong> optimiert die Gesamtqualität: Rauschen wird reduziert, 
+                {tx({ de: "Stimmen werden klarer, und die Lautstärke wird normalisiert. Musik und alle Sounds bleiben erhalten.", en: "Voices become clearer and the volume is normalized. Music and all sounds are preserved.", es: "Las voces se vuelven más claras y el volumen se normaliza. Se conservan la música y todos los sonidos." })}
               </p>
             </div>
           </TabsContent>
@@ -356,17 +356,17 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               {isProcessing ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  tx({ de: "Isoliere Stimme...", en: "Isolating voice...", es: "Aislando voz..." })
+                  {tx({ de: "Isoliere Stimme...", en: "Isolating voice...", es: "Aislando voz..." })}
                 </>
               ) : processedUrl && activeMode === 'isolate' ? (
                 <>
                   <Check className="w-5 h-5 mr-2" />
-                  tx({ de: "Erneut isolieren", en: "Isolate again", es: "Aislar de nuevo" })
+                  {tx({ de: "Erneut isolieren", en: "Isolate again", es: "Aislar de nuevo" })}
                 </>
               ) : (
                 <>
                   <Mic className="w-5 h-5 mr-2" />
-                  tx({ de: "Stimme isolieren", en: "Isolate voice", es: "Aislar voz" })
+                  {tx({ de: "Stimme isolieren", en: "Isolate voice", es: "Aislar voz" })}
                 </>
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
@@ -390,7 +390,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
             className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-center"
           >
             <p className="text-sm text-primary">
-              tx({ de: "✓ Wechsle zum "Vergleich"-Tab für Vorher/Nachher", en: "✓ Switch to the "Comparison" tab for before/after", es: "✓ Cambie a la pestaña "Comparación" para ver antes y después" })
+              {tx({ de: "✓ Wechsle zum "Vergleich"-Tab für Vorher/Nachher", en: "✓ Switch to the "Comparison" tab for before/after", es: "✓ Cambie a la pestaña "Comparación" para ver antes y después" })}
             </p>
           </motion.div>
         )}

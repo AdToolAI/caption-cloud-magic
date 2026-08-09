@@ -150,9 +150,9 @@ export default function EmailDirector() {
               <Mail className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-serif tracking-tight">Email Campaign Director</h1>
+              <h1 className="text-3xl font-serif tracking-tight">{tx({ de: 'Email Campaign Director', en: 'Email Campaign Director', es: 'Director de campañas de email' })}</h1>
               <p className="text-sm text-muted-foreground">
-                Brief → A/B-Subjects → Body-Varianten → Test-Send via Resend
+                {tx({ de: 'Brief → A/B-Subjects → Body-tx({ de: 'Varianten', en: 'variants', es: 'variantes' }) → Test-Send via Resend', en: 'Brief → A/B Subjects → Body Variants → Test Send via Resend', es: 'Resumen → Asuntos A/B → Variantes de cuerpo → Envío de prueba a través de Resend' })}
               </p>
             </div>
           </div>
@@ -164,11 +164,11 @@ export default function EmailDirector() {
             <Card className="p-5 border-primary/20">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <h2 className="font-medium">Neue Kampagne</h2>
+                <h2 className="font-medium">{tx({ de: 'Neue Kampagne', en: 'New Campaign', es: 'Nueva campaña' })}</h2>
               </div>
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs">Titel</Label>
+                  <Label className="text-xs">{tx({ de: 'Titel', en: 'Title', es: 'Título' })}</Label>
                   <Input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
@@ -176,20 +176,20 @@ export default function EmailDirector() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Briefing</Label>
+                  <Label className="text-xs">{tx({ de: 'Briefing', en: 'Briefing', es: 'Resumen' })}</Label>
                   <Textarea
                     value={briefing}
                     onChange={(e) => setBriefing(e.target.value)}
-                    placeholder="Worum geht's? Zielgruppe, Angebot, Kontext…"
+                    placeholder="{tx({ de: 'Worum geht's? Zielgruppe, Angebot, Kontext…', en: 'What's it about? Target group, offer, context...', es: '¿De qué se trata? Grupo objetivo, oferta, contexto...' })}"
                     rows={5}
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Ziel</Label>
+                  <Label className="text-xs">{tx({ de: 'Ziel', en: 'Goal', es: 'Objetivo' })}</Label>
                   <Input value={goal} onChange={(e) => setGoal(e.target.value)} />
                 </div>
                 <div>
-                  <Label className="text-xs">Tonalität</Label>
+                  <Label className="text-xs">{tx({ de: 'Tonalität', en: 'Tonality', es: 'Tonalidad' })}</Label>
                   <Select value={tonality} onValueChange={setTonality}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -203,13 +203,13 @@ export default function EmailDirector() {
                 </div>
                 <Button onClick={handleGenerate} disabled={generating} className="w-full">
                   {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
-                  Kampagne generieren
+                  {tx({ de: 'Kampagne generieren', en: 'Generate Campaign', es: 'Generar campaña' })}
                 </Button>
               </div>
             </Card>
 
             <Card className="p-5">
-              <h3 className="font-medium mb-3 text-sm">Meine Kampagnen ({campaigns.length})</h3>
+              <h3 className="font-medium mb-3 text-sm">{tx({ de: 'Meine Kampagnen', en: 'My Campaigns', es: 'Mis campañas' })} ({campaigns.length})</h3>
               {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
                 {campaigns.map((c) => (
@@ -226,7 +226,7 @@ export default function EmailDirector() {
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{c.title}</div>
                         <div className="text-xs text-muted-foreground">
-                          {format(new Date(c.created_at), "PP")} · {c.variants?.length || 0} Varianten
+                          {format(new Date(c.created_at), "PP")} · {c.variants?.length || 0} tx({ de: 'Varianten', en: 'variants', es: 'variantes' })
                         </div>
                       </div>
                       <Trash2
@@ -249,7 +249,7 @@ export default function EmailDirector() {
               <Card className="p-12 text-center border-dashed">
                 <Mail className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-muted-foreground">
-                  Wähle eine Kampagne oder erstelle eine neue, um Subjects und Varianten zu sehen.
+                  Wähle eine Kampagne oder erstelle eine neue, um Subjects und tx({ de: 'Varianten', en: 'variants', es: 'variantes' }) zu sehen.
                 </p>
               </Card>
             ) : (
@@ -267,7 +267,7 @@ export default function EmailDirector() {
                 <Tabs defaultValue="subjects" className="w-full">
                   <TabsList>
                     <TabsTrigger value="subjects">Subjects ({active.subjects?.length || 0})</TabsTrigger>
-                    <TabsTrigger value="variants">Body-Varianten ({active.variants?.length || 0})</TabsTrigger>
+                    <TabsTrigger value="variants">Body-tx({ de: 'Varianten', en: 'variants', es: 'variantes' }) ({active.variants?.length || 0})</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="subjects" className="space-y-2 mt-4">
@@ -315,7 +315,7 @@ export default function EmailDirector() {
                             ))}
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-2">
-                            Test wird an deine Account-Email ({user?.email}) gesendet.
+                            {tx({ de: `Test wird an deine Account-Email (${user?.email}) gesendet.`, en: `Test will be sent to your account email (${user?.email}).`, es: `La prueba se enviará al correo electrónico de tu cuenta (${user?.email}).` })}
                           </p>
                         </div>
                       </Card>

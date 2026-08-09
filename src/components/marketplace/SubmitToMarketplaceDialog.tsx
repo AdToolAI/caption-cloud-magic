@@ -59,7 +59,7 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
             <RadioGroupItem value="premium" id="opt-premium" className="mt-1" />
             <div className="flex-1">
               <div className="flex items-center gap-2 font-medium"><Coins className="h-4 w-4 text-amber-500" />{tx({ de: "Premium Template", en: "Premium template", es: "Plantilla premium" })}</div>
-              <p className="text-xs text-muted-foreground mt-1">tx({ de: `Käufer zahlen Credits, du erhältst ${REVENUE_SHARE}%. Wartet auf Admin-Freigabe.`, en: `Buyers pay credits, you receive ${REVENUE_SHARE}%. Waiting for admin approval.`, es: `Los compradores pagan créditos, tú recibes ${REVENUE_SHARE}%. Esperando aprobación del administrador.` })</p>
+              <p className="text-xs text-muted-foreground mt-1">{tx({ de: `Käufer zahlen Credits, du erhältst ${REVENUE_SHARE}%. Wartet auf Admin-Freigabe.`, en: `Buyers pay credits, you receive ${REVENUE_SHARE}%. Waiting for admin approval.`, es: `Los compradores pagan créditos, tú recibes ${REVENUE_SHARE}%. Esperando aprobación del administrador.` })}</p>
             </div>
           </Label>
         </RadioGroup>

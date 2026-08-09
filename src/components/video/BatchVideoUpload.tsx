@@ -85,7 +85,7 @@ export const BatchVideoUpload = ({ templateId, requiredFields }: BatchVideoUploa
       <div>
         <h3 className="font-semibold text-foreground mb-2">{tx({ de: "Batch-Video-Erstellung", en: "Batch video creation", es: "Creación de vídeos por lotes" })}</h3>
         <p className="text-sm text-muted-foreground">
-          tx({ de: "Erstelle mehrere Videos auf einmal mit CSV-Upload", en: "Create multiple videos at once with CSV upload", es: "Crea varios vídeos a la vez con la carga de CSV" })
+          {tx({ de: "Erstelle mehrere Videos auf einmal mit CSV-Upload", en: "Create multiple videos at once with CSV upload", es: "Crea varios vídeos a la vez con la carga de CSV" })}
         </p>
       </div>
 
@@ -96,7 +96,7 @@ export const BatchVideoUpload = ({ templateId, requiredFields }: BatchVideoUploa
           onClick={downloadTemplate}
         >
           <Download className="h-4 w-4 mr-2" />
-          tx({ de: "CSV-Template herunterladen", en: "Download CSV template", es: "Descargar plantilla CSV" })
+          {tx({ de: "CSV-Template herunterladen", en: "Download CSV template", es: "Descargar plantilla CSV" })}
         </Button>
 
         <div className="relative">
@@ -114,7 +114,7 @@ export const BatchVideoUpload = ({ templateId, requiredFields }: BatchVideoUploa
               {csvData.length} tx({ de: "Videos bereit", en: "Videos ready", es: "Vídeos listos" })
             </p>
             <p className="text-xs text-muted-foreground">
-              tx({ de: `Kosten: ${csvData.length * 50} Credits`, en: `Cost: ${csvData.length * 50} credits`, es: `Costo: ${csvData.length * 50} créditos` })
+              {tx({ de: `Kosten: ${csvData.length * 50} Credits`, en: `Cost: ${csvData.length * 50} credits`, es: `Costo: ${csvData.length * 50} créditos` })}
             </p>
           </div>
         )}
@@ -127,12 +127,12 @@ export const BatchVideoUpload = ({ templateId, requiredFields }: BatchVideoUploa
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              tx({ de: `Erstelle ${csvData.length} Videos...`, en: `Creating ${csvData.length} videos...`, es: `Creando ${csvData.length} vídeos...` })
+              {tx({ de: `Erstelle ${csvData.length} Videos...`, en: `Creating ${csvData.length} videos...`, es: `Creando ${csvData.length} vídeos...` })}
             </>
           ) : (
             <>
               <Upload className="h-4 w-4 mr-2" />
-              tx({ de: "Batch starten", en: "Start batch", es: "Iniciar lote" })
+              {tx({ de: "Batch starten", en: "Start batch", es: "Iniciar lote" })}
             </>
           )}
         </Button>

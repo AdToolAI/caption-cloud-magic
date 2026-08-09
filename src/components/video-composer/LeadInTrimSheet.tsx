@@ -99,7 +99,7 @@ export default function LeadInTrimSheet({ scene, open, onOpenChange }: LeadInTri
             Smart-Trim · Lead-In
           </SheetTitle>
           <SheetDescription>
-            tx({ de: "Schneidet eingefrorene Anfangsframes ab, die i2v-Modelle (Hailuo, Kling, Wan, …) zwischen Referenzbild und erster Bewegung produzieren.", en: "Cuts off frozen start frames produced by i2v models (Hailuo, Kling, Wan, ...) between reference image and first movement.", es: "Corta los fotogramas iniciales congelados que producen los modelos i2v (Hailuo, Kling, Wan, ...) entre la imagen de referencia y el primer movimiento." })
+            {tx({ de: "Schneidet eingefrorene Anfangsframes ab, die i2v-Modelle (Hailuo, Kling, Wan, …) zwischen Referenzbild und erster Bewegung produzieren.", en: "Cuts off frozen start frames produced by i2v models (Hailuo, Kling, Wan, ...) between reference image and first movement.", es: "Corta los fotogramas iniciales congelados que producen los modelos i2v (Hailuo, Kling, Wan, ...) entre la imagen de referencia y el primer movimiento." })}
           </SheetDescription>
         </SheetHeader>
 

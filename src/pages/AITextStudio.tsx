@@ -450,7 +450,7 @@ export default function AITextStudio() {
         <div>
           <h1 className="text-3xl font-display font-bold">{tx({ de: "AI Text Studio", en: "AI Text Studio", es: "AI Text Studio" })}</h1>
           <p className="text-sm text-muted-foreground">
-            tx({ de: "Premium Reasoning & Writing — OpenAI, Google und Anthropic in drei Qualitätsstufen", en: "Premium Reasoning & Writing — OpenAI, Google and Anthropic in three quality levels", es: "Razonamiento y redacción premium: OpenAI, Google y Anthropic en tres niveles de calidad" })
+            {tx({ de: "Premium Reasoning & Writing — OpenAI, Google und Anthropic in drei Qualitätsstufen", en: "Premium Reasoning & Writing — OpenAI, Google and Anthropic in three quality levels", es: "Razonamiento y redacción premium: OpenAI, Google y Anthropic en tres niveles de calidad" })}
           </p>
         </div>
       </div>

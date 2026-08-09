@@ -220,12 +220,12 @@ export function AIFrameInterpolation({
             {isProcessing ? (
               <>
                 <Zap className="h-4 w-4 animate-pulse" />
-                tx({ de: "Interpolation läuft...", en: "Interpolation in progress...", es: "Interpolación en curso..." })
+                {tx({ de: "Interpolation läuft...", en: "Interpolation in progress...", es: "Interpolación en curso..." })}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                tx({ de: `Interpolation starten (${selectedOption?.credits} Credits)`, en: `Start interpolation (${selectedOption?.credits} credits)`, es: `Iniciar interpolación (${selectedOption?.credits} créditos)` })
+                {tx({ de: `Interpolation starten (${selectedOption?.credits} Credits)`, en: `Start interpolation (${selectedOption?.credits} credits)`, es: `Iniciar interpolación (${selectedOption?.credits} créditos)` })}
               </>
             )}
           </Button>

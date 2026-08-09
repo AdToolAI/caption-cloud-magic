@@ -199,7 +199,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
               {albums.length === 0 ? (
                 <p className="col-span-full text-center text-muted-foreground py-8">
-                  tx({ de: 'Keine Alben mit Bildern gefunden', en: 'No albums with images found', es: 'No se encontraron álbumes con imágenes.' })
+                  {tx({ de: 'Keine Alben mit Bildern gefunden', en: 'No albums with images found', es: 'No se encontraron álbumes con imágenes.' })}
                 </p>
               ) : (
                 albums.map((album) => (
@@ -222,7 +222,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
                     )}
                     <div className="p-2">
                       <p className="text-sm font-medium truncate">{album.name}</p>
-                      <p className="text-xs text-muted-foreground">tx({ de: `${album.image_count} Bilder`, en: `${album.image_count} images`, es: `${album.image_count} imágenes` })</p>
+                      <p className="text-xs text-muted-foreground">{tx({ de: `${album.image_count} Bilder`, en: `${album.image_count} images`, es: `${album.image_count} imágenes` })}</p>
                     </div>
                   </button>
                 ))
@@ -233,7 +233,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-1">
               {images.length === 0 ? (
                 <p className="col-span-full text-center text-muted-foreground py-8">
-                  tx({ de: 'Keine Bilder in diesem Album', en: 'No images in this album', es: 'No hay imágenes en este álbum' })
+                  {tx({ de: 'Keine Bilder in diesem Album', en: 'No images in this album', es: 'No hay imágenes en este álbum' })}
                 </p>
               ) : (
                 images.map((img) => (

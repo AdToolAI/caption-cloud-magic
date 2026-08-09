@@ -174,7 +174,7 @@ export default function RenderQueue() {
             Render-Queue
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            tx({ de: "Live-Status aller Motion-Studio-Renderjobs. Aktualisiert sich automatisch alle 5 Sekunden.", en: "Live status of all Motion Studio render jobs. Updates automatically every 5 seconds.", es: "Estado en vivo de todos los trabajos de renderizado de Motion Studio. Se actualiza automáticamente cada 5 segundos." })
+            {tx({ de: "Live-Status aller Motion-Studio-Renderjobs. Aktualisiert sich automatisch alle 5 Sekunden.", en: "Live status of all Motion Studio render jobs. Updates automatically every 5 seconds.", es: "Estado en vivo de todos los trabajos de renderizado de Motion Studio. Se actualiza automáticamente cada 5 segundos." })}
           </p>
         </div>
         <div className="flex items-center gap-2">

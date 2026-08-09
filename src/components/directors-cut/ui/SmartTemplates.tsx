@@ -146,7 +146,7 @@ export function SmartTemplates({ onApply, currentTemplateId }: SmartTemplatesPro
           <h3 className="font-semibold">Smart Templates</h3>
         </div>
         <Badge variant="secondary" className="text-xs">
-          tx({ de: "One-Click Styles", en: "One-Click Styles", es: "Estilos de un clic" })
+          {tx({ de: "One-Click Styles", en: "One-Click Styles", es: "Estilos de un clic" })}
         </Badge>
       </div>
 

@@ -182,7 +182,7 @@ export function TranscriptWaveformEditor({
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })
+                  {tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })}
                 </>
               ) : (
                 <>

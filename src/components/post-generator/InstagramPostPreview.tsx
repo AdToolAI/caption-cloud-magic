@@ -137,7 +137,7 @@ export const InstagramPostPreview = ({
 
         {/* Timestamp */}
         <div className="mt-1">
-          <span className="text-xs text-muted-foreground uppercase">tx({ de: "VOR 5 MINUTEN", en: "5 MINUTES AGO", es: "HACE 5 MINUTOS" })</span>
+          <span className="text-xs text-muted-foreground uppercase">{tx({ de: "VOR 5 MINUTEN", en: "5 MINUTES AGO", es: "HACE 5 MINUTOS" })}</span>
         </div>
       </div>
     </Card>

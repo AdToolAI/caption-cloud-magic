@@ -404,7 +404,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            tx({ de: "Voice Studio — Eigene Stimme klonen", en: "Voice Studio — Clone your own voice", es: "Estudio de voz: clona tu propia voz" })
+            {tx({ de: "Voice Studio — Eigene Stimme klonen", en: "Voice Studio — Clone your own voice", es: "Estudio de voz: clona tu propia voz" })}
           </DialogTitle>
           <DialogDescription>
             tx({ de: "Nimm dich beim Vorlesen des Skripts auf oder lade eine WhatsApp-Sprachnachricht hoch.", en: "Record yourself reading the script or upload a WhatsApp voice message.", es: "Grábate leyendo el guion o sube un mensaje de voz de WhatsApp." })
@@ -515,7 +515,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 </p>
               </div>
               <p className="text-[11px] text-muted-foreground mt-2">
-                tx({ de: "Tipp: Aufnahme starten, kurz durchatmen, dann natürlich vorlesen.", en: "Tip: Start recording, take a quick breath, then read naturally.", es: "Consejo: Inicia la grabación, respira profundamente y luego lee con naturalidad." })
+                {tx({ de: "Tipp: Aufnahme starten, kurz durchatmen, dann natürlich vorlesen.", en: "Tip: Start recording, take a quick breath, then read naturally.", es: "Consejo: Inicia la grabación, respira profundamente y luego lee con naturalidad." })}
               </p>
             </Card>
 
@@ -537,7 +537,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                         {isRecording ? "tx({ de: "Aufnahme läuft…", en: "Recording in progress...", es: "Grabación en curso..." })" : tx({ de: "Bereit zum Aufnehmen", en: "Ready to record", es: "Listo para grabar" })}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        tx({ de: "Ziel: 60–90 Sekunden pro Aufnahme, in ruhiger Umgebung.", en: "Goal: 60–90 seconds per recording, in a quiet environment.", es: "Objetivo: 60-90 segundos por grabación, en un entorno tranquilo." })
+                        {tx({ de: "Ziel: 60–90 Sekunden pro Aufnahme, in ruhiger Umgebung.", en: "Goal: 60–90 seconds per recording, in a quiet environment.", es: "Objetivo: 60-90 segundos por grabación, en un entorno tranquilo." })}
                       </p>
                     </div>
                     <div className="text-2xl font-mono tabular-nums">

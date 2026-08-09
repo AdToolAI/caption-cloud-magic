@@ -137,10 +137,10 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
 
           <div className="flex gap-2 pt-4">
             <Button onClick={handleSave} className="flex-1">
-              tx({ de: 'Speichern', en: 'Save', es: 'Guardar' })
+              {tx({ de: 'Speichern', en: 'Save', es: 'Guardar' })}
             </Button>
             <Button variant="outline" onClick={onClose}>
-              tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })
+              {tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}
             </Button>
           </div>
 
@@ -151,7 +151,7 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
               className="w-full"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              tx({ de: 'Post löschen', en: 'Delete post', es: 'Eliminar publicación' })
+              {tx({ de: 'Post löschen', en: 'Delete post', es: 'Eliminar publicación' })}
             </Button>
           </div>
         </div>
@@ -162,11 +162,11 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
           <AlertDialogHeader>
             <AlertDialogTitle>tx({ de: 'Post löschen', en: 'Delete post', es: 'Eliminar publicación' })?</AlertDialogTitle>
             <AlertDialogDescription>
-              tx({ de: 'Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', en: 'Do you really want to delete this scheduled post? This action cannot be undone.', es: '¿Realmente quieres eliminar esta publicación programada? Esta acción no se puede deshacer.' })
+              {tx({ de: 'Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', en: 'Do you really want to delete this scheduled post? This action cannot be undone.', es: '¿Realmente quieres eliminar esta publicación programada? Esta acción no se puede deshacer.' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })</AlertDialogCancel>
+            <AlertDialogCancel>{tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (block?.id) {
@@ -176,7 +176,7 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              tx({ de: 'Löschen', en: 'Delete', es: 'Eliminar' })
+              {tx({ de: 'Löschen', en: 'Delete', es: 'Eliminar' })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

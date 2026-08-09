@@ -136,11 +136,11 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="google" className="gap-2">
           <Calendar className="w-4 h-4" />
-          tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })
+          {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}
         </TabsTrigger>
         <TabsTrigger value="notifications" className="gap-2">
           <MessageSquare className="w-4 h-4" />
-          tx({ de: "Benachrichtigungen", en: "Notifications", es: "Notificaciones" })
+          {tx({ de: "Benachrichtigungen", en: "Notifications", es: "Notificaciones" })}
         </TabsTrigger>
       </TabsList>
 
@@ -156,7 +156,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
               </div>
               {googletx({ de: "Verbunden", en: "Connected", es: "Conectado" }) ? (
                 <Badge variant="default" className="gap-2">
-                  tx({ de: "Verbunden", en: "Connected", es: "Conectado" })
+                  {tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}
                 </Badge>
               ) : (
                 <Badge variant="outline" className="gap-2">
@@ -181,13 +181,13 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="push">
-                        tx({ de: "Nur Push (Kalender → Google)", en: "Push Only (Calendar → Google)", es: "Solo push (Calendario → Google)" })
+                        {tx({ de: "Nur Push (Kalender → Google)", en: "Push Only (Calendar → Google)", es: "Solo push (Calendario → Google)" })}
                       </SelectItem>
                       <SelectItem value="pull">
-                        tx({ de: "Nur Pull (Google → Kalender)", en: "Pull Only (Google → Calendar)", es: "Solo pull (Google → Calendario)" })
+                        {tx({ de: "Nur Pull (Google → Kalender)", en: "Pull Only (Google → Calendar)", es: "Solo pull (Google → Calendario)" })}
                       </SelectItem>
                       <SelectItem value="two_way">
-                        tx({ de: "Zwei-Wege-Sync", en: "Two-way sync", es: "Sincronización bidireccional" })
+                        {tx({ de: "Zwei-Wege-Sync", en: "Two-way sync", es: "Sincronización bidireccional" })}
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -208,7 +208,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
                     onClick={handletx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })Google}
                   >
                     <Link2Off className="w-4 h-4 mr-2" />
-                    tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })
+                    {tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}
                   </Button>
                 </div>
               </>

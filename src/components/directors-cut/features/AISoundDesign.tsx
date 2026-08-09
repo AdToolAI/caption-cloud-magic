@@ -203,7 +203,7 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
           <div>
             <Label className="text-xs">{tx({ de: "Auto-Lautstärke", en: "Auto volume", es: "Volumen automático" })}</Label>
             <p className="text-[10px] text-muted-foreground">
-              tx({ de: "Passt Lautstärke an Sprache an", en: "Adjusts volume to speech", es: "Ajusta el volumen a la voz" })
+              {tx({ de: "Passt Lautstärke an Sprache an", en: "Adjusts volume to speech", es: "Ajusta el volumen a la voz" })}
             </p>
           </div>
           <Switch checked={autoVolume} onCheckedChange={setAutoVolume} />
@@ -218,19 +218,19 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              tx({ de: "Generiere Sounds...", en: "Generating sounds...", es: "Generando sonidos..." })
+              {tx({ de: "Generiere Sounds...", en: "Generating sounds...", es: "Generando sonidos..." })}
             </>
           ) : (
             <>
               <Sparkles className="h-4 w-4 mr-2" />
-              tx({ de: `Sounds für ${scenes.length} Szenen generieren`, en: `Generate sounds for ${scenes.length} scenes`, es: `Generar sonidos para ${scenes.length} escenas` })
+              {tx({ de: `Sounds für ${scenes.length} Szenen generieren`, en: `Generate sounds for ${scenes.length} scenes`, es: `Generar sonidos para ${scenes.length} escenas` })}
             </>
           )}
         </Button>
 
         {scenes.length === 0 && (
           <p className="text-xs text-muted-foreground text-center">
-            tx({ de: "Führe zuerst die Szenenanalyse durch", en: "Perform scene analysis first", es: "Realizar primero el análisis de la escena." })
+            {tx({ de: "Führe zuerst die Szenenanalyse durch", en: "Perform scene analysis first", es: "Realizar primero el análisis de la escena." })}
           </p>
         )}
 

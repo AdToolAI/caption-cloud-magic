@@ -219,7 +219,7 @@ export function InspectorDrawer({
             <div className="flex gap-2 pt-4 border-t">
               <Button onClick={handleSave} className="flex-1">
                 <Check className="h-4 w-4 mr-2" />
-                tx({ de: "Speichern", en: "Save", es: "Guardar" })
+                {tx({ de: "Speichern", en: "Save", es: "Guardar" })}
               </Button>
               
               <Button onClick={() => setShowOptimization(!showOptimization)} variant="outline">
@@ -230,7 +230,7 @@ export function InspectorDrawer({
               {status !== "approved" && (
                 <Button variant="secondary" onClick={handleQuickApprove}>
                   <Check className="h-4 w-4 mr-2" />
-                  tx({ de: "Genehmigen", en: "Approve", es: "Aprobar" })
+                  {tx({ de: "Genehmigen", en: "Approve", es: "Aprobar" })}
                 </Button>
               )}
             </div>
@@ -261,7 +261,7 @@ export function InspectorDrawer({
                 className="w-full"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                tx({ de: "Post löschen", en: "Delete post", es: "Eliminar publicación" })
+                {tx({ de: "Post löschen", en: "Delete post", es: "Eliminar publicación" })}
               </Button>
             </div>
           </div>
@@ -273,7 +273,7 @@ export function InspectorDrawer({
           <AlertDialogHeader>
             <AlertDialogTitle>tx({ de: "Post löschen", en: "Delete post", es: "Eliminar publicación" })?</AlertDialogTitle>
             <AlertDialogDescription>
-              tx({ de: "Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.", en: "Are you sure you want to delete this scheduled post? This action cannot be undone.", es: "¿Estás seguro de que quieres eliminar esta publicación programada? Esta acción no se puede deshacer." })
+              {tx({ de: "Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.", en: "Are you sure you want to delete this scheduled post? This action cannot be undone.", es: "¿Estás seguro de que quieres eliminar esta publicación programada? Esta acción no se puede deshacer." })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -287,7 +287,7 @@ export function InspectorDrawer({
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              tx({ de: "Löschen", en: "Delete", es: "Eliminar" })
+              {tx({ de: "Löschen", en: "Delete", es: "Eliminar" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

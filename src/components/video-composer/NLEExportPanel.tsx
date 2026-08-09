@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, FileCode, FileText, Package, Loader2, Clock, AlertTriangle, Upload } from 'lucide-react';
@@ -20,11 +21,11 @@ const formatBytes = (bytes: number) => {
 const formatRelative = (iso: string) => {
   const diffMs = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diffMs / 60_000);
-  if (min < 1) return 'gerade eben';
-  if (min < 60) return `vor ${min} Min`;
+  if (min < 1) return tx({ de: 'gerade eben', en: 'just now', es: 'ahora mismo' });
+  if (min < 60) return tx({ de: `vor ${min} Min`, en: `${min} min ago`, es: `hace ${min} min` });
   const h = Math.floor(min / 60);
-  if (h < 24) return `vor ${h} h`;
-  return `vor ${Math.floor(h / 24)} d`;
+  if (h < 24) return tx({ de: `vor ${h} h`, en: `${h} h ago`, es: `hace ${h} h` });
+  return tx({ de: `vor ${Math.floor(h / 24)} d`, en: `${Math.floor(h / 24)} d ago`, es: `hace ${Math.floor(h / 24)} d` });
 };
 
 const formatLabel: Record<string, string> = {
@@ -141,7 +142,7 @@ export const NLEExportPanel: React.FC<NLEExportPanelProps> = ({ projectId, class
 
         <p className="text-[11px] text-muted-foreground leading-relaxed">
           <strong>FCPXML</strong> öffnet Resolve / Premiere / FCP mit allen Clips & Audio.{' '}
-          <strong>EDL</strong> ist Legacy (Avid). <strong>Bundle</strong> packt alle Medien lokal in ein ZIP — ideal zum Verschicken oder Offline-Schnitt.
+          <strong>EDL</strong> {tx({ de: 'ist Legacy (Avid).', en: 'is legacy (Avid).', es: 'es heredado (Avid).' })} <strong>Bundle</strong> {tx({ de: 'packt alle Medien lokal in ein ZIP — ideal zum Verschicken oder Offline-Schnitt.', en: 'packs all media locally in a ZIP — ideal for sending or offline editing.', es: 'empaqueta todos los medios localmente en un ZIP, ideal para envío o edición fuera de línea.' })}
         </p>
 
         {/* Roundtrip Re-Import */}

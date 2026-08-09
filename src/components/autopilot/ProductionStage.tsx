@@ -166,7 +166,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
                 <div className="mt-1 flex flex-wrap gap-1">
                   {(scene.attempt ?? 1) > 1 && (
                     <Badge variant="outline" className="text-[10px]">
-                      tx({ de: "2. Anlauf", en: "2nd attempt", es: "2º intento" })
+                      {tx({ de: "2. Anlauf", en: "2nd attempt", es: "2º intento" })}
                     </Badge>
                   )}
                   {scene.fallback_kind === 'still' && (

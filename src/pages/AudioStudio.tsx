@@ -182,7 +182,7 @@ export default function AudioStudio() {
                 onClick={() => setShowAutoMatch(false)}
                 className="text-muted-foreground hover:text-foreground"
               >
-                ← Zurück zum Audio Studio
+                ← {tx({ de: 'Zurück zum Audio Studio', en: 'Back to Audio Studio', es: 'Volver al estudio de audio' })}
               </Button>
               <AutoMatchPanel
                 onTrackGenerated={(track) => {
@@ -206,7 +206,7 @@ export default function AudioStudio() {
                 onClick={() => setShowAudiobook(false)}
                 className="text-muted-foreground hover:text-foreground"
               >
-                ← Zurück zum Audio Studio
+                ← {tx({ de: 'Zurück zum Audio Studio', en: 'Back to Audio Studio', es: 'Volver al estudio de audio' })}
               </Button>
               <AudiobookPanel />
             </motion.div>
@@ -223,7 +223,7 @@ export default function AudioStudio() {
                 onClick={() => { setShowMusicGen(false); setMusicGenPrefill(null); }}
                 className="text-muted-foreground hover:text-foreground"
               >
-                ← Zurück zum Audio Studio
+                ← {tx({ de: 'Zurück zum Audio Studio', en: 'Back to Audio Studio', es: 'Volver al estudio de audio' })}
               </Button>
               <MusicGeneratorPanel
                 onTrackGenerated={() => setLibraryRefreshKey(k => k + 1)}
@@ -257,16 +257,16 @@ export default function AudioStudio() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-bold tracking-wider text-cyan-400">NEU · KOSTENLOS</span>
-                      <h3 className="text-lg font-bold">Music-to-Video Auto-Match</h3>
+                      <h3 className="text-lg font-bold">{tx({ de: 'Music-to-Video Auto-Match', en: 'Music-to-Video Auto-Match', es: 'Sincronización automática de música y video' })}</h3>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400">1-Click</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Video hochladen → KI analysiert Mood, BPM &amp; Länge → automatisch passender AI-Soundtrack.
+                      {tx({ de: 'Video hochladen → KI analysiert Mood, BPM & Länge → automatisch passender AI-Soundtrack.', en: 'Upload video → AI analyzes mood, BPM & length → automatic matching AI soundtrack.', es: 'Sube el video → La IA analiza el estado de ánimo, los BPM y la duración → Banda sonora de IA que coincide automáticamente.' })}
                     </p>
                   </div>
                   <Button className="bg-gradient-to-r from-cyan-500 to-primary hover:opacity-90 shrink-0 hidden sm:flex">
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Auto-Match starten
+                    {tx({ de: 'Auto-Match starten', en: 'Start Auto-Match', es: 'Iniciar sincronización automática' })}
                   </Button>
                 </div>
               </Card>
@@ -284,21 +284,21 @@ export default function AudioStudio() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
-                      <h3 className="text-lg font-bold">Hörbuch-Modus</h3>
+                      <h3 className="text-lg font-bold">{tx({ de: 'Hörbuch-Modus', en: 'Audiobook Mode', es: 'Modo audiolibro' })}</h3>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">9 Sprachen</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Manuskript einfügen → Kapitel &amp; Figuren erkennen → Erzähler- und Charakterstimmen aus der Bibliothek → MP3-Export.
+                      {tx({ de: 'Manuskript einfügen → Kapitel & Figuren erkennen → Erzähler- und Charakterstimmen aus der Bibliothek → MP3-Export.', en: 'Insert manuscript → recognize chapters & characters → narrator and character voices from library → MP3 export.', es: 'Insertar manuscrito → reconocer capítulos y personajes → voces de narrador y personajes de la biblioteca → exportación a MP3.' })}
                     </p>
                   </div>
                   <Button className="bg-gradient-to-r from-primary to-amber-500 hover:opacity-90 shrink-0 hidden sm:flex">
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Hörbuch starten
+                    {tx({ de: 'Hörbuch starten', en: 'Start Audiobook', es: 'Iniciar audiolibro' })}
                   </Button>
                 </div>
               </Card>
 
-              {/* Voice Studio Teaser */}
+              {/* {tx({ de: 'Voice Studio', en: 'Voice Studio', es: 'Estudio de voz' })} Teaser */}
               <Card
                 onClick={() => setShowVoiceStudio(true)}
                 className="relative overflow-hidden cursor-pointer backdrop-blur-xl bg-gradient-to-br from-primary/10 via-card/60 to-cyan-500/10 border-primary/30 hover:border-primary/60 hover:shadow-[0_0_40px_rgba(var(--primary),0.25)] transition-all p-5 group"
@@ -312,15 +312,15 @@ export default function AudioStudio() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-bold tracking-wider text-primary">NEU</span>
                       <h3 className="text-lg font-bold">{tx({ de: "Eigene Stimme erstellen", en: "Create your own voice", es: "Crea tu propia voz" })}</h3>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">Voice Studio</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary">{tx({ de: 'Voice Studio', en: 'Voice Studio', es: 'Estudio de voz' })}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Skript vorlesen, per Mikrofon aufnehmen oder WhatsApp-Sprachnachricht hochladen — danach für Voiceovers nutzen.
+                      {tx({ de: 'Skript vorlesen, per Mikrofon aufnehmen oder WhatsApp-Sprachnachricht hochladen — danach für Voiceovers nutzen.', en: 'Read script aloud, record via microphone or upload WhatsApp voice message — then use for voiceovers.', es: 'Lee el guión en voz alta, graba a través del micrófono o sube un mensaje de voz de WhatsApp; luego úsalo para las voces en off.' })}
                     </p>
                   </div>
                   <Button className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90 shrink-0 hidden sm:flex">
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Voice erstellen
+                    {tx({ de: 'Voice erstellen', en: 'Create Voice', es: 'Crear voz' })}
                   </Button>
                 </div>
               </Card>

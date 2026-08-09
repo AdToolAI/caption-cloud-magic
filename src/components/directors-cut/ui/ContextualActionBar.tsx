@@ -199,7 +199,7 @@ export function ContextualActionBar({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
-                          tx({ de: "Szene hinzufügen (danach)", en: "Add scene (after)", es: "Añadir escena (después)" })
+                          {tx({ de: "Szene hinzufügen (danach)", en: "Add scene (after)", es: "Añadir escena (después)" })}
                         </TooltipContent>
                       </Tooltip>
                     )}
@@ -218,7 +218,7 @@ export function ContextualActionBar({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
-                          tx({ de: "Segment herausschneiden", en: "Cut out segment", es: "Recortar segmento" })
+                          {tx({ de: "Segment herausschneiden", en: "Cut out segment", es: "Recortar segmento" })}
                         </TooltipContent>
                       </Tooltip>
                     )}
@@ -241,7 +241,7 @@ export function ContextualActionBar({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs">
-                      tx({ de: "Effekte & Filter anwenden", en: "Apply effects & filters", es: "Aplicar efectos y filtros" })
+                      {tx({ de: "Effekte & Filter anwenden", en: "Apply effects & filters", es: "Aplicar efectos y filtros" })}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

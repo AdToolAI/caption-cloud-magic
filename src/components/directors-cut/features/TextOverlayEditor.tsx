@@ -135,7 +135,7 @@ export function TextOverlayEditor({
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="overlays">Overlays</TabsTrigger>
-            <TabsTrigger value="templates">tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })</TabsTrigger>
+            <TabsTrigger value="templates">{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="templates" className="space-y-3 mt-3">
@@ -169,14 +169,14 @@ export function TextOverlayEditor({
               className="w-full border-dashed"
             >
               <Plus className="h-4 w-4 mr-2" />
-              tx({ de: "Neues Overlay hinzufügen", en: "Add new overlay", es: "Añadir nueva superposición" })
+              {tx({ de: "Neues Overlay hinzufügen", en: "Add new overlay", es: "Añadir nueva superposición" })}
             </Button>
 
             {/* Overlay List */}
             {overlays.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Type className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>tx({ de: "Keine Overlays vorhanden", en: "No overlays available", es: "No hay superposiciones disponibles" })</p>
+                <p>{tx({ de: "Keine Overlays vorhanden", en: "No overlays available", es: "No hay superposiciones disponibles" })}</p>
                 <p className="text-sm">{tx({ de: "Füge Text, CTAs oder Watermarks hinzu", en: "Add text, CTAs or watermarks", es: "Añadir texto, CTAs o marcas de agua" })}</p>
               </div>
             ) : (
@@ -331,7 +331,7 @@ export function TextOverlayEditor({
 
                 {/* Font Size */}
                 <div className="space-y-2">
-                  <Label className="text-sm">tx({ de: "Schriftgröße", en: "Font size", es: "Tamaño de fuente" })</Label>
+                  <Label className="text-sm">{tx({ de: "Schriftgröße", en: "Font size", es: "Tamaño de fuente" })}</Label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {FONT_SIZES.map((size) => (
                       <Button
@@ -349,7 +349,7 @@ export function TextOverlayEditor({
 
                 {/* Font Family */}
                 <div className="space-y-2">
-                  <Label className="text-sm">tx({ de: "Schriftart", en: "Font", es: "Fuente" })</Label>
+                  <Label className="text-sm">{tx({ de: "Schriftart", en: "Font", es: "Fuente" })}</Label>
                   <div className="grid grid-cols-3 gap-1.5">
                     {FONT_FAMILIES.map((font) => (
                       <Button
@@ -369,7 +369,7 @@ export function TextOverlayEditor({
                 {/* Colors */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-sm">tx({ de: "Textfarbe", en: "Text color", es: "Color de texto" })</Label>
+                    <Label className="text-sm">{tx({ de: "Textfarbe", en: "Text color", es: "Color de texto" })}</Label>
                     <div className="flex flex-wrap gap-1">
                       {PRESET_COLORS.map((color) => (
                         <button
@@ -384,7 +384,7 @@ export function TextOverlayEditor({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">tx({ de: "Hintergrund", en: "Background", es: "Fondo" })</Label>
+                    <Label className="text-sm">{tx({ de: "Hintergrund", en: "Background", es: "Fondo" })}</Label>
                     <div className="flex flex-wrap gap-1">
                       <button
                         onClick={() => updateOverlayStyle(selectedOverlay.id, { backgroundColor: 'transparent' })}

@@ -158,7 +158,7 @@ export function SmokeTestsAdmin() {
             <div className="text-center py-12 text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p className="font-medium">{tx({ de: "Noch keine Smoke-Test-Daten", en: "No smoke test data yet", es: "Aún no hay datos de pruebas de humo" })}</p>
-              <p className="text-sm mt-1">tx({ de: "Klicke „Jetzt ausführen" um den ersten Test zu starten.", en: "Click "Execute now" to start the first test.", es: "Haz clic en "Ejecutar ahora" para iniciar la primera prueba." })</p>
+              <p className="text-sm mt-1">{tx({ de: "Klicke „Jetzt ausführen" um den ersten Test zu starten.", en: "Click "Execute now" to start the first test.", es: "Haz clic en "Ejecutar ahora" para iniciar la primera prueba." })}</p>
             </div>
           ) : (
             <div className="space-y-2">

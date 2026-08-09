@@ -84,7 +84,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
             </div>
           ) : variants.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              tx({ de: "Noch keine Varianten tx({ de: "erstellt", en: "created", es: "creadas" })", en: "No variants created yet", es: "Aún no se han creado variantes" })
+              {tx({ de: "Noch keine Varianten tx({ de: "erstellt", en: "created", es: "creadas" })", en: "No variants created yet", es: "Aún no se han creado variantes" })}
             </div>
           ) : (
             <div className="space-y-4">
@@ -145,7 +145,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            tx({ de: "Neue Varianten erstellen", en: "Create new variants", es: "Crear nuevas variantes" })
+            {tx({ de: "Neue Varianten erstellen", en: "Create new variants", es: "Crear nuevas variantes" })}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -177,7 +177,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
 
           {/* Aspect Ratios */}
           <div className="space-y-3">
-            <Label className="text-base font-semibold">tx({ de: "Seitenverhältnisse", en: "Aspect ratios", es: "Relaciones de aspecto" })</Label>
+            <Label className="text-base font-semibold">{tx({ de: "Seitenverhältnisse", en: "Aspect ratios", es: "Relaciones de aspecto" })}</Label>
             <div className="grid grid-cols-2 gap-3">
               {ASPECT_RATIO_PROFILES.map(ratio => (
                 <div
@@ -239,7 +239,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                tx({ de: "Erstelle Varianten...", en: "Creating variants...", es: "Creando variantes..." })
+                {tx({ de: "Erstelle Varianten...", en: "Creating variants...", es: "Creando variantes..." })}
               </>
             ) : (
               <>

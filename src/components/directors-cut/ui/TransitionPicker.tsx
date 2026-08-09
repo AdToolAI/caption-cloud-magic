@@ -137,7 +137,7 @@ export function TransitionPicker({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-semibold text-primary">tx({ de: "AI Empfehlung", en: "AI Recommendation", es: "Recomendación de IA" })</span>
+                <span className="text-xs font-semibold text-primary">{tx({ de: "AI Empfehlung", en: "AI Recommendation", es: "Recomendación de IA" })}</span>
                 {aiConfidence && (
                   <Badge 
                     variant="secondary" 
@@ -161,7 +161,7 @@ export function TransitionPicker({
               onClick={() => onTypeChange(aiRecommendation)}
               className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium"
             >
-              tx({ de: "Anwenden", en: "Apply", es: "Aplicar" })
+              {tx({ de: "Anwenden", en: "Apply", es: "Aplicar" })}
             </motion.button>
           </div>
           
@@ -262,7 +262,7 @@ export function TransitionPicker({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">tx({ de: "Timing anpassen", en: "Adjust timing", es: "Ajustar tiempo" })</span>
+              <span className="text-sm font-medium">{tx({ de: "Timing anpassen", en: "Adjust timing", es: "Ajustar tiempo" })}</span>
             </div>
             <Badge variant="outline" className="font-mono">
               {offsetSeconds >= 0 ? '+' : ''}{offsetSeconds.toFixed(1)}s

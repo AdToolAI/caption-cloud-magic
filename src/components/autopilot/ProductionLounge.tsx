@@ -93,7 +93,7 @@ export function ProductionLounge({ production, scenes, log, language = 'de' }: P
                 onClick={() => void Notification.requestPermission()}
               >
                 <Bell className="mr-1.5 h-3.5 w-3.5" />
-                tx({ de: "Benachrichtigen, wenn fertig", en: "Notify when finished", es: "Notificar cuando termine" })
+                {tx({ de: "Benachrichtigen, wenn fertig", en: "Notify when finished", es: "Notificar cuando termine" })}
               </Button>
             )}
           </Card>

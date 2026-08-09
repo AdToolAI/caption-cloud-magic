@@ -53,7 +53,7 @@ export const TemplateActivityFeed = ({ templateId }: TemplateActivityFeedProps) 
 
           {activity?.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-8">
-              tx({ de: "Keine Aktivitäten vorhanden", en: "No activities available", es: "No hay actividades disponibles" })
+              {tx({ de: "Keine Aktivitäten vorhanden", en: "No activities available", es: "No hay actividades disponibles" })}
             </p>
           )}
         </div>

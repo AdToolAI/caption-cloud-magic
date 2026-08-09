@@ -76,7 +76,7 @@ export function LayoutStep() {
         {s.imageBusy && (
           <div className="flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-            tx({ de: "Motiv wird erzeugt … es erscheint automatisch in allen Layouts.", en: "Motif is being created... it appears automatically in all layouts.", es: "Se está creando el motivo... aparece automáticamente en todos los diseños." })
+            {tx({ de: "Motiv wird erzeugt … es erscheint automatisch in allen Layouts.", en: "Motif is being created... it appears automatically in all layouts.", es: "Se está creando el motivo... aparece automáticamente en todos los diseños." })}
           </div>
         )}
 

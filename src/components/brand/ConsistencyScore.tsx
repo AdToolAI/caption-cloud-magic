@@ -104,12 +104,12 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
         <div>
           <Progress value={score} className="h-3" />
           <p className="text-xs text-muted-foreground text-center mt-2">
-            tx({ de: `Basierend auf ${recentChecks.length} ${recentChecks.length === 1 ? "Analyse" : "Analysen"}`, en: `Based on ${recentChecks.length} ${recentChecks.length === 1 ? "analysis" : "analyses"}`, es: `Basado en ${recentChecks.length} ${recentChecks.length === 1 ? "análisis" : "análisis"}` })
+            {tx({ de: `Basierend auf ${recentChecks.length} ${recentChecks.length === 1 ? "Analyse" : "Analysen"}`, en: `Based on ${recentChecks.length} ${recentChecks.length === 1 ? "analysis" : "analyses"}`, es: `Basado en ${recentChecks.length} ${recentChecks.length === 1 ? "análisis" : "análisis"}` })}
           </p>
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium">tx({ de: "Verbesserungsvorschläge:", en: "Suggestions for improvement:", es: "Sugerencias de mejora:" })</p>
+          <p className="text-sm font-medium">{tx({ de: "Verbesserungsvorschläge:", en: "Suggestions for improvement:", es: "Sugerencias de mejora:" })}</p>
           {suggestions.map((suggestion, idx) => (
             <div key={idx} className="flex items-start gap-2 text-sm">
               <suggestion.icon className={`h-4 w-4 mt-0.5 ${
@@ -122,7 +122,7 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
 
         {recentChecks.length > 0 && (
           <div className="pt-4 border-t">
-            <p className="text-sm font-medium mb-2">tx({ de: "Letzte Analysen", en: "Recent analyses", es: "Análisis recientes" })</p>
+            <p className="text-sm font-medium mb-2">{tx({ de: "Letzte Analysen", en: "Recent analyses", es: "Análisis recientes" })}</p>
             <div className="space-y-2">
               {recentChecks.slice(0, 3).map((check: any) => (
                 <div key={check.id} className="flex items-center justify-between text-sm">

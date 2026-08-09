@@ -245,10 +245,10 @@ export default function AdCampaignTree({
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Megaphone className="h-5 w-5 text-amber-400" />
-          tx({ de: '{tx({ de: 'Kampagnen-Übersicht', en: 'Campaign Overview', es: 'Resumen de la campaña' })}', en: 'Campaign Overview', es: 'Resumen de la campaña' })
+          {tx({ de: '{tx({ de: 'Kampagnen-Übersicht', en: 'Campaign Overview', es: 'Resumen de la campaña' })}', en: 'Campaign Overview', es: 'Resumen de la campaña' })}
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          tx({ de: 'Master-Spot + automatisch erzeugte Cutdowns, A/B-Varianten & Format-Klone.', en: 'Master spot + automatically generated cutdowns, A/B variants & format clones.', es: 'Spot maestro + versiones reducidas generadas automáticamente, variantes A/B y clones de formato.' })
+          {tx({ de: 'Master-Spot + automatisch erzeugte Cutdowns, A/B-Varianten & Format-Klone.', en: 'Master spot + automatically generated cutdowns, A/B variants & format clones.', es: 'Spot maestro + versiones reducidas generadas automáticamente, variantes A/B y clones de formato.' })}
         </p>
       </div>
 
