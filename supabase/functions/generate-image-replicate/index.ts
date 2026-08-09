@@ -356,7 +356,7 @@ serve(async (req) => {
 
     let output: any;
     try {
-      output = await replicate.run(modelRef as any, { input: replicateInput });
+      output = gptImageDataUrl ?? await replicate.run(modelRef as any, { input: replicateInput });
     } catch (replicateError: any) {
       console.error('[generate-image-replicate] Replicate error:', replicateError);
       const detail = String(
