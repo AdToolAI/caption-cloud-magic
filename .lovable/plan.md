@@ -15,25 +15,29 @@ Nebenwirkung, die ich sauber machen möchte: Bei Pro/Ultra verschwindet "Banner"
 
 ### Was ich dazu ändere
 
-1. Nicht unterstützte Formate bleiben sichtbar, aber ausgegraut mit Hinweis "Bei Nano Banana 2 wird daraus 21:9".
-2. Die Filterlisten in der Oberfläche werden an die echten Modell-Listen angeglichen (aktuell fehlen z. B. 3:2, 2:3, 21:9, 5:4 bei Fast/Ultra, obwohl die Modelle sie können).
-3. Nach der Generierung zeigt die Bildkarte das tatsächlich verwendete Verhältnis, wenn gemappt wurde.
+1. **Nur echte Formate anbieten**: Die Auswahl zeigt pro Modell ausschließlich Verhältnisse, die das Modell wirklich akzeptiert. Kein 2:1 bei Modellen ohne 2:1, kein stilles Umbiegen.
+2. Die Listen werden an die echten Modell-Fähigkeiten angeglichen — aktuell fehlen z. B. 3:2, 2:3, 21:9, 5:4, obwohl Seedream/Nano Banana sie können.
+3. Beim Modellwechsel springt ein nicht mehr unterstütztes Verhältnis automatisch auf das nächstliegende erlaubte, sichtbar in der Auswahl.
+4. Serverseitiges Mapping bleibt nur als Sicherheitsnetz (falls doch etwas Ungültiges ankommt), ist aber im Normalbetrieb nie nötig.
 
-## Zur Frage 2: Weitere Bildmodelle
+## Zur Frage 2: Welches Bildmodell nutzt ChatGPT — und weitere Modelle
 
-Midjourney selbst hat **keine offizielle API** — nur inoffizielle Discord-Bridges, die gegen die Nutzungsbedingungen verstoßen und regelmäßig abgeschaltet werden. Das würde ich nicht einbauen.
+ChatGPT erzeugt Bilder mit OpenAIs eigenem Modell **GPT-Image** (Nachfolger von DALL·E 3), aktuell **GPT-Image-2**. Das ist über die Lovable-AI-Anbindung direkt verfügbar — kein eigener OpenAI-Key nötig. Formate dort: 1:1, 3:2, 2:3 (feste Größen), also z. B. **kein** 16:9 und kein Banner.
 
-Stattdessen diese Modelle, alle über die bereits verbundene Replicate-Anbindung, jeweils mit eigenem Preis und eigener Format-Liste:
+Midjourney hat **keine offizielle API** — nur inoffizielle Discord-Bridges, die gegen die Nutzungsbedingungen verstoßen und regelmäßig abgeschaltet werden. Das baue ich nicht ein.
+
+Vorschlag zur Erweiterung:
 
 | Neu | Stärke | ca. Kosten/Bild |
 | --- | --- | --- |
+| GPT-Image-2 (ChatGPT-Modell) | Prompt-Treue, saubere Texte, ChatGPT-Look | ~$0.02–0.08 je Qualität |
 | FLUX 1.1 Pro Ultra | Midjourney-nächster Look, 4 MP, sehr fotoreal | ~$0.06 |
-| FLUX Kontext Pro | Gezieltes Bild-Editing per Anweisung | ~$0.04 |
-| Ideogram v3 Turbo | Mit Abstand beste Text-/Logo-Darstellung im Bild | ~$0.03 |
-| Recraft v3 | Vektor/Icon/Brand-Grafiken, echtes SVG möglich | ~$0.04 |
-| Qwen Image | Sehr guter Allrounder, günstig | ~$0.02 |
+| Ideogram v3 Turbo | Beste Text-/Logo-Darstellung im Bild | ~$0.03 |
+| Recraft v3 | Vektor/Icon/Brand-Grafiken, echtes SVG | ~$0.04 |
+| Qwen Image | Günstiger Allrounder | ~$0.02 |
 
-Vorschlag: Die vier Stufen (Standard/Fast/Pro/Ultra) bleiben als Schnellwahl, darunter kommt eine ausklappbare Modell-Liste "Spezialmodelle" mit den obigen Einträgen inkl. Eignungs-Hinweis ("bester Text im Bild", "Vektor/Logo", "Editing").
+Die vier Stufen (Standard/Fast/Pro/Ultra) bleiben als Schnellwahl, darunter kommt eine ausklappbare Liste "Spezialmodelle" mit Eignungs-Hinweis. Jedes Modell bringt seine eigene, geprüfte Formatliste mit.
+
 
 ## Technische Details
 
