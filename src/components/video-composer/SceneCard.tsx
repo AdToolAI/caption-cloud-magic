@@ -1628,7 +1628,7 @@ export default function SceneCard({
                               {lang === "de"
                                 ? dialogMode
                                   ? "KI-Modell · Lip-Sync (HappyHorse · Hailuo Fallback)"
-                                  : "KI-Modell · Qualität & Preis im Dropdown"
+                                  : tx({ de: "KI-Modell · Qualität & Preis im Dropdown", en: "AI model · Quality & price in dropdown", es: "Modelo de IA · Calidad y precio en el menú desplegable" })
                                 : lang === "es"
                                   ? dialogMode
                                     ? "Modelo IA · Lip-Sync (HappyHorse · Hailuo)"
@@ -2489,7 +2489,7 @@ export default function SceneCard({
                         <span className="text-[9px] text-muted-foreground">
                           {scene.lipSyncAppliedAt
                             ? "Charakter spricht wortgenau · lipsync-2-pro · ~14 Credits"
-                            : "Auto: Sync.so lipsync-2-pro nach Generate (~14 Credits, Artlist-Qualität)"}
+                            : tx({ de: "Auto: Sync.so lipsync-2-pro nach Generate (~14 Credits, Artlist-Qualität)", en: "Auto: Sync.so lipsync-2-pro after generate (~14 credits, Artlist quality)", es: "Auto: Sync.so lipsync-2-pro tras la generación (~14 créditos, calidad Artlist)" })}
                         </span>
                       </div>
                       <button
@@ -3243,7 +3243,7 @@ export default function SceneCard({
                   : null;
                 const anchorShort: Record<string, string> = {
                   "first-frame-direct":
-                    lang === "de" ? "Anker: Porträt" : "Anchor: portrait",
+                    tx({ de: "Anker: Porträt", en: "Anchor: portrait", es: "Ancla: retrato" }),
                   "first-frame-composed":
                     lang === "de" ? "Anker: komponiert" : "Anchor: composed",
                   "subject-reference":

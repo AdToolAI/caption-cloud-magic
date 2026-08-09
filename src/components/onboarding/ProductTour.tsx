@@ -54,12 +54,12 @@ const tourCopy: Record<
     last: "Verstanden",
     steps: [
       {
-        title: "Willkommen in deinem Command-Center 🎬",
+        title: tx({ de: "Willkommen in deinem Command-Center 🎬", en: "Welcome to your command center 🎬", es: "Bienvenido a tu centro de mando 🎬" }),
         content:
           tx({ de: "Diese Hub-Icons sind dein Shortcut zu allen Tools — Studios, Social, Kalender, Analytics. Hover über jedes Icon, um zu sehen, was dahintersteckt.", en: "These Hub icons are your shortcut to all tools — Studios, Social, Calendar, Analytics. Hover over each icon to see what's behind it.", es: "Estos iconos de Hub son tu atajo a todas las herramientas — Estudios, Social, Calendario, Analíticas. Pasa el ratón por cada icono para ver qué hay detrás." }),
       },
       {
-        title: "Live News & Trends",
+        title: tx({ de: "Live News & Trends", en: "Live News & Trends", es: "Noticias y tendencias en vivo" }),
         content:
           tx({ de: "Dein Dashboard zeigt dir Echtzeit-Branchen-News und virale Hooks — du weißt immer, was als nächstes zu posten ist.", en: "Your Dashboard shows you real-time industry news and viral hooks — you'll always know what to post next.", es: "Tu Dashboard te muestra noticias de la industria en tiempo real y ganchos virales — siempre sabrás qué publicar a continuación." }),
       },
@@ -69,7 +69,7 @@ const tourCopy: Record<
           tx({ de: "Nutze einen der personalisierten Prompts hier, um dein erstes KI-Video mit Hailuo 2.3 zu erstellen. Der Brief ist bereits vorausgefüllt.", en: "Use one of the personalized prompts here to create your first AI video with Hailuo 2.3. The brief is already pre-filled.", es: "Usa una de las indicaciones personalizadas aquí para crear tu primer video de IA con Hailuo 2.3. El brief ya está prellenado." }),
       },
       {
-        title: "Verfolge deinen Fortschritt",
+        title: tx({ de: "Verfolge deinen Fortschritt", en: "Track your progress", es: "Sigue tu progreso" }),
         content:
           tx({ de: "Diese Checkliste zeigt die 5 Meilensteine, um die Plattform voll auszuschöpfen. Klicke einen offenen Schritt, um direkt zum passenden Tool zu springen.", en: "This checklist shows the 5 milestones to fully leverage the platform. Click an open step to jump directly to the corresponding tool.", es: "Esta lista de verificación muestra los 5 hitos para aprovechar al máximo la plataforma. Haz clic en un paso abierto para ir directamente a la herramienta correspondiente." }),
       },
