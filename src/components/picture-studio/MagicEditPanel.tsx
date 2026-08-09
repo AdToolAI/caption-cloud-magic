@@ -12,7 +12,6 @@ import { Brush, Eraser, Undo2, Upload, Wand2, Loader2, Image as ImageIcon, Maxim
 import { useMagicEdit } from "@/hooks/useMagicEdit";
 import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
 import { toast } from "sonner";
-import { tx } from "@/lib/i18nText";
 
 type Direction = 'left' | 'right' | 'top' | 'bottom' | 'all';
 
