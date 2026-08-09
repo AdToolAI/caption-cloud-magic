@@ -106,7 +106,7 @@ export default function BriefingImportDialog({
   const handleParse = async () => {
     const briefing = text.trim();
     if (briefing.length < 40) {
-      toast({ title: 'Briefing zu kurz', description: 'Mindestens ein paar Sätze einfügen.', variant: 'destructive' });
+      toast({ title: tx({ de: 'Briefing zu kurz', en: 'Briefing too short', es: 'Briefing demasiado corto' }), description: tx({ de: 'Mindestens ein paar Sätze einfügen.', en: 'Please insert at least a few sentences.', es: 'Por favor, inserta al menos unas frases.' }), variant: 'destructive' });
       return;
     }
     setParsing(true);
@@ -118,16 +118,16 @@ export default function BriefingImportDialog({
       const parsed = BriefingManifest.safeParse(data?.manifest);
       if (!parsed.success) {
         console.warn('[BriefingImportDialog] schema validation failed', parsed.error);
-        throw new Error('Manifest-Validierung fehlgeschlagen');
+        throw new Error(tx({ de: 'Manifest-Validierung fehlgeschlagen', en: 'Manifest validation failed', es: 'La validación del manifiesto falló' }));
       }
       setManifest(parsed.data);
       setStep('review');
     } catch (e: any) {
-      const msg = e?.message ?? 'Parsing fehlgeschlagen';
+      const msg = e?.message ?? tx({ de: 'Parsing fehlgeschlagen', en: 'Parsing failed', es: 'El análisis falló' });
       toast({
         title: tx({ de: 'Briefing konnte nicht gelesen werden', en: 'Could not read briefing', es: 'No se pudo leer el briefing' }),
-        description: msg.includes('402') ? 'Keine AI-Credits mehr.'
-          : msg.includes('429') ? 'Zu viele Anfragen — bitte kurz warten.' : msg,
+        description: msg.includes('402') ? tx({ de: 'Keine AI-Credits mehr.', en: 'No more AI credits.', es: 'No quedan créditos de IA.' })
+          : msg.includes('429') ? tx({ de: 'Zu viele Anfragen — bitte kurz warten.', en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' }) : msg,
         variant: 'destructive',
       });
     } finally {

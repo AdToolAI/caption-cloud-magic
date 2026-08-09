@@ -196,7 +196,7 @@ const AllComments = () => {
       if (error) throw error;
 
       toast({
-        title: "Import erfolgreich",
+        title: tx({ de: "Import erfolgreich", en: "Import successful", es: "Importación exitosa" }),
         description: data.message,
       });
 
@@ -207,8 +207,8 @@ const AllComments = () => {
     } catch (error: any) {
       console.error("Import error:", error);
       toast({
-        title: "Import fehlgeschlagen",
-        description: error.message || "Unbekannter Fehler",
+        title: tx({ de: "Import fehlgeschlagen", en: "Import failed", es: "Importación fallida" }),
+        description: error.message || tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
         variant: "destructive",
       });
     }

@@ -70,7 +70,7 @@ export function DeliverStep() {
       }
       toast.success("Export fertig");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Export fehlgeschlagen");
+      toast.error(error instanceof Error ? error.message : tx({ de: "Export fehlgeschlagen", en: "Export failed", es: "Exportación fallida" }));
     } finally {
       setExporting(false);
     }
@@ -96,7 +96,7 @@ export function DeliverStep() {
         source: "content_studio",
       };
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Veröffentlichen fehlgeschlagen");
+      toast.error(err instanceof Error ? err.message : tx({ de: "Veröffentlichen fehlgeschlagen", en: "Publishing failed", es: "Publicación fallida" }));
       return null;
     }
   };
@@ -115,7 +115,7 @@ export function DeliverStep() {
       if (error) throw error;
       toast.success("Als Vorlage gesichert");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Speichern fehlgeschlagen");
+      toast.error(error instanceof Error ? error.message : tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Guardado fallido" }));
     } finally {
       setSaving(false);
     }
@@ -141,7 +141,7 @@ export function DeliverStep() {
       }
       setSeriesDone(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Serie fehlgeschlagen");
+      toast.error(error instanceof Error ? error.message : tx({ de: "Serie fehlgeschlagen", en: "Series failed", es: "Serie fallida" }));
     } finally {
       setSeriesBusy(false);
     }

@@ -14,6 +14,7 @@
  * Selection styling (gold border + glow) is controlled by `isActive`.
  */
 import { useEffect, useRef, useState } from 'react';
+import { tx } from '@/lib/i18nText';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, RefreshCw, Sparkles, ImageIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -54,10 +55,7 @@ export default function SceneInlinePlayer({
   onGenerate,
 }: Props) {
   const { t, language } = useTranslation();
-  const notRenderedLabel =
-    language === 'en' ? 'Not rendered yet'
-      : language === 'es' ? 'Aún no renderizado'
-        : 'Noch nicht gerendert';
+  const notRenderedLabel = tx({ de: 'Noch nicht gerendert', en: 'Not rendered yet', es: 'Aún no renderizado' });
   const { reset: resetLipSync, resettingId } = useResetLipSync();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
