@@ -421,11 +421,11 @@ export function AISuperuserAdmin() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12"></TableHead>
-                <TableHead>Szenario</TableHead>
-                <TableHead>Letzter Run</TableHead>
-                <TableHead>Pass-Rate</TableHead>
+                <TableHead>{tx({ de: "Szenario", en: "Scenario", es: "Escenario" })}</TableHead>
+                <TableHead>{tx({ de: "Letzter Run", en: "Last run", es: "Última ejecución" })}</TableHead>
+                <TableHead>{tx({ de: "Pass-Rate", en: "Pass rate", es: "Tasa de aprobación" })}</TableHead>
                 <TableHead title={tx({ de: "Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal.", en: "True Edge Function latency including AI model response time. 5–10s are normal for image/multi-step generation.", es: "Latencia real de Edge Function, incluido el tiempo de respuesta del modelo de IA. 5–10 s son normales para la generación de imágenes/varios pasos." })}>{tx({ de: "Latenz", en: "Latency", es: "Latencia" })}</TableHead>
-                <TableHead>Runs</TableHead>
+                <TableHead>{tx({ de: "Runs", en: "Runs", es: "Ejecuciones" })}</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -454,7 +454,7 @@ export function AISuperuserAdmin() {
                   <TableCell>
                     {s.lastRun && (
                       <Button size="sm" variant="ghost" onClick={() => setSelectedRun(s.lastRun!)}>
-                        Details
+                        {tx({ de: "Details", en: "Details", es: "Detalles" })}
                       </Button>
                     )}
                   </TableCell>
@@ -463,7 +463,7 @@ export function AISuperuserAdmin() {
               {scenarios.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    Noch keine Test-Runs. Klicke auf „Schnell-Test" um zu starten.
+                    {tx({ de: 'Noch keine Test-Runs. Klicke auf „Schnell-Test" um zu starten.', en: 'No test runs yet. Click "Quick test" to start.', es: 'Aún no hay ejecuciones de prueba. Haz clic en "Prueba rápida" para empezar.' })}
                   </TableCell>
                 </TableRow>
               )}
@@ -512,7 +512,7 @@ export function AISuperuserAdmin() {
                       size="sm"
                     >
                       {creatingBugReport ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
-                      Als Bug-Report melden
+                      {tx({ de: "Als Bug-Report melden", en: "Report as bug", es: "Reportar como error" })}
                     </Button>
                   </div>
                 )}
