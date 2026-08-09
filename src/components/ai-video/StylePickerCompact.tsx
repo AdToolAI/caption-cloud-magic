@@ -8,6 +8,7 @@ import {
   type AIVideoModel,
 } from '@/config/modelStyleCompatibility';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 interface StylePickerCompactProps {
   /** Selected style — `null` means "no style hint, free prompt". */

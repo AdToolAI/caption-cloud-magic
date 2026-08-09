@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
+import { tx } from '@/lib/i18nText';
 
 // Purely decorative: 4 radial progress rings for channels, plus a scrolling ticker.
 const CHANNELS = [

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useTx } from '@/lib/i18nText';
+import { tx } from '@/lib/i18nText';
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB
 const ACCEPTED_IMAGE = ['image/jpeg', 'image/png', 'image/webp'];

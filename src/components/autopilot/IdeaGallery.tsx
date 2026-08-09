@@ -19,6 +19,7 @@ import { estimateProductionCost, formatEuro } from '@/lib/autopilot/costEstimate
 import type { LauncherOptions } from '@/components/autopilot/AutopilotIdeaLauncher';
 import { cn } from '@/lib/utils';
 import { useTx } from '@/lib/i18nText';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   strategy: AutopilotStrategy;

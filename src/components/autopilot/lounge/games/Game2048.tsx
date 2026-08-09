@@ -11,6 +11,7 @@ import { useEffect, useReducer, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTx } from '@/lib/i18nText';
+import { tx } from '@/lib/i18nText';
 
 type Grid = number[][];
 type Dir = 'left' | 'right' | 'up' | 'down';

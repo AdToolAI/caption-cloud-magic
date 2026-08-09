@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { TrendingUp } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { tx } from '@/lib/i18nText';
 
 // Purely decorative sparkline + rising bars. No numeric KPIs.
 const SPARK_PATH = "M0,40 L15,32 L30,36 L45,24 L60,28 L75,18 L90,22 L105,10 L120,14 L135,4";

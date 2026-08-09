@@ -13,6 +13,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { PostComposerPanel } from "./PostComposerPanel";
+import { tx } from '@/lib/i18nText';
 
 interface EventDrawerProps {
   open: boolean;

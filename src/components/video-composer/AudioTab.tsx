@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 import SoundDesignPanel from './SoundDesignPanel';
+import { tx } from '@/lib/i18nText';
 
 interface AudioTabProps {
   assemblyConfig: AssemblyConfig;

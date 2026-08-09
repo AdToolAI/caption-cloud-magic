@@ -8,6 +8,7 @@ import { Languages, Play } from 'lucide-react';
 import { useVoiceTranslation } from '@/hooks/useVoiceTranslation';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { useTx } from '@/lib/i18nText';
+import { tx } from '@/lib/i18nText';
 
 const LANGUAGES = [
   { code: 'de', name: 'Deutsch' },

@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { X, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { tx } from '@/lib/i18nText';
 
 interface BannerProps {
   type?: 'info' | 'success' | 'warning' | 'error';

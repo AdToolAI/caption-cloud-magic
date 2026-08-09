@@ -31,6 +31,7 @@ import {
 import { evaluateSceneQuality } from '@/lib/motion-studio/qualityScore';
 import type { ComposerScene } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost } from '@/types/video-composer';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   scene: ComposerScene;

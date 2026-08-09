@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { Volume2, VolumeX, Music2, Film, Maximize2, Minimize2, Gauge } from "lucide-react";
 import { useStudioPreferences, type EditorMode, type StageAudioMode } from "@/hooks/useStudioPreferences";
+import { tx } from '@/lib/i18nText';
 
 /**
  * Director's Bar — the sticky cinematic control strip at the top of the

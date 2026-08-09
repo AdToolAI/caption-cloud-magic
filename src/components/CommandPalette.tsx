@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/command";
 import * as LucideIcons from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { tx } from '@/lib/i18nText';
 
 interface Command {
   id: string;

@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { OverlayAnimation, TextOverlay } from '@/types/directors-cut';
 import { useTx } from '@/lib/i18nText';
+import { tx } from '@/lib/i18nText';
 
 interface OverlayInspectorProps {
   overlay: TextOverlay;

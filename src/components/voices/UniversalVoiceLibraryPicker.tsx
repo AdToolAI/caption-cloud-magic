@@ -27,6 +27,7 @@ import {
   type VoiceCategoryId,
 } from '@/lib/voice-categories';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
+import { tx } from '@/lib/i18nText';
 
 interface UniversalVoiceLibraryPickerProps {
   open: boolean;

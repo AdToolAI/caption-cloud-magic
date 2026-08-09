@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Activity } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { tx } from '@/lib/i18nText';
 
 interface TemplateActivityFeedProps {
   templateId: string;

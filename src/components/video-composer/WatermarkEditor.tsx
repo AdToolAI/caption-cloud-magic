@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Stamp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
+import { tx } from '@/lib/i18nText';
   DEFAULT_WATERMARK_CONFIG,
   type WatermarkConfig,
   type WatermarkPosition,

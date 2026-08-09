@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Heart, MessageCircle, Send, Bookmark } from "lucide-react";
 import { useState } from "react";
+import { tx } from '@/lib/i18nText';
 
 interface InstagramPostPreviewProps {
   mediaUrl: string;
