@@ -11,6 +11,8 @@ interface ProviderHealth {
   connected: boolean;
   expiring_in_days?: number;
   can_publish?: boolean;
+  account_name?: string | null;
+  has_refresh_token?: boolean;
 }
 
 
@@ -43,7 +45,7 @@ Deno.serve(async (req) => {
     // Get all active connections for user
     const { data: connections, error: connError } = await supabase
       .from('social_connections')
-      .select('provider, token_expires_at, scope')
+      .select('provider, token_expires_at, scope, account_name, refresh_token_hash')
       .eq('user_id', user.id);
 
     if (connError) {
@@ -74,7 +76,11 @@ Deno.serve(async (req) => {
     const now = new Date();
 
     connections?.forEach((conn) => {
-      const health: ProviderHealth = { connected: true };
+      const health: ProviderHealth = {
+        connected: true,
+        account_name: (conn as any).account_name ?? null,
+        has_refresh_token: !!(conn as any).refresh_token_hash,
+      };
 
       if (conn.token_expires_at) {
         const expiresAt = new Date(conn.token_expires_at);
