@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowDown, ArrowUp, Users, TrendingUp, Calendar } from "lucide-react";
+import { tx } from "@/lib/i18nText";
 
 interface RetentionMetrics {
   day1Retention: number;
@@ -25,7 +26,7 @@ export function RetentionDashboard({ data }: Props) {
   if (!data) {
     return (
       <Card className="p-8 text-center">
-        <p className="text-muted-foreground">Keine Retention-Daten verfügbar</p>
+        <p className="text-muted-foreground">{tx({ de: "Keine Retention-Daten verfügbar", en: "No retention data available", es: "No hay datos de retención disponibles" })}</p>
       </Card>
     );
   }
@@ -52,7 +53,7 @@ export function RetentionDashboard({ data }: Props) {
             <div className="text-2xl font-bold">{formatPercent(data.day1Retention)}</div>
             <TrendIndicator trend={data.day1Trend} />
             <p className="text-xs text-muted-foreground mt-2">
-              User, die nach 1 Tag zurückkehren
+              {tx({ de: "User, die nach 1 Tag zurückkehren", en: "Users returning after 1 day", es: "Usuarios que regresan después de 1 día" })}
             </p>
           </CardContent>
         </Card>
@@ -66,7 +67,7 @@ export function RetentionDashboard({ data }: Props) {
             <div className="text-2xl font-bold">{formatPercent(data.day7Retention)}</div>
             <TrendIndicator trend={data.day7Trend} />
             <p className="text-xs text-muted-foreground mt-2">
-              User, die nach 7 Tagen zurückkehren
+              {tx({ de: "User, die nach 7 Tagen zurückkehren", en: "Users returning after 7 days", es: "Usuarios que regresan después de 7 días" })}
             </p>
           </CardContent>
         </Card>
@@ -80,7 +81,7 @@ export function RetentionDashboard({ data }: Props) {
             <div className="text-2xl font-bold">{formatPercent(data.day30Retention)}</div>
             <TrendIndicator trend={data.day30Trend} />
             <p className="text-xs text-muted-foreground mt-2">
-              User, die nach 30 Tagen zurückkehren
+              {tx({ de: "User, die nach 30 Tagen zurückkehren", en: "Users returning after 30 days", es: "Usuarios que regresan después de 30 días" })}
             </p>
           </CardContent>
         </Card>
@@ -91,7 +92,7 @@ export function RetentionDashboard({ data }: Props) {
         <CardHeader>
           <CardTitle>Cohort Analysis</CardTitle>
           <CardDescription>
-            Retention nach Signup-Woche
+            {tx({ de: "Retention nach Signup-Woche", en: "Retention by signup week", es: "Retención por semana de registro" })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -99,8 +100,8 @@ export function RetentionDashboard({ data }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 px-4 font-medium">Signup-Woche</th>
-                  <th className="text-right py-2 px-4 font-medium">Signups</th>
+                  <th className="text-left py-2 px-4 font-medium">{tx({ de: "Signup-Woche", en: "Signup week", es: "Semana de registro" })}</th>
+                  <th className="text-right py-2 px-4 font-medium">{tx({ de: "Signups", en: "Signups", es: "Registros" })}</th>
                   <th className="text-right py-2 px-4 font-medium">Day 1</th>
                   <th className="text-right py-2 px-4 font-medium">Day 7</th>
                   <th className="text-right py-2 px-4 font-medium">Day 30</th>
@@ -139,11 +140,11 @@ export function RetentionDashboard({ data }: Props) {
           </div>
 
           <div className="mt-4 p-4 bg-muted rounded-lg">
-            <h4 className="font-semibold mb-2">Interpretation</h4>
+            <h4 className="font-semibold mb-2">{tx({ de: "Interpretation", en: "Interpretation", es: "Interpretación" })}</h4>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>• <strong>Day 1 Retention &gt; 50%:</strong> Sehr gut - User finden sofort Wert</li>
-              <li>• <strong>Day 7 Retention &gt; 30%:</strong> Gut - User bilden Habit</li>
-              <li>• <strong>Day 30 Retention &gt; 20%:</strong> Exzellent - Langfristige Nutzer</li>
+              <li>• <strong>Day 1 Retention &gt; 50%:</strong> {tx({ de: "Sehr gut - User finden sofort Wert", en: "Very good - users find value immediately", es: "Muy bueno - los usuarios encuentran valor de inmediato" })}</li>
+              <li>• <strong>Day 7 Retention &gt; 30%:</strong> {tx({ de: "Gut - User bilden Habit", en: "Good - users are forming a habit", es: "Bueno - los usuarios están formando un hábito" })}</li>
+              <li>• <strong>Day 30 Retention &gt; 20%:</strong> {tx({ de: "Exzellent - Langfristige Nutzer", en: "Excellent - long-term users", es: "Excelente - usuarios a largo plazo" })}</li>
             </ul>
           </div>
         </CardContent>
@@ -158,9 +159,9 @@ export function RetentionDashboard({ data }: Props) {
           <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
             <TrendingUp className="h-5 w-5 text-blue-600 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-sm mb-1">Retention Benchmark</h4>
+              <h4 className="font-semibold text-sm mb-1">{tx({ de: "Retention Benchmark", en: "Retention benchmark", es: "Referencia de retención" })}</h4>
               <p className="text-sm text-muted-foreground">
-                Durchschnittliche SaaS-Retention: Day 1: 40%, Day 7: 25%, Day 30: 15%
+                {tx({ de: "Durchschnittliche SaaS-Retention: Day 1: 40%, Day 7: 25%, Day 30: 15%", en: "Average SaaS retention: Day 1: 40%, Day 7: 25%, Day 30: 15%", es: "Retención media de SaaS: Día 1: 40%, Día 7: 25%, Día 30: 15%" })}
               </p>
             </div>
           </div>
@@ -168,7 +169,7 @@ export function RetentionDashboard({ data }: Props) {
           <div className="flex items-start gap-3 p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
             <Calendar className="h-5 w-5 text-purple-600 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-sm mb-1">Beste Cohort</h4>
+              <h4 className="font-semibold text-sm mb-1">{tx({ de: "Beste Cohort", en: "Best cohort", es: "Mejor cohorte" })}</h4>
               <p className="text-sm text-muted-foreground">
                 {data.cohorts.length > 0 && (
                   <>
@@ -178,7 +179,7 @@ export function RetentionDashboard({ data }: Props) {
                       data.cohorts.reduce((best, current) => 
                         current.day30 > best.day30 ? current : best
                       ).day30
-                    )} Day 30 Retention
+                    )} {tx({ de: "Day 30 Retention", en: "Day 30 retention", es: "Retención día 30" })}
                   </>
                 )}
               </p>

@@ -7,6 +7,7 @@
  */
 import { useRenderQueueJob } from '@/hooks/useRenderQueueJob';
 import { Loader2, Sparkles } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   jobId: string | null | undefined;
@@ -29,7 +30,7 @@ export function RenderQueueBadge({ jobId, className = '' }: Props) {
     return (
       <div className={`flex items-center gap-2 text-sm text-muted-foreground ${className}`}>
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        <span>Verbinde mit Render-Queue…</span>
+        <span>{tx({ de: 'Verbinde mit Render-Queue…', en: 'Connecting to render queue…', es: 'Conectando a la cola de renderizado…' })}</span>
       </div>
     );
   }
@@ -48,18 +49,18 @@ export function RenderQueueBadge({ jobId, className = '' }: Props) {
       {job.isFounder && (
         <span className="inline-flex items-center gap-1 rounded-full bg-[#F5C76A]/15 px-2 py-0.5 text-xs font-medium text-[#F5C76A]">
           <Sparkles className="h-3 w-3" />
-          Priority
+          {tx({ de: 'Priority', en: 'Priority', es: 'Prioridad' })}
         </span>
       )}
       {isRunning ? (
         <span className="flex items-center gap-2">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-          Rendering… <span className="text-muted-foreground">{formatEta(job.etaSeconds)}</span>
+          {tx({ de: 'Rendering…', en: 'Rendering…', es: 'Renderizando…' })} <span className="text-muted-foreground">{formatEta(job.etaSeconds)}</span>
         </span>
       ) : (
         <span className="flex items-center gap-2">
-          <span className="font-medium">Position {job.position ?? '—'}</span>
-          <span className="text-muted-foreground">in der Warteschlange · {formatEta(job.etaSeconds)}</span>
+          <span className="font-medium">{tx({ de: `Position ${job.position ?? '—'}`, en: `Position ${job.position ?? '—'}`, es: `Posición ${job.position ?? '—'}` })}</span>
+          <span className="text-muted-foreground">{tx({ de: `in der Warteschlange · ${formatEta(job.etaSeconds)}`, en: `in queue · ${formatEta(job.etaSeconds)}`, es: `en cola · ${formatEta(job.etaSeconds)}` })}</span>
         </span>
       )}
     </div>
