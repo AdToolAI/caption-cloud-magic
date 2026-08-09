@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -456,7 +457,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {language === 'de'
-                      ? `Max. Start: ${fmt(maxStart)} — das Voiceover endet spätestens mit dem Video, die Videolänge bleibt unverändert.`
+                      ? tx({ de: `Max. Start: ${fmt(maxStart)} — das Voiceover endet spätestens mit dem Video, die Videolänge bleibt unverändert.`, en: `Max. start: ${fmt(maxStart)} — the voiceover ends with the video at the latest, the video length remains unchanged.`, es: `Máx. start: ${fmt(maxStart)} — la voz en off termina a más tardar con el vídeo, la duración del vídeo permanece sin cambios.` })
                       : language === 'es'
                       ? `Inicio máx.: ${fmt(maxStart)} — el voiceover termina como máximo con el video; la duración no cambia.`
                       : `Max start: ${fmt(maxStart)} — the voice-over ends with the video at the latest; video length never changes.`}

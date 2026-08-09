@@ -36,7 +36,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
             <div>
               <h4 className="font-semibold text-foreground mb-2">{tx({ de: "2.2 Social Media Daten (mit Ihrer Einwilligung)", en: "2.2 Social media data (with your consent)", es: "2.2 Datos de redes sociales (con su consentimiento)" })}</h4>
               <ul className="list-disc list-inside space-y-1">
-                <li><strong>Instagram:</strong> Posts, Bilder, Videos, Metriken, Follower-Daten</li>
+                <li><strong>Instagram:</strong> {tx({ de: "Posts, Bilder, Videos, Metriken, Follower-Daten", en: "Posts, images, videos, metrics, follower data", es: "Publicaciones, imágenes, videos, métricas, datos de seguidores." })}</li>
                 <li><strong>Facebook:</strong> Seiten-Informationen, Post-Performance, Insights</li>
                 <li><strong>TikTok:</strong> Videos, Metriken, Kommentare, Engagement-Daten</li>
                 <li><strong>YouTube:</strong> Video-Metadaten, Kanal-Statistiken, Kommentare</li>

@@ -27,7 +27,7 @@ const STAGE_LABEL: Record<string, string> = {
   audio: 'Ton',
   lipsync: 'Lip-Sync',
   finalizing: 'Endschnitt',
-  completed: 'Fertig',
+  completed: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }),
   failed: 'Abgebrochen',
 };
 
@@ -37,7 +37,7 @@ const PHASES: Array<{ key: string; label: string }> = [
   { key: 'motion', label: 'Bewegung' },
   { key: 'audio', label: 'Ton' },
   { key: 'finalizing', label: 'Endschnitt' },
-  { key: 'completed', label: 'Fertig' },
+  { key: 'completed', label: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }) },
 ];
 
 const PHASE_ORDER = ['treatment', 'anchors', 'motion', 'scenes_ready', 'audio', 'lipsync', 'finalizing', 'completed'];
@@ -54,7 +54,7 @@ const SCENE_LABEL: Record<string, string> = {
   pending: 'Wartet',
   anchor: tx({ de: 'Bild wird geprüft', en: 'Checking image', es: 'Comprobando imagen' }),
   motion: 'Wird animiert',
-  completed: 'Fertig',
+  completed: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }),
   failed: 'Fehlgeschlagen',
 };
 
@@ -148,7 +148,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
               {scene.anchor_url && (
                 <img
                   src={scene.anchor_url}
-                  alt={`Szene ${scene.scene_index + 1}`}
+                  alt={tx({ de: `Szene ${scene.scene_index + 1}`, en: `Scene ${scene.scene_index + 1}`, es: `Escena ${scene.scene_index + 1}` })}
                   loading="lazy"
                   className="h-full w-full object-cover"
                 />
@@ -194,7 +194,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
               ) : scene.fallback_kind === 'still' && scene.anchor_url ? (
                 <img
                   src={scene.anchor_url}
-                  alt={`Szene ${scene.scene_index + 1} als Standbild`}
+                  alt={tx({ de: `Szene ${scene.scene_index + 1} als Standbild`, en: `Scene ${scene.scene_index + 1} as a still image`, es: `Escena ${scene.scene_index + 1} como imagen fija` })}
                   loading="lazy"
                   className="mt-2 w-full rounded-md"
                 />

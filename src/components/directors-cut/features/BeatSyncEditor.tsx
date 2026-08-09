@@ -104,7 +104,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
         onBeatsDetected(formattedBeats);
         setSettings(prev => ({ ...prev, enabled: true }));
         
-        toast.success(`${formattedBeats.length} Beats erkannt`, {
+        toast.success(tx({ de: `${formattedBeats.length} Beats erkannt`, en: `${formattedBeats.length} beats detected`, es: `${formattedBeats.length} latidos detectados` }), {
           description: data.analysis.bpm ? `${data.analysis.bpm} BPM • ${data.credits_used} Credits` : `${data.credits_used} Credits`,
         });
       }

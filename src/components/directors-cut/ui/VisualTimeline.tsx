@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -411,7 +412,7 @@ export function VisualTimeline({
                       className="absolute bottom-1 left-1 right-1"
                     >
                       <div className="text-[8px] text-white truncate font-medium">
-                        {scene.description || `Szene ${index + 1}`}
+                        {scene.description || tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` })}
                       </div>
                       <div className="text-[7px] text-white/70 font-mono">
                         {scene.start_time.toFixed(1)}s - {scene.end_time.toFixed(1)}s

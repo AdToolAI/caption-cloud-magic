@@ -28,7 +28,7 @@ export function describeRenderAdmissionError(raw: unknown): RenderAdmissionInfo 
 
   const message =
     reason === 'founder_reserve'
-      ? `Render-Slots gerade voll. Bitte ~${wait} warten — Founders erhalten Vorrang.`
+      ? tx({ de: `Render-Slots gerade voll. Bitte ~${wait} warten — Founders erhalten Vorrang.`, en: `Render slots currently full. Please wait ~${wait} — Founders receive priority.`, es: `Las ranuras de renderizado están actualmente llenas. Espere ~${wait}: los fundadores reciben prioridad.` })
       : tx({ de: `Alle Render-Slots sind gerade belegt. Bitte in ~${wait} noch einmal versuchen.`, en: `All render slots are currently occupied. Please try again in ~${wait}.`, es: `Todas las ranuras de renderizado están ocupadas actualmente. Por favor, inténtalo de nuevo en ~${wait}.` });
 
   return { message, reason, retryAfterSeconds: retry, foundersOnly };

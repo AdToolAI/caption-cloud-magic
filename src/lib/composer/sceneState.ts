@@ -88,7 +88,7 @@ export const SCENE_STATE_LABEL: Record<SceneState, string> = {
   lipsync_dispatched: tx({ de: 'Lip-Sync wird gestartet', en: 'Starting lip-sync', es: 'Iniciando sincronización labial' }),
   lipsync_running: 'Lip-Sync läuft',
   lipsync_muxing: 'Wird zusammengesetzt',
-  complete: 'Fertig',
+  complete: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }),
   failed: 'Fehlgeschlagen',
   canceled: 'Abgebrochen',
 };

@@ -59,7 +59,7 @@ export default function BatchVideoCreator() {
     return (
       <div className="container mx-auto py-8 px-4">
         <Card className="p-6">
-          <p className="text-center text-muted-foreground">Template wird geladen...</p>
+          <p className="text-center text-muted-foreground">{tx({ de: "Template wird geladen...", en: "Loading template...", es: "Cargando plantilla..." })}</p>
         </Card>
       </div>
     );
@@ -67,7 +67,7 @@ export default function BatchVideoCreator() {
 
   const steps = [
     { title: 'CSV hochladen', description: 'Videodaten importieren' },
-    { title: 'Bestätigen', description: 'Details überprüfen' },
+    { title: 'Bestätigen', description: tx({ de: 'Details überprüfen', en: 'Check details', es: 'Consultar detalles' }) },
     { title: 'Fortschritt', description: tx({ de: 'Videos werden erstellt', en: 'Videos are being created', es: 'Se están creando videos' }) }
   ];
 
@@ -134,7 +134,7 @@ export default function BatchVideoCreator() {
       {step === 1 && csvData.length > 0 && (
         <Card className="p-6 space-y-6">
           <div>
-            <h3 className="text-lg font-semibold mb-4">Batch-Details bestätigen</h3>
+            <h3 className="text-lg font-semibold mb-4">{tx({ de: "Batch-Details bestätigen", en: "Confirm batch details", es: "Confirmar detalles del lote" })}</h3>
             
             <div className="space-y-4">
               <div>
@@ -153,7 +153,7 @@ export default function BatchVideoCreator() {
                   <p className="font-medium">{template.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Anzahl Videos</p>
+                  <p className="text-sm text-muted-foreground">{tx({ de: "Anzahl Videos", en: "Number of videos", es: "Número de vídeos" })}</p>
                   <p className="font-medium">{csvData.length}</p>
                 </div>
                 <div>
@@ -201,7 +201,7 @@ export default function BatchVideoCreator() {
               onClick={handleStartBatch}
               disabled={loading || !jobName}
             >
-              {loading ? 'Wird gestartet...' : `${csvData.length} Videos erstellen`}
+              {loading ? tx({ de: 'Wird gestartet...', en: 'Starting...', es: 'A partir de...' }) : tx({ de: `${csvData.length} Videos erstellen`, en: `${csvData.length} Create videos`, es: `${csvData.length} Crear vídeos` })}
               <Sparkles className="ml-2 h-4 w-4" />
             </Button>
           )}

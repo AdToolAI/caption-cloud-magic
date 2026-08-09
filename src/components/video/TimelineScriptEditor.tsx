@@ -142,7 +142,7 @@ export const TimelineScriptEditor = ({
   const autoSyncSegments = async () => {
     if (segments.length === 0) {
       toast({
-        title: "Keine Segmente vorhanden",
+        title: tx({ de: "Keine Segmente vorhanden", en: "No segments present", es: "No hay segmentos presentes" }),
         description: tx({ de: "Füge zuerst Text-Segmente hinzu oder nutze 'Auto-Split'", en: "First add text segments or use 'Auto-Split'", es: "Primero añade segmentos de texto o usa 'Auto-Split'" }),
         variant: "destructive"
       });
@@ -157,7 +157,7 @@ export const TimelineScriptEditor = ({
       
       if (!fullScript.trim()) {
         toast({
-          title: "Keine Texte vorhanden",
+          title: tx({ de: "Keine Texte vorhanden", en: "No texts available", es: "No hay textos disponibles" }),
           description: tx({ de: "Füge Text zu deinen Segmenten hinzu", en: "Add text to your segments", es: "Añade texto a tus segmentos" }),
           variant: "destructive"
         });
@@ -178,7 +178,7 @@ export const TimelineScriptEditor = ({
       if (error) throw error;
 
       if (!data.segments || data.segments.length === 0) {
-        throw new Error('Keine Segmente zurückgegeben');
+        throw new Error(tx({ de: 'Keine Segmente zurückgegeben', en: 'No segments returned', es: 'No se devolvieron segmentos' }));
       }
 
       // Update segments with analyzed timings
@@ -223,7 +223,7 @@ export const TimelineScriptEditor = ({
     
     if (!fullText) {
       toast({
-        title: "Kein Text vorhanden",
+        title: tx({ de: "Kein Text vorhanden", en: "No text available", es: "No hay texto disponible" }),
         description: tx({ de: "Füge zuerst Text zu deinen Segmenten hinzu", en: "First add text to your segments", es: "Primero añade texto a tus segmentos" }),
         variant: "destructive"
       });
@@ -247,7 +247,7 @@ export const TimelineScriptEditor = ({
       if (error) throw error;
 
       if (!data.segments || data.segments.length === 0) {
-        throw new Error('Keine Segmente zurückgegeben');
+        throw new Error(tx({ de: 'Keine Segmente zurückgegeben', en: 'No segments returned', es: 'No se devolvieron segmentos' }));
       }
 
       // Create new segments from AI analysis
@@ -451,7 +451,7 @@ export const TimelineScriptEditor = ({
             <Card className="border-primary/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">Segment Details</CardTitle>
+                  <CardTitle className="text-base">{tx({ de: "Segment Details", en: "Segment details", es: "Detalles del segmento" })}</CardTitle>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
@@ -522,7 +522,7 @@ export const TimelineScriptEditor = ({
 
                 {mediaUrls.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Bild während Segment</Label>
+                    <Label>{tx({ de: "Bild während Segment", en: "Image during segment", es: "Imagen durante el segmento" })}</Label>
                     <Select
                       value={selectedSegment.imageIndex?.toString() || ''}
                       onValueChange={(value) => updateSegment(selectedSegment.id, { imageIndex: parseInt(value) })}
@@ -531,7 +531,7 @@ export const TimelineScriptEditor = ({
                         <SelectValue placeholder={tx({ de: "Kein Bild ausgewählt", en: "No image selected", es: "Ninguna imagen seleccionada" })} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="-1">Kein Bild</SelectItem>
+                        <SelectItem value="-1">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</SelectItem>
                         {mediaUrls.map((url, index) => (
                           <SelectItem key={index} value={index.toString()}>
                             Bild {index + 1}
@@ -543,9 +543,9 @@ export const TimelineScriptEditor = ({
                 )}
 
                 <div className="pt-2 text-xs text-muted-foreground space-y-1">
-                  <div>💡 <strong>Tipp:</strong> Ziehe Segmente auf der Timeline um die Position zu ändern</div>
-                  <div>✨ <strong>Auto-Split:</strong> Teilt Text intelligent in mehrere Segmente auf</div>
-                  <div>🎯 <strong>Auto-Sync:</strong> Optimiert Timing und generiert word-by-word Untertitel</div>
+                  <div>💡 <strong>Tipp:</strong> {tx({ de: "Ziehe Segmente auf der Timeline um die Position zu ändern", en: "Drag segments on the timeline to change positions", es: "Arrastre segmentos en la línea de tiempo para cambiar de posición" })}</div>
+                  <div>✨ <strong>Auto-Split:</strong> {tx({ de: "Teilt Text intelligent in mehrere Segmente auf", en: "Intelligently splits text into multiple segments", es: "Divide inteligentemente el texto en múltiples segmentos" })}</div>
+                  <div>🎯 <strong>Auto-Sync:</strong> {tx({ de: "Optimiert Timing und generiert word-by-word Untertitel", en: "Optimizes timing and generates word-by-word subtitles", es: "Optimiza el tiempo y genera subtítulos palabra por palabra." })}</div>
                 </div>
               </CardContent>
             </Card>

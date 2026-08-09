@@ -62,7 +62,7 @@ export default function AudioStudio() {
     setMusicUrl(track.url);
     setActiveTab('beat-sync');
     toast.success(tx({ de: "Track in Beat-Sync geladen", en: "Track loaded into beat sync", es: "Pista cargada en sincronización de ritmo" }), {
-      description: track.title ? `"${track.title}" bereit für Beat-Matching` : undefined,
+      description: track.title ? tx({ de: `"${track.title}" bereit für Beat-Matching`, en: `"${track.title}" ready for beat matching`, es: `"${track.title}" listo para coincidir con el ritmo` }) : undefined,
     });
   }, []);
 
@@ -402,7 +402,7 @@ export default function AudioStudio() {
                   {[
                     { icon: Mic, label: 'Custom Voice', desc: 'Eigene Stimme klonen' },
                     { icon: FileText, label: 'Skript vorlesen', desc: 'Geführter Aufnahme-Text' },
-                    { icon: MessageCircle, label: 'WhatsApp Upload', desc: 'Sprachnachricht nutzen' },
+                    { icon: MessageCircle, label: tx({ de: 'WhatsApp Upload', en: 'WhatsApp upload', es: 'subir WhatsApp' }), desc: 'Sprachnachricht nutzen' },
                     { icon: Wand2, label: 'Rauschoptimierung', desc: 'Samples automatisch säubern' }
                   ].map((feature, i) => (
                     <motion.div
@@ -624,7 +624,7 @@ export default function AudioStudio() {
                             setStemSet(set);
                             setActiveTab('stems');
                             toast.success(tx({ de: "Stems bereit zum Mixen", en: "Stems ready for mixing", es: "Tallos listos para mezclar" }), {
-                              description: `${set.stems.length} Spuren in den Stem-Mixer geladen`,
+                              description: tx({ de: `${set.stems.length} Spuren in den Stem-Mixer geladen`, en: `${set.stems.length} tracks loaded into the stem mixer`, es: `${set.stems.length} pistas cargadas en el mezclador principal` }),
                             });
                           }}
                         />
@@ -670,7 +670,7 @@ export default function AudioStudio() {
                           ]}
                           onMixSaved={() => {
                             setLibraryRefreshKey(k => k + 1);
-                            toast.success(tx({ de: "Final Mix gespeichert", en: "Final mix saved", es: "Mezcla final guardada" }), { description: 'In Bibliothek verfügbar' });
+                            toast.success(tx({ de: "Final Mix gespeichert", en: "Final mix saved", es: "Mezcla final guardada" }), { description: tx({ de: 'In Bibliothek verfügbar', en: 'Available in library', es: 'Disponible en la biblioteca' }) });
                           }}
                         />
                       </motion.div>

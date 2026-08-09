@@ -80,7 +80,7 @@ export function ProfileEditorDialog({
       setType(preset.config.type);
       toast({
         title: tx({ de: "Preset geladen", en: "Preset loaded", es: "Preestablecido cargado" }),
-        description: `${preset.name} wurde geladen.`
+        description: tx({ de: `${preset.name} wurde geladen.`, en: `${preset.name} has been loaded.`, es: `Se ha cargado ${preset.name}.` })
       });
     }
   };
@@ -98,7 +98,7 @@ export function ProfileEditorDialog({
     if (!isValid) {
       toast({
         title: 'Ungültige Konfiguration',
-        description: 'Bitte behebe die Validierungsfehler.',
+        description: tx({ de: 'Bitte behebe die Validierungsfehler.', en: 'Please fix the validation errors.', es: 'Corrija los errores de validación.' }),
         variant: 'destructive'
       });
       return;
@@ -116,7 +116,7 @@ export function ProfileEditorDialog({
         is_default: false
       });
       toast({
-        title: 'Erfolg',
+        title: tx({ de: 'Erfolg', en: 'Success', es: 'Éxito' }),
         description: profile ? tx({ de: "Profil wurde aktualisiert.", en: "Profile has been updated.", es: "El perfil ha sido actualizado." }) : tx({ de: 'Profil wurde erstellt.', en: 'Profile created.', es: 'Perfil creado.' })
       });
       onOpenChange(false);
@@ -218,7 +218,7 @@ export function ProfileEditorDialog({
             Abbrechen
           </Button>
           <Button onClick={handleSave} disabled={!isValid || isSaving}>
-            {isSaving ? 'Speichert...' : 'Speichern'}
+            {isSaving ? 'Speichert...' : tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' })}
           </Button>
         </DialogFooter>
       </DialogContent>

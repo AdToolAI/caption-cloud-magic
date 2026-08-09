@@ -65,7 +65,7 @@ const content: Record<string, { heading: string; updated: string; sections: Sect
       },
       {
         icon: ShieldOff,
-        title: '6. Keine Garantie',
+        title: tx({ de: '6. Keine Garantie', en: '6. No guarantee', es: '6. Sin garantía' }),
         items: [
           tx({ de: 'Es besteht kein Anspruch auf Verfügbarkeit, bestimmte Qualität oder ein bestimmtes Ergebnis der Videogenerierung.', en: 'There is no claim to availability, specific quality, or a specific result of video generation.', es: 'No existe derecho a la disponibilidad, una calidad específica o un resultado específico de la generación de video.' }),
           tx({ de: 'Die Generierung kann fehlschlagen, übermäßig lange dauern oder unerwartete Ergebnisse liefern. In solchen Fällen werden die Credits automatisch zurückerstattet.', en: 'Generation may fail, take excessively long, or produce unexpected results. In such cases, credits will be automatically refunded.', es: 'La generación puede fallar, tardar demasiado o producir resultados inesperados. En tales casos, los créditos se reembolsarán automáticamente.' }),

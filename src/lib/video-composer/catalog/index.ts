@@ -98,7 +98,7 @@ const MIMIK: CatalogEntry[] = [
 const GESTIK: CatalogEntry[] = [
   entry('gestik', 'still',            'Ruhig / still',     'Still',            'still upper body, hands at rest'),
   entry('gestik', 'open_palms',       'Offene Hände',      'Open palms',       'open palms gesture', ['offene handflächen','open hands']),
-  entry('gestik', 'point_to_camera',  'Zur Kamera zeigen', 'Point to camera',  'pointing toward the camera', ['zeigen','pointing']),
+  entry('gestik', 'point_to_camera',  tx({ de: 'Zur Kamera zeigen', en: 'Point to the camera', es: 'Apunta a la cámara' }), 'Point to camera',  'pointing toward the camera', ['zeigen','pointing']),
   entry('gestik', 'count_fingers',    'Finger zählen',     'Counting fingers', 'counting on fingers gesture', ['aufzählen','enumerate']),
   entry('gestik', 'thumbs_up',        'Daumen hoch',       'Thumbs up',        'thumbs up gesture'),
   entry('gestik', 'hands_explain',    'Erklärende Hände',  'Explaining hands', 'natural explaining hand motion', ['erklärend','gesticulating']),

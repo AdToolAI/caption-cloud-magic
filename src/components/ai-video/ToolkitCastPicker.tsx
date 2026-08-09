@@ -156,7 +156,7 @@ export function ToolkitCastPicker({
           <div className="flex-1 text-[11px] leading-relaxed text-muted-foreground">
             {supportsImageInput
               ? t(
-                  `Referenzbild & Beschreibung werden automatisch übergeben (${info.mode}).`,
+                  tx({ de: `Referenzbild & Beschreibung werden automatisch übergeben (${info.mode}).`, en: `Reference image & description are automatically passed (${info.mode}).`, es: `La imagen de referencia y la descripción se pasan automáticamente (${info.mode}).` }),
                   `Reference image & description are passed automatically (${info.mode}).`,
                   `Imagen y descripción de referencia se envían automáticamente (${info.mode}).`,
                 )

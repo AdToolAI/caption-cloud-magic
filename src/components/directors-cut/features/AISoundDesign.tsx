@@ -139,7 +139,7 @@ export function AISoundDesign({ scenes, videoUrl, onSoundsGenerated }: AISoundDe
       
       if (error?.context?.status === 402) {
         toast.error('Nicht genügend Credits', {
-          description: `Du benötigst ${CREDITS_COST} Credits für AI Sound Design`,
+          description: tx({ de: `Du benötigst ${CREDITS_COST} Credits für AI Sound Design`, en: `You need ${CREDITS_COST} credits for AI Sound Design`, es: `Necesitas ${CREDITS_COST} créditos para diseño de sonido con IA` }),
         });
       } else {
         toast.error(tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Generación fallida" }), {

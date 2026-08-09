@@ -102,7 +102,7 @@ export function SceneSelector({
           Anwendungsbereich
         </h4>
         <span className="text-xs text-muted-foreground">
-          {selectedSceneId ? `Szene ${scenes.findIndex(s => s.id === selectedSceneId) + 1}` : tx({ de: 'Alle Szenen', en: 'All Scenes', es: 'Todas las escenas' })}
+          {selectedSceneId ? tx({ de: `Szene ${scenes.findIndex(s => s.id === selectedSceneId) + 1}`, en: `Scene ${scenes.findIndex(s => s.id === selectedSceneId) + 1}`, es: `Escena ${scenes.findIndex(s => s.id === selectedSceneId) + 1}` }) : tx({ de: 'Alle Szenen', en: 'All Scenes', es: 'Todas las escenas' })}
         </span>
       </div>
 
@@ -176,7 +176,7 @@ export function SceneSelector({
               {thumbnails[scene.id] ? (
                 <img
                   src={thumbnails[scene.id]}
-                  alt={`Szene ${index + 1}`}
+                  alt={tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` })}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
               ) : (

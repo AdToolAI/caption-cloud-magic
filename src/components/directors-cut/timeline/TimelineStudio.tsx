@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -61,7 +62,7 @@ export function TimelineStudio({
     startTime: scene.start_time,
     endTime: scene.end_time,
     thumbnailUrl: scene.thumbnail_url,
-    name: scene.description?.substring(0, 30) || `Szene ${index + 1}`,
+    name: scene.description?.substring(0, 30) || tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` }),
   }));
 
   // Save to history

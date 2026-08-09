@@ -376,11 +376,11 @@ export default function MediaLibrary() {
           title: isSoraAI 
             ? (metadata?.prompt?.slice(0, 60) + '...' || 'AI Video')
             : isDirectorCutEnhancement
-              ? tx({ de: `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...` })
+              ? tx({ de: `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, en: `AI scene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`, es: `Escena de IA: ${metadata?.prompt?.slice(0, 40) || 'Realce'}...` })
               : isDirectorsCut
                 ? `Director's Cut - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                 : isMotionStudioClip
-                  ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}` })
+                  ? tx({ de: `Motion Studio · Szene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (Vorgängerversion)' : ''}`, en: `Motion Studio · Scene ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (previous version)' : ''}`, es: `Motion Studio · Escena ${(metadata?.scene_order ?? 0) + 1}${isSuperseded ? ' (versión anterior)' : ''}` })
                   : isUniversalCreator
                     ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
                     : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
@@ -608,7 +608,7 @@ export default function MediaLibrary() {
         }
         toast({
           title: 'Platz geschaffen',
-          description: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, es: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.` }),
+          description: tx({ de: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`, en: `${decision.toDelete.length} older medium${decision.toDelete.length === 1 ? '' : 's'} automatically removed. Tip: Connect Google Drive to offload media safely instead.`, es: `${decision.toDelete.length} medio${decision.toDelete.length === 1 ? '' : 's'} antiguo${decision.toDelete.length === 1 ? '' : 's'} eliminado${decision.toDelete.length === 1 ? '' : 's'} automáticamente. Consejo: Conecta Google Drive para descargar medios de forma segura en su lugar.` }),
         });
       } catch (cleanupErr: any) {
         toast({
@@ -651,7 +651,7 @@ export default function MediaLibrary() {
       if (dbError) throw dbError;
 
       toast({
-        title: 'Upload successful',
+        title: tx({ de: 'Upload successful', en: 'Upload successful', es: 'Subida exitosa' }),
         description: 'Media uploaded successfully',
       });
 
@@ -659,7 +659,7 @@ export default function MediaLibrary() {
       loadStorageQuota();
     } catch (error: any) {
       toast({
-        title: 'Upload failed',
+        title: tx({ de: 'Upload failed', en: 'Upload failed', es: 'Error al subir' }),
         description: error.message,
         variant: 'destructive',
       });

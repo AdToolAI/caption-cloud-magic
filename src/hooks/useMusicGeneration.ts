@@ -79,7 +79,7 @@ export function useMusicGeneration() {
 
         if (code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET') {
           toast.error(msg, {
-            description: 'Bitte AI Credits aufladen.',
+            description: tx({ de: 'Bitte AI Credits aufladen.', en: 'Please top up AI credits.', es: 'Recargue créditos de IA.' }),
             action: {
               label: 'Credits kaufen',
               onClick: () => { window.location.href = '/ai-video-purchase-credits'; },

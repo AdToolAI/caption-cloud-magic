@@ -334,14 +334,14 @@ export function useGenerateAllClips({
       const failedResults = (data?.results || []).filter((r: any) => r.status === 'failed');
       if (failedResults.length > 0) {
         toast({
-          title: `${failedResults.length} Clip(s) fehlgeschlagen`,
+          title: tx({ de: `${failedResults.length} Clip(s) fehlgeschlagen`, en: `${failedResults.length} Clip(s) failed`, es: `${failedResults.length} Clip(s) fallidos` }),
           description: tx({ de: 'Generierung fehlgeschlagen — bitte erneut versuchen.', en: 'Generation failed — please try again.', es: 'Error de generación — inténtalo de nuevo.' }),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Clip-Generierung gestartet',
-          description: `${data?.generatingCount || 0} KI-Clips werden generiert (€${remainingCost.toFixed(2)}).`,
+          title: tx({ de: 'Clip-Generierung gestartet', en: 'Clip generation started', es: 'Se inició la generación de clips' }),
+          description: tx({ de: `${data?.generatingCount || 0} KI-Clips werden generiert (€${remainingCost.toFixed(2)}).`, en: `${data?.generatingCount || 0} AI clips are generated (€${remainingCost.toFixed(2)}).`, es: `${data?.generatingCount || 0} Se generan clips de IA ($${remainingCost.toFixed(2)}).` }),
         });
       }
     } catch (err: any) {

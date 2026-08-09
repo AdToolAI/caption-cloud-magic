@@ -181,7 +181,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         throw new Error((invokeData as any).error || (invokeData as any).message || tx({ de: 'Render konnte nicht gestartet werden.', en: 'Render could not be started.', es: 'No se pudo iniciar el renderizado.' }));
       }
       toast({
-        title: 'Renderpfad neu gestartet',
+        title: tx({ de: 'Renderpfad neu gestartet', en: 'Render path restarted', es: 'Ruta de renderizado reiniciada' }),
         description: tx({ de: 'Die Szene läuft jetzt über HappyHorse/Hailuo + Sync.so.', en: 'The scene is now running via HappyHorse/Hailuo + Sync.so.', es: 'La escena se está ejecutando ahora a través de HappyHorse/Hailuo + Sync.so.' }),
       });
     } catch (err) {
@@ -278,7 +278,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     if (isImageScene) {
       return (
         <div className="relative w-full h-full">
-          <img src={scene.clipUrl} alt={`Szene ${index + 1}`} className="w-full h-full object-cover" />
+          <img src={scene.clipUrl} alt={tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` })} className="w-full h-full object-cover" />
           <div className="absolute top-1 right-1 bg-black/60 backdrop-blur rounded px-1.5 py-0.5 flex items-center gap-1">
             <ImageIcon className="h-2.5 w-2.5 text-white" />
             <span className="text-[8px] text-white font-medium">Ken Burns</span>

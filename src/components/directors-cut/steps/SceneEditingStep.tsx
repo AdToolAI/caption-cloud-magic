@@ -669,7 +669,7 @@ export function SceneEditingStep({
     
     toast({
       title: 'Medien hinzugefügt',
-      description: tx({ de: `${media.type === 'video' ? 'Video' : 'Bild'} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Bild'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Bild'} añadida como nueva escena` }),
+      description: tx({ de: `${media.type === 'video' ? 'Video' : 'Bild'} wurde als neue Szene hinzugefügt`, en: `${media.type === 'video' ? 'Video' : 'Image'} added as new scene`, es: `${media.type === 'video' ? 'Video' : 'Imagen'} añadida como nueva escena` }),
     });
   }, [scenes, onScenesUpdate, toast]);
 
@@ -738,7 +738,7 @@ export function SceneEditingStep({
     setActiveTemplateId(template.id);
     
     toast({
-      title: `Template "${template.name}" angewendet`,
+      title: tx({ de: `Template "${template.name}" angewendet`, en: `Template "${template.name}" applied`, es: `Plantilla "${template.name}" aplicada` }),
       description: tx({ de: `${newTransitions.length} Übergänge und Effekte wurden angewendet`, en: `${newTransitions.length} transitions and effects applied`, es: `Se aplicaron ${newTransitions.length} transiciones y efectos` }),
     });
   }, [scenes, onTransitionsChange, toast]);
@@ -756,7 +756,7 @@ export function SceneEditingStep({
     onTransitionsChange([]);
     toast({
       title: tx({ de: 'Szenen neu angeordnet', en: 'Scenes reordered', es: 'Escenas reordenadas' }),
-      description: tx({ de: `${newScenes.length} Szenen wurden gemäß der KI-Strategie neu sortiert`, en: `${newScenes.length} scenes were reordered according to the AI strategy`, es: `${newScenes.length} escenas se reordenaron según la estrategia de IA` }),
+      description: tx({ de: `${newScenes.length} Szenen wurden gemäß der KI-Strategie neu sortiert`, en: `${newScenes.length} Scenes have been reordered according to AI strategy`, es: `${newScenes.length} Las escenas se han reordenado según la estrategia de IA.` }),
     });
   }, [onScenesUpdate, onTransitionsChange, toast]);
 
@@ -845,15 +845,15 @@ export function SceneEditingStep({
               <CardContent className="py-3">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                   {[
-                    { key: '← →', action: 'Szene wechseln' },
+                    { key: '← →', action: tx({ de: 'Szene wechseln', en: 'Change scene', es: 'cambiar de escena' }) },
                     { key: 'T', action: 'Transition öffnen' },
                     { key: '1-6', action: 'Transition wählen' },
-                    { key: 'ESC', action: 'Schließen' },
-                    { key: '?', action: 'Hilfe ein/aus' },
+                    { key: 'ESC', action: tx({ de: 'Schließen', en: 'Close', es: 'Cerrar' }) },
+                    { key: '?', action: tx({ de: 'Hilfe ein/aus', en: 'Help on/off', es: 'Ayuda activada/desactivada' }) },
                     { key: 'Space', action: 'Play/Pause' },
                     { key: 'S', action: tx({ de: 'Szene teilen', en: 'Split scene', es: 'Dividir escena' }) },
                     { key: 'D', action: tx({ de: 'Szene duplizieren', en: 'Duplicate scene', es: 'Duplicar escena' }) },
-                    { key: '⌫', action: 'Szene löschen' },
+                    { key: '⌫', action: tx({ de: 'Szene löschen', en: 'Delete scene', es: 'eliminar escena' }) },
                     { key: '⌘Z', action: 'Rückgängig' },
                   ].map(({ key, action }) => (
                     <div key={key} className="flex items-center gap-2">
@@ -1348,7 +1348,7 @@ export function SceneEditingStep({
         onApplyEffect={handleOpenEffects}
         onAddScene={() => handleAddScene(true)}
         currentSpeed={selectedSceneSpeed}
-        sceneName={selectedSceneIds.size > 1 ? `${selectedSceneIds.size} Szenen` : selectedScene ? `Szene ${selectedSceneIndex + 1}` : undefined}
+        sceneName={selectedSceneIds.size > 1 ? tx({ de: `${selectedSceneIds.size} Szenen`, en: `${selectedSceneIds.size} Scenes`, es: `${selectedSceneIds.size} Escenas` }) : selectedScene ? tx({ de: `Szene ${selectedSceneIndex + 1}`, en: `Scene ${selectedSceneIndex + 1}`, es: `Escena ${selectedSceneIndex + 1}` }) : undefined}
         multiSelectCount={selectedSceneIds.size}
         cutSegmentMode={cutSegmentMode}
         onToggleCutSegment={() => { setCutSegmentMode(v => !v); setCutSegmentIn(null); setCutSegmentOut(null); }}

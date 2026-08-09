@@ -166,7 +166,7 @@ const pushCopy: Record<string, { title: string; desc: string; label: string; sub
     title: "Push-Erinnerungen",
     desc: tx({ de: "Browser-Push-Benachrichtigungen in deiner ersten Woche.", en: "Browser push notifications in your first week.", es: "Notificaciones push del navegador en tu primera semana." }),
     label: "Push-Erinnerungen erhalten",
-    sublabel: "Bis zu 3 kurze Erinnerungen (Tag 1, 3, 7). Push-Berechtigung erforderlich.",
+    sublabel: tx({ de: "Bis zu 3 kurze Erinnerungen (Tag 1, 3, 7). Push-Berechtigung erforderlich.", en: "Up to 3 short reminders (Day 1, 3, 7). Push permission required.", es: "Hasta 3 recordatorios cortos (Día 1, 3, 7). Se requiere permiso de inserción." }),
     saved: tx({ de: "Einstellungen aktualisiert", en: "Settings updated", es: "Configuraciones actualizadas" }),
     error: tx({ de: "Einstellungen konnten nicht aktualisiert werden", en: "Could not update settings", es: "No se pudieron actualizar los ajustes" }),
   },

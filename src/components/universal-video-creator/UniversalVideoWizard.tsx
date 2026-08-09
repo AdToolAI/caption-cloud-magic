@@ -342,7 +342,7 @@ export function UniversalVideoWizard() {
       }
     } catch (err: any) {
       console.error('Product image upload error:', err);
-      toast.error(language === 'de' ? tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }) : 'Upload failed');
+      toast.error(language === 'de' ? tx({ de: 'Fehler beim Hochladen', en: 'Upload error', es: 'Error al subir' }) : tx({ de: 'Upload failed', en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setIsUploadingImages(false);
     }
@@ -842,14 +842,14 @@ export function UniversalVideoWizard() {
             <div className="max-w-2xl mx-auto space-y-6">
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold mb-2 text-[#F5C76A]">
-                  {language === 'de' ? 'Produktbilder hochladen' : language === 'es' ? 'Subir imágenes del producto' : 'Upload Product Images'}
+                  {language === 'de' ? 'Produktbilder hochladen' : language === 'es' ? 'Subir imágenes del producto' : tx({ de: 'Upload Product Images', en: 'Upload product images', es: 'Subir imágenes de productos' })}
                 </h2>
                 <p className="text-muted-foreground">
                   {language === 'de' 
                     ? tx({ de: 'Lade mindestens 4 Fotos deines Produkts hoch. Diese werden per KI in die passenden Szenen eingebettet.', en: 'Upload at least 4 photos of your product. These will be embedded into the appropriate scenes by AI.', es: 'Sube al menos 4 fotos de tu producto. Estas serán incrustadas por IA en las escenas apropiadas.' })
                     : language === 'es'
                     ? 'Sube al menos 4 fotos de tu producto. Serán integradas en las escenas por IA.'
-                    : 'Upload at least 4 photos of your product. They will be AI-enhanced to fit each scene.'}
+                    : tx({ de: 'Upload at least 4 photos of your product. They will be AI-enhanced to fit each scene.', en: 'Upload at least 4 photos of your product. They will be AI-enhanced to fit each scene.', es: 'Sube al menos 4 fotos de tu producto. Serán mejorados por IA para adaptarse a cada escena.' })}
                 </p>
               </div>
               <MultiImageUpload

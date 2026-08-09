@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Multi-character cast picker for a Composer scene.
 // Up to 4 characters, each with its own shot-type strategy.
 // Backwards-compatible: writes both `characterShots[]` AND `characterShot`
@@ -526,7 +527,7 @@ function ActionFieldRow({
 }: ActionFieldRowProps) {
   const L = {
     en: { label: `Action — what does ${characterName} do?`, ph: `e.g. types focused on her laptop, nods at the others` },
-    de: { label: `Aktion — was tut ${characterName}?`, ph: `z. B. tippt konzentriert am Laptop und nickt den anderen zu` },
+    de: { label: tx({ de: `Aktion — was tut ${characterName}?`, en: `Action — what does ${characterName} do?`, es: `Acción: ¿qué hace ${characterName}?` }), ph: tx({ de: `z. B. tippt konzentriert am Laptop und nickt den anderen zu`, en: `e.g. types intently on the laptop and nods to the others`, es: `p. ej. escribe atentamente en la computadora portátil y asiente a los demás` }) },
     es: { label: `Acción — ¿qué hace ${characterName}?`, ph: `p. ej. teclea concentrado en su portátil y asiente a los demás` },
   }[language];
   return (

@@ -51,7 +51,7 @@ export const useBatchActions = () => {
         .eq('status', 'failed');
 
       if (!failedVideos?.length) {
-        toast.info('Keine fehlgeschlagenen Videos');
+        toast.info(tx({ de: 'Keine fehlgeschlagenen Videos', en: 'No failed videos', es: 'No hay vídeos fallidos.' }));
         return;
       }
 

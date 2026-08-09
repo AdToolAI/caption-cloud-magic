@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * Composer EDL → Director's Cut scene/transition import.
  *
@@ -91,7 +92,7 @@ function describeFromComposer(
   cs: ComposerScenesRow | undefined,
   edlEntry?: ComposerEDLEntry,
 ): string {
-  const neutral = `Composer Szene ${index + 1} · ${fmt(start)}–${fmt(end)}`;
+  const neutral = tx({ de: `Composer Szene ${index + 1} · ${fmt(start)}–${fmt(end)}`, en: `Composer scene ${index + 1} · ${fmt(start)}–${fmt(end)}`, es: `Escena del compositor ${index + 1} · ${fmt(start)}–${fmt(end)}` });
   const overlay =
     (cs?.text_overlay && typeof cs.text_overlay === 'object' && (cs.text_overlay as any).text)
       ? String((cs.text_overlay as any).text)
@@ -109,7 +110,7 @@ function describeFromComposer(
     ? String(cs.scene_type)
     : edlEntry?.sceneType
       ? String(edlEntry.sceneType)
-      : `Szene ${index + 1}`;
+      : tx({ de: `Szene ${index + 1}`, en: `Scene ${index + 1}`, es: `Escena ${index + 1}` });
   if (promptLike) return `${sceneTypeLabel} · ${promptLike.slice(0, 80)}`;
   if (cs?.scene_type || edlEntry?.sceneType) return sceneTypeLabel;
   return neutral;

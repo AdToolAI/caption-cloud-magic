@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -118,7 +119,7 @@ export function LaunchRadarCard() {
                   <Users className="h-4 w-4 text-primary" /> Letzte Registrierungen
                 </h4>
                 {stats.recent_signups.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Noch keine Registrierungen.</p>
+                  <p className="text-sm text-muted-foreground">{tx({ de: "Noch keine Registrierungen.", en: "No registrations yet.", es: "Aún no hay inscripciones." })}</p>
                 ) : (
                   <ul className="space-y-2">
                     {stats.recent_signups.map((s) => (

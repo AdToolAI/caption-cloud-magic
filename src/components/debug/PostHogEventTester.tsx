@@ -304,7 +304,7 @@ export function PostHogEventTester() {
     
     toast({
       title: 'Events gefeuert',
-      description: `${successCount} von ${totalCount} Events erfolgreich gesendet`,
+      description: tx({ de: `${successCount} von ${totalCount} Events erfolgreich gesendet`, en: `${successCount} of ${totalCount} Events sent successfully`, es: `${successCount} de ${totalCount} eventos enviados correctamente` }),
       variant: successCount === totalCount ? 'default' : 'destructive',
     });
   };
@@ -337,7 +337,7 @@ export function PostHogEventTester() {
     setTimeout(() => setCopiedCategory(null), 2000);
     
     toast({
-      title: 'Kopiert',
+      title: tx({ de: 'Kopiert', en: 'Copied', es: 'Copiado' }),
       description: 'Event-Namen in Zwischenablage kopiert',
     });
   };
@@ -357,7 +357,7 @@ export function PostHogEventTester() {
       
       toast({
         title: 'Test-Jobs erstellt',
-        description: `${data.jobs_created} Jobs wurden in die Datenbank eingefügt`,
+        description: tx({ de: `${data.jobs_created} Jobs wurden in die Datenbank eingefügt`, en: `${data.jobs_created} Jobs have been added to the database`, es: `${data.jobs_created} Se han agregado trabajos a la base de datos` }),
       });
       
       await fetchJobCounts();

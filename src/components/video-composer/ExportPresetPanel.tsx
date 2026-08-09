@@ -187,7 +187,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
       }
 
       toast({
-        title: `${data.triggered} Formate werden gerendert 🚀`,
+        title: tx({ de: `${data.triggered} Formate werden gerendert 🚀`, en: `${data.triggered} formats are rendered 🚀`, es: `Se procesan los formatos ${data.triggered} 🚀` }),
         description: tx({ de: `Geschätzte Kosten: €${data.totalCost.toFixed(2)}. Die Versionen erscheinen automatisch, sobald sie fertig sind.`, en: `Estimated cost: €${data.totalCost.toFixed(2)}. Versions will appear automatically once ready.`, es: `Costo estimado: €${data.totalCost.toFixed(2)}. Las versiones aparecerán automáticamente una vez listas.` }),
       });
       clearAll();
@@ -237,7 +237,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
       }
 
       toast({
-        title: `${preset.label} wird gerendert 🎬`,
+        title: tx({ de: `${preset.label} wird gerendert 🎬`, en: `${preset.label} is rendered 🎬`, es: `Se renderiza ${preset.label} 🎬` }),
         description: tx({ de: 'Du wirst benachrichtigt, sobald das Video fertig ist.', en: 'You will be notified once the video is ready.', es: 'Se te notificará cuando el video esté listo.' }),
       });
     } catch (err: any) {

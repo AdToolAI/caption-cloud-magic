@@ -566,14 +566,14 @@ export function DirectorsCut() {
             realMp4Duration: (result as any).realMp4Duration,
           });
           if (result.source === 'edl') {
-            toast.success(`${result.scenes.length} Composer-Szenen frame-genau importiert`);
+            toast.success(tx({ de: `${result.scenes.length} Composer-Szenen frame-genau importiert`, en: `${result.scenes.length} Composer scenes imported frame-accurate`, es: `${result.scenes.length} Escenas del compositor importadas con precisión de fotograma` }));
           } else if (result.source === 'edl-rebuilt') {
             const calNote = (result as any).calibratedToMp4
-              ? ` · auf ${realMp4Duration?.toFixed(1)}s kalibriert`
+              ? tx({ de: ` · auf ${realMp4Duration?.toFixed(1)}s kalibriert`, en: `· calibrated to ${realMp4Duration?.toFixed(1)}s`, es: `· calibrado a ${realMp4Duration?.toFixed(1)}s` })
               : '';
-            toast.success(`${result.scenes.length} Szenen rekonstruiert${calNote}`);
+            toast.success(tx({ de: `${result.scenes.length} Szenen rekonstruiert${calNote}`, en: `${result.scenes.length} scenes reconstructed${calNote}`, es: `${result.scenes.length} escenas reconstruidas${calNote}` }));
           } else if (result.source === 'sceneGeometry-fallback') {
-            toast.success(`${result.scenes.length} Composer-Szenen importiert (Geometrie-Fallback)`);
+            toast.success(tx({ de: `${result.scenes.length} Composer-Szenen importiert (Geometrie-Fallback)`, en: `${result.scenes.length} Composer scenes imported (geometry fallback)`, es: `${result.scenes.length} Escenas de Composer importadas (retroceso de geometría)` }));
           } else {
             toast.warning(
               tx({ de: `${result.scenes.length} Composer-Szenen importiert (Dauern-Fallback). Für frame-genaue Übergänge bitte neu rendern.`, en: `${result.scenes.length} Composer scenes imported (duration fallback). For frame-accurate transitions, please re-render.`, es: `${result.scenes.length} escenas de Composer importadas (duración de reserva). Para transiciones precisas por fotograma, por favor, vuelve a renderizar.` })
@@ -967,7 +967,7 @@ export function DirectorsCut() {
       if (diag.pixelCuts > 0)    diagParts.push(`Pixel ${diag.pixelCuts}`);
       const sourceLabel = diagParts.length > 0
         ? `Fusion: ${diagParts.join(' + ')} → ${diag.fusedCuts}`
-        : (data.analysis_mode || 'Keine Cuts erkannt');
+        : (data.analysis_mode || tx({ de: 'Keine Cuts erkannt', en: 'No cuts detected', es: 'No se detectaron cortes' }));
       toast.success(`${t('dc.scenesDetected', { count: normalizedScenes.length })} · ${sourceLabel}`);
     } catch (error) {
       console.error('Error analyzing video:', error);

@@ -104,7 +104,7 @@ export const PostGeneratorInline = ({
       if (error.message?.includes("429")) {
         toast.error(tx({ de: "Rate-Limit erreicht. Bitte warte einen Moment.", en: "Rate limit reached. Please wait a moment.", es: "Límite de tasa alcanzado. Por favor, espera un momento." }));
       } else if (error.message?.includes("402")) {
-        toast.error("AI Credits aufgebraucht. Bitte Credits aufladen.");
+        toast.error(tx({ de: "AI Credits aufgebraucht. Bitte Credits aufladen.", en: "AI credits used up. Please top up credits.", es: "Los créditos de IA se agotaron. Por favor recarga créditos." }));
       } else {
         toast.error(tx({ de: "Fehler beim Generieren. Bitte erneut versuchen.", en: "Error generating. Please try again.", es: "Error al generar. Por favor, inténtalo de nuevo." }));
       }
@@ -116,7 +116,7 @@ export const PostGeneratorInline = ({
   const handleApply = () => {
     if (generatedContent) {
       onApplyContent(postId, generatedContent);
-      toast.success("✅ Content auf Post angewendet!");
+      toast.success(tx({ de: "✅ Content auf Post angewendet!", en: "✅ Content applied to post!", es: "✅ ¡Contenido aplicado a la publicación!" }));
       onClose();
     }
   };
@@ -273,7 +273,7 @@ export const PostGeneratorInline = ({
                     ) : (
                       <Copy className="h-3 w-3" />
                     )}
-                    {copied ? "Kopiert" : "Kopieren"}
+                    {copied ? tx({ de: "Kopiert", en: "Copied", es: "Copiado" }) : "Kopieren"}
                   </Button>
                 </div>
 

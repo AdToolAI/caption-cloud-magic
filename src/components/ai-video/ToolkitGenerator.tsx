@@ -324,7 +324,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       setReferencePlacement('start');
       toast.info(
         language === 'de'
-          ? tx({ de: `Placement wurde auf „Am Anfangtx({ de: " zurückgesetzt — ${model.name} unterstützt keinen Endframe.`, en: `Placement has been reset to "At the beginningtx({ en: " — ${model.name} does not support an end frame.`, es: `La ubicación se ha restablecido a "Al principiotx({ es: " — ${model.name} no admite un marco final.` })
+          ? tx({ de: `Placement wurde auf „Am Anfang“ zurückgesetzt — ${model.name} unterstützt keinen Endframe.`, en: `Placement has been reset to “At the beginning” — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a «Al principio» — ${model.name} no admite un fotograma final.` })
           : `Placement reset to "At start" — ${model.name} does not support end-frame.`,
       );
     }
@@ -332,7 +332,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       setReferencePlacement('start');
       toast.info(
         language === 'de'
-          ? tx({ de: `Placement wurde auf „Am Anfangtx({ de: " zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`, en: `Placement has been reset to "At the beginningtx({ en: " — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a "Al principiotx({ es: " — ${model.name} no admite el modo de anclaje.` })
+          ? tx({ de: `Placement wurde auf „Am Anfang“ zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`, en: `Placement has been reset to “At the beginning” — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a «Al principio» — ${model.name} no admite el modo de anclaje.` })
           : `Placement reset to "At start" — ${model.name} does not support anchor mode.`,
       );
     }
@@ -953,7 +953,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <div className="space-y-1 text-xs leading-relaxed">
               <div className="font-medium text-foreground">
                 {language === 'de'
-                  ? 'Referenzbild automatisch — Startbild / Multi-Ref / V2V gesperrt'
+                  ? tx({ de: 'Referenzbild automatisch — Startbild / Multi-Ref / V2V gesperrt', en: 'Reference image automatically — Start image / Multi-Ref / V2V locked', es: 'Imagen de referencia automáticamente: Imagen inicial/Multi-Ref/V2V bloqueado' })
                   : 'Reference image automatic — Start image / Multi-Ref / V2V locked'}
               </div>
               <div className="text-muted-foreground">
@@ -1007,7 +1007,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <ImagePlus className="h-6 w-6 text-muted-foreground" />
               )}
               <span className="text-xs text-muted-foreground">
-                {language === 'de' ? tx({ de: 'Bild hochladen für Image-to-Video', en: 'Upload image for Image-to-Video', es: 'Subir imagen para Imagen a Video' }) : 'Upload an image for Image-to-Video'}
+                {language === 'de' ? tx({ de: 'Bild hochladen für Image-to-Video', en: 'Upload image for Image-to-Video', es: 'Subir imagen para Imagen a Video' }) : tx({ de: 'Upload an image for Image-to-Video', en: 'Upload an image for Image-to-Video', es: 'Sube una imagen para Imagen a Video' })}
               </span>
               <input
                 id="toolkit-image-upload"
@@ -1282,7 +1282,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {generateAudio && !ttsLangSupported && (
               <p className="text-[11px] leading-snug text-amber-500/90 pt-1 border-t border-border/30">
                 {language === 'de'
-                  ? tx({ de: `${model.name} unterstützt ${effectiveSpokenLang === 'de' ? 'Deutsch' : effectiveSpokenLang === 'es' ? 'Spanisch' : tx({ de: 'diese Sprache', en: 'this language', es: 'este idioma' })} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`, en: `${model.name} supports ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : tx({ de: 'this language', en: 'this language', es: 'este idioma' })} not reliable. No voiceover is created for this scene — only ambient sound/music. For real voiceover e.g. B. Choose Veo 3.1 or Sora 2, or add them later in Motion Studio.`, es: `¿${model.name} admite ${ effectiveSpokenLang === 'de'? 'Alemán' : effectiveSpokenLang === 'es' ? 'Español' : tx({ de: 'este idioma', en: 'este idioma', es: 'este idioma' })} no confiable. No se crea ninguna voz en off para esta escena, solo sonido/música ambiental. Para locuciones reales, p. B. Elija Veo 3.1 o Sora 2, o agréguelos más tarde en Motion Studio.` })
+                  ? tx({ de: `${model.name} unterstützt ${effectiveSpokenLang === "de" ? "Deutsch" : effectiveSpokenLang === "es" ? "Spanisch" : "diese Sprache"} nicht zuverlässig. Für diese Szene wird kein Voiceover erzeugt — nur Umgebungssound/Musik. Für echtes Voiceover z. B. Veo 3.1 oder Sora 2 wählen, oder nachträglich im Motion Studio ergänzen.`, en: `${model.name} does not reliably support ${effectiveSpokenLang === "de" ? "German" : effectiveSpokenLang === "es" ? "Spanish" : "this language"}. No voiceover will be generated for this scene — only ambient sound/music. For real voiceover, pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`, es: `${model.name} no admite de forma fiable ${effectiveSpokenLang === "de" ? "alemán" : effectiveSpokenLang === "es" ? "español" : "este idioma"}. No se generará locución para esta escena, solo sonido ambiental/música. Para una locución real, elige p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.` })
                   : language === 'es'
                   ? `${model.name} no admite ${effectiveSpokenLang === 'de' ? 'alemán' : effectiveSpokenLang === 'es' ? 'español' : 'este idioma'} de forma fiable. Esta escena se generará sin voz — solo sonido ambiente/música. Para voz real usa p. ej. Veo 3.1 o Sora 2, o añádela después en Motion Studio.`
                   : `${model.name} does not reliably support ${effectiveSpokenLang === 'de' ? 'German' : effectiveSpokenLang === 'es' ? 'Spanish' : 'this language'}. This scene will render without voiceover — ambient sound / music only. For real voiceover pick e.g. Veo 3.1 or Sora 2, or add it later in Motion Studio.`}
@@ -1607,7 +1607,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <AlertDialogDescription>
               {pendingPlacement?.placement === 'end'
                 ? (language === 'de'
-                    ? tx({ de: `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Endetx({ de: " aktiv ist, sind andere Modelle im Picker ausgegraut.`, en: `The end frame feature is only available with Luma Ray 2. Would you like to switch to ${pendingPlacement?.targetModelName} now? As long as "Am Endetx({ de: " is active, other models in the picker are grayed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Le gustaría cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras "Am Endetx({ de: " esté activo, los demás modelos en el selector aparecerán atenuados.` })
+                    ? tx({ de: `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Ende“ aktiv ist, sind andere Modelle im Picker ausgegraut.`, en: `The end frame feature is only available with Luma Ray 2. Do you want to switch to ${pendingPlacement?.targetModelName} now? As long as “At the end” is active, other models in the picker stay greyed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Quieres cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras «Al final» esté activo, los demás modelos del selector permanecen atenuados.` })
                     : `The end-frame option is exclusive to Luma Ray 2. Switch to ${pendingPlacement?.targetModelName} now? While "At end" is active, other models will be greyed out.`)
                 : (language === 'de'
                     ? tx({ de: `Der Anker-Modus (Referenzbild ohne festen Frame) ist nur mit Vidu Q2 oder Kling 3 verfügbar. Zu ${pendingPlacement?.targetModelName} wechseln?`, en: `Anchor mode (reference image without fixed frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`, es: `El modo ancla (imagen de referencia sin fotograma fijo) solo está disponible con Vidu Q2 o Kling 3. ¿Cambiar a ${pendingPlacement?.targetModelName}?` })

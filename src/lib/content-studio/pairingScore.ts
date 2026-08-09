@@ -41,7 +41,7 @@ export function scorePairing(input: {
   if (!input.hasImage) {
     return {
       score: 0,
-      label: "Kein Motiv",
+      label: tx({ de: "Kein Motiv", en: "No motive", es: "Sin motivo" }),
       hint: "Reine Typografie — das Layout trägt die Aussage allein.",
       tone: "ok",
     };

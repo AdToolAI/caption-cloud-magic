@@ -80,7 +80,7 @@ export function WatchdogTab() {
       queryClient.invalidateQueries({ queryKey: ["qa-bugs"] });
       queryClient.invalidateQueries({ queryKey: ["cron-heartbeats"] });
     },
-    onError: (e: any) => toast.error(`Watchdog-Fehler: ${e?.message ?? String(e)}`),
+    onError: (e: any) => toast.error(tx({ de: `Watchdog-Fehler: ${e?.message ?? String(e)}`, en: `Watchdog error: ${e?.message ?? String(e)}`, es: `Error de vigilancia: ${e?.message ?? String(e)}` })),
   });
 
   const lastRun = runs.data?.[0];
@@ -133,7 +133,7 @@ export function WatchdogTab() {
           {!sentry.data ? (
             <p className="text-sm text-muted-foreground">Lade Sentry-Status…</p>
           ) : !sentry.data.enabled ? (
-            <p className="text-sm text-amber-400/80">⚠ Sentry nicht konfiguriert (SENTRY_AUTH_TOKEN/ORG/PROJECT fehlen).</p>
+            <p className="text-sm text-amber-400/80">{tx({ de: "⚠ Sentry nicht konfiguriert (SENTRY_AUTH_TOKEN/ORG/PROJECT fehlen).", en: "⚠ Sentry not configured (SENTRY_AUTH_TOKEN/ORG/PROJECT missing).", es: "⚠ Sentry no configurado (falta SENTRY_AUTH_TOKEN/ORG/PROJECT)." })}</p>
           ) : (
             <>
               <p className="text-xs text-muted-foreground">
@@ -224,7 +224,7 @@ export function WatchdogTab() {
         </CardHeader>
         <CardContent className="space-y-2">
           {(runs.data ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">Noch keine Läufe.</p>
+            <p className="text-sm text-muted-foreground">{tx({ de: "Noch keine Läufe.", en: "No runs yet.", es: "Aún no hay carreras." })}</p>
           )}
           {(runs.data ?? []).map((r: any) => {
             const summary = r.summary ?? {};

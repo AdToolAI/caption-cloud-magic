@@ -27,7 +27,7 @@ export function BriefStep({ onOpenTemplates }: { onOpenTemplates: () => void }) 
             rows={5}
             value={s.brief}
             onChange={(e) => s.setBrief(e.target.value)}
-            placeholder={tx({ de: "z. B. Neues Winter-Menü in unserem Café: Zimt-Cappuccino, ab Montag, 20 % für Stammgäste.", en: "e.g. B. New winter menu in our café: cinnamon cappuccino, from Monday, 20% for regular guests.", es: "p.ej. B. Nuevo menú de invierno en nuestra cafetería: capuchino con canela, a partir del lunes, 20% para clientes habituales." })}
+            placeholder={tx({ de: "z. B. Neues Winter-Menü in unserem Café: Zimt-Cappuccino, ab Montag, 20 % für Stammgäste.", en: "e.g. New winter menu in our café: cinnamon cappuccino, from Monday, 20% for regular guests.", es: "p. ej. Nuevo menú de invierno en nuestra cafetería: capuchino con canela, a partir del lunes, 20% para clientes habituales." })}
           />
         </div>
 

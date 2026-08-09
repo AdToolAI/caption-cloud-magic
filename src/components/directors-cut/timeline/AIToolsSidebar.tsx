@@ -303,7 +303,7 @@ export function AIToolsSidebar({
             
             {/* Recent voiceovers would be shown here */}
             <div className="pt-4 border-t">
-              <Label className="text-xs text-muted-foreground">Position auf Timeline</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: "Position auf Timeline", en: "Position on timeline", es: "Posición en la línea de tiempo" })}</Label>
               <div className="mt-1 text-sm font-mono">
                 {Math.floor(currentTime / 60)}:{(currentTime % 60).toFixed(1).padStart(4, '0')}
               </div>

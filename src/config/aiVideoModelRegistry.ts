@@ -462,7 +462,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: sharedAspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-10s'].costPerSecond,
     badge: 'Neu · 10s',
-    tagline: tx({ de: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Sekunden am Stück', en: 'seconds straight', es: 'segundos seguidos' })}`, en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Seconds in a row', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }),
+    tagline: tx({ de: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Sekunden am Stück', en: 'seconds straight', es: 'segundos seguidos' })}`, en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'seconds straight', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }),
     legacyRoute: '/luma-video-studio',
   },
   {

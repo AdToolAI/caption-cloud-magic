@@ -48,7 +48,7 @@ export function AutopilotWeeklyReviewPanel() {
               <div className="font-medium text-sm">
                 {deadlinePassed
                   ? tx({ de: "Briefing-Deadline überschritten — Autopilot wird pausiert", en: "Briefing deadline exceeded — autopilot is paused", es: "Se superó la fecha límite para la sesión informativa: el piloto automático está en pausa" })
-                  : `Bitte bis ${deadline.toLocaleString('de-DE', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`}
+                  : tx({ de: `Bitte bis ${deadline.toLocaleString('de-DE', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`, en: `Please confirm by ${deadline.toLocaleString('de-DE', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC`, es: `Confirme antes de ${deadline.toLocaleString('de-DE', { weekday: 'largo', hour: '2 dígitos', minute: '2 dígitos' })} UTC` })}
               </div>
               <div className="text-xs text-muted-foreground">
                 {deadline && !deadlinePassed && `Noch ${formatDistanceToNow(deadline, { locale: de })}`}
@@ -88,7 +88,7 @@ export function AutopilotWeeklyReviewPanel() {
           <Sparkles className="h-5 w-5 text-primary" />
           <h3 className="font-serif text-xl">{tx({ de: "KI-Strategie für nächste Woche", en: "AI strategy for next week", es: "Estrategia de IA para la próxima semana" })}</h3>
           {isPending ? (
-            <Badge variant="outline" className="ml-auto">Wartet auf Bestätigung</Badge>
+            <Badge variant="outline" className="ml-auto">{tx({ de: "Wartet auf Bestätigung", en: "Waiting for confirmation", es: "Esperando confirmación" })}</Badge>
           ) : (
             <Badge variant="default" className="ml-auto gap-1">
               <CheckCircle2 className="h-3 w-3" />
@@ -97,7 +97,7 @@ export function AutopilotWeeklyReviewPanel() {
           )}
         </div>
 
-        <p className="text-sm leading-relaxed mb-4">{rec.strategy_text || 'Keine Strategie verfügbar.'}</p>
+        <p className="text-sm leading-relaxed mb-4">{rec.strategy_text || tx({ de: 'Keine Strategie verfügbar.', en: 'No strategy available.', es: 'No hay estrategia disponible.' })}</p>
 
         {rec.key_actions && rec.key_actions.length > 0 && (
           <div className="mb-4">

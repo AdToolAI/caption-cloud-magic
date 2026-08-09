@@ -174,7 +174,7 @@ export default function StockSearchPanel({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') runSearch(query, tab);
               }}
-              placeholder={tab === 'video' ? 'Stock-Videos suchen (z. B. "drone city")' : 'Stock-Bilder suchen (z. B. "minimal desk")'}
+              placeholder={tab === 'video' ? 'Stock-Videos suchen (z. B. "drone city")' : tx({ de: 'Stock-Bilder suchen (z. B. "minimal desk")', en: 'Search stock images (e.g. "minimal desk")', es: 'Buscar imágenes de archivo (por ejemplo, "escritorio mínimo")' })}
               className="pl-8 h-9 text-sm bg-background/60"
             />
           </div>

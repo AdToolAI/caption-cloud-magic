@@ -17,7 +17,7 @@ export function LivePreview({ compact = false }: { compact?: boolean }) {
   const showDesign = s.hasDesign && !!slide;
 
   const chips = useMemo(
-    () => [s.platform, s.language.toUpperCase(), s.imageMode === "none" ? tx({ de: "ohne Bild", en: "without image", es: "sin imagen" }) : "mit Motiv"],
+    () => [s.platform, s.language.toUpperCase(), s.imageMode === "none" ? tx({ de: "ohne Bild", en: "without image", es: "sin imagen" }) : tx({ de: "mit Motiv", en: "with motif", es: "con motivo" })],
     [s.imageMode, s.language, s.platform],
   );
 

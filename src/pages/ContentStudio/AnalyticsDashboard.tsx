@@ -161,7 +161,7 @@ export default function AnalyticsDashboard() {
                 <SelectItem value="7d">7 Tage</SelectItem>
                 <SelectItem value="30d">30 Tage</SelectItem>
                 <SelectItem value="90d">90 Tage</SelectItem>
-                <SelectItem value="all">Alle Zeit</SelectItem>
+                <SelectItem value="all">{tx({ de: "Alle Zeit", en: "All time", es: "Todo el tiempo" })}</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline">

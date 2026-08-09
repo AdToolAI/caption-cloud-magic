@@ -161,7 +161,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/creator-library", titleKey: "Creator Library", descKey: "Videos · Photos · Music · SFX — royalty-free Bundle, inklusive in allen Paid-Plans", icon: Library, cover: coverErstCreatorLibrary },
       
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers, cover: coverErstPictureStudio },
-      { route: "/marketplace", titleKey: "Template Marketplace", descKey: "Community-Templates entdecken & kaufen", icon: Store, cover: coverErstMarketplace },
+      { route: "/marketplace", titleKey: tx({ de: "Template Marketplace", en: "Template Marketplace", es: "Mercado de plantillas" }), descKey: "Community-Templates entdecken & kaufen", icon: Store, cover: coverErstMarketplace },
       { route: "/creator-studio", titleKey: "Creator Studio", descKey: "Eigene Templates verkaufen & Earnings tracken", icon: CoinsIcon, cover: coverErstCreatorStudio },
       { route: "/my-licenses", titleKey: "My Licenses", descKey: tx({ de: "PDF-Lizenz-Zertifikate für alle deine Assets — wie Envato/Artlist", en: "PDF license certificates for all your assets — like Envato/Artlist", es: "Certificados de licencia en PDF para todos tus activos — como Envato/Artlist" }), icon: FileBadge2, cover: coverErstMyLicenses },
     ],

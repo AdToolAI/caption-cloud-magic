@@ -132,7 +132,7 @@ export function MusicGeneratorPanel({
     // Auto-fallback if current language isn't supported by the new tier's provider.
     if (tierHasVocals(newTier, instrumental) && !isLanguageSupported(newTier, vocalLanguage)) {
       setVocalLanguage('en');
-      toast.info('Sprache auf Englisch zurückgesetzt', {
+      toast.info(tx({ de: 'Sprache auf Englisch zurückgesetzt', en: 'Language reset to English', es: 'Restablecer idioma a inglés' }), {
         description: tx({ de: `Der Provider dieses Tiers unterstützt die zuvor gewählte Sprache nicht.`, en: `The provider of this tier does not support the previously selected language.`, es: `El proveedor de este nivel no admite el idioma seleccionado anteriormente.` }),
       });
     }
@@ -346,7 +346,7 @@ export function MusicGeneratorPanel({
         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30">
           <div>
             <Label className="text-sm font-medium">Instrumental</Label>
-            <p className="text-xs text-muted-foreground">Ohne Vocals generieren</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: "Ohne Vocals generieren", en: "Generate without vocals", es: "Generar sin voces" })}</p>
           </div>
           <Switch checked={instrumental} onCheckedChange={setInstrumental} disabled={loading} />
         </div>
@@ -389,8 +389,8 @@ export function MusicGeneratorPanel({
                 <Label className="text-sm font-medium">BPM-Match</Label>
                 <p className="text-xs text-muted-foreground">
                   {defaultBpm
-                    ? `Tempo deines Videos: ${defaultBpm} BPM erkannt`
-                    : 'Track auf bestimmtes Tempo komponieren'}
+                    ? tx({ de: `Tempo deines Videos: ${defaultBpm} BPM erkannt`, en: `Tempo of your video: ${defaultBpm} BPM detected`, es: `Tempo de tu vídeo: ${defaultBpm} BPM detectados` })
+                    : tx({ de: 'Track auf bestimmtes Tempo komponieren', en: 'Compose a track at a specific tempo', es: 'Componer una pista a un tempo específico' })}
                 </p>
               </div>
             </div>
@@ -434,7 +434,7 @@ export function MusicGeneratorPanel({
               Komponiere... (~{tier === 'pro' ? '60s' : '20s'})
             </>
           ) : insufficient ? (
-            <>Nicht genügend Credits — bitte aufladen</>
+            <>{tx({ de: "Nicht genügend Credits — bitte aufladen", en: "Not enough credits - please top up", es: "No hay suficientes créditos: recargue" })}</>
           ) : (
             <>
               <Sparkles className="w-5 h-5 mr-2" />
