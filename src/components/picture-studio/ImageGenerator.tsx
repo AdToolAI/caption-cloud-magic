@@ -98,6 +98,15 @@ export function ImageGenerator() {
     { value: '2:1', label: t('picStudio.arBanner') },
   ], [t]);
 
+  /** Vom jeweiligen Modell akzeptierte Seitenverhältnisse. */
+  const TIER_ASPECTS: Record<QualityTier, string[] | null> = {
+    standard: null, // keine Einschränkung
+    fast: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+    pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+    ultra: ['1:1', '4:3', '3:4', '4:5', '16:9', '9:16'],
+  };
+
+
   const cached = getCachedState();
 
   const [prompt, setPrompt] = useState(cached?.prompt ?? "");
