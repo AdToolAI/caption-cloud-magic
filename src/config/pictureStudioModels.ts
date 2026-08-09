@@ -8,7 +8,16 @@ import { tx } from "@/lib/i18nText";
  */
 
 export type PictureMode = 'create' | 'transform' | 'restyle';
-export type QualityTier = 'standard' | 'fast' | 'pro' | 'ultra';
+export type QualityTier =
+  | 'standard'
+  | 'fast'
+  | 'pro'
+  | 'ultra'
+  | 'gptimage'
+  | 'flux'
+  | 'ideogram'
+  | 'recraft'
+  | 'qwen';
 
 export interface PictureModelCapability {
   tier: QualityTier;
@@ -20,11 +29,20 @@ export interface PictureModelCapability {
   cost: number;
   /** Quality per mode: 0 = not supported, 1 = weak, 2 = ok, 3 = good, 4 = excellent */
   modeQuality: Record<PictureMode, 0 | 1 | 2 | 3 | 4>;
+  /**
+   * Aspect ratios the model really accepts. `null` = no restriction.
+   * Single source of truth for the UI filter — never offer anything else,
+   * otherwise the provider rejects the whole request.
+   */
+  aspectRatios: string[] | null;
+  /** Shown as a secondary picker ("Spezialmodelle") instead of a main tier. */
+  specialist?: boolean;
   /** Optimal use-cases (German, shown in tooltip) */
   bestFor: string[];
   /** Short prompt-style hint for the Prompt-Helper */
   promptStyleHint: string;
 }
+
 
 export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
   standard: {
