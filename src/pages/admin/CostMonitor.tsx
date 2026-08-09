@@ -11,7 +11,6 @@ import { CostTrendChart } from '@/components/admin/cost/CostTrendChart';
 import { CostAlertsCard } from '@/components/admin/cost/CostAlertsCard';
 import { VideoProviderMarginCard } from '@/components/admin/cost/VideoProviderMarginCard';
 import { toast } from 'sonner';
-import { tx } from "@/lib/i18nText";
 
 interface Snapshot {
   timestamp: string;
