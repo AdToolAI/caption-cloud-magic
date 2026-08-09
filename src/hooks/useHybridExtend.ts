@@ -85,17 +85,17 @@ export function useHybridExtend() {
 
         const successMsg =
           params.mode === 'forward'
-            ? '🎬 Sequel wird gedreht…'
+            ? tx({ de: '🎬 Sequel wird gedreht…', en: '🎬 Shooting sequel…', es: '🎬 Rodando la secuela…' })
             : params.mode === 'backward'
-            ? '⏮ Prequel wird gedreht…'
+            ? tx({ de: '⏮ Prequel wird gedreht…', en: '⏮ Shooting prequel…', es: '⏮ Rodando la precuela…' })
             : params.mode === 'bridge'
-            ? '🌉 Crossfade wird gefilmt…'
-            : '🎨 Style-Echo wird komponiert…';
+            ? tx({ de: '🌉 Crossfade wird gefilmt…', en: '🌉 Filming crossfade…', es: '🌉 Filmando la transición…' })
+            : tx({ de: '🎨 Style-Echo wird komponiert…', en: '🎨 Composing style echo…', es: '🎨 Componiendo el eco de estilo…' });
         toast.success(successMsg);
         return data as HybridExtendResult;
       } catch (err) {
         const msg =
-          err instanceof Error ? err.message : 'Hybrid Extend fehlgeschlagen';
+          err instanceof Error ? err.message : tx({ de: 'Hybrid Extend fehlgeschlagen', en: 'Hybrid extend failed', es: 'La extensión híbrida falló' });
         console.error('[useHybridExtend] error:', err);
         toast.error(msg);
         return null;

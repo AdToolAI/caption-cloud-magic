@@ -11,6 +11,7 @@ import {
   BookOpen, ChevronDown, ChevronUp, Download, FileUp, Loader2, Plus, Sparkles, Trash2, Wand2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { tx } from '@/lib/i18nText';
 import { useAudiobookProject } from '@/hooks/useAudiobookProject';
 import { AudiobookCastPanel } from './AudiobookCastPanel';
 import {
@@ -56,7 +57,7 @@ export function AudiobookPanel() {
 
   const handleExportZip = async () => {
     const done = chapters.filter((c) => c.audio_url);
-    if (done.length === 0) { toast.error('Noch keine vertonten Kapitel'); return; }
+    if (done.length === 0) { toast.error(tx({ de: 'Noch keine vertonten Kapitel', en: 'No narrated chapters yet', es: 'Aún no hay capítulos narrados' })); return; }
     setExporting(true);
     try {
       const zip = new JSZip();
@@ -85,7 +86,7 @@ export function AudiobookPanel() {
       toast.success(`${done.length} Kapitel exportiert`);
     } catch (error) {
       console.error('[audiobook] export failed:', error);
-      toast.error('Export fehlgeschlagen');
+      toast.error(tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Exportación fallida' }));
     } finally {
       setExporting(false);
     }
