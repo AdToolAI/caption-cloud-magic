@@ -1,3 +1,4 @@
+import { useTx } from '@/lib/i18nText';
 import React from 'react';
 import {
   Dialog,
@@ -11,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import {
-import { useTx } from '@/lib/i18nText';
   ArrowRight,
   Scissors,
   ArrowUpDown,

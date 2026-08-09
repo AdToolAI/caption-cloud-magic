@@ -109,9 +109,8 @@ export interface DirectorsTableBriefing {
 
 
 export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing } = {}) {
-  const {
+  const { toast } = useToast();
   const tr = useTx();
- toast } = useToast();
 
   const [brief, setBrief] = useState(briefing?.brief ?? '');
   const [genre, setGenre] = useState<AutopilotGenre | 'auto'>(briefing?.genre ?? 'auto');

@@ -37,9 +37,8 @@ import { useTx } from '@/lib/i18nText';
 export default function MusicStudio() {
   useTrackPageFeature("music_studio");
   const navigate = useNavigate();
-  const {
+  const { wallet } = useAIVideoWallet();
   const tr = useTx();
- wallet } = useAIVideoWallet();
   const { generateMusic, generateLyrics, loading, generatingLyrics } = useMusicGeneration();
 
   const [engineId, setEngineId] = useState<MusicEngineId>('stable-audio-25');

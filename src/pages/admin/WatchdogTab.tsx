@@ -29,8 +29,8 @@ function HealthLamp({ ok, warn, label, sublabel }: { ok: boolean; warn?: boolean
 export function WatchdogTab() {
   const queryClient = useQueryClient();
 
-  const heartbeats = useQuery({
   const tr = useTx();
+  const heartbeats = useQuery({
 
     queryKey: ["cron-heartbeats"],
     queryFn: async () => {
