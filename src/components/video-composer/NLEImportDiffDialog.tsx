@@ -1,5 +1,4 @@
 import { tx } from "@/lib/i18nText";
-import { useTx } from '@/lib/i18nText';
 import React from 'react';
 import {
   Dialog,
@@ -216,7 +215,7 @@ export const NLEImportDiffDialog: React.FC<NLEImportDiffDialogProps> = ({
               {totalChanges === 0 && !hasIssues && (
                 <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
                   <CheckCircle2 className="h-8 w-8" />
-                  <p className="text-sm">Keine Änderungen erkannt.</p>
+                  <p className="text-sm">{tx({ de: "Keine Änderungen erkannt.", en: "No changes detected.", es: "No se detectaron cambios." })}</p>
                 </div>
               )}
             </div>
