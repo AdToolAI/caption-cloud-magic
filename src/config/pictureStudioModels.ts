@@ -114,7 +114,7 @@ export function recommendedTierForMode(mode: PictureMode): QualityTier {
 export function detectMismatch(tier: QualityTier, mode: PictureMode): string | null {
   const m = PICTURE_MODELS[tier];
   const score = m.modeQuality[mode];
-  if (score === 0) return tx({ de: `${m.label} (${m.model}) unterstützt diesen Modus nicht.`, en: `${m.label} (${m.model}) does not support this mode.`, es: `${m.label} (${m.model}) no admite este modo.` }));
+  if (score === 0) return tx({ de: `${m.label} (${m.model}) unterstützt diesen Modus nicht.`, en: `${m.label} (${m.model}) does not support this mode.`, es: `${m.label} (${m.model}) no admite este modo.` });
   if (score <= 2) {
     const better = recommendedTierForMode(mode);
     const betterModel = PICTURE_MODELS[better];
