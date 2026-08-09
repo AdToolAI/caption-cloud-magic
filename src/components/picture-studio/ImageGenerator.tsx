@@ -111,18 +111,15 @@ export function ImageGenerator() {
     { value: '16:9', label: t('picStudio.arLandscape') },
     { value: '9:16', label: t('picStudio.arPortrait') },
     { value: '4:5', label: t('picStudio.arInstagram') },
+    { value: '5:4', label: '5:4' },
     { value: '4:3', label: t('picStudio.arHeader') },
     { value: '3:4', label: t('picStudio.arVertical') },
+    { value: '3:2', label: '3:2' },
+    { value: '2:3', label: '2:3' },
+    { value: '21:9', label: tx({ de: '21:9 Banner (ultrabreit)', en: '21:9 banner (ultra-wide)', es: '21:9 banner (ultraancho)' }) },
     { value: '2:1', label: t('picStudio.arBanner') },
   ], [t]);
 
-  /** Vom jeweiligen Modell akzeptierte Seitenverhältnisse. */
-  const TIER_ASPECTS: Record<QualityTier, string[] | null> = {
-    standard: null, // keine Einschränkung
-    fast: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-    pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-    ultra: ['1:1', '4:3', '3:4', '4:5', '16:9', '9:16'],
-  };
 
 
   const cached = getCachedState();
