@@ -41,12 +41,14 @@ Die vier Stufen (Standard/Fast/Pro/Ultra) bleiben als Schnellwahl, darunter komm
 
 ## Technische Details
 
-- `src/config/pictureStudioModels.ts`: Fähigkeits-Matrix um die neuen Modelle erweitern, pro Modell `aspectRatios` und `cost` ergänzen — eine einzige Quelle für UI-Filter und Preis.
-- `src/components/picture-studio/ImageGenerator.tsx`: `TIER_ASPECTS` durch die Matrix ersetzen, ausgegraute Optionen mit Mapping-Hinweis, Modell-Auswahl erweitern.
-- `supabase/functions/generate-image-replicate/index.ts`: `ASPECT_SUPPORT` und den Modell-Slug-Zweig um die neuen Modelle ergänzen; Mapping-Logik bleibt unverändert.
+- `src/config/pictureStudioModels.ts`: Fähigkeits-Matrix um die neuen Modelle erweitern, pro Modell `aspectRatios` und `cost` — eine einzige Quelle für UI-Filter, Preis und Serverprüfung.
+- `src/components/picture-studio/ImageGenerator.tsx`: `TIER_ASPECTS` durch die Matrix ersetzen (strikte Filterung), Auto-Korrektur beim Modellwechsel, Modell-Auswahl erweitern.
+- `supabase/functions/generate-image-replicate/index.ts`: `ASPECT_SUPPORT` an die echten Modell-Listen angleichen und um die neuen Replicate-Modelle ergänzen; Mapping bleibt als Sicherheitsnetz.
+- GPT-Image-2 läuft über die Lovable-AI-Bildschnittstelle (eigener Zweig, Größen statt Ratio-String), nicht über Replicate.
 - Credits: Abbuchung weiterhin erst nach Erfolg, Kosten pro Modell aus der Matrix.
 
 ## Prüfung danach
 
-- Banner-Format bei jedem Modell: entweder echtes 2:1 oder sichtbarer Mapping-Hinweis, kein Fehlschlag.
+- Pro Modell zeigt die Auswahl nur gültige Formate; jede Kombination generiert erfolgreich.
 - Je ein Testbild pro neuem Modell inkl. korrekter Kostenbuchung.
+
