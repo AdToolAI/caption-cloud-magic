@@ -59,7 +59,7 @@ export default function LocationLightingGrid({
   const generate = useCallback(
     async (preset: { id: string; label: string; prompt: string }) => {
       if (!location.reference_image_url) {
-        toast.error('Diese Location braucht ein Referenzbild');
+        toast.error(tx({ de: 'Diese Location braucht ein Referenzbild', en: 'This location needs a reference image', es: 'Esta ubicación necesita una imagen de referencia.' }));
         return;
       }
       setGeneratingVibe(preset.id);

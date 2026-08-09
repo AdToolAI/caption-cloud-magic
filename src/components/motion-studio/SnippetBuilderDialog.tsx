@@ -144,7 +144,7 @@ export default function SnippetBuilderDialog({
           toast.success('Vorschau gesetzt');
         }
       } catch (e: any) {
-        toast.error(tx({ de: tx({ de: tx({ de: tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }));
+        toast.error(tx({ de: tx({ de: tx({ de: tx({ de: tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: tx({ de: `Upload failed: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), es: `Error al cargar: ${e.message ?? mi}` }), en: tx({ de: `Upload failed: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), es: `Error al cargar: ${e.message ?? mi}` }), en: tx({ de: `Upload failed: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), es: `Error al cargar: ${e.message ?? mi}` }), en: tx({ de: `Upload failed: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), es: `Error al cargar: ${e.message ?? mi}` }));
       } finally {
         setUploading(false);
       }
@@ -162,7 +162,7 @@ export default function SnippetBuilderDialog({
       return;
     }
     if (isPublic && !thumbnailUrl) {
-      toast.error('Öffentliche Snippets benötigen ein Vorschaubild');
+      toast.error(tx({ de: 'Öffentliche Snippets benötigen ein Vorschaubild', en: 'Public snippets require a thumbnail', es: 'Los fragmentos públicos requieren una miniatura' }));
       return;
     }
 
