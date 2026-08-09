@@ -32,7 +32,7 @@ import { getTonalityVoice } from '@/config/adTonalityVoiceMap';
 import type { AdCampaignMeta } from '@/types/video-composer';
 import type { AdTonalityId } from '@/config/adTonalityProfiles';
 import AdCampaignPerformance from './AdCampaignPerformance';
-import { useTx } from '@/lib/i18nText';
+import { tx, useTx } from '@/lib/i18nText';
 
 interface CampaignChild {
   id: string;

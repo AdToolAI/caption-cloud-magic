@@ -38,7 +38,7 @@ import StageStoryboardError from './stage/StageStoryboardError';
 import StagePanel from './stage/StagePanel';
 
 import { Play, CheckCircle2 } from 'lucide-react';
-import { useTx } from '@/lib/i18nText';
+import { tx, useTx } from '@/lib/i18nText';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
   hook: 'Hook',

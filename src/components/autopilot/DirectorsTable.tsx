@@ -59,7 +59,7 @@ import {
 } from '@/lib/autopilot/autoVoice';
 import type { AutopilotTreatment, AutopilotGenre, AutopilotAspect } from '@/lib/autopilot/types';
 import { cn } from '@/lib/utils';
-import { useTx } from '@/lib/i18nText';
+import { tx, useTx } from '@/lib/i18nText';
 
 const ASPECTS: Array<{ value: AutopilotAspect; label: string }> = [
   { value: '9:16', label: 'Hochkant 9:16 — Reels, Shorts, TikTok' },
