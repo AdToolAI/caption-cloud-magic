@@ -462,7 +462,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: sharedAspect,
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-10s'].costPerSecond,
     badge: 'Neu · 10s',
-    tagline: tx({ de: tx({ de: tx({ de: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Sekunden am Stück', en: 'seconds straight', es: 'segundos seguidos' })}`, en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Seconds in a row', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }), en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Seconds in a row', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }), en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Seconds in a row', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }),
+    tagline: tx({ de: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Sekunden am Stück', en: 'seconds straight', es: 'segundos seguidos' })}`, en: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Seconds in a row', en: 'seconds straight', es: 'segundos seguidos' })}`, es: `Ray 3.2 ${tx({ de: 'Langclip', en: 'long clip', es: 'clip largo' })} · 10 ${tx({ de: 'Segundos seguidos', en: 'segundos seguidos', es: 'segundos seguidos' })}` }),
     legacyRoute: '/luma-video-studio',
   },
   {
@@ -530,7 +530,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     aspectRatios: sharedAspect,
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-2-5'].costPerSecond,
     badge: 'Neu',
-    tagline: tx({ de: tx({ de: tx({ de: `Seedance 2.5 · ${tx({ de: 'bis 30 s pro Szene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }), en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }), en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }),
+    tagline: tx({ de: `Seedance 2.5 · ${tx({ de: 'bis 30 s pro Szene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, en: `Seedance 2.5 · ${tx({ de: 'up to 30 s per scene', en: 'up to 30s per scene', es: 'hasta 30 s por escena' })} · 720p`, es: `Seedance 2.5 · ${tx({ de: 'hasta 30 s por escena', en: 'hasta 30 s por escena', es: 'hasta 30 s por escena' })} · 720p` }),
     legacyRoute: '/seedance-video-studio',
   },
 
