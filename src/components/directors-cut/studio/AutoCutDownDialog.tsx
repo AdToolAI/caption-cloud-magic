@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useMemo, useState } from 'react';
 import { trackUDC } from '@/lib/analytics';
 import {
@@ -58,15 +59,15 @@ export function AutoCutDownDialog({
             Auto Cut-Down
           </DialogTitle>
           <DialogDescription className="text-white/60">
-            Erzeuge aus deinem {currentTotal.toFixed(1)}s Master automatisch eine
-            Ad-Kürze — Hook + Payoff bleiben immer erhalten.
+            {tx({ de: 'Erzeuge aus deinem ' + currentTotal.toFixed(1) + 's Master automatisch eine', en: 'Automatically create an ', es: 'Crea automáticamente una ' })}
+            {tx({ de: 'Ad-Kürze — Hook + Payoff bleiben immer erhalten.', en: 'ad short from your ' + currentTotal.toFixed(1) + 's master — Hook + Payoff are always preserved.', es: 'versión corta de anuncio de tu maestro de ' + currentTotal.toFixed(1) + 's: el gancho y el beneficio siempre se conservan.' })}
             {hasMasterSnapshot ? (
               <span className="block mt-1 text-emerald-300/90 text-xs">
-                Master ist bereits als Snapshot gesichert — Restore-Button in der Toolbar.
+                {tx({ de: 'Master ist bereits als Snapshot gesichert — Restore-Button in der Toolbar.', en: 'Master is already saved as a snapshot — Restore button in the toolbar.', es: 'El maestro ya está guardado como una instantánea: botón Restaurar en la barra de herramientas.' })}
               </span>
             ) : (
               <span className="block mt-1 text-white/40 text-xs">
-                Beim Anwenden wird dein Master automatisch als Snapshot gesichert.
+                {tx({ de: 'Beim Anwenden wird dein Master automatisch als Snapshot gesichert.', en: 'When applying, your master is automatically saved as a snapshot.', es: 'Al aplicar, tu maestro se guarda automáticamente como una instantánea.' })}
               </span>
             )}
           </DialogDescription>
@@ -107,7 +108,7 @@ export function AutoCutDownDialog({
                     : 'bg-amber-500/15 text-amber-300',
                 )}
               >
-                {plan.feasible ? 'Bereit' : 'Näherung'}
+                {plan.feasible ? 'tx({ de: 'Bereit', en: 'Ready', es: 'Listo' })' : 'tx({ de: 'Näherung', en: 'Approximation', es: 'Aproximación' })'}
               </Badge>
             </div>
             <div className="text-xs text-white/60">{plan.reason}</div>
@@ -138,7 +139,7 @@ export function AutoCutDownDialog({
             ))}
             {plan.scenes.length === 0 && (
               <div className="text-xs text-white/40 text-center py-4">
-                Keine Szenen zum Kürzen.
+                {tx({ de: 'Keine Szenen zum Kürzen.', en: 'No scenes to cut.', es: 'No hay escenas para recortar.' })}
               </div>
             )}
           </div>
@@ -166,7 +167,7 @@ export function AutoCutDownDialog({
             className="bg-[#F5C76A] hover:bg-[#F5C76A]/90 text-black font-semibold"
           >
             <Scissors className="h-4 w-4 mr-1.5" />
-            Auf Timeline anwenden
+            {tx({ de: 'Auf Timeline anwenden', en: 'Apply to timeline', es: 'Aplicar a la línea de tiempo' })}
           </Button>
         </DialogFooter>
       </DialogContent>

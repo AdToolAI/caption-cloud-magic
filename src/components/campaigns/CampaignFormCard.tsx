@@ -64,10 +64,10 @@ const postTypeConfig = [
 
 // Wizard Steps
 const steps = [
-  { id: 1, label: "Ziel", icon: Target },
-  { id: 2, label: "Inhalt", icon: Sparkles },
-  { id: 3, label: "Plattform", icon: Zap },
-  { id: 4, label: "Planen", icon: Calendar },
+  { id: 1, label: tx({ de: "Ziel", en: "Goal", es: "Objetivo" }), icon: Target },
+  { id: 2, label: tx({ de: "Inhalt", en: "Content", es: "Contenido" }), icon: Sparkles },
+  { id: 3, label: tx({ de: "Plattform", en: "Platform", es: "Plataforma" }), icon: Zap },
+  { id: 4, label: tx({ de: "Planen", en: "Schedule", es: "Planificar" }), icon: Calendar },
 ];
 
 export const CampaignFormCard = ({
@@ -219,7 +219,7 @@ export const CampaignFormCard = ({
               <SelectContent className="bg-card border-white/10">
                 {[3, 4, 5, 6, 7].map((n) => (
                   <SelectItem key={n} value={n.toString()}>
-                    {n} Posts/Woche
+                    {n} {tx({ de: 'Posts/Woche', en: 'Posts/week', es: 'Publicaciones/semana' })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -293,7 +293,7 @@ export const CampaignFormCard = ({
 
         {/* Post Types */}
         <div className="space-y-3">
-          <Label className="text-sm font-medium text-foreground">Post-Typen definieren</Label>
+          <Label className="text-sm font-medium text-foreground">{tx({ de: 'Post-Typen definieren', en: 'Define Post Types', es: 'Definir tipos de publicación' })}</Label>
           <p className="text-xs text-muted-foreground">{tx({ de: "Bestimme, welche Art von Posts erstellt werden sollen", en: "Determine what kind of posts should be created", es: "Determina qué tipo de publicaciones deben crearse" })}</p>
           
           <div className="space-y-2">
@@ -336,7 +336,7 @@ export const CampaignFormCard = ({
                   }}
                   className="w-20 bg-muted/30 border-white/10"
                 />
-                <span className="text-sm text-muted-foreground">pro Woche</span>
+                <span className="text-sm text-muted-foreground">{tx({ de: 'pro Woche', en: 'per week', es: 'por semana' })}</span>
                 
                 <Button
                   size="icon"
@@ -356,11 +356,11 @@ export const CampaignFormCard = ({
             className="border-dashed border-white/20 hover:border-primary/50 hover:bg-primary/5"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Post-Typ hinzufügen
+            {tx({ de: 'Post-Typ hinzufügen', en: 'Add Post Type', es: 'Agregar tipo de publicación' })}
           </Button>
           
           <div className={`text-sm ${totalPosts !== postFrequency ? 'text-destructive' : 'text-muted-foreground'}`}>
-            Gesamt: {totalPosts} Posts/Woche 
+            {tx({ de: 'Gesamt:', en: 'Total:', es: 'Total:' })} {totalPosts} {tx({ de: 'Posts/Woche', en: 'Posts/week', es: 'Publicaciones/semana' })} 
             {totalPosts !== postFrequency && ` (erwartet: ${postFrequency})`}
           </div>
         </div>
@@ -372,13 +372,13 @@ export const CampaignFormCard = ({
             maxFiles={20}
           />
           <p className="text-xs text-muted-foreground mt-3">
-            💡 Tipp: Lade Medien hoch, um sie Posts zuordnen zu können
+            {tx({ de: '💡 Tipp: Lade Medien hoch, um sie Posts zuordnen zu können', en: '💡 Tip: Upload media to assign them to posts', es: '💡 Consejo: sube archivos multimedia para poder asignarlos a las publicaciones' })}
           </p>
         </div>
 
         {/* Auto Destination */}
         <div className="p-4 rounded-xl bg-muted/20 border border-white/5 space-y-3">
-          <Label className="text-sm font-medium text-foreground">Nach Generierung automatisch übertragen:</Label>
+          <Label className="text-sm font-medium text-foreground">{tx({ de: 'Nach Generierung automatisch übertragen:', en: 'Transfer automatically after generation:', es: 'Transferir automáticamente después de la generación:' })}</Label>
           <div className="flex flex-col gap-3">
             <label className="flex items-center gap-3 cursor-pointer group">
               <Checkbox 
@@ -389,7 +389,7 @@ export const CampaignFormCard = ({
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
                 <span className="text-sm group-hover:text-foreground transition-colors">
-                  In Kalender übertragen
+                  {tx({ de: 'In Kalender übertragen', en: 'Transfer to calendar', es: 'Transferir al calendario' })}
                 </span>
               </div>
             </label>
@@ -403,7 +403,7 @@ export const CampaignFormCard = ({
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-accent" />
                 <span className="text-sm group-hover:text-foreground transition-colors">
-                  In Content-Planner mit KI-optimierten Zeiten
+                  {tx({ de: 'In Content-Planner mit KI-optimierten Zeiten', en: 'In Content Planner with AI-optimized times', es: 'En Content Planner con tiempos optimizados por IA' })}
                 </span>
               </div>
             </label>

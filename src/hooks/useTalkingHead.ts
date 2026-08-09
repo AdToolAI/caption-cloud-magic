@@ -42,7 +42,7 @@ export function useTalkingHead() {
       setResult(data);
       toast({
         title: tx({ de: 'Talking-Head wird generiert', en: 'Talking head is generated', es: 'Se genera cabeza parlante' }),
-        description: 'Die Generierung läuft im Hintergrund (1–3 Minuten).',
+        description: tx({ de: 'Die Generierung läuft im Hintergrund (1–3 Minuten).', en: 'Generation is running in the background (1–3 minutes).', es: 'La generación se está ejecutando en segundo plano (1-3 minutos).' }),
       });
       return data;
     } catch (error) {

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback, useRef, useEffect } from 'react';
 
 /**
@@ -352,7 +353,7 @@ export function useFinalMixer() {
 
   /** Render → measure → normalize → encode WAV */
   const exportMix = useCallback(async (): Promise<Blob | null> => {
-    setExportProgress({ phase: 'Rendering...', pct: 10 });
+    setExportProgress({ phase: tx({ de: 'Rendering...', en: 'Rendering...', es: 'Renderizando...' }), pct: 10 });
     const rendered = await renderOffline();
     if (!rendered) {
       setExportProgress(null);
@@ -361,17 +362,17 @@ export function useFinalMixer() {
 
     let final = rendered;
     if (target.id !== 'none') {
-      setExportProgress({ phase: 'Loudness messen...', pct: 50 });
+      setExportProgress({ phase: tx({ de: 'Loudness messen...', en: 'Measuring loudness...', es: 'Midiendo la sonoridad...' }), pct: 50 });
       const measured = measureLUFS(rendered);
       const deltaDb = target.lufs - measured.lufs;
       const gain = Math.pow(10, deltaDb / 20);
       // Cap gain to ±12 dB to avoid pathological boosts
       const safeGain = Math.max(0.25, Math.min(4, gain));
-      setExportProgress({ phase: `Normalisieren auf ${target.lufs} LUFS...`, pct: 75 });
+      setExportProgress({ phase: tx({ de: `Normalisieren auf ${target.lufs} LUFS...`, en: `Normalizing to ${target.lufs} LUFS...`, es: `Normalizando a ${target.lufs} LUFS...` }), pct: 75 });
       final = applyGainToBuffer(rendered, safeGain);
     }
 
-    setExportProgress({ phase: 'WAV codieren...', pct: 90 });
+    setExportProgress({ phase: tx({ de: 'WAV codieren...', en: 'Encoding WAV...', es: 'Codificando WAV...' }), pct: 90 });
     const blob = audioBufferToWav(final);
     setExportProgress(null);
     return blob;

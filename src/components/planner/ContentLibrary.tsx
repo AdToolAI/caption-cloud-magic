@@ -151,7 +151,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
           Content Library
           {campaignId && (
             <Badge variant="secondary" className="ml-2 text-xs">
-              Kampagne
+              {tx({ de: '{tx({ de: 'Kampagne', en: 'Campaign', es: 'Campaña' })}', en: 'Campaign', es: 'Campaña' })}
             </Badge>
           )}
         </h2>
@@ -159,7 +159,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
         <div className="relative mb-3">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Suchen..."
+            placeholder={tx({ de: 'Suchen...', en: 'Search...', es: 'Buscar...' })}
             className="pl-8"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -169,7 +169,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
         <Tabs value={filter} onValueChange={setFilter}>
           <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="all" className="text-xs">
-              Alle
+              {tx({ de: 'Alle', en: 'All', es: 'Todos' })}
             </TabsTrigger>
             <TabsTrigger value="image" className="text-xs">
               <Image className="h-3 w-3" />
@@ -186,7 +186,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {loading ? (
-          <div className="text-center text-sm text-muted-foreground">Lädt...</div>
+          <div className="text-center text-sm text-muted-foreground">{tx({ de: 'Lädt...', en: 'Loading...', es: 'Cargando...' })}</div>
         ) : items.length === 0 ? (
           <EmptyContentLibrary campaignFilter={!!campaignId} />
         ) : (
@@ -254,7 +254,7 @@ function DraggableContentItem({ item, onClick }: { item: any; onClick: () => voi
             {item.source === "campaign" && (
               <Badge variant="secondary" className="text-xs gap-1">
                 <Calendar className="h-3 w-3" />
-                Kampagne
+                {tx({ de: '{tx({ de: 'Kampagne', en: 'Campaign', es: 'Campaña' })}', en: 'Campaign', es: 'Campaña' })}
               </Badge>
             )}
             {item.source === "media_library" && (
@@ -279,12 +279,12 @@ function EmptyContentLibrary({ campaignFilter }: { campaignFilter: boolean }) {
         <FolderOpen className="h-8 w-8 text-muted-foreground" />
       </div>
       <h3 className="font-semibold text-sm mb-2">
-        {campaignFilter ? "Keine Kampagnen-Inhalte" : "Keine Inhalte gefunden"}
+        {campaignFilter ? "Keine {tx({ de: '{tx({ de: 'Kampagne', en: 'Campaign', es: 'Campaña' })}', en: 'Campaign', es: 'Campaña' })}n-Inhalte" : "{tx({ de: 'Keine Inhalte gefunden', en: 'No content found', es: 'No se encontró contenido' })}"}
       </h3>
       <p className="text-xs text-muted-foreground mb-4 max-w-xs">
         {campaignFilter 
-          ? tx({ de: "Erstellen Sie Inhalte für diese Kampagne oder laden Sie Medien in die Mediathek hoch.", en: "Create content for this campaign or upload media to the media library.", es: "Crea contenido para esta campaña o sube medios a la biblioteca de medios." })
-          : tx({ de: "Laden Sie Medien in die Mediathek hoch oder erstellen Sie Kampagnen, um Inhalte hier zu planen.", en: "Upload media to the media library or create campaigns to schedule content here.", es: "Sube medios a la biblioteca de medios o crea campañas para programar contenido aquí." })}
+          ? tx({ de: "Erstellen Sie Inhalte für diese {tx({ de: '{tx({ de: 'Kampagne', en: 'Campaign', es: 'Campaña' })}', en: 'Campaign', es: 'Campaña' })} oder laden Sie Medien in die Mediathek hoch.", en: "Create content for this campaign or upload media to the media library.", es: "Crea contenido para esta campaña o sube medios a la biblioteca de medios." })
+          : tx({ de: "Laden Sie Medien in die Mediathek hoch oder erstellen Sie {tx({ de: '{tx({ de: 'Kampagne', en: 'Campaign', es: 'Campaña' })}', en: 'Campaign', es: 'Campaña' })}n, um Inhalte hier zu planen.", en: "Upload media to the media library or create campaigns to schedule content here.", es: "Sube medios a la biblioteca de medios o crea campañas para programar contenido aquí." })}
       </p>
       {!campaignFilter && (
         <Button
@@ -294,7 +294,7 @@ function EmptyContentLibrary({ campaignFilter }: { campaignFilter: boolean }) {
           className="gap-2"
         >
           <Upload className="h-4 w-4" />
-          Zur Mediathek
+          {tx({ de: 'Zur Mediathek', en: 'To Media Library', es: 'A la biblioteca de medios' })}
         </Button>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
@@ -22,18 +23,18 @@ interface StemMixerPanelProps {
 
 const PRESETS: Record<string, { label: string; desc: string; state: Partial<Record<StemType, Partial<StemMixerState[StemType]>>>; master?: number }> = {
   flat: {
-    label: 'Original',
-    desc: 'Alle Stems auf Unity',
+    label: tx({ de: 'Original', en: 'Original', es: 'Original' }),
+    desc: tx({ de: 'Alle Stems auf Unity', en: 'All stems at unity', es: 'Todas las pistas en unidad' }),
     state: {},
   },
   karaoke: {
     label: 'Karaoke',
-    desc: 'Vocals raus',
+    desc: tx({ de: 'Vocals raus', en: 'Vocals out', es: 'Vocales fuera' }),
     state: { vocals: { muted: true } },
   },
   acapella: {
     label: 'Acapella',
-    desc: 'Nur Vocals',
+    desc: tx({ de: 'Nur Vocals', en: 'Vocals only', es: 'Solo vocales' }),
     state: {
       vocals: { volume: 1.2 },
       drums: { muted: true },
@@ -43,12 +44,12 @@ const PRESETS: Record<string, { label: string; desc: string; state: Partial<Reco
   },
   instrumental: {
     label: 'Instrumental',
-    desc: 'Beat + Bass + Other',
+    desc: tx({ de: 'Beat + Bass + Other', en: 'Beat + Bass + Other', es: 'Ritmo + Bajo + Otros' }),
     state: { vocals: { muted: true } },
   },
   drumsbass: {
     label: 'Drums + Bass',
-    desc: 'Rhythm Section',
+    desc: tx({ de: 'Rhythm Section', en: 'Rhythm Section', es: 'Sección rítmica' }),
     state: {
       vocals: { muted: true },
       other: { muted: true },
@@ -58,7 +59,7 @@ const PRESETS: Record<string, { label: string; desc: string; state: Partial<Reco
   },
   vocalfocus: {
     label: 'Vocal Focus',
-    desc: 'Vocals laut, Rest leise',
+    desc: tx({ de: 'Vocals laut, Rest leise', en: 'Vocals loud, others quiet', es: 'Voces fuertes, el resto en silencio' }),
     state: {
       vocals: { volume: 1.3 },
       drums: { volume: 0.6 },
@@ -138,9 +139,9 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
             <AudioLines className="w-10 h-10 text-primary" />
           </div>
           <div>
-            <h3 className="text-xl font-bold tracking-tight">Stem-Mixer</h3>
+            <h3 className="text-xl font-bold tracking-tight">{tx({ de: 'Stem-Mixer', en: 'Stem Mixer', es: 'Mezclador de pistas' })}</h3>
             <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-              Wähle einen Track in der <strong>Bibliothek</strong> und klicke auf{' '}
+              {tx({ de: 'Wähle einen Track in der Bibliothek und klicke auf ', en: 'Select a track in the library and click on ', es: 'Selecciona una pista en la biblioteca y haz clic en ' })}
               <strong>Stems extrahieren</strong>. Die separierten Spuren erscheinen
               automatisch hier zum Mixen.
             </p>
@@ -195,7 +196,7 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
               ) : (
                 <Save className="w-4 h-4 mr-2" />
               )}
-              Mix speichern
+              {tx({ de: 'Mix speichern', en: 'Save Mix', es: 'Guardar mezcla' })}
             </Button>
           </div>
         </div>
@@ -203,7 +204,7 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
         {/* Loading / Scrubber */}
         {isLoading ? (
           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" /> Stems werden dekodiert…
+            <Loader2 className="w-4 h-4 animate-spin" /> tx({ de: 'Stems werden dekodiert…', en: 'Stems are being decoded…', es: 'Las pistas se están decodificando...' })
           </div>
         ) : (
           <div className="mt-4 space-y-2">
@@ -226,7 +227,7 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
       <Card className="p-4 bg-card/40 backdrop-blur-md border-border/40">
         <div className="flex items-center gap-2 mb-3">
           <Wand2 className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold">Mix-Presets</span>
+          <span className="text-sm font-semibold">{tx({ de: 'Mix-Presets', en: 'Mix Presets', es: 'Ajustes preestablecidos' })}</span>
         </div>
         <div className="flex flex-wrap gap-2">
           {Object.entries(PRESETS).map(([key, p]) => (
@@ -278,7 +279,7 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
                     <div>
                       <div className="text-sm font-bold tracking-tight">{meta.label}</div>
                       {!hasBuffer && (
-                        <div className="text-[10px] text-muted-foreground">nicht geladen</div>
+                        <div className="text-[10px] text-muted-foreground">tx({ de: 'nicht geladen', en: 'not loaded', es: 'no cargado' })</div>
                       )}
                     </div>
                   </div>
@@ -390,7 +391,7 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
             size="sm"
             variant="ghost"
             onClick={() => { setState(DEFAULT_STEM_STATE); setMasterVolume(1); setActivePreset('flat'); }}
-            title="Mixer zurücksetzen"
+            title={tx({ de: 'Mixer zurücksetzen', en: 'Reset Mixer', es: 'Reiniciar mezclador' })}
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </Button>
