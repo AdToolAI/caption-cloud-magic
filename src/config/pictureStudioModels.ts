@@ -8,7 +8,16 @@ import { tx } from "@/lib/i18nText";
  */
 
 export type PictureMode = 'create' | 'transform' | 'restyle';
-export type QualityTier = 'standard' | 'fast' | 'pro' | 'ultra';
+export type QualityTier =
+  | 'standard'
+  | 'fast'
+  | 'pro'
+  | 'ultra'
+  | 'gptimage'
+  | 'flux'
+  | 'ideogram'
+  | 'recraft'
+  | 'qwen';
 
 export interface PictureModelCapability {
   tier: QualityTier;
@@ -20,11 +29,20 @@ export interface PictureModelCapability {
   cost: number;
   /** Quality per mode: 0 = not supported, 1 = weak, 2 = ok, 3 = good, 4 = excellent */
   modeQuality: Record<PictureMode, 0 | 1 | 2 | 3 | 4>;
+  /**
+   * Aspect ratios the model really accepts. `null` = no restriction.
+   * Single source of truth for the UI filter — never offer anything else,
+   * otherwise the provider rejects the whole request.
+   */
+  aspectRatios: string[] | null;
+  /** Shown as a secondary picker ("Spezialmodelle") instead of a main tier. */
+  specialist?: boolean;
   /** Optimal use-cases (German, shown in tooltip) */
   bestFor: string[];
   /** Short prompt-style hint for the Prompt-Helper */
   promptStyleHint: string;
 }
+
 
 export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
   standard: {
@@ -33,6 +51,7 @@ export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
     model: 'Gemini 2.5 Flash Image',
     cost: 0,
     modeQuality: { create: 3, transform: 3, restyle: 2 },
+    aspectRatios: null,
     bestFor: ['Schnelle Drafts', 'Konzept-Skizzen', 'Im Abo gratis'],
     promptStyleHint: 'Concise natural-language prompts. Gemini understands narrative descriptions well; avoid heavy comma-separated tag lists.',
   },
@@ -42,6 +61,7 @@ export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
     model: 'Seedream 4',
     cost: 0.04,
     modeQuality: { create: 3, transform: 2, restyle: 3 },
+    aspectRatios: ['1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
     bestFor: [tx({ de: 'Stilisierte Szenen', en: 'Stylized scenes', es: 'escenas estilizadas' }), 'Mood-Boards', 'Social-Content'],
     promptStyleHint: 'Mid-length descriptive prompts with explicit style cues, lighting and camera language.',
   },
@@ -51,6 +71,7 @@ export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
     model: 'Imagen 4 Ultra',
     cost: 0.08,
     modeQuality: { create: 4, transform: 1, restyle: 2 },
+    aspectRatios: ['1:1', '4:3', '3:4', '16:9', '9:16'],
     bestFor: [tx({ de: 'Hochauflösende Text→Bild Szenen', en: 'High-resolution Text→Image scenes', es: 'Escenas de texto a imagen de alta resolución' }), 'Werbung', 'Produkt-Hero'],
     promptStyleHint: 'Verbose photographic prompts work best. Imagen 4 is weak at preserving complex i2i compositions — use Nano Banana 2 instead.',
   },
@@ -60,10 +81,86 @@ export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
     model: 'Nano Banana 2',
     cost: 0.20,
     modeQuality: { create: 4, transform: 4, restyle: 4 },
+    aspectRatios: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
     bestFor: [tx({ de: 'Komplexe i2i mit vielen Personen', en: 'Complex i2i with many people', es: 'I2i complejo con mucha gente.' }), 'Stil-Transfer', 'Fotorealismus'],
     promptStyleHint: 'Structured prompts with explicit "preserve X from reference" instructions. Excellent at honoring composition.',
   },
+  gptimage: {
+    tier: 'gptimage',
+    label: 'GPT Image',
+    model: 'GPT-Image-2 (ChatGPT)',
+    cost: 0.08,
+    modeQuality: { create: 4, transform: 3, restyle: 3 },
+    aspectRatios: ['1:1', '3:2', '2:3'],
+    specialist: true,
+    bestFor: [tx({ de: 'Prompt-Treue', en: 'Prompt accuracy', es: 'Fidelidad al prompt' }), 'Saubere Texte', 'ChatGPT-Look'],
+    promptStyleHint: 'Plain, instruction-like prompts. GPT-Image follows long, explicit descriptions and renders in-image text reliably.',
+  },
+  flux: {
+    tier: 'flux',
+    label: 'FLUX Ultra',
+    model: 'FLUX 1.1 Pro Ultra',
+    cost: 0.10,
+    modeQuality: { create: 4, transform: 2, restyle: 3 },
+    aspectRatios: ['1:1', '3:2', '2:3', '4:5', '5:4', '16:9', '9:16', '21:9'],
+    specialist: true,
+    bestFor: [tx({ de: 'Midjourney-naher Look', en: 'Midjourney-like look', es: 'Estética tipo Midjourney' }), 'Fotorealismus', '4 MP'],
+    promptStyleHint: 'Rich cinematic prompts with lens, lighting and film-stock language.',
+  },
+  ideogram: {
+    tier: 'ideogram',
+    label: 'Ideogram',
+    model: 'Ideogram v3 Turbo',
+    cost: 0.06,
+    modeQuality: { create: 4, transform: 2, restyle: 2 },
+    aspectRatios: ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'],
+    specialist: true,
+    bestFor: [tx({ de: 'Text im Bild', en: 'Text in image', es: 'Texto en la imagen' }), 'Poster', 'Logos'],
+    promptStyleHint: 'Put the exact wording in quotes, then describe layout and typography.',
+  },
+  recraft: {
+    tier: 'recraft',
+    label: 'Recraft',
+    model: 'Recraft v3',
+    cost: 0.06,
+    modeQuality: { create: 4, transform: 1, restyle: 2 },
+    aspectRatios: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+    specialist: true,
+    bestFor: [tx({ de: 'Vektor & Icons', en: 'Vector & icons', es: 'Vectores e iconos' }), 'Brand-Grafiken', 'Illustration'],
+    promptStyleHint: 'Describe the graphic flatly: subject, style, palette. Avoid photographic camera language.',
+  },
+  qwen: {
+    tier: 'qwen',
+    label: 'Qwen',
+    model: 'Qwen Image',
+    cost: 0.03,
+    modeQuality: { create: 3, transform: 2, restyle: 2 },
+    aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+    specialist: true,
+    bestFor: [tx({ de: 'Günstiger Allrounder', en: 'Affordable all-rounder', es: 'Todoterreno económico' }), 'Drafts', 'Volumen'],
+    promptStyleHint: 'Short, concrete descriptions. Works well with bilingual prompts.',
+  },
 };
+
+/** Aspect ratios a tier accepts (`null` = unrestricted). */
+export function aspectRatiosForTier(tier: QualityTier): string[] | null {
+  return PICTURE_MODELS[tier]?.aspectRatios ?? null;
+}
+
+/** Closest supported ratio for a tier — used when switching models. */
+export function closestAspectRatio(tier: QualityTier, requested: string): string {
+  const allowed = PICTURE_MODELS[tier]?.aspectRatios;
+  if (!allowed || allowed.includes(requested)) return requested;
+  const parse = (r: string) => {
+    const [w, h] = r.split(':').map(Number);
+    return w > 0 && h > 0 ? w / h : 1;
+  };
+  const target = parse(requested);
+  return allowed.reduce((best, cand) =>
+    Math.abs(parse(cand) - target) < Math.abs(parse(best) - target) ? cand : best,
+  allowed[0]);
+}
+
 
 export const PICTURE_MODES: Record<PictureMode, {
   label: string;

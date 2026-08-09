@@ -26,9 +26,13 @@ import { PreflightCheck } from "./PreflightCheck";
 import AIVideoCostConfirmDialog from "@/components/ai-video/AIVideoCostConfirmDialog";
 import {
   PICTURE_MODES,
+  PICTURE_MODELS,
+  aspectRatiosForTier,
+  closestAspectRatio,
   type PictureMode,
   type QualityTier as ModelTier,
 } from "@/config/pictureStudioModels";
+
 
 interface GeneratedImage {
   id?: string;
@@ -38,13 +42,18 @@ interface GeneratedImage {
   aspectRatio: string;
 }
 
-type QualityTier = 'standard' | 'fast' | 'pro' | 'ultra';
+type QualityTier = ModelTier;
 
 const TIER_COSTS: Record<QualityTier, number> = {
-  standard: 0,    // Gemini via Lovable AI Gateway — gratis im Abo
-  fast: 0.04,     // Seedream 4
-  pro: 0.08,      // Imagen 4 Ultra
-  ultra: 0.20,    // Nano Banana 2
+  standard: PICTURE_MODELS.standard.cost,
+  fast: PICTURE_MODELS.fast.cost,
+  pro: PICTURE_MODELS.pro.cost,
+  ultra: PICTURE_MODELS.ultra.cost,
+  gptimage: PICTURE_MODELS.gptimage.cost,
+  flux: PICTURE_MODELS.flux.cost,
+  ideogram: PICTURE_MODELS.ideogram.cost,
+  recraft: PICTURE_MODELS.recraft.cost,
+  qwen: PICTURE_MODELS.qwen.cost,
 };
 
 const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; gradient: string }> = {
@@ -52,7 +61,16 @@ const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; 
   fast: { label: 'Fast', model: 'Seedream 4', icon: Zap, gradient: 'from-blue-500/20 to-cyan-500/20' },
   pro: { label: 'Pro', model: 'Imagen 4 Ultra', icon: Crown, gradient: 'from-purple-500/20 to-pink-500/20' },
   ultra: { label: 'Ultra', model: 'Nano Banana 2', icon: Gem, gradient: 'from-amber-500/20 to-orange-500/20' },
+  gptimage: { label: 'GPT Image', model: 'GPT-Image-2 (ChatGPT)', icon: Sparkles, gradient: 'from-slate-500/20 to-emerald-500/20' },
+  flux: { label: 'FLUX Ultra', model: 'FLUX 1.1 Pro Ultra', icon: Camera, gradient: 'from-rose-500/20 to-orange-500/20' },
+  ideogram: { label: 'Ideogram', model: 'Ideogram v3 Turbo', icon: Wand2, gradient: 'from-indigo-500/20 to-blue-500/20' },
+  recraft: { label: 'Recraft', model: 'Recraft v3', icon: Palette, gradient: 'from-lime-500/20 to-emerald-500/20' },
+  qwen: { label: 'Qwen', model: 'Qwen Image', icon: ImageIcon, gradient: 'from-cyan-500/20 to-sky-500/20' },
 };
+
+const MAIN_TIERS: QualityTier[] = ['standard', 'fast', 'pro', 'ultra'];
+const SPECIALIST_TIERS: QualityTier[] = ['gptimage', 'flux', 'ideogram', 'recraft', 'qwen'];
+
 
 export function ImageGenerator() {
   const { user } = useAuth();
@@ -93,18 +111,15 @@ export function ImageGenerator() {
     { value: '16:9', label: t('picStudio.arLandscape') },
     { value: '9:16', label: t('picStudio.arPortrait') },
     { value: '4:5', label: t('picStudio.arInstagram') },
+    { value: '5:4', label: '5:4' },
     { value: '4:3', label: t('picStudio.arHeader') },
     { value: '3:4', label: t('picStudio.arVertical') },
+    { value: '3:2', label: '3:2' },
+    { value: '2:3', label: '2:3' },
+    { value: '21:9', label: tx({ de: '21:9 Banner (ultrabreit)', en: '21:9 banner (ultra-wide)', es: '21:9 banner (ultraancho)' }) },
     { value: '2:1', label: t('picStudio.arBanner') },
   ], [t]);
 
-  /** Vom jeweiligen Modell akzeptierte Seitenverhältnisse. */
-  const TIER_ASPECTS: Record<QualityTier, string[] | null> = {
-    standard: null, // keine Einschränkung
-    fast: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-    pro: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-    ultra: ['1:1', '4:3', '3:4', '4:5', '16:9', '9:16'],
-  };
 
 
   const cached = getCachedState();
@@ -146,19 +161,22 @@ export function ImageGenerator() {
   const balance = wallet?.balance_euros ?? 0;
   const hasInsufficientCredits = cost > 0 && balance < cost;
 
-  // Nur Seitenverhältnisse anbieten, die das gewählte Modell akzeptiert.
+  // Nur Seitenverhältnisse anbieten, die das gewählte Modell wirklich akzeptiert.
   const availableAspectRatios = useMemo(() => {
-    const allowed = TIER_ASPECTS[tier];
+    const allowed = aspectRatiosForTier(tier);
     return allowed ? ASPECT_RATIOS.filter(r => allowed.includes(r.value)) : ASPECT_RATIOS;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, ASPECT_RATIOS]);
 
+  // Beim Modellwechsel auf das nächstliegende erlaubte Verhältnis springen.
   useEffect(() => {
     if (!availableAspectRatios.some(r => r.value === aspectRatio)) {
-      setAspectRatio(availableAspectRatios[0]?.value ?? '1:1');
+      const next = closestAspectRatio(tier, aspectRatio);
+      setAspectRatio(availableAspectRatios.some(r => r.value === next) ? next : (availableAspectRatios[0]?.value ?? '1:1'));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableAspectRatios]);
+
 
 
   useEffect(() => {
@@ -616,7 +634,7 @@ export function ImageGenerator() {
           <div className="space-y-2">
             <Label>Qualität & Modell</Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {(Object.keys(TIER_META) as QualityTier[]).map((t) => {
+              {MAIN_TIERS.map((t) => {
                 const meta = TIER_META[t];
                 const Icon = meta.icon;
                 const tierCost = TIER_COSTS[t];
@@ -644,7 +662,44 @@ export function ImageGenerator() {
                 );
               })}
             </div>
+
+            {/* Spezialmodelle */}
+            <details className="rounded-lg border border-border/50 bg-background/30" open={SPECIALIST_TIERS.includes(tier)}>
+              <summary className="cursor-pointer select-none px-3 py-2 text-xs text-muted-foreground">
+                {tx({ de: 'Spezialmodelle', en: 'Specialist models', es: 'Modelos especializados' })}
+              </summary>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-2 pt-0">
+                {SPECIALIST_TIERS.map((t) => {
+                  const meta = TIER_META[t];
+                  const Icon = meta.icon;
+                  const tierCost = TIER_COSTS[t];
+                  const isSelected = tier === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTier(t)}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        isSelected
+                          ? 'border-primary bg-gradient-to-br ' + meta.gradient + ' shadow-md'
+                          : 'border-border/50 bg-background/30 hover:border-border'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="font-semibold text-xs">{meta.label}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mb-1">{PICTURE_MODELS[t].bestFor[0]}</p>
+                      <Badge variant="outline" className="text-[10px] h-5">
+                        {currencySymbol}{tierCost.toFixed(2)}
+                      </Badge>
+                    </button>
+                  );
+                })}
+              </div>
+            </details>
           </div>
+
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
