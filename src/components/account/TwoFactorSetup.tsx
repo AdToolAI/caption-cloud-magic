@@ -64,7 +64,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
       console.error('MFA enroll error:', err);
       setError(err.message || tx({ de: 'Fehler beim Einrichten der 2FA', en: 'Error setting up 2FA', es: 'Error al configurar la 2FA' }));
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: err.message || tx({ de: 'Fehler beim Einrichten der 2FA', en: 'Error setting up 2FA', es: 'Error al configurar la 2FA' }),
         variant: "destructive"
       });
@@ -118,7 +118,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
   const copySecret = () => {
     navigator.clipboard.writeText(secret);
     toast({
-      title: "Kopiert",
+      title: tx({ de: "Kopiert", en: "Copied", es: "Copiado" }),
       description: tx({ de: "Geheimer Schlüssel wurde kopiert", en: "Secret key was copied", es: "La clave secreta fue copiada" })
     });
   };
@@ -127,7 +127,7 @@ export const TwoFactorSetup = ({ open, onOpenChange, onSuccess }: TwoFactorSetup
     { id: 'intro', label: 'Start' },
     { id: 'qr', label: 'QR-Code' },
     { id: 'verify', label: 'Verifizieren' },
-    { id: 'success', label: 'Fertig' }
+    { id: 'success', label: tx({ de: 'Fertig', en: 'Ready', es: 'Listo' }) }
   ];
 
   const currentStepIndex = steps.findIndex(s => s.id === step);

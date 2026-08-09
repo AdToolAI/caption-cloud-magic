@@ -32,7 +32,7 @@ export function BrandShareExport({ brandKit, onTokenChange }: Props) {
       onTokenChange?.(data.token);
       toast({ title: "Share-Link erstellt", description: "Gültig 30 Tage." });
     } catch (e: any) {
-      toast({ title: "Fehler", description: e.message, variant: "destructive" });
+      toast({ title: tx({ de: "Fehler", en: "Mistake", es: "Error" }), description: e.message, variant: "destructive" });
     } finally {
       setSharing(false);
     }

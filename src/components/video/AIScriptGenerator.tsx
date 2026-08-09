@@ -63,7 +63,7 @@ export const AIScriptGenerator = ({ onGenerate, fieldLabel = 'Text', contentType
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Bitte beschreibe, worum es in deinem Video gehen soll', en: 'Please describe what your video should be about', es: 'Por favor describe de qué debería tratar tu vídeo.' }),
         variant: 'destructive'
       });
@@ -95,7 +95,7 @@ ${script.cta}`;
     } catch (error) {
       console.error('Script generation error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Script konnte nicht generiert werden', en: 'Script could not be generated', es: 'No se pudo generar el guion' }),
         variant: 'destructive'
       });

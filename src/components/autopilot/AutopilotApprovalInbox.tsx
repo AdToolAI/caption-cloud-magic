@@ -18,7 +18,7 @@ interface Props {
 const META: Record<string, { label: string; icon: typeof Bell; className: string }> = {
   autopilot_qa_review: { label: 'QA-Review', icon: AlertTriangle, className: 'text-amber-500 bg-amber-500/10' },
   autopilot_blocked: { label: 'Blockiert', icon: XCircle, className: 'text-destructive bg-destructive/10' },
-  autopilot_failed: { label: 'Fehler', icon: XCircle, className: 'text-destructive bg-destructive/10' },
+  autopilot_failed: { label: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }), icon: XCircle, className: 'text-destructive bg-destructive/10' },
   autopilot_posted: { label: 'Live', icon: Sparkles, className: 'text-emerald-500 bg-emerald-500/10' },
   autopilot_daily_digest: { label: 'Tagesübersicht', icon: CalIcon, className: 'text-primary bg-primary/10' },
   autopilot_strike: { label: 'Strike', icon: ShieldAlert, className: 'text-destructive bg-destructive/10' },

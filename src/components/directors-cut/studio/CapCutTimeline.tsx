@@ -338,7 +338,7 @@ const DraggableScene: React.FC<{
               className="cursor-pointer text-red-300 hover:bg-red-500/20 focus:bg-red-500/20"
             >
               <Trash2 className="h-3.5 w-3.5 mr-2" />
-              {t('dc.deleteScene') || 'Löschen'}
+              {t('dc.deleteScene') || tx({ de: 'Löschen', en: 'Delete', es: 'Borrar' })}
             </ContextMenuItem>
           </>
         )}

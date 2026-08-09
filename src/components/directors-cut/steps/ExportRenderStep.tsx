@@ -340,7 +340,7 @@ export function ExportRenderStep({
       return !Number.isFinite(start) || !Number.isFinite(end);
     });
     if (badScene >= 0) {
-      toast.error(tx({ de: tx({ de: `Scene ${badScene + 1} hat ungültige Zeit-Angaben. Bitte erneut analysieren.`, en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }), en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }));
+      toast.error(tx({ de: tx({ de: tx({ de: `Scene ${badScene + 1} hat ungültige Zeit-Angaben. Bitte erneut analysieren.`, en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }), en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }), en: `Scene ${badScene + 1} has invalid time specifications. Please analyze again.`, es: `La escena ${badScene + 1} tiene especificaciones de tiempo no válidas. Por favor, analiza de nuevo.` }));
       return;
     }
     if (!Number.isFinite(Number(videoDuration)) || Number(videoDuration) <= 0) {

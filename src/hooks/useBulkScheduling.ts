@@ -42,7 +42,7 @@ export function useBulkScheduling() {
     } catch (error: any) {
       console.error('Bulk schedule error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });

@@ -130,7 +130,7 @@ const BrandKit = () => {
 
     if (file.size > 5 * 1024 * 1024) {
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Datei muss kleiner als 5MB sein", en: "File must be smaller than 5MB", es: "El archivo debe ser menor de 5MB" }),
         variant: "destructive"
       });
@@ -164,7 +164,7 @@ const BrandKit = () => {
 
     if (!data.brandDescription && !data.brandName) {
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Bitte gib mindestens einen Markennamen oder Beschreibung ein", en: "Please enter at least a brand name or description", es: "Introduce al menos un nombre de marca o una descripción" }),
         variant: "destructive"
       });
@@ -257,7 +257,7 @@ const BrandKit = () => {
       }
       
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: errorDetails || errorMessage,
         variant: "destructive",
         duration: 10000,
@@ -316,7 +316,7 @@ const BrandKit = () => {
       });
     } catch (error) {
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Konnte nicht dupliziert werden", en: "Could not be duplicated", es: "No se pudo duplicar" }),
         variant: "destructive"
       });
@@ -328,7 +328,7 @@ const BrandKit = () => {
     setCopiedText(label);
     setTimeout(() => setCopiedText(""), 2000);
     toast({
-      title: "Kopiert!",
+      title: tx({ de: "Kopiert!", en: "Copied!", es: "¡Copiado!" }),
       description: `${label}: ${text}`
     });
   };

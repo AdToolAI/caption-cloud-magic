@@ -39,7 +39,7 @@ const COPY: Record<Lang, {
     ],
     retry: "Erneut versuchen",
     back: tx({ de: "Zurück zum Briefing", en: "Back to Briefing", es: "Volver al Briefing" }),
-    errorPrefix: "Fehler",
+    errorPrefix: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
     retryableHint: "Wiederholbar — KI-Dienst meldet temporäre Auslastung.",
   },
   en: {

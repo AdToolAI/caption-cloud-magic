@@ -80,14 +80,14 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
       if (data?.success) {
         toast({
           title: "✅ Batch-Generierung gestartet",
-          description: tx({ de: tx({ de: `${variations.length} Varianten werden erstellt. Kosten: ${data.totalCost} Credits`, en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }), en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }),
+          description: tx({ de: tx({ de: tx({ de: `${variations.length} Varianten werden erstellt. Kosten: ${data.totalCost} Credits`, en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }), en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }), en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }),
         });
         onOpenChange(false);
       }
     } catch (error) {
       console.error('Batch generation error:', error);
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Batch-Generierung fehlgeschlagen.", en: "Batch generation failed.", es: "Error en la generación del lote." }),
         variant: "destructive",
       });

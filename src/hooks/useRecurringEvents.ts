@@ -55,7 +55,7 @@ export function useRecurringEvents(workspace_id?: string) {
     },
     onError: (error: any) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });

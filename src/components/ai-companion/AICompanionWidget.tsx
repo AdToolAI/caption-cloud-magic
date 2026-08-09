@@ -137,7 +137,7 @@ export function AICompanionWidget() {
   // Add welcome message when first opened - include error context if detected
   useEffect(() => {
     if (isOpen && messages.length === 0 && user) {
-      let welcomeContent = tx({ de: tx({ de: `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features.`, en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` }), en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` });
+      let welcomeContent = tx({ de: tx({ de: tx({ de: `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features.`, en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` }), en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` }), en: `Hey! 👋 I'm ${preferences.bot_name}, your personal AdTool assistant. I'll help you with everything related to AdTool - from initial setup to advanced features.`, es: `¡Hola! 👋 Soy ${preferences.bot_name}, tu asistente personal de AdTool. Te ayudaré con todo lo relacionado con AdTool, desde la configuración inicial hasta las funciones avanzadas.` });
       
       // If we detected an error, include it in the welcome message
       if (detectedError) {
@@ -153,7 +153,7 @@ export function AICompanionWidget() {
           es: `\n\n⚠️ He detectado ${errorCount > 0 ? `${errorCount} problema${errorCount > 1 ? 's' : ''} crítico${errorCount > 1 ? 's' : ''}` : ''}${errorCount > 0 && warningCount > 0 ? ' y ' : ''}${warningCount > 0 ? `${warningCount} advertencia${warningCount > 1 ? 's' : ''}` : ''} en tu cuenta. ¿Quieres ver más detalles?`,
         });
       } else {
-        welcomeContent += tx({ de: tx({ de: ` Was kann ich für dich tun?`, en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` }), en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` });
+        welcomeContent += tx({ de: tx({ de: tx({ de: ` Was kann ich für dich tun?`, en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` }), en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` }), en: ` What can I do for you?`, es: `¿Qué puedo hacer por ti?` });
       }
       
       setMessages([{
@@ -270,7 +270,7 @@ export function AICompanionWidget() {
         setMessages(prev => [...prev, {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          content: tx({ de: tx({ de: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" gestartet! Folge den Schritten auf dem Bildschirm.`, en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }), en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }),
+          content: tx({ de: tx({ de: tx({ de: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" gestartet! Folge den Schritten auf dem Bildschirm.`, en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }), en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }), en: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" started! Follow the steps on the screen.`, es: `🎓 ¡Comenzó el tutorial "${TUTORIALES[tutorialId].name}"! Siga los pasos en la pantalla.` }),
           timestamp: new Date()
         }]);
       }
@@ -526,7 +526,7 @@ export function AICompanionWidget() {
     setMessages([{
       id: 'welcome',
       role: 'assistant',
-      content: tx({ de: tx({ de: `Hey! 👋 Neues Gespräch mit ${preferences.bot_name} gestartet. Was kann ich für dich tun?`, en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }), en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }),
+      content: tx({ de: tx({ de: tx({ de: `Hey! 👋 Neues Gespräch mit ${preferences.bot_name} gestartet. Was kann ich für dich tun?`, en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }), en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }), en: `Hey! 👋 New conversation started with ${preferences.bot_name}. What can I do for you?`, es: `¡Hola! 👋 Nueva conversación iniciada con ${preferences.bot_name}. ¿Qué puedo hacer por ti?` }),
       timestamp: new Date()
     }]);
   };

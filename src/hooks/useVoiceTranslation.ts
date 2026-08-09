@@ -33,14 +33,14 @@ export function useVoiceTranslation() {
 
       toast({
         title: 'Übersetzung & Voiceover erstellt',
-        description: tx({ de: tx({ de: `Text wurde nach ${params.target_language} übersetzt`, en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }), en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }),
+        description: tx({ de: tx({ de: tx({ de: `Text wurde nach ${params.target_language} übersetzt`, en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }), en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }), en: `Text translated to ${params.target_language}`, es: `Texto traducido a ${params.target_language}` }),
       });
 
       return data;
     } catch (error) {
       console.error('Error translating:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Übersetzung fehlgeschlagen', en: 'Translation failed', es: 'La traducción falló' }),
         variant: 'destructive',
       });

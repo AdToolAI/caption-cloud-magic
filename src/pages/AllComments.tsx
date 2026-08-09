@@ -114,7 +114,7 @@ const AllComments = () => {
         if (error) {
           console.error("Error creating project:", error);
           toast({
-            title: "Fehler",
+            title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
             description: tx({ de: "Projekt konnte nicht erstellt werden", en: "Project could not be created", es: "No se pudo crear el proyecto" }),
             variant: "destructive",
           });
@@ -160,7 +160,7 @@ const AllComments = () => {
       } catch (error) {
         console.error("Error fetching comments:", error);
         toast({
-          title: "Fehler",
+          title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
           description: tx({ de: "Kommentare konnten nicht geladen werden", en: "Could not load comments", es: "No se pudieron cargar los comentarios" }),
           variant: "destructive",
         });
@@ -231,7 +231,7 @@ const AllComments = () => {
     } catch (error) {
       console.error("Error updating status:", error);
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Status konnte nicht aktualisiert werden", en: "Could not update status", es: "No se pudo actualizar el estado" }),
         variant: "destructive",
       });

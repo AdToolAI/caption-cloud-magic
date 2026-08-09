@@ -52,7 +52,7 @@ export function GreenScreenChromaKey({
   const handleAIDetect = async () => {
     if (!videoUrl) {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Kein Video zum Analysieren vorhanden', en: 'No video available to analyze', es: 'No hay vídeo disponible para analizar' }),
         variant: 'destructive',
       });
@@ -88,7 +88,7 @@ export function GreenScreenChromaKey({
         
         toast({
           title: 'AI Erkennung abgeschlossen',
-          description: tx({ de: tx({ de: `${analysis.color_name || 'Farbe'} erkannt mit ${Math.round((analysis.confidence || 0.85) * 100)}% Konfidenz. (${data.credits_used || 3} Credits)`, en: `${analysis.color_name || 'Color'} detected with ${Math.round((analysis.confidence || 0.85) * 100)}% confidence. (${data.credits_used || 3} credits)`, es: `${análisis.color_name || 'Color'} detectado con ${Math.round((analysis.confidence || 0.85) * 100)}% de confianza. (${data.credits_used || 3} créditos)` }), en: `${analysis.color_name || 'Color'} detected with ${Math.round((analysis.confidence || 0.85) * 100)}% confidence. (${data.credits_used || 3} credits)`, es: `${análisis.color_name || 'Color'} detectado con ${Math.round((analysis.confidence || 0.85) * 100)}% de confianza. (${data.credits_used || 3} créditos)` }),
+          description: tx({ de: tx({ de: tx({ de: `${analysis.color_name || 'Farbe'} erkannt mit ${Math.round((analysis.confidence || 0.85) * 100)}% Konfidenz. (${data.credits_used || 3} Credits)`, en: `${analysis.color_name || 'Color'} detected with ${Math.round((analysis.confidence || 0.85) * 100)}% confidence. (${data.credits_used || 3} credits)`, es: `${análisis.color_name || 'Color'} detectado con ${Math.round((analysis.confidence || 0.85) * 100)}% de confianza. (${data.credits_used || 3} créditos)` }), en: `${analysis.color_name || 'Color'} detected with ${Math.round((analysis.confidence || 0.85) * 100)}% confidence. (${data.credits_used || 3} credits)`, es: `${análisis.color_name || 'Color'} detectado con ${Math.round((analysis.confidence || 0.85) * 100)}% de confianza. (${data.credits_used || 3} créditos)` }), en: `${analysis.color_name || 'Color'} detected with ${Math.round((analysis.confidence || 0.85) * 100)}% confidence. (${data.credits_used || 3} credits)`, es: `${análisis.color_name || 'Color'} detectado con ${Math.round((analysis.confidence || 0.85) * 100)}% de confianza. (${data.credits_used || 3} créditos)` }),
         });
       } else {
         throw new Error(tx({ de: 'Ungültige Antwort vom Server', en: 'Invalid response from server', es: 'Respuesta no válida del servidor' }));
@@ -96,7 +96,7 @@ export function GreenScreenChromaKey({
     } catch (err: any) {
       console.error('Chroma Key detection error:', err);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: err.message || tx({ de: 'AI Chroma-Key-Analyse fehlgeschlagen', en: 'AI chroma key analysis failed', es: 'El análisis de clave de croma de IA falló' }),
         variant: 'destructive',
       });

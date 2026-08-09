@@ -85,7 +85,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
 
         toast({
           title: 'AI Audio-Optimierung abgeschlossen',
-          description: tx({ de: tx({ de: `Audio-Settings wurden optimiert. (${data.credits_used || 3} Credits)`, en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }), en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }),
+          description: tx({ de: tx({ de: tx({ de: `Audio-Settings wurden optimiert. (${data.credits_used || 3} Credits)`, en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }), en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }), en: `Audio settings have been optimized. (${data.credits_used || 3} credits)`, es: `La configuración de audio se ha optimizado. (${data.credits_used || 3} créditos)` }),
         });
       } else {
         throw new Error(tx({ de: 'Ungültige Antwort vom Server', en: 'Invalid response from server', es: 'Respuesta no válida del servidor' }));
@@ -93,7 +93,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
     } catch (err: any) {
       console.error('Audio optimization error:', err);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: err.message || tx({ de: 'AI Audio-Analyse fehlgeschlagen', en: 'AI audio analysis failed', es: 'El análisis de audio de IA falló' }),
         variant: 'destructive',
       });

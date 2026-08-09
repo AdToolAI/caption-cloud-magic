@@ -57,13 +57,13 @@ export const ScriptEditor = ({
         onChange(data.optimizedText);
         toast({
           title: "✨ Optimiert!",
-          description: tx({ de: tx({ de: `Skript wurde ${label}.`, en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }), en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }),
+          description: tx({ de: tx({ de: tx({ de: `Skript wurde ${label}.`, en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }), en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }), en: `Script became ${label}.`, es: `El script se convirtió en ${label}.` }),
         });
       }
     } catch (error) {
       console.error('Optimization error:', error);
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Skript konnte nicht optimiert werden.", en: "Script could not be optimized.", es: "No se pudo optimizar el guion." }),
         variant: "destructive",
       });

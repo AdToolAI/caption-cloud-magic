@@ -157,7 +157,7 @@ export const useCloudStorage = () => {
     } catch (err) {
       console.error('Error disconnecting:', err);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Verbindung konnte nicht getrennt werden.', en: 'The connection could not be removed.', es: 'No se pudo desconectar.' }),
         variant: 'destructive',
       });
@@ -181,7 +181,7 @@ export const useCloudStorage = () => {
     } catch (err) {
       console.error('Error listing cloud files:', err);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Cloud-Dateien konnten nicht geladen werden.', en: 'Cloud files could not be loaded.', es: 'No se pudieron cargar los archivos en la nube.' }),
         variant: 'destructive',
       });
@@ -210,7 +210,7 @@ export const useCloudStorage = () => {
 
       toast({
         title: '☁️ In Cloud hochgeladen',
-        description: tx({ de: tx({ de: `${fileName} wurde in Google Drive gespeichert.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }), en: tx({ de: `${fileName} was saved to Google Drive.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }), es: `${fileName} se guardó en Google Drive.` }),
+        description: tx({ de: tx({ de: tx({ de: `${fileName} wurde in Google Drive gespeichert.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }), en: tx({ de: `${fileName} was saved to Google Drive.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }), es: `${fileName} se guardó en Google Drive.` }), en: tx({ de: tx({ de: `${fileName} was saved to Google Drive.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }), en: tx({ de: `${fileName} was saved to Google Drive.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }), es: `${fileName} se guardó en Google Drive.` }), es: `${fileName} se guardó en Google Drive.` }),
       });
 
       // Refresh file list
@@ -250,7 +250,7 @@ export const useCloudStorage = () => {
     } catch (err) {
       console.error('Error deleting from cloud:', err);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Datei konnte nicht gelöscht werden.', en: 'File could not be deleted.', es: 'No se pudo eliminar el archivo.' }),
         variant: 'destructive',
       });

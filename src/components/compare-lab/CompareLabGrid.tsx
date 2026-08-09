@@ -297,7 +297,7 @@ function OutputCard({
         {isFailed && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
             <AlertCircle className="h-6 w-6 text-destructive" />
-            <span className="text-xs text-muted-foreground">{output.error_message ?? 'Fehler'}</span>
+            <span className="text-xs text-muted-foreground">{output.error_message ?? tx({ de: 'Fehler', en: 'Mistake', es: 'Error' })}</span>
           </div>
         )}
         {output.video_url && (

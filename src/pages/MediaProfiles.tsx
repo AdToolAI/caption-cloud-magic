@@ -61,7 +61,7 @@ export default function MediaProfiles() {
 
     if (error || !data) {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Workspace konnte nicht geladen werden.', en: 'Workspace could not be loaded.', es: 'No se pudo cargar el workspace.' }),
         variant: 'destructive'
       });
@@ -89,7 +89,7 @@ export default function MediaProfiles() {
 
     if (error) {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Profile konnten nicht geladen werden.', en: 'Profiles could not be loaded.', es: 'No se pudieron cargar los perfiles.' }),
         variant: 'destructive'
       });
@@ -151,7 +151,7 @@ export default function MediaProfiles() {
 
     if (error) {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Profil konnte nicht dupliziert werden.', en: 'Profile could not be duplicated.', es: 'No se pudo duplicar el perfil.' }),
         variant: 'destructive'
       });
@@ -182,7 +182,7 @@ export default function MediaProfiles() {
 
     if (error) {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Standard konnte nicht gesetzt werden.', en: 'Default could not be set.', es: 'No se pudo establecer el valor predeterminado.' }),
         variant: 'destructive'
       });
@@ -205,7 +205,7 @@ export default function MediaProfiles() {
 
     if (error) {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: tx({ de: 'Profil konnte nicht gelöscht werden.', en: 'Profile could not be deleted.', es: 'No se pudo eliminar el perfil.' }),
         variant: 'destructive'
       });
@@ -310,7 +310,7 @@ export default function MediaProfiles() {
               <p className="text-muted-foreground mb-4">
                 {filterPlatform === 'all' 
                   ? tx({ de: 'Noch keine Profile vorhanden.', en: 'No profiles yet.', es: 'Aún no hay perfiles.' })
-                  : tx({ de: tx({ de: `Keine Profile für ${filterPlatform} gefunden.`, en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` }), en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` })
+                  : tx({ de: tx({ de: tx({ de: `Keine Profile für ${filterPlatform} gefunden.`, en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` }), en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` }), en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` })
                 }
               </p>
               <Button onClick={() => {
@@ -421,7 +421,7 @@ export default function MediaProfiles() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+              <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => deleteDialog.profileId && handleDelete(deleteDialog.profileId)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

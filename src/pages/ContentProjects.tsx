@@ -43,7 +43,7 @@ export default function ContentProjects() {
     const variants = {
       draft: { variant: "secondary" as const, icon: Clock, label: "Entwurf", className: "" },
       rendering: { variant: "default" as const, icon: RefreshCw, label: "Wird gerendert...", className: "" },
-      completed: { variant: "outline" as const, icon: CheckCircle2, label: "Fertig", className: "border-green-500 text-green-700" },
+      completed: { variant: "outline" as const, icon: CheckCircle2, label: tx({ de: "Fertig", en: "Ready", es: "Listo" }), className: "border-green-500 text-green-700" },
       failed: { variant: "destructive" as const, icon: XCircle, label: tx({ de: "Fehler", en: "Mistake", es: "Error" }), className: "" },
     };
 
@@ -117,7 +117,7 @@ export default function ContentProjects() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Fertig</CardDescription>
+              <CardDescription>{tx({ de: "Fertig", en: "Ready", es: "Listo" })}</CardDescription>
               <CardTitle className="text-3xl text-green-600">{statusCounts.completed}</CardTitle>
             </CardHeader>
           </Card>
@@ -224,7 +224,7 @@ export default function ContentProjects() {
                   <CardDescription>
                     {selectedStatus === "all"
                       ? tx({ de: "Erstelle dein erstes Video im Content Studio", en: "Create your first video in Content Studio", es: "Crea tu primer vídeo en Content Studio" })
-                      : tx({ de: tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
+                      : tx({ de: tx({ de: tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` }), en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>
                     Zum Content Studio

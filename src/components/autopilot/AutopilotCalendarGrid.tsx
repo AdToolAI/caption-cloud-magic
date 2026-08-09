@@ -26,7 +26,7 @@ const STATUS_META: Record<AutopilotSlot['status'], { label: string; className: s
   scheduled:  { label: 'Geplant',     className: 'bg-primary/20 text-primary border-primary/40',                  icon: CalendarIcon },
   posted:     { label: 'Live',        className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/40',      icon: CheckCircle2 },
   blocked:    { label: 'Blockiert',   className: 'bg-destructive/15 text-destructive border-destructive/40',      icon: Ban },
-  failed:     { label: 'Fehler',      className: 'bg-destructive/10 text-destructive border-destructive/30',      icon: AlertTriangle },
+  failed:     { label: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),      className: 'bg-destructive/10 text-destructive border-destructive/30',      icon: AlertTriangle },
   skipped:    { label: 'Übersprungen',className: 'bg-muted/60 text-muted-foreground border-border line-through',  icon: SkipForward },
 };
 

@@ -47,7 +47,7 @@ export const ThumbnailManager = ({
     } catch (error) {
       console.error('Error regenerating thumbnail:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Thumbnail konnte nicht generiert werden', en: 'Thumbnail could not be generated', es: 'No se pudo generar la miniatura' }),
         variant: 'destructive',
       });
@@ -92,7 +92,7 @@ export const ThumbnailManager = ({
     } catch (error) {
       console.error('Error uploading thumbnail:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Thumbnail konnte nicht hochgeladen werden', en: 'Thumbnail could not be uploaded', es: 'No se pudo subir la miniatura' }),
         variant: 'destructive',
       });

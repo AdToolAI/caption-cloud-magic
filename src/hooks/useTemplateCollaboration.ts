@@ -176,7 +176,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Kommentar konnte nicht hinzugefügt werden', en: 'Could not add comment', es: 'No se pudo añadir el comentario' }),
         variant: 'destructive',
       });
@@ -221,7 +221,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Freigabe konnte nicht beantragt werden', en: 'Could not request approval', es: 'No se pudo solicitar la aprobación' }),
         variant: 'destructive',
       });
@@ -259,7 +259,7 @@ export const useTemplateCollaboration = (templateId?: string) => {
     },
     onError: (error) => {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Freigabe konnte nicht aktualisiert werden', en: 'Could not update approval', es: 'No se pudo actualizar la aprobación' }),
         variant: 'destructive',
       });

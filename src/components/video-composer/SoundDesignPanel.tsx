@@ -97,7 +97,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
       await load();
       emitSceneAudioClipsChanged(projectId);
     } catch (e) {
-      toast({ title: 'Fehler', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }), description: (e as Error).message, variant: 'destructive' });
     } finally {
       setGenerating(false);
     }

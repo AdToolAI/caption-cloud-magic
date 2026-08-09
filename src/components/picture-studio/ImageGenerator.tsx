@@ -294,7 +294,7 @@ export function ImageGenerator() {
     }
 
     if (hasInsufficientCredits) {
-      toast.error(tx({ de: tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
+      toast.error(tx({ de: tx({ de: tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
       navigate('/ai-video-purchase-credits');
       return;
     }
@@ -363,7 +363,7 @@ export function ImageGenerator() {
     // Free tier (Gemini/Standard "Gratis im Abo") skips confirm.
     if (cost <= 0) { void runGenerate(); return; }
     if (hasInsufficientCredits) {
-      toast.error(tx({ de: tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
+      toast.error(tx({ de: tx({ de: tx({ de: `Nicht genügend AI Credits. Du brauchst ${currencySymbol}${cost.toFixed(2)}, hast aber nur ${currencySymbol}${balance.toFixed(2)}.`, en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }), en: `Not enough AI credits. You need ${currencySymbol}${cost.toFixed(2)}, but only have ${currencySymbol}${balance.toFixed(2)}.`, es: `No hay suficientes créditos de IA. Necesitas ${currencySymbol}${cost.toFixed(2)}, pero solo tienes ${currencySymbol}${balance.toFixed(2)}.` }));
       navigate('/ai-video-purchase-credits');
       return;
     }
@@ -407,7 +407,7 @@ export function ImageGenerator() {
             const key = imageId || imgUrl;
             setCiScores(prev => ({ ...prev, [key]: score }));
             if (score < 60) {
-              toast.warning(tx({ de: tx({ de: `CI-Match nur ${score}% — Bild weicht vom Markenstil ab`, en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }), en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }));
+              toast.warning(tx({ de: tx({ de: tx({ de: `CI-Match nur ${score}% — Bild weicht vom Markenstil ab`, en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }), en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }), en: `CI-Match only ${score}% — image deviates from brand style`, es: `CI-Match solo ${score}% — la imagen se desvía del estilo de marca` }));
             }
           })
           .catch(() => { /* silent */ });

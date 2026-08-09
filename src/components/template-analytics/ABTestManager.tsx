@@ -35,7 +35,7 @@ export function ABTestManager({ templateId }: ABTestManagerProps) {
   const handleCreateTest = async () => {
     if (!testName) {
       toast({
-        title: "Fehler",
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: "Bitte geben Sie einen Test-Namen ein", en: "Please enter a test name", es: "Por favor, introduce un nombre para la prueba" }),
         variant: "destructive",
       });

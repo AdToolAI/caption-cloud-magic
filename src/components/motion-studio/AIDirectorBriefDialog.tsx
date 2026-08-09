@@ -99,7 +99,7 @@ export default function AIDirectorBriefDialog({
     onOpenChange(false);
     setBrief('');
     setPlan(null);
-    toast.success(tx({ de: tx({ de: `Storyboard "${plan.title}" geladen — ${plan.scenes.length} Szenen ✨`, en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }));
+    toast.success(tx({ de: tx({ de: tx({ de: `Storyboard "${plan.title}" geladen — ${plan.scenes.length} Szenen ✨`, en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }), en: `Storyboard "${plan.title}" loaded — ${plan.scenes.length} Scenes ✨`, es: `Guión gráfico "${plan.title}" cargado — ${plan.scenes.length} Escenas ✨` }));
   };
 
   return (

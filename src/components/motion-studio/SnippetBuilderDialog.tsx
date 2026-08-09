@@ -144,7 +144,7 @@ export default function SnippetBuilderDialog({
           toast.success('Vorschau gesetzt');
         }
       } catch (e: any) {
-        toast.error(tx({ de: tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }));
+        toast.error(tx({ de: tx({ de: tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }));
       } finally {
         setUploading(false);
       }
@@ -411,7 +411,7 @@ export default function SnippetBuilderDialog({
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            {isEdit ? 'Speichern' : 'Snippet anlegen'}
+            {isEdit ? tx({ de: 'Speichern', en: 'Save', es: 'Ahorrar' }) : 'Snippet anlegen'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -832,7 +832,7 @@ export default function AITextStudio() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
             <Button
               variant="outline"
               onClick={() => branchPrompt && createBranch(branchPrompt.targetModel, false)}

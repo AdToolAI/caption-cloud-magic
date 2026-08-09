@@ -55,7 +55,7 @@ export const useVideoCreation = () => {
     } catch (error) {
       console.error('Video creation error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Video konnte nicht erstellt werden', en: 'Video could not be created', es: 'No se pudo crear el video' }),
         variant: 'destructive'
       });

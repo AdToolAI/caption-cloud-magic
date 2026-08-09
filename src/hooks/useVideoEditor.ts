@@ -56,7 +56,7 @@ export const useVideoEditor = () => {
 
       toast({
         title: tx({ de: 'Neue Version wird erstellt', en: 'New version is being created', es: 'Se está creando una nueva versión' }),
-        description: tx({ de: tx({ de: `Version ${newVersionNumber} wird jetzt gerendert. Das dauert einige Minuten.`, en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` }), en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` })
+        description: tx({ de: tx({ de: tx({ de: `Version ${newVersionNumber} wird jetzt gerendert. Das dauert einige Minuten.`, en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` }), en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` }), en: `Version ${newVersionNumber} is now rendering. This will take a few minutes.`, es: `La versión ${newVersionNumber} se está renderizando ahora. Esto tardará unos minutos.` })
       });
 
       // Invalidate queries to refresh the list
@@ -69,7 +69,7 @@ export const useVideoEditor = () => {
     } catch (error) {
       console.error('Video edit error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Video konnte nicht bearbeitet werden', en: 'Video could not be edited', es: 'No se pudo editar el video' }),
         variant: 'destructive'
       });

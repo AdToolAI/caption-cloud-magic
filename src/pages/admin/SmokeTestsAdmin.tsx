@@ -94,7 +94,7 @@ export function SmokeTestsAdmin() {
       );
       await load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Fehler');
+      toast.error(e instanceof Error ? e.message : tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }));
     } finally {
       setRunning(false);
     }

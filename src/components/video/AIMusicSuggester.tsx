@@ -45,7 +45,7 @@ export const AIMusicSuggester = ({ onSelect }: AIMusicSuggesterProps) => {
     } catch (error) {
       console.error('Music suggestion error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Musik-Vorschläge konnten nicht generiert werden', en: 'Music suggestions could not be generated', es: 'No se pudieron generar sugerencias musicales' }),
         variant: 'destructive'
       });

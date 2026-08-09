@@ -180,7 +180,7 @@ export default function PipelineProgressBar({
               </span>
             )}
             <span className={cn('tabular-nums', hasFailure ? 'text-destructive' : 'text-foreground')}>
-              {hasFailure ? 'Fehler' : `${overallPercent}%`}
+              {hasFailure ? tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }) : `${overallPercent}%`}
             </span>
             <span className="text-muted-foreground/70 tabular-nums hidden sm:inline">
               {hasFailure ? 'Lip-Sync abgebrochen' : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}

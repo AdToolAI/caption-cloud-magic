@@ -31,7 +31,7 @@ export function useCalendarApprovals() {
     } catch (error: any) {
       console.error('Request approval error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });
@@ -59,7 +59,7 @@ export function useCalendarApprovals() {
     } catch (error: any) {
       console.error('Approve error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });
@@ -87,7 +87,7 @@ export function useCalendarApprovals() {
     } catch (error: any) {
       console.error('Reject error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error.message,
         variant: 'destructive',
       });

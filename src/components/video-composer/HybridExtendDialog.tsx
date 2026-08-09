@@ -113,7 +113,7 @@ const T = {
     prompt: 'Regie-Anweisung',
     promptPh: tx({ de: 'Action! In dieser Szene …', en: 'Action! In this scene...', es: '¡Acción! En esta escena...' }),
     cost: 'Drehbudget',
-    cancel: 'Abbrechen',
+    cancel: tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' }),
     action: tx({ de: 'Action! — Szene drehen', en: 'Action! — Shooting a scene', es: '¡Acción! — Filmar una escena' }),
     rolling: 'Kamera läuft …',
   },

@@ -48,7 +48,7 @@ export function useTalkingHead() {
     } catch (error) {
       console.error('[useTalkingHead] Error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Mistake', es: 'Error' }),
         description: error instanceof Error ? error.message : tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }),
         variant: 'destructive',
       });
