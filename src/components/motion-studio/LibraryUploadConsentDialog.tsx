@@ -156,7 +156,7 @@ export default function LibraryUploadConsentDialog({
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleCancel}>Abbrechen</AlertDialogCancel>
+          <AlertDialogCancel onClick={handleCancel}>{tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleAccept}
             disabled={!allChecked || submitting}

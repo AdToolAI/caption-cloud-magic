@@ -128,7 +128,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Integrationen werden geladen...</div>;
+    return <div className="text-center py-8">{tx({ de: "Integrationen werden geladen...", en: "Loading integrations...", es: "Cargando integraciones..." })}</div>;
   }
 
   return (
@@ -140,7 +140,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
         </TabsTrigger>
         <TabsTrigger value="notifications" className="gap-2">
           <MessageSquare className="w-4 h-4" />
-          Benachrichtigungen
+          {tx({ de: "Benachrichtigungen", en: "Notifications", es: "Notificaciones" })}
         </TabsTrigger>
       </TabsList>
 
@@ -156,11 +156,11 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
               </div>
               {googleVerbunden ? (
                 <Badge variant="default" className="gap-2">
-                  Verbunden
+                  {tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}
                 </Badge>
               ) : (
                 <Badge variant="outline" className="gap-2">
-                  Not Verbunden
+                  {tx({ de: "Nicht verbunden", en: "Not connected", es: "No conectado" })}
                 </Badge>
               )}
             </div>
@@ -174,20 +174,20 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
             ) : (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Sync-Richtung</label>
+                  <label className="text-sm font-medium">{tx({ de: "Sync-Richtung", en: "Sync direction", es: "Dirección de sincronización" })}</label>
                   <Select value={syncDirection} onValueChange={handleSyncDirectionChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="push">
-                        Nur Push (Kalender → Google)
+                        {tx({ de: "Nur Push (Kalender → Google)", en: "Push only (Calendar → Google)", es: "Solo push (Calendario → Google)" })}
                       </SelectItem>
                       <SelectItem value="pull">
-                        Nur Pull (Google → Kalender)
+                        {tx({ de: "Nur Pull (Google → Kalender)", en: "Pull only (Google → Calendar)", es: "Solo pull (Google → Calendario)" })}
                       </SelectItem>
                       <SelectItem value="two_way">
-                        Zwei-Wege-Sync
+                        {tx({ de: "Zwei-Wege-Sync", en: "Two-way sync", es: "Sincronización bidireccional" })}
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -208,7 +208,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
                     onClick={handleTrennenGoogle}
                   >
                     <Link2Off className="w-4 h-4 mr-2" />
-                    Trennen
+                    {tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}
                   </Button>
                 </div>
               </>

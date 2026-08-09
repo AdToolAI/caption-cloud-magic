@@ -117,7 +117,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
           </ul>
         </LegalSection>
 
-        <LegalSection title="7. Ihre Rechte (Art. 15-22 DSGVO)" icon="shield" index={6}>
+        <LegalSection title={tx({ de: "7. Ihre Rechte (Art. 15-22 DSGVO)", en: "7. Your Rights (Art. 15-22 GDPR)", es: "7. Sus derechos (Art. 15-22 RGPD)" })} icon="shield" index={6}>
           <div className="space-y-3">
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <h4 className="font-semibold text-foreground">Auskunftsrecht (Art. 15)</h4>
@@ -149,7 +149,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li>Authentifizierung: Supabase Auth Token</li>
                 <li>Spracheinstellung: Browser-Locale</li>
-                <li>Cookie-Consent: Ihre Cookie-Präferenzen</li>
+                <li>{tx({ de: "Cookie-Consent: Ihre Cookie-Präferenzen", en: "Cookie consent: your cookie preferences", es: "Consentimiento de cookies: sus preferencias de cookies" })}</li>
               </ul>
             </div>
             <div>

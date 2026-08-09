@@ -88,7 +88,7 @@ export default function LocationEditor({
         return;
       }
       if (file.size > MAX_BYTES) {
-        toast.error(`Datei zu groß (max 20 MB).`);
+        toast.error(tx({ de: 'Datei zu groß (max 20 MB).', en: 'File too large (max 20 MB).', es: 'Archivo demasiado grande (máx. 20 MB).' }));
         return;
       }
       if (!hasConsent) {
@@ -158,7 +158,7 @@ export default function LocationEditor({
             {location ? tx({ de: 'Location bearbeiten', en: 'Edit Location', es: 'Editar ubicación' }) : tx({ de: 'Neue Location anlegen', en: 'Create New Location', es: 'Crear nueva ubicación' })}
           </DialogTitle>
           <DialogDescription>
-            Schauplätze einmal definieren — in jedem Projekt wiederverwenden.
+            {tx({ de: 'Schauplätze einmal definieren — in jedem Projekt wiederverwenden.', en: 'Define locations once — reuse them in every project.', es: 'Define escenarios una vez y reutilízalos en cada proyecto.' })}
           </DialogDescription>
         </DialogHeader>
 
@@ -167,30 +167,28 @@ export default function LocationEditor({
             <div className="flex gap-2.5">
               <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Lade ein echtes Foto deiner Location hoch — die KI orientiert sich daran und
-                hält Schauplätze über mehrere Szenen visuell konsistent.
+                {tx({ de: 'Lade ein echtes Foto deiner Location hoch — die KI orientiert sich daran und hält Schauplätze über mehrere Szenen visuell konsistent.', en: 'Upload a real photo of your location — the AI uses it as a reference and keeps locations visually consistent across multiple scenes.', es: 'Sube una foto real de tu ubicación: la IA la usa como referencia y mantiene los escenarios visualmente consistentes en varias escenas.' })}
               </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Name *</Label>
+            <Label className="text-xs">{tx({ de: "Name *", en: "Name *", es: "Nombre *" })}</Label>
             <Input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              placeholder="z. B. Mein Wohnzimmer, Tokyo Skyline"
+              placeholder={tx({ de: "z. B. Mein Wohnzimmer, Tokyo Skyline", en: "e.g. My living room, Tokyo Skyline", es: "ej. Mi salón, Tokyo Skyline" })}
               className="bg-background/60"
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs">Referenzbild (optional)</Label>
+            <Label className="text-xs">{tx({ de: "Referenzbild (optional)", en: "Reference image (optional)", es: "Imagen de referencia (opcional)" })}</Label>
             {!hasConsent && !location && (
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
                 <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Beim ersten Upload bestätigst du einmalig die Bildrechte. Danach läuft jeder
-                  weitere Upload ohne Rückfrage.
+                  {tx({ de: 'Beim ersten Upload bestätigst du einmalig die Bildrechte. Danach läuft jeder weitere Upload ohne Rückfrage.', en: 'On your first upload you confirm the image rights once. After that, every further upload runs without confirmation.', es: 'En la primera carga confirmas una vez los derechos de imagen. Después, cada carga adicional se realiza sin confirmación.' })}
                 </p>
               </div>
             )}
@@ -203,7 +201,7 @@ export default function LocationEditor({
                 />
                 <div className="flex-1 space-y-2">
                   <p className="text-[11px] text-muted-foreground">
-                    Wird als visuelle Referenz an die KI übergeben.
+                    {tx({ de: 'Wird als visuelle Referenz an die KI übergeben.', en: 'Will be passed to the AI as a visual reference.', es: 'Se pasará a la IA como referencia visual.' })}
                   </p>
                   <Button
                     variant="ghost"
@@ -212,7 +210,7 @@ export default function LocationEditor({
                     onClick={() => setDraft((d) => ({ ...d, reference_image_url: null }))}
                   >
                     <X className="h-3 w-3 mr-1" />
-                    Entfernen
+                    {tx({ de: 'Entfernen', en: 'Remove', es: 'Eliminar' })}
                   </Button>
                 </div>
               </div>
@@ -230,7 +228,7 @@ export default function LocationEditor({
                 />
                 {uploading ? (
                   <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Lädt hoch...
+                    <Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: 'Lädt hoch...', en: 'Uploading...', es: 'Cargando...' })}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-xs">
@@ -250,7 +248,7 @@ export default function LocationEditor({
           )}
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Beschreibung (Englisch empfohlen) *</Label>
+            <Label className="text-xs">{tx({ de: "Beschreibung (Englisch empfohlen) *", en: "Description (English recommended) *", es: "Descripción (se recomienda inglés) *" })}</Label>
             <Textarea
               value={draft.description}
               onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
@@ -261,7 +259,7 @@ export default function LocationEditor({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Lichtstimmung (optional)</Label>
+            <Label className="text-xs">{tx({ de: "Lichtstimmung (optional)", en: "Lighting mood (optional)", es: "Ambiente de luz (opcional)" })}</Label>
             <Input
               value={draft.lighting_notes}
               onChange={(e) => setDraft((d) => ({ ...d, lighting_notes: e.target.value }))}
@@ -271,7 +269,7 @@ export default function LocationEditor({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Tags</Label>
+            <Label className="text-xs">{tx({ de: "Tags", en: "Tags", es: "Etiquetas" })}</Label>
             <div className="flex gap-2">
               <Input
                 value={tagInput}
@@ -282,11 +280,11 @@ export default function LocationEditor({
                     addTag();
                   }
                 }}
-                placeholder="z. B. interior, outdoor, studio"
+                placeholder={tx({ de: "z. B. interior, outdoor, studio", en: "e.g. interior, outdoor, studio", es: "ej. interior, exterior, estudio" })}
                 className="bg-background/60 text-sm"
               />
               <Button variant="outline" size="sm" onClick={addTag}>
-                Hinzufügen
+                {tx({ de: 'Hinzufügen', en: 'Add', es: 'Añadir' })}
               </Button>
             </div>
             {draft.tags.length > 0 && (
@@ -309,7 +307,7 @@ export default function LocationEditor({
 
         <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Abbrechen
+            {tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}

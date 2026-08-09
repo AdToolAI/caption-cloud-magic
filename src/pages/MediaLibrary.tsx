@@ -389,7 +389,7 @@ export default function MediaLibrary() {
             : isDirectorCutEnhancement
               ? `Director's Cut · Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
               : isDirectorsCut
-                ? 'Exportiert mit Universal Director\'s Cut'
+                ? tx({ de: "Exportiert mit Universal Director's Cut", en: "Exported with Universal Director's Cut", es: "Exportado con Universal Director's Cut" })
                 : isMotionStudioClip
                   ? `${motionModel} · ${metadata?.duration_seconds ?? '?'}s${metadata?.prompt ? ` · ${String(metadata.prompt).slice(0, 50)}…` : ''}`
                   : isUniversalCreator
@@ -1429,7 +1429,7 @@ export default function MediaLibrary() {
           <div className="text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-lg font-medium mb-2">{tx({ de: "Keine Medien gefunden", en: "No media found", es: "No se encontraron medios" })}</p>
-            <p className="text-sm text-muted-foreground mb-4">Laden Sie Ihre ersten Dateien hoch</p>
+            <p className="text-sm text-muted-foreground mb-4">{tx({ de: "Laden Sie Ihre ersten Dateien hoch", en: "Upload your first files", es: "Sube tus primeros archivos" })}</p>
             <Button asChild>
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />

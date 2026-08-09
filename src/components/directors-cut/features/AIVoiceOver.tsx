@@ -444,7 +444,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
               {generatedUrl ? (
                 <>{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}{isPlaying ? 'Pause' : 'Abspielen'}</>
               ) : (
-                <><Play className="h-4 w-4" />Vorschau</>
+                <><Play className="h-4 w-4" />{tx({ de: 'Vorschau', en: 'Preview', es: 'Vista previa' })}</>
               )}
             </Button>
             <Button onClick={handleGenerate} disabled={isGenerating || !settings.scriptText} className="flex-1 gap-2">

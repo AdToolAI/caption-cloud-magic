@@ -126,7 +126,7 @@ export function AISuperuserAdmin() {
         metadata: { source: 'ai_superuser', run_id: run.id, scenario: run.scenario_name },
       });
       if (error) throw error;
-      toast.success('Bug-Report erstellt');
+      toast.success(tx({ de: 'Bug-Report erstellt', en: 'Bug report created', es: 'Informe de error creado' }));
     } catch (err) {
       toast.error(tx({ de: `Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`, en: `Error: ${err instanceof Error ? err.message: 'Unknown'}`, es: `Error: ${err instanceof Error ? err.message : 'Desconocido'}` }));
     } finally {
@@ -224,7 +224,7 @@ export function AISuperuserAdmin() {
   }, null);
 
   const trimHistory = async () => {
-    if (!confirm('Historie kürzen? Behält die letzten 5 Runs pro Szenario, löscht den Rest.')) return;
+    if (!confirm(tx({ de: 'Historie kürzen? Behält die letzten 5 Runs pro Szenario, löscht den Rest.', en: 'Trim history? Keeps the last 5 runs per scenario, deletes the rest.', es: '¿Recortar historial? Conserva las últimas 5 ejecuciones por escenario, elimina el resto.' }))) return;
     const { data, error } = await supabase.rpc('cleanup_superuser_runs', { keep_per_scenario: 5 });
     if (error) {
       toast.error(tx({ de: `Fehler: ${error.message}`, en: `Error: ${error.message}`, es: `Error: ${error.message}` }));
@@ -234,7 +234,7 @@ export function AISuperuserAdmin() {
     if (count === 0) {
       toast.success(tx({ de: 'Keine Runs zum Löschen — bereits sauber', en: 'No runs to delete — already clean', es: 'No hay ejecuciones para eliminar, ya está limpio' }));
     } else {
-      toast.success(`${count} Run${count === 1 ? '' : 's'} gelöscht`);
+      toast.success(tx({ de: `${count} Run${count === 1 ? '' : 's'} gelöscht`, en: `${count} run${count === 1 ? '' : 's'} deleted`, es: `${count} ejecución(es) eliminada(s)` }));
     }
     await fetchData();
   };
@@ -250,7 +250,7 @@ export function AISuperuserAdmin() {
     if (count === 0) {
       toast.success(tx({ de: 'Keine Runs zum Löschen — bereits sauber', en: 'No runs to delete — already clean', es: 'No hay ejecuciones para eliminar, ya está limpio' }));
     } else {
-      toast.success(`${count} Run${count === 1 ? '' : 's'} gelöscht — Pass-Rate zurückgesetzt`);
+      toast.success(tx({ de: `${count} Run${count === 1 ? '' : 's'} gelöscht — Pass-Rate zurückgesetzt`, en: `${count} run${count === 1 ? '' : 's'} deleted — pass rate reset`, es: `${count} ejecución(es) eliminada(s) — tasa de aprobación restablecida` }));
     }
     await fetchData();
   };
@@ -294,11 +294,11 @@ export function AISuperuserAdmin() {
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             Komplett-Test
           </Button>
-          <Button onClick={trimHistory} variant="ghost" size="sm" title="Behält die letzten 5 Runs pro Szenario">
+          <Button onClick={trimHistory} variant="ghost" size="sm" title={tx({ de: "Behält die letzten 5 Runs pro Szenario", en: "Keeps the last 5 runs per scenario", es: "Conserva las últimas 5 ejecuciones por escenario" })}>
             {tx({ de: "Historie kürzen (letzte 5 behalten)", en: "Trim history (keep last 5)", es: "Recortar historial (mantener últimos 5)" })}
           </Button>
           <Button onClick={resetPassRateHistory} variant="ghost" size="sm" title={tx({ de: "Behält nur den letzten Run pro Szenario — Pass-Rate startet sofort bei 100% wenn grün", en: "Only keeps the last run per scenario — pass rate immediately starts at 100% when green", es: "Solo mantiene la última ejecución por escenario; la tasa de aprobación comienza inmediatamente al 100 % cuando está verde" })}>
-            Komplett zurücksetzen (nur letzten Run behalten)
+            {tx({ de: 'Komplett zurücksetzen (nur letzten Run behalten)', en: 'Reset completely (keep only last run)', es: 'Restablecer completamente (mantener solo la última ejecución)' })}
           </Button>
         </div>
       </div>
@@ -424,7 +424,7 @@ export function AISuperuserAdmin() {
                 <TableHead>Szenario</TableHead>
                 <TableHead>Letzter Run</TableHead>
                 <TableHead>Pass-Rate</TableHead>
-                <TableHead title={tx({ de: "Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal.", en: "True Edge Function latency including AI model response time. 5–10s are normal for image/multi-step generation.", es: "Latencia real de Edge Function, incluido el tiempo de respuesta del modelo de IA. 5–10 s son normales para la generación de imágenes/varios pasos." })}>Latenz</TableHead>
+                <TableHead title={tx({ de: "Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal.", en: "True Edge Function latency including AI model response time. 5–10s are normal for image/multi-step generation.", es: "Latencia real de Edge Function, incluido el tiempo de respuesta del modelo de IA. 5–10 s son normales para la generación de imágenes/varios pasos." })}>{tx({ de: "Latenz", en: "Latency", es: "Latencia" })}</TableHead>
                 <TableHead>Runs</TableHead>
                 <TableHead></TableHead>
               </TableRow>

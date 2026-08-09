@@ -317,14 +317,14 @@ function ActivationToggle({
 
 function ToolsPanel() {
   const tools = [
-    { name: 'Video Composer', desc: tx({ de: 'Mehrszenige AI-Videos mit konsistenten Charakteren', en: 'Multi-scene AI videos with consistent characters', es: 'Vídeos de IA de múltiples escenas con personajes consistentes' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
-    { name: 'Picture Studio', desc: tx({ de: 'AI-Bilder, Magic Edit, Style-Reference, Brand-Kit', en: 'AI images, magic edit, style reference, brand kit', es: 'Imágenes AI, edición mágica, referencia de estilo, kit de marca' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
-    { name: 'Music Studio', desc: tx({ de: "Hintergrundmusik via Stable Audio + MiniMax", en: "Background music via Stable Audio + MiniMax", es: "Música de fondo a través de Stable Audio + MiniMax" }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
-    { name: 'Talking Head Avatare', desc: tx({ de: 'Lippensynchrone Avatar-Videos mit Stimme', en: 'Lip-sync avatar videos with voice', es: 'Vídeos de avatares con sincronización labial y voz' }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
-    { name: 'Trend Radar', desc: tx({ de: 'Lokalisierte Trends, alle 5 Stunden aktualisiert', en: 'Localized trends, updated every 5 hours', es: 'Tendencias localizadas, actualizadas cada 5 horas.' }), status: tx({ de: 'live', en: 'live', es: 'en vivo' }) },
-    { name: 'Posting Berater', desc: tx({ de: "Optimale Veröffentlichungszeiten pro Plattform/Sprache", en: "Optimal posting times per platform/language", es: "Tiempos de publicación óptimos por plataforma/idioma" }), status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
-    { name: 'KI-QA-Gate', desc: tx({ de: 'Vision-Check auf Brand-CI, Copyright, Deepfakes', en: 'Vision check for brand CI, copyright, deepfakes', es: 'Verificación de visión para CI de marca, derechos de autor y deepfakes' }), status: tx({ de: 'aktiv', en: 'active', es: 'activo' }) },
-    { name: 'Performance-Loop', desc: tx({ de: "Lernende Optimierung — kommt in Stufe 2", en: "Learning optimization — coming in Stage 2", es: "Optimización del aprendizaje: llegará en la Etapa 2" }), status: tx({ de: 'geplant', en: 'planned', es: 'planificado' }) },
+    { name: 'Video Composer', desc: tx({ de: 'Mehrszenige AI-Videos mit konsistenten Charakteren', en: 'Multi-scene AI videos with consistent characters', es: 'Vídeos de IA de múltiples escenas con personajes consistentes' }), statusKey: 'available', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Picture Studio', desc: tx({ de: 'AI-Bilder, Magic Edit, Style-Reference, Brand-Kit', en: 'AI images, magic edit, style reference, brand kit', es: 'Imágenes AI, edición mágica, referencia de estilo, kit de marca' }), statusKey: 'available', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Music Studio', desc: tx({ de: "Hintergrundmusik via Stable Audio + MiniMax", en: "Background music via Stable Audio + MiniMax", es: "Música de fondo a través de Stable Audio + MiniMax" }), statusKey: 'available', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Talking Head Avatare', desc: tx({ de: 'Lippensynchrone Avatar-Videos mit Stimme', en: 'Lip-sync avatar videos with voice', es: 'Vídeos de avatares con sincronización labial y voz' }), statusKey: 'available', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'Trend Radar', desc: tx({ de: 'Lokalisierte Trends, alle 5 Stunden aktualisiert', en: 'Localized trends, updated every 5 hours', es: 'Tendencias localizadas, actualizadas cada 5 horas.' }), statusKey: 'live', status: tx({ de: 'live', en: 'live', es: 'en vivo' }) },
+    { name: 'Posting Berater', desc: tx({ de: "Optimale Veröffentlichungszeiten pro Plattform/Sprache", en: "Optimal posting times per platform/language", es: "Tiempos de publicación óptimos por plataforma/idioma" }), statusKey: 'available', status: tx({ de: 'verfügbar', en: 'available', es: 'disponible' }) },
+    { name: 'KI-QA-Gate', desc: tx({ de: 'Vision-Check auf Brand-CI, Copyright, Deepfakes', en: 'Vision check for brand CI, copyright, deepfakes', es: 'Verificación de visión para CI de marca, derechos de autor y deepfakes' }), statusKey: 'active', status: tx({ de: 'aktiv', en: 'active', es: 'activo' }) },
+    { name: 'Performance-Loop', desc: tx({ de: "Lernende Optimierung — kommt in Stufe 2", en: "Learning optimization — coming in Stage 2", es: "Optimización del aprendizaje: llegará en la Etapa 2" }), statusKey: 'planned', status: tx({ de: 'geplant', en: 'planned', es: 'planificado' }) },
   ];
   return (
     <div className="grid md:grid-cols-2 gap-3">
@@ -332,8 +332,8 @@ function ToolsPanel() {
         <Card key={t.name} className="p-3 flex items-start gap-3">
           <span className={cn(
             'h-2 w-2 rounded-full mt-1.5 shrink-0',
-            t.status === 'aktiv' || t.status === 'live' ? 'bg-emerald-500 shadow-[0_0_6px_rgb(16,185,129)]'
-            : t.status === 'verfügbar' ? 'bg-primary'
+            t.statusKey === 'active' || t.statusKey === 'live' ? 'bg-emerald-500 shadow-[0_0_6px_rgb(16,185,129)]'
+            : t.statusKey === 'available' ? 'bg-primary'
             : 'bg-muted-foreground/40',
           )} />
           <div className="flex-1 min-w-0">

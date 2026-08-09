@@ -31,7 +31,7 @@ export interface GenreRecipe {
 export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   ad_spot: {
     id: 'ad_spot',
-    label: 'Werbespot',
+    label: tx({ de: 'Werbespot', en: 'Ad spot', es: 'Anuncio' }),
     description: tx({ de: 'Klassischer Spot: Problem sichtbar machen, Lösung zeigen, Beweis liefern, Handlungsaufruf.', en: 'Classic spot: Make the problem visible, show the solution, provide evidence, call to action.', es: 'Spot clásico: Visibilizar el problema, mostrar la solución, aportar evidencia, llamado a la acción.' }),
     beats: ['hook', 'problem', 'reveal', 'proof', 'benefit', 'cta'],
     shotLadder: ['close_up', 'medium', 'wide', 'insert', 'medium_close', 'medium'],
@@ -43,7 +43,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   },
   product_demo: {
     id: 'product_demo',
-    label: 'Produktvideo',
+    label: tx({ de: 'Produktvideo', en: 'Product video', es: 'Video de producto' }),
     description: tx({ de: 'Das Produkt im Mittelpunkt: Kontext, Feature, Nutzen, Detail, Abbinder.', en: 'The product at the center: context, feature, benefit, detail, final card.', es: 'El producto en el centro: contexto, característica, beneficio, detalle, cierre.' }),
     beats: ['hook', 'reveal', 'benefit', 'proof', 'cta'],
     shotLadder: ['extreme_close_up', 'medium', 'insert', 'close_up', 'wide'],
@@ -55,7 +55,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   },
   corporate: {
     id: 'corporate',
-    label: 'Unternehmensvideo',
+    label: tx({ de: 'Unternehmensvideo', en: 'Corporate video', es: 'Video corporativo' }),
     description: tx({ de: 'Haltung und Menschen: Wer wir sind, wofür wir stehen, was wir bewegen.', en: 'Attitude and People: Who we are, what we stand for, what we achieve.', es: 'Actitud y personas: Quiénes somos, qué defendemos, qué logramos.' }),
     beats: ['hook', 'emotion', 'proof', 'benefit', 'cta'],
     shotLadder: ['wide', 'medium_close', 'over_shoulder', 'medium', 'wide'],
@@ -67,7 +67,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   },
   storytelling: {
     id: 'storytelling',
-    label: 'Storytelling',
+    label: tx({ de: 'Storytelling', en: 'Storytelling', es: 'Narrativa' }),
     description: tx({ de: 'Erzählbogen: Figur, Konflikt, Wendepunkt, Auflösung.', en: 'Narrative arc: character, conflict, turning point, resolution.', es: 'Arco narrativo: personaje, conflicto, punto de giro, resolución.' }),
     beats: ['hook', 'problem', 'emotion', 'reveal', 'benefit', 'cta'],
     shotLadder: ['extreme_wide', 'medium_close', 'close_up', 'wide', 'medium', 'medium_close'],
@@ -79,7 +79,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   },
   testimonial: {
     id: 'testimonial',
-    label: 'Testimonial',
+    label: tx({ de: 'Testimonial', en: 'Testimonial', es: 'Testimonio' }),
     description: tx({ de: 'Eine Person, eine ehrliche Aussage, unterlegt mit Belegbildern.', en: 'One person, one honest statement, supported by evidence images.', es: 'Una persona, una declaración honesta, respaldada por imágenes de prueba.' }),
     beats: ['hook', 'problem', 'proof', 'benefit', 'cta'],
     shotLadder: ['medium_close', 'medium_close', 'insert', 'medium_close', 'medium'],
@@ -91,7 +91,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   },
   explainer: {
     id: 'explainer',
-    label: 'Erklärvideo',
+    label: tx({ de: 'Erklärvideo', en: 'Explainer video', es: 'Video explicativo' }),
     description: tx({ de: 'Schritt für Schritt: Ausgangslage, Vorgehen, Ergebnis.', en: 'Step by step: initial situation, procedure, result.', es: 'Paso a paso: situación inicial, procedimiento, resultado.' }),
     beats: ['hook', 'problem', 'reveal', 'proof', 'cta'],
     shotLadder: ['medium', 'wide', 'insert', 'medium', 'wide'],
@@ -103,7 +103,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   },
   social_hook: {
     id: 'social_hook',
-    label: 'Social Hook',
+    label: tx({ de: 'Social Hook', en: 'Social hook', es: 'Gancho social' }),
     description: tx({ de: 'Maximal kurz, maximal auffällig — für Reels, Shorts und TikTok.', en: 'As short as possible, as striking as possible — for Reels, Shorts, and TikTok.', es: 'Lo más corto posible, lo más llamativo posible — para Reels, Shorts y TikTok.' }),
     beats: ['hook', 'reveal', 'benefit', 'cta'],
     shotLadder: ['extreme_close_up', 'medium', 'insert', 'medium_close'],
@@ -115,7 +115,7 @@ export const GENRE_RECIPES: Record<AutopilotGenre, GenreRecipe> = {
   },
   image_post: {
     id: 'image_post',
-    label: 'Bild-Post',
+    label: tx({ de: 'Bild-Post', en: 'Image post', es: 'Publicación de imagen' }),
     description: tx({ de: 'Ein einzelnes starkes Motiv — endet nach dem Anker, ohne Animation.', en: 'A single strong motif — ends after the anchor, without animation.', es: 'Un único motivo fuerte — termina después del ancla, sin animación.' }),
     beats: ['hook'],
     shotLadder: ['medium'],

@@ -338,7 +338,7 @@ export function PostHogEventTester() {
     
     toast({
       title: tx({ de: 'Kopiert', en: 'Copied', es: 'Copiado' }),
-      description: 'Event-Namen in Zwischenablage kopiert',
+      description: tx({ de: 'Event-Namen in Zwischenablage kopiert', en: 'Event names copied to clipboard', es: 'Nombres de eventos copiados al portapapeles' }),
     });
   };
 
@@ -356,7 +356,7 @@ export function PostHogEventTester() {
       if (error) throw error;
       
       toast({
-        title: 'Test-Jobs erstellt',
+        title: tx({ de: 'Test-Jobs erstellt', en: 'Test jobs created', es: 'Trabajos de prueba creados' }),
         description: tx({ de: `${data.jobs_created} Jobs wurden in die Datenbank eingefügt`, en: `${data.jobs_created} Jobs have been added to the database`, es: `${data.jobs_created} Se han agregado trabajos a la base de datos` }),
       });
       
@@ -383,7 +383,7 @@ export function PostHogEventTester() {
       if (error) throw error;
       
       toast({
-        title: 'Jobs gelöscht',
+        title: tx({ de: 'Jobs gelöscht', en: 'Jobs deleted', es: 'Trabajos eliminados' }),
         description: tx({ de: 'Alle Test-Jobs wurden aus der Datenbank entfernt', en: 'All test jobs have been removed from the database', es: 'Todos los trabajos de prueba han sido eliminados de la base de datos' }),
       });
       
@@ -405,7 +405,7 @@ export function PostHogEventTester() {
       <div>
         <h1 className="text-3xl font-bold mb-2">PostHog Event Tester</h1>
         <p className="text-muted-foreground">
-          Teste alle PostHog Events mit realistischen Daten
+          {tx({ de: 'Teste alle PostHog Events mit realistischen Daten', en: 'Test all PostHog events with realistic data', es: 'Prueba todos los eventos de PostHog con datos realistas' })}
         </p>
       </div>
 
@@ -417,7 +417,7 @@ export function PostHogEventTester() {
             AI Jobs Database
           </CardTitle>
           <CardDescription>
-            Erstelle Test-Jobs direkt in der Datenbank für das Operations Dashboard
+            {tx({ de: 'Erstelle Test-Jobs direkt in der Datenbank für das Operations Dashboard', en: 'Create test jobs directly in the database for the operations dashboard', es: 'Crea trabajos de prueba directamente en la base de datos para el panel de operaciones' })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -489,7 +489,7 @@ export function PostHogEventTester() {
           <CardDescription>
             {isPostHogConfigured 
               ? tx({ de: "PostHog ist bereit, Events zu empfangen", en: "PostHog is ready to receive events", es: "PostHog está listo para recibir eventos" })
-              : 'PostHog API Key fehlt. Setze VITE_PUBLIC_POSTHOG_KEY in deinen Environment Variables.'
+              : tx({ de: 'PostHog API Key fehlt. Setze VITE_PUBLIC_POSTHOG_KEY in deinen Environment Variables.', en: 'PostHog API key missing. Set VITE_PUBLIC_POSTHOG_KEY in your environment variables.', es: 'Falta la clave de API de PostHog. Configura VITE_PUBLIC_POSTHOG_KEY en tus variables de entorno.' })
             }
           </CardDescription>
         </CardHeader>
@@ -503,12 +503,12 @@ export function PostHogEventTester() {
             {isFiring ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Events werden gefeuert...
+                {tx({ de: 'Events werden gefeuert...', en: 'Firing events...', es: 'Disparando eventos...' })}
               </>
             ) : (
               <>
                 <Zap className="mr-2 h-4 w-4" />
-                Dashboard Events generieren
+                {tx({ de: 'Dashboard Events generieren', en: 'Generate dashboard events', es: 'Generar eventos del panel' })}
               </>
             )}
           </Button>
@@ -522,12 +522,12 @@ export function PostHogEventTester() {
             {isFiring ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Events werden gefeuert...
+                {tx({ de: 'Events werden gefeuert...', en: 'Firing events...', es: 'Disparando eventos...' })}
               </>
             ) : (
               <>
                 <Play className="mr-2 h-4 w-4" />
-                Alle Events feuern
+                {tx({ de: 'Alle Events feuern', en: 'Fire all events', es: 'Disparar todos los eventos' })}
               </>
             )}
           </Button>
@@ -544,7 +544,7 @@ export function PostHogEventTester() {
                   <div>
                     <CardTitle className="text-lg">{category.title}</CardTitle>
                     <CardDescription>
-                      {category.events.length} Event{category.events.length !== 1 ? 's' : ''}
+                      {tx({ de: `${category.events.length} Event${category.events.length !== 1 ? 's' : ''}`, en: `${category.events.length} event${category.events.length !== 1 ? 's' : ''}`, es: `${category.events.length} evento${category.events.length !== 1 ? 's' : ''}` })}
                     </CardDescription>
                   </div>
                   <Badge variant={key === 'backend' ? 'secondary' : 'outline'}>
@@ -570,7 +570,7 @@ export function PostHogEventTester() {
                   className="flex-1"
                 >
                   <Play className="mr-2 h-3 w-3" />
-                  Feuern
+                  {tx({ de: 'Feuern', en: 'Fire', es: 'Disparar' })}
                 </Button>
                 <Button
                   onClick={() => copyEventNames(key)}
@@ -594,13 +594,13 @@ export function PostHogEventTester() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Event Log</CardTitle>
+              <CardTitle>{tx({ de: 'Event Log', en: 'Event log', es: 'Registro de eventos' })}</CardTitle>
               <Button onClick={clearLog} variant="ghost" size="sm">
-                Log leeren
+                {tx({ de: 'Log leeren', en: 'Clear log', es: 'Vaciar registro' })}
               </Button>
             </div>
             <CardDescription>
-              {eventLog.length} Event{eventLog.length !== 1 ? 's' : ''} gefeuert
+              {tx({ de: `${eventLog.length} Event${eventLog.length !== 1 ? 's' : ''} gefeuert`, en: `${eventLog.length} event${eventLog.length !== 1 ? 's' : ''} fired`, es: `${eventLog.length} evento${eventLog.length !== 1 ? 's' : ''} disparado(s)` })}
             </CardDescription>
           </CardHeader>
           <CardContent>

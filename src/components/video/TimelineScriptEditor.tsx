@@ -270,8 +270,8 @@ export const TimelineScriptEditor = ({
       onSegmentsChange(newSegments);
       
       toast({
-        title: "✓ Text in Segmente aufgeteilt",
-        description: `${newSegments.length} intelligente Segmente erstellt`
+        title: tx({ de: "✓ Text in Segmente aufgeteilt", en: "✓ Text split into segments", es: "✓ Texto dividido en segmentos" }),
+        description: tx({ de: `${newSegments.length} intelligente Segmente erstellt`, en: `${newSegments.length} smart segments created`, es: `${newSegments.length} segmentos inteligentes creados` })
       });
     } catch (error) {
       console.error('Auto-Split error:', error);

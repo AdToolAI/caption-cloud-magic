@@ -966,7 +966,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
                       <div>
                         <p className="font-medium">{tx({ de: "Klicke auf \"Get Page Access Token\"", en: "Click on “Get Page Access Token”", es: "Haga clic en \"Obtener token de acceso a la página\"" })}</p>
-                        <p className="text-muted-foreground">Im Token-Dropdown → <strong>"Get Page Access Token"</strong> auswählen</p>
+                        <p className="text-muted-foreground">{tx({ de: "Im Token-Dropdown → ", en: "In the token dropdown → select ", es: "En el menú desplegable de tokens → seleccionar " })}<strong>"Get Page Access Token"</strong>{tx({ de: " auswählen", en: "", es: "" })}</p>
                       </div>
                     </li>
                     <li className="flex gap-3">

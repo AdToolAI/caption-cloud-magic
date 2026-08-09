@@ -90,7 +90,7 @@ export function SmokeTestsAdmin() {
       const { data, error } = await supabase.functions.invoke('daily-smoke-test');
       if (error) throw error;
       toast.success(
-        `Smoke-Test fertig — ${data?.passed ?? 0} ✅ / ${data?.failed ?? 0} ❌`
+        tx({ de: `Smoke-Test fertig — ${data?.passed ?? 0} ✅ / ${data?.failed ?? 0} ❌`, en: `Smoke test done — ${data?.passed ?? 0} ✅ / ${data?.failed ?? 0} ❌`, es: `Smoke test terminado — ${data?.passed ?? 0} ✅ / ${data?.failed ?? 0} ❌` })
       );
       await load();
     } catch (e: unknown) {
@@ -118,7 +118,7 @@ export function SmokeTestsAdmin() {
                 Daily Smoke Tests
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Automatischer Health-Check täglich um 06:00 — DB, Auth, Storage & kritische Edge Functions
+                {tx({ de: "Automatischer Health-Check täglich um 06:00 — DB, Auth, Storage & kritische Edge Functions", en: "Automatic health check daily at 06:00 — DB, Auth, Storage & critical Edge Functions", es: "Comprobación de estado automática diaria a las 06:00 — DB, Auth, Storage y Edge Functions críticas" })}
               </p>
             </div>
             <div className="flex gap-2">
@@ -131,7 +131,7 @@ export function SmokeTestsAdmin() {
                 ) : (
                   <Play className="h-4 w-4 mr-2" />
                 )}
-                Jetzt ausführen
+                {tx({ de: "Jetzt ausführen", en: "Run now", es: "Ejecutar ahora" })}
               </Button>
             </div>
           </div>
@@ -139,26 +139,26 @@ export function SmokeTestsAdmin() {
         <CardContent>
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="rounded-lg border border-border p-4">
-              <p className="text-sm text-muted-foreground">Tests Total</p>
+              <p className="text-sm text-muted-foreground">{tx({ de: "Tests Total", en: "Tests total", es: "Total de pruebas" })}</p>
               <p className="text-2xl font-bold">{summary.length}</p>
             </div>
             <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4">
-              <p className="text-sm text-muted-foreground">Passing</p>
+              <p className="text-sm text-muted-foreground">{tx({ de: "Passing", en: "Passing", es: "Aprobadas" })}</p>
               <p className="text-2xl font-bold text-green-600">{passingCount}</p>
             </div>
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-              <p className="text-sm text-muted-foreground">Failing</p>
+              <p className="text-sm text-muted-foreground">{tx({ de: "Failing", en: "Failing", es: "Fallidas" })}</p>
               <p className="text-2xl font-bold text-destructive">{failingCount}</p>
             </div>
           </div>
 
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Lade...</div>
+            <div className="text-center py-8 text-muted-foreground">{tx({ de: "Lade...", en: "Loading...", es: "Cargando..." })}</div>
           ) : summary.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Noch keine Smoke-Test-Daten</p>
-              <p className="text-sm mt-1">Klicke „Jetzt ausführen" um den ersten Test zu starten.</p>
+              <p className="font-medium">{tx({ de: "Noch keine Smoke-Test-Daten", en: "No smoke test data yet", es: "Aún no hay datos de smoke tests" })}</p>
+              <p className="text-sm mt-1">{tx({ de: 'Klicke „Jetzt ausführen" um den ersten Test zu starten.', en: 'Click "Run now" to start the first test.', es: 'Haz clic en "Ejecutar ahora" para iniciar la primera prueba.' })}</p>
             </div>
           ) : (
             <div className="space-y-2">

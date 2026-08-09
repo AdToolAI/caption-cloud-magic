@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,17 +54,17 @@ export const FoundersSlotBadge = ({ className = "" }: Props) => {
         <Sparkles className="w-3.5 h-3.5 text-primary" />
         {soldOut ? (
           <span className="text-muted-foreground">
-            Founders-Plätze ausverkauft
+            {tx({ de: "Founders-Plätze ausverkauft", en: "Founders slots sold out", es: "Plazas Founders agotadas" })}
           </span>
         ) : remaining === null ? (
-          <span className="text-muted-foreground">Founders-Deal verfügbar…</span>
+          <span className="text-muted-foreground">{tx({ de: "Founders-Deal verfügbar…", en: "Founders deal available…", es: "Oferta Founders disponible…" })}</span>
         ) : (
           <span className="text-foreground">
             <span className="text-primary font-bold tabular-nums">
               {remaining}
             </span>{" "}
-            / {FOUNDERS_MAX_SLOTS} Founders-Plätze frei —{" "}
-            <span className="text-primary">20 % auf alle KI-Credits, 24 Monate</span>
+            / {FOUNDERS_MAX_SLOTS} {tx({ de: "Founders-Plätze frei —", en: "founders slots left —", es: "plazas Founders libres —" })}{" "}
+            <span className="text-primary">{tx({ de: "20 % auf alle KI-Credits, 24 Monate", en: "20% off all AI credits, 24 months", es: "20 % en todos los créditos de IA, 24 meses" })}</span>
           </span>
         )}
       </div>
@@ -71,7 +72,7 @@ export const FoundersSlotBadge = ({ className = "" }: Props) => {
         href="/legal/terms#section-8"
         className="text-[10px] leading-tight text-muted-foreground/60 hover:text-muted-foreground/90 transition-colors text-center max-w-xs"
       >
-        Begrenztes Einführungsangebot. Änderungen vorbehalten. Gilt nur bei aktivem Betrieb des Dienstes. Details siehe AGB §8.
+        {tx({ de: "Begrenztes Einführungsangebot. Änderungen vorbehalten. Gilt nur bei aktivem Betrieb des Dienstes. Details siehe AGB §8.", en: "Limited introductory offer. Subject to change. Valid only while the service is actively operating. See Terms §8 for details.", es: "Oferta de lanzamiento limitada. Sujeta a cambios. Válida solo mientras el servicio esté activo. Detalles en los Términos §8." })}
       </a>
     </div>
   );

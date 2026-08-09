@@ -302,7 +302,7 @@ export function ConceptReviewEditor({ recommendation, onConfirm, onBack }: Conce
               </Select>
             </div>
             <div className="space-y-1.5">
-              <FieldLabel>Sprache</FieldLabel>
+              <FieldLabel>{tx({ de: "Sprache", en: "Language", es: "Idioma" })}</FieldLabel>
               <Input value={data.voiceLanguage} onChange={e => update('voiceLanguage', e.target.value)} className={fieldClass} />
             </div>
             <div className="space-y-1.5">

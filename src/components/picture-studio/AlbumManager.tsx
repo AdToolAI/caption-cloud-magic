@@ -106,7 +106,7 @@ export function AlbumManager() {
     if (error) {
       toast.error(tx({ de: "Fehler beim Erstellen", en: "Error creating", es: "Error al crear" }));
     } else {
-      toast.success("Album erstellt! 📁");
+      toast.success(tx({ de: "Album erstellt! 📁", en: "Album created! 📁", es: "¡Álbum creado! 📁" }));
       setNewAlbumName("");
       setShowCreateDialog(false);
       loadAlbums();

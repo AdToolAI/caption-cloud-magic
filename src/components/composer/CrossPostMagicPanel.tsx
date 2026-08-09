@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useMemo } from "react";
 import { Sparkles, RefreshCw, Instagram, Music, Linkedin, Youtube, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -142,7 +143,7 @@ export function CrossPostMagicPanel({
       <div className="border-t border-white/5 p-5">
         {loading && !hasAnyDraft ? (
           <div className="space-y-3">
-            <div className="text-xs text-[#F5C76A]/80">✨ Schreibt deine Captions…</div>
+            <div className="text-xs text-[#F5C76A]/80">✨ {tx({ de: "Schreibt deine Captions…", en: "Writing your captions…", es: "Escribiendo tus subtítulos…" })}</div>
             {[1,2,3].map((i) => (
               <Skeleton key={i} className="h-4 w-full bg-white/5" />
             ))}

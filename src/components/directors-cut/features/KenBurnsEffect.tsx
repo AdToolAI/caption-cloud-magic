@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SceneAnimationPreviewTile, type SceneAnimationId } from '@/components/studio-visual/SceneAnimationPreviewTile';
+import { tx } from '@/lib/i18nText';
 
 export interface KenBurnsKeyframe {
   id: string;
@@ -41,59 +42,59 @@ interface KenBurnsEffectProps {
 const PRESETS = [
   { 
     id: 'zoom-in-center', 
-    name: 'Zoom In', 
+    name: tx({ de: 'Zoom In', en: 'Zoom In', es: 'Zoom In' }), 
     icon: ZoomIn,
     config: { startZoom: 1.0, endZoom: 1.3, startX: 0, startY: 0, endX: 0, endY: 0 }
   },
   { 
     id: 'zoom-out-center', 
-    name: 'Zoom Out', 
+    name: tx({ de: 'Zoom Out', en: 'Zoom Out', es: 'Zoom Out' }), 
     icon: ZoomOut,
     config: { startZoom: 1.3, endZoom: 1.0, startX: 0, startY: 0, endX: 0, endY: 0 }
   },
   { 
     id: 'pan-left', 
-    name: 'Pan Links', 
+    name: tx({ de: 'Pan Links', en: 'Pan Left', es: 'Pan Izquierda' }), 
     icon: ArrowLeft,
     config: { startZoom: 1.2, endZoom: 1.2, startX: 15, startY: 0, endX: -15, endY: 0 }
   },
   { 
     id: 'pan-right', 
-    name: 'Pan Rechts', 
+    name: tx({ de: 'Pan Rechts', en: 'Pan Right', es: 'Pan Derecha' }), 
     icon: ArrowRight,
     config: { startZoom: 1.2, endZoom: 1.2, startX: -15, startY: 0, endX: 15, endY: 0 }
   },
   { 
     id: 'pan-up', 
-    name: 'Tilt Hoch', 
+    name: tx({ de: 'Tilt Hoch', en: 'Tilt Up', es: 'Tilt Arriba' }), 
     icon: ArrowUp,
     config: { startZoom: 1.2, endZoom: 1.2, startX: 0, startY: 15, endX: 0, endY: -15 }
   },
   { 
     id: 'pan-down', 
-    name: 'Tilt Runter', 
+    name: tx({ de: 'Tilt Runter', en: 'Tilt Down', es: 'Tilt Abajo' }), 
     icon: ArrowDown,
     config: { startZoom: 1.2, endZoom: 1.2, startX: 0, startY: -15, endX: 0, endY: 15 }
   },
   { 
     id: 'zoom-pan-tl', 
-    name: 'Zoom + Pan TL', 
+    name: tx({ de: 'Zoom + Pan TL', en: 'Zoom + Pan TL', es: 'Zoom + Pan TL' }), 
     icon: Sparkles,
     config: { startZoom: 1.0, endZoom: 1.4, startX: -20, startY: -15, endX: 20, endY: 15 }
   },
   { 
     id: 'zoom-pan-br', 
-    name: 'Zoom + Pan BR', 
+    name: tx({ de: 'Zoom + Pan BR', en: 'Zoom + Pan BR', es: 'Zoom + Pan BR' }), 
     icon: Sparkles,
     config: { startZoom: 1.0, endZoom: 1.4, startX: 20, startY: 15, endX: -20, endY: -15 }
   },
 ];
 
 const EASINGS = [
-  { id: 'linear', name: 'Linear' },
-  { id: 'easeIn', name: 'Ease In' },
-  { id: 'easeOut', name: 'Ease Out' },
-  { id: 'easeInOut', name: 'Ease In/Out' },
+  { id: 'linear', name: tx({ de: 'Linear', en: 'Linear', es: 'Lineal' }) },
+  { id: 'easeIn', name: tx({ de: 'Ease In', en: 'Ease In', es: 'Ease In' }) },
+  { id: 'easeOut', name: tx({ de: 'Ease Out', en: 'Ease Out', es: 'Ease Out' }) },
+  { id: 'easeInOut', name: tx({ de: 'Ease In/Out', en: 'Ease In/Out', es: 'Ease In/Out' }) },
 ];
 
 export function KenBurnsEffect({ 
@@ -163,28 +164,28 @@ export function KenBurnsEffect({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Move className="h-4 w-4 text-primary" />
-            Ken Burns Effekt
+            {tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })}
           </CardTitle>
           <div className="flex items-center gap-2">
             {hasEffect && (
               <Badge variant="secondary" className="text-xs">
-                Aktiv
+                {tx({ de: 'Aktiv', en: 'Active', es: 'Activo' })}
               </Badge>
             )}
             <Badge variant="outline" className="text-xs">
-              {selectedSceneId ? `Szene` : 'Global'}
+              {selectedSceneId ? tx({ de: 'Szene', en: 'Scene', es: 'Escena' }) : tx({ de: 'Global', en: 'Global', es: 'Global' })}
             </Badge>
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Professionelle Kamerabewegungen mit Zoom und Pan
+          {tx({ de: 'Professionelle Kamerabewegungen mit Zoom und Pan', en: 'Professional camera movements with zoom and pan', es: 'Movimientos de cámara profesionales con zoom y pan' })}
         </p>
       </CardHeader>
       
       <CardContent className="space-y-4">
         {/* Presets Grid */}
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Schnell-Presets</Label>
+          <Label className="text-xs text-muted-foreground">{tx({ de: 'Schnell-Presets', en: 'Quick Presets', es: 'Preajustes Rápidos' })}</Label>
           <div className="grid grid-cols-4 gap-2">
             {PRESETS.map((preset) => {
               const Icon = preset.icon;
@@ -221,7 +222,7 @@ export function KenBurnsEffect({
         
         {/* Advanced Mode Toggle */}
         <div className="flex items-center justify-between pt-2 border-t border-border/30">
-          <Label className="text-xs">Erweiterte Einstellungen</Label>
+          <Label className="text-xs">{tx({ de: 'Erweiterte Einstellungen', en: 'Advanced Settings', es: 'Ajustes Avanzados' })}</Label>
           <Switch
             checked={isAdvancedMode}
             onCheckedChange={setIsAdvancedMode}
@@ -240,13 +241,13 @@ export function KenBurnsEffect({
               <div className="space-y-3 p-3 rounded-lg bg-background/30 border border-border/30">
                 <Label className="text-xs font-medium flex items-center gap-2">
                   <ZoomIn className="h-3 w-3" />
-                  Zoom
+                  {tx({ de: 'Zoom', en: 'Zoom', es: 'Zoom' })}
                 </Label>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Start</span>
+                      <span>{tx({ de: 'Start', en: 'Start', es: 'Inicio' })}</span>
                       <span>{Math.round(currentKeyframe.startZoom * 100)}%</span>
                     </div>
                     <Slider
@@ -261,7 +262,7 @@ export function KenBurnsEffect({
                   
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Ende</span>
+                      <span>{tx({ de: 'Ende', en: 'End', es: 'Fin' })}</span>
                       <span>{Math.round(currentKeyframe.endZoom * 100)}%</span>
                     </div>
                     <Slider
@@ -280,13 +281,13 @@ export function KenBurnsEffect({
               <div className="space-y-3 p-3 rounded-lg bg-background/30 border border-border/30">
                 <Label className="text-xs font-medium flex items-center gap-2">
                   <Move className="h-3 w-3" />
-                  Position (Pan)
+                  {tx({ de: 'Position (Pan)', en: 'Position (Pan)', es: 'Posición (Pan)' })}
                 </Label>
                 
                 <div className="grid grid-cols-2 gap-4">
                   {/* Start Position */}
                   <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground">Start-Position</span>
+                    <span className="text-xs text-muted-foreground">{tx({ de: 'Start-Position', en: 'Start Position', es: 'Posición Inicial' })}</span>
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>X</span>
@@ -319,7 +320,7 @@ export function KenBurnsEffect({
                   
                   {/* End Position */}
                   <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground">End-Position</span>
+                    <span className="text-xs text-muted-foreground">{tx({ de: 'End-Position', en: 'End Position', es: 'Posición Final' })}</span>
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>X</span>
@@ -354,7 +355,7 @@ export function KenBurnsEffect({
               
               {/* Easing */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Bewegungskurve</Label>
+                <Label className="text-xs text-muted-foreground">{tx({ de: 'Bewegungskurve', en: 'Motion Curve', es: 'Curva de Movimiento' })}</Label>
                 <div className="flex gap-2">
                   {EASINGS.map((easing) => (
                     <Button
@@ -379,7 +380,7 @@ export function KenBurnsEffect({
                   className="flex-1 text-xs"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
-                  Zurücksetzen
+                  {tx({ de: 'Zurücksetzen', en: 'Reset', es: 'Restablecer' })}
                 </Button>
                 <Button
                   size="sm"
@@ -387,7 +388,7 @@ export function KenBurnsEffect({
                   onClick={removeEffect}
                   className="text-xs"
                 >
-                  Entfernen
+                  {tx({ de: 'Entfernen', en: 'Remove', es: 'Eliminar' })}
                 </Button>
               </div>
             </motion.div>
@@ -398,7 +399,7 @@ export function KenBurnsEffect({
         {!hasEffect && (
           <div className="text-center py-4 text-muted-foreground">
             <Move className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-xs">Wähle ein Preset um den Ken Burns Effekt zu aktivieren</p>
+            <p className="text-xs">{tx({ de: 'Wähle ein Preset um den Ken Burns Effekt zu aktivieren', en: 'Choose a preset to activate the Ken Burns effect', es: 'Elige un preajuste para activar el efecto Ken Burns' })}</p>
           </div>
         )}
       </CardContent>

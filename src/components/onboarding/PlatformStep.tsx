@@ -23,7 +23,7 @@ export function PlatformStep({ selectedPlatforms, onToggle, onNext, onBack }: Pl
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-xl font-semibold">Wohin sollen deine fertigen Videos?</h3>
+        <h3 className="text-xl font-semibold">{tx({ de: "Wohin sollen deine fertigen Videos?", en: "Where should your finished videos go?", es: "¿Dónde deben ir tus videos terminados?" })}</h3>
         <p className="text-sm text-muted-foreground mt-1">{tx({ de: "Wähle mindestens einen Kanal – wir optimieren Format und Länge dafür", en: "Choose at least one channel – we'll optimize format and length for it", es: "Elige al menos un canal – optimizaremos el formato y la duración para él" })}</p>
       </div>
 

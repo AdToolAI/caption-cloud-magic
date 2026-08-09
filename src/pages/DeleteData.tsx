@@ -32,7 +32,7 @@ const DeleteData = () => {
       option1Title: "E-Mail senden",
       option1Desc: tx({ de: "Sende eine E-Mail an", en: "Send an email to", es: "Envía un correo a" }),
       option1Email: "support@useadtool.ai",
-      option1Subject: "mit dem Betreff \"Datenlöschung\"",
+      option1Subject: tx({ de: "mit dem Betreff \"Datenlöschung\"", en: "with the subject line \"Data Deletion\"", es: "con el asunto \"Eliminación de datos\"" }),
       option2Title: tx({ de: "In der App löschen", en: "Delete in App", es: "Eliminar en la aplicación" }),
       option2Desc: tx({ de: "Du kannst dein Benutzerkonto direkt in deinen Account-Einstellungen löschen", en: "You can delete your user account directly in your account settings", es: "Puedes eliminar tu cuenta de usuario directamente en la configuración de tu cuenta" }),
       timeline: tx({ de: "Wir werden alle personenbezogenen Daten innerhalb von 30 Tagen nach Eingang deiner Anfrage entfernen.", en: "We will remove all personal data within 30 days of receiving your request.", es: "Eliminaremos todos los datos personales en un plazo de 30 días a partir de la recepción de tu solicitud." }),

@@ -397,7 +397,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
             </Button>
             
             <Button onClick={handleSave} disabled={loading || !hasChanges}>
-              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generiere...</> : <><Save className="mr-2 h-4 w-4" />Neue Version ({estimatedCost} Credits)</>}
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })}</> : <><Save className="mr-2 h-4 w-4" />{tx({ de: `Neue Version (${estimatedCost} Credits)`, en: `New version (${estimatedCost} credits)`, es: `Nueva versión (${estimatedCost} créditos)` })}</>}
             </Button>
           </div>
         </DialogFooter>
@@ -414,10 +414,9 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
       <Dialog open={showQuickPreview} onOpenChange={setShowQuickPreview}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Schnelle Vorschau</DialogTitle>
+            <DialogTitle>{tx({ de: "Schnelle Vorschau", en: "Quick preview", es: "Vista previa rápida" })}</DialogTitle>
             <DialogDescription>
-              Diese Vorschau zeigt eine Simulation deines Videos. Die finale Version wird in höherer 
-              Qualität und mit professionellen Transitions gerendert.
+              {tx({ de: "Diese Vorschau zeigt eine Simulation deines Videos. Die finale Version wird in höherer Qualität und mit professionellen Transitions gerendert.", en: "This preview shows a simulation of your video. The final version will be rendered in higher quality with professional transitions.", es: "Esta vista previa muestra una simulación de tu video. La versión final se renderizará en mayor calidad y con transiciones profesionales." })}
             </DialogDescription>
           </DialogHeader>
           

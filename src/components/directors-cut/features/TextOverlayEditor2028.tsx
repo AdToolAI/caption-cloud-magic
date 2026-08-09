@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -710,7 +711,7 @@ export function TextOverlayEditor2028({
               <div className="grid grid-cols-2 gap-4 min-w-0">
                 {/* Font Size */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Größe</Label>
+                  <Label className="text-sm font-medium">{tx({ de: 'Größe', en: 'Size', es: 'Tamaño' })}</Label>
                   <div className="grid grid-cols-4 gap-1 min-w-0">
                     {FONT_SIZES.map((size) => (
                       <motion.button

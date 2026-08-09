@@ -244,7 +244,7 @@ export function SmartCropping({
         {/* Auto-Track Settings */}
         {enabledCount > 0 && (
           <div className="space-y-3 pt-2 border-t">
-            <label className="text-xs font-medium">Tracking-Einstellungen</label>
+            <label className="text-xs font-medium">{tx({ de: "Tracking-Einstellungen", en: "Tracking settings", es: "Ajustes de seguimiento" })}</label>
             {cropVariants.filter(v => v.enabled).map((variant) => {
               const ratio = ASPECT_RATIOS.find(r => r.id === variant.aspectRatio);
               return (
@@ -266,7 +266,7 @@ export function SmartCropping({
         {/* Preview Selection */}
         {enabledCount > 0 && (
           <div className="space-y-2 pt-2 border-t">
-            <label className="text-xs font-medium">Vorschau</label>
+            <label className="text-xs font-medium">{tx({ de: "Vorschau", en: "Preview", es: "Vista previa" })}</label>
             <div className="flex gap-1 flex-wrap">
               {cropVariants.filter(v => v.enabled).map((variant) => (
                 <Button

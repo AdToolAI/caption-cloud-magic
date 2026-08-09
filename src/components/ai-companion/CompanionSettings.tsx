@@ -195,7 +195,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
         </Button>
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold">Bot-Einstellungen</h3>
+          <h3 className="font-semibold">{tx({ de: "Bot-Einstellungen", en: "Bot settings", es: "Ajustes del bot" })}</h3>
         </div>
       </div>
 

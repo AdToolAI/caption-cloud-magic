@@ -35,7 +35,7 @@ const IMAGE_TOOLKIT_MODEL: ToolkitModel = {
   resolution: '1024×1024',
   aspectRatios: ['16:9', '9:16', '1:1'],
   costPerSecond: { EUR: 0.02, USD: 0.02 },
-  badge: 'Bild',
+  badge: tx({ de: 'Bild', en: 'Image', es: 'Imagen' }),
   tagline: tx({ de: 'Statisches KI-Bild mit Ken-Burns-Effekt', en: 'Static AI image with Ken Burns effect', es: 'Imagen estática de IA con efecto Ken Burns' }),
   legacyRoute: '/picture-studio',
 };

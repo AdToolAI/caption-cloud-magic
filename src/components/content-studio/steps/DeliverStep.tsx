@@ -113,7 +113,7 @@ export function DeliverStep() {
         brand_kit_id: (s.brandKit?.id as string) ?? null,
       });
       if (error) throw error;
-      toast.success("Als Vorlage gesichert");
+      toast.success(tx({ de: "Als Vorlage gesichert", en: "Saved as template", es: "Guardado como plantilla" }));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Guardado fallido" }));
     } finally {

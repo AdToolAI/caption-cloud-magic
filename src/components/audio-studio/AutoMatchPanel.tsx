@@ -295,16 +295,16 @@ export function AutoMatchPanel({
                     className="flex-1 bg-gradient-to-r from-primary to-cyan-500 hover:opacity-90 disabled:opacity-50"
                   >
                     {generating ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Track wird komponiert…</>
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {tx({ de: 'Track wird komponiert…', en: 'Composing track…', es: 'Componiendo pista…' })}</>
                     ) : insufficient ? (
-                      <>Nicht genug Credits ({currencySymbol}{tierPrice.toFixed(2)} nötig)</>
+                      <>{tx({ de: 'Nicht genug Credits', en: 'Not enough credits', es: 'Créditos insuficientes' })} ({currencySymbol}{tierPrice.toFixed(2)} {tx({ de: 'nötig', en: 'needed', es: 'necesarios' })})</>
                     ) : (
-                      <><Music2 className="w-4 h-4 mr-2" /> Track generieren · {currencySymbol}{tierPrice.toFixed(2)}</>
+                      <><Music2 className="w-4 h-4 mr-2" /> {tx({ de: 'Track generieren', en: 'Generate track', es: 'Generar pista' })} · {currencySymbol}{tierPrice.toFixed(2)}</>
                     )}
                   </Button>
                   {onCustomize && (
                     <Button variant="outline" size="lg" onClick={handleCustomize} disabled={generating}>
-                      <Settings2 className="w-4 h-4 mr-2" /> Anpassen
+                      <Settings2 className="w-4 h-4 mr-2" /> {tx({ de: 'Anpassen', en: 'Customize', es: 'Personalizar' })}
                     </Button>
                   )}
                 </div>

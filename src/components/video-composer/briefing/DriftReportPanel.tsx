@@ -211,7 +211,7 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
             <div className="px-3 pb-3 space-y-1.5">
               {!report || report.findings.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground italic">
-                  Alle vom Plan vorgesehenen Felder wurden 1:1 ins Storyboard übernommen.
+                  {tx({ de: "Alle vom Plan vorgesehenen Felder wurden 1:1 ins Storyboard übernommen.", en: "All fields specified in the plan were carried over into the storyboard 1:1.", es: "Todos los campos previstos en el plan se trasladaron 1:1 al storyboard." })}
                 </p>
               ) : (
                 report.findings.map((f, i) => (
@@ -230,9 +230,9 @@ export default function DriftReportPanel({ projectId, scenes, onUpdateScene }: P
                         <div className="font-medium">{f.message}</div>
                         {(f.expected || f.actual) && (
                           <div className="mt-0.5 text-[10px] opacity-80 truncate">
-                            {f.expected && <>Plan: <span className="font-mono">{f.expected}</span></>}
+                            {f.expected && <>{tx({ de: 'Plan:', en: 'Plan:', es: 'Plan:' })} <span className="font-mono">{f.expected}</span></>}
                             {f.expected && f.actual && <span className="mx-1">·</span>}
-                            {f.actual && <>Szene: <span className="font-mono">{f.actual}</span></>}
+                            {f.actual && <>{tx({ de: 'Szene:', en: 'Scene:', es: 'Escena:' })} <span className="font-mono">{f.actual}</span></>}
                           </div>
                         )}
                       </div>

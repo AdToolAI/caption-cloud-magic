@@ -67,7 +67,7 @@ const DeleteAccount = () => {
     setLoading(true);
     try {
       toast({
-        title: "Löschanfrage gesendet",
+        title: tx({ de: "Löschanfrage gesendet", en: "Deletion request sent", es: "Solicitud de eliminación enviada" }),
         description: tx({ de: "Ihr Konto wird innerhalb von 30 Tagen gelöscht. Sie erhalten eine Bestätigungs-E-Mail. Innerhalb dieser Frist können Sie die Löschung widerrufen.", en: "Your account will be deleted within 30 days. You will receive a confirmation email. You can revoke the deletion within this period.", es: "Tu cuenta se eliminará en un plazo de 30 días. Recibirás un correo de confirmación. Puedes revocar la eliminación dentro de ese plazo." }),
       });
       await signOut();
@@ -92,7 +92,7 @@ const DeleteAccount = () => {
           className="mb-6 gap-2 text-muted-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Zurück zu den Einstellungen
+          {tx({ de: "Zurück zu den Einstellungen", en: "Back to settings", es: "Volver a los ajustes" })}
         </Button>
 
         <motion.div
@@ -141,7 +141,7 @@ const DeleteAccount = () => {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2 text-destructive">
                 <Trash2 className="h-5 w-5" />
-                Folgende Daten werden permanent gelöscht:
+                {tx({ de: "Folgende Daten werden permanent gelöscht:", en: "The following data will be permanently deleted:", es: "Se eliminarán permanentemente los siguientes datos:" })}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -149,8 +149,8 @@ const DeleteAccount = () => {
                 <li className="flex items-center gap-2">• {tx({ de: "Alle Projekte und Medien", en: "All projects and media", es: "Todos los proyectos y medios" })}</li>
                 <li className="flex items-center gap-2">• {tx({ de: "Alle Credits und Transaktionen", en: "All credits and transactions", es: "Todos los créditos y transacciones" })}</li>
                 <li className="flex items-center gap-2">• {tx({ de: "Persönliche Einstellungen und Profile", en: "Personal settings and profiles", es: "Ajustes personales y perfiles" })}</li>
-                <li className="flex items-center gap-2">• Aktives Abonnement wird gekündigt</li>
-                <li className="flex items-center gap-2">• Verknüpfte Social-Media-Verbindungen</li>
+                <li className="flex items-center gap-2">• {tx({ de: "Aktives Abonnement wird gekündigt", en: "Active subscription will be canceled", es: "Se cancelará la suscripción activa" })}</li>
+                <li className="flex items-center gap-2">• {tx({ de: "Verknüpfte Social-Media-Verbindungen", en: "Linked social media connections", es: "Conexiones de redes sociales vinculadas" })}</li>
               </ul>
             </CardContent>
           </Card>
@@ -164,7 +164,7 @@ const DeleteAccount = () => {
               </div>
               <Button variant="outline" onClick={handleExportData} disabled={exporting} size="sm">
                 {exporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="h-4 w-4 mr-2" />}
-                Exportieren
+                {tx({ de: "Exportieren", en: "Export", es: "Exportar" })}
               </Button>
             </CardContent>
           </Card>
@@ -205,7 +205,7 @@ const DeleteAccount = () => {
           <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
             <CardContent className="p-6 space-y-3">
               <Label className="text-sm">
-                Geben Sie <strong className="text-foreground">{user.email}</strong> {tx({ de: "ein, um die Löschung zu bestätigen:", en: "to confirm deletion:", es: "para confirmar la eliminación:" })}
+                {tx({ de: "Geben Sie", en: "Enter", es: "Introduce" })} <strong className="text-foreground">{user.email}</strong> {tx({ de: "ein, um die Löschung zu bestätigen:", en: "to confirm deletion:", es: "para confirmar la eliminación:" })}
               </Label>
               <Input
                 value={confirmEmail}
@@ -219,7 +219,7 @@ const DeleteAccount = () => {
           {/* Aktions-Buttons */}
           <div className="flex items-center justify-between pt-2 pb-8">
             <Button variant="outline" onClick={() => navigate("/account")}>
-              Abbrechen
+              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
             </Button>
             <Button
               variant="destructive"
@@ -229,7 +229,7 @@ const DeleteAccount = () => {
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               <Trash2 className="h-4 w-4" />
-              Account endgültig löschen
+              {tx({ de: "Account endgültig löschen", en: "Permanently delete account", es: "Eliminar cuenta definitivamente" })}
             </Button>
           </div>
         </motion.div>

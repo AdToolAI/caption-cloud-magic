@@ -76,23 +76,23 @@ export const TemplatePreview = ({
             <div className="flex gap-2">
               <Button onClick={() => onUse(template)} className="flex-1">
                 <Play className="mr-2 h-4 w-4" />
-                Template verwenden
+                {tx({ de: 'Template verwenden', en: 'Use template', es: 'Usar plantilla' })}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => onDuplicate(template.id)}
               >
                 <Copy className="mr-2 h-4 w-4" />
-                Duplizieren
+                {tx({ de: 'Duplizieren', en: 'Duplicate', es: 'Duplicar' })}
               </Button>
             </div>
 
             {/* Details */}
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold mb-2">Beschreibung</h3>
+                <h3 className="font-semibold mb-2">{tx({ de: 'Beschreibung', en: 'Description', es: 'Descripción' })}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {template.description || 'Keine Beschreibung verfügbar'}
+                  {template.description || tx({ de: 'Keine Beschreibung verfügbar', en: 'No description available', es: 'Sin descripción disponible' })}
                 </p>
               </div>
 

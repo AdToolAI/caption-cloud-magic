@@ -264,7 +264,7 @@ export default function Planner() {
     const result = data?.results?.[0];
     if (result?.error) {
       console.error("Database error:", result.error);
-      toast.error("Fehler: " + (result.error.message || JSON.stringify(result.error)));
+      toast.error(tx({ de: "Fehler: ", en: "Error: ", es: "Error: " }) + (result.error.message || JSON.stringify(result.error)));
       return;
     }
 

@@ -1247,7 +1247,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                   : <VolumeX className="h-4 w-4 text-muted-foreground" />
                 }
                 <Label className="text-sm cursor-pointer" htmlFor="audio-switch">
-                  {language === 'de' ? 'Native Audio generieren' : 'Generate native audio'}
+                  {language === 'de' ? 'Native Audio generieren' : language === 'es' ? 'Generar audio nativo' : 'Generate native audio'}
                 </Label>
               </div>
               <Switch
@@ -1260,7 +1260,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {generateAudio && (
               <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/30">
                 <Label className="text-xs text-muted-foreground">
-                  {language === 'de' ? 'Gesprochene Sprache' : language === 'es' ? 'Idioma hablado' : 'Spoken language'}
+                  {tx({ de: 'Gesprochene Sprache', en: 'Spoken language', es: 'Idioma hablado' })}
                 </Label>
                 <Select value={spokenLanguage} onValueChange={(v) => setSpokenLanguage(v as 'auto' | 'de' | 'en' | 'es')}>
                   <SelectTrigger className="h-8 w-[180px] text-xs">

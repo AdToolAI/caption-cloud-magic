@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { tx } from '@/lib/i18nText';
 
 export default function VideoManagement() {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ export default function VideoManagement() {
     <div className="container mx-auto py-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Video Manager</h1>
-        <p className="text-muted-foreground">Verwalte deine erstellten Videos</p>
+        <p className="text-muted-foreground">{tx({ de: "Verwalte deine erstellten Videos", en: "Manage your created videos", es: "Gestiona tus videos creados" })}</p>
       </div>
 
       <Card className="p-12 text-center space-y-4">

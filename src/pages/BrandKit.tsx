@@ -228,7 +228,7 @@ const BrandKit = () => {
       setActiveTab("brandboard");
 
       toast({
-        title: "Erfolgreich erstellt!",
+        title: tx({ de: "Erfolgreich erstellt!", en: "Successfully created!", es: "¡Creado con éxito!" }),
         description: tx({ de: "Dein Marken-Set wurde generiert und ist jetzt aktiv", en: "Your brand set was generated and is now active", es: "Tu set de marca se generó y ya está activo" }),
         duration: 5000
       });

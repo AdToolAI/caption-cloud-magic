@@ -159,7 +159,7 @@ export default function TalkingHeadDialog({
       setNewPhotoUrl(publicUrl);
     } catch (err) {
       toast({
-        title: 'Upload-Fehler',
+        title: tx({ de: 'Upload-Fehler', en: 'Upload error', es: 'Error de carga' }),
         description: err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: 'destructive',
       });
@@ -884,7 +884,7 @@ function DialogModeTab({
 
       {availableScenes && availableScenes.length > 0 && (
         <div>
-          <Label>Anker-Szene <span className="text-muted-foreground font-normal">(optional)</span></Label>
+          <Label>{tx({ de: "Anker-Szene", en: "Anchor scene", es: "Escena ancla" })} <span className="text-muted-foreground font-normal">(optional)</span></Label>
           <Select value={targetSceneId} onValueChange={setTargetSceneId}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>

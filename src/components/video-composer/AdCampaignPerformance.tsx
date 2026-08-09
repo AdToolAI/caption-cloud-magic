@@ -168,7 +168,7 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
     return (
       <Card className="border-border/40 bg-card/60 p-8 text-center">
         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-        <p className="text-xs text-muted-foreground mt-2">Lade Performance-Daten …</p>
+        <p className="text-xs text-muted-foreground mt-2">{tx({ de: "Lade Performance-Daten …", en: "Loading performance data …", es: "Cargando datos de rendimiento …" })}</p>
       </Card>
     );
   }
@@ -179,14 +179,13 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
         <div className="flex items-start gap-3">
           <TrendingUp className="h-5 w-5 text-muted-foreground mt-0.5" />
           <div className="flex-1">
-            <h3 className="text-sm font-semibold mb-1">Noch keine Performance-Daten</h3>
+            <h3 className="text-sm font-semibold mb-1">{tx({ de: "Noch keine Performance-Daten", en: "No performance data yet", es: "Aún no hay datos de rendimiento" })}</h3>
             <p className="text-xs text-muted-foreground mb-3">
-              Verknüpfe veröffentlichte Posts mit deinen Varianten, um Engagement zu vergleichen und einen Winner zu küren.
-              Sobald du eine Variante über die Plattform-Integration postest, erscheint sie hier automatisch.
+              {tx({ de: "Verknüpfe veröffentlichte Posts mit deinen Varianten, um Engagement zu vergleichen und einen Winner zu küren. Sobald du eine Variante über die Plattform-Integration postest, erscheint sie hier automatisch.", en: "Link published posts to your variants to compare engagement and crown a winner. As soon as you post a variant via the platform integration, it appears here automatically.", es: "Vincula publicaciones publicadas con tus variantes para comparar el engagement y elegir un ganador. En cuanto publiques una variante a través de la integración de la plataforma, aparecerá aquí automáticamente." })}
             </p>
             <Button size="sm" variant="outline" onClick={load} disabled={loading}>
               <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', loading && 'animate-spin')} />
-              Aktualisieren
+              {tx({ de: "Aktualisieren", en: "Refresh", es: "Actualizar" })}
             </Button>
           </div>
         </div>
@@ -212,10 +211,10 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
         <div>
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-400" />
-            Performance-Insights
+            {tx({ de: "Performance-Insights", en: "Performance insights", es: "Estadísticas de rendimiento" })}
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {data.total_posts} verknüpfte Posts · zuletzt aktualisiert{' '}
+            {tx({ de: `${data.total_posts} verknüpfte Posts · zuletzt aktualisiert`, en: `${data.total_posts} linked posts · last updated`, es: `${data.total_posts} publicaciones vinculadas · última actualización` })}{' '}
             {new Date(data.analyzed_at).toLocaleTimeString()}
           </p>
         </div>
@@ -227,15 +226,15 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
       {/* Totals */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="p-3 border-border/40 bg-card/60">
-          <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Posts</div>
+          <div className="text-[10px] uppercase text-muted-foreground tracking-wider">{tx({ de: "Posts", en: "Posts", es: "Publicaciones" })}</div>
           <div className="text-xl font-semibold">{totals.posts}</div>
         </Card>
         <Card className="p-3 border-border/40 bg-card/60">
-          <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Impressions</div>
+          <div className="text-[10px] uppercase text-muted-foreground tracking-wider">{tx({ de: "Impressions", en: "Impressions", es: "Impresiones" })}</div>
           <div className="text-xl font-semibold">{formatNum(totals.impressions)}</div>
         </Card>
         <Card className="p-3 border-border/40 bg-card/60">
-          <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Engagement</div>
+          <div className="text-[10px] uppercase text-muted-foreground tracking-wider">{tx({ de: "Engagement", en: "Engagement", es: "Interacción" })}</div>
           <div className="text-xl font-semibold">{formatNum(totals.engagement)}</div>
         </Card>
       </div>
@@ -263,7 +262,7 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <Link2 className="h-3 w-3" />
-                    {r.posts_count} {r.posts_count === 1 ? 'Post' : 'Posts'}
+                    {r.posts_count} {r.posts_count === 1 ? tx({ de: 'Post', en: 'Post', es: 'Publicación' }) : tx({ de: 'Posts', en: 'Posts', es: 'Publicaciones' })}
                   </div>
                 </div>
 
@@ -289,7 +288,7 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
                     </div>
                   </>
                 ) : (
-                  <p className="text-[11px] text-muted-foreground italic">Noch keine Posts verknüpft</p>
+                  <p className="text-[11px] text-muted-foreground italic">{tx({ de: "Noch keine Posts verknüpft", en: "No posts linked yet", es: "Aún no hay publicaciones vinculadas" })}</p>
                 )}
               </div>
             );
@@ -304,10 +303,10 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
             <div className="min-w-0">
               <h4 className="text-sm font-semibold flex items-center gap-2">
                 <Trophy className="h-4 w-4 text-emerald-400" />
-                Winner identifiziert
+                {tx({ de: "Winner identifiziert", en: "Winner identified", es: "Ganador identificado" })}
               </h4>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Klone die Top-Variante als neuen Master und iteriere weiter.
+                {tx({ de: "Klone die Top-Variante als neuen Master und iteriere weiter.", en: "Clone the top variant as a new master and keep iterating.", es: "Clona la variante ganadora como nuevo máster y sigue iterando." })}
               </p>
             </div>
             <Button size="sm" onClick={handleCloneWinner} disabled={cloning}>
@@ -316,7 +315,7 @@ export default function AdCampaignPerformance({ masterProjectId, onCloneWinner }
               ) : (
                 <Copy className="h-3.5 w-3.5 mr-1.5" />
               )}
-              Winner → Neuer Master
+              {tx({ de: "Winner → Neuer Master", en: "Winner → New master", es: "Ganador → Nuevo máster" })}
             </Button>
           </div>
         </Card>

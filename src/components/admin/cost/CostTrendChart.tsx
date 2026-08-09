@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { tx } from '@/lib/i18nText';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 
 interface TrendPoint {
@@ -12,11 +13,11 @@ export function CostTrendChart({ trend }: { trend: TrendPoint[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Verbrauchstrend</CardTitle>
+        <CardTitle>{tx({ de: 'Verbrauchstrend', en: 'Usage Trend', es: 'Tendencia de uso' })}</CardTitle>
       </CardHeader>
       <CardContent>
         {trend.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Noch keine Trend-Daten.</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">{tx({ de: 'Noch keine Trend-Daten.', en: 'No trend data yet.', es: 'Aún no hay datos de tendencia.' })}</p>
         ) : (
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">

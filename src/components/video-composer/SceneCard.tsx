@@ -2963,7 +2963,7 @@ export default function SceneCard({
                   {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
                     block was removed. The same composed prompt + layer
                     breakdown now lives inside ScenePromptDetailsSheet, opened
-                    via the tx({ de: "Prompt-Details ansehen", en: "View prompt details", es: "Ver detalles del mensaje" }) button above. */}
+                    via the "Prompt-Details ansehen" button above. */}
                 </div>
               )}
 

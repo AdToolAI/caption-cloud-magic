@@ -1337,7 +1337,7 @@ export function useStoryboardTransition({
               name: fetchErr?.name,
               cause: fetchErr?.cause?.code ?? null,
             });
-            setState((s) => ({ ...s, phaseLabel: 'Verbindung wiederhergestellt — analysiere weiter …' }));
+            setState((s) => ({ ...s, phaseLabel: tx({ de: 'Verbindung wiederhergestellt — analysiere weiter …', en: 'Connection restored — analyzing further …', es: 'Conexión restablecida — analizando más …' }) }));
             await new Promise((r) => setTimeout(r, delay));
             if (cancelledRef.current) return { handled: true };
             attempt += 1;

@@ -85,12 +85,12 @@ export function AIRecommendationsOverlay({
       );
 
     if (freeSlots.length === 0) {
-      toast.info("Keine freien AI-Slots verfügbar");
+      toast.info(tx({ de: "Keine freien AI-Slots verfügbar", en: "No free AI slots available", es: "No hay franjas de IA disponibles" }));
       return;
     }
 
     onApplySlots(timeline);
-    toast.success(`${freeSlots.length} AI-Empfehlungen angewendet`);
+    toast.success(tx({ de: `${freeSlots.length} AI-Empfehlungen angewendet`, en: `${freeSlots.length} AI recommendations applied`, es: `${freeSlots.length} recomendaciones de IA aplicadas` }));
   };
 
   if (!visible) {

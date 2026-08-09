@@ -1,4 +1,3 @@
-import { tx } from "@/lib/i18nText";
 // Stage 4 — "Save as Character / Location" UI
 //
 // Drop-in dropdown menu used on any image (Frame-First variants, Picture
@@ -91,13 +90,13 @@ export default function SaveAsAssetMenu({
 
       toast.success(
         mode === 'character'
-          ? t(language, 'Character saved', tx({ de: 'Charakter gespeichert', en: 'Character saved', es: 'Personaje guardado' }), 'Personaje guardado')
-          : t(language, 'Location saved', tx({ de: 'Location gespeichert', en: 'Location saved', es: 'Ubicación guardada' }), 'Ubicación guardada'),
+          ? t(language, 'Character saved', 'Charakter gespeichert', 'Personaje guardado')
+          : t(language, 'Location saved', 'Location gespeichert', 'Ubicación guardada'),
       );
       setOpen(false);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.message ?? t(language, 'Save failed', tx({ de: 'Speichern fehlgeschlagen', en: 'Save failed', es: 'Error al guardar' }), 'Error al guardar'));
+      toast.error(e?.message ?? t(language, 'Save failed', 'Speichern fehlgeschlagen', 'Error al guardar'));
     } finally {
       setSaving(false);
     }
@@ -114,7 +113,7 @@ export default function SaveAsAssetMenu({
                 'h-6 w-6 rounded-full bg-background/80 backdrop-blur border border-border/50 flex items-center justify-center hover:bg-primary/15 hover:border-primary/50 transition',
                 className,
               )}
-              title={t(language, 'Save as asset', tx({ de: 'Als Asset speichern', en: 'Save as asset', es: 'Guardar como recurso' }), 'Guardar como recurso')}
+              title={t(language, 'Save as asset', 'Als Asset speichern', 'Guardar como recurso')}
               onClick={(e) => e.stopPropagation()}
             >
               <Bookmark className="h-3 w-3" />
@@ -127,18 +126,18 @@ export default function SaveAsAssetMenu({
               onClick={(e) => e.stopPropagation()}
             >
               <Bookmark className="h-3 w-3" />
-              {t(language, 'Save as…', tx({ de: 'Speichern als…', en: 'Save as…', es: 'Guardar como…' }), 'Guardar como…')}
+              {t(language, 'Save as…', 'Speichern als…', 'Guardar como…')}
             </Button>
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuItem onClick={() => start('character')}>
             <User className="h-3.5 w-3.5 mr-2" />
-            {t(language, 'Save as Character', tx({ de: 'Als Charakter speichern', en: 'Save as character', es: 'Guardar como personaje' }), 'Guardar como personaje')}
+            {t(language, 'Save as Character', 'Als Charakter speichern', 'Guardar como personaje')}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => start('location')}>
             <MapPin className="h-3.5 w-3.5 mr-2" />
-            {t(language, 'Save as Location', tx({ de: 'Als Location speichern', en: 'Save as location', es: 'Guardar como ubicación' }), 'Guardar como ubicación')}
+            {t(language, 'Save as Location', 'Als Location speichern', 'Guardar como ubicación')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -148,8 +147,8 @@ export default function SaveAsAssetMenu({
           <DialogHeader>
             <DialogTitle>
               {mode === 'character'
-                ? t(language, 'Save as Character', tx({ de: 'Als Charakter speichern', en: 'Save as character', es: 'Guardar como personaje' }), 'Guardar como personaje')
-                : t(language, 'Save as Location', tx({ de: 'Als Location speichern', en: 'Save as location', es: 'Guardar como ubicación' }), 'Guardar como ubicación')}
+                ? t(language, 'Save as Character', 'Als Charakter speichern', 'Guardar como personaje')
+                : t(language, 'Save as Location', 'Als Location speichern', 'Guardar como ubicación')}
             </DialogTitle>
           </DialogHeader>
 

@@ -14,15 +14,15 @@ export function BriefStep({ onOpenTemplates }: { onOpenTemplates: () => void }) 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="space-y-2">
-        <h2 className="font-display text-3xl tracking-tight">Ein Briefing. Ein fertiger Beitrag.</h2>
+        <h2 className="font-display text-3xl tracking-tight">{tx({ de: "Ein Briefing. Ein fertiger Beitrag.", en: "One brief. One finished post.", es: "Un briefing. Una publicación terminada." })}</h2>
         <p className="text-sm text-muted-foreground">
-          Thema einmal setzen — Copy, Motiv, Layout und Termin bauen darauf auf.
+          {tx({ de: "Thema einmal setzen — Copy, Motiv, Layout und Termin bauen darauf auf.", en: "Set the topic once — copy, visual, layout and date build on it.", es: "Define el tema una vez — el texto, la imagen, el diseño y la fecha se basan en él." })}
         </p>
       </div>
 
       <div className="space-y-5 rounded-2xl border border-border/60 bg-card/60 p-6 backdrop-blur">
         <div className="space-y-2">
-          <Label>Briefing</Label>
+          <Label>{tx({ de: "Briefing", en: "Brief", es: "Briefing" })}</Label>
           <Textarea
             rows={5}
             value={s.brief}
@@ -33,7 +33,7 @@ export function BriefStep({ onOpenTemplates }: { onOpenTemplates: () => void }) 
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label>Plattform</Label>
+            <Label>{tx({ de: "Plattform", en: "Platform", es: "Plataforma" })}</Label>
             <Select value={s.platform} onValueChange={s.setPlatform}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -45,18 +45,18 @@ export function BriefStep({ onOpenTemplates }: { onOpenTemplates: () => void }) 
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Sprache</Label>
+            <Label>{tx({ de: "Sprache", en: "Language", es: "Idioma" })}</Label>
             <Select value={s.language} onValueChange={s.setLanguage}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="de">Deutsch</SelectItem>
-                <SelectItem value="en">Englisch</SelectItem>
-                <SelectItem value="es">Spanisch</SelectItem>
+                <SelectItem value="de">{tx({ de: "Deutsch", en: "German", es: "Alemán" })}</SelectItem>
+                <SelectItem value="en">{tx({ de: "Englisch", en: "English", es: "Inglés" })}</SelectItem>
+                <SelectItem value="es">{tx({ de: "Spanisch", en: "Spanish", es: "Español" })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Tonalität</Label>
+            <Label>{tx({ de: "Tonalität", en: "Tone", es: "Tono" })}</Label>
             <Input value={s.tone} onChange={(e) => s.setTone(e.target.value)} />
           </div>
         </div>
@@ -64,10 +64,10 @@ export function BriefStep({ onOpenTemplates }: { onOpenTemplates: () => void }) 
         <div className="flex flex-wrap gap-2">
           <Button size="lg" className="flex-1" onClick={s.generateCopy} disabled={s.copyBusy}>
             {s.copyBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-            Copy erzeugen
+            {tx({ de: "Copy erzeugen", en: "Generate copy", es: "Generar texto" })}
           </Button>
           <Button size="lg" variant="outline" onClick={onOpenTemplates}>
-            <BookTemplate className="mr-2 h-4 w-4" /> Vorlagen
+            <BookTemplate className="mr-2 h-4 w-4" /> {tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })}
           </Button>
         </div>
       </div>

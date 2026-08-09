@@ -71,14 +71,14 @@ const ForgotPassword = () => {
                 >
                   <CheckCircle2 className="h-10 w-10 text-green-500" />
                 </motion.div>
-                <CardTitle className="text-2xl">E-Mail gesendet!</CardTitle>
+                <CardTitle className="text-2xl">{tx({ de: "E-Mail gesendet!", en: "Email sent!", es: "¡Email enviado!" })}</CardTitle>
                 <CardDescription className="text-base">
-                  Wir haben Ihnen einen Link zum Zurücksetzen Ihres Passworts an <strong>{email}</strong> gesendet.
+                  {tx({ de: "Wir haben Ihnen einen Link zum Zurücksetzen Ihres Passworts an", en: "We have sent you a link to reset your password to", es: "Le hemos enviado un enlace para restablecer su contraseña a" })} <strong>{email}</strong> {tx({ de: "gesendet.", en: "sent.", es: "enviado." })}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 rounded-xl bg-muted/30 border border-white/5 text-sm text-muted-foreground">
-                  <p>Prüfen Sie auch Ihren Spam- oder Junk-Ordner, falls Sie die E-Mail nicht finden.</p>
+                  <p>{tx({ de: "Prüfen Sie auch Ihren Spam- oder Junk-Ordner, falls Sie die E-Mail nicht finden.", en: "Also check your spam or junk folder if you cannot find the email.", es: "Revise también su carpeta de spam o correo no deseado si no encuentra el email." })}</p>
                 </div>
                 <Button
                   variant="outline"
@@ -86,7 +86,7 @@ const ForgotPassword = () => {
                   className="w-full"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Zurück zur Anmeldung
+                  {tx({ de: "Zurück zur Anmeldung", en: "Back to login", es: "Volver al inicio de sesión" })}
                 </Button>
               </CardContent>
             </Card>
@@ -139,21 +139,21 @@ const ForgotPassword = () => {
                 className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm font-medium text-primary mx-auto"
               >
                 <Shield className="h-4 w-4" />
-                Passwort-Wiederherstellung
+                {tx({ de: "Passwort-Wiederherstellung", en: "Password recovery", es: "Recuperación de contraseña" })}
               </motion.div>
 
               <CardTitle className="text-2xl font-bold">
-                Passwort vergessen?
+                {tx({ de: "Passwort vergessen?", en: "Forgot password?", es: "¿Olvidaste tu contraseña?" })}
               </CardTitle>
               <CardDescription className="text-base">
-                Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum Zurücksetzen.
+                {tx({ de: "Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum Zurücksetzen.", en: "Enter your email address and we will send you a link to reset it.", es: "Introduce tu dirección de email y te enviaremos un enlace para restablecerla." })}
               </CardDescription>
             </CardHeader>
 
             <form onSubmit={handleSubmit}>
               <CardContent className="space-y-5 pt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">E-Mail-Adresse</Label>
+                  <Label htmlFor="email">{tx({ de: "E-Mail-Adresse", en: "Email address", es: "Dirección de email" })}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -176,7 +176,7 @@ const ForgotPassword = () => {
                   ) : (
                     <Mail className="mr-2 h-5 w-5" />
                   )}
-                  Reset-Link senden
+                  {tx({ de: "Reset-Link senden", en: "Send reset link", es: "Enviar enlace de restablecimiento" })}
                 </Button>
 
                 <Button
@@ -186,7 +186,7 @@ const ForgotPassword = () => {
                   className="w-full"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Zurück zur Anmeldung
+                  {tx({ de: "Zurück zur Anmeldung", en: "Back to login", es: "Volver al inicio de sesión" })}
                 </Button>
               </CardContent>
             </form>

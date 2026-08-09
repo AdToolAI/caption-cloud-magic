@@ -582,7 +582,7 @@ export function ImageGenerator() {
                     </div>
                     <p className="text-[10px] text-muted-foreground mb-1.5">{meta.model}</p>
                     <Badge variant={tierCost === 0 ? 'secondary' : 'outline'} className="text-[10px] h-5">
-                      {tierCost === 0 ? 'Gratis im Abo' : `${currencySymbol}${tierCost.toFixed(2)}/Bild`}
+                      {tierCost === 0 ? tx({ de: 'Gratis im Abo', en: 'Free with subscription', es: 'Gratis con suscripción' }) : tx({ de: `${currencySymbol}${tierCost.toFixed(2)}/Bild`, en: `${currencySymbol}${tierCost.toFixed(2)}/image`, es: `${currencySymbol}${tierCost.toFixed(2)}/imagen` })}
                     </Badge>
                   </button>
                 );

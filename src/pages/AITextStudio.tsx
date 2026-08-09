@@ -488,7 +488,7 @@ export default function AITextStudio() {
               <div>
                 <Label className="text-xs">Persona</Label>
                 <Select value={personaId} onValueChange={setPersonaId}>
-                  <SelectTrigger><SelectValue placeholder="(keine)" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={tx({ de: "(keine)", en: "(none)", es: "(ninguno)" })} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">{tx({ de: "— Keine —", en: "- No -", es: "- No -" })}</SelectItem>
                     {personas.map((p) => (

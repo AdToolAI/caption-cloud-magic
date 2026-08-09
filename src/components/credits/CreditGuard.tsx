@@ -3,6 +3,7 @@ import { useCreditReservation } from '@/hooks/useCreditReservation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Coins } from 'lucide-react';
 import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
+import { tx } from '@/lib/i18nText';
 
 interface CreditGuardProps {
   children: (checkAndExecute: (feature_code: string, action: () => Promise<void>) => Promise<void>) => ReactNode;
@@ -64,22 +65,22 @@ export const CreditGuard = ({ children, feature_code, estimated_cost }: CreditGu
           <AlertDialogHeader>
             <div className="flex items-center gap-2">
               <Coins className="h-5 w-5 text-amber-500" />
-              <AlertDialogTitle>Nicht genügend Credits</AlertDialogTitle>
+              <AlertDialogTitle>{tx({ de: 'Nicht genügend Credits', en: 'Not enough credits', es: 'Créditos insuficientes' })}</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="space-y-2">
               <p>
-                Diese Aktion benötigt <strong>{insufficientData?.required || 0} Credits</strong>,
-                aber Sie haben nur <strong>{insufficientData?.available || 0} Credits</strong> verfügbar.
+                {tx({ de: 'Diese Aktion benötigt', en: 'This action requires', es: 'Esta acción requiere' })} <strong>{insufficientData?.required || 0} Credits</strong>,
+                {tx({ de: 'aber Sie haben nur', en: 'but you only have', es: 'pero solo tienes' })} <strong>{insufficientData?.available || 0} Credits</strong> {tx({ de: 'verfügbar.', en: 'available.', es: 'disponibles.' })}
               </p>
               <p className="text-sm">
-                Bitte kaufen Sie Credits nach, um diese Funktion zu nutzen.
+                {tx({ de: 'Bitte kaufen Sie Credits nach, um diese Funktion zu nutzen.', en: 'Please purchase more credits to use this feature.', es: 'Compra más créditos para usar esta función.' })}
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}</AlertDialogCancel>
             <AlertDialogAction onClick={() => window.location.href = '/credits'}>
-              Credits kaufen
+              {tx({ de: 'Credits kaufen', en: 'Buy credits', es: 'Comprar créditos' })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

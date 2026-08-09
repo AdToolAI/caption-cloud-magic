@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle, Download, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { tx } from "@/lib/i18nText";
 
 interface ImageAnalysisPanelProps {
   imageUrl: string;
@@ -32,7 +33,7 @@ export const ImageAnalysisPanel = ({ imageUrl, brandKitId }: ImageAnalysisPanelP
       <div className="flex items-center justify-center h-64">
         <div className="text-center space-y-2">
           <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-          <p className="text-sm text-muted-foreground">Analysiere Bild...</p>
+          <p className="text-sm text-muted-foreground">{tx({ de: "Analysiere Bild...", en: "Analyzing image...", es: "Analizando imagen..." })}</p>
         </div>
       </div>
     );

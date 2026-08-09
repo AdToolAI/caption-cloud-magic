@@ -270,12 +270,12 @@ export function LiveSweepTab() {
                 {sweeping ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Sweep läuft …
+                    {tx({ de: "Sweep läuft …", en: "Sweep running …", es: "Barrido en curso …" })}
                   </>
                 ) : (
                   <>
                     <Play className="h-4 w-4 mr-2" />
-                    Run Live Sweep (Cap: {cap.toFixed(0)} €)
+                    {tx({ de: `Run Live Sweep (Cap: ${cap.toFixed(0)} €)`, en: `Run live sweep (cap: ${cap.toFixed(0)} €)`, es: `Ejecutar barrido en vivo (tope: ${cap.toFixed(0)} €)` })}
                   </>
                 )}
               </Button>
@@ -283,19 +283,19 @@ export function LiveSweepTab() {
             <AlertDialogContent className="bg-[#050816] border-[#F5C76A]/30">
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-[#F5C76A]">
-                  Live Sweep starten?
+                  {tx({ de: "Live Sweep starten?", en: "Start live sweep?", es: "¿Iniciar barrido en vivo?" })}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Dies feuert echte Provider-Calls bei Replicate, Runway und Hedra.
-                  Geschätzte Kosten: ~8 €. Hard-Cap stoppt bei ${cap.toFixed(2)} €.
+                  {tx({ de: "Dies feuert echte Provider-Calls bei Replicate, Runway und Hedra.", en: "This triggers real provider calls at Replicate, Runway and Hedra.", es: "Esto activa llamadas reales a los proveedores Replicate, Runway y Hedra." })}{" "}
+                  {tx({ de: `Geschätzte Kosten: ~8 €. Hard-Cap stoppt bei ${cap.toFixed(2)} €.`, en: `Estimated costs: ~8 €. Hard cap stops at ${cap.toFixed(2)} €.`, es: `Costos estimados: ~8 €. El tope máximo se detiene en ${cap.toFixed(2)} €.` })}
                   <br /><br />
-                  Test-Assets müssen vorher per "Bootstrap Assets" erzeugt sein.
+                  {tx({ de: 'Test-Assets müssen vorher per "Bootstrap Assets" erzeugt sein.', en: 'Test assets must be created beforehand via "Bootstrap Assets".', es: 'Los recursos de prueba deben crearse previamente mediante "Bootstrap Assets".' })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
                 <AlertDialogAction onClick={handleSweep} className="bg-[#F5C76A] text-[#050816]">
-                  Sweep starten
+                  {tx({ de: "Sweep starten", en: "Start sweep", es: "Iniciar barrido" })}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

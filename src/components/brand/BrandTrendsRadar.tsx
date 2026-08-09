@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Radar, RefreshCw, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { tx } from "@/lib/i18nText";
 
 interface Props {
   brandKitId: string;
@@ -53,25 +54,25 @@ export function BrandTrendsRadar({ brandKitId }: Props) {
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <Radar className="h-4 w-4 text-cyan-400" />
-            Brand-Trends Radar
+            {tx({ de: "Brand-Trends Radar", en: "Brand Trends Radar", es: "Radar de Tendencias de Marca" })}
           </CardTitle>
           <CardDescription>
-            Wöchentlicher Brand-Pulse für deine Branche.
+            {tx({ de: "Wöchentlicher Brand-Pulse für deine Branche.", en: "Weekly brand pulse for your industry.", es: "Pulso de marca semanal para tu sector." })}
             {data?.cached && <span className="ml-1 opacity-60">(cached)</span>}
           </CardDescription>
         </div>
         <Button size="sm" variant="outline" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />
-          Refresh
+          {tx({ de: "Refresh", en: "Refresh", es: "Actualizar" })}
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Radar lädt…
+            <Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: "Radar lädt…", en: "Radar loading…", es: "Cargando radar…" })}
           </div>
         ) : trends.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keine Signale. Refresh anstoßen.</p>
+          <p className="text-sm text-muted-foreground">{tx({ de: "Noch keine Signale. Refresh anstoßen.", en: "No signals yet. Trigger a refresh.", es: "Aún no hay señales. Inicia una actualización." })}</p>
         ) : (
           trends.map((t, i) => (
             <motion.div

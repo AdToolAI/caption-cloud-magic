@@ -39,6 +39,27 @@ const GOALS = ['Werbung', 'Social', 'Portrait', 'Szene', 'Produkt', 'Kunst'];
 const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime', 'Aquarell'];
 const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
+const CHIP_LABELS: Record<string, { de: string; en: string; es: string }> = {
+  Werbung: { de: 'Werbung', en: 'Advertising', es: 'Publicidad' },
+  Social: { de: 'Social', en: 'Social', es: 'Social' },
+  Portrait: { de: 'Portrait', en: 'Portrait', es: 'Retrato' },
+  Szene: { de: 'Szene', en: 'Scene', es: 'Escena' },
+  Produkt: { de: 'Produkt', en: 'Product', es: 'Producto' },
+  Kunst: { de: 'Kunst', en: 'Art', es: 'Arte' },
+  Fotorealistisch: { de: 'Fotorealistisch', en: 'Photorealistic', es: 'Fotorrealista' },
+  Cinematisch: { de: 'Cinematisch', en: 'Cinematic', es: 'Cinematográfico' },
+  Illustration: { de: 'Illustration', en: 'Illustration', es: 'Ilustración' },
+  '3D': { de: '3D', en: '3D', es: '3D' },
+  Anime: { de: 'Anime', en: 'Anime', es: 'Anime' },
+  Aquarell: { de: 'Aquarell', en: 'Watercolor', es: 'Acuarela' },
+  Episch: { de: 'Episch', en: 'Epic', es: 'Épico' },
+  Ruhig: { de: 'Ruhig', en: 'Calm', es: 'Tranquilo' },
+  Dramatisch: { de: 'Dramatisch', en: 'Dramatic', es: 'Dramático' },
+  Hell: { de: 'Hell', en: 'Bright', es: 'Brillante' },
+  Düster: { de: 'Düster', en: 'Dark', es: 'Sombrío' },
+  Verspielt: { de: 'Verspielt', en: 'Playful', es: 'Juguetón' },
+};
+
 const ENHANCE_DEFAULT_TEXT =
   tx({ de: "Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.", en: "Adopt this image 1:1 and improve quality, realism, light consistency, and detail — keep all people, clothing, composition, and background exactly as is.", es: "Adopta esta imagen 1:1 y mejora la calidad, el realismo, la consistencia de la luz y el detalle — mantén a todas las personas, la ropa, la composición y el fondo exactamente como están." });
 
@@ -119,7 +140,7 @@ export function PromptHelperDialog({
           : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
       }`}
     >
-      {value}
+      {CHIP_LABELS[value] ? tx(CHIP_LABELS[value]) : value}
     </button>
   );
 

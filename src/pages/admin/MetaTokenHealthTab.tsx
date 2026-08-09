@@ -50,9 +50,9 @@ export function MetaTokenHealthTab() {
     },
     onSuccess: (data: any) => {
       if (data?.refreshed) {
-        toast.success(`Token erneuert — gültig bis ${data.new_expires_at ? format(new Date(data.new_expires_at), "dd.MM.yyyy") : "∞"}`);
+        toast.success(tx({ de: `Token erneuert — gültig bis ${data.new_expires_at ? format(new Date(data.new_expires_at), "dd.MM.yyyy") : "∞"}`, en: `Token renewed — valid until ${data.new_expires_at ? format(new Date(data.new_expires_at), "dd.MM.yyyy") : "∞"}`, es: `Token renovado — válido hasta ${data.new_expires_at ? format(new Date(data.new_expires_at), "dd.MM.yyyy") : "∞"}` }));
       } else {
-        toast.info(`Kein Refresh nötig: ${data?.reason || "ok"}`);
+        toast.info(tx({ de: `Kein Refresh nötig: ${data?.reason || "ok"}`, en: `No refresh needed: ${data?.reason || "ok"}`, es: `No se necesita renovación: ${data?.reason || "ok"}` }));
       }
       qc.invalidateQueries({ queryKey: ["meta-token-status"] });
     },
@@ -94,7 +94,7 @@ export function MetaTokenHealthTab() {
               onClick={() => refreshM.mutate(false)}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-              Check / Refresh wenn nötig
+              {tx({ de: "Check / Refresh wenn nötig", en: "Check / refresh if needed", es: "Comprobar / renovar si es necesario" })}
             </Button>
             <Button
               size="sm"
@@ -118,10 +118,10 @@ export function MetaTokenHealthTab() {
               <Stat label="Status">
                 <span className={`flex items-center gap-2 font-medium ${healthColor}`}>
                   {healthIcon}
-                  {!s.is_valid ? "Invalid" : s.needs_refresh ? "Refresh fällig" : "Gesund"}
+                  {!s.is_valid ? "Invalid" : s.needs_refresh ? tx({ de: "Refresh fällig", en: "Refresh due", es: "Renovación pendiente" }) : tx({ de: "Gesund", en: "Healthy", es: "Saludable" })}
                 </span>
               </Stat>
-              <Stat label="Läuft ab">
+              <Stat label={tx({ de: "Läuft ab", en: "Expires", es: "Expira" })}>
                 <span className="text-white">
                   {s.never_expires ? "Nie" : s.expires_at ? format(new Date(s.expires_at), "dd.MM.yyyy HH:mm") : "—"}
                 </span>
@@ -149,16 +149,19 @@ export function MetaTokenHealthTab() {
                 <div className="flex flex-wrap gap-1">
                   {s.scopes.length ? s.scopes.map((sc) => (
                     <Badge key={sc} variant="outline" className="text-xs">{sc}</Badge>
-                  )) : <span className="text-zinc-500 text-xs">keine</span>}
+                  )) : <span className="text-zinc-500 text-xs">{tx({ de: "keine", en: "none", es: "ninguno" })}</span>}
                 </div>
               </div>
             </div>
           ) : null}
 
           <div className="mt-4 text-xs text-zinc-500 border-t border-[#F5C76A]/10 pt-3">
-            Cron läuft täglich um 03:00 UTC. Refresh wird ausgelöst, sobald Restlaufzeit &lt; {s?.threshold_days ?? 14} Tage.
-            Bei <code>token_invalid</code> muss manuell ein neuer Short-Token im{" "}
-            <code>InstagramTokenDialog</code> eingefügt werden.
+            {tx({ de: <>Cron läuft täglich um 03:00 UTC. Refresh wird ausgelöst, sobald Restlaufzeit &lt; {s?.threshold_days ?? 14} Tage.</>, en: <>Cron runs daily at 03:00 UTC. Refresh is triggered once remaining time is &lt; {s?.threshold_days ?? 14} days.</>, es: <>El cron se ejecuta diariamente a las 03:00 UTC. La renovación se activa cuando el tiempo restante es &lt; {s?.threshold_days ?? 14} días.</> })}
+            {tx({
+              de: <> Bei <code>token_invalid</code> muss manuell ein neuer Short-Token im <code>InstagramTokenDialog</code> eingefügt werden.</>,
+              en: <> On <code>token_invalid</code>, a new short-lived token must be inserted manually in the <code>InstagramTokenDialog</code>.</>,
+              es: <> En caso de <code>token_invalid</code>, se debe insertar manualmente un nuevo token de corta duración en el <code>InstagramTokenDialog</code>.</>,
+            })}
           </div>
         </CardContent>
       </Card>

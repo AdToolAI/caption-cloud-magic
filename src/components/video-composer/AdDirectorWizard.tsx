@@ -482,10 +482,12 @@ export default function AdDirectorWizard({
       });
 
       toast({
-        title: 'Ad Director erstellt',
-        description: `${built.scenes.length} Szenen · ${Math.round(built.totalDurationSec)}s${
-          voiceoverConfig ? ' · Voiceover ✓' : ''
-        }${brandKitInput ? ' · Brand-Kit ✓' : ''}`,
+        title: tx({ de: 'Ad Director erstellt', en: 'Ad Director created', es: 'Ad Director creado' }),
+        description: tx({
+          de: `${built.scenes.length} Szenen · ${Math.round(built.totalDurationSec)}s${voiceoverConfig ? ' · Voiceover ✓' : ''}${brandKitInput ? ' · Brand-Kit ✓' : ''}`,
+          en: `${built.scenes.length} scenes · ${Math.round(built.totalDurationSec)}s${voiceoverConfig ? ' · Voiceover ✓' : ''}${brandKitInput ? ' · Brand kit ✓' : ''}`,
+          es: `${built.scenes.length} escenas · ${Math.round(built.totalDurationSec)}s${voiceoverConfig ? ' · Voz en off ✓' : ''}${brandKitInput ? ' · Kit de marca ✓' : ''}`,
+        }),
       });
       handleClose(false);
     } catch (err: any) {

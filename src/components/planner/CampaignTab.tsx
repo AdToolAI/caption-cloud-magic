@@ -38,6 +38,7 @@ import {
 import { PostGeneratorInline } from "@/components/campaigns/PostGeneratorInline";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
+import { tx } from "@/lib/i18nText";
 
 interface CampaignPost {
   id: string;
@@ -249,7 +250,7 @@ export function CampaignTab({ workspaceId, initialOpenTemplates = false }: Campa
             workspaceId={workspaceId}
             onGenerated={() => {
               setShowTemplateDialog(false);
-              toast.success(t('planner.contentGenerated') || 'Kampagne erstellt');
+              toast.success(t('planner.contentGenerated') || tx({ de: 'Kampagne erstellt', en: 'Campaign created', es: 'Campaña creada' }));
               fetchCampaigns();
             }}
           />
@@ -573,7 +574,7 @@ export function CampaignTab({ workspaceId, initialOpenTemplates = false }: Campa
           workspaceId={workspaceId}
           onGenerated={() => {
             setShowTemplateDialog(false);
-            toast.success(t('planner.contentGenerated') || 'Kampagne erstellt');
+            toast.success(t('planner.contentGenerated') || tx({ de: 'Kampagne erstellt', en: 'Campaign created', es: 'Campaña creada' }));
             fetchCampaigns();
           }}
         />

@@ -85,7 +85,7 @@ export default function AIDirectorBriefDialog({
       if (!data?.plan) throw new Error(tx({ de: 'Kein Plan zurückgegeben', en: 'No plan returned', es: 'No se devolvió ningún plan' }));
       setPlan(data.plan as DirectorPlan);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Director-Fehler';
+      const msg = err instanceof Error ? err.message : tx({ de: 'Director-Fehler', en: 'Director error', es: 'Error del director' });
       console.error('[AIDirector] error:', err);
       toast.error(msg);
     } finally {

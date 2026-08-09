@@ -1,6 +1,7 @@
 import { Check, CloudUpload, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 interface AutosaveBadgeProps {
   status: 'idle' | 'saving' | 'saved' | 'error';
@@ -9,12 +10,12 @@ interface AutosaveBadgeProps {
 
 function formatRelative(ts: number, now: number): string {
   const diffSec = Math.max(0, Math.round((now - ts) / 1000));
-  if (diffSec < 5) return 'gerade eben';
-  if (diffSec < 60) return `vor ${diffSec}s`;
+  if (diffSec < 5) return tx({ de: 'gerade eben', en: 'just now', es: 'justo ahora' });
+  if (diffSec < 60) return tx({ de: `vor ${diffSec}s`, en: `${diffSec}s ago`, es: `hace ${diffSec}s` });
   const min = Math.round(diffSec / 60);
-  if (min < 60) return `vor ${min} min`;
+  if (min < 60) return tx({ de: `vor ${min} min`, en: `${min} min ago`, es: `hace ${min} min` });
   const hr = Math.round(min / 60);
-  return `vor ${hr}h`;
+  return tx({ de: `vor ${hr}h`, en: `${hr}h ago`, es: `hace ${hr}h` });
 }
 
 /**
@@ -38,7 +39,7 @@ export function AutosaveBadge({ status, lastSavedAt }: AutosaveBadgeProps) {
     return (
       <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-white/5 border border-white/10 text-[10px] text-white/70">
         <CloudUpload className="h-3 w-3 text-cyan-300 animate-pulse" />
-        <span>Speichere…</span>
+        <span>{tx({ de: 'Speichere…', en: 'Saving…', es: 'Guardando…' })}</span>
       </div>
     );
   }
@@ -47,7 +48,7 @@ export function AutosaveBadge({ status, lastSavedAt }: AutosaveBadgeProps) {
     return (
       <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-red-500/10 border border-red-500/30 text-[10px] text-red-300">
         <AlertCircle className="h-3 w-3" />
-        <span>Speichern fehlgeschlagen</span>
+        <span>{tx({ de: 'Speichern fehlgeschlagen', en: 'Save failed', es: 'Error al guardar' })}</span>
       </div>
     );
   }
@@ -56,7 +57,7 @@ export function AutosaveBadge({ status, lastSavedAt }: AutosaveBadgeProps) {
     return (
       <div className="flex items-center gap-1.5 h-6 px-2 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-[10px] text-emerald-200">
         <Check className="h-3 w-3" />
-        <span>Gesichert{relative ? ` · ${relative}` : ''}</span>
+        <span>{tx({ de: 'Gesichert', en: 'Saved', es: 'Guardado' })}{relative ? ` · ${relative}` : ''}</span>
       </div>
     );
   }
@@ -72,7 +73,7 @@ export function AutosaveBadge({ status, lastSavedAt }: AutosaveBadgeProps) {
       title={new Date(lastSavedAt!).toLocaleString()}
     >
       <Check className="h-3 w-3 text-white/30" />
-      <span>Zuletzt gesichert {relative}</span>
+      <span>{tx({ de: 'Zuletzt gesichert', en: 'Last saved', es: 'Guardado por última vez' })} {relative}</span>
     </div>
   );
 }
