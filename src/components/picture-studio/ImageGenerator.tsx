@@ -634,7 +634,7 @@ export function ImageGenerator() {
           <div className="space-y-2">
             <Label>Qualität & Modell</Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {(Object.keys(TIER_META) as QualityTier[]).map((t) => {
+              {MAIN_TIERS.map((t) => {
                 const meta = TIER_META[t];
                 const Icon = meta.icon;
                 const tierCost = TIER_COSTS[t];
@@ -662,7 +662,44 @@ export function ImageGenerator() {
                 );
               })}
             </div>
+
+            {/* Spezialmodelle */}
+            <details className="rounded-lg border border-border/50 bg-background/30" open={SPECIALIST_TIERS.includes(tier)}>
+              <summary className="cursor-pointer select-none px-3 py-2 text-xs text-muted-foreground">
+                {tx({ de: 'Spezialmodelle', en: 'Specialist models', es: 'Modelos especializados' })}
+              </summary>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-2 pt-0">
+                {SPECIALIST_TIERS.map((t) => {
+                  const meta = TIER_META[t];
+                  const Icon = meta.icon;
+                  const tierCost = TIER_COSTS[t];
+                  const isSelected = tier === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTier(t)}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        isSelected
+                          ? 'border-primary bg-gradient-to-br ' + meta.gradient + ' shadow-md'
+                          : 'border-border/50 bg-background/30 hover:border-border'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="font-semibold text-xs">{meta.label}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mb-1">{PICTURE_MODELS[t].bestFor[0]}</p>
+                      <Badge variant="outline" className="text-[10px] h-5">
+                        {currencySymbol}{tierCost.toFixed(2)}
+                      </Badge>
+                    </button>
+                  );
+                })}
+              </div>
+            </details>
           </div>
+
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
