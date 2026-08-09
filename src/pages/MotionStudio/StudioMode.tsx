@@ -892,7 +892,7 @@ function RenderStep({
             {location ? (
               <Badge variant="secondary">{location.name}</Badge>
             ) : (
-              <span className="text-muted-foreground text-sm">Keine ausgewählt</span>
+              <span className="text-muted-foreground text-sm">{tx({ de: "Keine ausgewählt", en: "None selected", es: "Ninguno seleccionado" })}</span>
             )}
           </SummaryRow>
 
