@@ -392,7 +392,7 @@ export default function AudioStudio() {
                     className="relative overflow-hidden bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90"
                   >
                     <FileAudio className="w-5 h-5 mr-2" />
-                    Datei auswählen
+                    {tx({ de: 'Datei auswählen', en: 'Choose file', es: 'Elegir archivo' })}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
                   </Button>
                 </div>
@@ -400,10 +400,10 @@ export default function AudioStudio() {
                 {/* Feature preview cards */}
                 <div className="px-8 pb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
                   {[
-                    { icon: Mic, label: 'Custom Voice', desc: 'Eigene Stimme klonen' },
-                    { icon: FileText, label: 'Skript vorlesen', desc: 'Geführter Aufnahme-Text' },
-                    { icon: MessageCircle, label: tx({ de: 'WhatsApp Upload', en: 'WhatsApp upload', es: 'subir WhatsApp' }), desc: 'Sprachnachricht nutzen' },
-                    { icon: Wand2, label: 'Rauschoptimierung', desc: 'Samples automatisch säubern' }
+                    { icon: Mic, label: 'Custom Voice', desc: tx({ de: 'Eigene Stimme klonen', en: 'Clone your own voice', es: 'Clona tu propia voz' }) },
+                    { icon: FileText, label: tx({ de: 'Skript vorlesen', en: 'Read a script', es: 'Leer un guion' }), desc: tx({ de: 'Geführter Aufnahme-Text', en: 'Guided recording text', es: 'Texto de grabación guiado' }) },
+                    { icon: MessageCircle, label: tx({ de: 'WhatsApp Upload', en: 'WhatsApp upload', es: 'subir WhatsApp' }), desc: tx({ de: 'Sprachnachricht nutzen', en: 'Use a voice message', es: 'Usar un mensaje de voz' }) },
+                    { icon: Wand2, label: tx({ de: 'Rauschoptimierung', en: 'Noise cleanup', es: 'Reducción de ruido' }), desc: tx({ de: 'Samples automatisch säubern', en: 'Clean samples automatically', es: 'Limpia las muestras automáticamente' }) }
                   ].map((feature, i) => (
                     <motion.div
                       key={feature.label}

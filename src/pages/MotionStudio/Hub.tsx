@@ -204,11 +204,10 @@ export default function MotionStudioHub() {
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-                  Dein <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Director's Cockpit</span>
+                  {tx({ de: 'Dein', en: 'Your', es: 'Tu' })} <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Director's Cockpit</span>
                 </h1>
                 <p className="text-muted-foreground mt-2 max-w-2xl">
-                  Alles, was du für professionelle KI-Videoproduktion brauchst – Library, Voices, Composer
-                  und alle Generierungs-Engines an einem Ort. Studio-Power mit transparenter Pay-per-Use-Preisgestaltung.
+                  {tx({ de: 'Alles, was du für professionelle KI-Videoproduktion brauchst – Library, Voices, Composer und alle Generierungs-Engines an einem Ort. Studio-Power mit transparenter Pay-per-Use-Preisgestaltung.', en: 'Everything you need for professional AI video production – library, voices, composer and every generation engine in one place. Studio power with transparent pay-per-use pricing.', es: 'Todo lo que necesitas para la producción profesional de video con IA: biblioteca, voces, composer y todos los motores de generación en un solo lugar. Potencia de estudio con precios transparentes de pago por uso.' })}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
