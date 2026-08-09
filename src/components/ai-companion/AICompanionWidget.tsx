@@ -139,7 +139,11 @@ export function AICompanionWidget() {
       
       // If we detected an error, include it in the welcome message
       if (detectedError) {
-        welcomeContent = `Hey! 👋 Ich bin ${preferences.bot_name}. Ich habe bemerkt, dass ein Fehler aufgetreten ist:\n\n🚨 **${detectedError.message}**\n\n${detectedError.url ? `Seite: ${detectedError.url}\n\n` : ''}Möchtest du, dass ich dir bei der Behebung helfe? Oder soll ich den Fehler an unser Support-Team weiterleiten?`;
+        welcomeContent = tx({
+          de: `Hey! 👋 Ich bin ${preferences.bot_name}. Ich habe bemerkt, dass ein Fehler aufgetreten ist:\n\n🚨 **${detectedError.message}**\n\n${detectedError.url ? `Seite: ${detectedError.url}\n\n` : ''}Möchtest du, dass ich dir bei der Behebung helfe? Oder soll ich den Fehler an unser Support-Team weiterleiten?`,
+          en: `Hey! 👋 I'm ${preferences.bot_name}. I noticed that an error occurred:\n\n🚨 **${detectedError.message}**\n\n${detectedError.url ? `Page: ${detectedError.url}\n\n` : ''}Would you like me to help you fix it? Or should I forward the error to our support team?`,
+          es: `¡Hola! 👋 Soy ${preferences.bot_name}. He detectado que se ha producido un error:\n\n🚨 **${detectedError.message}**\n\n${detectedError.url ? `Página: ${detectedError.url}\n\n` : ''}¿Quieres que te ayude a solucionarlo? ¿O prefieres que envíe el error a nuestro equipo de soporte?`,
+        });
       } else if (hasIssues) {
         welcomeContent += `\n\n⚠️ Ich habe ${errorCount > 0 ? `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'}` : ''}${errorCount > 0 && warningCount > 0 ? ' und ' : ''}${warningCount > 0 ? `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}` : ''} in deinem Account erkannt. Soll ich dir mehr Details zeigen?`;
       } else {
