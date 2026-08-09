@@ -254,7 +254,7 @@ export function EffectControlPanel({
       
       {/* Info */}
       <p className="text-[10px] text-muted-foreground text-center">
-        Klicke auf einzelne Effekte um sie ein/auszuschalten, dann tx({ de: "Neu verarbeiten", en: "Reprocess", es: "reprocesar" })
+        {tx({ de: 'Klicke auf einzelne Effekte um sie ein/auszuschalten, dann "Neu verarbeiten".', en: 'Click individual effects to toggle them, then "Reprocess".', es: 'Haz clic en los efectos para activarlos o desactivarlos y luego "Reprocesar".' })}
       </p>
     </div>
   );

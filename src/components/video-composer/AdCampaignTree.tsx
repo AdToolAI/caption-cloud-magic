@@ -296,7 +296,7 @@ export default function AdCampaignTree({
         {loading && <p className="text-xs text-muted-foreground">Lade …</p>}
         {!loading && cutdowns.length === 0 && (
           <p className="text-xs text-muted-foreground italic">
-            Keine Cutdowns konfiguriert. Aktiviere im Ad Director „15stx({ de: " oder „6s Hook", en: "or “6s Hook", es: "o “Gancho 6s" }).
+            {tx({ de: 'Keine Cutdowns konfiguriert. Aktiviere im Ad Director „15s“ oder „6s Hook“.', en: 'No cutdowns configured. Enable “15s” or “6s Hook” in the Ad Director.', es: 'No hay cutdowns configurados. Activa «15s» o «6s Hook» en el Ad Director.' })}
           </p>
         )}
         <div className="grid sm:grid-cols-2 gap-3">
