@@ -252,20 +252,27 @@ serve(async (req) => {
       if (imageInputs.length) replicateInput.image_input = imageInputs;
     }
 
-    console.log(`[generate-image-replicate] Tier=${tier} Cost=${currencySymbol}${cost.toFixed(2)} Model=${modelRef}`);
+    console.log(`[generate-image-replicate] Tier=${tier} Cost=${currencySymbol}${cost.toFixed(2)} Model=${modelRef} aspect=${safeAspect} images=${imageInputs.length}`);
 
     let output: any;
     try {
       output = await replicate.run(modelRef as any, { input: replicateInput });
     } catch (replicateError: any) {
       console.error('[generate-image-replicate] Replicate error:', replicateError);
-      const msg = String(replicateError?.message ?? 'Unknown error');
+      const detail = String(
+        replicateError?.response?.data?.detail ??
+        replicateError?.detail ??
+        replicateError?.message ??
+        'Unknown error'
+      );
+      const msg = detail;
       const isSafety = /E005|flagged as sensitive|safety|nsfw/i.test(msg);
       return new Response(
         JSON.stringify({
           error: isSafety
             ? 'Das Referenzbild oder der Prompt wurde vom Sicherheitsfilter des Modells blockiert. Häufige Auslöser: viele Personen, religiöse, politische oder gewaltvolle Motive. Tipp: anderes Referenzbild wählen, Motiv im Prompt beschreiben statt vorzulegen, oder Tier „Pro" ohne Referenz testen.'
             : `Bildgenerierung fehlgeschlagen: ${msg}`,
+          provider_message: msg,
           code: isSafety ? 'SAFETY_FILTERED' : 'REPLICATE_ERROR',
         }),
         { status: isSafety ? 422 : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
