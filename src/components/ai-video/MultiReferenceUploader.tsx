@@ -170,7 +170,7 @@ export function MultiReferenceUploader({
           >
             <UserCircle2 className="h-3 w-3 mr-1" />
             {language === 'de'
-              ? 'Brand Character laden'
+              ? 'tx({ de: 'Brand Character laden', en: 'Load Brand Character', es: 'Cargar personaje de marca' })'
               : language === 'es'
               ? 'Cargar Brand Character'
               : 'Load Brand Character'}

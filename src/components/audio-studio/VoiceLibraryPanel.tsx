@@ -36,7 +36,7 @@ export function VoiceLibraryPanel() {
       });
       if (error) throw error;
       const audioB64 = data?.audioBase64 || data?.audio || data?.audioContent;
-      if (!audioB64) throw new Error('Keine Audio-Daten erhalten');
+      if (!audioB64) throw new Error('tx({ de: "Keine Audio-Daten erhalten", en: "No audio data received", es: "No se recibieron datos de audio" })');
       const audio = new Audio(`data:audio/mpeg;base64,${audioB64}`);
       await audio.play();
     } catch (err) {
