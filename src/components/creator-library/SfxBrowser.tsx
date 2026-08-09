@@ -188,14 +188,14 @@ export default function SfxBrowser() {
         ))}
         <Button asChild variant="ghost" size="sm" className="h-6 text-[11px] ml-auto">
           <Link to="/sfx-library">
-            tx({ de: 'Erweiterte SFX-Library', en: 'Advanced SFX library', es: 'Biblioteca SFX avanzada' }) <ArrowUpRightFromSquare className="h-3 w-3 ml-1" />
+            {tx({ de: 'Erweiterte SFX-Library', en: 'Advanced SFX library', es: 'Biblioteca SFX avanzada' })} <ArrowUpRightFromSquare className="h-3 w-3 ml-1" />
           </Link>
         </Button>
       </div>
 
       {loading && results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /> tx({ de: 'Lade SFX …', en: 'Loading SFX …', es: 'Cargando SFX …' })
+          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /> {tx({ de: 'Lade SFX …', en: 'Loading SFX …', es: 'Cargando SFX …' })}
         </Card>
       ) : results.length === 0 ? (
         <Card className="p-12 text-center text-sm text-muted-foreground">

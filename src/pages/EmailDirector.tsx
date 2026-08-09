@@ -152,7 +152,7 @@ export default function EmailDirector() {
             <div>
               <h1 className="text-3xl font-serif tracking-tight">{tx({ de: 'Email Campaign Director', en: 'Email Campaign Director', es: 'Director de campañas de email' })}</h1>
               <p className="text-sm text-muted-foreground">
-                {tx({ de: 'Brief → A/B-Subjects → Body-tx({ de: 'Varianten', en: 'variants', es: 'variantes' }) → Test-Send via Resend', en: 'Brief → A/B Subjects → Body Variants → Test Send via Resend', es: 'Resumen → Asuntos A/B → Variantes de cuerpo → Envío de prueba a través de Resend' })}
+                {tx({ de: 'Brief → A/B-Subjects → Body-{tx({ de: 'Varianten', en: 'variants', es: 'variantes' })} → Test-Send via Resend', en: 'Brief → A/B Subjects → Body Variants → Test Send via Resend', es: 'Resumen → Asuntos A/B → Variantes de cuerpo → Envío de prueba a través de Resend' })}
               </p>
             </div>
           </div>
@@ -226,7 +226,7 @@ export default function EmailDirector() {
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{c.title}</div>
                         <div className="text-xs text-muted-foreground">
-                          {format(new Date(c.created_at), "PP")} · {c.variants?.length || 0} tx({ de: 'Varianten', en: 'variants', es: 'variantes' })
+                          {format(new Date(c.created_at), "PP")} · {c.variants?.length || 0} {tx({ de: 'Varianten', en: 'variants', es: 'variantes' })}
                         </div>
                       </div>
                       <Trash2
@@ -249,7 +249,7 @@ export default function EmailDirector() {
               <Card className="p-12 text-center border-dashed">
                 <Mail className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-muted-foreground">
-                  Wähle eine Kampagne oder erstelle eine neue, um Subjects und tx({ de: 'Varianten', en: 'variants', es: 'variantes' }) zu sehen.
+                  Wähle eine Kampagne oder erstelle eine neue, um Subjects und {tx({ de: 'Varianten', en: 'variants', es: 'variantes' })} zu sehen.
                 </p>
               </Card>
             ) : (
@@ -267,7 +267,7 @@ export default function EmailDirector() {
                 <Tabs defaultValue="subjects" className="w-full">
                   <TabsList>
                     <TabsTrigger value="subjects">Subjects ({active.subjects?.length || 0})</TabsTrigger>
-                    <TabsTrigger value="variants">Body-tx({ de: 'Varianten', en: 'variants', es: 'variantes' }) ({active.variants?.length || 0})</TabsTrigger>
+                    <TabsTrigger value="variants">Body-{tx({ de: 'Varianten', en: 'variants', es: 'variantes' })} ({active.variants?.length || 0})</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="subjects" className="space-y-2 mt-4">

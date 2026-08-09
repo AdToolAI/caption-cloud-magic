@@ -71,13 +71,13 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
           <h3 className="font-semibold text-lg mb-4">✍️ {tx({ de: 'Schriftarten', en: 'Fonts', es: 'Fuentes' })}</h3>
           <div className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">tx({ de: 'Überschrift', en: 'Headline', es: 'Titular' })}</p>
+              <p className="text-sm text-muted-foreground mb-1">{tx({ de: 'Überschrift', en: 'Headline', es: 'Titular' })}</p>
               <p className="text-2xl font-bold" style={{ fontFamily: brandKit.font_pairing.headline }}>
                 {brandKit.font_pairing.headline}
               </p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">tx({ de: 'Fließtext', en: 'Body Text', es: 'Texto del cuerpo' })}</p>
+              <p className="text-sm text-muted-foreground mb-1">{tx({ de: 'Fließtext', en: 'Body Text', es: 'Texto del cuerpo' })}</p>
               <p className="text-lg" style={{ fontFamily: brandKit.font_pairing.body }}>
                 {brandKit.font_pairing.body}
               </p>
@@ -98,7 +98,7 @@ export function BrandBoard({ brandKit }: BrandBoardProps) {
               )}
               <div>
                 <p className="font-semibold">{brandKit.brand_name || "Deine Marke"}</p>
-                <p className="text-xs text-muted-foreground">tx({ de: 'Gesponsert', en: 'Sponsored', es: 'Patrocinado' })}</p>
+                <p className="text-xs text-muted-foreground">{tx({ de: 'Gesponsert', en: 'Sponsored', es: 'Patrocinado' })}</p>
               </div>
             </div>
 

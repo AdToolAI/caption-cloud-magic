@@ -140,7 +140,7 @@ export function TextOverlayEditor({
 
           <TabsContent value="templates" className="space-y-3 mt-3">
             <p className="text-sm text-muted-foreground">
-              Schnell-tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" }) mit einem Klick hinzufügen
+              Schnell-{tx({ de: "Vorlagen", en: "Templates", es: "Plantillas" })} mit einem Klick hinzufügen
             </p>
             <div className="grid grid-cols-2 gap-2">
               {TEXT_OVERLAY_TEMPLATES.map((template) => (
@@ -311,7 +311,7 @@ export function TextOverlayEditor({
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> tx({ de: "Ende", en: "End", es: "Fin" })
+                      <Clock className="h-3 w-3" /> {tx({ de: "Ende", en: "End", es: "Fin" })}
                     </Label>
                     <div className="flex items-center gap-2">
                       <Slider

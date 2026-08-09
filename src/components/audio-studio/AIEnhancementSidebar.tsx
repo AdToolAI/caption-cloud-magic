@@ -129,7 +129,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
       toast.success(tx({ de: 'Stimme erfolgreich isoliert!', en: 'Voice successfully isolated!', es: '¡Voz aislada con éxito!' }));
     } catch (error) {
       console.error('Isolation error:', error);
-      toast.error(tx({ de: 'Fehler bei der tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" })', en: 'Voice isolation error', es: 'Error de aislamiento de voz' }));
+      toast.error(tx({ de: 'Fehler bei der {tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" })}', en: 'Voice isolation error', es: 'Error de aislamiento de voz' }));
     } finally {
       setIsProcessing(false);
     }
@@ -320,9 +320,9 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
                 <div>
                   <h4 className="text-sm font-medium text-amber-500">{tx({ de: "Wichtiger Hinweis", en: "Important NOTE", es: "NOTA IMPORTANTE" })}</h4>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Die tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" }) entfernt <strong>alle</strong> Hintergrundgeräusche und Musik. 
-                    tx({ de: "Nur die reine Stimme bleibt erhalten. Ideal für Videos mit störender Hintergrundmusik", en: "Only the pure voice remains. Ideal for videos with annoying background music", es: "Solo queda la voz pura. Ideal para vídeos con música de fondo molesta" }) 
-                    tx({ de: "oder Interviews mit Umgebungslärm.", en: "or interviews with ambient noise.", es: "o entrevistas con ruido ambiental." })
+                    Die {tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" })} entfernt <strong>alle</strong> Hintergrundgeräusche und Musik. 
+                    {tx({ de: "Nur die reine Stimme bleibt erhalten. Ideal für Videos mit störender Hintergrundmusik", en: "Only the pure voice remains. Ideal for videos with annoying background music", es: "Solo queda la voz pura. Ideal para vídeos con música de fondo molesta" })} 
+                    {tx({ de: "oder Interviews mit Umgebungslärm.", en: "or interviews with ambient noise.", es: "o entrevistas con ruido ambiental." })}
                   </p>
                 </div>
               </div>
@@ -375,8 +375,8 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
             {/* Technical Info */}
             <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
               <p className="text-xs text-muted-foreground">
-                tx({ de: "<strong>Powered by ElevenLabs Audio Isolation API</strong> – Nutzt KI, um Sprache", en: "<strong>Powered by ElevenLabs Audio Isolation API</strong> – Uses AI to convert speech", es: "<strong>Impulsado por la API de aislamiento de audio de ElevenLabs</strong>: utiliza IA para convertir voz" }) 
-                tx({ de: "präzise von allen anderen Audioelementen zu trennen.", en: "precisely separate it from all other audio elements.", es: "separarlo con precisión de todos los demás elementos de audio." })
+                {tx({ de: "<strong>Powered by ElevenLabs Audio Isolation API</strong> – Nutzt KI, um Sprache", en: "<strong>Powered by ElevenLabs Audio Isolation API</strong> – Uses AI to convert speech", es: "<strong>Impulsado por la API de aislamiento de audio de ElevenLabs</strong>: utiliza IA para convertir voz" })} 
+                {tx({ de: "präzise von allen anderen Audioelementen zu trennen.", en: "precisely separate it from all other audio elements.", es: "separarlo con precisión de todos los demás elementos de audio." })}
               </p>
             </div>
           </TabsContent>

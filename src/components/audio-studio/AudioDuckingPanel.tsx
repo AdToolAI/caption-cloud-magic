@@ -144,7 +144,7 @@ export function AudioDuckingPanel({
                   {speechLabel}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {intervals.length} tx({ de: `Sprach-Block${intervals.length === 1 ? '' : 'e'}`, en: `speech block${intervals.length === 1 ? '' : 's'}`, es: `bloque${intervals.length === 1 ? '' : 's'} de voz` }) + " ·" {speechCoverage.toFixed(0)}% " " + tx({ de: 'Sprache', en: 'speech', es: 'habla' })
+                  {intervals.length} {tx({ de: `Sprach-Block${intervals.length === 1 ? '' : 'e'}`, en: `speech block${intervals.length === 1 ? '' : 's'}`, es: `bloque${intervals.length === 1 ? '' : 's'} de voz` })} + " ·" {speechCoverage.toFixed(0)}% " " + tx({ de: 'Sprache', en: 'speech', es: 'habla' })
                 </span>
               </div>
               <div className="relative h-20 rounded-lg bg-muted/30 border border-border/50 overflow-hidden cursor-pointer"

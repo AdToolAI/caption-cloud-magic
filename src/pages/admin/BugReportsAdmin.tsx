@@ -123,9 +123,9 @@ export function BugReportsAdmin() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{tx({ de: "Alle", en: "All", es: "Todos" })}</SelectItem>
-                  <SelectItem value="open">tx({ de: "🔵 Offen", en: "🔵 Open", es: "🔵 Abierto" })</SelectItem>
-                  <SelectItem value="in_progress">tx({ de: "🟡 In Arbeit", en: "🟡 In Progress", es: "🟡 En progreso" })</SelectItem>
-                  <SelectItem value="resolved">tx({ de: "🟢 Gelöst", en: "🟢 Resolved", es: "🟢 Resuelto" })</SelectItem>
+                  <SelectItem value="open">{tx({ de: "🔵 Offen", en: "🔵 Open", es: "🔵 Abierto" })}</SelectItem>
+                  <SelectItem value="in_progress">{tx({ de: "🟡 In Arbeit", en: "🟡 In Progress", es: "🟡 En progreso" })}</SelectItem>
+                  <SelectItem value="resolved">{tx({ de: "🟢 Gelöst", en: "🟢 Resolved", es: "🟢 Resuelto" })}</SelectItem>
                   <SelectItem value="wont_fix">Won't Fix</SelectItem>
                   <SelectItem value="duplicate">Duplicate</SelectItem>
                 </SelectContent>

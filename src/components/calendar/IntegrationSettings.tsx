@@ -19,7 +19,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [googletx({ de: "Verbunden", en: "Connected", es: "Conectado" }), setGoogletx({ de: "Verbunden", en: "Connected", es: "Conectado" })] = useState(false);
+  const [google{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}, setGoogle{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}] = useState(false);
   const [syncDirection, setSyncDirection] = useState<string>("push");
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
     }
 
     if (data) {
-      setGoogletx({ de: "Verbunden", en: "Connected", es: "Conectado" })(data.google_calendar_connected || false);
+      setGoogle{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}(data.google_calendar_connected || false);
       setSyncDirection(data.google_sync_direction || "push");
     }
 
@@ -63,12 +63,12 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
       // Open OAuth window
       window.location.href = data.authorization_url;
     } catch (error: any) {
-      console.error("Failed to connect tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }):", error);
-      toast.error(tx({ de: "Fehler beim Verbinden mit tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })", en: "Failed to connect tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })", es: "Error al conectar con tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })" }));
+      console.error("Failed to connect {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}:", error);
+      toast.error(tx({ de: "Fehler beim Verbinden mit {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}", en: "Failed to connect {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}", es: "Error al conectar con {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}" }));
     }
   };
 
-  const handletx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })Google = async () => {
+  const handle{tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}Google = async () => {
     try {
       const { error } = await supabase.functions.invoke(
         "calendar-google-oauth/disconnect",
@@ -79,10 +79,10 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
 
       if (error) throw error;
 
-      setGoogletx({ de: "Verbunden", en: "Connected", es: "Conectado" })(false);
+      setGoogle{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}(false);
       toast.success(tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }));
     } catch (error: any) {
-      console.error("Failed to disconnect tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }):", error);
+      console.error("Failed to disconnect {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}:", error);
       toast.error(tx({ de: "Fehler beim Trennen", en: "Failed to disconnect", es: "Error al desconectar" }));
     }
   };
@@ -149,27 +149,27 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }) Integration</CardTitle>
+                <CardTitle>{tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })} Integration</CardTitle>
                 <CardDescription>
-                  Sync your calendar events with tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })
+                  Sync your calendar events with {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}
                 </CardDescription>
               </div>
-              {googletx({ de: "Verbunden", en: "Connected", es: "Conectado" }) ? (
+              {google{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })} ? (
                 <Badge variant="default" className="gap-2">
                   {tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}
                 </Badge>
               ) : (
                 <Badge variant="outline" className="gap-2">
-                  Not tx({ de: "Verbunden", en: "Connected", es: "Conectado" })
+                  Not {tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}
                 </Badge>
               )}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!googletx({ de: "Verbunden", en: "Connected", es: "Conectado" }) ? (
+            {!google{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })} ? (
               <Button onClick={handleConnectGoogle} className="w-full">
                 <Calendar className="w-4 h-4 mr-2" />
-                Connect tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })
+                Connect {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}
               </Button>
             ) : (
               <>
@@ -192,8 +192,8 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    {syncDirection === "push" && "Events are synced from your calendar to tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })"}
-                    {syncDirection === "pull" && "Events are synced from tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }) to your calendar"}
+                    {syncDirection === "push" && "Events are synced from your calendar to {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}"}
+                    {syncDirection === "pull" && "Events are synced from {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })} to your calendar"}
                     {syncDirection === "two_way" && tx({ de: "Ereignisse werden in beide Richtungen synchronisiert", en: "Events are synced in both directions", es: "Los eventos se sincronizan en ambas direcciones." })}
                   </p>
                 </div>
@@ -205,7 +205,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={handletx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })Google}
+                    onClick={handle{tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}Google}
                   >
                     <Link2Off className="w-4 h-4 mr-2" />
                     {tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}

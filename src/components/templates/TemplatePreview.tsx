@@ -188,7 +188,7 @@ export const TemplatePreview = ({
                               Version {version.version_number}
                             </span>
                             {version.is_published && (
-                              <Badge variant="secondary">tx({ de: 'Veröffentlicht', en: 'Published', es: 'Publicado' })</Badge>
+                              <Badge variant="secondary">{tx({ de: 'Veröffentlicht', en: 'Published', es: 'Publicado' })}</Badge>
                             )}
                           </div>
                           {version.change_notes && (

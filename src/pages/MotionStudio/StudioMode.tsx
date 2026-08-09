@@ -367,7 +367,7 @@ export default function StudioMode() {
               Zurück
             </Button>
             <div className="text-xs text-muted-foreground hidden sm:block">
-              Schritt {stepIndex + 1} tx({ de: "von", en: "of", es: "de" }) {STEPS.length} · {STEPS[stepIndex].title}
+              Schritt {stepIndex + 1} {tx({ de: "von", en: "of", es: "de" })} {STEPS.length} · {STEPS[stepIndex].title}
             </div>
             {!isLast ? (
               <Button onClick={goNext} disabled={!canAdvance} className="gap-2">

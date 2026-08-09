@@ -96,7 +96,7 @@ export const DetailedProgressBar = ({
       {/* Current progress text */}
       <div className="text-center">
         <p className="text-sm text-muted-foreground">
-          {progress}% tx({ de: 'abgeschlossen', en: 'completed', es: 'completado' })
+          {progress}% {tx({ de: 'abgeschlossen', en: 'completed', es: 'completado' })}
         </p>
       </div>
     </div>

@@ -84,7 +84,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
             </div>
           ) : variants.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {tx({ de: "Noch keine Varianten tx({ de: "erstellt", en: "created", es: "creadas" })", en: "No variants created yet", es: "Aún no se han creado variantes" })}
+              {tx({ de: "Noch keine Varianten {tx({ de: "erstellt", en: "created", es: "creadas" })}", en: "No variants created yet", es: "Aún no se han creado variantes" })}
             </div>
           ) : (
             <div className="space-y-4">
@@ -225,7 +225,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
               <span className="font-semibold text-foreground">
                 {selectedFormats.length * selectedRatios.length} {tx({ de: "Varianten", en: "variants", es: "variantes" })}
               </span>
-              {' '}tx({ de: "erstellt", en: "created", es: "creadas" })
+              {' '}{tx({ de: "erstellt", en: "created", es: "creadas" })}
             </div>
           </div>
 

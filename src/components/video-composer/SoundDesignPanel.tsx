@@ -143,7 +143,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
         </CardTitle>
         <Button onClick={generateMix} disabled={generating || !projectId} size="sm">
           {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-          tx({ de: "Mix erstellen", en: "Create mix", es: "Crear mezcla" })
+          {tx({ de: "Mix erstellen", en: "Create mix", es: "Crear mezcla" })}
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -152,14 +152,14 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
           Diese werden im finalen Render automatisch unter die Voiceover-Spur gemischt (Auto-Ducking, -14 LUFS).
         </p>
         <p className="text-[11px] text-muted-foreground/80 italic">
-          {tx({ de: "Hinweis:", en: "Note:", es: "Nota:" }) tx({ de: "Lip-Sync für sprechende Charaktere wird im <strong>Talking-Head-Dialog</strong> erstellt — der Sound-Mix mischt nur Atmo, SFX und Musik.", en: "Lip-sync for speaking characters is created in the <strong>Talking Head Dialog</strong> — the sound mix only mixes atmo, SFX and music.", es: "La sincronización de labios para personajes que hablan se crea en el <strong>diálogo de cabeza parlante</strong>: la mezcla de sonido solo mezcla atmo, efectos de sonido y música." })}
+          {tx({ de: "Hinweis:", en: "Note:", es: "Nota:" }) {tx({ de: "Lip-Sync für sprechende Charaktere wird im <strong>Talking-Head-Dialog</strong> erstellt — der Sound-Mix mischt nur Atmo, SFX und Musik.", en: "Lip-sync for speaking characters is created in the <strong>Talking Head Dialog</strong> — the sound mix only mixes atmo, SFX and music.", es: "La sincronización de labios para personajes que hablan se crea en el <strong>diálogo de cabeza parlante</strong>: la mezcla de sonido solo mezcla atmo, efectos de sonido y música." })}
         </p>
 
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
 
         {!loading && clips.length === 0 && (
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {tx({ de: 'Noch kein AI Sound Design generiert. Klick tx({ de: "Mix erstellen", en: "Create mix", es: "Crear mezcla" }) um Atmo + SFX vorschlagen und generieren zu lassen.', en: 'No AI sound design generated yet. Click "Create mix" to suggest and generate ambience + SFX.', es: 'Aún no se ha generado diseño de sonido con IA. Haz clic en "Crear mezcla" para sugerir y generar ambiente + SFX.' })}
+            {tx({ de: 'Noch kein AI Sound Design generiert. Klick {tx({ de: "Mix erstellen", en: "Create mix", es: "Crear mezcla" })} um Atmo + SFX vorschlagen und generieren zu lassen.', en: 'No AI sound design generated yet. Click "Create mix" to suggest and generate ambience + SFX.', es: 'Aún no se ha generado diseño de sonido con IA. Haz clic en "Crear mezcla" para sugerir y generar ambiente + SFX.' })}
           </div>
         )}
 

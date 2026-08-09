@@ -312,7 +312,7 @@ export function AISuperuserAdmin() {
             </div>
             {latestRunAt && (
               <div className="text-xs text-muted-foreground">
-                tx({ de: "Letzter Komplett-Test ", en: "Last full test ", es: "Última prueba completa " }){formatDistanceToNow(new Date(latestRunAt), { addSuffix: true, locale: de })}
+                {tx({ de: "Letzter Komplett-Test ", en: "Last full test ", es: "Última prueba completa " })}{formatDistanceToNow(new Date(latestRunAt), { addSuffix: true, locale: de })}
               </div>
             )}
           </div>

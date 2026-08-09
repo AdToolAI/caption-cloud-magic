@@ -54,7 +54,7 @@ export function TranscriptWaveformEditor({
         .from('audio-temp')
         .upload(tempFileName, blob, { contentType: blob.type || 'audio/mpeg' });
       
-      if (uploadError) throw new Error(`tx({ de: "Upload fehlgeschlagen: ", en: "Upload failed: ", es: "Error de carga: " })${uploadError.message}`);
+      if (uploadError) throw new Error(`{tx({ de: "Upload fehlgeschlagen: ", en: "Upload failed: ", es: "Error de carga: " })}${uploadError.message}`);
       
       // 3. Get public URL
       const { data: urlData } = supabase.storage
@@ -96,7 +96,7 @@ export function TranscriptWaveformEditor({
       toast.success(tx({ de: 'Transcript erfolgreich generiert', en: 'Transcript generated successfully', es: 'Transcripción generada con éxito' }));
     } catch (error) {
       console.error('Transcript error:', error);
-      toast.error(tx({ de: 'Fehler beim tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })es Transcripts', en: 'Error generating transcript', es: 'Error al generar la transcripción' }));
+      toast.error(tx({ de: 'Fehler beim {tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })}es Transcripts', en: 'Error generating transcript', es: 'Error al generar la transcripción' }));
     } finally {
       // 5. Cleanup: Delete temp file
       if (tempFileName) {
@@ -171,8 +171,8 @@ export function TranscriptWaveformEditor({
             </div>
             <h3 className="text-lg font-semibold mb-2">{tx({ de: "Transcript generieren", en: "Generate transcript", es: "Generar transcripción" })}</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              tx({ de: "Generiere...", en: "Generating...", es: "Generando..." }) 
-              tx({ de: "Markiere Wörter zum Löschen oder suche nach bestimmten Passagen.", en: "Highlight words to delete or search for specific passages.", es: "Resalte palabras para eliminarlas o busque pasajes específicos." })
+              {tx({ de: "Generiere...", en: "Generating...", es: "Generando..." })} 
+              {tx({ de: "Markiere Wörter zum Löschen oder suche nach bestimmten Passagen.", en: "Highlight words to delete or search for specific passages.", es: "Resalte palabras para eliminarlas o busque pasajes específicos." })}
             </p>
             <Button
               onClick={generateTranscript}

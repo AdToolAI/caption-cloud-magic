@@ -129,7 +129,7 @@ export default function SocialMediaSettings() {
       <Alert className="mb-6">
         <AlertDescription>
           Um Social Media Publishing zu nutzen, müssen die entsprechenden API-Tokens als Secrets konfiguriert werden.
-          tx({ de: 'Die Token-Namen sind: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.', en: 'The token names are: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.', es: 'Los nombres de los tokens son: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.' })
+          {tx({ de: 'Die Token-Namen sind: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.', en: 'The token names are: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.', es: 'Los nombres de los tokens son: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.' })}
         </AlertDescription>
       </Alert>
 

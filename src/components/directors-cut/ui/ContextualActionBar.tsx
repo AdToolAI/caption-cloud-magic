@@ -145,7 +145,7 @@ export function ContextualActionBar({
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
                         <span className="flex items-center gap-1">
-                          tx({ de: "Am Playhead teilen", en: "Split at playhead", es: "Dividir en el cabezal de reproducción" }) <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">S</kbd>
+                          {tx({ de: "Am Playhead teilen", en: "Split at playhead", es: "Dividir en el cabezal de reproducción" })} <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">S</kbd>
                         </span>
                       </TooltipContent>
                     </Tooltip>
@@ -163,7 +163,7 @@ export function ContextualActionBar({
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
                         <span className="flex items-center gap-1">
-                          tx({ de: "Duplizieren", en: "Duplicate", es: "Duplicar" }) <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">D</kbd>
+                          {tx({ de: "Duplizieren", en: "Duplicate", es: "Duplicar" })} <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">D</kbd>
                         </span>
                       </TooltipContent>
                     </Tooltip>
@@ -251,7 +251,7 @@ export function ContextualActionBar({
             {/* Keyboard hint */}
             <div className="ml-1 px-2 py-1 bg-muted/50 rounded-lg">
               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Zap className="w-3 h-3" /> tx({ de: "Shortcuts aktiv", en: "Shortcuts active", es: "Atajos activos" })
+                <Zap className="w-3 h-3" /> {tx({ de: "Shortcuts aktiv", en: "Shortcuts active", es: "Atajos activos" })}
               </span>
             </div>
           </div>

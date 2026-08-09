@@ -184,7 +184,7 @@ const DeleteAccount = () => {
               <div className="flex items-start gap-3">
                 <Checkbox id="check-legal" checked={checkLegal} onCheckedChange={(v) => setCheckLegal(v === true)} />
                 <Label htmlFor="check-legal" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                  tx({ de: "Ich habe die", en: "I have read the", es: "He leído los" }){" "}
+                  {tx({ de: "Ich habe die", en: "I have read the", es: "He leído los" })}{" "}
                   <Link to="/legal/terms" className="text-primary underline">AGB</Link>{" "}
                   und{" "}
                   <Link to="/privacy" className="text-primary underline">Datenschutzbestimmungen</Link>{" "}
@@ -205,7 +205,7 @@ const DeleteAccount = () => {
           <Card className="backdrop-blur-xl bg-card/60 border border-white/10">
             <CardContent className="p-6 space-y-3">
               <Label className="text-sm">
-                Geben Sie <strong className="text-foreground">{user.email}</strong> tx({ de: "ein, um die Löschung zu bestätigen:", en: "to confirm deletion:", es: "para confirmar la eliminación:" })
+                Geben Sie <strong className="text-foreground">{user.email}</strong> {tx({ de: "ein, um die Löschung zu bestätigen:", en: "to confirm deletion:", es: "para confirmar la eliminación:" })}
               </Label>
               <Input
                 value={confirmEmail}

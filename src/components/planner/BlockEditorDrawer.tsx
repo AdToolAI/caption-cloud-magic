@@ -130,7 +130,7 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
               <div className="text-xs text-muted-foreground">
                 {block.content_items.title}
                 <br />
-                tx({ de: 'Quelle:', en: 'Source:', es: 'Fuente:' }) {block.content_items.source}
+                {tx({ de: 'Quelle:', en: 'Source:', es: 'Fuente:' })} {block.content_items.source}
               </div>
             </div>
           )}
@@ -160,7 +160,7 @@ export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEdi
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>tx({ de: 'Post löschen', en: 'Delete post', es: 'Eliminar publicación' })?</AlertDialogTitle>
+            <AlertDialogTitle>{tx({ de: 'Post löschen', en: 'Delete post', es: 'Eliminar publicación' })}?</AlertDialogTitle>
             <AlertDialogDescription>
               {tx({ de: 'Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', en: 'Do you really want to delete this scheduled post? This action cannot be undone.', es: '¿Realmente quieres eliminar esta publicación programada? Esta acción no se puede deshacer.' })}
             </AlertDialogDescription>

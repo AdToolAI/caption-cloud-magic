@@ -250,17 +250,17 @@ export function WatchdogTab() {
                     </Badge>
                     {anomalyCount > 0 && (
                       <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40">
-                        {anomalyCount} tx({ de: `Anomalie${anomalyCount === 1 ? '' : 'n'}`, en: `anomaly${anomalyCount === 1 ? '' : 'ies'}`, es: `anomalía${anomalyCount === 1 ? '' : 's'}` })
+                        {anomalyCount} {tx({ de: `Anomalie${anomalyCount === 1 ? '' : 'n'}`, en: `anomaly${anomalyCount === 1 ? '' : 'ies'}`, es: `anomalía${anomalyCount === 1 ? '' : 's'}` })}
                       </Badge>
                     )}
                     {r.bugs_created > 0 && (
                       <Badge className="bg-red-500/20 text-red-300 border-red-500/40">
-                        {r.bugs_created} tx({ de: `Bug${r.bugs_created === 1 ? '' : 's'} erstellt`, en: `bug${r.bugs_created === 1 ? '' : 's'} created`, es: `bug${r.bugs_created === 1 ? '' : 's'} creado` })
+                        {r.bugs_created} {tx({ de: `Bug${r.bugs_created === 1 ? '' : 's'} erstellt`, en: `bug${r.bugs_created === 1 ? '' : 's'} created`, es: `bug${r.bugs_created === 1 ? '' : 's'} creado` })}
                       </Badge>
                     )}
                     {r.rows_auto_failed > 0 && (
                       <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/40">
-                        {r.rows_auto_failed} tx({ de: `Zeile${r.rows_auto_failed === 1 ? '' : 'n'} auto-failed`, en: `row${r.rows_auto_failed === 1 ? '' : 's'} auto-failed`, es: `fila${r.rows_auto_failed === 1 ? '' : 's'} auto-failed` })
+                        {r.rows_auto_failed} {tx({ de: `Zeile${r.rows_auto_failed === 1 ? '' : 'n'} auto-failed`, en: `row${r.rows_auto_failed === 1 ? '' : 's'} auto-failed`, es: `fila${r.rows_auto_failed === 1 ? '' : 's'} auto-failed` })}
                       </Badge>
                     )}
                   </div>

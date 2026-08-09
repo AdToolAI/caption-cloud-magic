@@ -124,7 +124,7 @@ export const ProviderHealth = () => {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Provider Health</h2>
           <p className="text-sm text-muted-foreground">
-            tx({ de: "Live-Auslastung externer Anbieter • Stand: ", en: "Live usage of external providers • As of: ", es: "Uso en vivo de proveedores externos • A partir de: " }){lastUpdate.toLocaleTimeString('de-DE')}
+            {tx({ de: "Live-Auslastung externer Anbieter • Stand: ", en: "Live usage of external providers • As of: ", es: "Uso en vivo de proveedores externos • A partir de: " })}{lastUpdate.toLocaleTimeString('de-DE')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -142,8 +142,8 @@ export const ProviderHealth = () => {
                   <AlertDialogTitle>{tx({ de: "Kill-Switch aktivieren?", en: "Activate kill switch?", es: "¿Activar el interruptor de apagado?" })}</AlertDialogTitle>
                   <AlertDialogDescription>
                     Setzt <code className="font-mono">lambda_max_concurrent</code> sofort auf <strong>10</strong>.
-                    tx({ de: "Neue Renders werden stark gedrosselt — laufende Jobs nicht abgebrochen.", en: "New renders will be heavily throttled - running jobs will not be canceled.", es: "Los nuevos renderizados se reducirán drásticamente; los trabajos en curso no se cancelarán." })
-                    tx({ de: "Nutzen nur im Notfall (z. B. AWS-Throttling, Massenfehler).", en: "Use only in emergencies (e.g. AWS throttling, mass errors).", es: "Úselo solo en emergencias (p. ej., limitación de AWS, errores masivos)." })
+                    {tx({ de: "Neue Renders werden stark gedrosselt — laufende Jobs nicht abgebrochen.", en: "New renders will be heavily throttled - running jobs will not be canceled.", es: "Los nuevos renderizados se reducirán drásticamente; los trabajos en curso no se cancelarán." })}
+                    {tx({ de: "Nutzen nur im Notfall (z. B. AWS-Throttling, Massenfehler).", en: "Use only in emergencies (e.g. AWS throttling, mass errors).", es: "Úselo solo en emergencias (p. ej., limitación de AWS, errores masivos)." })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -212,7 +212,7 @@ export const ProviderHealth = () => {
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">
-                  {lambdaInfo.active} / {lambdaInfo.max} tx({ de: "parallele Renders", en: "parallel renders", es: "renderizados paralelos" })
+                  {lambdaInfo.active} / {lambdaInfo.max} {tx({ de: "parallele Renders", en: "parallel renders", es: "renderizados paralelos" })}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -232,11 +232,11 @@ export const ProviderHealth = () => {
           <CardTitle className="text-base">{tx({ de: "Wie funktioniert das?", en: "How does it work?", es: "¿Cómo funciona?" })}</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• tx({ de: "Jeder API-Call wird in", en: "Each API call is recorded in", es: "Cada llamada a la API se registra en" }) <code className="text-xs bg-muted px-1 py-0.5 rounded">provider_quota_log</code> {tx({ de: "erfasst.", en: "recorded.", es: "registrada." })}</p>
+          <p>• {tx({ de: "Jeder API-Call wird in", en: "Each API call is recorded in", es: "Cada llamada a la API se registra en" })} <code className="text-xs bg-muted px-1 py-0.5 rounded">provider_quota_log</code> {tx({ de: "erfasst.", en: "recorded.", es: "registrada." })}</p>
           <p>{tx({ de: "• Aggregation läuft jede Minute, Anzeige aktualisiert alle 30 Sekunden.", en: "• Aggregation runs every minute, display updates every 30 seconds.", es: "• La agregación se ejecuta cada minuto, la visualización se actualiza cada 30 segundos." })}</p>
           <p>• Bei <strong>≥80% Auslastung</strong> {tx({ de: "wird automatisch eine E-Mail-Warnung an Admins gesendet (Cooldown 60 Min).", en: "an email warning is automatically sent to admins (Cooldown 60 min).", es: "se envía automáticamente una advertencia por correo electrónico a los administradores (Enfriamiento 60 min)." })}</p>
           <p>{tx({ de: "• Lambda-Concurrency wird vom", en: "• Lambda concurrency is set by", es: "• La concurrencia de Lambda está establecida por" })} <strong>Circuit Breaker</strong> automatisch zwischen <strong>{lambdaInfo?.safe ?? 15}</strong> (Safe) und <strong>{lambdaInfo?.max ?? 25}</strong> (Normal) angepasst.</p>
-          <p>• <strong>Kill-Switch</strong> (oben rechts, nur Admin): drosselt im Notfall sofort auf <strong>10</strong> tx({ de: "parallele Renders", en: "parallel renders", es: "renderizados paralelos" }).</p>
+          <p>• <strong>Kill-Switch</strong> (oben rechts, nur Admin): drosselt im Notfall sofort auf <strong>10</strong> {tx({ de: "parallele Renders", en: "parallel renders", es: "renderizados paralelos" })}.</p>
         </CardContent>
       </Card>
     </div>

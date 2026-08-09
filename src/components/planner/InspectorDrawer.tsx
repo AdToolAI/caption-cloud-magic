@@ -194,7 +194,7 @@ export function InspectorDrawer({
                   ) : (
                     <ImageIcon className="h-4 w-4" />
                   )}
-                  tx({ de: "Original-Inhalt", en: "Original content", es: "Contenido original" })
+                  {tx({ de: "Original-Inhalt", en: "Original content", es: "Contenido original" })}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {block.content_items.title}
@@ -271,7 +271,7 @@ export function InspectorDrawer({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>tx({ de: "Post löschen", en: "Delete post", es: "Eliminar publicación" })?</AlertDialogTitle>
+            <AlertDialogTitle>{tx({ de: "Post löschen", en: "Delete post", es: "Eliminar publicación" })}?</AlertDialogTitle>
             <AlertDialogDescription>
               {tx({ de: "Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.", en: "Are you sure you want to delete this scheduled post? This action cannot be undone.", es: "¿Estás seguro de que quieres eliminar esta publicación programada? Esta acción no se puede deshacer." })}
             </AlertDialogDescription>

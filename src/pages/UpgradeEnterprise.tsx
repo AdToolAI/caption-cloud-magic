@@ -56,7 +56,7 @@ export default function UpgradeEnterprise() {
             Enterprise Upgrade
           </CardTitle>
           <CardDescription>
-            tx({ de: "Upgrade auf Enterprise", en: "Upgrade to Enterprise", es: "Actualizar a Enterprise" }) Plan für unbegrenzte Features
+            {tx({ de: "Upgrade auf Enterprise", en: "Upgrade to Enterprise", es: "Actualizar a Enterprise" })} Plan für unbegrenzte Features
           </CardDescription>
         </CardHeader>
         <CardContent>

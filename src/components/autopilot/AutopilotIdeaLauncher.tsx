@@ -438,7 +438,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
             <Label className="text-sm">{tx({ de: 'Länge', en: 'Length', es: 'Longitud' })}</Label>
-            <span className="text-sm text-muted-foreground">{options.duration} + " " + tx({ de: 'Sekunden', en: 'seconds', es: 'segundos' })</span>
+            <span className="text-sm text-muted-foreground">{options.duration} {tx({ de: 'Sekunden', en: 'seconds', es: 'segundos' })</span>
           </div>
           <Slider
             value={[options.duration]}

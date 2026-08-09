@@ -80,7 +80,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{STAGE_LABEL[production.stage] ?? production.stage}</Badge>
         <Badge variant="outline">
-          {done}/{scenes.length} tx({ de: "Szenen", en: "Scenes", es: "Escenas" })
+          {done}/{scenes.length} {tx({ de: "Szenen", en: "Scenes", es: "Escenas" })}
         </Badge>
         {production.status === 'failed' && <Badge variant="destructive">Abgebrochen</Badge>}
       </div>
@@ -211,7 +211,7 @@ export function ProductionStage({ production, scenes, log }: Props) {
 
       {(production.spent_credits ?? 0) > 0 && (
         <p className="mt-4 text-xs text-muted-foreground">
-          tx({ de: "Verbraucht", en: "Used", es: "Usado" }) + ":" {Math.round(production.spent_credits ?? 0)} Cr
+          {tx({ de: "Verbraucht", en: "Used", es: "Usado" })} + ":" {Math.round(production.spent_credits ?? 0)} Cr
           {(production.refunded_credits ?? 0) > 0 &&
             ` + " · " + tx({ de: "erstattet", en: "refunded", es: "reembolsado" }) + ":" ${Math.round(production.refunded_credits ?? 0)} Cr`}
         </p>

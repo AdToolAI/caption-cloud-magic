@@ -45,7 +45,7 @@ export const TemplateActivityFeed = ({ templateId }: TemplateActivityFeedProps) 
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  tx({ de: "Benutzer:", en: "User:", es: "Usuario:" }) {item.user_id.slice(0, 8)}
+                  {tx({ de: "Benutzer:", en: "User:", es: "Usuario:" })} {item.user_id.slice(0, 8)}
                 </p>
               </div>
             </div>

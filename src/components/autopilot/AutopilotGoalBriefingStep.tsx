@@ -78,7 +78,7 @@ export function AutopilotGoalBriefingStep({ value, onChange }: Props) {
       {/* Budget */}
       <div>
         <Label className="text-base font-semibold mb-3 block">
-          tx({ de: "Wochen-Budget:", en: "Weekly budget:", es: "Presupuesto semanal:" }) <span className="text-primary">{value.weekly_budget_eur} €</span>
+          {tx({ de: "Wochen-Budget:", en: "Weekly budget:", es: "Presupuesto semanal:" })} <span className="text-primary">{value.weekly_budget_eur} €</span>
         </Label>
         <div className="flex flex-wrap gap-2 mb-3">
           {BUDGETS.map((b) => (

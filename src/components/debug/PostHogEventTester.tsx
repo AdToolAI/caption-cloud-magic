@@ -479,7 +479,7 @@ export function PostHogEventTester() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            tx({ de: "PostHog Status", en: "PostHog Status", es: "Estado de PostHog" })
+            {tx({ de: "PostHog Status", en: "PostHog Status", es: "Estado de PostHog" })}
             {isPostHogConfigured ? (
               <Badge variant="default" className="ml-2">{tx({ de: "Konfiguriert", en: "Configured", es: "Configurado" })}</Badge>
             ) : (

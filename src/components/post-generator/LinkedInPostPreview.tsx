@@ -130,7 +130,7 @@ export const LinkedInPostPreview = ({
         </div>
         {comments > 0 && (
           <div className="text-xs text-muted-foreground mt-1">
-            {comments} tx({ de: " Kommentare", en: " comments", es: " comentarios" })
+            {comments} {tx({ de: " Kommentare", en: " comments", es: " comentarios" })}
           </div>
         )}
       </div>

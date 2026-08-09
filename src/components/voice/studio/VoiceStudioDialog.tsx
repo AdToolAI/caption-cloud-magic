@@ -261,7 +261,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
     [samples.length],
   );
 
-  const handletx({ de: "Upload", en: "Upload", es: "Carga" }) = async (files: FileList | null) => {
+  const handle{tx({ de: "Upload", en: "Upload", es: "Carga" })} = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const accepted: Sample[] = [];
     for (const f of Array.from(files)) {
@@ -355,7 +355,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
       const draftId = crypto.randomUUID();
       const sampleUrls: string[] = [];
 
-      // 2. tx({ de: "Upload", en: "Upload", es: "Carga" }) all samples to voiceover-audio bucket
+      // 2. {tx({ de: "Upload", en: "Upload", es: "Carga" })} all samples to voiceover-audio bucket
       for (let i = 0; i < samples.length; i++) {
         const s = samples[i];
         const ext = s.fileName.split(".").pop() || "wav";
@@ -407,8 +407,8 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
             {tx({ de: "Voice Studio — Eigene Stimme klonen", en: "Voice Studio — Clone your own voice", es: "Estudio de voz: clona tu propia voz" })}
           </DialogTitle>
           <DialogDescription>
-            tx({ de: "Nimm dich beim Vorlesen des Skripts auf oder lade eine WhatsApp-Sprachnachricht hoch.", en: "Record yourself reading the script or upload a WhatsApp voice message.", es: "Grábate leyendo el guion o sube un mensaje de voz de WhatsApp." })
-            tx({ de: "Wir säubern Hintergrundrauschen automatisch.", en: "We clean background noise automatically.", es: "Limpiamos el ruido de fondo automáticamente." })
+            {tx({ de: "Nimm dich beim Vorlesen des Skripts auf oder lade eine WhatsApp-Sprachnachricht hoch.", en: "Record yourself reading the script or upload a WhatsApp voice message.", es: "Grábate leyendo el guion o sube un mensaje de voz de WhatsApp." })}
+            {tx({ de: "Wir säubern Hintergrundrauschen automatisch.", en: "We clean background noise automatically.", es: "Limpiamos el ruido de fondo automáticamente." })}
           </DialogDescription>
         </DialogHeader>
 
@@ -465,8 +465,8 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 maxLength={40}
               />
               <p className="text-xs text-muted-foreground">
-                tx({ de: "Wir ersetzen den Platzhalter", en: "We replace the placeholder", es: "Reemplazamos el marcador de posición" }) <code>{"{NAME}"}</code> tx({ de: "im Skript automatisch —", en: "in the script automatically —", es: "en el guion automáticamente —" })
-                tx({ de: "so klingt die Vorstellung natürlich.", en: "this way the introduction sounds natural.", es: "así la presentación suena natural." })
+                {tx({ de: "Wir ersetzen den Platzhalter", en: "We replace the placeholder", es: "Reemplazamos el marcador de posición" })} <code>{"{NAME}"}</code> {tx({ de: "im Skript automatisch —", en: "in the script automatically —", es: "en el guion automáticamente —" })}
+                {tx({ de: "so klingt die Vorstellung natürlich.", en: "this way the introduction sounds natural.", es: "así la presentación suena natural." })}
               </p>
             </div>
             <Card className="p-4 bg-muted/30 max-h-72 overflow-y-auto">
@@ -522,10 +522,10 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
             <Tabs defaultValue="mic">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="mic" className="gap-2">
-                  <Mic className="h-4 w-4" /> tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" })
+                  <Mic className="h-4 w-4" /> {tx({ de: "Mikrofon", en: "Microphone", es: "Micrófono" })}
                 </TabsTrigger>
                 <TabsTrigger value="upload" className="gap-2">
-                  <tx({ de: "Upload", en: "Upload", es: "Carga" }) className="h-4 w-4" /> Datei / WhatsApp
+                  <{tx({ de: "Upload", en: "Upload", es: "Carga" })} className="h-4 w-4" /> Datei / WhatsApp
                 </TabsTrigger>
               </TabsList>
 
@@ -578,7 +578,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                     type="file"
                     accept="audio/*"
                     multiple
-                    onChange={(e) => handletx({ de: "Upload", en: "Upload", es: "Carga" })(e.target.files)}
+                    onChange={(e) => handle{tx({ de: "Upload", en: "Upload", es: "Carga" })}(e.target.files)}
                   />
                   <p className="text-xs text-muted-foreground">
                     Tipp: Sende dir deine WhatsApp-Sprachnachricht selbst → „Teilen" → Datei
@@ -593,7 +593,7 @@ export function VoiceStudioDialog({ open, onOpenChange }: VoiceStudioDialogProps
                 <div className="flex items-center justify-between">
                   <Label className="text-sm">{tx({ de: "Deine Samples", en: "Your samples", es: "Tus muestras" })}</Label>
                   <div className="text-xs text-muted-foreground">
-                    tx({ de: "Gesamt: ", en: "Total: ", es: "Total: " })<span className="font-mono">{formatSec(totalSec)}</span> /{" "}
+                    {tx({ de: "Gesamt: ", en: "Total: ", es: "Total: " })}<span className="font-mono">{formatSec(totalSec)}</span> /{" "}
                     min. {MIN_TOTAL_SEC}s
                   </div>
                 </div>

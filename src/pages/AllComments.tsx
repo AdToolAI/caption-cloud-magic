@@ -280,12 +280,12 @@ const AllComments = () => {
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
-                tx({ de: 'Importieren', en: 'Import', es: 'Importar' })
+                {tx({ de: 'Importieren', en: 'Import', es: 'Importar' })}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>tx({ de: 'Kommentare importieren', en: 'Import comments', es: 'Importar comentarios' }) + "</DialogTitle>"
+                <DialogTitle>{tx({ de: 'Kommentare importieren', en: 'Import comments', es: 'Importar comentarios' })} + "</DialogTitle>"
               </DialogHeader>
               <Textarea
                 placeholder="Ein Kommentar pro Zeile..."
@@ -293,12 +293,12 @@ const AllComments = () => {
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
               />
-              <Button onClick={handleImport}>tx({ de: 'Import starten', en: 'Start import', es: 'Iniciar importación' }) + "</Button>"
+              <Button onClick={handleImport}>{tx({ de: 'Import starten', en: 'Start import', es: 'Iniciar importación' })} + "</Button>"
             </DialogContent>
           </Dialog>
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            tx({ de: 'Exportieren', en: 'Export', es: 'Exportar' })
+            {tx({ de: 'Exportieren', en: 'Export', es: 'Exportar' })}
           </Button>
         </div>
       </div>
@@ -378,7 +378,7 @@ const AllComments = () => {
             <div className="text-center py-12">{tx({ de: "Lädt...", en: "Loading...", es: "Cargando..." })}</div>
           ) : comments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              tx({ de: "Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.", en: "No saved comments yet – import data or connect a source.", es: "Aún no hay comentarios guardados: importa datos o conecta una fuente." })
+              {tx({ de: "Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.", en: "No saved comments yet – import data or connect a source.", es: "Aún no hay comentarios guardados: importa datos o conecta una fuente." })}
             </div>
           ) : (
             <Table>

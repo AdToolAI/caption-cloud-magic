@@ -58,7 +58,7 @@ export default function ContentProjects() {
     );
   };
 
-  const handletx({ de: "Download", en: "Download", es: "Descargar" }) = async (url: string, filename: string) => {
+  const handle{tx({ de: "Download", en: "Download", es: "Descargar" })} = async (url: string, filename: string) => {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -72,7 +72,7 @@ export default function ContentProjects() {
       window.URL.revokeObjectURL(downloadUrl);
       toast.success(tx({ de: "Video wird heruntergeladen", en: "Video is downloading", es: "El vídeo se está descargando." }));
     } catch (error) {
-      console.error("tx({ de: "Download", en: "Download", es: "Descargar" }) error:", error);
+      console.error("{tx({ de: "Download", en: "Download", es: "Descargar" })} error:", error);
       toast.error(tx({ de: "Fehler beim Herunterladen", en: "Error downloading", es: "Error al descargar" }));
     }
   };
@@ -198,9 +198,9 @@ export default function ContentProjects() {
                             <Button
                               size="sm"
                               className="flex-1"
-                              onClick={() => handletx({ de: "Download", en: "Download", es: "Descargar" })(outputUrls[0], `${project.project_name}.mp4`)}
+                              onClick={() => handle{tx({ de: "Download", en: "Download", es: "Descargar" })}(outputUrls[0], `${project.project_name}.mp4`)}
                             >
-                              <tx({ de: "Download", en: "Download", es: "Descargar" }) className="h-4 w-4 mr-2" />
+                              <{tx({ de: "Download", en: "Download", es: "Descargar" })} className="h-4 w-4 mr-2" />
                               {tx({ de: "Download", en: "Download", es: "Descargar" })}
                             </Button>
                           </div>

@@ -111,7 +111,7 @@ export const BatchVideoUpload = ({ templateId, requiredFields }: BatchVideoUploa
         {csvData.length > 0 && (
           <div className="bg-muted p-3 rounded-md">
             <p className="text-sm text-foreground font-medium">
-              {csvData.length} tx({ de: "Videos bereit", en: "Videos ready", es: "Vídeos listos" })
+              {csvData.length} {tx({ de: "Videos bereit", en: "Videos ready", es: "Vídeos listos" })}
             </p>
             <p className="text-xs text-muted-foreground">
               {tx({ de: `Kosten: ${csvData.length * 50} Credits`, en: `Cost: ${csvData.length * 50} credits`, es: `Costo: ${csvData.length * 50} créditos` })}

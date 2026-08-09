@@ -80,9 +80,9 @@ const STATUS_ICON: Record<string, any> = {
 const FLOW_NAMES = [
   "Composer Multi-Scene Stitch",
   "Director's Cut Lambda Render",
-  tx({ de: "Auto-Director (Brief → Video)", en: "Auto-Director (Letter → Video)", es: "Director automático (Carta → Vídeo)" }),
+  {tx({ de: "Auto-Director (Brief → Video)", en: "Auto-Director (Letter → Video)", es: "Director automático (Carta → Vídeo)" })},
   "Talking Head (HeyGen)",
-  tx({ de: "Universal Video Creator", en: "Universal Video Creator", es: "Creador de vídeos universal" }),
+  {tx({ de: "Universal Video Creator", en: "Universal Video Creator", es: "Creador de vídeos universal" })},
   "Magic Edit (FLUX Fill)",
 ];
 
@@ -231,7 +231,7 @@ export function DeepSweepTab() {
                 ) : (
                   <XCircle className="h-4 w-4 mr-1" />
                 )}
-                tx({ de: 'Lauf abbrechen', en: 'Cancel run', es: 'Cancelar ejecución' }) ({Math.round(runAgeMinutes)} min)
+                {tx({ de: 'Lauf abbrechen', en: 'Cancel run', es: 'Cancelar ejecución' })} ({Math.round(runAgeMinutes)} min)
               </Button>
             )}
             <AlertDialog>
@@ -364,7 +364,7 @@ export function DeepSweepTab() {
                         ) : (
                           <RefreshCw className="h-3 w-3 mr-1" />
                         )}
-                        tx({ de: "Portrait neu provisionieren", en: "Reprovision portrait", es: "Reprovisionar retrato" })
+                        {tx({ de: "Portrait neu provisionieren", en: "Reprovision portrait", es: "Reprovisionar retrato" })}
                       </Button>
                     )}
                   {flow?.flow_index === 6 &&
@@ -382,7 +382,7 @@ export function DeepSweepTab() {
                         ) : (
                           <RefreshCw className="h-3 w-3 mr-1" />
                         )}
-                        tx({ de: "Bootstrap jetzt ausführen", en: "Execute bootstrap now", es: "Ejecutar bootstrap ahora" })
+                        {tx({ de: "Bootstrap jetzt ausführen", en: "Execute bootstrap now", es: "Ejecutar bootstrap ahora" })}
                       </Button>
                     )}
                 </div>

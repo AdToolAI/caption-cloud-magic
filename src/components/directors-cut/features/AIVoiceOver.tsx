@@ -253,7 +253,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
               rows={4}
             />
             <p className="text-xs text-muted-foreground text-right">
-              {settings.scriptText.length} + " " + tx({ de: 'Zeichen', en: 'characters', es: 'caracteres' }) + " • ~"{estimatedDuration} + " " + tx({ de: 'Sekunden', en: 'seconds', es: 'segundos' })
+              {settings.scriptText.length} {tx({ de: 'Zeichen', en: 'characters', es: 'caracteres' }) + " • ~"{estimatedDuration} {tx({ de: 'Sekunden', en: 'seconds', es: 'segundos' })
             </p>
           </div>
 

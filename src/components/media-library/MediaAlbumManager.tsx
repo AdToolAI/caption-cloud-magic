@@ -380,7 +380,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       {/* Unsorted Images */}
       {unsortedImages.length > 0 && (
         <div>
-          <h4 className="text-md font-medium mb-3 text-muted-foreground">tx({ de: 'Unsortierte Bilder', en: 'Unsorted Images', es: 'Imágenes sin clasificar' }) ({unsortedImages.length})</h4>
+          <h4 className="text-md font-medium mb-3 text-muted-foreground">{tx({ de: 'Unsortierte Bilder', en: 'Unsorted Images', es: 'Imágenes sin clasificar' })} ({unsortedImages.length})</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <AnimatePresence>
               {unsortedImages.map((img, i) => (

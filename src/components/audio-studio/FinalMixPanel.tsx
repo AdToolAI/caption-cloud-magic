@@ -199,7 +199,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <AudioLines className="w-5 h-5 text-primary" />
-            <h4 className="font-semibold">tx({ de: `Quellen (${mixer.sources.length})`, en: `Sources (${mixer.sources.length})`, es: `Fuentes (${mixer.sources.length})` })</h4>
+            <h4 className="font-semibold">{tx({ de: `Quellen (${mixer.sources.length})`, en: `Sources (${mixer.sources.length})`, es: `Fuentes (${mixer.sources.length})` })}</h4>
             {mixer.decoding && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
           </div>
           <div className="flex gap-2">
@@ -397,7 +397,7 @@ export function FinalMixPanel({ initialSources, onMixSaved }: FinalMixPanelProps
               </p>
             </div>
             <div className="text-right">
-              <p className="text-[11px] text-muted-foreground">tx({ de: 'Ziel', en: 'Target', es: 'Objetivo' })}</p>
+              <p className="text-[11px] text-muted-foreground">{tx({ de: 'Ziel', en: 'Target', es: 'Objetivo' })}</p>
               <p className="text-lg font-mono font-bold text-primary">
                 {mixer.target.id === 'none' ? '—' : `${mixer.target.lufs} LUFS`}
               </p>

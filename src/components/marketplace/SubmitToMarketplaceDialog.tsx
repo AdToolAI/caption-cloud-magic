@@ -42,7 +42,7 @@ export function SubmitToMarketplaceDialog({ template, open, onOpenChange }: Prop
         <DialogHeader>
           <DialogTitle>{tx({ de: "Im Marketplace veröffentlichen", en: "Publish in Marketplace", es: "Publicar en el mercado" })}</DialogTitle>
           <DialogDescription>
-            "{template.name}"tx({ de: " mit der Community teilen. Free → sofort live. Premium → Admin-Review.", en: " share with the community. Free → live immediately. Premium → Admin review.", es: " compartir con la comunidad. Gratis → en vivo de inmediato. Premium → revisión de administrador." })
+            "{template.name}"{tx({ de: " mit der Community teilen. Free → sofort live. Premium → Admin-Review.", en: " share with the community. Free → live immediately. Premium → Admin review.", es: " compartir con la comunidad. Gratis → en vivo de inmediato. Premium → revisión de administrador." })}
           </DialogDescription>
         </DialogHeader>
 

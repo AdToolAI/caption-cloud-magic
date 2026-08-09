@@ -128,7 +128,7 @@ export function CalendarAlerts({
                         <span className={`text-sm font-medium ${config.color}`}>
                           {alert.type === 'conflict' ? 'Konflikt erkannt' : tx({ de: 'Konflikt erkannt', en: 'Conflict detected', es: 'Conflicto detectado' }) : 
                            alert.type === 'overdue' ? 'Überfällig' : tx({ de: 'Überfällig', en: 'Overdue', es: 'Vencido' }) : 
-                           tx({ de: 'Leere Tage', en: 'Empty days', es: 'Días vacíos' })}
+                           {tx({ de: 'Leere Tage', en: 'Empty days', es: 'Días vacíos' })}
                         </span>
                       </div>
                       <p className="text-sm text-foreground mb-3">{alert.message}</p>

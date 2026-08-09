@@ -204,7 +204,7 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
         {/* Loading / Scrubber */}
         {isLoading ? (
           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" /> tx({ de: 'Stems werden dekodiert…', en: 'Stems are being decoded…', es: 'Las pistas se están decodificando...' })
+            <Loader2 className="w-4 h-4 animate-spin" /> {tx({ de: 'Stems werden dekodiert…', en: 'Stems are being decoded…', es: 'Las pistas se están decodificando...' })}
           </div>
         ) : (
           <div className="mt-4 space-y-2">
@@ -279,7 +279,7 @@ export function StemMixerPanel({ stems, sourceTitle, onMixSaved }: StemMixerPane
                     <div>
                       <div className="text-sm font-bold tracking-tight">{meta.label}</div>
                       {!hasBuffer && (
-                        <div className="text-[10px] text-muted-foreground">tx({ de: 'nicht geladen', en: 'not loaded', es: 'no cargado' })</div>
+                        <div className="text-[10px] text-muted-foreground">{tx({ de: 'nicht geladen', en: 'not loaded', es: 'no cargado' })}</div>
                       )}
                     </div>
                   </div>

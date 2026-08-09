@@ -241,7 +241,7 @@ export const InstantAvatarDemo = () => {
             {tx({ de: 'Live · 10 s · Kein Login', en: 'Live · 10 s · No Login', es: 'En vivo · 10 s · Sin inicio de sesión' })}
           </Badge>
           <h2 className="font-serif text-3xl md:text-4xl font-semibold tracking-tight mb-3">
-            tx({ de: 'Werde in 10 Sekunden zum', en: 'Become in 10 seconds a', es: 'Conviértete en 10 segundos en un' }){" "}
+            {tx({ de: 'Werde in 10 Sekunden zum', en: 'Become in 10 seconds a', es: 'Conviértete en 10 segundos en un' })}{" "}
             <span className="bg-gradient-to-r from-primary via-primary to-primary/70 bg-clip-text text-transparent">
               {tx({ de: 'Cast-Mitglied', en: 'cast member', es: 'miembro del reparto' })}
             </span>

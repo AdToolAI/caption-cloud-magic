@@ -104,7 +104,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
   const meta = platformMeta[post.platform.toLowerCase()] || platformMeta.instagram;
   const Icon = meta.icon;
   const status = STATUS_LABEL[post.status] || STATUS_LABEL.pending;
-  const dateLabel = format(new Date(post.scheduled_at), "EEEE, d. MMM tx({ de: 'um', en: 'at', es: 'a las' }) + ' ' + 'HH:mm'");
+  const dateLabel = format(new Date(post.scheduled_at), "EEEE, d. MMM {tx({ de: 'um', en: 'at', es: 'a las' })} + ' ' + 'HH:mm'");
 
   const tagsArr = hashtags.split(/[\s,]+/).map((h) => h.replace(/^#/, "")).filter(Boolean);
 

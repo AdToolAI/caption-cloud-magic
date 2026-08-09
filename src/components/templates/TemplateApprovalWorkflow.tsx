@@ -55,7 +55,7 @@ export const TemplateApprovalWorkflow = ({ templateId }: TemplateApprovalWorkflo
             <div className="flex justify-between items-start mb-3">
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  tx({ de: 'Eingereicht von:', en: 'Submitted by:', es: 'Presentado por:' }) {approval.submitted_by.slice(0, 8)}
+                  {tx({ de: 'Eingereicht von:', en: 'Submitted by:', es: 'Presentado por:' })} {approval.submitted_by.slice(0, 8)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(approval.submitted_at), {

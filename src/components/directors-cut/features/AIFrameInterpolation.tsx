@@ -112,7 +112,7 @@ export function AIFrameInterpolation({
       {settings.enabled && (
         <div className="space-y-4">
           <div className="p-2 bg-muted/50 rounded text-center">
-            <span className="text-sm text-muted-foreground">tx({ de: "Quell-Framerate: ", en: "Source framerate: ", es: "Frecuencia de fotogramas de origen: " })</span>
+            <span className="text-sm text-muted-foreground">{tx({ de: "Quell-Framerate: ", en: "Source framerate: ", es: "Frecuencia de fotogramas de origen: " })}</span>
             <span className="text-sm font-medium">{sourceFps} FPS</span>
           </div>
 

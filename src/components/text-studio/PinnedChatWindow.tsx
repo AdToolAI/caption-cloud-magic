@@ -328,7 +328,7 @@ export default function PinnedChatWindow() {
           </div>
         ) : messages.length === 0 ? (
           <div className="text-white/40 text-xs text-center py-8">
-            tx({ de: "Noch keine Nachrichten. Schreib etwas …", en: "No messages yet. Write something ...", es: "Aún no hay mensajes. Escribe algo ..." })
+            {tx({ de: "Noch keine Nachrichten. Schreib etwas …", en: "No messages yet. Write something ...", es: "Aún no hay mensajes. Escribe algo ..." })}
           </div>
         ) : (
           messages.map((m, i) => (

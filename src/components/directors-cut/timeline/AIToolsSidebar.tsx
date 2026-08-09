@@ -258,7 +258,7 @@ export function AIToolsSidebar({
               </div>
               
               <div className="space-y-2">
-                <Label className="text-xs">tx({ de: 'Geschwindigkeit:', en: 'Speed:', es: 'Velocidad:' }) {voiceSpeed.toFixed(1)}x</Label>
+                <Label className="text-xs">{tx({ de: 'Geschwindigkeit:', en: 'Speed:', es: 'Velocidad:' })} {voiceSpeed.toFixed(1)}x</Label>
                 <Slider
                   value={[voiceSpeed]}
                   onValueChange={([v]) => setVoiceSpeed(v)}
@@ -277,7 +277,7 @@ export function AIToolsSidebar({
                   className="min-h-[100px] text-sm resize-none"
                 />
                 <div className="text-xs text-muted-foreground text-right">
-                  {voiceoverText.length} tx({ de: 'Zeichen', en: 'characters', es: 'caracteres' })
+                  {voiceoverText.length} {tx({ de: 'Zeichen', en: 'characters', es: 'caracteres' })}
                 </div>
               </div>
               

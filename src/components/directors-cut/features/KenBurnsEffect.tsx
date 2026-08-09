@@ -161,8 +161,8 @@ export function KenBurnsEffect({
     <Card className="bg-background/40 backdrop-blur-xl border-border/50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">{tx({ de: "Move className="h-4 w-4 text-primary" /> tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })", en: "Ken Burns Effect", es: "Efecto Ken Burns" })}
-            Move className="h-4 w-4 text-primary" /> tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })
+          <CardTitle className="text-base flex items-center gap-2">{tx({ de: "Move className="h-4 w-4 text-primary" /> {tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })}", en: "Ken Burns Effect", es: "Efecto Ken Burns" })}
+            Move className="h-4 w-4 text-primary" /> {tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })}
           </CardTitle>
           <div className="flex items-center gap-2">
             {hasEffect && (
@@ -397,7 +397,7 @@ export function KenBurnsEffect({
         {!hasEffect && (
           <div className="text-center py-4 text-muted-foreground">
             <Move className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-xs">Wähle ein Preset um den Move className="h-4 w-4 text-primary" /> tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' }) zu aktivieren</p>
+            <p className="text-xs">Wähle ein Preset um den Move className="h-4 w-4 text-primary" /> {tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })} zu aktivieren</p>
           </div>
         )}
       </CardContent>
