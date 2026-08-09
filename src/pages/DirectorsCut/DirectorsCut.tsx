@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { saveDraft, loadDraft, clearDraft, consumeReloadReset, installReloadFlag, SubtitleSafeZone, DEFAULT_SUBTITLE_SAFE_ZONE } from '@/lib/directors-cut-draft';
 import { extractTimestampedFrames, extractRefinementFrames, detectBoundariesAsync, type TimestampedFrame, type DetectedBoundary } from '@/lib/directors-cut-scene-detection';
@@ -14,7 +15,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { KenBurnsKeyframe } from '@/components/directors-cut/features/KenBurnsEffect';
 import type { 
-import { tx } from "@/lib/i18nText";
   SelectedVideo, 
   SceneAnalysis, 
   AppliedEffects, 

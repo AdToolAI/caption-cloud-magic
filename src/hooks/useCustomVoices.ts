@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { tx } from "@/lib/i18nText";
 
 interface CustomVoice {
   id: string;
@@ -13,7 +14,7 @@ interface CustomVoice {
   created_at: string;
 }
 
-async function getFunctionErrorMessage(error: unknown, fallback = 'Voice Cloning fehlgeschlagen') {
+async function getFunctionErrorMessage(error: unknown, fallback = tx({ de: 'Voice Cloning fehlgeschlagen', en: 'Voice cloning failed', es: 'Error al clonar la voz' })) {
   if (error instanceof FunctionsHttpError) {
     const raw = await error.context.text().catch(() => '');
     if (raw) {
@@ -75,8 +76,8 @@ export function useCustomVoices() {
       if (error) throw error;
 
       toast({
-        title: 'Voice Clone erstellt',
-        description: `${name} wurde erfolgreich geklont`,
+        title: tx({ de: 'Voice Clone erstellt', en: 'Voice clone created', es: 'Clon de voz creado' }),
+        description: tx({ de: `${name} wurde erfolgreich geklont`, en: `${name} was successfully cloned`, es: `${name} se clonó correctamente` }),
       });
 
       await fetchVoices();
@@ -85,7 +86,7 @@ export function useCustomVoices() {
       console.error('Error cloning voice:', error);
       const description = await getFunctionErrorMessage(error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
         description,
         variant: 'destructive',
       });
@@ -106,16 +107,16 @@ export function useCustomVoices() {
       if (error) throw error;
 
       toast({
-        title: 'Voice gelöscht',
-        description: 'Custom Voice wurde entfernt',
+        title: tx({ de: 'Voice gelöscht', en: 'Voice deleted', es: 'Voz eliminada' }),
+        description: tx({ de: 'Custom Voice wurde entfernt', en: 'Custom voice was removed', es: 'La voz personalizada fue eliminada' }),
       });
 
       await fetchVoices();
     } catch (error) {
       console.error('Error deleting voice:', error);
       toast({
-        title: 'Fehler',
-        description: 'Voice konnte nicht gelöscht werden',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: tx({ de: 'Voice konnte nicht gelöscht werden', en: 'Voice could not be deleted', es: 'No se pudo eliminar la voz' }),
         variant: 'destructive',
       });
     }
@@ -145,13 +146,13 @@ export function useCustomVoices() {
         .eq('id', voice_id);
 
       if (error) throw error;
-      toast({ title: 'Umbenannt', description: `Voice heißt jetzt „${trimmed}"` });
+      toast({ title: tx({ de: 'Umbenannt', en: 'Renamed', es: 'Renombrado' }), description: tx({ de: `Voice heißt jetzt „${trimmed}"`, en: `Voice is now called "${trimmed}"`, es: `La voz ahora se llama "${trimmed}"` }) });
       await fetchVoices();
     } catch (error) {
       console.error('Error renaming voice:', error);
       toast({
-        title: 'Fehler',
-        description: 'Voice konnte nicht umbenannt werden',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: tx({ de: 'Voice konnte nicht umbenannt werden', en: 'Voice could not be renamed', es: 'No se pudo renombrar la voz' }),
         variant: 'destructive',
       });
     }

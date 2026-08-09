@@ -1,9 +1,9 @@
+import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import type {
-import { tx } from "@/lib/i18nText";
   MotionStudioCharacter,
   MotionStudioLocation,
   CharacterDraft,

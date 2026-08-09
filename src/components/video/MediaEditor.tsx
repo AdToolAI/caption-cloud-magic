@@ -53,6 +53,7 @@ export const MediaEditor = ({
   const [selectedPreset, setSelectedPreset] = useState('Original');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const tx = useTx();
 
   const filterPresets = [
     {
