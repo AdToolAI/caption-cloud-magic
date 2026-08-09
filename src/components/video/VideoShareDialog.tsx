@@ -4,6 +4,7 @@ import { useVideoHistory } from '@/hooks/useVideoHistory';
 import { Instagram, Facebook, Twitter, Linkedin, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { VideoCreation } from '@/types/video';
+import { tx } from '@/lib/i18nText';
 
 interface VideoShareDialogProps {
   open: boolean;

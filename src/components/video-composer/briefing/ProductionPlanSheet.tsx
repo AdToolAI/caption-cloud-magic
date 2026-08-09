@@ -583,7 +583,7 @@ export default function ProductionPlanSheet({
     if (briefing.length < 40) {
       toast({
         title: 'Briefing zu kurz',
-        description: 'Mindestens ein paar Sätze einfügen.',
+        description: tx({ de: 'Mindestens ein paar Sätze einfügen.', en: 'Please insert at least a few sentences.', es: 'Por favor, inserta al menos unas frases.' }),
         variant: 'destructive',
       });
       return;
@@ -615,7 +615,7 @@ export default function ProductionPlanSheet({
       const parsed = ProductionPlan.safeParse(data?.plan);
       if (!parsed.success) {
         console.warn('[ProductionPlanSheet] plan validation failed', parsed.error);
-        throw new Error('Plan-Validierung fehlgeschlagen');
+        throw new Error(tx({ de: 'Plan-Validierung fehlgeschlagen', en: 'Plan validation failed', es: 'La validación del plan falló' }));
       }
       // Selfheal: re-index duplicates so the UI never silently drops a scene.
       const seen = new Set<number>();
@@ -641,13 +641,13 @@ export default function ProductionPlanSheet({
     } catch (e: any) {
       clearTimeout(phaseTimer);
       const details = await extractFunctionsErrorDetails(e);
-      const msg = details.message || 'Deep-Parse fehlgeschlagen';
+      const msg = details.message || tx({ de: 'Deep-Parse fehlgeschlagen', en: 'Deep parse failed', es: 'El análisis profundo falló' });
       const status = details.status;
       console.error('[ProductionPlanSheet] deep-parse failed', { status, msg, body: details.body });
       toast({
         title: tx({ de: 'Briefing konnte nicht verarbeitet werden', en: 'Could not process briefing', es: 'No se pudo procesar el briefing' }),
-        description: status === 402 || /402/.test(msg) ? 'Keine AI-Credits mehr.'
-          : status === 429 || /429/.test(msg) ? 'Zu viele Anfragen — bitte kurz warten.'
+        description: status === 402 || /402/.test(msg) ? tx({ de: 'Keine AI-Credits mehr.', en: 'No more AI credits.', es: 'No quedan créditos de IA.' })
+          : status === 429 || /429/.test(msg) ? tx({ de: 'Zu viele Anfragen — bitte kurz warten.', en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
           : status ? `${status}: ${msg}` : msg,
         variant: 'destructive',
       });
@@ -719,7 +719,7 @@ export default function ProductionPlanSheet({
         warnings,
       });
       toast({
-        title: warnings.length ? 'Plan übernommen — bitte Hinweise prüfen' : 'Plan übernommen und verifiziert',
+        title: warnings.length ? tx({ de: 'Plan übernommen — bitte Hinweise prüfen', en: 'Plan applied — please check notes', es: 'Plan aplicado — revisa las notas' }) : tx({ de: 'Plan übernommen und verifiziert', en: 'Plan applied and verified', es: 'Plan aplicado y verificado' }),
         description: warnings.length
           ? warnings.join(' · ')
           : `${result.scenesNew} neu · ${result.scenesReplaced} ersetzt · ${result.scenesProtected} geschützt`,
@@ -918,7 +918,7 @@ export default function ProductionPlanSheet({
           : tx({ de: `„${created.name}" ist jetzt in der Library.`, en: `"${created.name}" is now in the library.`, es: `"${created.name}" ahora está en la biblioteca.` }),
       });
     } catch (e: any) {
-      toast({ title: 'Konnte Location nicht anlegen', description: e?.message || 'Unbekannter Fehler', variant: 'destructive' });
+      toast({ title: tx({ de: 'Konnte Location nicht anlegen', en: 'Could not create location', es: 'No se pudo crear la ubicación' }), description: e?.message || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }), variant: 'destructive' });
     } finally {
       setCreatingLoc(null);
     }
@@ -1191,7 +1191,7 @@ export default function ProductionPlanSheet({
                 <Row label="Gesamtdauer" value={plan.project?.totalDurationSec ? `${plan.project.totalDurationSec}s` : undefined} />
                 <Row label="Plattformen" value={plan.project?.platforms?.join(', ')} />
                 <Row
-                  label="Summe Szenen"
+                  label={tx({ de: "Summe Szenen", en: "Total scenes", es: "Total de escenas" })}
                   value={`${totalPlanSec}s (${plan.scenes.length} Szenen)`}
                   highlight={plan.project?.totalDurationSec ? totalPlanSec !== plan.project.totalDurationSec : false}
                 />
@@ -1349,7 +1349,7 @@ export default function ProductionPlanSheet({
                                 className={`text-[10px] ${typeof s.seed === 'number' ? 'border-emerald-400/40 text-emerald-300' : 'border-muted-foreground/30 text-muted-foreground'}`}
                                 title={typeof s.seed === 'number'
                                   ? `Seed=${s.seed} · reproduzierbarer Render`
-                                  : 'Kein Seed — Composer würfelt pro Render (gewollt für A/B-Tests).'}
+                                  : tx({ de: 'Kein Seed — Composer würfelt pro Render (gewollt für A/B-Tests).', en: 'No seed — the composer rolls the dice per render (intended for A/B tests).', es: 'Sin semilla — el compositor tira los dados por render (previsto para pruebas A/B).' })}
                               >
                                 {typeof s.seed === 'number' ? `✓ Seed (${s.seed})` : '— Seed · random'}
                               </Badge>
@@ -1623,7 +1623,7 @@ export default function ProductionPlanSheet({
                                 {(c.voiceName || c.voiceId || baseId) && (
                                   <div className="inline-flex items-center gap-1">
                                     <Badge variant="secondary" className="text-[10px]">
-                                      🎙 {c.voiceName ?? (c.voiceId ? 'Stimme' : 'Auto-Voice beim Anwenden')}
+                                      🎙 {c.voiceName ?? (c.voiceId ? tx({ de: 'Stimme', en: 'Voice', es: 'Voz' }) : tx({ de: 'Auto-Voice beim Anwenden', en: 'Auto voice on apply', es: 'Voz automática al aplicar' }))}
                                       {((c as any).voiceAutoAssigned || (!c.voiceId && !c.voiceName && baseId)) && (
                                         <span className="ml-1 text-amber-300" title="Stimme automatisch von der KI zugeordnet">⚡ AI</span>
                                       )}

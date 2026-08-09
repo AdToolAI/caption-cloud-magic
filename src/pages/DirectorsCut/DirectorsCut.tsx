@@ -690,7 +690,7 @@ export function DirectorsCut() {
             if (b) {
               setScenes(b.scenes);
               setAiCutMarkers(b.markers);
-              toast.success('Szenen wiederhergestellt');
+              toast.success(tx({ de: "Szenen wiederhergestellt", en: "Scenes restored", es: "Escenas restauradas" }));
             }
           },
         },

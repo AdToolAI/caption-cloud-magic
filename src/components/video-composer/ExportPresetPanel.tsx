@@ -141,7 +141,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
 
   const handleBatchExport = async () => {
     if (!masterReady) {
-      toast({ title: tx({ de: 'Bitte zuerst rendern', en: 'Please render first', es: 'Por favor, renderiza primero' }), description: 'Erstelle erst dein Hauptvideo.', variant: 'destructive' });
+      toast({ title: tx({ de: 'Bitte zuerst rendern', en: 'Please render first', es: 'Por favor, renderiza primero' }), description: tx({ de: 'Erstelle erst dein Hauptvideo.', en: 'Create your main video first.', es: 'Crea primero tu video principal.' }), variant: 'destructive' });
       return;
     }
     if (selectedKeys.size === 0) return;
@@ -183,7 +183,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
       });
 
       if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || 'Batch-Export fehlgeschlagen');
+        throw new Error(error?.message || data?.error || tx({ de: 'Batch-Export fehlgeschlagen', en: 'Batch export failed', es: 'Error en la exportación por lotes' }));
       }
 
       toast({
@@ -192,7 +192,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
       });
       clearAll();
     } catch (err: any) {
-      toast({ title: 'Batch-Export fehlgeschlagen', description: err.message, variant: 'destructive' });
+      toast({ title: tx({ de: 'Batch-Export fehlgeschlagen', en: 'Batch export failed', es: 'Error en la exportación por lotes' }), description: err.message, variant: 'destructive' });
     } finally {
       setBatchLoading(false);
     }
@@ -200,7 +200,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
 
   const handleExport = async (preset: PresetDef) => {
     if (!masterReady) {
-      toast({ title: tx({ de: 'Bitte zuerst rendern', en: 'Please render first', es: 'Por favor, renderiza primero' }), description: 'Erstelle erst dein Hauptvideo.', variant: 'destructive' });
+      toast({ title: tx({ de: 'Bitte zuerst rendern', en: 'Please render first', es: 'Por favor, renderiza primero' }), description: tx({ de: 'Erstelle erst dein Hauptvideo.', en: 'Create your main video first.', es: 'Crea primero tu video principal.' }), variant: 'destructive' });
       return;
     }
     setActiveKey(preset.key);
@@ -231,9 +231,9 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
       if (error || !data?.success) {
         await supabase.from('composer_exports').update({
           status: 'failed',
-          error_message: error?.message || data?.error || 'Render fehlgeschlagen',
+          error_message: error?.message || data?.error || tx({ de: 'Render fehlgeschlagen', en: 'Render failed', es: 'Error en el renderizado' }),
         }).eq('id', row.id);
-        throw new Error(error?.message || data?.error || 'Render fehlgeschlagen');
+        throw new Error(error?.message || data?.error || tx({ de: 'Render fehlgeschlagen', en: 'Render failed', es: 'Error en el renderizado' }));
       }
 
       toast({
@@ -241,7 +241,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
         description: tx({ de: 'Du wirst benachrichtigt, sobald das Video fertig ist.', en: 'You will be notified once the video is ready.', es: 'Se te notificará cuando el video esté listo.' }),
       });
     } catch (err: any) {
-      toast({ title: 'Export fehlgeschlagen', description: err.message, variant: 'destructive' });
+      toast({ title: tx({ de: 'Export fehlgeschlagen', en: 'Export failed', es: 'Error en la exportación' }), description: err.message, variant: 'destructive' });
     } finally {
       setActiveKey(null);
     }
@@ -276,7 +276,7 @@ export default function ExportPresetPanel({ projectId, masterReady, currentAspec
               onClick={selectedKeys.size === PRESETS.length ? clearAll : selectAll}
               disabled={!masterReady}
             >
-              {selectedKeys.size === PRESETS.length ? 'Auswahl löschen' : tx({ de: 'Alle auswählen', en: 'Select all', es: 'Seleccionar todo' })}
+              {selectedKeys.size === PRESETS.length ? tx({ de: 'Auswahl löschen', en: 'Clear selection', es: 'Borrar selección' }) : tx({ de: 'Alle auswählen', en: 'Select all', es: 'Seleccionar todo' })}
             </Button>
           </div>
         </div>

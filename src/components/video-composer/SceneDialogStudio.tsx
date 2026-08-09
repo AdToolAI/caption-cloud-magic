@@ -1019,13 +1019,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       if (generated) {
         setScript(generated);
         toast({
-          title: language === 'de' ? 'Skript bereit' : language === 'es' ? 'Guion listo' : 'Script ready',
-          description:
-            language === 'de'
-              ? 'Prompt aktualisiert ✓ — jetzt „Dialog generieren" klicken.'
-              : language === 'es'
-              ? 'Prompt actualizado ✓ — ahora haz clic en "Generar diálogo".'
-              : 'Prompt updated ✓ — now click "Generate dialog".',
+          title: tx({ de: 'Skript bereit', en: 'Script ready', es: 'Guion listo' }),
+          description: tx({ de: 'Prompt aktualisiert ✓ — jetzt „Dialog generieren" klicken.', en: 'Prompt updated ✓ — now click "Generate dialog".', es: 'Prompt actualizado ✓ — ahora haz clic en "Generar diálogo".' }),
         });
       }
     } catch (e) {
@@ -1294,18 +1289,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       scene.lipSyncWithVoiceover === true || scene.dialogMode === true;
     if (!wantsLipSync) {
       toast({
-        title:
-          language === 'de'
-            ? 'Lip-Sync ist ausgeschaltet'
-            : language === 'es'
-              ? 'Lip-Sync está desactivado'
-              : 'Lip-Sync is off',
-        description:
-          language === 'de'
-            ? tx({ de: 'Aktiviere den Dialog & Lip-Sync-Schalter, um das Studio zu starten — oder nutze den regulären "Generieren"-Button für einen reinen Bild-Render ohne Sync.so.', en: 'Activate the dialog & lip-sync switch to start the studio — or use the regular "Generate" button for a pure image render without Sync.so.', es: 'Activa el interruptor de diálogo y sincronización labial para iniciar el estudio, o usa el botón "Generar" normal para un render de imagen puro sin Sync.so.' })
-            : language === 'es'
-              ? 'Activa el interruptor de Diálogo & Lip-Sync para usar el Studio — o pulsa "Generar" para un render solo de imagen.'
-              : 'Turn the Dialog & Lip-Sync switch on to use the Studio — or use the standard Generate button for an image-only render.',
+        title: tx({ de: 'Lip-Sync ist ausgeschaltet', en: 'Lip-Sync is off', es: 'Lip-Sync está desactivado' }),
+        description: tx({ de: 'Aktiviere den Dialog & Lip-Sync-Schalter, um das Studio zu starten — oder nutze den regulären "Generieren"-Button für einen reinen Bild-Render ohne Sync.so.', en: 'Turn the Dialog & Lip-Sync switch on to use the Studio — or use the standard Generate button for an image-only render.', es: 'Activa el interruptor de Diálogo & Lip-Sync para usar el Studio — o pulsa "Generar" para un render solo de imagen.' }),
         variant: 'destructive',
       });
       return;
@@ -1367,12 +1352,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         passes: turnCount,
         title:
           turnCount > 1
-            ? `Dialog rendern (${turnCount} Turns)?`
-            : 'Dialog-Szene rendern?',
+            ? tx({ de: `Dialog rendern (${turnCount} Turns)?`, en: `Render dialog (${turnCount} turns)?`, es: `¿Renderizar diálogo (${turnCount} turnos)?` })
+            : tx({ de: 'Dialog-Szene rendern?', en: 'Render dialog scene?', es: '¿Renderizar escena de diálogo?' }),
         description:
           turnCount > 1
-            ? `Pro Sprecher-Turn läuft ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. Gesamtkosten siehe unten.`
-            : 'Voiceover + Lip-Sync werden mitberechnet.',
+            ? tx({ de: 'Pro Sprecher-Turn läuft ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. Gesamtkosten siehe unten.', en: 'Each speaker turn runs its own Hailuo plate + dedicated Sync.so lip-sync. See total cost below.', es: 'Cada turno del orador ejecuta su propia toma Hailuo + Sync.so lip-sync dedicado. Ver el costo total abajo.' })
+            : tx({ de: 'Voiceover + Lip-Sync werden mitberechnet.', en: 'Voiceover + lip-sync will be included in the cost.', es: 'La voz en off + lip-sync se incluirán en el costo.' }),
       });
       if (!ok) return;
     }
@@ -1760,13 +1745,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             'ai-luma': 'Luma Ray 2',
           };
           toast({
-            title: 'Dialog länger als Szene',
-            description:
-              language === 'de'
-                ? tx({ de: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts at the end (cut_off). To get full dialogue, increase scene duration or choose a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} es de ${masterDuration}s. Sync.so corta al final (cut_off). Para obtener el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` })
-                : language === 'es'
-                ? `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} dura ${masterDuration}s. Sync.so recorta el final (cut_off). Para el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.`
-                : `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts off the end (cut_off). For the full dialog, increase scene duration or pick a provider with a larger duration window.`,
+            title: tx({ de: 'Dialog länger als Szene', en: 'Dialog longer than scene', es: 'Diálogo más largo que la escena' }),
+            description: tx({ de: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts off the end (cut_off). For the full dialog, increase scene duration or pick a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} dura ${masterDuration}s. Sync.so recorta el final (cut_off). Para el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }),
           });
         }
 
@@ -1872,13 +1852,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
         okCount = 1;
         toast({
-          title: language === 'de' ? 'Dialog-Shots werden gerendert' : language === 'es' ? 'Renderizando Dialog-Shots' : 'Rendering Dialog Shots',
-          description:
-            language === 'de'
-              ? tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `For each speaker turn, a separate shot (Hailuo + Sync.so Lip-Sync) is rendered and then stitched together into a ${masterDuration}s scene. Live progress in the clip card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Sync.so Lip-Sync) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` })
-              : language === 'es'
-              ? `Por cada turno se renderiza un shot dedicado (Hailuo + Sync.so) y al final se concatena a una escena de ${masterDuration}s. Progreso en vivo en la tarjeta del clip.`
-              : `One dedicated shot (Hailuo + Sync.so lip-sync) per speaker turn, concatenated into a ${masterDuration}s scene at the end. Live progress in the clip-card overlay.`,
+          title: tx({ de: 'Dialog-Shots werden gerendert', en: 'Rendering Dialog Shots', es: 'Renderizando Dialog-Shots' }),
+          description: tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `One dedicated shot (Hailuo + Sync.so lip-sync) per speaker turn, concatenated into a ${masterDuration}s scene at the end. Live progress in the clip-card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Sync.so Lip-Sync) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` }),
         });
         if (onClose) onClose();
       } catch (twoShotErr) {
@@ -1893,11 +1868,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       console.error('[SceneDialogStudio] generate error', e);
       const degraded = isEdgeRuntimeDegraded(e);
       const description = degraded
-        ? language === 'de'
-          ? tx({ de: 'Voiceover-Service kurzzeitig nicht erreichbar (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Bitte in ~30 s erneut auf „Clip generieren mit Voiceover" klicken — bereits erzeugte Voiceovers werden aus dem Cache wiederverwendet.', en: 'Voiceover service temporarily unavailable (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Please click "Generate clip with voiceover" again in ~30 s — already generated voiceovers will be reused from the cache.', es: 'Servicio de voz en off temporalmente no disponible (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Por favor, haz clic en "Generar clip con voz en off" de nuevo en ~30 s — las voces en off ya generadas se reutilizarán de la caché.' })
-          : language === 'es'
-          ? 'Servicio de voiceover temporalmente no disponible. Vuelve a intentarlo en ~30 s — los voiceovers ya generados se reutilizan.'
-          : 'Voiceover service briefly unavailable (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Please click "Generate clip with voiceover" again in ~30s — already-generated voiceovers are cached.'
+        ? tx({ de: 'Voiceover-Service kurzzeitig nicht erreichbar (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Bitte in ~30 s erneut auf „Clip generieren mit Voiceover" klicken — bereits erzeugte Voiceovers werden aus dem Cache wiederverwendet.', en: 'Voiceover service briefly unavailable (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Please click "Generate clip with voiceover" again in ~30s — already-generated voiceovers are cached.', es: 'Servicio de voz en off temporalmente no disponible (SUPABASE_EDGE_RUNTIME_SERVICE_DEGRADED). Por favor, haz clic en "Generar clip con voz en off" de nuevo en ~30 s — las voces en off ya generadas se reutilizarán de la caché.' })
         : formatError(e);
       toast({
         title: t.failed,
@@ -2012,7 +1983,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                   }
                   await onInsertScenesAfter(scene.id, partials, { removeParent: false });
                   toast({
-                    title: language === 'de' ? '✨ Coverage erzeugt' : language === 'es' ? '✨ Coverage creada' : '✨ Coverage created',
+                    title: tx({ de: '✨ Coverage erzeugt', en: '✨ Coverage created', es: '✨ Coverage creada' }),
                     description:
                       language === 'de'
                         ? tx({ de: `${partials.length} Szenen nach dieser Szene eingefügt.`, en: `${partials.length} scenes inserted after this scene.`, es: `Se insertaron ${partials.length} escenas después de esta escena.` })
@@ -2026,7 +1997,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               }}
             >
               <Clapperboard className="h-3 w-3" />
-              {language === 'de' ? 'Auto-Coverage' : language === 'es' ? 'Auto-Coverage' : 'Auto-Coverage'}
+              {tx({ de: 'Auto-Coverage', en: 'Auto-Coverage', es: 'Auto-Coverage' })}
             </Button>
           )}
           {onClose && (
@@ -2127,7 +2098,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                     : 'Hi, welcome!'
                 }`
               : `${sceneCast[0]?.name ?? 'Sarah'}: ${
-                  language === 'de' ? 'Hi!' : language === 'es' ? '¡Hola!' : 'Hi!'
+                  tx({ de: 'Hi!', en: 'Hi!', es: '¡Hola!' })
                 }\n${sceneCast[1]?.name ?? 'Matthew'}: ${
                   language === 'de'
                     ? `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
@@ -2493,7 +2464,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           size="sm"
           onClick={handleGenerate}
           disabled={generating || blocks.length === 0 || castEmpty}
-          title={castEmpty ? (language === 'de' ? 'Cast-Charakter im Briefing zuweisen' : language === 'es' ? 'Asigna un personaje del reparto en el briefing' : 'Assign a cast character in the briefing') : undefined}
+          title={castEmpty ? tx({ de: 'Cast-Charakter im Briefing zuweisen', en: 'Assign a cast character in the briefing', es: 'Asigna un personaje del reparto en el briefing' }) : undefined}
           className="h-7 text-xs gap-1 ml-auto"
 
         >

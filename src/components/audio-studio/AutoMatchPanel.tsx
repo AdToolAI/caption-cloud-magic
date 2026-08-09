@@ -96,7 +96,7 @@ export function AutoMatchPanel({
   };
 
   const phaseLabels: Record<string, string> = {
-    uploading: 'Lade Video hoch…',
+    uploading: tx({ de: "Lade Video hoch…", en: "Upload video...", es: "Subir vídeo..." }),
     extracting: 'Extrahiere Frames & analysiere Schnitte…',
     analyzing: 'KI analysiert Mood & empfiehlt Sound…',
   };
@@ -152,7 +152,7 @@ export function AutoMatchPanel({
               </div>
             </motion.div>
             <h3 className="text-xl font-semibold mb-2">
-              {isDragActive ? 'Video hier ablegen' : tx({ de: 'Video hochladen für Auto-Match', en: 'Upload video for Auto-Match', es: 'Subir video para Auto-Match' })}
+              {isDragActive ? tx({ de: "Video hier ablegen", en: "Drop video here", es: "Deja el vídeo aquí" }) : tx({ de: 'Video hochladen für Auto-Match', en: 'Upload video for Auto-Match', es: 'Subir video para Auto-Match' })}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
               MP4, MOV, WEBM • bis 200 MB • Analyse dauert 10–20 Sekunden

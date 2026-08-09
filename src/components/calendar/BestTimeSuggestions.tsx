@@ -5,6 +5,7 @@ import { Clock, Sparkles } from "lucide-react";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
+import { tx } from '@/lib/i18nText';
 
 interface BestTimeSuggestionsProps {
   /** Kanäle des Beitrags — der erste bestimmt die Prognose. */

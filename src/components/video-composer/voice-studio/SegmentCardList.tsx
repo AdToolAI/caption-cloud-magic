@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +49,7 @@ export function SegmentCardList({ script, speakerMap, overrides, onOverridesChan
   const reRollSegment = async (idx: number, seg: SpeakerSegment) => {
     const cfg = speakerMap[seg.speakerId];
     if (!cfg) {
-      toast({ title: 'Keine Stimme zugeordnet', description: seg.speakerName, variant: 'destructive' });
+      toast({ title: tx({ de: 'Keine Stimme zugeordnet', en: 'No voice assigned', es: 'Sin voz asignada' }), description: seg.speakerName, variant: 'destructive' });
       return;
     }
     setReRollingIdx(idx);
@@ -67,9 +68,9 @@ export function SegmentCardList({ script, speakerMap, overrides, onOverridesChan
         },
       });
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Re-Roll fehlgeschlagen');
+      if (!data?.success) throw new Error(data?.error || tx({ de: 'Re-Roll fehlgeschlagen', en: 'Re-roll failed', es: 'Re-roll fallido' }));
       const audioBase64 = data.segments?.[0]?.audioBase64;
-      if (!audioBase64) throw new Error('Kein Audio zurück');
+      if (!audioBase64) throw new Error(tx({ de: 'Kein Audio zurück', en: 'No audio returned', es: 'No se recibió audio' }));
       const url = `data:audio/mpeg;base64,${audioBase64}`;
       setPreviewUrls((prev) => ({ ...prev, [idx]: url }));
       try {
@@ -77,7 +78,7 @@ export function SegmentCardList({ script, speakerMap, overrides, onOverridesChan
         await audio.play();
       } catch { /* user-gesture ignored */ }
     } catch (e: any) {
-      toast({ title: 'Re-Roll fehlgeschlagen', description: e?.message ?? String(e), variant: 'destructive' });
+      toast({ title: tx({ de: 'Re-Roll fehlgeschlagen', en: 'Re-roll failed', es: 'Re-roll fallido' }), description: e?.message ?? String(e), variant: 'destructive' });
     } finally {
       setReRollingIdx(null);
     }
@@ -86,8 +87,8 @@ export function SegmentCardList({ script, speakerMap, overrides, onOverridesChan
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-xs">Sätze ({segments.length})</Label>
-        <span className="text-[10px] text-muted-foreground">Re-Roll testet einzelne Sätze ohne den Master neu zu rendern.</span>
+        <Label className="text-xs">{tx({ de: 'Sätze', en: 'Sentences', es: 'Frases' })} ({segments.length})</Label>
+        <span className="text-[10px] text-muted-foreground">{tx({ de: 'Re-Roll testet einzelne Sätze ohne den Master neu zu rendern.', en: 'Re-roll tests individual sentences without re-rendering the master.', es: 'Re-roll prueba frases individuales sin volver a renderizar el máster.' })}</span>
       </div>
       <div className="space-y-1.5">
         {segments.map((seg, idx) => {
@@ -207,7 +208,7 @@ export function SegmentCardList({ script, speakerMap, overrides, onOverridesChan
                     ) : (
                       <Play className="h-3 w-3 mr-1" />
                     )}
-                    Mit diesen Settings testen
+                    {tx({ de: 'Mit diesen Settings testen', en: 'Test with these settings', es: 'Probar con esta configuración' })}
                   </Button>
                 </CollapsibleContent>
               </Collapsible>

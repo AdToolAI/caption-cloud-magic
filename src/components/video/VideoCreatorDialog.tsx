@@ -182,7 +182,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       toast.success(`${uploadedUrls.length} Video(s) hochgeladen`);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Video-Upload fehlgeschlagen');
+      toast.error(tx({ de: "Video-Upload fehlgeschlagen", en: "Video upload failed", es: "Error al subir el vídeo" }));
     } finally {
       setUploadingImages(prev => {
         const next = new Set(prev);
@@ -473,7 +473,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
               </Button>
             )}
             <Video className="h-5 w-5" />
-            {step === 'gallery' && 'Template auswählen'}
+            {step === 'gallery' && tx({ de: "Template auswählen", en: "Select template", es: "Seleccionar plantilla" })}
             {step === 'customize' && `Video erstellen: ${selectedTemplate?.name}`}
             {step === 'rendering' && tx({ de: 'Video wird erstellt...', en: 'Video is being created...', es: 'El video se está creando...' })}
           </DialogTitle>

@@ -159,8 +159,8 @@ export default function MediaProfiles() {
     }
 
     toast({
-      title: 'Profil dupliziert',
-      description: 'Das Profil wurde erfolgreich kopiert.'
+      title: tx({ de: 'Profil dupliziert', en: 'Profile duplicated', es: 'Perfil duplicado' }),
+      description: tx({ de: 'Das Profil wurde erfolgreich kopiert.', en: 'The profile was copied successfully.', es: 'El perfil se copió correctamente.' })
     });
 
     loadProfiles();
@@ -236,8 +236,8 @@ export default function MediaProfiles() {
     a.click();
     URL.revokeObjectURL(url);
     toast({
-      title: 'Export erfolgreich',
-      description: 'Profil wurde als JSON exportiert.'
+      title: tx({ de: 'Export erfolgreich', en: 'Export successful', es: 'Exportación exitosa' }),
+      description: tx({ de: 'Profil wurde als JSON exportiert.', en: 'Profile was exported as JSON.', es: 'El perfil se exportó como JSON.' })
     });
   };
 
@@ -309,8 +309,8 @@ export default function MediaProfiles() {
               <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-muted-foreground mb-4">
                 {filterPlatform === 'all' 
-                  ? 'Noch keine Profile vorhanden.'
-                  : `Keine Profile für ${filterPlatform} gefunden.`
+                  ? tx({ de: 'Noch keine Profile vorhanden.', en: 'No profiles yet.', es: 'Aún no hay perfiles.' })
+                  : tx({ de: `Keine Profile für ${filterPlatform} gefunden.`, en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` })
                 }
               </p>
               <Button onClick={() => {

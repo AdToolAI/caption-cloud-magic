@@ -98,7 +98,7 @@ export function AudiobookCastPanel({ cast, language, onChange }: Props) {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCharacter(); } }}
-          placeholder="Figur hinzufügen (z. B. Emma)"
+          placeholder={tx({ de: "Figur hinzufügen (z. B. Emma)", en: "Add character (e.g. Emma)", es: "Agregar personaje (por ejemplo, Emma)" })}
           className="h-9 text-sm"
         />
         <Button size="sm" variant="outline" onClick={addCharacter} disabled={!newName.trim()}>

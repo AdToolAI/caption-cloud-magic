@@ -76,7 +76,7 @@ export function AIToolsSidebar({
   const handleGenerateVoiceover = async () => {
     if (!voiceoverText.trim()) {
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
         description: tx({ de: 'Bitte gib einen Text ein', en: 'Please enter some text', es: 'Por favor, introduce un texto' }),
         variant: 'destructive',
       });
@@ -119,7 +119,7 @@ export function AIToolsSidebar({
     } catch (error) {
       console.error('Voiceover generation error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
         description: tx({ de: 'Voice-Over konnte nicht erstellt werden', en: 'Voice-over could not be created', es: 'No se pudo crear la voz en off' }),
         variant: 'destructive',
       });
@@ -153,8 +153,8 @@ export function AIToolsSidebar({
   const handleGenerateSfx = async () => {
     if (!sfxPrompt.trim()) {
       toast({
-        title: 'Fehler',
-        description: 'Bitte beschreibe den gewünschten Sound',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
+        description: tx({ de: 'Bitte beschreibe den gewünschten Sound', en: 'Please describe the desired sound', es: 'Por favor, describe el sonido deseado' }),
         variant: 'destructive',
       });
       return;
@@ -195,7 +195,7 @@ export function AIToolsSidebar({
     } catch (error) {
       console.error('SFX generation error:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: 'Fehler', en: 'Error', es: 'Error' }),
         description: tx({ de: 'Sound Effect konnte nicht erstellt werden', en: 'Sound effect could not be created', es: 'No se pudo crear el efecto de sonido' }),
         variant: 'destructive',
       });
@@ -273,7 +273,7 @@ export function AIToolsSidebar({
                 <Textarea
                   value={voiceoverText}
                   onChange={(e) => setVoiceoverText(e.target.value)}
-                  placeholder="Gib den Text für das Voice-Over ein..."
+                  placeholder={tx({ de: "Gib den Text für das Voice-Over ein...", en: "Enter the text for the voice-over...", es: "Introduce el texto para la voz en off..." })}
                   className="min-h-[100px] text-sm resize-none"
                 />
                 <div className="text-xs text-muted-foreground text-right">
@@ -352,7 +352,7 @@ export function AIToolsSidebar({
                 <Textarea
                   value={sfxPrompt}
                   onChange={(e) => setSfxPrompt(e.target.value)}
-                  placeholder="Beschreibe den gewünschten Sound, z.B. 'Whoosh Übergang' oder 'Glockenspiel Notification'..."
+                  placeholder={tx({ de: "Beschreibe den gewünschten Sound, z.B. 'Whoosh Übergang' oder 'Glockenspiel Notification'...", en: "Describe the desired sound, e.g. 'Whoosh transition' or 'Chime notification'...", es: "Describe el sonido deseado, p. ej. 'Transición whoosh' o 'Notificación de campanas'..." })}
                   className="min-h-[80px] text-sm resize-none"
                 />
               </div>

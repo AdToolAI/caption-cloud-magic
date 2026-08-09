@@ -93,7 +93,7 @@ export function TranscriptWaveformEditor({
       }
 
       onTranscriptChange(words);
-      toast.success('Transcript erfolgreich generiert');
+      toast.success(tx({ de: 'Transcript erfolgreich generiert', en: 'Transcript generated successfully', es: 'Transcripción generada con éxito' }));
     } catch (error) {
       console.error('Transcript error:', error);
       toast.error(tx({ de: 'Fehler beim Generieren des Transcripts', en: 'Error generating transcript', es: 'Error al generar la transcripción' }));

@@ -47,8 +47,8 @@ export function AnalyticsExport({ data, dateRange }: Props) {
       document.body.removeChild(link);
 
       toast({
-        title: 'CSV Export erfolgreich',
-        description: 'Report wurde heruntergeladen'
+        title: tx({ de: 'CSV Export erfolgreich', en: 'CSV export successful', es: 'Exportación CSV exitosa' }),
+        description: tx({ de: 'Report wurde heruntergeladen', en: 'Report was downloaded', es: 'El informe se ha descargado' })
       });
     } catch (error) {
       toast({
@@ -61,8 +61,8 @@ export function AnalyticsExport({ data, dateRange }: Props) {
 
   const exportToPDF = () => {
     toast({
-      title: 'PDF Export',
-      description: 'PDF-Export wird vorbereitet... (Feature in Entwicklung)'
+      title: tx({ de: 'PDF Export', en: 'PDF export', es: 'Exportación PDF' }),
+      description: tx({ de: 'PDF-Export wird vorbereitet... (Feature in Entwicklung)', en: 'PDF export is being prepared... (feature in development)', es: 'Preparando la exportación en PDF... (función en desarrollo)' })
     });
   };
 
@@ -80,8 +80,8 @@ export function AnalyticsExport({ data, dateRange }: Props) {
       document.body.removeChild(link);
 
       toast({
-        title: 'JSON Export erfolgreich',
-        description: 'Rohdaten wurden heruntergeladen'
+        title: tx({ de: 'JSON Export erfolgreich', en: 'JSON export successful', es: 'Exportación JSON exitosa' }),
+        description: tx({ de: 'Rohdaten wurden heruntergeladen', en: 'Raw data was downloaded', es: 'Se han descargado los datos sin procesar' })
       });
     } catch (error) {
       toast({
@@ -94,16 +94,16 @@ export function AnalyticsExport({ data, dateRange }: Props) {
 
   return (
     <Card className="p-6">
-      <h3 className="text-lg font-semibold mb-4">📊 Reports exportieren</h3>
+      <h3 className="text-lg font-semibold mb-4">📊 {tx({ de: 'Reports exportieren', en: 'Export reports', es: 'Exportar informes' })}</h3>
       
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Exportiere deine Analytics-Daten für externe Auswertungen oder Präsentationen
+          {tx({ de: 'Exportiere deine Analytics-Daten für externe Auswertungen oder Präsentationen', en: 'Export your analytics data for external evaluations or presentations', es: 'Exporta tus datos analíticos para evaluaciones o presentaciones externas' })}
         </p>
 
         {dateRange && (
           <div className="text-xs text-muted-foreground">
-            Zeitraum: {new Date(dateRange.start).toLocaleDateString('de-DE')} - {new Date(dateRange.end).toLocaleDateString('de-DE')}
+            {tx({ de: 'Zeitraum', en: 'Period', es: 'Periodo' })}: {new Date(dateRange.start).toLocaleDateString('de-DE')} - {new Date(dateRange.end).toLocaleDateString('de-DE')}
           </div>
         )}
 
@@ -125,12 +125,12 @@ export function AnalyticsExport({ data, dateRange }: Props) {
         </div>
 
         <div className="mt-4 p-3 rounded-lg bg-muted/30 text-xs text-muted-foreground">
-          <p className="font-medium mb-1">Export enthält:</p>
+          <p className="font-medium mb-1">{tx({ de: 'Export enthält:', en: 'Export includes:', es: 'La exportación incluye:' })}</p>
           <ul className="list-disc list-inside space-y-1">
-            <li>{data.videoPerformance.length} Video Performance Einträge</li>
-            <li>{data.templateROI.length} Template ROI Analysen</li>
-            <li>Komplette Kostenaufstellung</li>
-            <li>Engine Vergleichsdaten (Remotion vs. Shotstack)</li>
+            <li>{data.videoPerformance.length} {tx({ de: 'Video Performance Einträge', en: 'video performance entries', es: 'entradas de rendimiento de vídeo' })}</li>
+            <li>{data.templateROI.length} {tx({ de: 'Template ROI Analysen', en: 'template ROI analyses', es: 'análisis de ROI de plantillas' })}</li>
+            <li>{tx({ de: 'Komplette Kostenaufstellung', en: 'Complete cost breakdown', es: 'Desglose completo de costes' })}</li>
+            <li>{tx({ de: 'Engine Vergleichsdaten', en: 'Engine comparison data', es: 'Datos de comparación de motores' })} (Remotion vs. Shotstack)</li>
           </ul>
         </div>
       </div>

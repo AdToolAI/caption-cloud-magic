@@ -344,7 +344,7 @@ export default function StockMediaBrowser({
                           onClick={(e) => { e.stopPropagation(); favoriteMutation.mutate(item); }}
                           disabled={favoriteMutation.isPending}
                           className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 hover:bg-yellow-500/80 transition-all"
-                          title={t('videoComposer.stock.favorite') || 'In Bibliothek speichern'}
+                          title={t('videoComposer.stock.favorite') || tx({ de: 'In Bibliothek speichern', en: 'Save to library', es: 'Guardar en biblioteca' })}
                         >
                           <Star className="h-3.5 w-3.5" />
                         </button>

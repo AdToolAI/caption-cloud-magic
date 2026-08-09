@@ -229,7 +229,7 @@ export default function AIVideoToolkit() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {language === 'de'
-                      ? 'Speichere Charaktere einmal — nutze sie konsistent in jedem Video.'
+                      ? tx({ de: "Speichere Charaktere einmal — nutze sie konsistent in jedem Video.", en: "Save characters once — use them consistently in every video.", es: "Guarde los personajes una vez: úselos de manera constante en cada video." })
                       : 'Save a character once — reuse it consistently in every video.'}
                   </p>
                 </div>

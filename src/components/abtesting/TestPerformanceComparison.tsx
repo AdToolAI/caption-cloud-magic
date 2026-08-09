@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Database } from '@/integrations/supabase/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Badge } from '@/components/ui/badge';
+import { tx } from '@/lib/i18nText';
 
 type ABTestVariant = Database['public']['Tables']['ab_test_variants']['Row'];
 

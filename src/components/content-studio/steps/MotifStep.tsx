@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ImageSourceDialog } from "@/components/post-designer/ImageSourceDialog";
 import { useContentStudio } from "@/contexts/ContentStudioContext";
 import { scorePairing } from "@/lib/content-studio/pairingScore";
+import { tx } from '@/lib/i18nText';
 
 const MODES = [
   { id: "ai" as const, label: "KI-Motiv", hint: "Aus dem Briefing" },

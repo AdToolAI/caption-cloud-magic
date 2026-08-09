@@ -5,6 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { OverlayAnimation, TextOverlay } from '@/types/directors-cut';
+import { useTx } from '@/lib/i18nText';
 
 interface OverlayInspectorProps {
   overlay: TextOverlay;
@@ -12,27 +13,31 @@ interface OverlayInspectorProps {
   onUpdateStyle: (patch: Partial<TextOverlay['style']>) => void;
 }
 
-const ANIMATION_OPTIONS: { value: OverlayAnimation; label: string }[] = [
-  { value: 'none', label: 'Ohne' },
-  { value: 'fadeIn', label: 'Einblenden' },
-  { value: 'slideUp', label: 'Von unten' },
-  { value: 'slideDown', label: 'Von oben' },
-  { value: 'slideLeft', label: 'Von rechts' },
-  { value: 'slideRight', label: 'Von links' },
-  { value: 'wipe', label: 'Wipe' },
-  { value: 'pop', label: 'Pop' },
-  { value: 'blurIn', label: 'Blur-In' },
-  { value: 'scaleUp', label: 'Scale Up' },
-  { value: 'stagger', label: 'Wort für Wort' },
-  { value: 'typewriter', label: 'Schreibmaschine' },
-  { value: 'tickerLoop', label: 'Ticker-Lauf' },
-];
+function useAnimationOptions(tx: ReturnType<typeof useTx>): { value: OverlayAnimation; label: string }[] {
+  return [
+    { value: 'none', label: tx({ de: 'Ohne', en: 'None', es: 'Ninguna' }) },
+    { value: 'fadeIn', label: tx({ de: 'Einblenden', en: 'Fade in', es: 'Aparecer' }) },
+    { value: 'slideUp', label: tx({ de: 'Von unten', en: 'From below', es: 'Desde abajo' }) },
+    { value: 'slideDown', label: tx({ de: 'Von oben', en: 'From above', es: 'Desde arriba' }) },
+    { value: 'slideLeft', label: tx({ de: 'Von rechts', en: 'From the right', es: 'Desde la derecha' }) },
+    { value: 'slideRight', label: tx({ de: 'Von links', en: 'From the left', es: 'Desde la izquierda' }) },
+    { value: 'wipe', label: 'Wipe' },
+    { value: 'pop', label: 'Pop' },
+    { value: 'blurIn', label: 'Blur-In' },
+    { value: 'scaleUp', label: 'Scale Up' },
+    { value: 'stagger', label: tx({ de: 'Wort für Wort', en: 'Word by word', es: 'Palabra por palabra' }) },
+    { value: 'typewriter', label: tx({ de: 'Schreibmaschine', en: 'Typewriter', es: 'Máquina de escribir' }) },
+    { value: 'tickerLoop', label: tx({ de: 'Ticker-Lauf', en: 'Ticker loop', es: 'Bucle de ticker' }) },
+  ];
+}
 
 const FILLS = ['transparent', 'rgba(10,10,15,0.85)', 'rgba(255,255,255,0.14)', '#F5C76A', '#E5484D', '#0A84FF'];
 const COLORS = ['#FFFFFF', '#0A0A0F', '#F5C76A', '#E5484D', '#34C759', '#0A84FF'];
 
 /** Kontext-Inspektor für Grafik-Overlays (Banner, Schilder, Störer …). */
 export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayInspectorProps) {
+  const tx = useTx();
+  const ANIMATION_OPTIONS = useAnimationOptions(tx);
   const s = overlay.style;
   const box = overlay.box ?? { x: 0.1, y: 0.4, w: 0.8, h: 0.15 };
   const hasSlots = ['lowerThird', 'card', 'quote', 'banner'].includes(overlay.kind ?? 'text');
@@ -41,7 +46,7 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
     <div className="space-y-5 min-w-0">
       {/* Inhalt */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium">{overlay.kind === 'progress' ? 'Beschriftung (optional)' : 'Text'}</Label>
+        <Label className="text-sm font-medium">{overlay.kind === 'progress' ? tx({ de: 'Beschriftung (optional)', en: 'Label (optional)', es: 'Etiqueta (opcional)' }) : tx({ de: 'Text', en: 'Text', es: 'Texto' })}</Label>
         <Textarea
           value={overlay.text}
           onChange={(e) => onUpdate({ text: e.target.value, slots: hasSlots ? { ...overlay.slots, title: e.target.value } : overlay.slots })}
@@ -52,7 +57,7 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
           <Input
             value={overlay.slots?.subtitle ?? ''}
             onChange={(e) => onUpdate({ slots: { ...overlay.slots, subtitle: e.target.value } })}
-            placeholder="Unterzeile"
+            placeholder={tx({ de: "Unterzeile", en: "Subtitle", es: "Subtítulo" })}
             className="bg-white/5 border-white/20"
           />
         )}
@@ -60,7 +65,7 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
           <Input
             value={overlay.slots?.imageUrl ?? ''}
             onChange={(e) => onUpdate({ slots: { ...overlay.slots, imageUrl: e.target.value || null } })}
-            placeholder="Logo-URL (leer = Text)"
+            placeholder={tx({ de: "Logo-URL (leer = Text)", en: "Logo URL (empty = text)", es: "URL del logo (vacío = texto)" })}
             className="bg-white/5 border-white/20"
           />
         )}
@@ -69,7 +74,7 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
       {/* Animation */}
       <div className="grid grid-cols-2 gap-3 min-w-0">
         <div className="space-y-2 min-w-0">
-          <Label className="text-sm font-medium">Einblendung</Label>
+          <Label className="text-sm font-medium">{tx({ de: 'Einblendung', en: 'Entry', es: 'Entrada' })}</Label>
           <Select
             value={overlay.enter ?? overlay.animation}
             onValueChange={(v) => onUpdate({ enter: v as OverlayAnimation, animation: v as TextOverlay['animation'] })}
@@ -83,7 +88,7 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
           </Select>
         </div>
         <div className="space-y-2 min-w-0">
-          <Label className="text-sm font-medium">Ausblendung</Label>
+          <Label className="text-sm font-medium">{tx({ de: 'Ausblendung', en: 'Exit', es: 'Salida' })}</Label>
           <Select value={overlay.exit ?? 'none'} onValueChange={(v) => onUpdate({ exit: v as OverlayAnimation })}>
             <SelectTrigger className="bg-white/5 border-white/20"><SelectValue /></SelectTrigger>
             <SelectContent className="bg-background z-50">
@@ -99,7 +104,7 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
       <div className="space-y-3">
         <div className="space-y-1.5">
           <div className="flex justify-between text-sm">
-            <Label className="font-medium">Schriftgröße</Label>
+            <Label className="font-medium">{tx({ de: 'Schriftgröße', en: 'Font size', es: 'Tamaño de fuente' })}</Label>
             <span className="text-muted-foreground">{Math.round((s.fontSizeRel ?? 0.038) * 1080)} px</span>
           </div>
           <Slider
@@ -112,7 +117,7 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
         </div>
         <div className="grid grid-cols-2 gap-3 min-w-0">
           <div className="space-y-1.5 min-w-0">
-            <Label className="text-sm font-medium">Schriftstärke</Label>
+            <Label className="text-sm font-medium">{tx({ de: 'Schriftstärke', en: 'Font weight', es: 'Grosor de fuente' })}</Label>
             <Select value={String(s.fontWeight ?? 700)} onValueChange={(v) => onUpdateStyle({ fontWeight: Number(v) })}>
               <SelectTrigger className="bg-white/5 border-white/20"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-background z-50">
@@ -123,27 +128,27 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
             </Select>
           </div>
           <div className="space-y-1.5 min-w-0">
-            <Label className="text-sm font-medium">Ausrichtung</Label>
+            <Label className="text-sm font-medium">{tx({ de: 'Ausrichtung', en: 'Alignment', es: 'Alineación' })}</Label>
             <Select value={s.align ?? 'center'} onValueChange={(v) => onUpdateStyle({ align: v as 'left' | 'center' | 'right' })}>
               <SelectTrigger className="bg-white/5 border-white/20"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-background z-50">
-                <SelectItem value="left">Links</SelectItem>
-                <SelectItem value="center">Mittig</SelectItem>
-                <SelectItem value="right">Rechts</SelectItem>
+                <SelectItem value="left">{tx({ de: 'Links', en: 'Left', es: 'Izquierda' })}</SelectItem>
+                <SelectItem value="center">{tx({ de: 'Mittig', en: 'Center', es: 'Centro' })}</SelectItem>
+                <SelectItem value="right">{tx({ de: 'Rechts', en: 'Right', es: 'Derecha' })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <Switch checked={s.uppercase ?? false} onCheckedChange={(v) => onUpdateStyle({ uppercase: v })} />
-          <span className="text-sm text-muted-foreground">Großbuchstaben</span>
+          <span className="text-sm text-muted-foreground">{tx({ de: 'Großbuchstaben', en: 'Uppercase', es: 'Mayúsculas' })}</span>
         </div>
       </div>
 
       {/* Farben */}
       <div className="grid grid-cols-2 gap-4 min-w-0">
         <div className="space-y-2 min-w-0">
-          <Label className="text-sm font-medium">Textfarbe</Label>
+          <Label className="text-sm font-medium">{tx({ de: 'Textfarbe', en: 'Text color', es: 'Color de texto' })}</Label>
           <div className="flex flex-wrap gap-1.5">
             {COLORS.map((c) => (
               <button
@@ -156,11 +161,11 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
           </div>
         </div>
         <div className="space-y-2 min-w-0">
-          <Label className="text-sm font-medium">Fläche</Label>
+          <Label className="text-sm font-medium">{tx({ de: 'Fläche', en: 'Fill', es: 'Relleno' })}</Label>
           <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
-              title="Goldverlauf"
+              title={tx({ de: "Goldverlauf", en: "Gold gradient", es: "Degradado dorado" })}
               onClick={() => onUpdateStyle({ fill: null, backgroundColor: undefined, gradient: ['#F5C76A', '#C79B3F'] })}
               className={`w-7 h-7 rounded-lg border-2 ${
                 !s.fill && !s.backgroundColor && s.gradient ? 'border-white' : 'border-transparent hover:border-white/50'
@@ -188,28 +193,28 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
       <div className="grid grid-cols-2 gap-4 min-w-0">
         <div className="space-y-1.5 min-w-0">
           <div className="flex justify-between text-sm">
-            <Label className="font-medium">Ecken</Label>
+            <Label className="font-medium">{tx({ de: 'Ecken', en: 'Corners', es: 'Bordes' })}</Label>
             <span className="text-muted-foreground">{Math.round((s.radius ?? 0.014) * 1080)} px</span>
           </div>
           <Slider value={[Math.round((s.radius ?? 0.014) * 1080)]} min={0} max={120} step={1} onValueChange={([v]) => onUpdateStyle({ radius: v / 1080 })} />
         </div>
         <div className="space-y-1.5 min-w-0">
           <div className="flex justify-between text-sm">
-            <Label className="font-medium">Deckkraft</Label>
+            <Label className="font-medium">{tx({ de: 'Deckkraft', en: 'Opacity', es: 'Opacidad' })}</Label>
             <span className="text-muted-foreground">{Math.round((s.opacity ?? 1) * 100)} %</span>
           </div>
           <Slider value={[Math.round((s.opacity ?? 1) * 100)]} min={10} max={100} step={1} onValueChange={([v]) => onUpdateStyle({ opacity: v / 100 })} />
         </div>
         <div className="space-y-1.5 min-w-0">
           <div className="flex justify-between text-sm">
-            <Label className="font-medium">Drehung</Label>
+            <Label className="font-medium">{tx({ de: 'Drehung', en: 'Rotation', es: 'Rotación' })}</Label>
             <span className="text-muted-foreground">{Math.round(s.rotation ?? 0)}°</span>
           </div>
           <Slider value={[Math.round(s.rotation ?? 0)]} min={-30} max={30} step={1} onValueChange={([v]) => onUpdateStyle({ rotation: v })} />
         </div>
         <div className="space-y-1.5 min-w-0">
           <div className="flex justify-between text-sm">
-            <Label className="font-medium">Rand</Label>
+            <Label className="font-medium">{tx({ de: 'Rand', en: 'Border', es: 'Borde' })}</Label>
             <span className="text-muted-foreground">{Math.round((s.borderWidth ?? 0) * 1080)} px</span>
           </div>
           <Slider
@@ -226,10 +231,10 @@ export function OverlayInspector({ overlay, onUpdate, onUpdateStyle }: OverlayIn
       <div className="grid grid-cols-2 gap-4 min-w-0">
         {(
           [
-            ['x', 'Links'],
-            ['y', 'Oben'],
-            ['w', 'Breite'],
-            ['h', 'Höhe'],
+            ['x', tx({ de: 'Links', en: 'Left', es: 'Izquierda' })],
+            ['y', tx({ de: 'Oben', en: 'Top', es: 'Arriba' })],
+            ['w', tx({ de: 'Breite', en: 'Width', es: 'Ancho' })],
+            ['h', tx({ de: 'Höhe', en: 'Height', es: 'Alto' })],
           ] as const
         ).map(([key, label]) => (
           <div key={key} className="space-y-1.5 min-w-0">

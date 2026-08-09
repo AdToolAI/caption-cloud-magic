@@ -208,7 +208,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
         .update({ album_id: albumId })
         .eq('id', imageData.id);
       if (error) { toast.error(tx({ de: "Fehler beim Verschieben", en: "Error moving", es: "Error al mover" })); return; }
-      toast.success("Bild verschoben! 📁");
+      toast.success(tx({ de: "Bild verschoben! 📁", en: "Image moved! 📁", es: "¡Imagen movida! 📁" }));
       setUnsortedImages(prev => prev.filter(img => img.id !== imageData.id));
       setAlbums(prev => prev.map(a =>
         a.id === albumId ? { ...a, image_count: (a.image_count || 0) + 1 } : a

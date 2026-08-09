@@ -125,7 +125,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       id: 'no-scenes',
       severity: 'fail',
-      title: 'Keine Szenen auf der Timeline',
+      title: tx({ de: "Keine Szenen auf der Timeline", en: "No scenes on the timeline", es: "No hay escenas en la línea de tiempo." }),
     });
   }
 
@@ -199,7 +199,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'aspect-missing',
       severity: 'warn',
       title: 'Kein Seitenverhältnis gewählt',
-      hint: 'Standardmäßig wird 16:9 verwendet.',
+      hint: tx({ de: "Standardmäßig wird 16:9 verwendet.", en: "By default 16:9 is used.", es: "Por defecto se utiliza 16:9." }),
     });
   }
 
@@ -229,7 +229,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       severity: 'warn',
       title: tx({ de: `${mismatched.length} Szene${mismatched.length > 1 ? 'n' : ''} mit abweichendem Seitenverhältnis`, en: `${mismatched.length} scene${mismatched.length > 1 ? 's' : ''} with mismatched aspect ratio`, es: `${mismatched.length} escena${mismatched.length > 1 ? 's' : ''} con relación de aspecto no coincidente` }),
       detail: tx({ de: `Projekt rendert in ${targetLabel} — betroffene Szenen werden beschnitten oder mit Letterbox versehen.`, en: `Project renders in ${targetLabel} — affected scenes will be cropped or letterboxed.`, es: `El proyecto se renderiza en ${targetLabel} — las escenas afectadas se recortarán o se les añadirá letterbox.` }),
-      hint: 'Ersetze Assets oder ändere das Export-Seitenverhältnis passend.',
+      hint: tx({ de: "Ersetze Assets oder ändere das Export-Seitenverhältnis passend.", en: "Replace assets or change the export aspect ratio appropriately.", es: "Reemplace los activos o cambie la relación de aspecto de exportación de manera adecuada." }),
     });
   }
 
@@ -265,7 +265,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
         severity: 'warn',
         title: 'Mix wirkt zu laut',
         detail: `Musik ${musicVol}% + Voice-Over ${voVol}% überschreiten voraussichtlich -14 LUFS (Social-Standard).`,
-        hint: 'Reduziere Musik auf ~40–50% oder aktiviere stärkeres Ducking.',
+        hint: tx({ de: "Reduziere Musik auf ~40–50% oder aktiviere stärkeres Ducking.", en: "Reduce music to ~40-50% or enable more ducking.", es: "Reduzca la música a ~40-50% o habilite más agacharse." }),
       });
     }
   } else if (hasMusic && !hasVO && musicVol > 85) {
@@ -299,7 +299,7 @@ export function runCIPreflight(input: PreflightInput): PreflightFinding[] {
       id: 'missing-thumbnails',
       severity: 'warn',
       title: tx({ de: `${missingThumbs.length} Szene${missingThumbs.length > 1 ? 'n' : ''} ohne geladenes Asset`, en: `${missingThumbs.length} scene${missingThumbs.length > 1 ? 's' : ''} without loaded asset`, es: `${missingThumbs.length} escena${missingThumbs.length > 1 ? 's' : ''} sin recurso cargado` }),
-      detail: 'Ohne Thumbnail fehlt beim Render eventuell das zugrundeliegende Video.',
+      detail: tx({ de: "Ohne Thumbnail fehlt beim Render eventuell das zugrundeliegende Video.", en: "Without a thumbnail, the underlying video may be missing from the render.", es: "Sin una miniatura, es posible que el vídeo subyacente no aparezca en el renderizado." }),
       hint: tx({ de: 'Öffne die Szene und lade das Asset neu oder ersetze es.', en: 'Open the scene and reload or replace the asset.', es: 'Abre la escena y recarga o reemplaza el recurso.' }),
     });
   }

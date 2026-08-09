@@ -507,7 +507,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             }
             if (reason === 'tts_failed' || reason === 'no_voiceover') {
               toast({
-                title: 'Cinematic-Sync braucht ein Voiceover',
+                title: tx({ de: "Cinematic-Sync braucht ein Voiceover", en: "Cinematic sync needs a voiceover", es: "La sincronización cinematográfica necesita una voz en off" }),
                 description: message || tx({ de: 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut starten.', en: 'Please check a voice in the Voiceover tab, then restart.', es: 'Comprueba una voz en la pestaña de locución y vuelve a iniciar.' }),
                 variant: 'destructive',
               });
@@ -1574,7 +1574,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                       <Input
                         value={stockSearch[scene.id]}
                         onChange={(e) => setStockSearch(prev => ({ ...prev, [scene.id]: e.target.value }))}
-                        placeholder="Stock-Video suchen..."
+                        placeholder={tx({ de: "Stock-Video suchen...", en: "Search stock video...", es: "Buscar vídeo de stock..." })}
                         className="h-7 text-xs"
                         onKeyDown={(e) => e.key === 'Enter' && handleSearchStock(scene.id)}
                       />
@@ -1611,7 +1611,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                           >
                             <img
                               src={video.thumbnail_url}
-                              alt="Stock Video"
+                              alt={tx({ de: "Stock Video", en: "Stock video", es: "Vídeo almacenado" })}
                               className="w-full h-16 object-cover"
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">

@@ -50,8 +50,8 @@ export function usePostOptimization() {
     } catch (error) {
       console.error('Error analyzing post:', error);
       toast({
-        title: 'Fehler',
-        description: 'Post-Analyse fehlgeschlagen',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
+        description: tx({ de: "Post-Analyse fehlgeschlagen", en: "Post analysis failed", es: "El análisis posterior falló" }),
         variant: 'destructive',
       });
       return null;
@@ -78,7 +78,7 @@ export function usePostOptimization() {
     } catch (error) {
       console.error('Error applying optimizations:', error);
       toast({
-        title: 'Fehler',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
         description: tx({ de: 'Optimierungen konnten nicht angewendet werden', en: 'Optimizations could not be applied', es: 'No se pudieron aplicar las optimizaciones' }),
         variant: 'destructive',
       });

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useState } from 'react';
 import { useSubmitRating, useUserTemplateRating } from '@/hooks/useTemplateRatings';
+import { tx } from '@/lib/i18nText';
 
 interface TemplateRatingProps {
   templateId: string;

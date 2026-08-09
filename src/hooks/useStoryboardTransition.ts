@@ -309,7 +309,7 @@ function mergeScenesToSingleScene(scenes: TProductionPlan['scenes'], targetDurat
   return [{
     ...base,
     index: 1,
-    label: base.label ?? 'Durchgehende Szene',
+    label: base.label ?? tx({ de: 'Durchgehende Szene', en: 'Continuous scene', es: 'Escena continua' }),
     durationSec: targetDurationSec,
     cast: Array.from(castByKey.values()),
     lipSync: base.lipSync || dialogTurns.length > 0 || Array.from(castByKey.values()).length > 0,
@@ -1073,12 +1073,12 @@ export function useStoryboardTransition({
         //   65–95% Cast & Locations gegen deine Library auflösen
         const phaseLabel =
           next < 20
-            ? 'Schritt 1/4 · Briefing-Modus erkennen'
+            ? tx({ de: 'Schritt 1/4 · Briefing-Modus erkennen', en: 'Step 1/4 · Detecting briefing mode', es: 'Paso 1/4 · Detectando modo del briefing' })
             : next < 45
-              ? 'Schritt 2/4 · Research & Wissens-Anreicherung (KI füllt Lücken)'
+              ? tx({ de: 'Schritt 2/4 · Research & Wissens-Anreicherung (KI füllt Lücken)', en: 'Step 2/4 · Research & knowledge enrichment (AI fills gaps)', es: 'Paso 2/4 · Investigación y enriquecimiento de conocimiento (la IA rellena huecos)' })
               : next < 65
-                ? 'Schritt 3/4 · Strukturextraktion (Szenen, VO, Cast)'
-                : 'Schritt 4/4 · Cast & Locations gegen Library auflösen';
+                ? tx({ de: 'Schritt 3/4 · Strukturextraktion (Szenen, VO, Cast)', en: 'Step 3/4 · Structure extraction (scenes, VO, cast)', es: 'Paso 3/4 · Extracción de estructura (escenas, VO, reparto)' })
+                : tx({ de: 'Schritt 4/4 · Cast & Locations gegen Library auflösen', en: 'Step 4/4 · Resolving cast & locations against the library', es: 'Paso 4/4 · Resolviendo reparto y localizaciones con la biblioteca' });
         return { ...s, progress: next, phase, phaseLabel };
       });
     }, 700);
@@ -1369,7 +1369,7 @@ export function useStoryboardTransition({
       }
       const data = await res.json();
       const { plan, dropped, error: validationErr } = parsePlan(data);
-      if (!plan) throw new Error(validationErr || 'Plan-Validierung fehlgeschlagen');
+      if (!plan) throw new Error(validationErr || tx({ de: 'Plan-Validierung fehlgeschlagen', en: 'Plan validation failed', es: 'Error en la validación del plan' }));
 
       // T-1 — attach the response envelope onto plan._meta.debug so the
       // ProductionPlanSheet can surface parser diagnostics behind ?debug=1
@@ -1412,7 +1412,7 @@ export function useStoryboardTransition({
       }
 
       // Smoothly drive the bar to 100% before swapping to the plan sheet.
-      setState((s) => ({ ...s, progress: 100, phase: 'done', phaseLabel: 'Plan bereit' }));
+      setState((s) => ({ ...s, progress: 100, phase: 'done', phaseLabel: tx({ de: 'Plan bereit', en: 'Plan ready', es: 'Plan listo' }) }));
       await new Promise((r) => setTimeout(r, 650));
 
       setState({
@@ -1431,7 +1431,7 @@ export function useStoryboardTransition({
 
       const isAbort = e?.name === 'AbortError';
       const status: number | undefined = e?.status;
-      const msg: string = isAbort ? `Timeout nach ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s` : (e?.message || 'Deep-Parse fehlgeschlagen');
+      const msg: string = isAbort ? tx({ de: `Timeout nach ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s`, en: `Timeout after ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s`, es: `Tiempo de espera agotado tras ${Math.round(CLIENT_TIMEOUT_MS / 1000)}s` }) : (e?.message || tx({ de: 'Deep-Parse fehlgeschlagen', en: 'Deep-parse failed', es: 'Error en el análisis profundo' }));
       console.error('[useStoryboardTransition] deep-parse failed', {
         status,
         msg,
@@ -1446,10 +1446,10 @@ export function useStoryboardTransition({
       // Hard blocks (credits / rate-limit / payload): keep classic toast + navigate.
       if (status === 402 || status === 429 || status === 413) {
         toast({
-          title: 'Briefing-Analyse fehlgeschlagen',
+          title: tx({ de: 'Briefing-Analyse fehlgeschlagen', en: 'Briefing analysis failed', es: 'Error en el análisis del briefing' }),
           description: status === 402 ? tx({ de: 'Keine AI-Credits mehr — bitte aufladen.', en: 'No AI credits left — please top up.', es: 'No quedan créditos de IA — por favor, recarga.' })
             : status === 429 ? tx({ de: 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.', en: 'Too many requests — please wait briefly and try again.', es: 'Demasiadas solicitudes — por favor, espera brevemente e inténtalo de nuevo.' })
-            : 'Briefing zu lang — bitte kürzen.',
+            : tx({ de: 'Briefing zu lang — bitte kürzen.', en: 'Briefing too long — please shorten it.', es: 'El briefing es demasiado largo — por favor, acórtalo.' }),
           variant: 'destructive',
         });
         setState((s) => ({ ...s, warRoomOpen: false, phase: 'idle', progress: 0 }));
@@ -1548,7 +1548,7 @@ export function useStoryboardTransition({
             title: isNetwork ? 'Basis-Plan bereit' : 'Basis-Plan bereit',
             description: isNetwork
               ? tx({ de: 'Verbindung war kurz instabil — wir haben einen Basis-Plan vorbereitet. Du kannst ihn wie gewohnt anpassen oder die Analyse erneut starten.', en: 'Connection was briefly unstable — we have prepared a basic plan. You can adjust it as usual or restart the analysis.', es: 'La conexión fue brevemente inestable — hemos preparado un plan básico. Puedes ajustarlo como de costumbre o reiniciar el análisis.' })
-              : 'Analyse übersprungen — Basis-Plan als Startpunkt eingeblendet. Passe Werte an oder starte die Analyse neu.',
+              : tx({ de: 'Analyse übersprungen — Basis-Plan als Startpunkt eingeblendet. Passe Werte an oder starte die Analyse neu.', en: 'Analysis skipped — a basic plan has been shown as a starting point. Adjust values or restart the analysis.', es: 'Análisis omitido — se ha mostrado un plan básico como punto de partida. Ajusta los valores o reinicia el análisis.' }),
             // v238 — neutral, not destructive: fallback is a valid path.
           });
 
@@ -1639,7 +1639,7 @@ export function useStoryboardTransition({
       } catch (fallbackErr: any) {
         console.error('[useStoryboardTransition] local fallback failed', fallbackErr);
         toast({
-          title: 'Briefing-Analyse fehlgeschlagen',
+          title: tx({ de: 'Briefing-Analyse fehlgeschlagen', en: 'Briefing analysis failed', es: 'Error en el análisis del briefing' }),
           description: status ? `${status}: ${msg}` : msg,
           variant: 'destructive',
         });

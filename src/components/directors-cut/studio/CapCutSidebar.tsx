@@ -1664,7 +1664,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                           {formatDuration(caption.startTime)} - {formatDuration(caption.endTime)}
                         </span>
                         <p className="text-white/80 mt-0.5 line-clamp-2 break-words [overflow-wrap:anywhere]">
-                          {caption.text || '(Klicke zum Bearbeiten)'}
+                          {caption.text || tx({ de: "(Klicke zum Bearbeiten)", en: "(Click to edit)", es: "(Haga clic para editar)" })}
                         </p>
                       </div>
                     ))}

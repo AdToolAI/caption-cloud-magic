@@ -88,7 +88,7 @@ export function VoicePicker({ value, onChange, previewText }: VoicePickerProps) 
       await audio.play();
     } catch (err) {
       console.error('[VoicePicker] preview failed:', err);
-      toast.error('Voice-Preview fehlgeschlagen');
+      toast.error(tx({ de: 'Voice-Preview fehlgeschlagen', en: 'Voice preview failed', es: 'La vista previa de voz falló' }));
     } finally {
       setPreviewing(false);
     }

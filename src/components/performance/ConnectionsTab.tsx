@@ -23,6 +23,7 @@ import { TokenStatusBadge } from "./TokenStatusBadge";
 import { XConnectionCard } from "./XConnectionCard";
 import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
 import { RefreshCw } from "lucide-react";
+import { tx } from '@/lib/i18nText';
 
 const PROVIDERS = [
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'bg-pink-500' },

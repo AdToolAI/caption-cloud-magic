@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 // Director's Cut Types
 
 export interface DirectorCutProject {

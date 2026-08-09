@@ -49,8 +49,8 @@ async function extractFramesAndCuts(file: File): Promise<ExtractedFrames> {
 
     await new Promise<void>((resolve, reject) => {
       video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error('Konnte Video-Metadaten nicht laden'));
-      setTimeout(() => reject(new Error('Video lädt zu langsam')), 30000);
+      video.onerror = () => reject(new Error(tx({ de: 'Konnte Video-Metadaten nicht laden', en: 'Could not load video metadata', es: 'No se pudieron cargar los metadatos del video' })));
+      setTimeout(() => reject(new Error(tx({ de: 'Video lädt zu langsam', en: 'Video is loading too slowly', es: 'El video se carga demasiado lento' }))), 30000);
     });
 
     const duration = Math.max(1, video.duration || 1);
@@ -144,7 +144,7 @@ export function useMusicAutoMatch() {
         throw new Error(tx({ de: 'Bitte eine Video-Datei auswählen (mp4, mov, webm)', en: 'Please select a video file (mp4, mov, webm)', es: 'Selecciona un archivo de video (mp4, mov, webm)' }));
       }
       if (file.size > 200 * 1024 * 1024) {
-        throw new Error('Video zu groß (max. 200 MB)');
+        throw new Error(tx({ de: 'Video zu groß (max. 200 MB)', en: 'Video too large (max. 200 MB)', es: 'Video demasiado grande (máx. 200 MB)' }));
       }
 
       // Phase 1: Upload to storage
@@ -155,7 +155,7 @@ export function useMusicAutoMatch() {
       const { error: upErr } = await supabase.storage
         .from('audio-studio')
         .upload(fileName, file, { contentType: file.type });
-      if (upErr) throw new Error(`Upload fehlgeschlagen: ${upErr.message}`);
+      if (upErr) throw new Error(tx({ de: `Upload fehlgeschlagen: ${upErr.message}`, en: `Upload failed: ${upErr.message}`, es: `Error al subir: ${upErr.message}` }));
       const { data: pub } = supabase.storage.from('audio-studio').getPublicUrl(fileName);
       const videoUrl = pub.publicUrl;
       setProgress(35);
@@ -175,8 +175,8 @@ export function useMusicAutoMatch() {
           scene_cuts: sceneCuts,
         },
       });
-      if (fnErr) throw new Error(fnErr.message || 'Analyse fehlgeschlagen');
-      if (!data?.success) throw new Error(data?.error || 'Analyse lieferte kein Ergebnis');
+      if (fnErr) throw new Error(fnErr.message || tx({ de: 'Analyse fehlgeschlagen', en: 'Analysis failed', es: 'Error en el análisis' }));
+      if (!data?.success) throw new Error(data?.error || tx({ de: 'Analyse lieferte kein Ergebnis', en: 'Analysis returned no result', es: 'El análisis no arrojó resultado' }));
 
       setProgress(100);
       setPhase('done');
@@ -188,15 +188,15 @@ export function useMusicAutoMatch() {
         videoFileName: file.name,
       };
       setResult(finalResult);
-      toast.success('Video analysiert', {
+      toast.success(tx({ de: 'Video analysiert', en: 'Video analyzed', es: 'Video analizado' }), {
         description: `${data.recommendation.bpm} BPM • ${data.recommendation.genre} • ${data.recommendation.mood}`,
       });
       return finalResult;
     } catch (err: any) {
       console.error('[useMusicAutoMatch]', err);
       setPhase('error');
-      setError(err.message || 'Unbekannter Fehler');
-      toast.error('Auto-Match fehlgeschlagen', { description: err.message });
+      setError(err.message || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }));
+      toast.error(tx({ de: 'Auto-Match fehlgeschlagen', en: 'Auto-match failed', es: 'Error en la coincidencia automática' }), { description: err.message });
       return null;
     }
   }, []);

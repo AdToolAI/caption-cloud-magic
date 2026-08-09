@@ -5,6 +5,7 @@ import { QueueJob, useRenderQueue } from '@/hooks/useRenderQueue';
 import { Clock, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { tx } from "@/lib/i18nText";
 
 interface QueueJobCardProps {
   job: QueueJob;
@@ -22,15 +23,15 @@ export const QueueJobCard = ({ job, onUpdate }: QueueJobCardProps) => {
   const getStatusConfig = () => {
     switch (job.status) {
       case 'queued':
-        return { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Wartend' };
+        return { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100', label: tx({ de: 'Wartend', en: 'Queued', es: 'En cola' }) };
       case 'processing':
-        return { icon: Loader2, color: 'text-blue-600', bg: 'bg-blue-100', label: 'Verarbeitung', animate: true };
+        return { icon: Loader2, color: 'text-blue-600', bg: 'bg-blue-100', label: tx({ de: 'Verarbeitung', en: 'Processing', es: 'Procesando' }), animate: true };
       case 'completed':
-        return { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100', label: 'Fertig' };
+        return { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100', label: tx({ de: 'Fertig', en: 'Done', es: 'Listo' }) };
       case 'failed':
-        return { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100', label: 'Fehler' };
+        return { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100', label: tx({ de: 'Fehler', en: 'Error', es: 'Error' }) };
       case 'cancelled':
-        return { icon: X, color: 'text-gray-600', bg: 'bg-gray-100', label: 'Abgebrochen' };
+        return { icon: X, color: 'text-gray-600', bg: 'bg-gray-100', label: tx({ de: 'Abgebrochen', en: 'Cancelled', es: 'Cancelado' }) };
       default:
         return { icon: Clock, color: 'text-gray-600', bg: 'bg-gray-100', label: job.status };
     }
@@ -51,17 +52,17 @@ export const QueueJobCard = ({ job, onUpdate }: QueueJobCardProps) => {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm truncate">
-                  Job {job.id.slice(0, 8)}
+                  {tx({ de: "Job", en: "Job", es: "Trabajo" })} {job.id.slice(0, 8)}
                 </span>
                 <Badge variant="secondary" className="text-xs">
                   {job.engine || 'auto'}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
-                  Priority {job.priority}
+                  {tx({ de: "Priorität", en: "Priority", es: "Prioridad" })} {job.priority}
                 </Badge>
               </div>
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                <span>{job.estimated_cost} Credits</span>
+                <span>{job.estimated_cost} {tx({ de: "Credits", en: "Credits", es: "Créditos" })}</span>
                 <span>•</span>
                 <span>{formatDistanceToNow(new Date(job.created_at), { addSuffix: true, locale: de })}</span>
               </div>

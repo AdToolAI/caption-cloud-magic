@@ -44,7 +44,7 @@ export default function ContentProjects() {
       draft: { variant: "secondary" as const, icon: Clock, label: "Entwurf", className: "" },
       rendering: { variant: "default" as const, icon: RefreshCw, label: "Wird gerendert...", className: "" },
       completed: { variant: "outline" as const, icon: CheckCircle2, label: "Fertig", className: "border-green-500 text-green-700" },
-      failed: { variant: "destructive" as const, icon: XCircle, label: "Fehler", className: "" },
+      failed: { variant: "destructive" as const, icon: XCircle, label: tx({ de: "Fehler", en: "Mistake", es: "Error" }), className: "" },
     };
 
     const config = variants[status as keyof typeof variants] || variants.draft;
@@ -70,7 +70,7 @@ export default function ContentProjects() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
-      toast.success("Video wird heruntergeladen");
+      toast.success(tx({ de: "Video wird heruntergeladen", en: "Video is downloading", es: "El vídeo se está descargando." }));
     } catch (error) {
       console.error("Download error:", error);
       toast.error(tx({ de: "Fehler beim Herunterladen", en: "Error downloading", es: "Error al descargar" }));
@@ -223,7 +223,7 @@ export default function ContentProjects() {
                   <CardTitle className="mb-2">Keine Videos gefunden</CardTitle>
                   <CardDescription>
                     {selectedStatus === "all"
-                      ? "Erstelle dein erstes Video im Content Studio"
+                      ? tx({ de: "Erstelle dein erstes Video im Content Studio", en: "Create your first video in Content Studio", es: "Crea tu primer vídeo en Content Studio" })
                       : `Keine Videos mit Status "${selectedStatus}"`}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>

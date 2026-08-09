@@ -170,10 +170,10 @@ export function useUpsertAutopilotBrief() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['autopilot-brief'] });
-      toast({ title: 'Brief gespeichert', description: 'Deine Strategie wurde aktualisiert.' });
+      toast({ title: tx({ de: "Brief gespeichert", en: "Letter saved", es: "Carta guardada" }), description: tx({ de: "Deine Strategie wurde aktualisiert.", en: "Your strategy has been updated.", es: "Tu estrategia ha sido actualizada." }) });
     },
     onError: (e: unknown) => toast({
-      title: 'Speichern fehlgeschlagen',
+      title: tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Error al guardar" }),
       description: e instanceof Error ? e.message : String(e),
       variant: 'destructive',
     }),
@@ -204,7 +204,7 @@ export function useToggleAutopilot() {
         .eq('user_id', u.user.id)
         .maybeSingle();
       if (existing?.locked_until && new Date(existing.locked_until) > new Date()) {
-        return { ok: false, error: 'Autopilot ist gesperrt. Kontaktiere den Support.' };
+        return { ok: false, error: tx({ de: "Autopilot ist gesperrt. Kontaktiere den Support.", en: "Autopilot is locked. Contact support.", es: "El piloto automático está bloqueado. Póngase en contacto con el soporte." }) };
       }
 
       const patch: Record<string, unknown> = {
@@ -251,13 +251,13 @@ export function useToggleAutopilot() {
       } else {
         toast({
           title: 'Aktivierung blockiert',
-          description: res.error ?? res.lock_reason ?? 'Unbekannter Fehler',
+          description: res.error ?? res.lock_reason ?? tx({ de: "Unbekannter Fehler", en: "Unknown error", es: "Error desconocido" }),
           variant: 'destructive',
         });
       }
     },
     onError: (e: unknown) => toast({
-      title: 'Toggle fehlgeschlagen',
+      title: tx({ de: "Toggle fehlgeschlagen", en: "Toggle failed", es: "Error al alternar" }),
       description: e instanceof Error ? e.message : String(e),
       variant: 'destructive',
     }),
@@ -441,7 +441,7 @@ export function useTriggerPerformanceAnalysis() {
       });
     },
     onError: (e: unknown) => toast({
-      title: 'Analyse fehlgeschlagen',
+      title: tx({ de: "Analyse fehlgeschlagen", en: "Analysis failed", es: "El análisis falló" }),
       description: e instanceof Error ? e.message : String(e),
       variant: 'destructive',
     }),
@@ -535,7 +535,7 @@ export function useAcceptWeeklyReview() {
       });
     },
     onError: (e: unknown) => toast({
-      title: 'Fehler',
+      title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
       description: e instanceof Error ? e.message : String(e),
       variant: 'destructive',
     }),
@@ -556,7 +556,7 @@ export function useTriggerWeeklyReview() {
       toast({ title: 'Review erstellt', description: 'Strategie-Vorschlag bereit.' });
     },
     onError: (e: unknown) => toast({
-      title: 'Review fehlgeschlagen',
+      title: tx({ de: "Review fehlgeschlagen", en: "Review failed", es: "Revisión fallida" }),
       description: e instanceof Error ? e.message : String(e),
       variant: 'destructive',
     }),

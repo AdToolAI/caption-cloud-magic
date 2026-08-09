@@ -107,7 +107,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       if (error) throw error;
       toast({
         title: tx({ de: '⚡ Schnell-Vorschau gestartet', en: '⚡ Quick preview started', es: '⚡ Vista previa rápida iniciada' }),
-        description: '~10 Sekunden bis zum 3-Sekunden-Proxy.',
+        description: tx({ de: "~10 Sekunden bis zum 3-Sekunden-Proxy.", en: "~10 seconds to 3 second proxy.", es: "~10 segundos a 3 segundos de proxy." }),
       });
     } catch (err) {
       toast({
@@ -186,7 +186,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       });
     } catch (err) {
       toast({
-        title: 'Reset fehlgeschlagen',
+        title: tx({ de: "Reset fehlgeschlagen", en: "Reset failed", es: "Error al restablecer" }),
         description: err instanceof Error ? err.message : String(err),
         variant: 'destructive',
       });
@@ -493,7 +493,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
                 'rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 font-semibold shadow transition',
                 'bg-black/70 hover:bg-black text-amber-300 border border-amber-500/40',
               )}
-              title="4 Takes parallel mit verschiedenen Seeds (Reroll Pro)"
+              title={tx({ de: "4 Takes parallel mit verschiedenen Seeds (Reroll Pro)", en: "4 takes in parallel with different seeds (Reroll Pro)", es: "4 tomas en paralelo con diferentes semillas (Reroll Pro)" })}
             >
               {variantsGenerating
                 ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
@@ -511,7 +511,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
                 'rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 font-semibold shadow transition',
                 'bg-amber-500/90 hover:bg-amber-500 text-black',
               )}
-              title="3-Sekunden-Vorschau in ca. 10 Sek. (LTX, ~0.005 €)"
+              title={tx({ de: "3-Sekunden-Vorschau in ca. 10 Sek. (LTX, ~0.005 €)", en: "3 second preview in approx. 10 seconds (LTX, ~0.005 €)", es: "Vista previa de 3 segundos en aprox. 10 segundos (LTX, ~0,005 €)" })}
             >
               {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5" />}
               Schnell-Vorschau
@@ -547,7 +547,7 @@ interface DialogShotsBarProps {
 function DialogShotsBar({ shots, ready, total }: DialogShotsBarProps) {
   const headline = total > 0
     ? `🎭 Dialog-Shots · ${ready}/${total}`
-    : '🎭 Dialog-Shots · Audio wird vorbereitet…';
+    : tx({ de: "🎭 Dialog-Shots · Audio wird vorbereitet…", en: "🎭 Dialogue shots · Audio is being prepared…", es: "🎭 Tomas de diálogo · Se está preparando el audio..." });
   return (
     <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/85 via-black/60 to-transparent px-2 py-1.5 pointer-events-none">
       <div className="flex items-center gap-1 mb-1">

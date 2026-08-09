@@ -665,7 +665,7 @@ export function SceneAnalysisStep({
                     const index = scenes.findIndex(s => s.id === currentScene.id);
                     return `Szene ${index + 1}: ${currentScene.description}`;
                   }
-                  return 'Keine Szene';
+                  return tx({ de: "Keine Szene", en: "No scene", es: "sin escena" });
                 })()}
               </span>
               {(() => {
@@ -827,14 +827,14 @@ export function SceneAnalysisStep({
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
-                {scenes.length} {scenes.length === 1 ? 'Szene' : 'Szenen'} erkannt
+                {scenes.length} {scenes.length === 1 ? 'Szene' : tx({ de: "Szenen", en: "Scenes", es: "Escenas" })} erkannt
                 <Badge variant="outline" className="text-xs font-normal">
                   {scenes.length === 1 ? 'Keine Schnitte erkannt' : 'Szenenanalyse'}
                 </Badge>
               </h3>
               <p className="text-sm text-muted-foreground">
                 {scenes.length === 1 
-                  ? 'Kein Szenenwechsel im Video gefunden' 
+                  ? tx({ de: "Kein Szenenwechsel im Video gefunden", en: "No scene change found in the video", es: "No se encontró ningún cambio de escena en el video." }) 
                   : 'Szenengrenzen basieren auf visueller Videoanalyse'}
               </p>
             </div>

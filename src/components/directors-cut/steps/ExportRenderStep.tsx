@@ -81,13 +81,13 @@ const QUALITY_OPTIONS = [
   { 
     value: '4k', 
     label: '4K Ultra HD', 
-    description: 'Höchste Qualität für YouTube/TV',
+    description: tx({ de: 'Höchste Qualität für YouTube/TV', en: 'Highest quality for YouTube/TV', es: 'Máxima calidad para YouTube/TV' }),
     baseCredits: 20,
   },
   { 
     value: '8k', 
     label: '8K Cinema', 
-    description: 'Maximale Auflösung für professionelle Produktion',
+    description: tx({ de: 'Maximale Auflösung für professionelle Produktion', en: 'Maximum resolution for professional production', es: 'Máxima resolución para producción profesional' }),
     baseCredits: 50,
   },
 ];
@@ -163,7 +163,7 @@ export function ExportRenderStep({
       } as any);
 
       if (!error) {
-        toast.success('Video in Mediathek gespeichert');
+        toast.success(tx({ de: 'Video in Mediathek gespeichert', en: 'Video saved to media library', es: 'Video guardado en la mediateca' }));
       }
     } catch (err) {
       console.error('Error saving to media library:', err);
@@ -221,7 +221,7 @@ export function ExportRenderStep({
             setRenderedVideoUrl(record.output_url);
             setRenderComplete(true);
             setIsRendering(false);
-            toast.success('Video erfolgreich gerendert!');
+            toast.success(tx({ de: 'Video erfolgreich gerendert!', en: 'Video rendered successfully!', es: '¡Video renderizado con éxito!' }));
             
             // Auto-save to media library
             saveToMediaLibrary(record.output_url);
@@ -229,7 +229,7 @@ export function ExportRenderStep({
           
           if (record.status === 'failed') {
             setIsRendering(false);
-            toast.error(record.error_message || 'Rendering fehlgeschlagen');
+            toast.error(record.error_message || tx({ de: 'Rendering fehlgeschlagen', en: 'Rendering failed', es: 'Error en el renderizado' }));
           }
         }
       )
@@ -297,13 +297,13 @@ export function ExportRenderStep({
             setRenderedVideoUrl(outputFile);
             setRenderComplete(true);
             setIsRendering(false);
-            toast.success('Video erfolgreich gerendert!');
+            toast.success(tx({ de: 'Video erfolgreich gerendert!', en: 'Video rendered successfully!', es: '¡Video renderizado con éxito!' }));
             saveToMediaLibrary(outputFile);
           } else if (fatalErrorEncountered) {
             // Properly extract error messages from error objects
             const errorMsg = errors?.map((e: any) => 
-              typeof e === 'string' ? e : e.message || 'Unbekannter Fehler'
-            ).join(', ') || 'Rendering fehlgeschlagen';
+              typeof e === 'string' ? e : e.message || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' })
+            ).join(', ') || tx({ de: 'Rendering fehlgeschlagen', en: 'Rendering failed', es: 'Error en el renderizado' });
             
             await supabase
               .from('director_cut_renders')
@@ -527,7 +527,7 @@ export function ExportRenderStep({
       toast.success('Download gestartet');
     } catch (error) {
       console.error('Download error:', error);
-      toast.error('Download fehlgeschlagen');
+      toast.error(tx({ de: 'Download fehlgeschlagen', en: 'Download failed', es: 'Error al descargar' }));
     }
   };
 

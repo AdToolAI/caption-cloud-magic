@@ -1,4 +1,5 @@
 import { Copy, Check } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -33,10 +34,10 @@ export function EntityIdBadge({
     try {
       await navigator.clipboard.writeText(id);
       setCopied(true);
-      toast.success('ID kopiert', { description: id });
+      toast.success(tx({ de: 'ID kopiert', en: 'ID copied', es: 'ID copiado' }), { description: id });
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast.error('Konnte ID nicht kopieren');
+      toast.error(tx({ de: 'Konnte ID nicht kopieren', en: 'Could not copy ID', es: 'No se pudo copiar el ID' }));
     }
   };
 
@@ -44,7 +45,7 @@ export function EntityIdBadge({
     <button
       type="button"
       onClick={handleCopy}
-      title={`${label}: ${id} (Klick zum Kopieren)`}
+      title={`${label}: ${id} (${tx({ de: 'Klick zum Kopieren', en: 'Click to copy', es: 'Haz clic para copiar' })})`}
       className={cn(
         'inline-flex items-center gap-1 rounded border border-border/40 bg-background/60 px-1.5 py-0.5',
         'text-[10px] font-mono text-muted-foreground hover:text-primary hover:border-primary/40 transition',

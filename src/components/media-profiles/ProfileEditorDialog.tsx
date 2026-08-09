@@ -79,7 +79,7 @@ export function ProfileEditorDialog({
       setConfigJson(JSON.stringify(preset.config, null, 2));
       setType(preset.config.type);
       toast({
-        title: 'Preset geladen',
+        title: tx({ de: "Preset geladen", en: "Preset loaded", es: "Preestablecido cargado" }),
         description: `${preset.name} wurde geladen.`
       });
     }
@@ -88,8 +88,8 @@ export function ProfileEditorDialog({
   const handleSave = async () => {
     if (!name.trim()) {
       toast({
-        title: 'Fehler',
-        description: 'Name ist erforderlich.',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
+        description: tx({ de: "Name ist erforderlich.", en: "Name is required.", es: "El nombre es obligatorio." }),
         variant: 'destructive'
       });
       return;
@@ -117,13 +117,13 @@ export function ProfileEditorDialog({
       });
       toast({
         title: 'Erfolg',
-        description: profile ? 'Profil wurde aktualisiert.' : tx({ de: 'Profil wurde erstellt.', en: 'Profile created.', es: 'Perfil creado.' })
+        description: profile ? tx({ de: "Profil wurde aktualisiert.", en: "Profile has been updated.", es: "El perfil ha sido actualizado." }) : tx({ de: 'Profil wurde erstellt.', en: 'Profile created.', es: 'Perfil creado.' })
       });
       onOpenChange(false);
     } catch (error) {
       toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Speichern fehlgeschlagen.',
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
+        description: error instanceof Error ? error.message : tx({ de: "Speichern fehlgeschlagen.", en: "Save failed.", es: "Error al guardar." }),
         variant: 'destructive'
       });
     } finally {
@@ -136,7 +136,7 @@ export function ProfileEditorDialog({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {profile ? 'Profil bearbeiten' : 'Neues Profil erstellen'}
+            {profile ? 'Profil bearbeiten' : tx({ de: "Neues Profil erstellen", en: "Create new profile", es: "Crear nuevo perfil" })}
           </DialogTitle>
         </DialogHeader>
 

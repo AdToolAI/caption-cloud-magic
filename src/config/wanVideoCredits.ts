@@ -1,4 +1,5 @@
 import { Currency } from './pricing';
+import { tx } from '@/lib/i18nText';
 
 // Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
 // Std: $0.04/s → €0.12/s | Pro: $0.07/s → €0.21/s

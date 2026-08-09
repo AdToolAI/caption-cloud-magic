@@ -26,7 +26,7 @@ export function AutopilotWeeklyReviewPanel() {
           Jeden Samstag um 10:00 UTC erstellt der Autopilot automatisch ein Review der vergangenen Woche.
         </p>
         <Button variant="outline" onClick={() => trigger.mutate()} disabled={trigger.isPending}>
-          {trigger.isPending ? 'Wird erstellt …' : 'Jetzt manuell erstellen'}
+          {trigger.isPending ? 'Wird erstellt …' : tx({ de: "Jetzt manuell erstellen", en: "Now create manually", es: "Ahora crea manualmente" })}
         </Button>
       </Card>
     );
@@ -47,7 +47,7 @@ export function AutopilotWeeklyReviewPanel() {
             <div className="flex-1">
               <div className="font-medium text-sm">
                 {deadlinePassed
-                  ? 'Briefing-Deadline überschritten — Autopilot wird pausiert'
+                  ? tx({ de: "Briefing-Deadline überschritten — Autopilot wird pausiert", en: "Briefing deadline exceeded — autopilot is paused", es: "Se superó la fecha límite para la sesión informativa: el piloto automático está en pausa" })
                   : `Bitte bis ${deadline.toLocaleString('de-DE', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} UTC bestätigen`}
               </div>
               <div className="text-xs text-muted-foreground">

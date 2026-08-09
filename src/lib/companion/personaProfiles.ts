@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18nText';
 /**
  * Companion learning-pace profiles.
  *

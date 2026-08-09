@@ -39,6 +39,7 @@ import { useStrategyMode, type StrategyPost } from "@/hooks/useStrategyMode";
 import { Switch } from "@/components/ui/switch";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { tx } from '@/lib/i18nText';
 
 interface Post {
   id: string;

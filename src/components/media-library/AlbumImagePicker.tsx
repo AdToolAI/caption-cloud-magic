@@ -122,7 +122,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
       setAlbums(finalAlbums);
     } catch (err: any) {
       console.error('[AlbumImagePicker] loadAlbums exception:', err);
-      toast.error('Unerwarteter Fehler', { description: err?.message });
+      toast.error(tx({ de: "Unerwarteter Fehler", en: "Unexpected error", es: "error inesperado" }), { description: err?.message });
     } finally {
       setLoading(false);
     }
@@ -156,7 +156,7 @@ export function AlbumImagePicker({ open, onOpenChange, onSelectImage }: AlbumIma
       setImages(data || []);
     } catch (err: any) {
       console.error('[AlbumImagePicker] loadImages exception:', err);
-      toast.error('Unerwarteter Fehler', { description: err?.message });
+      toast.error(tx({ de: "Unerwarteter Fehler", en: "Unexpected error", es: "error inesperado" }), { description: err?.message });
       setImages([]);
     } finally {
       setLoading(false);

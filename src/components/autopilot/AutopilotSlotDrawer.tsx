@@ -58,7 +58,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
       toast({ title: 'Slot aktualisiert', description: tx({ de: 'Änderungen gespeichert.', en: 'Changes saved.', es: 'Cambios guardados.' }) });
     } catch (e: unknown) {
       toast({
-        title: 'Speichern fehlgeschlagen',
+        title: tx({ de: "Speichern fehlgeschlagen", en: "Save failed", es: "Error al guardar" }),
         description: e instanceof Error ? e.message : String(e),
         variant: 'destructive',
       });
@@ -75,7 +75,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
       qc.invalidateQueries({ queryKey: ['autopilot-queue'] });
     } catch {
       toast({
-        title: 'Edge Function nicht erreichbar',
+        title: tx({ de: "Edge Function nicht erreichbar", en: "Edge function not accessible", es: "Función Edge no accesible" }),
         description: tx({ de: 'Bitte später erneut versuchen.', en: 'Please try again later.', es: 'Por favor, inténtalo de nuevo más tarde.' }),
         variant: 'destructive',
       });
@@ -153,7 +153,7 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
               disabled={!isEditable}
               rows={5}
               className="mt-2 font-mono text-sm"
-              placeholder={slot.status === 'generating' ? 'Wird generiert…' : 'Noch keine Caption'}
+              placeholder={slot.status === 'generating' ? 'Wird generiert…' : tx({ de: "Noch keine Caption", en: "No caption yet", es: "Aún no hay subtítulos" })}
             />
             {slot.hashtags && slot.hashtags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
@@ -302,12 +302,12 @@ function StatusChip({ status }: { status: AutopilotSlot['status'] }) {
   const map: Record<AutopilotSlot['status'], { label: string; cls: string; icon: typeof Clock }> = {
     draft:      { label: 'Entwurf',      cls: 'bg-muted text-foreground',                          icon: Clock },
     generating: { label: 'Generiere…',   cls: 'bg-primary/15 text-primary animate-pulse',          icon: Sparkles },
-    generating_video: { label: 'Video rendert…', cls: 'bg-fuchsia-500/15 text-fuchsia-600 animate-pulse', icon: Sparkles },
+    generating_video: { label: tx({ de: "Video rendert…", en: "Video renders...", es: "Vídeo renderizado..." }), cls: 'bg-fuchsia-500/15 text-fuchsia-600 animate-pulse', icon: Sparkles },
     qa_review:  { label: 'QA-Review',    cls: 'bg-amber-500/15 text-amber-600',                    icon: AlertTriangle },
     scheduled:  { label: 'Geplant',      cls: 'bg-primary/20 text-primary',                        icon: Clock },
     posted:     { label: 'Live',         cls: 'bg-emerald-500/15 text-emerald-600',                icon: CheckCircle2 },
     blocked:    { label: 'Blockiert',    cls: 'bg-destructive/15 text-destructive',                icon: AlertTriangle },
-    failed:     { label: 'Fehler',       cls: 'bg-destructive/10 text-destructive',                icon: AlertTriangle },
+    failed:     { label: tx({ de: "Fehler", en: "Mistake", es: "Error" }),       cls: 'bg-destructive/10 text-destructive',                icon: AlertTriangle },
     skipped:    { label: 'Übersprungen', cls: 'bg-muted/60 text-muted-foreground',                 icon: SkipForward },
   };
   const m = map[status];

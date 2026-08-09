@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useCache } from '@/hooks/useCache';
 import { Trophy } from 'lucide-react';
+import { tx } from '@/lib/i18nText';
 
 /**
  * Hook to listen for goal completion events in real-time

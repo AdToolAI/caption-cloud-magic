@@ -40,9 +40,9 @@ export const SEO_CONFIG = {
   author: 'AdTool AI Team',
   keywords: [
     'KI Videogenerator',
-    'KI Video erstellen',
+    tx({ de: "KI Video erstellen", en: "Create AI video", es: "Crear vídeo de IA" }),
     'Lip-Sync KI',
-    'AI Avatar Video',
+    tx({ de: "AI Avatar Video", en: "AI avatar video", es: "Vídeo de avatar de IA" }),
     'Videoproduktion ohne Team',
     'KI Voiceover',
     'Content Creator Tools',
@@ -98,7 +98,7 @@ export const PAGES_SEO = {
     ogImage: '/og-home.jpg',
     priority: 1.0,
     changefreq: 'weekly' as const,
-    keywords: ['KI Videogenerator', 'Lip-Sync KI', 'AI Avatar Video', 'KI Werbevideo'],
+    keywords: ['KI Videogenerator', 'Lip-Sync KI', tx({ de: "AI Avatar Video", en: "AI avatar video", es: "Vídeo de avatar de IA" }), 'KI Werbevideo'],
   },
   pricing: {
     path: '/pricing',

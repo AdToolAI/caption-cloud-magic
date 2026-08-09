@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InfoFeed } from '@/components/autopilot/lounge/InfoFeed';
 import { StageProgressBar } from '@/components/autopilot/StageProgressBar';
 import { cn } from '@/lib/utils';
+import { tx } from '@/lib/i18nText';
 
 const Solitaire = lazy(() => import('@/components/autopilot/lounge/games/Solitaire'));
 const ChessGame = lazy(() => import('@/components/autopilot/lounge/games/ChessGame'));

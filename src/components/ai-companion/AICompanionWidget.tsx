@@ -46,7 +46,9 @@ const DEFAULT_PREFERENCES: CompanionPreferences = {
 const ESCALATION_KEYWORDS = [
   'bug', 'fehler', 'funktioniert nicht', 'kaputt', 'problem', 'error',
   'hilfe', 'help', 'support', 'broken', 'crash', 'absturz', 'hängt',
-  'lädt nicht', 'geht nicht', 'defekt', 'falsch', 'failed'
+  'lädt nicht', 'geht nicht', 'defekt', 'falsch', 'failed',
+  'not working', 'won\'t load', 'doesn\'t work',
+  'no funciona', 'no carga', 'no va',
 ];
 
 export function AICompanionWidget() {
@@ -237,7 +239,7 @@ export function AICompanionWidget() {
             responseContent = formatTipsResponse(data);
             break;
           default:
-            responseContent = 'Befehl nicht erkannt.';
+            responseContent = tx({ de: 'Befehl nicht erkannt.', en: 'Command not recognized.', es: 'Comando no reconocido.' });
         }
 
         setMessages(prev => [...prev, {
@@ -639,7 +641,7 @@ export function AICompanionWidget() {
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowSettings(true)}
-                  title="Einstellungen"
+                  title={tx({ de: "Einstellungen", en: "Settings", es: "Configuración" })}
                 >
                   <Settings className="w-4 h-4" />
                 </Button>
@@ -720,9 +722,9 @@ export function AICompanionWidget() {
                   animate={{ opacity: 1, y: 0 }}
                   className="text-sm text-muted-foreground text-center"
                 >
-                  {isListening ? 'Ich höre zu... Sprich jetzt.' : 
+                  {isListening ? tx({ de: 'Ich höre zu... Sprich jetzt.', en: 'Listening... Speak now.', es: 'Escuchando... Habla ahora.' }) : 
                    isSpeaking ? `${preferences.bot_name} spricht...` : 
-                   'Tippe auf das Mikrofon um zu sprechen'}
+                   tx({ de: 'Tippe auf das Mikrofon um zu sprechen', en: 'Tap the microphone to speak', es: 'Toca el micrófono para hablar' })}
                 </motion.p>
                 
                 {/* Big Mic Button */}
@@ -931,7 +933,7 @@ export function AICompanionWidget() {
                         setShowSlashCommands(e.target.value.startsWith('/'));
                       }}
                       onKeyDown={handleKeyDown}
-                      placeholder="Frag mich etwas... (/ für Befehle)"
+                      placeholder={tx({ de: "Frag mich etwas... (/ für Befehle)", en: "Ask me something... (/ for commands)", es: "Pregúntame algo... (/ para comandos)" })}
                       className="min-h-[44px] max-h-[120px] resize-none bg-muted/30 border-white/10 focus:border-primary/50 ai-companion-scrollbar"
                       rows={1}
                     />

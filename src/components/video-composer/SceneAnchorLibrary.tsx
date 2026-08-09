@@ -13,6 +13,7 @@ import { Link2, User, MapPin, X, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
+import { tx } from '@/lib/i18nText';
 
 interface Props {
   selectedReferenceUrl?: string;

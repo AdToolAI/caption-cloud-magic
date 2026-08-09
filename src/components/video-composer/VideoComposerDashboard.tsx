@@ -723,7 +723,7 @@ export default function VideoComposerDashboard() {
         });
       } catch (e) {
         toast({
-          title: 'Cancel teilweise fehlgeschlagen',
+          title: tx({ de: "Cancel teilweise fehlgeschlagen", en: "Cancel partially failed", es: "Cancelar parcialmente fallido" }),
           description:
             (e instanceof Error ? e.message : String(e)) +
             tx({ de: ' — neues Projekt wird trotzdem gestartet.', en: ' — new project will be started anyway.', es: ' — se iniciará un nuevo proyecto de todos modos.' }),
@@ -1020,7 +1020,7 @@ export default function VideoComposerDashboard() {
 
   const STEP_HINTS: Record<TabId, string> = {
     briefing: 'Produkt, Zielgruppe & Tonalität',
-    storyboard: 'Szenen planen & anordnen',
+    storyboard: tx({ de: "Szenen planen & anordnen", en: "Plan & arrange scenes", es: "Planificar y organizar escenas" }),
     clips: 'AI-Clips generieren',
     text: 'Voiceover & Untertitel',
     audio: 'Musik & Sound-Mix',

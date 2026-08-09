@@ -60,7 +60,7 @@ export const TwoFactorChallenge = ({ open, onSuccess, onCancel }: TwoFactorChall
 
       toast({
         title: "Erfolgreich verifiziert",
-        description: "Du bist jetzt angemeldet"
+        description: tx({ de: "Du bist jetzt angemeldet", en: "You are now logged in", es: "Ya has iniciado sesión" })
       });
       
       onSuccess();

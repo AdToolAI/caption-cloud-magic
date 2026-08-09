@@ -42,7 +42,7 @@ const DURATION_OPTIONS: Array<{ value: 15 | 30 | 60; label: string }> = [
 ];
 
 const ENGINE_OPTIONS: Array<{ id: AutoDirectorEnginePref; label: string; desc: string }> = [
-  { id: 'auto', label: '🎯 Auto-Mix', desc: 'KI wählt optimale Engines pro Szene' },
+  { id: 'auto', label: '🎯 Auto-Mix', desc: tx({ de: "KI wählt optimale Engines pro Szene", en: "AI selects optimal engines per scene", es: "La IA selecciona los motores óptimos por escena" }) },
   { id: 'premium', label: '💎 Premium', desc: 'Kling, Luma, Sora — höchste Qualität' },
   { id: 'budget', label: '💰 Budget', desc: 'Wan, Seedance — günstig & schnell' },
 ];

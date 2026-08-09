@@ -369,7 +369,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         .getPublicUrl(path);
       setStartImageUrl(publicUrl);
     } catch (err: any) {
-      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploading(false);
     }
@@ -379,9 +379,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const handleVideoUpload = async (file: File) => {
     if (!user) return;
     if (file.size > 50 * 1024 * 1024) {
-      toast.error(language === 'de'
-        ? 'Datei zu groß (max. 50 MB).'
-        : 'File too large (max 50 MB).');
+      toast.error(tx({ de: 'Datei zu groß (max. 50 MB).', en: 'File too large (max 50 MB).', es: 'Archivo demasiado grande (máx. 50 MB).' }));
       return;
     }
     setUploadingVideo(true);
@@ -397,7 +395,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         .getPublicUrl(path);
       setReferenceVideoUrl(publicUrl);
     } catch (err: any) {
-      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+      toast.error(err?.message ?? tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }));
     } finally {
       setUploadingVideo(false);
     }
@@ -753,9 +751,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       // Sora 2 cannot accept image input → toast hint when a character is selected
       if (model.family === 'sora' && (anchorChars.length > 0 || castLocation || castBuilding)) {
         toast.info(
-          language === 'de'
-            ? 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.'
-            : 'Sora 2 uses only the description (~70 % consistency). For longer stories switch to Kling or Hailuo.',
+          tx({ de: 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.', en: 'Sora 2 uses only the description (~70 % consistency). For longer stories switch to Kling or Hailuo.', es: 'Sora 2 usa solo la descripción (~70 % de consistencia). Para historias más largas, cambia a Kling o Hailuo.' }),
         );
       }
 
@@ -781,7 +777,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       refetchWallet();
       onAfterGenerate?.();
     } catch (err: any) {
-      toast.error(err?.message ?? 'Generierung fehlgeschlagen');
+      toast.error(err?.message ?? tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error en la generación' }));
     } finally {
       setGenerating(false);
     }
@@ -1027,7 +1023,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           {startImageUrl && (
             <div className="space-y-2 pt-2 border-t border-border/40">
               <Label className="text-xs font-medium text-muted-foreground">
-                {language === 'de' ? 'Wo soll das Bild erscheinen?' : 'Where should the image appear?'}
+                {tx({ de: 'Wo soll das Bild erscheinen?', en: 'Where should the image appear?', es: '¿Dónde debe aparecer la imagen?' })}
               </Label>
               <div className="grid grid-cols-3 gap-1.5">
                 {([
@@ -1042,7 +1038,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     label: language === 'de' ? 'Am Ende' : 'At end',
                     hint: model.capabilities.endFrame
                       ? (language === 'de' ? tx({ de: 'Kamera fährt zum Bild hin', en: 'Camera moves to the image', es: 'La cámara se mueve a la imagen' }) : 'Camera transitions to image')
-                      : (language === 'de' ? 'Nur mit Luma Ray 2 möglich' : 'Only available with Luma Ray 2'),
+                      : tx({ de: 'Nur mit Luma Ray 2 möglich', en: 'Only available with Luma Ray 2', es: 'Solo disponible con Luma Ray 2' }),
                     supportedByCurrent: !!model.capabilities.endFrame,
                   },
                   {
@@ -1116,7 +1112,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <div className="flex items-center gap-2">
               <Film className="h-4 w-4 text-primary" />
               <Label className="text-sm font-medium">
-                {language === 'de' ? 'Referenz-Video (Video-to-Video)' : 'Reference video (Video-to-Video)'}
+                {tx({ de: 'Referenz-Video (Video-to-Video)', en: 'Reference video (Video-to-Video)', es: 'Video de referencia (Video-to-Video)' })}
               </Label>
               <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">V2V</Badge>
             </div>
@@ -1148,9 +1144,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 <Film className="h-6 w-6 text-muted-foreground" />
               )}
               <span className="text-xs text-muted-foreground">
-                {language === 'de'
-                  ? 'Video hochladen (mp4/webm, max. 50 MB, ≤ 30s empfohlen)'
-                  : 'Upload a video (mp4/webm, max 50 MB, ≤ 30s recommended)'}
+                {tx({ de: 'Video hochladen (mp4/webm, max. 50 MB, ≤ 30s empfohlen)', en: 'Upload a video (mp4/webm, max 50 MB, ≤ 30s recommended)', es: 'Subir un video (mp4/webm, máx. 50 MB, ≤ 30s recomendado)' })}
               </span>
               <input
                 id="toolkit-video-upload"
@@ -1192,9 +1186,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground p-2 rounded-md bg-background/40 border border-border/40 max-w-xs">
               <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
               <span>
-                {language === 'de'
-                  ? 'V2V derzeit nur für Kling 3 Standard / Pro.'
-                  : 'V2V is currently only available for Kling 3 Standard / Pro.'}
+                {tx({ de: 'V2V derzeit nur für Kling 3 Standard / Pro.', en: 'V2V is currently only available for Kling 3 Standard / Pro.', es: 'V2V actualmente solo disponible para Kling 3 Standard / Pro.' })}
               </span>
             </div>
           </div>
@@ -1513,9 +1505,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                       )}
                       {!row.lipSync && (
                         <p className="text-[10px] text-muted-foreground italic pl-12">
-                          {language === 'de'
-                            ? 'Stumme:r Statist:in — erscheint im Anchor, spricht nicht.'
-                            : 'Silent extra — appears in the anchor, does not speak.'}
+                          {tx({ de: 'Stumme:r Statist:in — erscheint im Anchor, spricht nicht.', en: 'Silent extra — appears in the anchor, does not speak.', es: 'Extra silencioso — aparece en el ancla, no habla.' })}
                         </p>
                       )}
                     </div>
@@ -1568,11 +1558,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {composingScene ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Szene komponieren…' : 'Composing scene…'}</>
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Szene komponieren…', en: 'Composing scene…', es: 'Componiendo escena…' })}</>
           ) : generating ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Generiere…' : 'Generating…'}</>
           ) : (
-            <><Sparkles className="h-4 w-4 mr-2" /> {language === 'de' ? 'Video generieren' : 'Generate video'}</>
+            <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: 'Video generieren', en: 'Generate video', es: 'Generar video' })}</>
           )}
         </Button>
       </div>
@@ -1611,7 +1601,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {pendingPlacement?.placement === 'end'
-                ? (language === 'de' ? 'Endframe nur mit Luma Ray 2' : 'End-frame only with Luma Ray 2')
+                ? tx({ de: 'Endframe nur mit Luma Ray 2', en: 'End-frame only with Luma Ray 2', es: 'Fotograma final solo con Luma Ray 2' })
                 : (language === 'de' ? tx({ de: 'Anker-Modus benötigt Vidu Q2 oder Kling 3', en: 'Anchor mode requires Vidu Q2 or Kling 3', es: 'El modo Ancla requiere Vidu Q2 o Kling 3' }) : 'Anchor mode needs Vidu Q2 or Kling 3')}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -1648,7 +1638,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       <AIVideoCostConfirmDialog
         open={costDialogOpen}
         payload={{
-          title: language === 'de' ? 'Video generieren?' : 'Generate video?',
+          title: tx({ de: 'Video generieren?', en: 'Generate video?', es: '¿Generar video?' }),
           description:
             language === 'de'
               ? tx({ de: 'Übersicht deiner Kosten — sobald du bestätigst, startet die Generierung und dein AI-Guthaben wird belastet.', en: 'Overview of your costs — once you confirm, generation will start and your AI credit will be charged.', es: 'Resumen de tus costes: una vez que confirmes, la generación comenzará y se cargará tu crédito de IA.' })

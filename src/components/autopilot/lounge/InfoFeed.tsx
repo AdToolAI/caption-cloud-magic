@@ -3,6 +3,7 @@
  * Quelle: Edge Function `autopilot-lounge-feed` (24 h Cache pro Brand-Kit).
  */
 
+import { tx } from '@/lib/i18nText';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,15 +54,15 @@ export function InfoFeed({ brandKitId, language = 'de' }: Props) {
         </p>
         <Button size="sm" variant="outline" onClick={refresh} disabled={query.isFetching}>
           <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${query.isFetching ? 'animate-spin' : ''}`} />
-          Aktualisieren
+          {tx({ de: 'Aktualisieren', en: 'Refresh', es: 'Actualizar' })}
         </Button>
       </div>
 
       {query.isLoading ? (
-        <StageProgressBar label="Signale werden zusammengestellt" />
+        <StageProgressBar label={tx({ de: "Signale werden zusammengestellt", en: "Compiling signals", es: "Recopilando señales" })} />
       ) : query.isError ? (
         <p className="text-sm text-muted-foreground">
-          Der Feed ist gerade nicht erreichbar. Später erneut versuchen.
+          {tx({ de: 'Der Feed ist gerade nicht erreichbar. Später erneut versuchen.', en: 'The feed is currently unavailable. Please try again later.', es: 'El feed no está disponible en este momento. Inténtalo de nuevo más tarde.' })}
         </p>
       ) : (query.data ?? []).length === 0 ? (
         <p className="text-sm text-muted-foreground">

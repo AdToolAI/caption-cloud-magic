@@ -53,9 +53,9 @@ const labels = {
     delete: 'Löschen',
     frequency: 'Auftritte im Storyboard',
     freqCameo: 'Cameo',
-    freqCameoHint: '1–2 Szenen — kurzer Auftritt',
+    freqCameoHint: tx({ de: "1–2 Szenen — kurzer Auftritt", en: "1-2 scenes — short appearance", es: "1-2 escenas - aparición corta" }),
     freqBalanced: 'Ausgewogen',
-    freqBalancedHint: '40–60% der Szenen (Standard)',
+    freqBalancedHint: tx({ de: "40–60% der Szenen (Standard)", en: "40–60% of scenes (default)", es: "40–60% de las escenas (predeterminado)" }),
     freqLead: 'Hauptrolle',
     freqLeadHint: tx({ de: 'In fast jeder Szene präsent', en: 'Present in almost every scene', es: 'Presente en casi todas las escenas' }),
   },
@@ -457,7 +457,7 @@ export default function CharacterManager({ characters, language, onChange }: Cha
             {/* Avatars section */}
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">
-                {lang === 'de' ? 'Avatare (mit Portrait-Anker)' : lang === 'es' ? 'Avatares (con ancla)' : 'Avatars (portrait anchor)'}
+                {lang === 'de' ? tx({ de: "Avatare (mit Portrait-Anker)", en: "Avatars (with portrait anchor)", es: "Avatares (con anclaje vertical)" }) : lang === 'es' ? 'Avatares (con ancla)' : 'Avatars (portrait anchor)'}
               </p>
               {avatarsLoading ? (
                 <p className="text-xs text-muted-foreground py-3 text-center">…</p>

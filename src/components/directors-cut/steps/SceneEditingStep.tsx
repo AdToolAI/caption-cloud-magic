@@ -397,9 +397,9 @@ export function SceneEditingStep({
     setSelectedSceneId(firstHalf.id);
     
     toast({
-      title: playheadInScene ? 'Am Playhead geteilt' : 'Szene geteilt',
+      title: playheadInScene ? tx({ de: 'Am Playhead geteilt', en: 'Split at playhead', es: 'Dividido en el playhead' }) : tx({ de: 'Szene geteilt', en: 'Scene split', es: 'Escena dividida' }),
       description: playheadInScene 
-        ? `Szene bei ${splitPoint.toFixed(1)}s geteilt`
+        ? tx({ de: `Szene bei ${splitPoint.toFixed(1)}s geteilt`, en: `Scene split at ${splitPoint.toFixed(1)}s`, es: `Escena dividida en ${splitPoint.toFixed(1)}s` })
         : tx({ de: 'Die Szene wurde in der Mitte geteilt', en: 'The scene was split in the middle', es: 'La escena se dividió por la mitad' }),
     });
   }, [selectedSceneId, scenes, onScenesUpdate, toast, currentVideoTime]);
@@ -425,8 +425,8 @@ export function SceneEditingStep({
     onScenesUpdate([...scenes, copiedScene]);
     
     toast({
-      title: 'Szene dupliziert',
-      description: 'Die Kopie wurde am Ende hinzugefügt',
+      title: tx({ de: 'Szene dupliziert', en: 'Scene duplicated', es: 'Escena duplicada' }),
+      description: tx({ de: 'Die Kopie wurde am Ende hinzugefügt', en: 'The copy was added at the end', es: 'La copia se añadió al final' }),
     });
   }, [selectedSceneId, scenes, onScenesUpdate, toast]);
 
@@ -476,7 +476,7 @@ export function SceneEditingStep({
       return upd;
     });
     onScenesUpdate(recalc);
-    toast({ title: 'Szenen neu angeordnet' });
+    toast({ title: tx({ de: 'Szenen neu angeordnet', en: 'Scenes reordered', es: 'Escenas reordenadas' }) });
   }, [scenes, onScenesUpdate, toast]);
 
   const handleCutSegment = useCallback(() => {
@@ -549,11 +549,11 @@ export function SceneEditingStep({
     
     toast({
       title: tx({ de: 'Szene gelöscht', en: 'Scene deleted', es: 'Escena eliminada' }),
-      description: 'Drücke Strg+Z zum Rückgängig machen',
+      description: tx({ de: 'Drücke Strg+Z zum Rückgängig machen', en: 'Press Ctrl+Z to undo', es: 'Presiona Ctrl+Z para deshacer' }),
       action: (
-        <ToastAction altText="Rückgängig" onClick={() => handleUndoDelete()}>
+        <ToastAction altText={tx({ de: 'Rückgängig', en: 'Undo', es: 'Deshacer' })} onClick={() => handleUndoDelete()}>
           <Undo2 className="h-4 w-4 mr-1" />
-          Rückgängig
+          {tx({ de: 'Rückgängig', en: 'Undo', es: 'Deshacer' })}
         </ToastAction>
       ),
     });
@@ -593,7 +593,7 @@ export function SceneEditingStep({
     setSelectedSceneId(scene.id);
     
     toast({
-      title: 'Szene wiederhergestellt',
+      title: tx({ de: 'Szene wiederhergestellt', en: 'Scene restored', es: 'Escena restaurada' }),
       description: tx({ de: 'Die gelöschte Szene wurde wiederhergestellt', en: 'The deleted scene has been restored', es: 'La escena eliminada ha sido restaurada' }),
     });
   }, [deletedScenes, scenes, transitions, onScenesUpdate, onTransitionsChange, toast]);
@@ -637,7 +637,7 @@ export function SceneEditingStep({
     
     setSelectedSceneId(newScene.id);
     toast({
-      title: 'Szene hinzugefügt',
+      title: tx({ de: 'Szene hinzugefügt', en: 'Scene added', es: 'Escena añadida' }),
       description: tx({ de: 'Eine neue leere Szene wurde erstellt', en: 'A new empty scene has been created', es: 'Se ha creado una nueva escena vacía' }),
     });
   }, [scenes, selectedSceneId, onScenesUpdate, toast]);
@@ -675,8 +675,8 @@ export function SceneEditingStep({
 
   const handleOpenEffects = useCallback(() => {
     toast({
-      title: 'Effekte',
-      description: 'Wechsle zu Schritt 4 (Style) für Effekte',
+      title: tx({ de: 'Effekte', en: 'Effects', es: 'Efectos' }),
+      description: tx({ de: 'Wechsle zu Schritt 4 (Style) für Effekte', en: 'Switch to step 4 (Style) for effects', es: 'Cambia al paso 4 (Estilo) para los efectos' }),
     });
   }, [toast]);
 
@@ -755,8 +755,8 @@ export function SceneEditingStep({
     // Clear transitions when remixing (they'll need to be regenerated)
     onTransitionsChange([]);
     toast({
-      title: 'Szenen neu angeordnet',
-      description: `${newScenes.length} Szenen wurden gemäß der KI-Strategie neu sortiert`,
+      title: tx({ de: 'Szenen neu angeordnet', en: 'Scenes reordered', es: 'Escenas reordenadas' }),
+      description: tx({ de: `${newScenes.length} Szenen wurden gemäß der KI-Strategie neu sortiert`, en: `${newScenes.length} scenes were reordered according to the AI strategy`, es: `${newScenes.length} escenas se reordenaron según la estrategia de IA` }),
     });
   }, [onScenesUpdate, onTransitionsChange, toast]);
 
@@ -851,8 +851,8 @@ export function SceneEditingStep({
                     { key: 'ESC', action: 'Schließen' },
                     { key: '?', action: 'Hilfe ein/aus' },
                     { key: 'Space', action: 'Play/Pause' },
-                    { key: 'S', action: 'Szene teilen' },
-                    { key: 'D', action: 'Szene duplizieren' },
+                    { key: 'S', action: tx({ de: 'Szene teilen', en: 'Split scene', es: 'Dividir escena' }) },
+                    { key: 'D', action: tx({ de: 'Szene duplizieren', en: 'Duplicate scene', es: 'Duplicar escena' }) },
                     { key: '⌫', action: 'Szene löschen' },
                     { key: '⌘Z', action: 'Rückgängig' },
                   ].map(({ key, action }) => (

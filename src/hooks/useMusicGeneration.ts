@@ -88,15 +88,15 @@ export function useMusicGeneration() {
         } else if (code === 'RATE_LIMIT') {
           toast.error('Rate limit erreicht', { description: tx({ de: 'Bitte kurz warten und erneut versuchen.', en: 'Please wait briefly and try again.', es: 'Espera un momento y vuelve a intentarlo.' }) });
         } else if (code === 'MISSING_LYRICS') {
-          toast.error('Lyrics fehlen', { description: 'Für Vocal-Tracks bitte Songtext eingeben.' });
+          toast.error(tx({ de: 'Lyrics fehlen', en: 'Lyrics missing', es: 'Faltan las letras' }), { description: tx({ de: 'Für Vocal-Tracks bitte Songtext eingeben.', en: 'Please enter lyrics for vocal tracks.', es: 'Por favor, introduce la letra para las pistas vocales.' }) });
         } else {
-          toast.error('Music-Generierung fehlgeschlagen', { description: msg });
+          toast.error(tx({ de: 'Music-Generierung fehlgeschlagen', en: 'Music generation failed', es: 'La generación de música falló' }), { description: msg });
         }
         return null;
       }
 
       if (!data?.success) {
-        toast.error(data?.error || 'Unbekannter Fehler');
+        toast.error(data?.error || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }));
         return null;
       }
 
@@ -108,8 +108,8 @@ export function useMusicGeneration() {
       return data.track as GeneratedMusicTrack;
     } catch (err: any) {
       console.error('Music generation error:', err);
-      toast.error('Fehler bei der Musik-Generierung', {
-        description: err.message || 'Unbekannter Fehler',
+      toast.error(tx({ de: 'Fehler bei der Musik-Generierung', en: 'Error during music generation', es: 'Error durante la generación de música' }), {
+        description: err.message || tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
       });
       return null;
     } finally {
@@ -129,18 +129,18 @@ export function useMusicGeneration() {
         body: params,
       });
       if (error) {
-        toast.error('Lyrics-Generierung fehlgeschlagen', { description: error.message });
+        toast.error(tx({ de: 'Lyrics-Generierung fehlgeschlagen', en: 'Lyrics generation failed', es: 'La generación de letras falló' }), { description: error.message });
         return null;
       }
       if (!data?.success) {
-        toast.error(data?.error || 'Lyrics-Generierung fehlgeschlagen');
+        toast.error(data?.error || tx({ de: 'Lyrics-Generierung fehlgeschlagen', en: 'Lyrics generation failed', es: 'La generación de letras falló' }));
         return null;
       }
       toast.success('✍️ Lyrics generiert!');
       return data.lyrics as string;
     } catch (err: any) {
       console.error('Lyrics generation error:', err);
-      toast.error('Fehler bei der Lyrics-Generierung', { description: err.message });
+      toast.error(tx({ de: 'Fehler bei der Lyrics-Generierung', en: 'Error during lyrics generation', es: 'Error durante la generación de letras' }), { description: err.message });
       return null;
     } finally {
       setGeneratingLyrics(false);

@@ -90,7 +90,7 @@ export function assessIdea(input: AutopilotIdea, ctx: FeasibilityContext): Feasi
 
   if (TEXT_IN_IMAGE.test(haystack)) {
     score -= 10;
-    notes.push('Schrift im Bild vermieden — Text kommt sauber als Einblendung.');
+    notes.push(tx({ de: "Schrift im Bild vermieden — Text kommt sauber als Einblendung.", en: "Font in the image avoided - text appears cleanly as an overlay.", es: "Se evita la fuente en la imagen: el texto aparece limpio como una superposición." }));
   }
   if (CROWD.test(haystack)) {
     score -= 14;
@@ -98,7 +98,7 @@ export function assessIdea(input: AutopilotIdea, ctx: FeasibilityContext): Feasi
   }
   if (RISKY_MOTION.test(haystack)) {
     score -= 12;
-    notes.push('Extreme Bewegung entschärft, damit die Physik glaubwürdig bleibt.');
+    notes.push(tx({ de: "Extreme Bewegung entschärft, damit die Physik glaubwürdig bleibt.", en: "Extreme movement defused so that the physics remain believable.", es: "El movimiento extremo se desactiva para que la física siga siendo creíble." }));
   }
 
   // --- Scene count and timing ----------------------------------------------
@@ -121,7 +121,7 @@ export function assessIdea(input: AutopilotIdea, ctx: FeasibilityContext): Feasi
   if (idea.beats.length > maxScenes) {
     idea.beats = idea.beats.slice(0, maxScenes);
     score -= 4;
-    notes.push('Auf eine Schnittfolge gekürzt, die in der Laufzeit atmet.');
+    notes.push(tx({ de: "Auf eine Schnittfolge gekürzt, die in der Laufzeit atmet.", en: "Shortened to an editing sequence that breathes during the running time.", es: "Acortado a una secuencia de edición que respira durante el tiempo de ejecución." }));
   }
 
   // Normalise the rough seconds to the requested runtime.

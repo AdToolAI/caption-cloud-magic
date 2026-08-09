@@ -124,7 +124,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
     if (!files?.length) return;
     const room = MAX_ASSETS - assets.length;
     if (room <= 0) {
-      toast({ title: 'Maximal 8 Bilder', description: 'Mehr verarbeitet der Autopilot nicht sauber.' });
+      toast({ title: tx({ de: 'Maximal 8 Bilder', en: 'Maximum 8 images', es: 'Máximo 8 imágenes' }), description: tx({ de: 'Mehr verarbeitet der Autopilot nicht sauber.', en: 'The Autopilot cannot process more cleanly.', es: 'El Autopilot no puede procesar más de forma limpia.' }) });
       return;
     }
 
@@ -137,7 +137,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       for (const file of Array.from(files).slice(0, room)) {
         if (!file.type.startsWith('image/')) continue;
         if (file.size > 12 * 1024 * 1024) {
-          toast({ title: `${file.name} ist zu groß`, description: 'Maximal 12 MB pro Bild.', variant: 'destructive' });
+          toast({ title: `${file.name} ${tx({ de: 'ist zu groß', en: 'is too large', es: 'es demasiado grande' })}`, description: tx({ de: 'Maximal 12 MB pro Bild.', en: 'Maximum 12 MB per image.', es: 'Máximo 12 MB por imagen.' }), variant: 'destructive' });
           continue;
         }
 
@@ -180,8 +180,8 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       }
     } catch (err) {
       toast({
-        title: 'Upload fehlgeschlagen',
-        description: err instanceof Error ? err.message : 'Unbekannter Fehler',
+        title: tx({ de: 'Upload fehlgeschlagen', en: 'Upload failed', es: 'Error al subir' }),
+        description: err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
         variant: 'destructive',
       });
     } finally {
@@ -271,14 +271,14 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         assets,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      const message = err instanceof Error ? err.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' });
       toast({
         title: tx({ de: 'Ideen konnten nicht entwickelt werden', en: 'Ideas could not be developed', es: 'No se pudieron desarrollar ideas' }),
         description:
           message === 'credits_exhausted'
-            ? 'Dein KI-Guthaben ist aufgebraucht.'
+            ? tx({ de: 'Dein KI-Guthaben ist aufgebraucht.', en: 'Your AI credit balance is used up.', es: 'Tu saldo de créditos de IA se ha agotado.' })
             : message === 'rate_limited'
-              ? 'Zu viele Anfragen — bitte kurz warten.'
+              ? tx({ de: 'Zu viele Anfragen — bitte kurz warten.', en: 'Too many requests — please wait a moment.', es: 'Demasiadas solicitudes — espera un momento.' })
               : message,
         variant: 'destructive',
       });
@@ -333,7 +333,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
                       type="button"
                       onClick={() => removeAsset(asset)}
                       className="text-muted-foreground transition-colors hover:text-destructive"
-                      aria-label="Bild entfernen"
+                      aria-label={tx({ de: "Bild entfernen", en: "Remove image", es: "Eliminar imagen" })}
                     >
                       <X className="h-4 w-4" />
                     </button>

@@ -80,9 +80,9 @@ const STATUS_ICON: Record<string, any> = {
 const FLOW_NAMES = [
   "Composer Multi-Scene Stitch",
   "Director's Cut Lambda Render",
-  "Auto-Director (Brief → Video)",
+  tx({ de: "Auto-Director (Brief → Video)", en: "Auto-Director (Letter → Video)", es: "Director automático (Carta → Vídeo)" }),
   "Talking Head (HeyGen)",
-  "Universal Video Creator",
+  tx({ de: "Universal Video Creator", en: "Universal Video Creator", es: "Creador de vídeos universal" }),
   "Magic Edit (FLUX Fill)",
 ];
 
@@ -171,7 +171,7 @@ export function DeepSweepTab() {
     try {
       const { error } = await supabase.functions.invoke("qa-live-sweep-bootstrap", {});
       if (error) throw error;
-      toast.success("QA-Test-Assets aktualisiert. Beim nächsten Run sollte Magic Edit grün werden.");
+      toast.success(tx({ de: "QA-Test-Assets aktualisiert. Beim nächsten Run sollte Magic Edit grün werden.", en: "QA testing assets updated. On the next run, Magic Edit should turn green.", es: "Activos de pruebas de control de calidad actualizados. En la siguiente ejecución, Magic Edit debería volverse verde." }));
     } catch (e: any) {
       toast.error(`Bootstrap failed: ${e?.message ?? String(e)}`);
     } finally {
