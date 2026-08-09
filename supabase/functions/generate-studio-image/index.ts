@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { fetchWithTimeout, isTimeoutError } from "../_shared/timeout.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,7 +82,7 @@ function getFallbackChain(quality: string): string[] {
   ];
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders }
 );
@@ -241,7 +242,7 @@ MANDATORY RULES:
       if (status === 429) {
         return new Response(JSON.stringify({ 
           ok: false, code: 429, step: 'ai_generate', 
-          error: 'Alle Modelle sind gerade überlastet. Bitte versuche es in 1-2 Minuten erneut.',
+          error: tl({ de: 'Alle Modelle sind gerade überlastet. Bitte versuche es in 1-2 Minuten erneut.', en: 'All models are currently overloaded. Please try again in 1-2 minutes.', es: 'Todos los modelos están actualmente sobrecargados. Por favor, inténtalo de nuevo en 1-2 minutos.' }),
           attemptedModels 
         }), {
           status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -250,7 +251,7 @@ MANDATORY RULES:
       if (status === 402) {
         return new Response(JSON.stringify({ 
           ok: false, code: 402, step: 'ai_generate', 
-          error: 'Credits erschöpft. Bitte lade dein Guthaben auf.',
+          error: tl({ de: 'Credits erschöpft. Bitte lade dein Guthaben auf.', en: 'Credits exhausted. Please top up your balance.', es: 'Créditos agotados. Por favor, recarga tu saldo.' }),
           attemptedModels 
         }), {
           status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -296,7 +297,7 @@ MANDATORY RULES:
       console.error('[Studio] Upload error:', uploadError);
       return new Response(JSON.stringify({ 
         ok: false, code: 500, step: 'storage_upload', 
-        error: 'Bild konnte nicht gespeichert werden.' 
+        error: tl({ de: 'Bild konnte nicht gespeichert werden.', en: 'Could not save image.', es: 'No se pudo guardar la imagen.' }) 
       }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -372,4 +373,4 @@ MANDATORY RULES:
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-});
+})(req)));

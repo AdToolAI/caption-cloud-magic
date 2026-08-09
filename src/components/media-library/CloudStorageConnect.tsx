@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -149,7 +150,7 @@ export const CloudStorageConnect = () => {
         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/10 border border-white/5">
           <div>
             <Label className="text-sm font-medium">Auto-Sync</Label>
-            <p className="text-xs text-muted-foreground">Neue Medien automatisch in die Cloud hochladen</p>
+            <p className="text-xs text-muted-foreground">{tx({ de: "Neue Medien automatisch in die Cloud hochladen", en: "Automatically upload new media to the cloud", es: "Subir automáticamente nuevos medios a la nube" })}</p>
           </div>
           <Switch
             checked={connection.auto_sync}

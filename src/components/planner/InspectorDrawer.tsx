@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
@@ -147,7 +148,7 @@ export function InspectorDrawer({
             {/* Date & Time */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Datum & Uhrzeit *</Label>
+                <Label>{tx({ de: "Datum & Uhrzeit *", en: "Date & Time *", es: "Fecha y hora *" })}</Label>
                 <Input
                   type="datetime-local"
                   value={startAt}

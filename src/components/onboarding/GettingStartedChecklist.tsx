@@ -53,7 +53,7 @@ const headlines: Record<string, { title: string; subtitle: string; allDone: stri
   de: {
     title: "Deine erste Produktion",
     subtitle: tx({ de: "Von der Idee zum veröffentlichten Video – Schritt für Schritt", en: "From idea to published video – step by step", es: "De la idea al video publicado – paso a paso" }),
-    allDone: "Alle Schritte abgeschlossen! 🎉",
+    allDone: tx({ de: "Alle Schritte abgeschlossen! 🎉", en: "All steps completed! 🎉", es: "¡Todos los pasos completados! 🎉" }),
   },
   es: {
     title: "Tu primera producción",

@@ -71,7 +71,7 @@ export const VideoPreviewComparison = ({
     const timeout = window.setTimeout(() => {
       if (originalVideoLoading) {
         console.warn('[VideoPreview] Original video timeout after 10s');
-        setOriginalVideoError('Laden dauert ungewöhnlich lange. Öffne das Video direkt im neuen Tab.');
+        setOriginalVideoError(tx({ de: 'Laden dauert ungewöhnlich lange. Öffne das Video direkt im neuen Tab.', en: 'Loading is taking unusually long. Open the video directly in a new tab.', es: 'La carga está tardando inusualmente. Abre el video directamente en una nueva pestaña.' }));
         setOriginalVideoLoading(false);
       }
     }, 10000);
@@ -89,7 +89,7 @@ export const VideoPreviewComparison = ({
     const timeout = window.setTimeout(() => {
       if (editedVideoLoading) {
         console.warn('[VideoPreview] Edited video timeout after 10s');
-        setEditedVideoError('Laden dauert ungewöhnlich lange. Öffne das Video direkt im neuen Tab.');
+        setEditedVideoError(tx({ de: 'Laden dauert ungewöhnlich lange. Öffne das Video direkt im neuen Tab.', en: 'Loading is taking unusually long. Open the video directly in a new tab.', es: 'La carga está tardando inusualmente. Abre el video directamente en una nueva pestaña.' }));
         setEditedVideoLoading(false);
       }
     }, 10000);

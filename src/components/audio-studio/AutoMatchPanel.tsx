@@ -152,7 +152,7 @@ export function AutoMatchPanel({
               </div>
             </motion.div>
             <h3 className="text-xl font-semibold mb-2">
-              {isDragActive ? 'Video hier ablegen' : 'Video hochladen für Auto-Match'}
+              {isDragActive ? 'Video hier ablegen' : tx({ de: 'Video hochladen für Auto-Match', en: 'Upload video for Auto-Match', es: 'Subir video para Auto-Match' })}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
               MP4, MOV, WEBM • bis 200 MB • Analyse dauert 10–20 Sekunden

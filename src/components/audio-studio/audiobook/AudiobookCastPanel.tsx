@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -110,7 +111,7 @@ export function AudiobookCastPanel({ cast, language, onChange }: Props) {
         onOpenChange={(open) => { if (!open) setTarget(null); }}
         onSelect={handleSelect}
         language={pickerLanguage}
-        title="Hörbuch-Stimme wählen"
+        title={tx({ de: "Hörbuch-Stimme wählen", en: "Choose audiobook voice", es: "Elegir voz de audiolibro" })}
         currentVoiceId={
           target?.kind === 'narrator'
             ? cast.narrator?.voiceId

@@ -16,7 +16,7 @@ const FeatureFlagDemo = () => {
     {
       name: "enable_ai_queue_worker_v2",
       title: "AI Queue Worker V2",
-      description: "Neue Version des AI Queue Workers mit verbesserter Performance",
+      description: tx({ de: "Neue Version des AI Queue Workers mit verbesserter Performance", en: "New version of the AI Queue Worker with improved performance", es: "Nueva versión del AI Queue Worker con rendimiento mejorado" }),
       rollout: "10%",
       status: aiQueueWorkerV2,
       icon: Zap,

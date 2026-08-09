@@ -278,7 +278,7 @@ export function MultiReferenceUploader({
               ? '⚠️ Se requiere al menos 1 imagen.'
               : '⚠️ At least 1 image required.'
             : language === 'de'
-              ? 'Optional — ohne Bild entsteht ein reines Text-to-Video.'
+              ? tx({ de: 'Optional — ohne Bild entsteht ein reines Text-to-Video.', en: 'Optional — without an image, a pure text-to-video is created.', es: 'Opcional — sin imagen, se crea un video de texto a video puro.' })
               : language === 'es'
               ? 'Opcional — sin imagen se genera un vídeo solo de texto.'
               : 'Optional — without an image this is a pure text-to-video.'}

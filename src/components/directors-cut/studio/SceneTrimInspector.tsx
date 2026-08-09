@@ -378,7 +378,7 @@ export const SceneTrimInspector: React.FC<SceneTrimInspectorProps> = ({
               variant="outline"
               size="sm"
               disabled
-              title="Bewege den Playhead in die Szene oder setze Start/Ende im Inspector, um zu teilen."
+              title={tx({ de: "Bewege den Playhead in die Szene oder setze Start/Ende im Inspector, um zu teilen.", en: "Move the playhead into the scene or set start/end in the inspector to split.", es: "Mueve el cabezal de reproducción a la escena o establece el inicio/fin en el inspector para dividir." })}
               className="border-white/10 text-white/40 disabled:opacity-40"
             >
               <Scissors className="h-3.5 w-3.5 mr-1.5" />

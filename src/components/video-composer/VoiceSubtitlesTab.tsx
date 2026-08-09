@@ -230,7 +230,7 @@ export default function VoiceSubtitlesTab({
         ? 'Tell a coherent story that matches the storyboard scenes.'
         : language === 'es'
         ? 'Cuenta una historia coherente que coincida con las escenas del guion gráfico.'
-        : 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.';
+        : tx({ de: 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.', en: 'Tell a coherent story that matches the storyboard scenes.', es: 'Cuenta una historia coherente que coincida con las escenas del storyboard.' });
 
     (async () => {
       try {
@@ -296,7 +296,7 @@ export default function VoiceSubtitlesTab({
           .map((s) => s.speakerId)
           .filter((id) => !voiceover.speakerMap![id]);
         if (missing.length) {
-          throw new Error(`Stimme fehlt für: ${Array.from(new Set(missing)).join(', ')}`);
+          throw new Error(tx({ de: `Stimme fehlt für: ${Array.from(new Set(missing)).join(', ')}`, en: `Voice missing for: ${Array.from(new Set(missing)).join(', ')}`, es: `Falta la voz para: ${Array.from(new Set(missing)).join(', ')}` }));
         }
 
         const overridesMap = voiceover.segmentOverrides || {};

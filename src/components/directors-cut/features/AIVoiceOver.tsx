@@ -265,7 +265,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <Label>Sprache & Stimme</Label>
+              <Label>{tx({ de: "Sprache & Stimme", en: "Language & Voice", es: "Idioma y Voz" })}</Label>
               <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
@@ -353,7 +353,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                         <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lade Stimmen…
                       </div>
                     ) : langVoices.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-6">Keine Stimmen verfügbar</p>
+                      <p className="text-sm text-muted-foreground text-center py-6">{tx({ de: "Keine Stimmen verfügbar", en: "No voices available", es: "No hay voces disponibles" })}</p>
                     ) : (
                       <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                         {cloned.length > 0 && (

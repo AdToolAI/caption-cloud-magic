@@ -242,7 +242,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
       await supabase.from('studio_images').delete().eq('id', image.id);
       setUnsortedImages(prev => prev.filter(img => img.id !== image.id));
       setAlbumImages(prev => prev.filter(img => img.id !== image.id));
-      toast.success("Bild gelöscht 🗑️");
+      toast.success(tx({ de: "Bild gelöscht 🗑️", en: "Image deleted 🗑️", es: "Imagen eliminada 🗑️" }));
       loadAlbums();
     } catch (err) {
       console.error(err);
@@ -286,7 +286,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
             <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
             <p>Keine Bilder in diesem Album</p>
             {selectedAlbum.is_system && (
-              <p className="text-sm mt-1">Generiere Bilder im KI Picture Studio — sie erscheinen hier automatisch!</p>
+              <p className="text-sm mt-1">{tx({ de: "Generiere Bilder im KI Picture Studio — sie erscheinen hier automatisch!", en: "Generate images in the AI Picture Studio — they'll appear here automatically!", es: "Genera imágenes en el AI Picture Studio — ¡aparecerán aquí automáticamente!" })}</p>
             )}
           </div>
         ) : (
@@ -402,7 +402,7 @@ export function MediaAlbumManager({ initialAlbumSlug }: MediaAlbumManagerProps) 
         <div className="text-center py-16 text-muted-foreground">
           <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p>{tx({ de: "Noch keine Bilder oder Alben vorhanden", en: "No images or albums yet", es: "Aún no hay imágenes o álbumes" })}</p>
-          <p className="text-sm mt-1">Generiere dein erstes Bild im KI Picture Studio!</p>
+          <p className="text-sm mt-1">{tx({ de: "Generiere dein erstes Bild im KI Picture Studio!", en: "Generate your first image in the AI Picture Studio!", es: "¡Genera tu primera imagen en el AI Picture Studio!" })}</p>
         </div>
       )}
 

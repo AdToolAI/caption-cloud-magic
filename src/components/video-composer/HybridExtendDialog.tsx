@@ -88,9 +88,9 @@ const T = {
     prequel: 'Prequel',
     prequelHint: 'Was passierte davor?',
     crossfade: 'Crossfade',
-    crossfadeHint: 'Morphe in eine andere Szene.',
+    crossfadeHint: tx({ de: 'Morphe in eine andere Szene.', en: 'Morph into another scene.', es: 'Transformar en otra escena.' }),
     styleEcho: 'Style-Echo',
-    styleEchoHint: 'Neue Szene, gleiche Bildsprache.',
+    styleEchoHint: tx({ de: 'Neue Szene, gleiche Bildsprache.', en: 'New scene, same visuals.', es: 'Nueva escena, mismos elementos visuales.' }),
     // Cast
     castLabel: 'Hauptdarsteller (AI-Engine)',
     castOff: 'Im Off',
@@ -103,7 +103,7 @@ const T = {
     // Bridge target
     targetScene: 'Ziel-Szene',
     targetPlaceholder: tx({ de: 'Wähle die Szene, in die übergeleitet wird …', en: 'Select the scene to transition into…', es: 'Selecciona la escena a la que se hará la transición…' }),
-    noTargets: 'Keine weiteren fertigen Szenen verfügbar.',
+    noTargets: tx({ de: 'Keine weiteren fertigen Szenen verfügbar.', en: 'No further finished scenes available.', es: 'No hay más escenas terminadas disponibles.' }),
     // Direct
     quality: 'Qualität',
     standard: 'Standard',
@@ -111,7 +111,7 @@ const T = {
     duration: 'Dauer',
     seconds: 'Sek.',
     prompt: 'Regie-Anweisung',
-    promptPh: 'Action! In dieser Szene …',
+    promptPh: tx({ de: 'Action! In dieser Szene …', en: 'Action! In this scene...', es: '¡Acción! En esta escena...' }),
     cost: 'Drehbudget',
     cancel: 'Abbrechen',
     action: 'Action! — Szene drehen',

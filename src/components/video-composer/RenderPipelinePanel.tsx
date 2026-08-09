@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,7 +32,7 @@ interface RenderPipelinePanelProps {
 const statusLabel: Record<PipelineStatus, string> = {
   idle: 'Bereit',
   queueing: 'Warteschlange wird vorbereitet …',
-  generating: 'Szenen werden generiert …',
+  generating: tx({ de: 'Szenen werden generiert …', en: 'Scenes are being generated...', es: 'Se están generando las escenas...' }),
   stitching: 'Wird zusammengeschnitten …',
   ready: 'Fertig 🎬',
   partial: 'Teilweise fertig — Entscheidung nötig',

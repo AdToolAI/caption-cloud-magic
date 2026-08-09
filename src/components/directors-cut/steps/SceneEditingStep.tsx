@@ -400,7 +400,7 @@ export function SceneEditingStep({
       title: playheadInScene ? 'Am Playhead geteilt' : 'Szene geteilt',
       description: playheadInScene 
         ? `Szene bei ${splitPoint.toFixed(1)}s geteilt`
-        : 'Die Szene wurde in der Mitte geteilt',
+        : tx({ de: 'Die Szene wurde in der Mitte geteilt', en: 'The scene was split in the middle', es: 'La escena se dividió por la mitad' }),
     });
   }, [selectedSceneId, scenes, onScenesUpdate, toast, currentVideoTime]);
 
@@ -460,7 +460,7 @@ export function SceneEditingStep({
     onScenesUpdate(recalc);
     setSelectedSceneIds(new Set());
     setSelectedSceneId(recalc[0]?.id || null);
-    toast({ title: `${selectedSceneIds.size} Szenen gelöscht` });
+    toast({ title: tx({ de: `${selectedSceneIds.size} Szenen gelöscht`, en: `${selectedSceneIds.size} scenes deleted`, es: `${selectedSceneIds.size} escenas eliminadas` }) });
   }, [selectedSceneIds, scenes, transitions, onScenesUpdate, onTransitionsChange, toast]);
 
   const handleScenesReorder = useCallback((fromIndex: number, toIndex: number) => {
@@ -548,7 +548,7 @@ export function SceneEditingStep({
     setSelectedSceneId(newScenes[nextIndex]?.id || null);
     
     toast({
-      title: 'Szene gelöscht',
+      title: tx({ de: 'Szene gelöscht', en: 'Scene deleted', es: 'Escena eliminada' }),
       description: 'Drücke Strg+Z zum Rückgängig machen',
       action: (
         <ToastAction altText="Rückgängig" onClick={() => handleUndoDelete()}>
@@ -594,7 +594,7 @@ export function SceneEditingStep({
     
     toast({
       title: 'Szene wiederhergestellt',
-      description: 'Die gelöschte Szene wurde wiederhergestellt',
+      description: tx({ de: 'Die gelöschte Szene wurde wiederhergestellt', en: 'The deleted scene has been restored', es: 'La escena eliminada ha sido restaurada' }),
     });
   }, [deletedScenes, scenes, transitions, onScenesUpdate, onTransitionsChange, toast]);
 
@@ -609,7 +609,7 @@ export function SceneEditingStep({
       id: `scene-new-${Date.now()}`,
       start_time: newStartTime,
       end_time: newStartTime + 5, // Default 5 seconds
-      description: 'Neue Szene',
+      description: tx({ de: 'Neue Szene', en: 'New scene', es: 'Nueva escena' }),
       mood: 'neutral',
       suggested_effects: [],
       ai_suggestions: [],
@@ -1236,7 +1236,7 @@ export function SceneEditingStep({
                       <div className="pt-4 border-t">
                         <div className="flex items-center gap-2 mb-3">
                           <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs font-medium">Übergang zur nächsten Szene</span>
+                          <span className="text-xs font-medium">{tx({ de: "Übergang zur nächsten Szene", en: "Transition to next scene", es: "Transición a la siguiente escena" })}</span>
                         </div>
                         <TransitionPicker
                           selectedType={getTransitionForScene(selectedScene.id)?.transitionType || 'none'}

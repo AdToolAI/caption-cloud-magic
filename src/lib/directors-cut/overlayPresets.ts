@@ -251,7 +251,7 @@ export const OVERLAY_PRESETS: OverlayPreset[] = [
     build: () =>
       base(
         'ticker',
-        'Neue Funktionen  •  Jetzt verfügbar  •  Ein Creator. Ein ganzes Studio.',
+        tx({ de: 'Neue Funktionen  •  Jetzt verfügbar  •  Ein Creator. Ein ganzes Studio.', en: 'New Features • Now Available • One Creator. One Whole Studio.', es: 'Nuevas Funciones • Ya Disponible • Un Creador. Un Estudio Completo.' }),
         { fill: 'rgba(10,10,15,0.88)', fontSizeRel: 0.026, fontWeight: 600, align: 'left', radius: 0 },
         { animation: 'tickerLoop', enter: 'tickerLoop' },
       ),

@@ -79,7 +79,7 @@ export function getRenderWarnings(scene: ComposerScene): RenderWarning[] {
     out.push({
       level: 'info',
       message:
-        'Kein Charakter-Anker gesetzt — die Pipeline rendert den Anker automatisch in einem Vorlauf-Schritt.',
+        tx({ de: 'Kein Charakter-Anker gesetzt — die Pipeline rendert den Anker automatisch in einem Vorlauf-Schritt.', en: 'No character anchor set — the pipeline will automatically render the anchor in a pre-run step.', es: 'No se ha establecido un ancla de personaje — el pipeline renderizará automáticamente el ancla en un paso previo.' }),
     });
   }
 

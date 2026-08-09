@@ -158,7 +158,7 @@ export function AnchorPreviewGate({
       }
     }
     setPhase("error");
-    setErrMsg("Zeitüberschreitung beim Erstellen der Vorschau.");
+    setErrMsg(tx({ de: "Zeitüberschreitung beim Erstellen der Vorschau.", en: "Preview creation timed out.", es: "Tiempo de espera agotado al crear la vista previa." }));
   }, [sceneId, composeBody]);
 
   useEffect(() => {
@@ -193,7 +193,7 @@ export function AnchorPreviewGate({
         useExistingRun: true,
       });
 
-      toast.success("Render gestartet — Vorschau bestätigt.");
+      toast.success(tx({ de: "Render gestartet — Vorschau bestätigt.", en: "Render started — preview confirmed.", es: "Renderizado iniciado — vista previa confirmada." }));
       onConfirmed?.();
       onOpenChange(false);
     } catch (e: any) {

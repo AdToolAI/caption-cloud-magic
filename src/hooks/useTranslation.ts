@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Language, translations, detectBrowserLanguage } from '@/lib/translations';
+import { translationsFill } from '@/lib/translationsFill';
 
 const { useState, useEffect, createContext, useContext } = React;
 
@@ -34,20 +35,46 @@ export const useTranslationState = () => {
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('adtool-ai-lang', lang);
+    // Persist for server-side copy (emails, cron jobs) — best effort.
+    void (async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data } = await supabase.auth.getUser();
+        if (data.user) {
+          await supabase.from('profiles').update({ language: lang }).eq('id', data.user.id);
+        }
+      } catch {
+        /* offline or signed out — localStorage is enough */
+      }
+    })();
   };
+
 
   const t = (key: string, params?: Record<string, string | number>): any => {
     const keys = key.split('.') as any;
-    let value: any = translations[language];
-    
-    for (const k of keys) {
-      value = value?.[k];
+    const lookup = (dict: any) => {
+      let v: any = dict;
+      for (const k of keys) v = v?.[k];
+      return v;
+    };
+
+    // Preferred language -> generated fill -> English -> German -> key
+    let value: any = lookup(translations[language]);
+    if (value === undefined || value === null) {
+      value = lookup((translationsFill as any)[language]);
+    }
+    if (value === undefined || value === null) {
+      value = lookup(translations.en);
+    }
+    if (value === undefined || value === null) {
+      value = lookup(translations.de);
     }
 
-    // Return key if value is undefined or null
+    // Return key if nothing was found at all
     if (value === undefined || value === null) {
       return key;
     }
+
 
     // Return objects directly (for featureGuides, etc.)
     if (typeof value === 'object') {

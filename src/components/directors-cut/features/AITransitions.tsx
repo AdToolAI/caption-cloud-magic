@@ -48,7 +48,7 @@ export const TRANSITION_TYPES = [
   { 
     id: 'wipe', 
     name: 'Wipe', 
-    description: 'Horizontaler Wisch für dynamische Szenen',
+    description: tx({ de: 'Horizontaler Wisch für dynamische Szenen', en: 'Horizontal swipe for dynamic scenes', es: 'Deslizamiento horizontal para escenas dinámicas' }),
     icon: '▶',
     gradient: 'from-green-500 to-emerald-500',
     aiScore: 0.75,

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ export function CopyStep() {
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="space-y-2">
-        <h2 className="font-display text-3xl tracking-tight">Wähle die Stimme</h2>
+        <h2 className="font-display text-3xl tracking-tight">{tx({ de: "Wähle die Stimme", en: "Choose the voice", es: "Elige la voz" })}</h2>
         <p className="text-sm text-muted-foreground">
           Eine Richtung auswählen — alles bleibt später frei editierbar.
         </p>

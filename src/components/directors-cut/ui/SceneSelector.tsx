@@ -102,7 +102,7 @@ export function SceneSelector({
           Anwendungsbereich
         </h4>
         <span className="text-xs text-muted-foreground">
-          {selectedSceneId ? `Szene ${scenes.findIndex(s => s.id === selectedSceneId) + 1}` : 'Alle Szenen'}
+          {selectedSceneId ? `Szene ${scenes.findIndex(s => s.id === selectedSceneId) + 1}` : tx({ de: 'Alle Szenen', en: 'All Scenes', es: 'Todas las escenas' })}
         </span>
       </div>
 

@@ -49,7 +49,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'Curated Scene Library',
-    desc: '24+ ready-to-use Stock-Szenen — Product Hero, Lifestyle, Talking Head, Establishing & mehr.',
+    desc: tx({ de: '24+ ready-to-use Stock-Szenen — Product Hero, Lifestyle, Talking Head, Establishing & mehr.', en: '24+ ready-to-use Stock Scenes — Product Hero, Lifestyle, Talking Head, Establishing & more.', es: 'Más de 24 escenas de stock listas para usar: Product Hero, Lifestyle, Talking Head, Establishing y más.' }),
     icon: Library,
     href: '/motion-studio/studio',
     accent: 'from-accent/30 to-primary/10',
@@ -57,7 +57,7 @@ const QUICK_ACTIONS = [
   },
   {
     title: 'Video Composer',
-    desc: 'Szenen-basierte KI-Video-Produktion mit Continuity & Director-Presets',
+    desc: tx({ de: 'Szenen-basierte KI-Video-Produktion mit Continuity & Director-Presets', en: 'Scene-based AI video production with Continuity & Director presets', es: 'Producción de vídeo con IA basada en escenas con ajustes preestablecidos de continuidad y director' }),
     icon: Clapperboard,
     href: '/video-composer',
     accent: 'from-primary/30 to-primary/5',
@@ -106,7 +106,7 @@ const TOOLBOX_ITEMS = [
   {
     icon: Layers,
     title: 'Frame-to-Shot Continuity',
-    desc: 'Letzten Frame als Start für die nächste Szene → nahtlose Cuts.',
+    desc: tx({ de: 'Letzten Frame als Start für die nächste Szene → nahtlose Cuts.', en: 'Last frame as start for the next scene → seamless cuts.', es: 'Último fotograma como inicio de la siguiente escena → cortes sin interrupciones.' }),
   },
   {
     icon: Wand2,

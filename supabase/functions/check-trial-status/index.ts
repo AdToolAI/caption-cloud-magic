@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { sendEmail } from "../_shared/email-send.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { canSendMarketingEmail, markMarketingEmailSent } from "../_shared/emailFrequency.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 type Lang = "de" | "en" | "es";
 
@@ -14,9 +15,9 @@ const trialExpiredCopy: Record<Lang, { subject: string; heading: string; intro: 
   de: {
     subject: "Dein 14-Tage Enterprise-Trial ist abgelaufen 🔒",
     heading: "Dein Trial ist beendet",
-    intro: "Dein 14-Tage Enterprise-Trial ist heute abgelaufen, und auch deine 14-Tage Grace-Period ist vorbei. Damit du wieder posten, generieren und veröffentlichen kannst, wähle jetzt einen Plan – schon ab €19/Monat.",
+    intro: tl({ de: "Dein 14-Tage Enterprise-Trial ist heute abgelaufen, und auch deine 14-Tage Grace-Period ist vorbei. Damit du wieder posten, generieren und veröffentlichen kannst, wähle jetzt einen Plan – schon ab €19/Monat.", en: "Your 14-day Enterprise Trial expired today, and your 14-day grace period is also over. To post, generate, and publish again, choose a plan now – starting from €19/month.", es: "Tu prueba Enterprise de 14 días ha caducado hoy, y tu período de gracia de 14 días también ha terminado. Para volver a publicar, generar y publicar, elige un plan ahora, desde 19 €/mes." }),
     cta: "Plan wählen & freischalten",
-    footnote: "Deine Daten und Assets bleiben gespeichert. Du verlierst nichts.",
+    footnote: tl({ de: "Deine Daten und Assets bleiben gespeichert. Du verlierst nichts.", en: "Your data and assets remain saved. You lose nothing.", es: "Tus datos y activos permanecen guardados. No pierdes nada." }),
   },
   en: {
     subject: "Your 14-day Enterprise trial has ended 🔒",
@@ -36,11 +37,11 @@ const trialExpiredCopy: Record<Lang, { subject: string; heading: string; intro: 
 
 const graceWarningCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
   de: {
-    subject: "⚠ Dein Trial ist abgelaufen — du hast noch 14 Tage Zugriff",
+    subject: tl({ de: "⚠ Dein Trial ist abgelaufen — du hast noch 14 Tage Zugriff", en: "⚠ Your trial has expired — you still have 14 days of access", es: "⚠ Tu prueba ha caducado — aún tienes 14 días de acceso" }),
     heading: "Trial vorbei — 14 Tage Grace-Period läuft",
-    intro: "Dein 14-Tage Enterprise-Trial ist abgelaufen. Wir geben dir 14 zusätzliche Tage, um in Ruhe einen Plan zu wählen. Danach wird dein Konto pausiert, bis du abonnierst. Deine Daten bleiben sicher.",
+    intro: tl({ de: "Dein 14-Tage Enterprise-Trial ist abgelaufen. Wir geben dir 14 zusätzliche Tage, um in Ruhe einen Plan zu wählen. Danach wird dein Konto pausiert, bis du abonnierst. Deine Daten bleiben sicher.", en: "Your 14-day Enterprise Trial has expired. We're giving you 14 additional days to choose a plan at your leisure. After that, your account will be paused until you subscribe. Your data remains secure.", es: "Tu prueba Enterprise de 14 días ha caducado. Te damos 14 días adicionales para elegir un plan con tranquilidad. Después de eso, tu cuenta se pausará hasta que te suscribas. Tus datos permanecen seguros." }),
     cta: "Jetzt Plan wählen",
-    footnote: "Tipp: Mit einem Plan-Abschluss innerhalb der nächsten 14 Tage vermeidest du jede Unterbrechung.",
+    footnote: tl({ de: "Tipp: Mit einem Plan-Abschluss innerhalb der nächsten 14 Tage vermeidest du jede Unterbrechung.", en: "Tip: By subscribing to a plan within the next 14 days, you avoid any interruption.", es: "Consejo: Al suscribirte a un plan dentro de los próximos 14 días, evitas cualquier interrupción." }),
   },
   en: {
     subject: "⚠ Your trial has ended — you have 14 days left to upgrade",
@@ -63,9 +64,9 @@ const countdownCopy: Record<Lang, (daysLeft: number) => { subject: string; headi
   de: (d) => ({
     subject: `Noch ${d} Tage in deinem Enterprise-Trial ⏳`,
     heading: `Noch ${d} Tage volle Power`,
-    intro: `Du hast noch ${d} Tage in deinem 14-Tage Enterprise-Trial — alle Premium-Features, Lip-Sync, 4K-Renders und Cross-Post Magic. Nutze die Zeit, um dein erstes Creator-Reel live zu schalten.`,
+    intro: tl({ de: `Du hast noch ${d} Tage in deinem 14-Tage Enterprise-Trial — alle Premium-Features, Lip-Sync, 4K-Renders und Cross-Post Magic. Nutze die Zeit, um dein erstes Creator-Reel live zu schalten.`, en: `You have ${d} days left in your 14-day Enterprise Trial — all premium features, lip-sync, 4K renders, and Cross-Post Magic. Use this time to launch your first creator reel live.`, es: `Te quedan ${d} días en tu prueba Enterprise de 14 días — todas las funciones premium, sincronización labial, renders 4K y Cross-Post Magic. Aprovecha este tiempo para lanzar tu primer reel de creador en vivo.` }),
     cta: "Studio öffnen",
-    footnote: "Du erhältst diese Erinnerung maximal alle 3 Tage — keine Spam-Mails versprochen.",
+    footnote: tl({ de: "Du erhältst diese Erinnerung maximal alle 3 Tage — keine Spam-Mails versprochen.", en: "You will receive this reminder at most every 3 days — no spam emails, promised.", es: "Recibirás este recordatorio como máximo cada 3 días — sin correos no deseados, prometido." }),
   }),
   en: (d) => ({
     subject: `${d} days left in your Enterprise trial ⏳`,
@@ -88,7 +89,7 @@ const finalDayCopy: Record<Lang, { subject: string; heading: string; intro: stri
   de: {
     subject: "⚠ Letzter Tag: Dein Enterprise-Trial endet morgen",
     heading: "Letzter Tag deines Trials",
-    intro: "Morgen endet dein 14-Tage Enterprise-Trial. Danach starten 14 zusätzliche Grace-Tage, bevor dein Konto pausiert wird. Sicher dir jetzt deinen Plan und vermeide jede Unterbrechung.",
+    intro: tl({ de: "Morgen endet dein 14-Tage Enterprise-Trial. Danach starten 14 zusätzliche Grace-Tage, bevor dein Konto pausiert wird. Sicher dir jetzt deinen Plan und vermeide jede Unterbrechung.", en: "Your 14-day Enterprise Trial ends tomorrow. After that, an additional 14 grace days will start before your account is paused. Secure your plan now and avoid any interruption.", es: "Tu prueba Enterprise de 14 días termina mañana. Después de eso, comenzarán 14 días de gracia adicionales antes de que tu cuenta se pause. Asegura tu plan ahora y evita cualquier interrupción." }),
     cta: "Plan jetzt sichern",
     footnote: "Du wirst diese Warnung nur einmal sehen.",
   },
@@ -111,11 +112,11 @@ const finalDayCopy: Record<Lang, { subject: string; heading: string; intro: stri
 // Pre-pause warning (1 day before account pause — bypass cap)
 const prePauseCopy: Record<Lang, { subject: string; heading: string; intro: string; cta: string; footnote: string }> = {
   de: {
-    subject: "⚠ Letzter Tag bevor dein Konto pausiert wird",
-    heading: "Morgen wird dein Konto pausiert",
-    intro: "Deine 14-Tage Grace-Period endet morgen. Wenn du bis dahin keinen Plan wählst, wird dein Konto pausiert. Deine Daten bleiben gespeichert, aber Renders, Posts und Lip-Sync sind dann blockiert.",
+    subject: tl({ de: "⚠ Letzter Tag bevor dein Konto pausiert wird", en: "⚠ Last day before your account is paused", es: "⚠ Último día antes de que tu cuenta sea pausada" }),
+    heading: tl({ de: "Morgen wird dein Konto pausiert", en: "Your account will be paused tomorrow", es: "Tu cuenta será pausada mañana" }),
+    intro: tl({ de: "Deine 14-Tage Grace-Period endet morgen. Wenn du bis dahin keinen Plan wählst, wird dein Konto pausiert. Deine Daten bleiben gespeichert, aber Renders, Posts und Lip-Sync sind dann blockiert.", en: "Your 14-day grace period ends tomorrow. If you don't choose a plan by then, your account will be paused. Your data will remain saved, but renders, posts, and lip-sync will be blocked.", es: "Tu período de gracia de 14 días termina mañana. Si no eliges un plan para entonces, tu cuenta será pausada. Tus datos permanecerán guardados, pero los renders, publicaciones y la sincronización labial serán bloqueados." }),
     cta: "Konto reaktivieren",
-    footnote: "Diese Warnung erhältst du nur einmal — wir möchten dich nicht überraschen.",
+    footnote: tl({ de: "Diese Warnung erhältst du nur einmal — wir möchten dich nicht überraschen.", en: "You will only receive this warning once — we don't want to surprise you.", es: "Solo recibirás esta advertencia una vez — no queremos sorprenderte." }),
   },
   en: {
     subject: "⚠ Final day before your account is paused",
@@ -164,7 +165,7 @@ const normalizeLang = (raw?: string | null): Lang => {
   return "en";
 };
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   if (isQaMockRequest(req)) {
@@ -395,4 +396,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+})(req)));

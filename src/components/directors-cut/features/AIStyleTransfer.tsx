@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -301,7 +302,7 @@ export function AIStyleTransfer({
             <div className="flex items-center gap-2 mb-2">
               <Palette className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs text-muted-foreground font-medium">Klassische Filter</span>
-              <span className="text-[10px] text-muted-foreground/60 ml-auto">Hover für Live-Vorschau</span>
+              <span className="text-[10px] text-muted-foreground/60 ml-auto">{tx({ de: "Hover für Live-Vorschau", en: "Hover for live preview", es: "Pasa el ratón para vista previa en vivo" })}</span>
             </div>
             {renderFilterGrid(basicFilters, 0)}
           </div>

@@ -28,7 +28,7 @@ export function AudioUpload({
     if (!file || disabled) return;
 
     if (!file.type.startsWith('audio/')) {
-      toast.error('Bitte nur Audiodateien hochladen');
+      toast.error(tx({ de: 'Bitte nur Audiodateien hochladen', en: 'Please upload audio files only', es: 'Por favor, sube solo archivos de audio' }));
       return;
     }
 

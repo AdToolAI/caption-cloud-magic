@@ -166,7 +166,7 @@ export default function StudioMode() {
     }
     const cleanScenes = scenes.filter((s) => s.prompt.trim().length > 0);
     if (cleanScenes.length === 0) {
-      toast.error('Mindestens eine Szene benötigt');
+      toast.error(tx({ de: 'Mindestens eine Szene benötigt', en: 'At least one scene required', es: 'Se requiere al menos una escena' }));
       return;
     }
     setCreating(true);
@@ -758,7 +758,7 @@ function StoryboardStep({
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold">Schnellstart mit kuratierten Szenen</h3>
+              <h3 className="text-sm font-semibold">{tx({ de: "Schnellstart mit kuratierten Szenen", en: "Quick start with curated scenes", es: "Inicio rápido con escenas seleccionadas" })}</h3>
               <p className="text-[11px] text-muted-foreground mt-0.5">
                 24+ ready-to-use Templates: Product Hero, Lifestyle, Talking Head, Establishing & mehr.
               </p>
@@ -783,7 +783,7 @@ function StoryboardStep({
                       onChange={(e) =>
                         updateScene(scene.id, { prompt: e.target.value })
                       }
-                      placeholder="Was passiert in dieser Szene? z. B. Held betritt langsam den Raum, Kamera fährt rückwärts, warmes Sonnenlicht durch Fenster…"
+                      placeholder={tx({ de: "Was passiert in dieser Szene? z. B. Held betritt langsam den Raum, Kamera fährt rückwärts, warmes Sonnenlicht durch Fenster…", en: "What happens in this scene? E.g., hero slowly enters the room, camera moves backward, warm sunlight through window…", es: "¿Qué sucede en esta escena? Por ejemplo, el héroe entra lentamente en la habitación, la cámara retrocede, luz solar cálida a través de la ventana…" })}
                       rows={3}
                       className="bg-background/60 resize-none text-sm"
                     />

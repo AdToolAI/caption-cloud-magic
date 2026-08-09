@@ -135,12 +135,12 @@ export function BugReporter() {
             </div>
 
             <div>
-              <Label htmlFor="bug-desc">Was ist passiert? *</Label>
+              <Label htmlFor="bug-desc">{tx({ de: "Was ist passiert? *", en: "What happened? *", es: "¿Qué pasó? *" })}</Label>
               <Textarea
                 id="bug-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Schritte, erwartetes Verhalten, was tatsächlich passiert ist..."
+                placeholder={tx({ de: "Schritte, erwartetes Verhalten, was tatsächlich passiert ist...", en: "Steps, expected behavior, what actually happened...", es: "Pasos, comportamiento esperado, lo que realmente sucedió..." })}
                 rows={5}
                 maxLength={2000}
               />

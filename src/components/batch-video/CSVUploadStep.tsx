@@ -51,7 +51,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
         if (data.length === 0) {
           toast({
             title: 'Leere CSV',
-            description: 'Die CSV-Datei enthält keine Daten.',
+            description: tx({ de: 'Die CSV-Datei enthält keine Daten.', en: 'The CSV file contains no data.', es: 'El archivo CSV no contiene datos.' }),
             variant: 'destructive'
           });
           return;
@@ -115,7 +115,7 @@ export function CSVUploadStep({ templateFields, onDataParsed }: CSVUploadStepPro
   return (
     <Card className="p-6 space-y-6">
       <div className="space-y-2">
-        <h3 className="text-lg font-semibold">CSV-Datei hochladen</h3>
+        <h3 className="text-lg font-semibold">{tx({ de: "CSV-Datei hochladen", en: "Upload CSV file", es: "Subir archivo CSV" })}</h3>
         <p className="text-sm text-muted-foreground">
           Lade eine CSV-Datei mit deinen Video-Daten hoch oder lade zuerst die Vorlage herunter.
         </p>

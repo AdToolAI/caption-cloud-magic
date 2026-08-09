@@ -846,7 +846,7 @@ export function UniversalVideoWizard() {
                 </h2>
                 <p className="text-muted-foreground">
                   {language === 'de' 
-                    ? 'Lade mindestens 4 Fotos deines Produkts hoch. Diese werden per KI in die passenden Szenen eingebettet.'
+                    ? tx({ de: 'Lade mindestens 4 Fotos deines Produkts hoch. Diese werden per KI in die passenden Szenen eingebettet.', en: 'Upload at least 4 photos of your product. These will be embedded into the appropriate scenes by AI.', es: 'Sube al menos 4 fotos de tu producto. Estas serán incrustadas por IA en las escenas apropiadas.' })
                     : language === 'es'
                     ? 'Sube al menos 4 fotos de tu producto. Serán integradas en las escenas por IA.'
                     : 'Upload at least 4 photos of your product. They will be AI-enhanced to fit each scene.'}

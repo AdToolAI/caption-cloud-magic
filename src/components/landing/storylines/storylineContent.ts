@@ -97,7 +97,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5500,
       copy: S(
         ["Schritt 01 · Brief", "Step 01 · Brief", "Paso 01 · Brief"],
-        ["Vom Satz zum Charakter-Slot.", "From a sentence to a character slot.", "De una frase al slot de personaje."],
+        [tx({ de: "Vom Satz zum Charakter-Slot.", en: "From sentence to character slot.", es: "De la frase al espacio del personaje." }), "From a sentence to a character slot.", "De una frase al slot de personaje."],
         [
           tx({ de: "Beschreibe deinen Charakter in einem Satz — Alter, Ausstrahlung, Herkunft, Vibe. Cast & World zerlegt den Brief in strukturierte Tokens und legt einen leeren Charakter-Slot an.", en: "Describe your character in one sentence — age, charisma, origin, vibe. Cast & World breaks the brief into structured tokens and creates an empty character slot.", es: "Describe a tu personaje en una frase — edad, carisma, origen, vibra. Cast & World desglosa el brief en tokens estructurados y crea un espacio de personaje vacío." }),
           "Describe your character in one sentence — age, vibe, origin, mood. Cast & World parses the brief into structured tokens and opens an empty character slot.",
@@ -153,7 +153,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       durationMs: 5500,
       copy: S(
         ["Schritt 05 · Voice Binding", "Step 05 · Voice binding", "Paso 05 · Vinculación de voz"],
-        ["Stimme fest an den Charakter geknüpft.", "Voice bound to the character.", "Voz vinculada al personaje."],
+        [tx({ de: "Stimme fest an den Charakter geknüpft.", en: "Voice firmly linked to the character.", es: "Voz firmemente ligada al personaje." }), "Voice bound to the character.", "Voz vinculada al personaje."],
         [
           tx({ de: "Klone die Stimme einmal via ElevenLabs und binde sie an den Charakter. Ab jetzt spricht Aurora in Motion, AI-Video und Voice Studio automatisch in ihrer eigenen Stimme.", en: "Clone the voice once via ElevenLabs and link it to the character. From now on, Aurora will automatically speak in her own voice in Motion, AI-Video, and Voice Studio.", es: "Clona la voz una vez a través de ElevenLabs y vincúlala al personaje. A partir de ahora, Aurora hablará automáticamente con su propia voz en Motion, AI-Video y Voice Studio." }),
           "Clone the voice once via ElevenLabs and bind it to the character. From now on Aurora speaks in Motion, AI-Video and Voice Studio in her own voice, automatically.",
@@ -542,7 +542,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       imageSrc: voiceS3,
       copy: S(
         ["Charakter-Binding", "Character binding", "Vinculación al personaje"],
-        ["Deine Stimme trifft deinen Cast.", "Your voice meets your cast.", "Tu voz se une a tu cast."],
+        [tx({ de: "Deine Stimme trifft deinen Cast.", en: "Your voice meets your cast.", es: "Tu voz se une a tu elenco." }), "Your voice meets your cast.", "Tu voz se une a tu cast."],
         [
           tx({ de: "Weise geklonte Stimmen einem Cast & World-Charakter zu. Ab jetzt spricht dieser Charakter in jedem Studio automatisch in dieser Stimme.", en: "Assign cloned voices to a Cast & World character. From now on, this character will automatically speak in that voice in every studio.", es: "Asigna voces clonadas a un personaje de Cast & World. A partir de ahora, este personaje hablará automáticamente con esa voz en cada estudio." }),
           "Assign cloned voices to a Cast & World character. From now on that character speaks in that voice in every studio.",
@@ -581,7 +581,7 @@ export const STORYLINES: Record<StudioKey, StorylineSlide[]> = {
       imageSrc: voiceS6,
       copy: S(
         ["Multi-Sprecher", "Multi-speaker", "Multi-voz"],
-        ["Vier Stimmen, ein Skript, eine Session.", "Four voices, one script, one session.", "Cuatro voces, un guion, una sesión."],
+        [tx({ de: "Vier Stimmen, ein Skript, eine Session.", en: "Four voices, one script, one session.", es: "Cuatro voces, un guion, una sesión." }), "Four voices, one script, one session.", "Cuatro voces, un guion, una sesión."],
         [
           tx({ de: "Assign per-line: Sprecher 1, 2, 3, 4. Voice Studio rendert alle in einem Rutsch und liefert eine saubere, gemischte Dialogdatei — bereit für Motion Studio.", en: "Assign per-line: Speaker 1, 2, 3, 4. Voice Studio renders all in one go and delivers a clean, mixed dialogue file — ready for Motion Studio.", es: "Asignar por línea: Orador 1, 2, 3, 4. Voice Studio renderiza todo de una vez y entrega un archivo de diálogo limpio y mezclado — listo para Motion Studio." }),
           "Assign per line: speaker 1, 2, 3, 4. Voice Studio renders them all in one pass and delivers a clean, mixed dialogue file — ready for Motion Studio.",

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SceneTransitionInlineEditor — flat, always-visible transition editor for the
  * currently selected scene's outgoing transition. Mirrors the popover UI but
@@ -26,7 +27,7 @@ const ALL_TRANSITIONS: TransitionStyle[] = [
 const MIN_PALETTE: TransitionStyle[] = ['none', 'crossfade'];
 
 const L10N = {
-  de: { title: 'Übergang zur nächsten Szene', duration: 'Dauer', more: 'Mehr Übergänge', less: 'Weniger Übergänge' },
+  de: { title: tx({ de: 'Übergang zur nächsten Szene', en: 'Transition to next scene', es: 'Transición a la siguiente escena' }), duration: 'Dauer', more: 'Mehr Übergänge', less: 'Weniger Übergänge' },
   en: { title: 'Transition to next scene', duration: 'Duration', more: 'More transitions', less: 'Fewer transitions' },
   es: { title: 'Transición a la siguiente escena', duration: 'Duración', more: 'Más transiciones', less: 'Menos transiciones' },
 } as const;

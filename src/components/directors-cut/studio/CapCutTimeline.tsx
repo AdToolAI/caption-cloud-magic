@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack } from '@/types/timeline';
@@ -809,7 +810,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  title={t('dc.addNewScene') || 'Szene hinzufügen'}
+                  title={t('dc.addNewScene') || tx({ de: 'Szene hinzufügen', en: 'Add scene', es: 'Añadir escena' })}
                   className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-[#F5C76A]/15 text-[#F5C76A] hover:bg-[#F5C76A]/25 border border-[#F5C76A]/40 transition-colors"
                 >
                   <PlusCircle className="h-3 w-3" />

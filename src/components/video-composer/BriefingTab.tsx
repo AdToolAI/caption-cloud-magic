@@ -944,7 +944,7 @@ export default function BriefingTab({
                                 : `Shot Director: ${styleLabel} defaults applied`,
                           description:
                             lang2 === 'de'
-                              ? `Auf ${emptyScenes.length} Szene(n) ohne Kamera-Auswahl. Pro Szene überschreibbar.`
+                              ? tx({ de: `Auf ${emptyScenes.length} Szene(n) ohne Kamera-Auswahl. Pro Szene überschreibbar.`, en: `On ${emptyScenes.length} scene(s) without camera selection. Overwritable per scene.`, es: `En ${emptyScenes.length} escena(s) sin selección de cámara. Se puede sobrescribir por escena.` })
                               : lang2 === 'es'
                                 ? `En ${emptyScenes.length} escena(s) sin selección de cámara. Editable por escena.`
                                 : `Applied to ${emptyScenes.length} scene(s) with no camera selection. Editable per scene.`,

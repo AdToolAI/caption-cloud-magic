@@ -32,7 +32,7 @@ import { getTonalityVoice } from '@/config/adTonalityVoiceMap';
 import type { AdCampaignMeta } from '@/types/video-composer';
 import type { AdTonalityId } from '@/config/adTonalityProfiles';
 import AdCampaignPerformance from './AdCampaignPerformance';
-import { useTx } from '@/lib/i18nText';
+import { tx, useTx } from '@/lib/i18nText';
 
 interface CampaignChild {
   id: string;
@@ -213,7 +213,7 @@ export default function AdCampaignTree({
 
       toast({
         title: 'Voiceover erstellt',
-        description: `Neue VO (${voiceCfg.voiceLabel}) für „${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`,
+        description: tx({ de: `Neue VO (${voiceCfg.voiceLabel}) für „${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`, en: `New VO (${voiceCfg.voiceLabel}) for "${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".`, es: `Nueva VO (${voiceCfg.voiceLabel}) para "${CUTDOWN_LABEL[child.cutdown_type ?? ''] ?? child.cutdown_type}".` }),
       });
     } catch (err: any) {
       console.error('[AdCampaignTree] re-synth VO failed:', err);

@@ -31,7 +31,7 @@ const CONTENT_TYPE_PLACEHOLDERS: Record<string, string> = {
   reel: tx({ de: 'Was ist deine Hook-Idee? z.B. "3 Fehler, die jeder beim Kochen macht"', en: 'What\'s your hook idea? e.g. "3 mistakes everyone makes when cooking"', es: '¿Cuál es tu idea de gancho? p. ej. "3 errores que todo el mundo comete al cocinar"' }),
   tutorial: 'Was soll das Tutorial zeigen? z.B. "Wie man in 5 Minuten professionelle Fotos macht"',
   testimonial: 'Beschreibe die Erfolgsgeschichte... z.B. "Wie ich 10kg in 3 Monaten abgenommen habe"',
-  news: 'Was ist die Breaking News? z.B. "Neue KI-Technologie revolutioniert Marketing"'
+  news: tx({ de: 'Was ist die Breaking News? z.B. "Neue KI-Technologie revolutioniert Marketing"', en: 'What\'s the breaking news? e.g. "New AI technology revolutionizes marketing"', es: '¿Cuál es la noticia de última hora? p. ej. "Nueva tecnología de IA revoluciona el marketing"' })
 };
 
 const CONTENT_TYPE_TONE_PRESETS: Record<string, string[]> = {

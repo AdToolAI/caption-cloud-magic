@@ -41,7 +41,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
     if (variations.length <= 2) {
       toast({
         title: "Mindestanzahl erreicht",
-        description: "Du benötigst mindestens 2 Varianten für A/B-Testing.",
+        description: tx({ de: "Du benötigst mindestens 2 Varianten für A/B-Testing.", en: "You need at least 2 variants for A/B testing.", es: "Necesitas al menos 2 variantes para pruebas A/B." }),
         variant: "destructive",
       });
       return;

@@ -250,7 +250,7 @@ function CharacterPicker({
           className="w-full justify-start gap-2 h-9 border-dashed"
         >
           <Plus className="h-3.5 w-3.5" />
-          {language === 'de' ? 'Charakter wählen' : language === 'es' ? 'Elegir personaje' : 'Pick character'}
+          {language === 'de' ? tx({ de: 'Charakter wählen', en: 'Select character', es: 'Seleccionar personaje' }) : language === 'es' ? 'Elegir personaje' : 'Pick character'}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2 max-h-[300px] overflow-y-auto" align="start">

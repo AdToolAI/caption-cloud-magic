@@ -92,7 +92,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(`Charakter speichern fehlgeschlagen: ${error.message}`);
+        toast.error(tx({ de: `Charakter speichern fehlgeschlagen: ${error.message}`, en: `Failed to save character: ${error.message}`, es: `Error al guardar el personaje: ${error.message}` }));
         return null;
       }
       const created = data as MotionStudioCharacter;
@@ -134,7 +134,7 @@ export function useMotionStudioLibrary() {
       return false;
     }
     setCharacters((prev) => prev.filter((c) => c.id !== id));
-    toast.success('Charakter gelöscht');
+    toast.success(tx({ de: 'Charakter gelöscht', en: 'Character deleted', es: 'Personaje eliminado' }));
     return true;
   }, []);
 
@@ -155,7 +155,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(`Location speichern fehlgeschlagen: ${error.message}`);
+        toast.error(tx({ de: `Location speichern fehlgeschlagen: ${error.message}`, en: `Failed to save location: ${error.message}`, es: `Error al guardar la ubicación: ${error.message}` }));
         return null;
       }
       const created = data as MotionStudioLocation;
@@ -308,7 +308,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(`Variante speichern fehlgeschlagen: ${error.message}`);
+        toast.error(tx({ de: `Variante speichern fehlgeschlagen: ${error.message}`, en: `Failed to save variant: ${error.message}`, es: `Error al guardar la variante: ${error.message}` }));
         return null;
       }
       return data as CharacterVariant;
@@ -391,7 +391,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(`Variante speichern fehlgeschlagen: ${error.message}`);
+        toast.error(tx({ de: `Variante speichern fehlgeschlagen: ${error.message}`, en: `Failed to save variant: ${error.message}`, es: `Error al guardar la variante: ${error.message}` }));
         return null;
       }
       return data as LocationVariant;
@@ -469,7 +469,7 @@ export function useMotionStudioLibrary() {
         .select()
         .single();
       if (error) {
-        toast.error(`Snippet speichern fehlgeschlagen: ${error.message}`);
+        toast.error(tx({ de: `Snippet speichern fehlgeschlagen: ${error.message}`, en: `Failed to save snippet: ${error.message}`, es: `Error al guardar el snippet: ${error.message}` }));
         return null;
       }
       toast.success(`Snippet „${data.name}" gespeichert`);

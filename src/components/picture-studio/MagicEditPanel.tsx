@@ -148,7 +148,7 @@ export function MagicEditPanel() {
   // ── Submit ──
   const handleSubmit = async () => {
     if (!sourceFile && !sourceUrl) {
-      toast.error('Bitte Bild hochladen');
+      toast.error(tx({ de: 'Bitte Bild hochladen', en: 'Please upload image', es: 'Por favor, sube una imagen' }));
       return;
     }
     if (!prompt.trim()) {
@@ -255,7 +255,7 @@ export function MagicEditPanel() {
             >
               <CardContent className="flex flex-col items-center justify-center py-16 px-6 text-center">
                 <Upload className="h-12 w-12 text-muted-foreground mb-3" />
-                <p className="font-semibold mb-1">Bild hochladen</p>
+                <p className="font-semibold mb-1">{tx({ de: "Bild hochladen", en: "Upload image", es: "Subir imagen" })}</p>
                 <p className="text-sm text-muted-foreground">JPG, PNG oder WebP. Drag & Drop unterstützt.</p>
                 <input
                   ref={fileInputRef}

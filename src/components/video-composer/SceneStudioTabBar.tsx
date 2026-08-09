@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 /**
  * SceneStudioTabBar — sticky pill nav inside an expanded SceneCard.
  *
@@ -134,8 +135,8 @@ const SECTION_TITLES = {
   },
   de: {
     story: { title: 'Story & Engine', sub: 'Skript, Dauer und welches KI-Modell den Clip rendert' },
-    cast: { title: 'Cast', sub: 'Charaktere in dieser Szene + Face-Lock-Anker' },
-    performance: { title: 'Performance', sub: 'Mimik, Gestik, Blick und Energy pro Charakter' },
+    cast: { title: 'Cast', sub: tx({ de: 'Charaktere in dieser Szene + Face-Lock-Anker', en: 'Characters in this scene + face-lock anchor', es: 'Personajes en esta escena + anclaje de bloqueo facial' }) },
+    performance: { title: 'Performance', sub: tx({ de: 'Mimik, Gestik, Blick und Energy pro Charakter', en: 'Facial expressions, gestures, gaze and energy per character', es: 'Expresiones faciales, gestos, mirada y energía por personaje' }) },
     audio: { title: 'Audio & Voiceover', sub: 'Skript-Studio, Lip-Sync und Director Score' },
     look: { title: 'Look & Bildsprache', sub: 'One-Click Cinematic Styles + Referenzbild' },
     advanced: { title: 'Erweitert', sub: 'Final-Prompt, Negative-Prompt und Engine-Vergleich' },

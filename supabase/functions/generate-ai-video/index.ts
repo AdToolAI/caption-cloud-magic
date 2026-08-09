@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { withTimeout, isTimeoutError } from "../_shared/timeout.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,7 +28,7 @@ interface GenerateRequest {
   imageUrl?: string; // Optional: For Image-to-Video mode
 }
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders }
 );
@@ -281,7 +282,7 @@ serve(async (req) => {
       if (isTimeoutError(replicateError)) {
         return new Response(
           JSON.stringify({
-            error: "Der Video-Anbieter hat nicht rechtzeitig geantwortet. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es erneut.",
+            error: tl({ de: "Der Video-Anbieter hat nicht rechtzeitig geantwortet. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es erneut.", en: "The video provider did not respond in time. Your credits have been automatically refunded. Please try again.", es: "El proveedor de video no respondió a tiempo. Tus créditos han sido reembolsados automáticamente. Por favor, inténtalo de nuevo." }),
             code: "REPLICATE_TIMEOUT"
           }),
           { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -292,7 +293,7 @@ serve(async (req) => {
       if (replicateError?.response?.status === 502) {
         return new Response(
           JSON.stringify({
-            error: "Sora 2 Pro ist aktuell nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es später erneut oder nutze Sora 2 Standard.",
+            error: tl({ de: "Sora 2 Pro ist aktuell nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es später erneut oder nutze Sora 2 Standard.", en: "Sora 2 Pro is currently unavailable. Your credits have been automatically refunded. Please try again later or use Sora 2 Standard.", es: "Sora 2 Pro no está disponible actualmente. Tus créditos han sido reembolsados automáticamente. Por favor, inténtalo de nuevo más tarde o usa Sora 2 Standard." }),
             code: "SORA_PRO_UNAVAILABLE"
           }),
           { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -304,7 +305,7 @@ serve(async (req) => {
         const retryAfter = replicateError?.response?.headers?.get?.('retry-after') || '60';
         return new Response(
           JSON.stringify({
-            error: `Replicate Rate Limit erreicht. Deine Credits wurden zurückerstattet. Bitte warte ${retryAfter} Sekunden und versuche es erneut.`,
+            error: tl({ de: `Replicate Rate Limit erreicht. Deine Credits wurden zurückerstattet. Bitte warte ${retryAfter} Sekunden und versuche es erneut.`, en: `Replicate rate limit reached. Your credits have been refunded. Please wait ${retryAfter} seconds and try again.`, es: `Límite de tasa de replicación alcanzado. Tus créditos han sido reembolsados. Por favor, espera ${retryAfter} segundos e inténtalo de nuevo.` }),
             code: "REPLICATE_RATE_LIMIT",
             retryAfter: parseInt(retryAfter, 10)
           }),
@@ -315,7 +316,7 @@ serve(async (req) => {
       // Handle other Replicate errors
       return new Response(
         JSON.stringify({
-          error: "Der Video-Anbieter hat einen Fehler gemeldet. Deine Credits wurden gutgeschrieben. Bitte versuche es später erneut.",
+          error: tl({ de: "Der Video-Anbieter hat einen Fehler gemeldet. Deine Credits wurden gutgeschrieben. Bitte versuche es später erneut.", en: "The video provider reported an error. Your credits have been credited. Please try again later.", es: "El proveedor de video informó un error. Tus créditos han sido abonados. Por favor, inténtalo de nuevo más tarde." }),
           code: "REPLICATE_ERROR"
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -343,7 +344,7 @@ serve(async (req) => {
     if (error?.response?.status === 422) {
       return new Response(
         JSON.stringify({
-          error: "Der Videoanbieter hat die Eingabe abgelehnt. Bitte versuchen Sie es mit anderen Einstellungen.",
+          error: tl({ de: "Der Videoanbieter hat die Eingabe abgelehnt. Bitte versuchen Sie es mit anderen Einstellungen.", en: "The video provider rejected the input. Please try with different settings.", es: "El proveedor de video rechazó la entrada. Por favor, intenta con otras configuraciones." }),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
@@ -354,4 +355,4 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
-});
+})(req)));

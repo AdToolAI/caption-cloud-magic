@@ -230,7 +230,7 @@ export function ShotDirectorPanel({ value, onChange, basePrompt = '' }: Props) {
           >
             <div className="rounded-md bg-background/60 border border-primary/20 p-3">
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {lang === 'de' ? 'Vorschau (Englisch für maximale Modell-Qualität)' : lang === 'es' ? 'Vista previa (en inglés para máxima calidad)' : 'Preview (English for max model quality)'}
+                {lang === 'de' ? tx({ de: 'Vorschau (Englisch für maximale Modell-Qualität)', en: 'Preview (English for maximum model quality)', es: 'Vista previa (inglés para máxima calidad del modelo)' }) : lang === 'es' ? 'Vista previa (en inglés para máxima calidad)' : 'Preview (English for max model quality)'}
               </Label>
               <p className="mt-2 text-xs leading-relaxed text-foreground/90 font-mono">
                 {finalPrompt || suffix}

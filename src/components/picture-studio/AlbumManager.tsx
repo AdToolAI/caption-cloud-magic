@@ -188,7 +188,7 @@ export function AlbumManager() {
       await supabase.from('studio_images').delete().eq('id', image.id);
       setUnsortedImages(prev => prev.filter(img => img.id !== image.id));
       setAlbumImages(prev => prev.filter(img => img.id !== image.id));
-      toast.success("Bild gelöscht 🗑️");
+      toast.success(tx({ de: "Bild gelöscht 🗑️", en: "Image deleted 🗑️", es: "Imagen eliminada 🗑️" }));
       loadAlbums();
     } catch (err) {
       console.error(err);
@@ -316,7 +316,7 @@ export function AlbumManager() {
         <div className="text-center py-16 text-muted-foreground">
           <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p>{tx({ de: "Noch keine Bilder oder Alben vorhanden", en: "No images or albums yet", es: "Aún no hay imágenes o álbumes" })}</p>
-          <p className="text-sm mt-1">Generiere dein erstes Bild im "Generieren" Tab!</p>
+          <p className="text-sm mt-1">{tx({ de: "Generiere dein erstes Bild im \"Generieren\" Tab!", en: "Generate your first image in the \"Generate\" tab!", es: "¡Genera tu primera imagen en la pestaña \"Generar\"!" })}</p>
         </div>
       )}
 

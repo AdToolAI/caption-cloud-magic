@@ -143,9 +143,9 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
     } catch (error) {
       console.error('Upload error:', error);
       if (error instanceof Error) {
-        toast.error(`Bild-Upload fehlgeschlagen: ${error.message}`);
+        toast.error(tx({ de: `Bild-Upload fehlgeschlagen: ${error.message}`, en: `Image upload failed: ${error.message}`, es: `Error al subir la imagen: ${error.message}` }));
       } else {
-        toast.error('Bild-Upload fehlgeschlagen');
+        toast.error(tx({ de: 'Bild-Upload fehlgeschlagen', en: 'Image upload failed', es: 'Error al subir la imagen' }));
       }
     } finally {
       setUploadingImages(prev => {

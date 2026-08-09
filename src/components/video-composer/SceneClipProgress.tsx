@@ -106,12 +106,12 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       });
       if (error) throw error;
       toast({
-        title: '⚡ Schnell-Vorschau gestartet',
+        title: tx({ de: '⚡ Schnell-Vorschau gestartet', en: '⚡ Quick preview started', es: '⚡ Vista previa rápida iniciada' }),
         description: '~10 Sekunden bis zum 3-Sekunden-Proxy.',
       });
     } catch (err) {
       toast({
-        title: 'Vorschau fehlgeschlagen',
+        title: tx({ de: 'Vorschau fehlgeschlagen', en: 'Preview failed', es: 'Error en la vista previa' }),
         description: err instanceof Error ? err.message : String(err),
         variant: 'destructive',
       });
@@ -335,7 +335,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           {isDialog && dialogShotsState?.status === 'done' && typeof scene.continuityDriftScore === 'number' && scene.continuityDriftScore > 0.35 && (
             <div
               className="absolute bottom-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 text-[9px] font-semibold flex items-center gap-1 shadow"
-              title={`Continuity-Drift ${scene.continuityDriftScore.toFixed(2)} — Charakter-Identität weicht vom Anchor ab. Re-Render empfohlen.`}
+              title={tx({ de: `Continuity-Drift ${scene.continuityDriftScore.toFixed(2)} — Charakter-Identität weicht vom Anchor ab. Re-Render empfohlen.`, en: `Continuity drift ${scene.continuityDriftScore.toFixed(2)} — character identity deviates from anchor. Re-render recommended.`, es: `Desviación de continuidad ${scene.continuityDriftScore.toFixed(2)} — la identidad del personaje se desvía del ancla. Se recomienda volver a renderizar.` })}
             >
               ⚠ Drift {scene.continuityDriftScore.toFixed(2)}
             </div>

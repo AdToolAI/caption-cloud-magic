@@ -119,7 +119,7 @@ export function AISuperuserAdmin() {
     try {
       const { error } = await supabase.from('bug_reports').insert({
         title: `[KI Superuser] ${run.scenario_name} fehlgeschlagen`,
-        description: `Test-Szenario "${run.scenario_name}" ist fehlgeschlagen.\n\nHTTP: ${run.http_status}\nLatenz: ${run.latency_ms}ms\n\nError: ${run.error_message || 'unknown'}\n\nRequest:\n${JSON.stringify(run.full_request_json, null, 2)}\n\nResponse:\n${JSON.stringify(run.full_response_json, null, 2)}`,
+        description: tx({ de: `Test-Szenario "${run.scenario_name}" ist fehlgeschlagen.\\n\\nHTTP: ${run.http_status}\\nLatenz: ${run.latency_ms}ms\\n\\nError: ${run.error_message || 'unknown'}\\n\\nRequest:\\n${JSON.stringify(run.full_request_json, null, 2)}\\n\\nResponse:\\n${JSON.stringify(run.full_response_json, null, 2)}`, en: `Test scenario "${run.scenario_name}" failed.\\n\\nHTTP: ${run.http_status}\\nLatency: ${run.latency_ms}ms\\n\\nError: ${run.error_message || 'unknown'}\\n\\nRequest:\\n${JSON.stringify(run.full_request_json, null, 2)}\\n\\nResponse:\\n${JSON.stringify(run.full_response_json, null, 2)}`, es: `El escenario de prueba "${run.scenario_name}" falló.\\n\\nHTTP: ${run.http_status}\\nLatencia: ${run.latency_ms}ms\\n\\nError: ${run.error_message || 'unknown'}\\n\\nSolicitud:\\n${JSON.stringify(run.full_request_json, null, 2)}\\n\\nRespuesta:\\n${JSON.stringify(run.full_response_json, null, 2)}` }),
         severity: run.status === 'fail' ? 'high' : 'medium',
         status: 'open',
         route: '/admin (KI Superuser)',
@@ -168,7 +168,7 @@ export function AISuperuserAdmin() {
         body: { mode, triggeredBy: 'manual' },
       });
       if (error) throw error;
-      toast.success(`Tests abgeschlossen: ${data.summary?.passed || 0} bestanden, ${data.summary?.failed || 0} fehlgeschlagen`);
+      toast.success(tx({ de: `Tests abgeschlossen: ${data.summary?.passed || 0} bestanden, ${data.summary?.failed || 0} fehlgeschlagen`, en: `Tests completed: ${data.summary?.passed || 0} passed, ${data.summary?.failed || 0} failed`, es: `Pruebas completadas: ${data.summary?.passed || 0} aprobadas, ${data.summary?.failed || 0} fallidas` }));
       await fetchData();
     } catch (err) {
       toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`);
@@ -424,7 +424,7 @@ export function AISuperuserAdmin() {
                 <TableHead>Szenario</TableHead>
                 <TableHead>Letzter Run</TableHead>
                 <TableHead>Pass-Rate</TableHead>
-                <TableHead title="Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal.">Latenz</TableHead>
+                <TableHead title={tx({ de: "Echte Edge-Function-Latenz inkl. KI-Modell-Antwortzeit. 5–10 s sind bei Bild-/Multi-Step-Generierung normal.", en: "True Edge Function latency including AI model response time. 5–10s are normal for image/multi-step generation.", es: "Latencia real de Edge Function, incluido el tiempo de respuesta del modelo de IA. 5–10 s son normales para la generación de imágenes/varios pasos." })}>Latenz</TableHead>
                 <TableHead>Runs</TableHead>
                 <TableHead></TableHead>
               </TableRow>

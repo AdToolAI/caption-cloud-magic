@@ -51,7 +51,7 @@ export const PICTURE_MODELS: Record<QualityTier, PictureModelCapability> = {
     model: 'Imagen 4 Ultra',
     cost: 0.08,
     modeQuality: { create: 4, transform: 1, restyle: 2 },
-    bestFor: ['Hochauflösende Text→Bild Szenen', 'Werbung', 'Produkt-Hero'],
+    bestFor: [tx({ de: 'Hochauflösende Text→Bild Szenen', en: 'High-resolution Text→Image scenes', es: 'Escenas de texto a imagen de alta resolución' }), 'Werbung', 'Produkt-Hero'],
     promptStyleHint: 'Verbose photographic prompts work best. Imagen 4 is weak at preserving complex i2i compositions — use Nano Banana 2 instead.',
   },
   ultra: {
@@ -72,7 +72,7 @@ export const PICTURE_MODES: Record<PictureMode, {
 }> = {
   create: {
     label: 'Neues Bild',
-    description: 'Text → Bild. Generiere komplett neu aus deinem Prompt.',
+    description: tx({ de: 'Text → Bild. Generiere komplett neu aus deinem Prompt.', en: 'Text → Image. Generate completely new from your prompt.', es: 'Texto → Imagen. Genera completamente nuevo a partir de tu prompt.' }),
     needsReference: false,
   },
   transform: {

@@ -69,7 +69,7 @@ export function useHybridExtend() {
             return null;
           }
           if (!params.targetSceneId) {
-            toast.error('Bridge benötigt eine Ziel-Szene.');
+            toast.error(tx({ de: 'Bridge benötigt eine Ziel-Szene.', en: 'Bridge requires a target scene.', es: 'El puente requiere una escena de destino.' }));
             return null;
           }
         }
@@ -81,7 +81,7 @@ export function useHybridExtend() {
 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        if (!data?.newSceneId) throw new Error('Keine neue Szene zurückgegeben');
+        if (!data?.newSceneId) throw new Error(tx({ de: 'Keine neue Szene zurückgegeben', en: 'No new scene returned', es: 'No se devolvió ninguna escena nueva' }));
 
         const successMsg =
           params.mode === 'forward'

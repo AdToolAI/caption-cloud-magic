@@ -131,7 +131,7 @@ const BrandKit = () => {
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "Fehler",
-        description: "Datei muss kleiner als 5MB sein",
+        description: tx({ de: "Datei muss kleiner als 5MB sein", en: "File must be smaller than 5MB", es: "El archivo debe ser menor de 5MB" }),
         variant: "destructive"
       });
       return;

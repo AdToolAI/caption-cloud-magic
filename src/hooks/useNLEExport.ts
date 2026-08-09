@@ -144,10 +144,10 @@ export function useNLEExport(projectId?: string) {
           body: { projectId, fcpxmlContent, apply: false },
         });
         if (error) throw new Error(error.message);
-        if (!data?.success) throw new Error(data?.error || 'Import-Vorschau fehlgeschlagen');
+        if (!data?.success) throw new Error(data?.error || tx({ de: 'Import-Vorschau fehlgeschlagen', en: 'Import preview failed', es: 'Error en la vista previa de importación' }));
         return data;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Import-Vorschau fehlgeschlagen';
+        const msg = err instanceof Error ? err.message : tx({ de: 'Import-Vorschau fehlgeschlagen', en: 'Import preview failed', es: 'Error en la vista previa de importación' });
         toast.error(msg);
         return null;
       }

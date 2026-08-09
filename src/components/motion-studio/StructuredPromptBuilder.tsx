@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 // Block K-1 — Structured Prompt Builder
 //
 // Slot-based prompt UI that complements the free-text editor. Users can
@@ -373,7 +374,7 @@ export default function StructuredPromptBuilder({
               variant="ghost"
               className="h-6 px-2 text-[10px] gap-1"
               onClick={onInspireMe}
-              title={t(language, 'Würfle eine Szene', 'Roll a scene', 'Lanza una escena')}
+              title={t(language, tx({ de: 'Würfle eine Szene', en: 'Roll a scene', es: 'Generar una escena' }), 'Roll a scene', 'Lanza una escena')}
             >
               <Dices className="h-3 w-3" />
             </Button>

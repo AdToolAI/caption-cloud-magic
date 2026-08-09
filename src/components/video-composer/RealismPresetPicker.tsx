@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,7 +21,7 @@ const STRINGS = {
   trigger: 'Realismus',
   none: 'Kein Preset',
   noneDesc: 'Kein Realismus-Preset – Scene-Director arbeitet ohne Voreinstellung.',
-  applyAll: 'Auf alle Szenen anwenden',
+  applyAll: tx({ de: 'Auf alle Szenen anwenden', en: 'Apply to all scenes', es: 'Aplicar a todas las escenas' }),
 };
 
 export function RealismPresetPicker({ value, onChange, onApplyToAll, className }: Props) {

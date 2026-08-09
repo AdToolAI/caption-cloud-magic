@@ -25,7 +25,7 @@ const labels = {
     title: 'Charaktere (optional)',
     subtitle:
       tx({ de: 'Hilft der KI, Personen über mehrere Szenen hinweg ähnlich aussehen zu lassen — exakte Gesichts-Identität ist mit Text-zu-Video technisch nicht möglich.', en: 'Helps the AI make people look similar across multiple scenes — exact facial identity is not technically possible with text-to-video.', es: 'Ayuda a la IA a que las personas se parezcan en varias escenas; la identidad facial exacta no es técnicamente posible con texto a vídeo.' }),
-    add: 'Charakter hinzufügen',
+    add: tx({ de: 'Charakter hinzufügen', en: 'Add character', es: 'Añadir personaje' }),
     pickFromLibrary: 'Aus Avatar-Bibliothek wählen',
     pickerTitle: 'Avatar als Charakter verknüpfen',
     pickerDesc:
@@ -57,7 +57,7 @@ const labels = {
     freqBalanced: 'Ausgewogen',
     freqBalancedHint: '40–60% der Szenen (Standard)',
     freqLead: 'Hauptrolle',
-    freqLeadHint: 'In fast jeder Szene präsent',
+    freqLeadHint: tx({ de: 'In fast jeder Szene präsent', en: 'Present in almost every scene', es: 'Presente en casi todas las escenas' }),
   },
   en: {
     title: 'Characters (optional)',

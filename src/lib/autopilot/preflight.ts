@@ -46,10 +46,10 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
   const findings: PreflightFinding[] = [];
   const id = scene.id;
 
-  if (!scene.subject?.trim()) findings.push(block('scene_no_subject', 'Szene hat kein Motiv.', id));
-  if (!scene.action?.trim()) findings.push(block('scene_no_action', 'Szene hat keine Handlung.', id));
+  if (!scene.subject?.trim()) findings.push(block('scene_no_subject', tx({ de: 'Szene hat kein Motiv.', en: 'Scene has no subject.', es: 'La escena no tiene sujeto.' }), id));
+  if (!scene.action?.trim()) findings.push(block('scene_no_action', tx({ de: 'Szene hat keine Handlung.', en: 'Scene has no action.', es: 'La escena no tiene acción.' }), id));
   if (!scene.environment?.trim()) {
-    findings.push(block('scene_no_environment', 'Szene hat keinen Ort.', id));
+    findings.push(block('scene_no_environment', tx({ de: 'Szene hat keinen Ort.', en: 'Scene has no location.', es: 'La escena no tiene ubicación.' }), id));
   }
 
   const limits = ENGINE_DURATION_LIMITS[scene.engine ?? ''] ?? DEFAULT_LIMITS;
@@ -57,7 +57,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     findings.push(
       block(
         'scene_too_short',
-        `Szene ist ${scene.durationSeconds}s — das Modell braucht mindestens ${limits.min}s.`,
+        tx({ de: `Szene ist ${scene.durationSeconds}s — das Modell braucht mindestens ${limits.min}s.`, en: `Scene is ${scene.durationSeconds}s — the model needs at least ${limits.min}s.`, es: `La escena dura ${scene.durationSeconds}s — el modelo necesita al menos ${limits.min}s.` }),
         id,
       ),
     );
@@ -66,7 +66,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     findings.push(
       block(
         'scene_too_long',
-        `Szene ist ${scene.durationSeconds}s — das Modell erlaubt maximal ${limits.max}s.`,
+        tx({ de: `Szene ist ${scene.durationSeconds}s — das Modell erlaubt maximal ${limits.max}s.`, en: `Scene is ${scene.durationSeconds}s — the model allows a maximum of ${limits.max}s.`, es: `La escena dura ${scene.durationSeconds}s — el modelo permite un máximo de ${limits.max}s.` }),
         id,
       ),
     );
@@ -80,17 +80,17 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     turns.forEach((turn, i) => {
       const label = turn.speakerName ?? `Sprecher ${i + 1}`;
       if (!turn.speakerCharacterId) {
-        findings.push(warn('turn_no_speaker', `Redebeitrag ${i + 1}: Sprecher wird automatisch besetzt.`, id));
+        findings.push(warn('turn_no_speaker', tx({ de: `Redebeitrag ${i + 1}: Sprecher wird automatisch besetzt.`, en: `Speech ${i + 1}: Speaker will be assigned automatically.`, es: `Discurso ${i + 1}: El orador se asignará automáticamente.` }), id));
       } else if (
         scene.characterIds.length > 0 &&
         !scene.characterIds.includes(turn.speakerCharacterId)
       ) {
         findings.push(
-          warn('turn_speaker_not_in_scene', `${label} wird der Szene automatisch hinzugefügt.`, id),
+          warn('turn_speaker_not_in_scene', tx({ de: `${label} wird der Szene automatisch hinzugefügt.`, en: `${label} will be added to the scene automatically.`, es: `${label} se añadirá a la escena automáticamente.` }), id),
         );
       }
       if (!turn.voiceId) {
-        findings.push(warn('turn_no_voice', `${label}: Stimme wird automatisch gewählt.`, id));
+        findings.push(warn('turn_no_voice', tx({ de: `${label}: Stimme wird automatisch gewählt.`, en: `${label}: Voice will be chosen automatically.`, es: `${label}: La voz se elegirá automáticamente.` }), id));
       }
     });
     if (turns.length > 4) {
@@ -108,17 +108,17 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
       findings.push(
         warn(
           'dialogue_too_long',
-          `Die Redebeiträge brauchen ca. ${turnNeeded.toFixed(1)}s, Szene ist nur ${scene.durationSeconds}s lang.`,
+          tx({ de: `Die Redebeiträge brauchen ca. ${turnNeeded.toFixed(1)}s, Szene ist nur ${scene.durationSeconds}s lang.`, en: `The speeches need approx. ${turnNeeded.toFixed(1)}s, scene is only ${scene.durationSeconds}s long.`, es: `Los discursos necesitan aprox. ${turnNeeded.toFixed(1)}s, la escena dura solo ${scene.durationSeconds}s.` }),
           id,
         ),
       );
     }
   } else if (scene.dialogue?.trim()) {
     if (!scene.speakerCharacterId) {
-      findings.push(warn('dialogue_no_speaker', 'Sprecher wird automatisch besetzt.', id));
+      findings.push(warn('dialogue_no_speaker', tx({ de: 'Sprecher wird automatisch besetzt.', en: 'Speaker will be automatically assigned.', es: 'El orador será asignado automáticamente.' }), id));
     }
     if (!scene.voiceId) {
-      findings.push(warn('dialogue_no_voice', 'Stimme wird automatisch gewählt.', id));
+      findings.push(warn('dialogue_no_voice', tx({ de: 'Stimme wird automatisch gewählt.', en: 'Voice will be automatically selected.', es: 'La voz se seleccionará automáticamente.' }), id));
     }
     if (!scene.voiceLanguage) {
       findings.push(warn('dialogue_no_language', 'Dialog ohne Sprachcode — nutze Projektsprache.', id));
@@ -126,7 +126,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
     if (scene.characterIds.length > 0 && scene.speakerCharacterId) {
       if (!scene.characterIds.includes(scene.speakerCharacterId)) {
         findings.push(
-          warn('speaker_not_in_scene', 'Der Sprecher wird der Szene automatisch hinzugefügt.', id),
+          warn('speaker_not_in_scene', tx({ de: 'Der Sprecher wird der Szene automatisch hinzugefügt.', en: 'The speaker will be automatically added to the scene.', es: 'El orador se añadirá automáticamente a la escena.' }), id),
         );
       }
     }
@@ -137,7 +137,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
       findings.push(
         warn(
           'dialogue_too_long',
-          `Text braucht ca. ${needed.toFixed(1)}s, Szene ist nur ${scene.durationSeconds}s lang.`,
+          tx({ de: `Text braucht ca. ${needed.toFixed(1)}s, Szene ist nur ${scene.durationSeconds}s lang.`, en: `Text needs approx. ${needed.toFixed(1)}s, scene is only ${scene.durationSeconds}s long.`, es: `El texto necesita aprox. ${needed.toFixed(1)}s, la escena dura solo ${scene.durationSeconds}s.` }),
           id,
         ),
       );
@@ -147,7 +147,7 @@ export function preflightScene(scene: SceneGrammar): PreflightFinding[] {
 
   const uniqueChars = new Set(scene.characterIds);
   if (uniqueChars.size !== scene.characterIds.length) {
-    findings.push(block('duplicate_character', 'Derselbe Charakter ist doppelt besetzt.', id));
+    findings.push(block('duplicate_character', tx({ de: 'Derselbe Charakter ist doppelt besetzt.', en: 'The same character is cast twice.', es: 'El mismo personaje está asignado dos veces.' }), id));
   }
 
   return findings;
@@ -169,11 +169,11 @@ export function preflightTreatment(treatment: AutopilotTreatment): PreflightResu
   const findings: PreflightFinding[] = [];
 
   if (!treatment.scenes.length) {
-    findings.push(block('no_scenes', 'Das Treatment enthält keine Szenen.'));
+    findings.push(block('no_scenes', tx({ de: 'Das Treatment enthält keine Szenen.', en: 'The treatment contains no scenes.', es: 'El tratamiento no contiene escenas.' })));
   }
 
   if (treatment.scenes.length > 12) {
-    findings.push(warn('many_scenes', 'Mehr als 12 Szenen — Laufzeit und Kosten steigen deutlich.'));
+    findings.push(warn('many_scenes', tx({ de: 'Mehr als 12 Szenen — Laufzeit und Kosten steigen deutlich.', en: 'More than 12 scenes — runtime and costs increase significantly.', es: 'Más de 12 escenas — el tiempo de ejecución y los costos aumentan significativamente.' })));
   }
 
   const sum = treatment.scenes.reduce((acc, s) => acc + s.durationSeconds, 0);

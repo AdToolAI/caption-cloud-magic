@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -184,7 +185,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
 
             <div className="space-y-3 pt-2 border-t border-border/40">
               <div>
-                <Label className="text-xs mb-1.5 block">Medien (Bild oder Video)</Label>
+                <Label className="text-xs mb-1.5 block">{tx({ de: "Medien (Bild oder Video)", en: "Media (image or video)", es: "Medios (imagen o video)" })}</Label>
                 <PostMediaUploader
                   mediaUrl={mediaUrl}
                   mediaType={mediaType}

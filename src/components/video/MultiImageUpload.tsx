@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback } from 'react';
 import { Upload, X, GripVertical, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ export function MultiImageUpload({
   maxFiles = 5,
   minFiles = 1,
   disabled = false,
-  label = 'Bilder hochladen'
+  label = tx({ de: 'Bilder hochladen', en: 'Upload images', es: 'Subir imágenes' })
 }: MultiImageUploadProps) {
   const [dragOver, setDragOver] = useState(false);
 
@@ -38,7 +39,7 @@ export function MultiImageUpload({
     const imageFiles = fileArray.filter(file => file.type.startsWith('image/'));
 
     if (imageFiles.length === 0) {
-      toast.error('Bitte nur Bilddateien hochladen');
+      toast.error(tx({ de: 'Bitte nur Bilddateien hochladen', en: 'Please upload image files only', es: 'Por favor, sube solo archivos de imagen' }));
       return;
     }
 

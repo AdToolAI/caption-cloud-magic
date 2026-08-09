@@ -121,7 +121,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           {step === 1 && (
             <div className="space-y-4 animate-fade-in">
               <div>
-                <Label htmlFor="brandName">Wie heißt deine Marke? *</Label>
+                <Label htmlFor="brandName">{tx({ de: "Wie heißt deine Marke? *", en: "What is your brand's name? *", es: "¿Cómo se llama tu marca? *" })}</Label>
                 <Input
                   id="brandName"
                   value={data.brandName}
@@ -152,7 +152,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           {step === 3 && (
             <div className="space-y-4 animate-fade-in">
               <div>
-                <Label>Welche Werte & Emotionen verkörpert deine Marke? *</Label>
+                <Label>{tx({ de: "Welche Werte & Emotionen verkörpert deine Marke? *", en: "What values & emotions does your brand embody? *", es: "¿Qué valores y emociones encarna tu marca? *" })}</Label>
                 <p className="text-sm text-muted-foreground mb-3">
                   Wähle mindestens einen Wert
                 </p>
@@ -175,7 +175,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           {step === 4 && (
             <div className="space-y-4 animate-fade-in">
               <div>
-                <Label>Welche Stilrichtung passt zu deiner Marke? *</Label>
+                <Label>{tx({ de: "Welche Stilrichtung passt zu deiner Marke? *", en: "Which style suits your brand? *", es: "¿Qué estilo se adapta a tu marca? *" })}</Label>
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   {styleOptions.map(style => (
                     <Card
@@ -201,7 +201,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           {step === 5 && (
             <div className="space-y-4 animate-fade-in">
               <div>
-                <Label>Welche Tonalität soll deine Marke haben? *</Label>
+                <Label>{tx({ de: "Welche Tonalität soll deine Marke haben? *", en: "What tonality should your brand have? *", es: "¿Qué tonalidad debe tener tu marca? *" })}</Label>
                 <div className="grid grid-cols-2 gap-2 mt-3">
                   {toneOptions.map(tone => (
                     <Badge

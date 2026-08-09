@@ -420,7 +420,7 @@ const SubtitleVoiceoverSection: React.FC<{
   const selectedVoiceMeta = useMemo(() => allVoices.find(v => v.id === selectedVoice), [allVoices, selectedVoice]);
 
   const tipText = activeLang === 'de'
-    ? '💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.'
+    ? tx({ de: '💡 Premium-Stimmen klingen am natürlichsten. Tipp: Nutze Satzzeichen für realistische Pausen.', en: '💡 Premium voices sound most natural. Tip: Use punctuation for realistic pauses.', es: '💡 Las voces premium suenan más naturales. Consejo: Usa la puntuación para pausas realistas.' })
     : activeLang === 'es'
     ? '💡 Las voces Premium suenan más naturales. Consejo: usa puntuación para pausas realistas.'
     : '💡 Premium voices sound most natural. Tip: use punctuation for realistic pauses.';

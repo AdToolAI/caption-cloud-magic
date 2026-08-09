@@ -1443,7 +1443,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         id: `scene-${Date.now()}`,
         start_time: 0,
         end_time: INSERT_DURATION,
-        description: t('dc.newSceneBlackscreen') || 'Neue Szene',
+        description: t('dc.newSceneBlackscreen') || tx({ de: 'Neue Szene', en: 'New scene', es: 'Nueva escena' }),
         content_description: t('dc.emptySceneDesc') || '',
         suggested_effects: [],
         isBlackscreen: true,
@@ -1497,7 +1497,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       id: `scene-${Date.now()}`,
       start_time: 0, // recalculated below
       end_time: INSERT_DURATION,
-      description: t('dc.newSceneBlackscreen') || 'Neue Szene',
+      description: t('dc.newSceneBlackscreen') || tx({ de: 'Neue Szene', en: 'New scene', es: 'Nueva escena' }),
       content_description: t('dc.emptySceneDesc') || '',
       suggested_effects: [],
       isBlackscreen: true,
@@ -2275,7 +2275,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             onClick={() => setAnchorRefreshOpen(true)}
             title={
               anchorDriftCount > 0
-                ? `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`
+                ? tx({ de: `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`, en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` })
                 : 'Anchor-Refresh — Character Consistency prüfen'
             }
           >

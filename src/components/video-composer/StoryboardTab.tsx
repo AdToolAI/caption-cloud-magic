@@ -38,7 +38,7 @@ import StageStoryboardError from './stage/StageStoryboardError';
 import StagePanel from './stage/StagePanel';
 
 import { Play, CheckCircle2 } from 'lucide-react';
-import { useTx } from '@/lib/i18nText';
+import { tx, useTx } from '@/lib/i18nText';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
   hook: 'Hook',
@@ -391,7 +391,7 @@ export default function StoryboardTab({
         projectId: target.projectId,
         sceneId: target.id,
         actionType: 'delete-scene',
-        label: `Szene ${target.orderIndex + 1} gelöscht`,
+        label: tx({ de: `Szene ${target.orderIndex + 1} gelöscht`, en: `Scene ${target.orderIndex + 1} deleted`, es: `Escena ${target.orderIndex + 1} eliminada` }),
         beforeState: sceneToSnakeSnapshot(target),
       }).catch(() => { /* non-fatal */ });
     }
@@ -557,7 +557,7 @@ export default function StoryboardTab({
             className="gap-1 text-xs"
             title={
               addSceneAllowed
-                ? 'Neue Szene hinzufügen'
+                ? tx({ de: 'Neue Szene hinzufügen', en: 'Add new scene', es: 'Añadir nueva escena' })
                 : tr({ de: `Budget voll (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — kürze oder lösche eine Szene.`, en: `Budget full (max. ${formatDuration(MAX_PROJECT_SECONDS)}) — shorten or delete a scene.`, es: `Presupuesto lleno (máx. ${formatDuration(MAX_PROJECT_SECONDS)}) — acorta o elimina una escena.` })
             }
           >
@@ -569,7 +569,7 @@ export default function StoryboardTab({
               variant="outline"
               onClick={applyEngineToAll}
               className="gap-1 text-xs"
-              title="Engine der ersten Szene auf alle anderen KI-Szenen übertragen"
+              title={tx({ de: "Engine der ersten Szene auf alle anderen KI-Szenen übertragen", en: "Transfer the engine of the first scene to all other AI scenes", es: "Transferir el motor de la primera escena a todas las demás escenas de IA" })}
             >
               <Sparkles className="h-3.5 w-3.5" /> Engine für alle
             </Button>
@@ -706,10 +706,10 @@ export default function StoryboardTab({
           <StagePanel
             slateIndex="01"
             eyebrow="REEL · EMPTY"
-            title="Noch keine Szenen"
+            title={tx({ de: "Noch keine Szenen", en: "No scenes yet", es: "Aún no hay escenas" })}
           >
             <div className="py-8 text-center">
-              <p className="text-muted-foreground text-sm mb-3">Noch keine Szenen vorhanden</p>
+              <p className="text-muted-foreground text-sm mb-3">{tx({ de: "Noch keine Szenen vorhanden", en: "No scenes available yet", es: "Aún no hay escenas disponibles" })}</p>
               <Button onClick={handleAddSceneClick} disabled={!addSceneAllowed} variant="outline" className="gap-2">
                 <Plus className="h-4 w-4" /> Erste Szene hinzufügen
               </Button>

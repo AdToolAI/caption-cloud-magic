@@ -189,7 +189,7 @@ export function SpeakerMappingBar({
                   }}
                 >
                   <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Stimme wählen" />
+                    <SelectValue placeholder={tx({ de: "Stimme wählen", en: "Select voice", es: "Seleccionar voz" })} />
                   </SelectTrigger>
                   <SelectContent className="max-h-[320px]">
                     {humeVoices.map((v) => (
@@ -208,7 +208,7 @@ export function SpeakerMappingBar({
                   voiceName={cfg?.voiceName}
                   language={targetLanguage}
                   category="characters"
-                  pickerTitle={`Stimme für ${s.speakerName}`}
+                  pickerTitle={tx({ de: `Stimme für ${s.speakerName}`, en: `Voice for ${s.speakerName}`, es: `Voz para ${s.speakerName}` })}
                   onChange={({ voiceId, voiceName }) =>
                     setSpeakerCfg(s.speakerId, { voiceId, voiceName })
                   }

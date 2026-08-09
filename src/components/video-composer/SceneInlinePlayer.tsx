@@ -381,7 +381,7 @@ export default function SceneInlinePlayer({
 
         {/* v124 — Failure overlay: shows the actual backend error (e.g.
             anchor_identity_failed) plus a Re-Render button, instead of an
-            endless "Szene wird gebaut…" spinner. */}
+            endless tx({ de: "Szene wird gebaut…", en: "Scene is building…", es: "La escena se está construyendo…" }) spinner. */}
         {isFailed && (() => {
           const rawErr = String(
             (scene as any).clipError ?? (scene as any).clip_error ?? '',

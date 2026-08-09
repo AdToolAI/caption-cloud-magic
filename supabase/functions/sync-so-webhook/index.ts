@@ -32,6 +32,7 @@ import {
 } from "../_shared/syncso-preflight.ts";
 import { probeMp4Dims } from "../_shared/twoshot-face-map.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { tl, withLang } from "../_shared/i18n.ts";
 
 
 const corsHeaders = {
@@ -170,7 +171,7 @@ function terminalV5Counts(passes: any[]) {
 
 
 
-serve(async (req) => {
+serve((req: Request) => withLang(req, () => (async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -786,7 +787,7 @@ serve(async (req) => {
         // hint rather than a frozen-lips final output.
         const turnStart = Number(passBeforeDone?.segments?.[0]?.startTime ?? 0).toFixed(1);
         const turnEnd = Number(passBeforeDone?.segments?.[0]?.endTime ?? 0).toFixed(1);
-        const userMsg = `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`;
+        const userMsg = tl({ de: `Lip-Sync für ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) konnte nach ${NOOP_LADDER.length + 1} Versuchen nicht erzeugt werden. Bitte Plate neu rendern.`, en: `Lip-sync for ${passSpeakerName} (Turn ${turnStart}s–${turnEnd}s) could not be generated after ${NOOP_LADDER.length + 1} attempts. Please re-render plate.`, es: `La sincronización labial para ${passSpeakerName} (Turno ${turnStart}s–${turnEnd}s) no pudo generarse después de ${NOOP_LADDER.length + 1} intentos. Por favor, vuelve a renderizar la placa.` });
         await supabase
           .from("composer_scenes")
           .update({
@@ -993,7 +994,7 @@ serve(async (req) => {
         const failedSpeakers = freshDonePasses
           .filter((p: any) => ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? "")))
           .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`);
-        const failReason = `multi_speaker_incomplete_${doneCount}_of_${totalPasses}: Sprecher ${failedSpeakers.join(", ")} konnten nicht lip-synct werden — bitte Szene-Plate neu rendern oder Anzahl Sprecher reduzieren.`;
+        const failReason = tl({ de: `multi_speaker_incomplete_${doneCount}_of_${totalPasses}: Sprecher ${failedSpeakers.join(", ")} konnten nicht lip-synct werden — bitte Szene-Plate neu rendern oder Anzahl Sprecher reduzieren.`, en: `multi_speaker_incomplete_${doneCount}_of_${totalPasses}: Speakers ${failedSpeakers.join(", ")} could not be lip-synced — please re-render scene plate or reduce number of speakers.`, es: `multi_speaker_incomplete_${doneCount}_of_${totalPasses}: Los oradores ${failedSpeakers.join(", ")} no pudieron ser sincronizados labialmente — por favor, vuelve a renderizar la placa de la escena o reduce el número de oradores.` });
         const costFinal = Number((freshDoneState as any)?.cost_credits ?? 0);
         const alreadyRefundedFinal = !!(freshDoneState as any)?.refunded;
         if (costFinal > 0 && !alreadyRefundedFinal) {
@@ -1505,7 +1506,7 @@ serve(async (req) => {
       // Prefix the reason with the official error_code (when present) so the
       // UI badge surfaces a real diagnostic instead of "unknown error".
       const noCodeSuffix = !errorCode && isGenericMsg(rawErr)
-        ? " — Sync.so lieferte keinen error_code (3-Sprecher-Plate + Audio-Lead-In wahrscheinliche Ursache)"
+        ? tl({ de: " — Sync.so lieferte keinen error_code (3-Sprecher-Plate + Audio-Lead-In wahrscheinliche Ursache)", en: " — Sync.so did not provide an error_code (3-speaker plate + audio lead-in probable cause)", es: " — Sync.so no proporcionó un error_code (placa de 3 oradores + entrada de audio causa probable)" })
         : "";
       const codePrefix = errorCode ? `[${errorCode}] ` : "";
       const explainSuffix = codeExplain ? ` — ${codeExplain}` : "";
@@ -1708,7 +1709,7 @@ serve(async (req) => {
           const failedSpeakers = finalPasses
             .filter((p: any) => ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? "")))
             .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`);
-          const failReason = `multi_speaker_incomplete_${doneCount}_of_${totalSpeakers}: Sprecher ${failedSpeakers.join(", ")} konnten nicht lip-synct werden — bitte Szene-Plate neu rendern oder Anzahl Sprecher reduzieren.`;
+          const failReason = tl({ de: `multi_speaker_incomplete_${doneCount}_of_${totalSpeakers}: Sprecher ${failedSpeakers.join(", ")} konnten nicht lip-synct werden — bitte Szene-Plate neu rendern oder Anzahl Sprecher reduzieren.`, en: `multi_speaker_incomplete_${doneCount}_of_${totalSpeakers}: Speakers ${failedSpeakers.join(", ")} could not be lip-synced — please re-render scene plate or reduce number of speakers.`, es: `multi_speaker_incomplete_${doneCount}_of_${totalSpeakers}: Los oradores ${failedSpeakers.join(", ")} no pudieron ser sincronizados labialmente — por favor, vuelve a renderizar la placa de la escena o reduce el número de oradores.` });
           await supabase
             .from("composer_scenes")
             .update({
@@ -1783,4 +1784,4 @@ serve(async (req) => {
     `[sync-so-webhook] legacy_v4_ignored scene=${sceneId} job=${jobId} version=${(state as any)?.version ?? "?"}`,
   );
   return ok({ ok: true, skipped: "legacy_v4_ignored" });
-});
+})(req)));

@@ -156,7 +156,7 @@ export function ImageSourceDialog({ open, onOpenChange, onPick }: ImageSourceDia
             {loadingLibrary ? (
               <div className="flex h-40 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
             ) : libraryItems.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">Noch keine Bilder in der Mediathek.</p>
+              <p className="py-12 text-center text-sm text-muted-foreground">{tx({ de: "Noch keine Bilder in der Mediathek.", en: "No images in the media library yet.", es: "Aún no hay imágenes en la biblioteca de medios." })}</p>
             ) : (
               <div className="grid max-h-[380px] grid-cols-4 gap-2 overflow-y-auto">
                 {libraryItems.map((item) => (

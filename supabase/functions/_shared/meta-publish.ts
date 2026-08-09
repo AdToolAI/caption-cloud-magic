@@ -11,6 +11,7 @@
 //   - Friendly error mapping (Meta error codes -> user-facing messages)
 
 import { decryptToken, encryptToken } from './crypto.ts';
+import { tl, withLang } from "./i18n.ts";
 
 export const GRAPH_VERSION = 'v24.0';
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -77,14 +78,14 @@ export async function getMetaConnection(
   if (!row) {
     throw new MetaPublishError({
       code: 'NOT_CONNECTED',
-      message: `Kein ${provider === 'facebook' ? 'Facebook' : 'Instagram'}-Account verbunden. Bitte unter Integrationen verbinden.`,
+      message: tl({ de: `Kein ${provider === 'facebook' ? 'Facebook' : 'Instagram'}-Account verbunden. Bitte unter Integrationen verbinden.`, en: `No ${provider === 'facebook' ? 'Facebook' : 'Instagram'} account connected. Please connect under Integrations.`, es: `Ninguna cuenta de ${provider === 'facebook' ? 'Facebook' : 'Instagram'} conectada. Por favor, conéctela en Integraciones.` }),
       reconnectRequired: true,
     });
   }
   if (!row.access_token_hash) {
     throw new MetaPublishError({
       code: 'NO_TOKEN',
-      message: `Verbindung ohne Token gefunden. Bitte ${provider === 'facebook' ? 'Facebook' : 'Instagram'} neu verbinden.`,
+      message: tl({ de: `Verbindung ohne Token gefunden. Bitte ${provider === 'facebook' ? 'Facebook' : 'Instagram'} neu verbinden.`, en: `Connection found without token. Please reconnect ${provider === 'facebook' ? 'Facebook' : 'Instagram'}.`, es: `Conexión encontrada sin token. Por favor, vuelva a conectar ${provider === 'facebook' ? 'Facebook' : 'Instagram'}.` }),
       reconnectRequired: true,
     });
   }
@@ -99,7 +100,7 @@ export async function getMetaConnection(
     } catch {
       throw new MetaPublishError({
         code: 'TOKEN_DECRYPT_FAILED',
-        message: 'Token konnte nicht entschlüsselt werden. Bitte Verbindung erneuern.',
+        message: tl({ de: 'Token konnte nicht entschlüsselt werden. Bitte Verbindung erneuern.', en: 'Could not decrypt token. Please renew connection.', es: 'No se pudo descifrar el token. Por favor, renueve la conexión.' }),
         reconnectRequired: true,
       });
     }
@@ -222,7 +223,7 @@ export async function waitForContainer(
   }
   throw new MetaPublishError({
     code: 'MEDIA_PROCESSING_TIMEOUT',
-    message: `Meta brauchte länger als ${Math.round(maxMs / 1000)}s zum Verarbeiten. Bitte später erneut versuchen.`,
+    message: tl({ de: `Meta brauchte länger als ${Math.round(maxMs / 1000)}s zum Verarbeiten. Bitte später erneut versuchen.`, en: `Meta took longer than ${Math.round(maxMs / 1000)}s to process. Please try again later.`, es: `Meta tardó más de ${Math.round(maxMs / 1000)}s en procesar. Por favor, inténtelo de nuevo más tarde.` }),
   });
 }
 
@@ -238,7 +239,7 @@ export function mapMetaError(err: any): MetaPublishError {
   if (code === 190 || code === 102 || code === 463 || code === 467) {
     return new MetaPublishError({
       code: 'TOKEN_EXPIRED',
-      message: 'Dein Access-Token ist abgelaufen oder wurde widerrufen. Bitte die Verbindung unter Integrationen neu autorisieren.',
+      message: tl({ de: 'Dein Access-Token ist abgelaufen oder wurde widerrufen. Bitte die Verbindung unter Integrationen neu autorisieren.', en: 'Your access token has expired or been revoked. Please re-authorize the connection under Integrations.', es: 'Su token de acceso ha caducado o ha sido revocado. Por favor, vuelva a autorizar la conexión en Integraciones.' }),
       reconnectRequired: true,
       fbCode: code, fbSubcode: sub, fbTraceId: trace,
     });
@@ -247,7 +248,7 @@ export function mapMetaError(err: any): MetaPublishError {
   if (code === 200 || code === 210 || code === 299 || code === 803) {
     return new MetaPublishError({
       code: 'PERMISSION_DENIED',
-      message: `Berechtigung fehlt: ${msg}. Bitte Verbindung mit allen Scopes erneut autorisieren.`,
+      message: tl({ de: `Berechtigung fehlt: ${msg}. Bitte Verbindung mit allen Scopes erneut autorisieren.`, en: `Permission missing: ${msg}. Please re-authorize connection with all scopes.`, es: `Permiso faltante: ${msg}. Por favor, vuelva a autorizar la conexión con todos los alcances.` }),
       reconnectRequired: true,
       fbCode: code, fbSubcode: sub, fbTraceId: trace,
     });
@@ -256,7 +257,7 @@ export function mapMetaError(err: any): MetaPublishError {
   if (code === 4 || code === 17 || code === 32 || code === 613 || code === 368) {
     return new MetaPublishError({
       code: 'RATE_LIMITED',
-      message: 'Meta-Rate-Limit erreicht. Bitte einige Minuten warten und erneut versuchen.',
+      message: tl({ de: 'Meta-Rate-Limit erreicht. Bitte einige Minuten warten und erneut versuchen.', en: 'Meta rate limit reached. Please wait a few minutes and try again.', es: 'Límite de tasa de Meta alcanzado. Por favor, espere unos minutos e inténtelo de nuevo.' }),
       fbCode: code, fbSubcode: sub, fbTraceId: trace,
     });
   }
@@ -264,7 +265,7 @@ export function mapMetaError(err: any): MetaPublishError {
   if (code === 100) {
     return new MetaPublishError({
       code: 'INVALID_PARAMETER',
-      message: `Ungültige Parameter (${msg}). Häufige Ursache: Medien-URL ist nicht öffentlich erreichbar.`,
+      message: tl({ de: `Ungültige Parameter (${msg}). Häufige Ursache: Medien-URL ist nicht öffentlich erreichbar.`, en: `Invalid parameters (${msg}). Common cause: media URL is not publicly accessible.`, es: `Parámetros inválidos (${msg}). Causa común: la URL del medio no es accesible públicamente.` }),
       fbCode: code, fbSubcode: sub, fbTraceId: trace,
     });
   }
@@ -375,7 +376,7 @@ export async function publishInstagram(input: InstagramPublishInput): Promise<{ 
   if (!input.imageUrl) {
     throw new MetaPublishError({
       code: 'NO_MEDIA',
-      message: 'Instagram-Posts benötigen ein Bild oder Video.',
+      message: tl({ de: 'Instagram-Posts benötigen ein Bild oder Video.', en: 'Instagram posts require an image or video.', es: 'Las publicaciones de Instagram requieren una imagen o un video.' }),
     });
   }
   const container = await graphPost(`/${igUserId}/media`, {

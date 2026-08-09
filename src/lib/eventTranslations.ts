@@ -2,7 +2,7 @@ import { tx } from "@/lib/i18nText";
 // Event system translations - Separated for clarity
 export const eventTranslations = {
   de: {
-    captionCreated: "Neue Caption erstellt",
+    captionCreated: tx({ de: "Neue Caption erstellt", en: "New caption created", es: "Nueva leyenda creada" }),
     hooksGenerated: "Hooks generiert",
     goalProgress: "Zielfortschritt aktualisiert",
     goalCompleted: "Ziel erreicht!",

@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -83,7 +84,7 @@ export const useAutoDirector = () => {
       }
       toast({
         title: '✨ Auto-Director gestartet',
-        description: `${data.sceneCount} Szenen werden generiert (~${data.estimatedCostEuros.toFixed(2)}€).`,
+        description: tx({ de: `${data.sceneCount} Szenen werden generiert (~${data.estimatedCostEuros.toFixed(2)}€).`, en: `${data.sceneCount} scenes will be generated (~${data.estimatedCostEuros.toFixed(2)}€).`, es: `Se generarán ${data.sceneCount} escenas (~${data.estimatedCostEuros.toFixed(2)}€).` }),
       });
       return { projectId: data.projectId };
     } catch (err) {

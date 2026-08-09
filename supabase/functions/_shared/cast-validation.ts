@@ -1,3 +1,4 @@
+import { tl, withLang } from "./i18n.ts";
 /**
  * Cast validation for dialog/lip-sync scenes.
  *
@@ -58,8 +59,8 @@ export function validateCast(speakers: CastSpeakerLike[]): CastValidationResult 
       ok: false,
       reason: "cast_invalid_too_many_speakers",
       message:
-        `Lip-Sync unterstützt maximal ${MAX_SPEAKERS} verschiedene Sprecher pro Szene. ` +
-        `Diese Szene hat ${list.length}. Bitte Cast reduzieren.`,
+        tl({ de: `Lip-Sync unterstützt maximal ${MAX_SPEAKERS} verschiedene Sprecher pro Szene. `, en: `Lip-sync supports a maximum of ${MAX_SPEAKERS} different speakers per scene.`, es: `La sincronización labial admite un máximo de ${MAX_SPEAKERS} oradores diferentes por escena.` }) +
+        tl({ de: `Diese Szene hat ${list.length}. Bitte Cast reduzieren.`, en: `This scene has ${list.length}. Please reduce cast.`, es: `Esta escena tiene ${list.length}. Por favor, reduzca el elenco.` }),
     };
   }
 
@@ -84,8 +85,8 @@ export function validateCast(speakers: CastSpeakerLike[]): CastValidationResult 
       reason: "cast_invalid_duplicate_character",
       offenders: duplicates,
       message:
-        `Derselbe Charakter darf in einer Szene nicht mehrfach lip-synct werden ` +
-        `(${duplicates.join(", ")}). Bitte jedem Sprecher einen anderen Charakter zuweisen.`,
+        tl({ de: `Derselbe Charakter darf in einer Szene nicht mehrfach lip-synct werden `, en: `The same character cannot be lip-synced multiple times in one scene`, es: `El mismo personaje no puede ser sincronizado labialmente varias veces en una escena` }) +
+        tl({ de: `(${duplicates.join(", ")}). Bitte jedem Sprecher einen anderen Charakter zuweisen.`, en: `(${duplicates.join(", ")}). Please assign a different character to each speaker.`, es: `(${duplicates.join(", ")}). Por favor, asigne un personaje diferente a cada orador.` }),
     };
   }
 
@@ -112,7 +113,7 @@ export function validateCast(speakers: CastSpeakerLike[]): CastValidationResult 
             `Charakter "${cid}" hat überlappende Turns ` +
             `(${prevStart.toFixed(2)}-${prevEnd.toFixed(2)}s & ` +
             `${curStart.toFixed(2)}s+). Bitte Skript so anpassen, dass derselbe ` +
-            `Charakter nicht gleichzeitig spricht.`,
+            tl({ de: `Charakter nicht gleichzeitig spricht.`, en: `character is not speaking at the same time.`, es: `el personaje no está hablando al mismo tiempo.` }),
         };
       }
     }
