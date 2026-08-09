@@ -38,13 +38,18 @@ interface GeneratedImage {
   aspectRatio: string;
 }
 
-type QualityTier = 'standard' | 'fast' | 'pro' | 'ultra';
+type QualityTier = ModelTier;
 
 const TIER_COSTS: Record<QualityTier, number> = {
-  standard: 0,    // Gemini via Lovable AI Gateway — gratis im Abo
-  fast: 0.04,     // Seedream 4
-  pro: 0.08,      // Imagen 4 Ultra
-  ultra: 0.20,    // Nano Banana 2
+  standard: PICTURE_MODELS.standard.cost,
+  fast: PICTURE_MODELS.fast.cost,
+  pro: PICTURE_MODELS.pro.cost,
+  ultra: PICTURE_MODELS.ultra.cost,
+  gptimage: PICTURE_MODELS.gptimage.cost,
+  flux: PICTURE_MODELS.flux.cost,
+  ideogram: PICTURE_MODELS.ideogram.cost,
+  recraft: PICTURE_MODELS.recraft.cost,
+  qwen: PICTURE_MODELS.qwen.cost,
 };
 
 const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; gradient: string }> = {
@@ -52,7 +57,16 @@ const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; 
   fast: { label: 'Fast', model: 'Seedream 4', icon: Zap, gradient: 'from-blue-500/20 to-cyan-500/20' },
   pro: { label: 'Pro', model: 'Imagen 4 Ultra', icon: Crown, gradient: 'from-purple-500/20 to-pink-500/20' },
   ultra: { label: 'Ultra', model: 'Nano Banana 2', icon: Gem, gradient: 'from-amber-500/20 to-orange-500/20' },
+  gptimage: { label: 'GPT Image', model: 'GPT-Image-2 (ChatGPT)', icon: Sparkles, gradient: 'from-slate-500/20 to-emerald-500/20' },
+  flux: { label: 'FLUX Ultra', model: 'FLUX 1.1 Pro Ultra', icon: Camera, gradient: 'from-rose-500/20 to-orange-500/20' },
+  ideogram: { label: 'Ideogram', model: 'Ideogram v3 Turbo', icon: Wand2, gradient: 'from-indigo-500/20 to-blue-500/20' },
+  recraft: { label: 'Recraft', model: 'Recraft v3', icon: Palette, gradient: 'from-lime-500/20 to-emerald-500/20' },
+  qwen: { label: 'Qwen', model: 'Qwen Image', icon: ImageIcon, gradient: 'from-cyan-500/20 to-sky-500/20' },
 };
+
+const MAIN_TIERS: QualityTier[] = ['standard', 'fast', 'pro', 'ultra'];
+const SPECIALIST_TIERS: QualityTier[] = ['gptimage', 'flux', 'ideogram', 'recraft', 'qwen'];
+
 
 export function ImageGenerator() {
   const { user } = useAuth();
