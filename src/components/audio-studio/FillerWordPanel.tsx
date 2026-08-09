@@ -114,8 +114,8 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
               <Volume2 className="w-5 h-5 text-yellow-500" />
             </div>
             <div>
-              <h3 className="font-semibold">Füllwörter & Pausen</h3>
-              <p className="text-xs text-muted-foreground">Automatisch "ähms" und Pausen entfernen</p>
+              <h3 className="font-semibold">{tx({ de: "Füllwörter & Pausen", en: "Filler words & pauses", es: "Muletillas y pausas" })}</h3>
+              <p className="text-xs text-muted-foreground">{tx({ de: 'Automatisch "ähms" und Pausen entfernen', en: 'Automatically remove "ums" and pauses', es: 'Eliminar automáticamente "ehh" y pausas' })}</p>
             </div>
           </div>
 
@@ -127,12 +127,12 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
             {isAnalyzing ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Entferne...
+                {tx({ de: "Entferne...", en: "Removing...", es: "Eliminando..." })}
               </>
             ) : (
               <>
                 <Trash2 className="w-4 h-4 mr-2" />
-                Alle entfernen
+                {tx({ de: "Alle entfernen", en: "Remove all", es: "Eliminar todo" })}
               </>
             )}
           </Button>
@@ -142,18 +142,18 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
         <div className="grid grid-cols-3 gap-4">
           <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
             <div className="text-2xl font-bold text-yellow-500">{fillerAnalysis.fillers.length}</div>
-            <div className="text-xs text-muted-foreground">Füllwörter</div>
+            <div className="text-xs text-muted-foreground">{tx({ de: "Füllwörter", en: "Filler words", es: "Muletillas" })}</div>
           </div>
           <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
             <div className="text-2xl font-bold text-orange-500">{fillerAnalysis.pauses.length}</div>
-            <div className="text-xs text-muted-foreground">Lange Pausen</div>
+            <div className="text-xs text-muted-foreground">{tx({ de: "Lange Pausen", en: "Long pauses", es: "Pausas largas" })}</div>
           </div>
           <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
             <div className="text-2xl font-bold text-green-500">
               {Math.round((fillerAnalysis.fillers.reduce((acc, f) => acc + (f.word.end - f.word.start), 0) + 
                 fillerAnalysis.pauses.reduce((acc, p) => acc + p.duration, 0)) * 10) / 10}s
             </div>
-            <div className="text-xs text-muted-foreground">Einsparung</div>
+            <div className="text-xs text-muted-foreground">{tx({ de: "Einsparung", en: "Savings", es: "Ahorro" })}</div>
           </div>
         </div>
       </div>
@@ -170,12 +170,12 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
               />
               <Label htmlFor="show-fillers" className="text-sm">
                 {showFillers ? <Eye className="w-4 h-4 inline mr-1" /> : <EyeOff className="w-4 h-4 inline mr-1" />}
-                Füllwörter anzeigen
+                {tx({ de: "Füllwörter anzeigen", en: "Show filler words", es: "Mostrar muletillas" })}
               </Label>
             </div>
 
             <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Pausen-Schwelle</Label>
+              <Label className="text-xs text-muted-foreground">{tx({ de: "Pausen-Schwelle", en: "Pause threshold", es: "Umbral de pausa" })}</Label>
               <Slider
                 value={[pauseThreshold]}
                 onValueChange={([v]) => setPauseThreshold(v)}
@@ -197,7 +197,7 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
                 className="flex items-center gap-2"
               >
                 <Button variant="outline" size="sm" onClick={() => setSelectedFillers(new Set())}>
-                  Auswahl aufheben
+                  {tx({ de: "Auswahl aufheben", en: "Clear selection", es: "Deseleccionar" })}
                 </Button>
                 <Button
                   variant="destructive"
@@ -205,7 +205,7 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
                   onClick={removeSelectedFillers}
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  {selectedFillers.size} entfernen
+                  {tx({ de: `${selectedFillers.size} entfernen`, en: `Remove ${selectedFillers.size}`, es: `Eliminar ${selectedFillers.size}` })}
                 </Button>
               </motion.div>
             )}
@@ -215,9 +215,9 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
         {transcript.length === 0 ? (
           <div className="text-center py-12">
             <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Kein Transcript vorhanden</h3>
+            <h3 className="text-lg font-semibold mb-2">{tx({ de: "Kein Transcript vorhanden", en: "No transcript available", es: "No hay transcripción disponible" })}</h3>
             <p className="text-muted-foreground">
-              Generiere zuerst ein Transcript im "Transcript"-Tab
+              {tx({ de: 'Generiere zuerst ein Transcript im "Transcript"-Tab', en: 'First generate a transcript in the "Transcript" tab', es: 'Primero genera una transcripción en la pestaña "Transcript"' })}
             </p>
           </div>
         ) : fillerAnalysis.fillers.length === 0 ? (
@@ -225,9 +225,9 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
             <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-green-500" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">Keine Füllwörter gefunden</h3>
+            <h3 className="text-lg font-semibold mb-2">{tx({ de: "Keine Füllwörter gefunden", en: "No filler words found", es: "No se encontraron muletillas" })}</h3>
             <p className="text-muted-foreground">
-              Dein Audio ist bereits sauber!
+              {tx({ de: "Dein Audio ist bereits sauber!", en: "Your audio is already clean!", es: "¡Tu audio ya está limpio!" })}
             </p>
           </div>
         ) : (
@@ -235,10 +235,10 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
             {/* Select All */}
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-muted-foreground">
-                {selectedFillers.size} von {fillerAnalysis.fillers.length} ausgewählt
+                {tx({ de: `${selectedFillers.size} von ${fillerAnalysis.fillers.length} ausgewählt`, en: `${selectedFillers.size} of ${fillerAnalysis.fillers.length} selected`, es: `${selectedFillers.size} de ${fillerAnalysis.fillers.length} seleccionados` })}
               </span>
               <Button variant="ghost" size="sm" onClick={selectAllFillers}>
-                Alle auswählen
+                {tx({ de: "Alle auswählen", en: "Select all", es: "Seleccionar todo" })}
               </Button>
             </div>
 
@@ -301,7 +301,7 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
                 {fillerAnalysis.pauses.length > 0 && (
                   <>
                     <div className="pt-4 pb-2">
-                      <Label className="text-xs text-muted-foreground">Lange Pausen (&gt;{pauseThreshold}s)</Label>
+                      <Label className="text-xs text-muted-foreground">{tx({ de: `Lange Pausen (>${pauseThreshold}s)`, en: `Long pauses (>${pauseThreshold}s)`, es: `Pausas largas (>${pauseThreshold}s)` })}</Label>
                     </div>
                     {fillerAnalysis.pauses.map((pause, i) => (
                       <div
@@ -312,7 +312,7 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
                           <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
                             <Volume2 className="w-4 h-4 text-orange-500" />
                           </div>
-                          <span className="text-sm">Pause</span>
+                          <span className="text-sm">{tx({ de: "Pause", en: "Pause", es: "Pausa" })}</span>
                           <span className="text-xs text-muted-foreground">
                             {formatTime(pause.start)} - {formatTime(pause.end)}
                           </span>
