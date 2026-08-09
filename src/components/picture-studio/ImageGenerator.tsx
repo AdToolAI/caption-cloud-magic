@@ -663,7 +663,7 @@ export function ImageGenerator() {
               <Select value={aspectRatio} onValueChange={setAspectRatio}>
                 <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {ASPECT_RATIOS.map(r => (
+                  {availableAspectRatios.map(r => (
                     <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                   ))}
                 </SelectContent>
