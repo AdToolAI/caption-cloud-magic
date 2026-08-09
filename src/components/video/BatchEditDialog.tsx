@@ -80,7 +80,7 @@ export const BatchEditDialog = ({ open, onOpenChange, video }: BatchEditDialogPr
       if (data?.success) {
         toast({
           title: "✅ Batch-Generierung gestartet",
-          description: tx({ de: `${variations.length} Varianten werden erstellt. Kosten: ${data.totalCost} Credits`, en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }),
+          description: tx({ de: tx({ de: `${variations.length} Varianten werden erstellt. Kosten: ${data.totalCost} Credits`, en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }), en: `${variations.length} variations will be created. Cost: ${data.totalCost} Credits`, es: `Se crearán ${variations.length} variaciones. Costo: ${data.totalCost} créditos` }),
         });
         onOpenChange(false);
       }

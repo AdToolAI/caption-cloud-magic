@@ -144,7 +144,7 @@ export default function SnippetBuilderDialog({
           toast.success('Vorschau gesetzt');
         }
       } catch (e: any) {
-        toast.error(tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }));
+        toast.error(tx({ de: tx({ de: `Upload fehlgeschlagen: ${e.message ?? e}`, en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }), en: `Upload failed: ${e.message ?? e}`, es: `Error al cargar: ${e.message ?? mi}` }));
       } finally {
         setUploading(false);
       }

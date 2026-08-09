@@ -310,7 +310,7 @@ export default function MediaProfiles() {
               <p className="text-muted-foreground mb-4">
                 {filterPlatform === 'all' 
                   ? tx({ de: 'Noch keine Profile vorhanden.', en: 'No profiles yet.', es: 'Aún no hay perfiles.' })
-                  : tx({ de: `Keine Profile für ${filterPlatform} gefunden.`, en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` })
+                  : tx({ de: tx({ de: `Keine Profile für ${filterPlatform} gefunden.`, en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` }), en: `No profiles found for ${filterPlatform}.`, es: `No se encontraron perfiles para ${filterPlatform}.` })
                 }
               </p>
               <Button onClick={() => {

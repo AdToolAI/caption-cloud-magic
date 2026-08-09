@@ -222,7 +222,7 @@ export const AD_TONALITY_PROFILES: AdTonalityProfile[] = [
       ],
     },
     ctaPatterns: {
-      de: [tx({ de: 'Probier’s aus. Was kann schon schiefgehen?', en: 'Try it. What could go wrong?', es: 'Pruébalo. ¿Qué podría salir mal?' }), 'Klick mich.', 'Du weißt, was zu tun ist.'],
+      de: [tx({ de: 'Probier’s aus. Was kann schon schiefgehen?', en: 'Try it. What could go wrong?', es: 'Pruébalo. ¿Qué podría salir mal?' }), 'Klick mich.', tx({ de: 'Du weißt, was zu tun ist.', en: 'You know what to do.', es: 'Sabes qué hacer.' })],
       en: ["Try it. What's the worst that could happen?", 'Click me.', 'You know what to do.'],
       es: ['Pruébalo. ¿Qué puede salir mal?', 'Haz clic.', 'Ya sabes qué hacer.'],
     },

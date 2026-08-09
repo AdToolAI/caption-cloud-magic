@@ -224,7 +224,7 @@ export function DeepSweepTab() {
                 size="sm"
                 onClick={finalizeStaleRun}
                 disabled={finalizing}
-                title={tx({ de: `Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.`, en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` })}
+                title={tx({ de: tx({ de: `Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.`, en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` }), en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` })}
               >
                 {finalizing ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />

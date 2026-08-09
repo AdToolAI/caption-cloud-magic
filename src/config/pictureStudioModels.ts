@@ -114,12 +114,12 @@ export function recommendedTierForMode(mode: PictureMode): QualityTier {
 export function detectMismatch(tier: QualityTier, mode: PictureMode): string | null {
   const m = PICTURE_MODELS[tier];
   const score = m.modeQuality[mode];
-  if (score === 0) return tx({ de: `${m.label} (${m.model}) unterstützt diesen Modus nicht.`, en: `${m.label} (${m.model}) does not support this mode.`, es: `${m.label} (${m.model}) no admite este modo.` });
+  if (score === 0) return tx({ de: tx({ de: `${m.label} (${m.model}) unterstützt diesen Modus nicht.`, en: `${m.label} (${m.model}) does not support this mode.`, es: `${m.label} (${m.model}) no admite este modo.` }), en: `${m.label} (${m.model}) does not support this mode.`, es: `${m.label} (${m.model}) no admite este modo.` });
   if (score <= 2) {
     const better = recommendedTierForMode(mode);
     const betterModel = PICTURE_MODELS[better];
     if (better !== tier) {
-      return tx({ de: `${m.label} ist schwach in diesem Modus. ${betterModel.label} (${betterModel.model}) liefert oft bessere Ergebnisse.`, en: `${m.label} is weak in this mode. ${betterModel.label} (${betterModel.model}) often gives better results.`, es: `${m.label} es débil en este modo. ${betterModel.label} (${betterModel.model}) suele dar mejores resultados.` });
+      return tx({ de: tx({ de: `${m.label} ist schwach in diesem Modus. ${betterModel.label} (${betterModel.model}) liefert oft bessere Ergebnisse.`, en: `${m.label} is weak in this mode. ${betterModel.label} (${betterModel.model}) often gives better results.`, es: `${m.label} es débil en este modo. ${betterModel.label} (${betterModel.model}) suele dar mejores resultados.` }), en: `${m.label} is weak in this mode. ${betterModel.label} (${betterModel.model}) often gives better results.`, es: `${m.label} es débil en este modo. ${betterModel.label} (${betterModel.model}) suele dar mejores resultados.` });
     }
   }
   return null;

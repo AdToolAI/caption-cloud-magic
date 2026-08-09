@@ -210,7 +210,7 @@ export const useCloudStorage = () => {
 
       toast({
         title: '☁️ In Cloud hochgeladen',
-        description: tx({ de: `${fileName} wurde in Google Drive gespeichert.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }),
+        description: tx({ de: tx({ de: `${fileName} wurde in Google Drive gespeichert.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }), en: tx({ de: `${fileName} was saved to Google Drive.`, en: `${fileName} was saved to Google Drive.`, es: `${fileName} se guardó en Google Drive.` }), es: `${fileName} se guardó en Google Drive.` }),
       });
 
       // Refresh file list

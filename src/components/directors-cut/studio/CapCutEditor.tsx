@@ -2275,7 +2275,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             onClick={() => setAnchorRefreshOpen(true)}
             title={
               anchorDriftCount > 0
-                ? tx({ de: `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`, en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` })
+                ? tx({ de: tx({ de: `Anchor-Refresh — ${anchorDriftCount} Szene(n) mit Drift`, en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` }), en: `Anchor Refresh — ${anchorDriftCount} scene(s) with drift`, es: `Actualización de anclaje — ${anchorDriftCount} escena(s) con desviación` })
                 : 'Anchor-Refresh — Character Consistency prüfen'
             }
           >

@@ -867,7 +867,7 @@ export function UniversalVideoWizard() {
                 >
                   {isUploadingImages 
                     ? (language === 'de' ? 'Wird hochgeladen...' : 'Uploading...') 
-                    : (language === 'de' ? tx({ de: `Weiter mit ${productImages.length} Bildern`, en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }) : `Continue with ${productImages.length} images`)}
+                    : (language === 'de' ? tx({ de: tx({ de: `Weiter mit ${productImages.length} Bildern`, en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }), en: `Continue with ${productImages.length} images`, es: `Continuar con ${productImages.length} imágenes` }) : `Continue with ${productImages.length} images`)}
                 </Button>
               </div>
             </div>

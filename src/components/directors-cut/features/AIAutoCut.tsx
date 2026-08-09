@@ -92,7 +92,7 @@ export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }
       
       if (error?.context?.status === 402) {
         toast.error('Nicht genügend Credits', {
-          description: tx({ de: `Du benötigst ${CREDITS_COST} Credits für AI Auto-Cut`, en: `You need ${CREDITS_COST} credits for AI Auto-Cut`, es: `Necesitas ${CREDITS_COST} créditos para el corte automático con IA` }),
+          description: tx({ de: tx({ de: `Du benötigst ${CREDITS_COST} Credits für AI Auto-Cut`, en: `You need ${CREDITS_COST} credits for AI Auto-Cut`, es: `Necesitas ${CREDITS_COST} créditos para el corte automático con IA` }), en: `You need ${CREDITS_COST} credits for AI Auto-Cut`, es: `Necesitas ${CREDITS_COST} créditos para el corte automático con IA` }),
         });
       } else {
         toast.error(tx({ de: 'Analyse fehlgeschlagen', en: 'Analysis failed', es: 'El análisis falló' }), {

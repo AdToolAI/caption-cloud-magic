@@ -238,19 +238,19 @@ const T = {
     speakers: (n: number) => `${n} Sprecher`,
     sec: (n: number) => `~${n}s`,
     needCast: 'Mindestens 1 Charakter im Cast nötig.',
-    voiceMissing: (name: string) => tx({ de: `Wähle eine Stimme für „${name}".`, en: `Choose a voice for "${name}".`, es: `Elige una voz para "${name}".` }),
+    voiceMissing: (name: string) => tx({ de: tx({ de: `Wähle eine Stimme für „${name}".`, en: `Choose a voice for "${name}".`, es: `Elige una voz para "${name}".` }), en: `Choose a voice for "${name}".`, es: `Elige una voz para "${name}".` }),
     parseEmpty: 'Kein gültiges Skript. Format: "Sarah: Hallo!"',
-    success: (n: number) => tx({ de: `${n} Lip-Sync-Clip${n === 1 ? '' : 's'} werden generiert (1–3 Min).`, en: `${n} Lip Sync Clip${n === 1 ? '' : 's'} are generated (1-3 min).`, es: `${n} Clip de sincronización de labios${n === 1 ? '' : 's'} se generan (1-3 min).` }),
-    successInline: (n: number) => tx({ de: `${n} Voiceover-Block${n === 1 ? '' : 'blöcke'} an diese Szene gehängt.`, en: `${n} voiceover block${n === 1 ? '' : 's'} attached to this scene.`, es: `${n} bloque${n === 1 ? '' : 's'} de voz en off adjunto${n === 1 ? '' : 's'} a esta escena.` }),
+    success: (n: number) => tx({ de: tx({ de: `${n} Lip-Sync-Clip${n === 1 ? '' : 'stx({ de: '} werden generiert (1–3 Min).`, en: `${n} Lip Sync Clip${n === 1 ? ', en: '} are generated (1–3 min).`, en: `${n} Lip Sync Clip${n === 1 ?', es: '} se generan (1–3 min).`, en: `${n} Clip de sincronización de labios${n === 1 ?' })' : 's'} are generated (1-3 min).`, es: `${n} Clip de sincronización de labios${n === 1 ? '' : 's'} se generan (1-3 min).` }), en: `${n} Lip Sync Clip${n === 1 ? '' : 's'} are generated (1-3 min).`, es: `${n} Clip de sincronización de labios${n === 1 ? '' : 's'} se generan (1-3 min).` }),
+    successInline: (n: number) => tx({ de: tx({ de: `${n} Voiceover-Block${n === 1 ? '' : 'blöcketx({ de: '} an diese Szene gehängt.`, en: `${n} voiceover block${n === 1 ? ', en: '} attached to this scene.`, en: `${n} voiceover block${n === 1 ?', es: '} adjunto a esta escena.`, en: `${n} bloque de voz en off${n === 1 ?' })' : 's'} attached to this scene.`, es: `${n} bloque${n === 1 ? '' : 's'} de voz en off adjunto${n === 1 ? '' : 's'} a esta escena.` }), en: `${n} voiceover block${n === 1 ? '' : 's'} attached to this scene.`, es: `${n} bloque${n === 1 ? '' : 's'} de voz en off adjunto${n === 1 ? '' : 's'} a esta escena.` }),
     failed: tx({ de: 'Generierung fehlgeschlagen', en: 'Generation failed', es: 'Error de generación' }),
     aiFailed: tx({ de: 'KI-Skript konnte nicht erstellt werden', en: 'AI script could not be created', es: 'No se pudo crear el script de IA' }),
     srsLabel: tx({ de: 'Erweitert: Stattdessen als Voiceover über eine gemeinsame Szene legen', en: 'Advanced: Instead, layer as a voiceover over a shared scene', es: 'Avanzado: En su lugar, superponer como voz en off sobre una escena compartida' }),
     srsHint: tx({ de: 'Standard bei mehreren Sprechern mit Portrait: jeder Sprecher bekommt seinen eigenen Lip-Sync-Cut. Schalter aktivieren, wenn du nur eine Gruppen-Szene mit Voiceover willst.', en: 'Standard for multiple speakers with portrait: each speaker gets their own lip-sync cut. Activate the switch if you only want a group scene with voiceover.', es: 'Estándar para múltiples oradores con retrato: cada orador obtiene su propio corte de sincronización labial. Activa el interruptor si solo quieres una escena de grupo con voz en off.' }),
     close: 'Schließen',
     continuityLocked: 'Continuity gesperrt',
-    continuityInherited: (n: number) => tx({ de: `Continuity erbt von Szene ${n}`, en: `Continuity inherits from scene ${n}`, es: `La continuidad hereda de la escena ${n}` }),
+    continuityInherited: (n: number) => tx({ de: tx({ de: `Continuity erbt von Szene ${n}`, en: `Continuity inherits from scene ${n}`, es: `La continuidad hereda de la escena ${n}` }), en: `Continuity inherits from scene ${n}`, es: `La continuidad hereda de la escena ${n}` }),
     continuityTooltip: tx({ de: 'Folgeszenen mit gleichem Cast erben diesen Identity-Anker automatisch.', en: 'Subsequent scenes with the same cast automatically inherit this identity anchor.', es: 'Las escenas posteriores con el mismo reparto heredan automáticamente este ancla de identidad.' }),
-    continuityTooltipInherited: (n: number) => tx({ de: `Sarah/Matthew werden visuell an Szene ${n} angeglichen.`, en: `Sarah/Matthew are visually matched to scene ${n}.`, es: `Sarah/Matthew se ajustan visualmente a la escena ${n}.` }),
+    continuityTooltipInherited: (n: number) => tx({ de: tx({ de: `Sarah/Matthew werden visuell an Szene ${n} angeglichen.`, en: `Sarah/Matthew are visually matched to scene ${n}.`, es: `Sarah/Matthew se ajustan visualmente a la escena ${n}.` }), en: `Sarah/Matthew are visually matched to scene ${n}.`, es: `Sarah/Matthew se ajustan visualmente a la escena ${n}.` }),
     continuityRemove: 'Lock entfernen',
     continuityForce: 'Eigenen Lock erzwingen',
   },
@@ -1313,7 +1313,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           const other = seen.get(vid)!;
           toast({
             title: tx({ de: 'Gleiche Stimme für zwei Sprecher', en: 'Same voice for two speakers', es: 'Misma voz para dos oradores' }),
-            description: tx({ de: `${other} und ${sp.name} nutzen dieselbe Stimme. Bitte unterschiedliche Stimmen wählen.`, en: `${other} and ${sp.name} use the same voice. Please choose different voices.`, es: `${other} y ${sp.name} usan la misma voz. Por favor, elige voces diferentes.` }),
+            description: tx({ de: tx({ de: `${other} und ${sp.name} nutzen dieselbe Stimme. Bitte unterschiedliche Stimmen wählen.`, en: `${other} and ${sp.name} use the same voice. Please choose different voices.`, es: `${other} y ${sp.name} usan la misma voz. Por favor, elige voces diferentes.` }), en: `${other} and ${sp.name} use the same voice. Please choose different voices.`, es: `${other} y ${sp.name} usan la misma voz. Por favor, elige voces diferentes.` }),
             variant: 'destructive',
           });
           return;
@@ -1402,8 +1402,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       const missingPortrait = speakers[0];
       const name = missingPortrait ? (sceneCast.find((c) => c.id === missingPortrait.id)?.name || missingPortrait.name || 'Sprecher') : 'Sprecher';
       toast({
-        title: tx({ de: `Kein Portrait für ${name}`, en: `No portrait for ${name}`, es: `Sin retrato para ${name}` }),
-        description: tx({ de: `Weise ${name} im Cast einen Brand-Character mit Portrait zu — sonst ist kein Lip-Sync möglich.`, en: `Assign a brand character with a portrait to ${name} in the cast — otherwise, lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${name} en el elenco; de lo contrario, no es posible la sincronización labial.` }),
+        title: tx({ de: tx({ de: `Kein Portrait für ${name}`, en: `No portrait for ${name}`, es: `Sin retrato para ${name}` }), en: `No portrait for ${name}`, es: `Sin retrato para ${name}` }),
+        description: tx({ de: tx({ de: `Weise ${name} im Cast einen Brand-Character mit Portrait zu — sonst ist kein Lip-Sync möglich.`, en: `Assign a brand character with a portrait to ${name} in the cast — otherwise, lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${name} en el elenco; de lo contrario, no es posible la sincronización labial.` }), en: `Assign a brand character with a portrait to ${name} in the cast — otherwise, lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${name} en el elenco; de lo contrario, no es posible la sincronización labial.` }),
         variant: 'destructive',
       });
       return;
@@ -1427,8 +1427,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       );
       if (missingPortrait) {
         toast({
-          title: tx({ de: `Kein Portrait für ${missingPortrait.name}`, en: `No portrait for ${missingPortrait.name}`, es: `Sin retrato para ${missingPortrait.name}` }),
-          description: tx({ de: `Weise ${missingPortrait.name} im Cast einen Brand-Character mit Portrait zu — sonst kein echtes Lip-Sync möglich.`, en: `Assign a brand character with a portrait to ${missingPortrait.name} in the cast — otherwise, real lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${missingPortrait.name} en el elenco; de lo contrario, no es posible una sincronización labial real.` }),
+          title: tx({ de: tx({ de: `Kein Portrait für ${missingPortrait.name}`, en: `No portrait for ${missingPortrait.name}`, es: `No hay retrato para ${missingPortrait.name}` }), en: `No portrait for ${missingPortrait.name}`, es: `Sin retrato para ${missingPortrait.name}` }),
+          description: tx({ de: tx({ de: `Weise ${missingPortrait.name} im Cast einen Brand-Character mit Portrait zu — sonst kein echtes Lip-Sync möglich.`, en: `Assign a brand character with a portrait to ${missingPortrait.name} in the cast — otherwise, real lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${missingPortrait.name} en el elenco; de lo contrario, no es posible una sincronización labial real.` }), en: `Assign a brand character with a portrait to ${missingPortrait.name} in the cast — otherwise, real lip-sync is not possible.`, es: `Asigna un personaje de marca con un retrato a ${missingPortrait.name} en el elenco; de lo contrario, no es posible una sincronización labial real.` }),
           variant: 'destructive',
         });
         return;
@@ -1477,7 +1477,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         if (!c) throw new Error(`Speaker "${block.speakerName}" is not in this scene's cast`);
         if (!c.referenceImageUrl) {
           throw new Error(
-            tx({ de: `${c.name} hat kein Portrait — bitte im Cast einen Brand-Character mit Portrait zuweisen.`, en: `${c.name} has no portrait — please assign a brand character with a portrait in the cast.`, es: `${c.name} no tiene retrato; por favor, asigna un personaje de marca con un retrato en el elenco.` }),
+            tx({ de: tx({ de: `${c.name} hat kein Portrait — bitte im Cast einen Brand-Character mit Portrait zuweisen.`, en: `${c.name} has no portrait — please assign a brand character with a portrait in the cast.`, es: `${c.name} no tiene retrato; por favor, asigna un personaje de marca con un retrato en el elenco.` }), en: `${c.name} has no portrait — please assign a brand character with a portrait in the cast.`, es: `${c.name} no tiene retrato; por favor, asigna un personaje de marca con un retrato en el elenco.` }),
           );
         }
         const cfg = getResolvedVoiceForSpeakerId(block.speakerId);
@@ -1534,7 +1534,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const block = blocks[i];
         const c = sceneCast.find((x) => x.id === block.speakerId)!;
         setGenStage(
-          tx({ de: `Stimme ${i + 1}/${blocks.length} (${c.name}) wird erzeugt…`, en: `Voice ${i + 1}/${blocks.length} (${c.name}) is being generated...`, es: `Se está generando la voz ${i + 1}/${blocks.length} (${c.name})...` }),
+          tx({ de: tx({ de: `Stimme ${i + 1}/${blocks.length} (${c.name}) wird erzeugt…`, en: `Voice ${i + 1}/${blocks.length} (${c.name}) is being generated...`, es: `Se está generando la voz ${i + 1}/${blocks.length} (${c.name})...` }), en: `Voice ${i + 1}/${blocks.length} (${c.name}) is being generated...`, es: `Se está generando la voz ${i + 1}/${blocks.length} (${c.name})...` }),
         );
         const cfg = getResolvedVoiceForSpeakerId(block.speakerId)!;
 
@@ -1704,7 +1704,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           };
           toast({
             title: tx({ de: 'Dialog länger als Szene', en: 'Dialog longer than scene', es: 'Diálogo más largo que la escena' }),
-            description: tx({ de: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts off the end (cut_off). For the full dialog, increase scene duration or pick a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} dura ${masterDuration}s. Sync.so recorta el final (cut_off). Para el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }),
+            description: tx({ de: tx({ de: `Audio braucht ~${audioRequired}s, ${providerLabel[masterProvider]}-Szene ist ${masterDuration}s. Sync.so kürzt am Ende (cut_off). Für vollen Dialog Szenendauer erhöhen oder Provider mit größerem Duration-Fenster wählen.`, en: `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts at the end (cut_off). To get full dialogue, increase scene duration or choose a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} es de ${masterDuration}s. Sync.so corta al final (cut_off). Para obtener el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }), en: `Audio needs ~${audioRequired}s, ${providerLabel[masterProvider]} scene is ${masterDuration}s. Sync.so cuts off the end (cut_off). For the full dialog, increase scene duration or pick a provider with a larger duration window.`, es: `El audio necesita ~${audioRequired}s, la escena de ${providerLabel[masterProvider]} dura ${masterDuration}s. Sync.so recorta el final (cut_off). Para el diálogo completo, aumenta la duración de la escena o elige un proveedor con una ventana de duración mayor.` }),
           });
         }
 
@@ -1811,7 +1811,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         okCount = 1;
         toast({
           title: tx({ de: 'Dialog-Shots werden gerendert', en: 'Rendering Dialog Shots', es: 'Renderizando Dialog-Shots' }),
-          description: tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `One dedicated shot (Hailuo + Sync.so lip-sync) per speaker turn, concatenated into a ${masterDuration}s scene at the end. Live progress in the clip-card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Sync.so Lip-Sync) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` }),
+          description: tx({ de: tx({ de: `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`, en: `For each speaker turn, a separate shot (Hailuo + Sync.so Lip-Sync) is rendered and then stitched together into a ${masterDuration}s scene. Live progress in the clip card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Sync.so Lip-Sync) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` }), en: `One dedicated shot (Hailuo + Sync.so lip-sync) per speaker turn, concatenated into a ${masterDuration}s scene at the end. Live progress in the clip-card overlay.`, es: `Para cada turno de orador, se renderiza una toma separada (Hailuo + Sync.so Lip-Sync) y luego se une en una escena de ${masterDuration}s. Progreso en vivo en la superposición de la tarjeta de clip.` }),
         });
         if (onClose) onClose();
       } catch (twoShotErr) {
@@ -1922,7 +1922,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                   await onInsertScenesAfter(scene.id, partials, { removeParent: false });
                   toast({
                     title: tx({ de: '✨ Coverage erzeugt', en: '✨ Coverage created', es: '✨ Coverage creada' }),
-                    description: tx({ de: `${partials.length} Szenen nach dieser Szene eingefügt.`, en: `${partials.length} scenes inserted after this scene.`, es: `Se insertaron ${partials.length} escenas después de esta escena.` }),
+                    description: tx({ de: tx({ de: `${partials.length} Szenen nach dieser Szene eingefügt.`, en: `${partials.length} scenes inserted after this scene.`, es: `Se insertaron ${partials.length} escenas después de esta escena.` }), en: `${partials.length} scenes inserted after this scene.`, es: `Se insertaron ${partials.length} escenas después de esta escena.` }),
                   });
                 } catch (e) {
                   toast({ title: 'Auto-Coverage', description: formatError(e), variant: 'destructive' });
@@ -2038,7 +2038,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
         {(!script || script.trim().length === 0) && sceneCast.length > 0 && (
           <p className="mt-1.5 text-[10px] text-muted-foreground italic">
-            {tx({ de: `Skript eintragen — ${sceneCast.length} Sprecher-Slot${sceneCast.length === 1 ? '' : 's'} und Timing sind für dich vorbereitet.`, en: `Script entered — ${sceneCast.length} speaker slot${sceneCast.length === 1 ? '' : 's'} and timing are prepared for you.`, es: `Guion introducido: ${sceneCast.length} espacio${sceneCast.length === 1 ? '' : 's'} para orador${sceneCast.length === 1 ? '' : 'es'} y el timing están preparados para ti.` })}
+            {tx({ de: tx({ de: `Skript eintragen — ${sceneCast.length} Sprecher-Slot${sceneCast.length === 1 ? '' : 'stx({ de: '} und Timing sind für dich vorbereitet.`, en: `Script entered — ${sceneCast.length} speaker slot${sceneCast.length === 1 ? ', en: '} and timing are prepared for you.`, en: `Script entered — ${sceneCast.length} speaker slot${sceneCast.length === 1 ?', es: '} y el tiempo está preparado para usted.`, en: `Se ingresó el guión — ${sceneCast.length} ranura para altavoz${sceneCast.length === 1 ?' })' : 's'} and timing are prepared for you.`, es: `Guion introducido: ${sceneCast.length} espacio${sceneCast.length === 1 ? '' : 's'} para orador${sceneCast.length === 1 ? '' : 'es'} y el timing están preparados para ti.` }), en: `Script entered — ${sceneCast.length} speaker slot${sceneCast.length === 1 ? '' : 's'} and timing are prepared for you.`, es: `Guion introducido: ${sceneCast.length} espacio${sceneCast.length === 1 ? '' : 's'} para orador${sceneCast.length === 1 ? '' : 'es'} y el timing están preparados para ti.` })}
           </p>
         )}
 
@@ -2294,10 +2294,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         let tone: 'primary' | 'amber' | 'muted' = 'muted';
         if (isMulti && missing) {
           tone = 'amber';
-          label = tx({ de: `⚠️ ${missing.name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst kein echter Lip-Sync möglich.`, en: `⚠️ ${missing.name} has no portrait — please assign a cast character, otherwise real lip-sync is not possible.`, es: `⚠️ ${missing.name} no tiene retrato; asigna un personaje del elenco, de lo contrario no será posible una sincronización labial real.` });
+          label = tx({ de: tx({ de: `⚠️ ${missing.name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst kein echter Lip-Sync möglich.`, en: `⚠️ ${missing.name} has no portrait — please assign a cast character, otherwise real lip-sync is not possible.`, es: `⚠️ ${missing.name} no tiene retrato; asigna un personaje del elenco, de lo contrario no será posible una sincronización labial real.` }), en: `⚠️ ${missing.name} has no portrait — please assign a cast character, otherwise real lip-sync is not possible.`, es: `⚠️ ${missing.name} no tiene retrato; asigna un personaje del elenco, de lo contrario no será posible una sincronización labial real.` });
         } else if (isSrsSplit && portraitsAll) {
           tone = 'primary';
-          label = tx({ de: `🎬 Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 Hailuo-Plate + Sync.so pro Sprecher)`, en: `🎬 Will be rendered as ${speakers.length} scene${speakers.length === 1 ? '' : 's'} (shot-reverse-shot, 1 Hailuo plate + Sync.so per speaker each)`, es: `🎬 Se renderizará como ${speakers.length} escena${speakers.length === 1 ? '' : 's'} (plano-contraplano, 1 placa Hailuo + Sync.so por orador cada una)` });
+          label = tx({ de: tx({ de: `🎬 Wird als ${speakers.length} Szene${speakers.length === 1 ? '' : 'n'} gerendert (Shot-Reverse-Shot, je 1 Hailuo-Plate + Sync.so pro Sprecher)`, en: `🎬 Will be rendered as ${speakers.length} scene${speakers.length === 1 ? '' : 's'} (shot-reverse-shot, 1 Hailuo plate + Sync.so per speaker each)`, es: `🎬 Se renderizará como ${speakers.length} escena${speakers.length === 1 ? '' : 's'} (plano-contraplano, 1 placa Hailuo + Sync.so por orador cada una)` }), en: `🎬 Will be rendered as ${speakers.length} scene${speakers.length === 1 ? '' : 's'} (shot-reverse-shot, 1 Hailuo plate + Sync.so per speaker each)`, es: `🎬 Se renderizará como ${speakers.length} escena${speakers.length === 1 ? '' : 's'} (plano-contraplano, 1 placa Hailuo + Sync.so por orador cada una)` });
         } else if (isSyncSegments && portraitsAll) {
           tone = 'primary';
           // sync-segments pricing ≈ €0.20/s; show flat cost note instead of per-speaker.
@@ -2318,7 +2318,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return (
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-400 leading-relaxed">
             🎭 <strong>Dialog-Shot Pipeline:</strong>{' '}
-            {tx({ de: `Pro Sprecher-Turn ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. ${blocks.length} Shots werden am Ende zu einer Szene gestitcht.`, en: `Each speaker turn gets its own Hailuo plate + dedicated Sync.so lip-sync. ${blocks.length} shots will be stitched into one scene at the end.`, es: `Cada turno de orador obtiene su propia placa Hailuo + sincronización labial dedicada de Sync.so. ${blocks.length} tomas se unirán en una escena al final.` })}
+            {tx({ de: tx({ de: `Pro Sprecher-Turn ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. ${blocks.length} Shots werden am Ende zu einer Szene gestitcht.`, en: `Each speaker turn gets its own Hailuo plate + dedicated Sync.so lip-sync. ${blocks.length} shots will be stitched into one scene at the end.`, es: `Cada turno de orador obtiene su propia placa Hailuo + sincronización labial dedicada de Sync.so. ${blocks.length} tomas se unirán en una escena al final.` }), en: `Each speaker turn gets its own Hailuo plate + dedicated Sync.so lip-sync. ${blocks.length} shots will be stitched into one scene at the end.`, es: `Cada turno de orador obtiene su propia placa Hailuo + sincronización labial dedicada de Sync.so. ${blocks.length} tomas se unirán en una escena al final.` })}
           </div>
         );
       })()}
@@ -2363,7 +2363,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               return willSrs ? (
                 <>
                   <User className="h-3 w-3" />{' '}
-                  {tx({ de: `🎭 ${blocks.length} Dialog-Shots in echte Szene rendern`, en: `🎭 Render ${blocks.length} Dialog Shots into real scene`, es: `🎭 Renderizar ${blocks.length} Dialog-Shots en escena real` })}
+                  {tx({ de: tx({ de: `🎭 ${blocks.length} Dialog-Shots in echte Szene rendern`, en: `🎭 Render ${blocks.length} dialogue shots into real scene`, es: `🎭 Renderiza tomas de diálogo de ${blocks.length} en una escena real` }), en: `🎭 Render ${blocks.length} Dialog Shots into real scene`, es: `🎭 Renderizar ${blocks.length} Dialog-Shots en escena real` })}
                 </>
               ) : (
                 <>

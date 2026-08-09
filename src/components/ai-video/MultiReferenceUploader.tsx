@@ -180,7 +180,7 @@ export function MultiReferenceUploader({
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         {language === 'de'
-          ? `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : tx({ de: ' Ohne Bild wird rein aus dem Text generiert.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`
+          ? tx({ de: `Lade Charakter, Produkt, Setting und Style — ${engine} kombiniert sie in einer Szene.${required ? '' : tx({ de: ' Ohne Bild wird rein aus dem Text generiert.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, en: `Load character, product, setting and style — ${engine} combines them into one scene.${required ? '' : tx({ de: ' Without an image, generation is purely text-based.', en: ' Without an image, generation is purely text-based.', es: ' Sin imagen, la generación se basa puramente en texto.' })}`, es: `Cargue carácter, producto, entorno y estilo: ${engine} los combina en una sola escena.${required ? '' : tx({ de: ' Sin una imagen, la generación se basa puramente en texto.', en: ' Sin una imagen, la generación se basa puramente en texto.', es: ' Sin imagen, la generación se basa puramente en texto.' })}` })
           : language === 'es'
           ? `Sube personaje, producto, ubicación y estilo — ${engine} los combina en una escena.${required ? '' : ' Sin imagen se genera solo a partir del texto.'}`
           : `Upload character, product, location and style — ${engine} blends them into one scene.${required ? '' : ' Without an image it generates from text only.'}`}

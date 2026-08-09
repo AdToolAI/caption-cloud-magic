@@ -58,7 +58,7 @@ export function SentryDashboard() {
       await loadCached();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Fehler';
-      toast.error(tx({ de: `Sync fehlgeschlagen: ${msg}`, en: `Sync failed: ${msg}`, es: `Error de sincronización: ${msg}` }));
+      toast.error(tx({ de: tx({ de: `Sync fehlgeschlagen: ${msg}`, en: `Sync failed: ${msg}`, es: `Error de sincronización: ${msg}` }), en: `Sync failed: ${msg}`, es: `Error de sincronización: ${msg}` }));
     } finally {
       setSyncing(false);
     }
