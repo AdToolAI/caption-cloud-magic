@@ -114,6 +114,7 @@ export function ImageGenerator() {
   const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   const [replicateLoading, setReplicateLoading] = useState(false);
+  const [refUploading, setRefUploading] = useState(false);
 
   const [albumDialogOpen, setAlbumDialogOpen] = useState(false);
   const [selectedImageForAlbum, setSelectedImageForAlbum] = useState<GeneratedImage | null>(null);
