@@ -73,30 +73,30 @@ export const CreditHistory = () => {
   const getTypeInfo = (type: string) => {
     switch (type) {
       case 'credit':
-        return { icon: ArrowUp, color: 'text-green-500', bgColor: 'bg-green-500/10 border-green-500/20', label: 'Gutschrift' };
+        return { icon: ArrowUp, color: 'text-green-500', bgColor: 'bg-green-500/10 border-green-500/20', label: tx({ de: 'Gutschrift', en: 'Credit', es: 'Abono' }) };
       case 'debit':
-        return { icon: ArrowDown, color: 'text-red-500', bgColor: 'bg-red-500/10 border-red-500/20', label: 'Abbuchung' };
+        return { icon: ArrowDown, color: 'text-red-500', bgColor: 'bg-red-500/10 border-red-500/20', label: tx({ de: 'Abbuchung', en: 'Debit', es: 'Cargo' }) };
       case 'refund':
-        return { icon: Clock, color: 'text-cyan-500', bgColor: 'bg-cyan-500/10 border-cyan-500/20', label: 'Rückerstattung' };
+        return { icon: Clock, color: 'text-cyan-500', bgColor: 'bg-cyan-500/10 border-cyan-500/20', label: tx({ de: 'Rückerstattung', en: 'Refund', es: 'Reembolso' }) };
       default:
-        return { icon: Clock, color: 'text-muted-foreground', bgColor: 'bg-muted/10 border-muted/20', label: 'Sonstige' };
+        return { icon: Clock, color: 'text-muted-foreground', bgColor: 'bg-muted/10 border-muted/20', label: tx({ de: 'Sonstige', en: 'Other', es: 'Otros' }) };
     }
   };
 
   const getFeatureLabel = (code: string) => {
     const labels: Record<string, string> = {
-      'caption_generate': 'Caption generieren',
-      'hashtag_analyze': 'Hashtag Analyse',
-      'bio_optimize': 'Bio optimieren',
-      'post_schedule': 'Post planen',
-      'trend_fetch': 'Trend abrufen',
+      'caption_generate': tx({ de: 'Caption generieren', en: 'Generate caption', es: 'Generar leyenda' }),
+      'hashtag_analyze': tx({ de: 'Hashtag Analyse', en: 'Hashtag analysis', es: 'Análisis de hashtags' }),
+      'bio_optimize': tx({ de: 'Bio optimieren', en: 'Optimize bio', es: 'Optimizar biografía' }),
+      'post_schedule': tx({ de: 'Post planen', en: 'Schedule post', es: 'Programar publicación' }),
+      'trend_fetch': tx({ de: 'Trend abrufen', en: 'Fetch trend', es: 'Obtener tendencia' }),
       'image_process': tx({ de: 'Bild verarbeiten', en: 'Process image', es: 'Imagen de proceso' }),
-      'comment_analyze': 'Kommentar analysieren',
-      'background_generate': 'Hintergrund generieren',
-      'coach_chat': 'Coach Chat',
-      'monthly_topup': 'Monatliche Aufladung',
-      'manual_credit': 'Manuelle Gutschrift',
-      'refund': 'Rückerstattung'
+      'comment_analyze': tx({ de: 'Kommentar analysieren', en: 'Analyze comment', es: 'Analizar comentario' }),
+      'background_generate': tx({ de: 'Hintergrund generieren', en: 'Generate background', es: 'Generar fondo' }),
+      'coach_chat': tx({ de: 'Coach Chat', en: 'Coach chat', es: 'Chat de entrenador' }),
+      'monthly_topup': tx({ de: 'Monatliche Aufladung', en: 'Monthly top-up', es: 'Recarga mensual' }),
+      'manual_credit': tx({ de: 'Manuelle Gutschrift', en: 'Manual credit', es: 'Abono manual' }),
+      'refund': tx({ de: 'Rückerstattung', en: 'Refund', es: 'Reembolso' })
     };
     return labels[code] || code;
   };
@@ -130,8 +130,8 @@ export const CreditHistory = () => {
               <History className="h-5 w-5 text-primary" />
             </motion.div>
             <div>
-              <CardTitle>Credit-Verlauf</CardTitle>
-              <CardDescription>Ihre letzten 20 Transaktionen</CardDescription>
+              <CardTitle>{tx({ de: "Credit-Verlauf", en: "Credit history", es: "Historial de créditos" })}</CardTitle>
+              <CardDescription>{tx({ de: "Ihre letzten 20 Transaktionen", en: "Your last 20 transactions", es: "Tus últimas 20 transacciones" })}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -158,10 +158,10 @@ export const CreditHistory = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="border-white/5 hover:bg-transparent">
-                    <TableHead className="text-muted-foreground font-medium">Datum</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Feature</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Typ</TableHead>
-                    <TableHead className="text-right text-muted-foreground font-medium">Credits</TableHead>
+                    <TableHead className="text-muted-foreground font-medium">{tx({ de: "Datum", en: "Date", es: "Fecha" })}</TableHead>
+                    <TableHead className="text-muted-foreground font-medium">{tx({ de: "Feature", en: "Feature", es: "Función" })}</TableHead>
+                    <TableHead className="text-muted-foreground font-medium">{tx({ de: "Typ", en: "Type", es: "Tipo" })}</TableHead>
+                    <TableHead className="text-right text-muted-foreground font-medium">{tx({ de: "Credits", en: "Credits", es: "Créditos" })}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

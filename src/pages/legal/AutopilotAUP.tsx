@@ -97,56 +97,56 @@ export default function AutopilotAUP() {
             {tx({ de: "Inhalte, die irgendeine dieser Walls nicht passieren, werden automatisch blockiert. Versuche, diese Walls zu umgehen, gelten als Critical-Strike (siehe §6).", en: "Content that fails to pass any of these walls is automatically blocked. Attempts to bypass these walls count as a Critical Strike (see §6).", es: "El contenido que no supera alguno de estos muros se bloquea automáticamente. Los intentos de eludir estos muros cuentan como una infracción crítica (ver §6)." })}
           </Section>
 
-          <Section title="§6 Strike-System &amp; Sanktionen">
+          <Section title={tx({ de: "§6 Strike-System & Sanktionen", en: "§6 Strike system & sanctions", es: "§6 Sistema de infracciones y sanciones" })}>
             <div className="space-y-2">
               <p><strong>Soft-Strike</strong> {tx({ de: "(Eingabe oder Caption blockiert) — Hinweis im Cockpit, keine weiteren Folgen.", en: "(Input or caption blocked) — Note in cockpit, no further consequences.", es: "(Entrada o subtítulo bloqueado) — Nota en el cockpit, sin más consecuencias." })}</p>
-              <p><strong>Hard-Strike</strong> (Generierungs- oder Render-Block: Deepfake-Hint, Copyright-Hint, prominente Person, geschützte IP) — zählt im Strike-Counter.</p>
+              <p><strong>Hard-Strike</strong> {tx({ de: "(Generierungs- oder Render-Block: Deepfake-Hint, Copyright-Hint, prominente Person, geschützte IP) — zählt im Strike-Counter.", en: "(Generation or render block: deepfake hint, copyright hint, prominent person, protected IP) — counts in the strike counter.", es: "(Bloqueo de generación o renderizado: indicio de deepfake, indicio de copyright, persona prominente, propiedad intelectual protegida) — cuenta en el contador de infracciones." })}</p>
               <p><strong>Critical-Strike</strong> {tx({ de: "(Manipulationsversuch: Watermark-Removal, Filter-Bypass, gefälschte Origin-Daten, modifizierte API-Payloads, mehrfacher Hard-Strike-Wiederholung) — zählt doppelt und kann zur sofortigen Termination führen (siehe §7).", en: "(Attempted manipulation: watermark removal, filter bypass, fake origin data, modified API payloads, multiple hard-strike repetitions) — counts double and may lead to immediate termination (see §7).", es: "(Intento de manipulación: eliminación de marca de agua, bypass de filtro, datos de origen falsos, cargas útiles de API modificadas, repetición múltiple de infracciones graves) — cuenta doble y puede llevar a la terminación inmediata (ver §7)." })}</p>
             </div>
             <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm space-y-1">
-              <p>Strike 1 → Schriftliche Warnung per Mail.</p>
-              <p>Strike 2 → 7 Tage Autopilot-Sperre + verpflichtendes Re-Onboarding.</p>
-              <p>Strike 3 → Autopilot dauerhaft für diesen Account gesperrt + Admin-Review.</p>
+              <p>{tx({ de: "Strike 1 → Schriftliche Warnung per Mail.", en: "Strike 1 → Written warning via email.", es: "Infracción 1 → Advertencia escrita por correo electrónico." })}</p>
+              <p>{tx({ de: "Strike 2 → 7 Tage Autopilot-Sperre + verpflichtendes Re-Onboarding.", en: "Strike 2 → 7-day Autopilot suspension + mandatory re-onboarding.", es: "Infracción 2 → Suspensión de Autopilot de 7 días + reincorporación obligatoria." })}</p>
+              <p>{tx({ de: "Strike 3 → Autopilot dauerhaft für diesen Account gesperrt + Admin-Review.", en: "Strike 3 → Autopilot permanently blocked for this account + admin review.", es: "Infracción 3 → Autopilot bloqueado permanentemente para esta cuenta + revisión por administrador." })}</p>
             </div>
           </Section>
 
-          <Section title="§7 Fristlose Account-Löschung ohne Rückerstattung">
+          <Section title={tx({ de: "§7 Fristlose Account-Löschung ohne Rückerstattung", en: "§7 Immediate account deletion without refund", es: "§7 Eliminación inmediata de la cuenta sin reembolso" })}>
             <Card className="bg-destructive/10 border-destructive/50 p-4 my-2">
               <div className="flex items-start gap-2">
                 <Ban className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                 <div className="text-sm space-y-2">
                   <p className="font-semibold text-destructive">
-                    Folgende Verstöße führen zur sofortigen, fristlosen Löschung des gesamten Accounts ohne Anspruch auf Rückerstattung von Credits, laufenden Abonnements oder anderen Guthaben:
+                    {tx({ de: "Folgende Verstöße führen zur sofortigen, fristlosen Löschung des gesamten Accounts ohne Anspruch auf Rückerstattung von Credits, laufenden Abonnements oder anderen Guthaben:", en: "The following violations lead to immediate deletion of the entire account without any claim to a refund of credits, running subscriptions, or other balances:", es: "Las siguientes infracciones conllevan la eliminación inmediata de toda la cuenta sin derecho a reembolso de créditos, suscripciones activas u otros saldos:" })}
                   </p>
                   <ul className="list-disc pl-5 space-y-1">
                     <li>{tx({ de: "Versuch, ein Deepfake einer realen Person zu generieren (auch erfolgloser Versuch);", en: "Attempt to generate a deepfake of a real person (even unsuccessful attempt);", es: "Intento de generar un deepfake de una persona real (incluso intento fallido);" })}</li>
-                    <li>Mehrfacher Versuch, denselben blockierten Prompt nach Block zu wiederholen;</li>
+                    <li>{tx({ de: "Mehrfacher Versuch, denselben blockierten Prompt nach Block zu wiederholen;", en: "Repeated attempts to resubmit the same blocked prompt after being blocked;", es: "Intentos repetidos de volver a enviar el mismo prompt bloqueado después de ser bloqueado;" })}</li>
                     <li>{tx({ de: "Manipulation an unseren Systemen oder unautorisierte direkte API-Aufrufe mit modifizierten Payloads;", en: "Manipulation of our systems or unauthorized direct API calls with modified payloads;", es: "Manipulación de nuestros sistemas o llamadas directas no autorizadas a la API con cargas útiles modificadas;" })}</li>
-                    <li>Einreichung von Assets mit gefälschten Origin-Daten (z.B. fremde Person als „Self-Portrait" deklariert);</li>
+                    <li>{tx({ de: "Einreichung von Assets mit gefälschten Origin-Daten (z.B. fremde Person als „Self-Portrait\" deklariert);", en: "Submitting assets with falsified origin data (e.g. declaring another person as a \"self-portrait\");", es: "Envío de recursos con datos de origen falsificados (por ejemplo, declarar a otra persona como \"autorretrato\");" })}</li>
                     <li>{tx({ de: "Veröffentlichungen, die nachweislich auf Plattformen wegen Copyright-Verletzung oder Identitätstäuschung gesperrt werden (DMCA-Eingang);", en: "Publications that are demonstrably blocked on platforms due to copyright infringement or identity deception (DMCA receipt);", es: "Publicaciones que son demostrablemente bloqueadas en plataformas debido a infracción de derechos de autor o suplantación de identidad (recepción DMCA);" })}</li>
                     <li>{tx({ de: "Nutzung des Autopilots zur Verbreitung von Hass, illegalen Inhalten oder zur Schädigung Dritter.", en: "Use of Autopilot to spread hate, illegal content, or to harm third parties.", es: "Uso de Autopilot para difundir odio, contenido ilegal o para dañar a terceros." })}</li>
                   </ul>
                 </div>
               </div>
             </Card>
-            <p>Im Falle einer Termination werden Beweise (Prompts, Renderings, Strikes, Consent-Log) für 90 Tage zur rechtlichen Verteidigung archiviert und anschließend gemäß DSGVO Art. 17 endgültig gelöscht. Du erhältst eine schriftliche Begründung mit Beweis-Hash und kannst innerhalb von 14 Tagen schriftlich Widerspruch einlegen (<Link to="/legal/character-takedown" className="text-primary underline">Kontakt</Link>).</p>
+            <p>{tx({ de: "Im Falle einer Termination werden Beweise (Prompts, Renderings, Strikes, Consent-Log) für 90 Tage zur rechtlichen Verteidigung archiviert und anschließend gemäß DSGVO Art. 17 endgültig gelöscht. Du erhältst eine schriftliche Begründung mit Beweis-Hash und kannst innerhalb von 14 Tagen schriftlich Widerspruch einlegen (", en: "In case of termination, evidence (prompts, renderings, strikes, consent log) is archived for 90 days for legal defense purposes and then permanently deleted in accordance with GDPR Art. 17. You will receive a written justification with an evidence hash and can lodge a written objection within 14 days (", es: "En caso de terminación, las pruebas (prompts, renderizados, infracciones, registro de consentimiento) se archivan durante 90 días con fines de defensa legal y luego se eliminan permanentemente de conformidad con el artículo 17 del RGPD. Recibirás una justificación por escrito con un hash de evidencia y podrás presentar una objeción por escrito en un plazo de 14 días (" })}<Link to="/legal/character-takedown" className="text-primary underline">{tx({ de: "Kontakt", en: "Contact", es: "Contacto" })}</Link>).</p>
           </Section>
 
-          <Section title="§8 EU-AI-Act-Konformität &amp; Audit">
-            Jede KI-Entscheidung des Autopilots wird in einem unveränderlichen Activity-Log mit Prompt, Output, QA-Score und Zeitstempel gespeichert (für mindestens 12 Monate). Du hast jederzeit Zugriff auf dein eigenes Log im Cockpit. Du erfüllst damit deine Transparenzpflicht ggü. Plattformen und Behörden.
+          <Section title={tx({ de: "§8 EU-AI-Act-Konformität & Audit", en: "§8 EU AI Act compliance & audit", es: "§8 Cumplimiento y auditoría de la Ley de IA de la UE" })}>
+            {tx({ de: "Jede KI-Entscheidung des Autopilots wird in einem unveränderlichen Activity-Log mit Prompt, Output, QA-Score und Zeitstempel gespeichert (für mindestens 12 Monate). Du hast jederzeit Zugriff auf dein eigenes Log im Cockpit. Du erfüllst damit deine Transparenzpflicht ggü. Plattformen und Behörden.", en: "Every AI decision made by Autopilot is recorded in an immutable activity log with prompt, output, QA score, and timestamp (for at least 12 months). You have access to your own log in the cockpit at any time. This fulfills your transparency obligations to platforms and authorities.", es: "Cada decisión de IA tomada por Autopilot se registra en un registro de actividad inmutable con prompt, salida, puntuación de control de calidad y marca de tiempo (durante al menos 12 meses). Tienes acceso a tu propio registro en el cockpit en cualquier momento. Esto cumple con tus obligaciones de transparencia frente a plataformas y autoridades." })}
           </Section>
 
-          <Section title="§9 Disclosure-Pflicht">
-            Alle vom Autopilot generierten Posts werden automatisch mit dem Hinweis „Made with AI · @useadtool" in der Caption versehen sowie mit einem unsichtbaren C2PA-Provenance-Manifest in den Asset-Metadaten. Diese Markierungen dürfen nicht entfernt werden — siehe §6 (Critical-Strike).
+          <Section title={tx({ de: "§9 Disclosure-Pflicht", en: "§9 Disclosure obligation", es: "§9 Obligación de divulgación" })}>
+            {tx({ de: "Alle vom Autopilot generierten Posts werden automatisch mit dem Hinweis „Made with AI · @useadtool\" in der Caption versehen sowie mit einem unsichtbaren C2PA-Provenance-Manifest in den Asset-Metadaten. Diese Markierungen dürfen nicht entfernt werden — siehe §6 (Critical-Strike).", en: "All posts generated by Autopilot are automatically labeled with \"Made with AI · @useadtool\" in the caption as well as an invisible C2PA provenance manifest in the asset metadata. These markings must not be removed — see §6 (Critical Strike).", es: "Todas las publicaciones generadas por Autopilot se etiquetan automáticamente con \"Made with AI · @useadtool\" en el subtítulo, así como con un manifiesto de procedencia C2PA invisible en los metadatos del recurso. Estas marcas no deben eliminarse — ver §6 (infracción crítica)." })}
           </Section>
 
-          <Section title="§10 Plattform-Konformität">
-            Du versicherst, dass deine verbundenen Social-Media-Konten den jeweiligen Plattform-Richtlinien (Meta Platform Terms, TikTok Community Guidelines, X Developer Agreement etc.) entsprechen. Die Nutzung des Autopilots entbindet dich nicht von eigener Verantwortung für Plattform-konformes Verhalten.
+          <Section title={tx({ de: "§10 Plattform-Konformität", en: "§10 Platform compliance", es: "§10 Cumplimiento de la plataforma" })}>
+            {tx({ de: "Du versicherst, dass deine verbundenen Social-Media-Konten den jeweiligen Plattform-Richtlinien (Meta Platform Terms, TikTok Community Guidelines, X Developer Agreement etc.) entsprechen. Die Nutzung des Autopilots entbindet dich nicht von eigener Verantwortung für Plattform-konformes Verhalten.", en: "You warrant that your connected social media accounts comply with the respective platform policies (Meta Platform Terms, TikTok Community Guidelines, X Developer Agreement, etc.). Using Autopilot does not release you from your own responsibility for platform-compliant behavior.", es: "Garantizas que tus cuentas de redes sociales conectadas cumplen con las políticas de la plataforma correspondiente (Meta Platform Terms, TikTok Community Guidelines, X Developer Agreement, etc.). El uso de Autopilot no te exime de tu propia responsabilidad de comportarte de acuerdo con la plataforma." })}
           </Section>
 
           <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
             <FileText className="h-3.5 w-3.5" />
-            Hash dieses Dokuments wird beim Akzeptieren mit Zeitstempel und IP-Hash unveränderlich in deinem Consent-Log abgelegt.
+            {tx({ de: "Hash dieses Dokuments wird beim Akzeptieren mit Zeitstempel und IP-Hash unveränderlich in deinem Consent-Log abgelegt.", en: "This document's hash is immutably recorded in your consent log with timestamp and IP hash upon acceptance.", es: "El hash de este documento se registra de forma inmutable en tu registro de consentimiento con marca de tiempo y hash de IP al aceptarlo." })}
           </div>
         </div>
       </div>

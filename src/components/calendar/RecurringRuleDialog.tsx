@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18nText";
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -59,40 +60,40 @@ export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRu
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Repeat className="h-5 w-5" />
-            Recurring Event erstellen
+            {tx({ de: "Recurring Event erstellen", en: "Create recurring event", es: "Crear evento recurrente" })}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div>
-            <Label>Regel-Name</Label>
+            <Label>{tx({ de: "Regel-Name", en: "Rule name", es: "Nombre de la regla" })}</Label>
             <Input
-              placeholder="z.B. Wöchentlicher Status Update"
+              placeholder={tx({ de: "z.B. Wöchentlicher Status Update", en: "e.g. Weekly status update", es: "p. ej. Actualización semanal de estado" })}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
           <div>
-            <Label>Wiederholungs-Pattern</Label>
+            <Label>{tx({ de: "Wiederholungs-Pattern", en: "Recurrence pattern", es: "Patrón de recurrencia" })}</Label>
             <Select value={pattern} onValueChange={setPattern}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="daily">Täglich</SelectItem>
-                <SelectItem value="weekly">Wöchentlich</SelectItem>
-                <SelectItem value="monthly">Monatlich</SelectItem>
+                <SelectItem value="daily">{tx({ de: "Täglich", en: "Daily", es: "Diario" })}</SelectItem>
+                <SelectItem value="weekly">{tx({ de: "Wöchentlich", en: "Weekly", es: "Semanal" })}</SelectItem>
+                <SelectItem value="monthly">{tx({ de: "Monatlich", en: "Monthly", es: "Mensual" })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="border-t pt-4">
-            <h3 className="font-medium mb-3">Event-Vorlage</h3>
+            <h3 className="font-medium mb-3">{tx({ de: "Event-Vorlage", en: "Event template", es: "Plantilla de evento" })}</h3>
             
             <div className="space-y-3">
               <div>
-                <Label>Event-Titel</Label>
+                <Label>{tx({ de: "Event-Titel", en: "Event title", es: "Título del evento" })}</Label>
                 <Input
                   placeholder={t("calendarRecurring.eventTitle")}
                   value={eventTitle}
@@ -101,7 +102,7 @@ export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRu
               </div>
 
               <div>
-                <Label>Caption (optional)</Label>
+                <Label>{tx({ de: "Caption (optional)", en: "Caption (optional)", es: "Leyenda (opcional)" })}</Label>
                 <Textarea
                   placeholder={t("calendarRecurring.captionPlaceholder")}
                   value={eventCaption}
@@ -112,9 +113,9 @@ export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRu
 
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>Auto-Rendering</Label>
+                  <Label>{tx({ de: "Auto-Rendering", en: "Auto rendering", es: "Renderizado automático" })}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Video automatisch rendern
+                    {tx({ de: "Video automatisch rendern", en: "Automatically render video", es: "Renderizar video automáticamente" })}
                   </p>
                 </div>
                 <Switch
@@ -128,14 +129,14 @@ export function RecurringRuleDialog({ workspace_id, open, onClose }: RecurringRu
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
-            Abbrechen
+            {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
           </Button>
           <Button 
             onClick={handleSubmit} 
             disabled={loading || !name || !eventTitle}
           >
             <Repeat className="h-4 w-4 mr-2" />
-            Regel erstellen
+            {tx({ de: "Regel erstellen", en: "Create rule", es: "Crear regla" })}
           </Button>
         </div>
       </DialogContent>

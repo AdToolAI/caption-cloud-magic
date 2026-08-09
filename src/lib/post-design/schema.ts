@@ -1,3 +1,5 @@
+import { tx } from "@/lib/i18nText";
+
 /**
  * Post Designer — zentrales Design-Schema.
  * Alle Koordinaten sind relativ (0..1) zur Canvas-Kante, damit derselbe
@@ -173,14 +175,14 @@ export function isTextLike(layer: Layer): layer is TextLayer | BadgeLayer {
 export function layerLabel(layer: Layer): string {
   switch (layer.type) {
     case "text":
-      return (layer as TextLayer).text.slice(0, 24) || "Text";
+      return (layer as TextLayer).text.slice(0, 24) || tx({ de: "Text", en: "Text", es: "Texto" });
     case "badge":
-      return (layer as BadgeLayer).text.slice(0, 24) || "Badge";
+      return (layer as BadgeLayer).text.slice(0, 24) || tx({ de: "Badge", en: "Badge", es: "Insignia" });
     case "image":
-      return "Bild";
+      return tx({ de: "Bild", en: "Image", es: "Imagen" });
     case "logo":
       return "Logo";
     default:
-      return "Form";
+      return tx({ de: "Form", en: "Shape", es: "Forma" });
   }
 }
