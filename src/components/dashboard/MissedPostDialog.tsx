@@ -7,6 +7,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import type { StrategyPost } from "@/hooks/useStrategyMode";
+import { tx } from "@/lib/i18nText";
 
 interface Props {
   open: boolean;
@@ -36,10 +37,10 @@ export function MissedPostDialog({ open, onOpenChange, post, onDismiss, onResche
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
-            Verpasster Post
+            {tx({ de: "Verpasster Post", en: "Missed post", es: "Publicación perdida" })}
           </DialogTitle>
           <DialogDescription>
-            Geplant für {originalDate}
+            {tx({ de: `Geplant für ${originalDate}`, en: `Scheduled for ${originalDate}`, es: `Programado para ${originalDate}` })}
           </DialogDescription>
         </DialogHeader>
 
@@ -60,7 +61,7 @@ export function MissedPostDialog({ open, onOpenChange, post, onDismiss, onResche
           )}
 
           <div className="space-y-2 pt-2">
-            <label className="text-xs font-medium text-muted-foreground">Neu planen für:</label>
+            <label className="text-xs font-medium text-muted-foreground">{tx({ de: "Neu planen für:", en: "Reschedule for:", es: "Reprogramar para:" })}</label>
             <Input
               type="datetime-local"
               value={newDateTime}
@@ -75,7 +76,7 @@ export function MissedPostDialog({ open, onOpenChange, post, onDismiss, onResche
             size="sm"
             onClick={() => { onDismiss(post.id); onOpenChange(false); }}
           >
-            <Trash2 className="h-4 w-4 mr-1" /> Verwerfen
+            <Trash2 className="h-4 w-4 mr-1" /> {tx({ de: "Verwerfen", en: "Discard", es: "Descartar" })}
           </Button>
           <Button
             variant="outline"
@@ -83,13 +84,13 @@ export function MissedPostDialog({ open, onOpenChange, post, onDismiss, onResche
             onClick={handleReschedule}
             disabled={!newDateTime}
           >
-            <CalendarClock className="h-4 w-4 mr-1" /> Neu planen
+            <CalendarClock className="h-4 w-4 mr-1" /> {tx({ de: "Neu planen", en: "Reschedule", es: "Reprogramar" })}
           </Button>
           <Button
             size="sm"
             onClick={() => { onPostNow(post); onOpenChange(false); }}
           >
-            <Send className="h-4 w-4 mr-1" /> Jetzt posten
+            <Send className="h-4 w-4 mr-1" /> {tx({ de: "Jetzt posten", en: "Post now", es: "Publicar ahora" })}
           </Button>
         </DialogFooter>
       </DialogContent>

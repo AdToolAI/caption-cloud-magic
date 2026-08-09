@@ -79,7 +79,7 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
     const newTranscript = transcript.filter((_, i) => !selectedFillers.has(i));
     onTranscriptChange(newTranscript);
     setSelectedFillers(new Set());
-    toast.success(`${selectedFillers.size} Füllwörter entfernt`);
+    toast.success(tx({ de: `${selectedFillers.size} Füllwörter entfernt`, en: `${selectedFillers.size} filler words removed`, es: `${selectedFillers.size} muletillas eliminadas` }));
   };
 
   const autoRemoveAll = async () => {
@@ -91,7 +91,7 @@ export function FillerWordPanel({ audioUrl, transcript, onTranscriptChange }: Fi
       const newTranscript = transcript.filter((_, i) => !fillerIndices.has(i));
       onTranscriptChange(newTranscript);
       
-      toast.success(`${fillerIndices.size} Füllwörter automatisch entfernt`);
+      toast.success(tx({ de: `${fillerIndices.size} Füllwörter automatisch entfernt`, en: `${fillerIndices.size} filler words removed automatically`, es: `${fillerIndices.size} muletillas eliminadas automáticamente` }));
     } catch (error) {
       toast.error(tx({ de: 'Fehler beim Entfernen', en: 'Error removing', es: 'Error al eliminar' }));
     } finally {

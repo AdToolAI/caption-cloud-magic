@@ -70,31 +70,31 @@ export default function AutopilotAUP() {
             </ul>
           </Section>
 
-          <Section title="§4 Inhaltliche Verbote">
-            Generell verboten — unabhängig von Aufmachung — sind:
+          <Section title={tx({ de: "§4 Inhaltliche Verbote", en: "§4 Content prohibitions", es: "§4 Prohibiciones de contenido" })}>
+            {tx({ de: "Generell verboten — unabhängig von Aufmachung — sind:", en: "Generally prohibited — regardless of format — are:", es: "Generalmente prohibido — independientemente del formato — está:" })}
             <ul className="list-disc pl-5 mt-2 space-y-1">
-              <li>Hassrede, Aufruf zur Gewalt, Diskriminierung jeglicher Art;</li>
+              <li>{tx({ de: "Hassrede, Aufruf zur Gewalt, Diskriminierung jeglicher Art;", en: "Hate speech, incitement to violence, discrimination of any kind;", es: "Discurso de odio, incitación a la violencia, discriminación de cualquier tipo;" })}</li>
               <li>{tx({ de: "medizinische, juristische oder finanzielle Beratung mit Wirkungs-/Heilungsversprechen;", en: "medical, legal, or financial advice with promises of effect/cure;", es: "asesoramiento médico, legal o financiero con promesas de efecto/curación;" })}</li>
-              <li>politische Wahlkampf- oder Propagandainhalte;</li>
-              <li>Glücksspiel-, Krypto-Spam-, Pyramidenschema-, MLM-Inhalte;</li>
+              <li>{tx({ de: "politische Wahlkampf- oder Propagandainhalte;", en: "Political campaign or propaganda content;", es: "Contenido de campaña política o propaganda;" })}</li>
+              <li>{tx({ de: "Glücksspiel-, Krypto-Spam-, Pyramidenschema-, MLM-Inhalte;", en: "Gambling, crypto-spam, pyramid scheme, MLM content;", es: "Contenido de juegos de azar, spam de criptomonedas, esquemas piramidales, MLM;" })}</li>
               <li>{tx({ de: "sexuelle/pornografische Inhalte oder solche, die als jugendgefährdend einzustufen sind;", en: "sexual/pornographic content or content that is to be classified as harmful to minors;", es: "contenido sexual/pornográfico o contenido que deba clasificarse como perjudicial para menores;" })}</li>
-              <li>Engagement-Bait, Spam-Hashtag-Cluster, künstliche Reichweiten-Manipulation;</li>
-              <li>Identitätstäuschung in Captions („Ich bin Arzt/Anwalt/CEO von …" ohne Wahrheit).</li>
+              <li>{tx({ de: "Engagement-Bait, Spam-Hashtag-Cluster, künstliche Reichweiten-Manipulation;", en: "Engagement bait, spam hashtag clusters, artificial reach manipulation;", es: "Cebos de interacción, clústeres de hashtags de spam, manipulación artificial del alcance;" })}</li>
+              <li>{tx({ de: "Identitätstäuschung in Captions („Ich bin Arzt/Anwalt/CEO von …\" ohne Wahrheit).", en: "Identity deception in captions (\"I am a doctor/lawyer/CEO of…\" without truth).", es: "Suplantación de identidad en subtítulos (\"Soy médico/abogado/CEO de…\" sin ser verdad)." })}</li>
             </ul>
           </Section>
 
-          <Section title="§5 Mehrstufige Schutzschicht (Hard Legal Shield)">
-            Jeder Slot durchläuft sieben technische Walls:
+          <Section title={tx({ de: "§5 Mehrstufige Schutzschicht (Hard Legal Shield)", en: "§5 Multi-layer protection (Hard Legal Shield)", es: "§5 Capa de protección de varios niveles (Hard Legal Shield)" })}>
+            {tx({ de: "Jeder Slot durchläuft sieben technische Walls:", en: "Each slot passes through seven technical walls:", es: "Cada espacio pasa por siete muros técnicos:" })}
             <ol className="list-decimal pl-5 mt-2 space-y-1">
-              <li><strong>Brief-Wall</strong> — Klassifikation der Strategie-Eingaben.</li>
-              <li><strong>Asset-Origin-Wall</strong> — nur freigegebene Avatare (AI/Self/Lizenz).</li>
-              <li><strong>Generation-Wall</strong> — Pre-Render-Klassifikation des Prompts.</li>
-              <li><strong>Output-Wall</strong> — Vision-Check auf Gesichter, Logos, IP, NSFW.</li>
-              <li><strong>Caption-Wall</strong> — Text-Filter inkl. Identitäts- und Verspechensprüfung.</li>
-              <li><strong>Publishing-Wall</strong> — Cooldowns, Rate-Limits, Token-Validierung.</li>
-              <li><strong>Watermark &amp; Disclosure</strong> — C2PA-Metadaten + AI-Disclosure-Suffix in Captions.</li>
+              <li><strong>Brief-Wall</strong> — {tx({ de: "Klassifikation der Strategie-Eingaben.", en: "Classification of strategy inputs.", es: "Clasificación de las entradas de estrategia." })}</li>
+              <li><strong>Asset-Origin-Wall</strong> — {tx({ de: "nur freigegebene Avatare (AI/Self/Lizenz).", en: "only approved avatars (AI/self/license).", es: "solo avatares aprobados (IA/propio/licencia)." })}</li>
+              <li><strong>Generation-Wall</strong> — {tx({ de: "Pre-Render-Klassifikation des Prompts.", en: "Pre-render classification of the prompt.", es: "Clasificación previa al renderizado del prompt." })}</li>
+              <li><strong>Output-Wall</strong> — {tx({ de: "Vision-Check auf Gesichter, Logos, IP, NSFW.", en: "Vision check for faces, logos, IP, NSFW.", es: "Verificación visual de caras, logotipos, propiedad intelectual, NSFW." })}</li>
+              <li><strong>Caption-Wall</strong> — {tx({ de: "Text-Filter inkl. Identitäts- und Verspechensprüfung.", en: "Text filter including identity and promise checks.", es: "Filtro de texto incluyendo verificación de identidad y promesas." })}</li>
+              <li><strong>Publishing-Wall</strong> — {tx({ de: "Cooldowns, Rate-Limits, Token-Validierung.", en: "Cooldowns, rate limits, token validation.", es: "Tiempos de espera, límites de tasa, validación de tokens." })}</li>
+              <li><strong>Watermark &amp; Disclosure</strong> — {tx({ de: "C2PA-Metadaten + AI-Disclosure-Suffix in Captions.", en: "C2PA metadata + AI disclosure suffix in captions.", es: "Metadatos C2PA + sufijo de divulgación de IA en los subtítulos." })}</li>
             </ol>
-            Inhalte, die irgendeine dieser Walls nicht passieren, werden automatisch blockiert. Versuche, diese Walls zu umgehen, gelten als Critical-Strike (siehe §6).
+            {tx({ de: "Inhalte, die irgendeine dieser Walls nicht passieren, werden automatisch blockiert. Versuche, diese Walls zu umgehen, gelten als Critical-Strike (siehe §6).", en: "Content that fails to pass any of these walls is automatically blocked. Attempts to bypass these walls count as a Critical Strike (see §6).", es: "El contenido que no supera alguno de estos muros se bloquea automáticamente. Los intentos de eludir estos muros cuentan como una infracción crítica (ver §6)." })}
           </Section>
 
           <Section title="§6 Strike-System &amp; Sanktionen">

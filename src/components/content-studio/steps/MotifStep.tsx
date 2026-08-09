@@ -9,9 +9,9 @@ import { scorePairing } from "@/lib/content-studio/pairingScore";
 import { tx } from '@/lib/i18nText';
 
 const MODES = [
-  { id: "ai" as const, label: "KI-Motiv", hint: "Aus dem Briefing" },
-  { id: "own" as const, label: tx({ de: "Eigenes Bild", en: "Own picture", es: "Foto propia" }), hint: "Upload / Mediathek / Stock" },
-  { id: "none" as const, label: tx({ de: "Ohne Bild", en: "Without picture", es: "Sin foto" }), hint: "Reine Typografie" },
+  { id: "ai" as const, label: tx({ de: "KI-Motiv", en: "AI motif", es: "Motivo IA" }), hint: tx({ de: "Aus dem Briefing", en: "From the briefing", es: "Del briefing" }) },
+  { id: "own" as const, label: tx({ de: "Eigenes Bild", en: "Own picture", es: "Foto propia" }), hint: tx({ de: "Upload / Mediathek / Stock", en: "Upload / library / stock", es: "Subida / biblioteca / stock" }) },
+  { id: "none" as const, label: tx({ de: "Ohne Bild", en: "Without picture", es: "Sin foto" }), hint: tx({ de: "Reine Typografie", en: "Pure typography", es: "Tipografía pura" }) },
 ];
 
 export function MotifStep() {
@@ -41,9 +41,9 @@ export function MotifStep() {
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="space-y-2">
-        <h2 className="font-display text-3xl tracking-tight">Das Motiv</h2>
+        <h2 className="font-display text-3xl tracking-tight">{tx({ de: "Das Motiv", en: "The motif", es: "El motivo" })}</h2>
         <p className="text-sm text-muted-foreground">
-          Motive werden bewusst textfrei erzeugt — die Typografie kommt aus dem Layout.
+          {tx({ de: "Motive werden bewusst textfrei erzeugt — die Typografie kommt aus dem Layout.", en: "Motifs are deliberately generated without text — the typography comes from the layout.", es: "Los motivos se generan deliberadamente sin texto: la tipografía viene del diseño." })}
         </p>
       </div>
 
@@ -73,29 +73,29 @@ export function MotifStep() {
         {s.imageMode === "ai" && (
           <Button onClick={() => s.generateMotif()} disabled={s.imageBusy}>
             {s.imageBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-            {s.image ? "Motiv neu denken" : "Motiv erzeugen"}
+            {s.image ? tx({ de: "Motiv neu denken", en: "Rethink motif", es: "Repensar motivo" }) : tx({ de: "Motiv erzeugen", en: "Generate motif", es: "Generar motivo" })}
           </Button>
         )}
         {s.imageMode === "own" && (
           <Button variant="outline" onClick={() => setDialog(true)}>
-            <ImageIcon className="mr-2 h-4 w-4" /> Bild wählen
+            <ImageIcon className="mr-2 h-4 w-4" /> {tx({ de: "Bild wählen", en: "Choose image", es: "Elegir imagen" })}
           </Button>
         )}
         {s.image && s.imageMode !== "none" && (
-          <img src={s.image} alt="Gewähltes Motiv" className="h-16 w-16 rounded-xl object-cover ring-1 ring-border" />
+          <img src={s.image} alt={tx({ de: "Gewähltes Motiv", en: "Chosen motif", es: "Motivo elegido" })} className="h-16 w-16 rounded-xl object-cover ring-1 ring-border" />
         )}
       </div>
 
       {s.imageMode === "ai" && (
         <p className="text-[11px] text-muted-foreground">
-          Die KI schreibt den Bild-Prompt selbst und erzeugt das Motiv im Picture Studio. Kosten: 1 Bild-Credit.
+          {tx({ de: "Die KI schreibt den Bild-Prompt selbst und erzeugt das Motiv im Picture Studio. Kosten: 1 Bild-Credit.", en: "The AI writes the image prompt itself and generates the motif in Picture Studio. Cost: 1 image credit.", es: "La IA escribe el prompt de imagen y genera el motivo en Picture Studio. Costo: 1 crédito de imagen." })}
         </p>
       )}
       {s.imageError && <p className="text-xs text-destructive">{s.imageError}</p>}
 
       <div className={`rounded-2xl border p-4 ${toneClass}`}>
         <div className="flex items-center justify-between">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Bild-Text-Passung</Label>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">{tx({ de: "Bild-Text-Passung", en: "Image-text match", es: "Coincidencia imagen-texto" })}</Label>
           <span className="font-display text-lg">{verdict.score}</span>
         </div>
         <p className="mt-1 text-sm font-medium">{verdict.label}</p>
@@ -104,7 +104,7 @@ export function MotifStep() {
 
       <div className="flex flex-wrap gap-2">
         <Button variant="ghost" onClick={s.back}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Zurück
+          <ArrowLeft className="mr-2 h-4 w-4" /> {tx({ de: "Zurück", en: "Back", es: "Atrás" })}
         </Button>
         <Button
           onClick={() => {
@@ -113,7 +113,7 @@ export function MotifStep() {
           }}
           disabled={s.imageBusy}
         >
-          Layouts erzeugen <ArrowRight className="ml-2 h-4 w-4" />
+          {tx({ de: "Layouts erzeugen", en: "Generate layouts", es: "Generar diseños" })} <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
 

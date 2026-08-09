@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { Calendar, Slack, MessageSquare, RefreshCw, Link2Off } from "lucide-react";
 import { NotificationSettings } from "./NotificationSettings";
 import { useTranslation } from "@/hooks/useTranslation";
-import { tx } from "@/lib/i18nText";
 
 interface IntegrationSettingsProps {
   workspaceId: string;

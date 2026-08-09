@@ -12,7 +12,8 @@ import type { Language } from '@/lib/translations';
  *
  * Spanish falls back to English until a translation is supplied.
  */
-export type TriText = { de: string; en: string; es?: string };
+export type TriTextOf<T> = { de: T; en: T; es?: T };
+export type TriText = TriTextOf<string>;
 
 const SUPPORTED: Language[] = ['de', 'en', 'es'];
 
@@ -26,19 +27,19 @@ export function getLang(): Language {
   return 'de';
 }
 
-export function pickText(lang: Language | string, text: TriText): string {
+export function pickText<T>(lang: Language | string, text: TriTextOf<T>): T {
   if (lang === 'en') return text.en;
   if (lang === 'es') return text.es ?? text.en;
   return text.de;
 }
 
 /** For hooks, lib modules and any non-component code. */
-export function tx(text: TriText): string {
+export function tx<T = string>(text: TriTextOf<T>): T {
   return pickText(getLang(), text);
 }
 
 /** For React components — re-renders when the user switches language. */
 export function useTx() {
   const { language } = useTranslation();
-  return (text: TriText) => pickText(language, text);
+  return <T,>(text: TriTextOf<T>) => pickText(language, text);
 }
