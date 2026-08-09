@@ -149,7 +149,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       localStorage.setItem(lockStorageKey, JSON.stringify(payload));
       setLockedVoiceId(settings.voiceId);
       const voice = voices.find((v) => v.id === settings.voiceId);
-      toast.success(`${tx({ de: 'Voice-Lock aktiv', en: 'Voice lock active', es: 'Bloqueo de voz activo' })}: ${voice?.name ?? settings.voiceId}`);
+      toast.success(`$Voice-Lock aktiv: ${voice?.name ?? settings.voiceId}`);
     }
   };
 
@@ -245,11 +245,11 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       {settings.enabled && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>{tx({ de: 'Skript / Text', en: 'Script / Text', es: 'Guion / Texto' })}</Label>
+            <Label>Skript / Text</Label>
             <Textarea
               value={settings.scriptText}
               onChange={(e) => { onSettingsChange({ ...settings, scriptText: e.target.value }); setGeneratedUrl(null); }}
-              placeholder={tx({ de: "Gib hier deinen Voice-Over Text ein...", en: "Enter your voice-over text here...", es: "Introduce tu texto de voz en off aquí..." })}
+              placeholder=Gib hier deinen Voice-Over Text ein...
               rows={4}
             />
             <p className="text-xs text-muted-foreground text-right">
@@ -265,7 +265,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <Label>{tx({ de: "Sprache & Stimme", en: "Language & Voice", es: "Idioma y Voz" })}</Label>
+              <Label>Sprache & Stimme</Label>
               <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
@@ -353,7 +353,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                         <Loader2 className="h-4 w-4 animate-spin mr-2" /> Lade Stimmen…
                       </div>
                     ) : langVoices.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-6">{tx({ de: "Keine Stimmen verfügbar", en: "No voices available", es: "No hay voces disponibles" })}</p>
+                      <p className="text-sm text-muted-foreground text-center py-6">Keine Stimmen verfügbar</p>
                     ) : (
                       <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                         {cloned.length > 0 && (
@@ -383,7 +383,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
           </div>
 
           <div className="space-y-2">
-            <Label>{tx({ de: 'Emotionaler Ton', en: 'Emotional tone', es: 'Tono emocional' })}</Label>
+            <Label>Emotionaler Ton</Label>
             <Select
               value={settings.emotionalTone}
               onValueChange={(emotionalTone: typeof settings.emotionalTone) => {

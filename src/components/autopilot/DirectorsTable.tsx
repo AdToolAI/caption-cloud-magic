@@ -75,11 +75,11 @@ const LANGUAGES = [
 ];
 
 const TREATMENT_PHASES = [
-  {tx({ de: 'Briefing wird gelesen …', en: 'Reading briefing…', es: 'Leyendo el briefing…' })},
-  {tx({ de: 'Konzept und Dramaturgie …', en: 'Concept and dramaturgy…', es: 'Concepto y dramaturgia…' })},
-  {tx({ de: 'Szenen werden gebaut …', en: 'Building scenes…', es: 'Creando escenas…' })},
-  {tx({ de: 'Dialoge und Besetzung …', en: 'Dialogues and casting…', es: 'Diálogos y reparto…' })},
-  {tx({ de: 'Letzter Feinschliff …', en: 'Final touches…', es: 'Toques finales…' })},
+  Briefing wird gelesen …,
+  Konzept und Dramaturgie …,
+  Szenen werden gebaut …,
+  Dialoge und Besetzung …,
+  Letzter Feinschliff …,
 ];
 
 const BEAT_LABEL: Record<string, string> = {
@@ -751,7 +751,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
             </Button>
           </div>
 
-          {starting && <StageProgressBar label={tx({ de: "Produktion wird gestartet …", en: "Starting production…", es: "Iniciando producción…" })} />}
+          {starting && <StageProgressBar label=Produktion wird gestartet … />}
 
         </Card>
       )}
@@ -799,7 +799,7 @@ export function DirectorsTable({ briefing }: { briefing?: DirectorsTableBriefing
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setConfirmOpen(false);

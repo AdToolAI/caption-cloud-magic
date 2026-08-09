@@ -220,7 +220,7 @@ export function LiveSweepTab() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="text-sm text-[#F5C76A] font-medium uppercase tracking-wider">
-              {tx({ de: "Live Sweep — Hard Cap (pro Run)", en: "Live Sweep — Hard Cap (per run)", es: "Barrido en vivo — Límite estricto (por ejecución)" })}
+              Live Sweep — Hard Cap (pro Run)
             </div>
             <div className="mt-1 text-3xl font-bold text-white">
               {spent.toFixed(2)} <span className="text-base text-slate-400">/ {cap.toFixed(2)} €</span>
@@ -270,7 +270,7 @@ export function LiveSweepTab() {
                 {sweeping ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {tx({ de: "Sweep läuft …", en: "Sweep running …", es: "Barrido en curso …" })}
+                    Sweep läuft …
                   </>
                 ) : (
                   <>
@@ -283,19 +283,19 @@ export function LiveSweepTab() {
             <AlertDialogContent className="bg-[#050816] border-[#F5C76A]/30">
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-[#F5C76A]">
-                  {tx({ de: "Live {tx({ de: "Sweep starten", en: "Start sweep", es: "Iniciar barrido" })}?", en: "Start live sweep?", es: "¿Iniciar barrido en vivo?" })}
+                  Live Sweep starten?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  {tx({ de: "Dies feuert echte Provider-Calls bei Replicate, Runway und Hedra.", en: "This fires real provider calls at Replicate, Runway, and Hedra.", es: "Esto activa llamadas a proveedores reales en Replicate, Runway y Hedra." })}
-                  {tx({ de: `Geschätzte Kosten: ~8 €. Hard-Cap stoppt bei ${cap.toFixed(2)} €.`, en: `Estimated costs: ~8 €. Hard cap stops at ${cap.toFixed(2)} €.`, es: `Costos estimados: ~8 €. El límite estricto se detiene en ${cap.toFixed(2)} €.` })}
+                  Dies feuert echte Provider-Calls bei Replicate, Runway und Hedra.
+                  Geschätzte Kosten: ~8 €. Hard-Cap stoppt bei ${cap.toFixed(2)} €.
                   <br /><br />
-                  {tx({ de: "Test-Assets müssen vorher per "Bootstrap Assets" erzeugt sein.", en: "Test assets must have been created beforehand via "Bootstrap Assets".", es: "Los activos de prueba deben haberse creado previamente mediante "Activos de arranque"." })}
+                  Test-Assets müssen vorher per "Bootstrap Assets" erzeugt sein.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
+                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                 <AlertDialogAction onClick={handleSweep} className="bg-[#F5C76A] text-[#050816]">
-                  {tx({ de: "Sweep starten", en: "Start sweep", es: "Iniciar barrido" })}
+                  Sweep starten
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -378,7 +378,7 @@ export function LiveSweepTab() {
       {Object.keys(sweeps).length === 0 && !loading && (
         <Card className="bg-[#0A0F1F]/40 border-[#F5C76A]/10 p-8 text-center">
           <div className="text-slate-400">
-            {tx({ de: "Noch keine Live-Sweeps. Klicke "Bootstrap Assets" und dann "Run Live Sweep".", en: "No live sweeps yet. Click "Bootstrap Assets" and then "Run Live Sweep".", es: "Aún no hay barridos en vivo. Haz clic en "Activos de arranque" y luego en "Ejecutar barrido en vivo"." })}
+            Noch keine Live-Sweeps. Klicke "Bootstrap Assets" und dann "Run Live Sweep".
           </div>
         </Card>
       )}

@@ -104,7 +104,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
   const meta = platformMeta[post.platform.toLowerCase()] || platformMeta.instagram;
   const Icon = meta.icon;
   const status = STATUS_LABEL[post.status] || STATUS_LABEL.pending;
-  const dateLabel = format(new Date(post.scheduled_at), "EEEE, d. MMM {tx({ de: 'um', en: 'at', es: 'a las' })} + ' ' + 'HH:mm'");
+  const dateLabel = format(new Date(post.scheduled_at), "EEEE, d. MMM um + ' ' + 'HH:mm'");
 
   const tagsArr = hashtags.split(/[\s,]+/).map((h) => h.replace(/^#/, "")).filter(Boolean);
 
@@ -163,13 +163,13 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
         <Tabs defaultValue="preview" className="w-full">
           <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="preview" className="gap-1.5">
-              <Eye className="h-3.5 w-3.5" /> {tx({ de: 'Vorschau', en: 'Preview', es: 'Vista previa' })}
+              <Eye className="h-3.5 w-3.5" /> Vorschau
             </TabsTrigger>
             <TabsTrigger value="strategy" className="gap-1.5">
-              <Compass className="h-3.5 w-3.5" /> {tx({ de: 'Strategie', en: 'Strategy', es: 'Estrategia' })}
+              <Compass className="h-3.5 w-3.5" /> Strategie
             </TabsTrigger>
             <TabsTrigger value="schedule" className="gap-1.5">
-              <CalendarIcon className="h-3.5 w-3.5" /> {tx({ de: 'Zeitplan', en: 'Schedule', es: 'Horario' })}
+              <CalendarIcon className="h-3.5 w-3.5" /> Zeitplan
             </TabsTrigger>
           </TabsList>
 
@@ -185,7 +185,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
 
             <div className="space-y-3 pt-2 border-t border-border/40">
               <div>
-                <Label className="text-xs mb-1.5 block">{tx({ de: "Medien (Bild oder Video)", en: "Media (image or video)", es: "Medios (imagen o video)" })}</Label>
+                <Label className="text-xs mb-1.5 block">Medien (Bild oder Video)</Label>
                 <PostMediaUploader
                   mediaUrl={mediaUrl}
                   mediaType={mediaType}
@@ -196,10 +196,10 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                 />
                 <div className="flex gap-2 mt-2">
                   <Button variant="outline" size="sm" className="flex-1 text-[11px] h-8" onClick={() => navigate("/picture-studio")}>
-                    <Sparkles className="h-3 w-3 mr-1" /> {tx({ de: 'Bild mit KI', en: 'Image with AI', es: 'Imagen con IA' })}
+                    <Sparkles className="h-3 w-3 mr-1" /> Bild mit KI
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1 text-[11px] h-8" onClick={() => navigate("/ai-video-studio")}>
-                    <Sparkles className="h-3 w-3 mr-1" /> {tx({ de: 'Video mit KI', en: 'Video with AI', es: 'Video con IA' })}
+                    <Sparkles className="h-3 w-3 mr-1" /> Video mit KI
                   </Button>
                 </div>
               </div>
@@ -208,7 +208,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                 <div className="flex items-center justify-between mb-1">
                   <Label htmlFor="caption" className="text-xs">Caption</Label>
                   <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={handleAIGenerate}>
-                    <Wand2 className="h-3 w-3 mr-1" /> {tx({ de: 'Mit KI verbessern', en: 'Improve with AI', es: 'Mejorar con IA' })}
+                    <Wand2 className="h-3 w-3 mr-1" /> Mit KI verbessern
                   </Button>
                 </div>
                 <Textarea
@@ -216,7 +216,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   rows={5}
-                  placeholder={tx({ de: 'Schreibe deinen Post …', en: 'Write your post …', es: 'Escribe tu publicación …' })}
+                  placeholder=Schreibe deinen Post …
                   className="resize-none"
                 />
               </div>
@@ -249,11 +249,11 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
           <TabsContent value="schedule" className="space-y-3 mt-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="date" className="text-xs">{tx({ de: 'Datum', en: 'Date', es: 'Fecha' })}</Label>
+                <Label htmlFor="date" className="text-xs">Datum</Label>
                 <Input id="date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="time" className="text-xs">{tx({ de: 'Uhrzeit', en: 'Time', es: 'Hora' })}</Label>
+                <Label htmlFor="time" className="text-xs">Uhrzeit</Label>
                 <Input id="time" type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} />
               </div>
             </div>
@@ -270,7 +270,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                   <div className="flex items-start gap-2 p-2.5 rounded-md border border-warning/40 bg-warning/10 text-xs">
                     <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
                     <div>
-                      <div className="font-semibold text-warning">{tx({ de: 'Suboptimale Zeit', en: 'Suboptimal time', es: 'Tiempo subóptimo' })} (Score {evalResult.score})</div>
+                      <div className="font-semibold text-warning">Suboptimale Zeit (Score {evalResult.score})</div>
                       <div className="text-muted-foreground">
                         Empfohlen: <span className="font-medium text-foreground">{String(evalResult.bestHour).padStart(2, "0")}:00</span> (Score {evalResult.bestScore})
                         {original !== null original !== null && ` · KI-Vorschlag war Score ${original}`original !== null && ` · KI-Vorschlag war Score ${original}` ' · ' + tx({ de: 'KI-Vorschlag war Score', en: 'AI suggestion was score', es: 'La sugerencia de IA fue la puntuación' }) + ' ' + original}
@@ -283,7 +283,7 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
                 return (
                   <div className="flex items-center gap-2 p-2.5 rounded-md border border-success/40 bg-success/10 text-xs">
                     <Sparkles className="h-3.5 w-3.5 text-success" />
-                    <span className="font-medium text-success">{tx({ de: 'Top-Slot deiner Heatmap', en: 'Top slot of your heatmap', es: 'Espacio superior de tu mapa de calor' })} (Score {evalResult.score})</span>
+                    <span className="font-medium text-success">Top-Slot deiner Heatmap (Score {evalResult.score})</span>
                   </div>
                 );
               }
@@ -292,9 +292,9 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
 
             <div className="flex items-center justify-between p-3 rounded-md border border-border/50 bg-card/40">
               <div>
-                <div className="text-sm font-medium">{tx({ de: 'Automatisch posten', en: 'Auto-post', es: 'Publicar automáticamente' })}</div>
+                <div className="text-sm font-medium">Automatisch posten</div>
                 <div className="text-[11px] text-muted-foreground">
-                  {tx({ de: 'Wird zur geplanten Zeit automatisch auf', en: 'Will be automatically published at the scheduled time on', es: 'Se publicará automáticamente a la hora programada en' })} {meta.label} {tx({ de: 'veröffentlicht', en: '', es: '' })}.
+                  Wird zur geplanten Zeit automatisch auf {meta.label} veröffentlicht.
                 </div>
               </div>
               <Switch checked={autoPublish} onCheckedChange={setAutoPublish} />
@@ -309,11 +309,11 @@ export function PlatformRingDialog({ open, onOpenChange, post }: Props) {
             onClick={() => { dismiss(post.id); onOpenChange(false); }}
             className="text-destructive hover:text-destructive"
           >
-            <Trash2 className="h-4 w-4 mr-1" /> {tx({ de: 'Verwerfen', en: 'Dismiss', es: 'Descartar' })}
+            <Trash2 className="h-4 w-4 mr-1" /> Verwerfen
           </Button>
           <div className="flex-1" />
           <Button variant="outline" size="sm" onClick={handleSave} disabled={isUpdating}>
-            <Save className="h-4 w-4 mr-1" /> {tx({ de: 'Speichern', en: 'Save', es: 'Guardar' })}
+            <Save className="h-4 w-4 mr-1" /> Speichern
           </Button>
           <Button size="sm" onClick={handleSubmitToCalendar} disabled={isSubmittingToCalendar}>
             <CalendarPlus className="h-4 w-4 mr-1" />

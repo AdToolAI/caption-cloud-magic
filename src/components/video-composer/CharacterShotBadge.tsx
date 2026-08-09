@@ -54,10 +54,10 @@ export function CharacterShotBadge({ shot, characterName }: BadgeProps) {
           </span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-[260px] text-xs">
-          <p className="font-medium mb-1">{tx({ de: 'Shot-Strategie:', en: 'Shot strategy:', es: 'Estrategia de toma:' })} {meta.label}</p>
+          <p className="font-medium mb-1">Shot-Strategie: {meta.label}</p>
           <p className="text-muted-foreground">{meta.hint}</p>
           <p className="text-[10px] text-muted-foreground/80 mt-1.5 italic">
-            {tx({ de: 'Weniger Gesichts-Closeups → konsistentere Charakter-Wahrnehmung.', en: 'Fewer facial close-ups → more consistent character perception.', es: 'Menos primeros planos faciales → percepción del personaje más consistente.' })}
+            Weniger Gesichts-Closeups → konsistentere Charakter-Wahrnehmung.
           </p>
         </TooltipContent>
       </Tooltip>
@@ -146,13 +146,13 @@ export function CharacterShotPicker({ characters, value, onChange, language = 'e
                   variant="ghost"
                   className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                   onClick={() => onChange(undefined)}
-                  aria-label={tx({ de: 'Charakter aus dieser Szene entfernen', en: 'Remove character from this scene', es: 'Quitar personaje de esta escena' })}
+                  aria-label=Charakter aus dieser Szene entfernen
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
-                {tx({ de: 'Charakter aus dieser Szene entfernen', en: 'Remove character from this scene', es: 'Quitar personaje de esta escena' })}
+                Charakter aus dieser Szene entfernen
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

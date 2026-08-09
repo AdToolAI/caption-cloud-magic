@@ -272,20 +272,20 @@ const AllComments = () => {
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">{tx({ de: "Alle Kommentare", en: "All comments", es: "Todos los comentarios" })}</h1>
-          <p className="text-muted-foreground">{tx({ de: "Persistente Kommentarverwaltung über alle Plattformen", en: "Persistent comment management across all platforms", es: "Gestión persistente de comentarios en todas las plataformas" })}</p>
+          <h1 className="text-3xl font-bold">Alle Kommentare</h1>
+          <p className="text-muted-foreground">Persistente Kommentarverwaltung über alle Plattformen</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
-                {tx({ de: 'Importieren', en: 'Import', es: 'Importar' })}
+                Importieren
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{tx({ de: 'Kommentare importieren', en: 'Import comments', es: 'Importar comentarios' })} + "</DialogTitle>"
+                <DialogTitle>Kommentare importieren + "</DialogTitle>"
               </DialogHeader>
               <Textarea
                 placeholder="Ein Kommentar pro Zeile..."
@@ -293,12 +293,12 @@ const AllComments = () => {
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
               />
-              <Button onClick={handleImport}>{tx({ de: 'Import starten', en: 'Start import', es: 'Iniciar importación' })} + "</Button>"
+              <Button onClick={handleImport}>Import starten + "</Button>"
             </DialogContent>
           </Dialog>
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            {tx({ de: 'Exportieren', en: 'Export', es: 'Exportar' })}
+            Exportieren
           </Button>
         </div>
       </div>
@@ -340,10 +340,10 @@ const AllComments = () => {
         </div>
         <Select value={filterPlatform} onValueChange={setFilterPlatform}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={tx({ de: "Plattform", en: "Platform", es: "Plataforma" })} />
+            <SelectValue placeholder=Plattform />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{tx({ de: "Alle", en: "All", es: "Todos" })}</SelectItem>
+            <SelectItem value="">Alle</SelectItem>
             <SelectItem value="instagram">Instagram</SelectItem>
             <SelectItem value="tiktok">TikTok</SelectItem>
             <SelectItem value="youtube">YouTube</SelectItem>
@@ -351,13 +351,13 @@ const AllComments = () => {
         </Select>
         <Select value={filterSentiment} onValueChange={setFilterSentiment}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={tx({ de: "Sentiment", en: "Sentiment", es: "Sentimiento" })} />
+            <SelectValue placeholder=Sentiment />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{tx({ de: "Alle", en: "All", es: "Todos" })}</SelectItem>
-            <SelectItem value="positive">{tx({ de: "Positiv", en: "Positive", es: "Positivo" })}</SelectItem>
-            <SelectItem value="neutral">{tx({ de: "Neutral", en: "Neutral", es: "Neutral" })}</SelectItem>
-            <SelectItem value="negative">{tx({ de: "Negativ", en: "Negative", es: "Negativo" })}</SelectItem>
+            <SelectItem value="">Alle</SelectItem>
+            <SelectItem value="positive">Positiv</SelectItem>
+            <SelectItem value="neutral">Neutral</SelectItem>
+            <SelectItem value="negative">Negativ</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -365,20 +365,20 @@ const AllComments = () => {
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
           <TabsTrigger value="alle">Alle</TabsTrigger>
-          <TabsTrigger value="inbox">{tx({ de: "Inbox", en: "Inbox", es: "Bandeja de entrada" })}</TabsTrigger>
-          <TabsTrigger value="leads">{tx({ de: "Leads", en: "Leads", es: "Leads" })}</TabsTrigger>
-          <TabsTrigger value="fragen">{tx({ de: "Fragen", en: "Questions", es: "Preguntas" })}</TabsTrigger>
-          <TabsTrigger value="beschwerden">{tx({ de: "Beschwerden", en: "Complaints", es: "Quejas" })}</TabsTrigger>
-          <TabsTrigger value="toxisch">{tx({ de: "Toxisch", en: "Toxic", es: "Tóxico" })}</TabsTrigger>
-          <TabsTrigger value="erledigt">{tx({ de: "Erledigt", en: "Done", es: "Hecho" })}</TabsTrigger>
+          <TabsTrigger value="inbox">Inbox</TabsTrigger>
+          <TabsTrigger value="leads">Leads</TabsTrigger>
+          <TabsTrigger value="fragen">Fragen</TabsTrigger>
+          <TabsTrigger value="beschwerden">Beschwerden</TabsTrigger>
+          <TabsTrigger value="toxisch">Toxisch</TabsTrigger>
+          <TabsTrigger value="erledigt">Erledigt</TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedTab} className="mt-6">
           {loading ? (
-            <div className="text-center py-12">{tx({ de: "Lädt...", en: "Loading...", es: "Cargando..." })}</div>
+            <div className="text-center py-12">Lädt...</div>
           ) : comments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              {tx({ de: "Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.", en: "No saved comments yet – import data or connect a source.", es: "Aún no hay comentarios guardados: importa datos o conecta una fuente." })}
+              Noch keine gespeicherten Kommentare – importiere Daten oder verbinde eine Quelle.
             </div>
           ) : (
             <Table>
@@ -387,15 +387,15 @@ const AllComments = () => {
                   <TableHead className="w-12">
                     <Checkbox />
                   </TableHead>
-                  <TableHead>{tx({ de: "Zeit", en: "Time", es: "Tiempo" })}</TableHead>
-                  <TableHead>{tx({ de: "Plattform", en: "Platform", es: "Plataforma" })}</TableHead>
-                  <TableHead>{tx({ de: "User", en: "User", es: "Usuario" })}</TableHead>
-                  <TableHead>{tx({ de: "Kommentar", en: "Comment", es: "Comentario" })}</TableHead>
-                  <TableHead>{tx({ de: "Sentiment", en: "Sentiment", es: "Sentimiento" })}</TableHead>
-                  <TableHead>{tx({ de: "Intent", en: "Intent", es: "Intento" })}</TableHead>
-                  <TableHead>{tx({ de: "Priorität", en: "Priority", es: "Prioridad" })}</TableHead>
-                  <TableHead>{tx({ de: "Status", en: "Status", es: "Estado" })}</TableHead>
-                  <TableHead>{tx({ de: "Aktionen", en: "Actions", es: "Acciones" })}</TableHead>
+                  <TableHead>Zeit</TableHead>
+                  <TableHead>Plattform</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Kommentar</TableHead>
+                  <TableHead>Sentiment</TableHead>
+                  <TableHead>Intent</TableHead>
+                  <TableHead>Priorität</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Aktionen</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -429,22 +429,22 @@ const AllComments = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="open">{tx({ de: "Offen", en: "Open", es: "Abierto" })}</SelectItem>
-                          <SelectItem value="replied">{tx({ de: "Beantwortet", en: "Answered", es: "Respondido" })}</SelectItem>
-                          <SelectItem value="ignored">{tx({ de: "Ignoriert", en: "Ignored", es: "Ignorado" })}</SelectItem>
-                          <SelectItem value="flagged">{tx({ de: "Markiert", en: "Flagged", es: "Marcado" })}</SelectItem>
+                          <SelectItem value="open">Offen</SelectItem>
+                          <SelectItem value="replied">Beantwortet</SelectItem>
+                          <SelectItem value="ignored">Ignoriert</SelectItem>
+                          <SelectItem value="flagged">Markiert</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" title={tx({ de: "Antwort kopieren", en: "Copy answer", es: "Copiar respuesta" })}>
+                        <Button variant="ghost" size="sm" title=Antwort kopieren>
                           <Copy className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title={tx({ de: "Als erledigt markieren", en: "Mark as done", es: "Marcar como hecho" })}>
+                        <Button variant="ghost" size="sm" title=Als erledigt markieren>
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title={tx({ de: "Flaggen", en: "Flag", es: "Marcar" })}>
+                        <Button variant="ghost" size="sm" title=Flaggen>
                           <Flag className="h-4 w-4" />
                         </Button>
                       </div>

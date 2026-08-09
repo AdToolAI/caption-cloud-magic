@@ -10,20 +10,20 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Plus, Trash2, GripVertical, Lock, Unlock, Sparkles, Loader2 } from 'lucide-react';
-import { Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })} } from '@/types/video';
+import { ScriptSegment } from '@/types/video';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface TimelineScriptEditorProps {
-  segments: Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })}[];
-  on{tx({ de: "Segment", en: "Segment", es: "Segmento" })}sChange: (segments: Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })}[]) => void;
+  segments: ScriptSegment[];
+  onSegmentsChange: (segments: ScriptSegment[]) => void;
   totalDuration: number;
   voiceStyle: string;
   voiceSpeed: number;
   mediaUrls: string[];
 }
 
-const calculate{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Duration = (text: string, speed: number): number => {
+const calculateSegmentDuration = (text: string, speed: number): number => {
   const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
   if (words === 0) return 3; // Default 3s for empty
   const baseWordsPerMinute = 150;
@@ -31,18 +31,18 @@ const calculate{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Duration = 
   return Math.max(1, (words / adjustedWPM) * 60); // Minimum 1s
 };
 
-function Timeline{tx({ de: "Segment", en: "Segment", es: "Segmento" })}({ 
+function TimelineSegment({ 
   segment, 
   totalDuration, 
   isSelected,
   onClick,
   onUpdate 
 }: { 
-  segment: Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })};
+  segment: ScriptSegment;
   totalDuration: number;
   isSelected: boolean;
   onClick: () => void;
-  onUpdate: (id: string, updates: Partial<Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })}>) => void;
+  onUpdate: (id: string, updates: Partial<ScriptSegment>) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
     id: segment.id,
@@ -78,7 +78,7 @@ function Timeline{tx({ de: "Segment", en: "Segment", es: "Segmento" })}({
         </button>
         <div className="flex-1 overflow-hidden">
           <div className="text-xs font-medium text-primary-foreground truncate">
-            {segment.text || tx({ de: 'Leeres {tx({ de: "Segment", en: "Segment", es: "Segmento" })}', en: 'Empty segment', es: '{tx({ de: "Segment", en: "Segment", es: "Segmento" })}o vacío' })}
+            {segment.text || tx({ de: 'Leeres Segment', en: 'Empty segment', es: 'Segmento vacío' })}
           </div>
           <div className="text-[10px] text-primary-foreground/70">
             {segment.startTime.toFixed(1)}s - {(segment.startTime + segment.duration).toFixed(1)}s
@@ -92,13 +92,13 @@ function Timeline{tx({ de: "Segment", en: "Segment", es: "Segmento" })}({
 
 export const TimelineScriptEditor = ({
   segments,
-  on{tx({ de: "Segment", en: "Segment", es: "Segmento" })}sChange,
+  onSegmentsChange,
   totalDuration,
   voiceStyle,
   voiceSpeed,
   mediaUrls
 }: TimelineScriptEditorProps) => {
-  const [selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Id, setSelected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Id] = useState<string | null>(null);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -108,17 +108,17 @@ export const TimelineScriptEditor = ({
     useSensor(KeyboardSensor)
   );
 
-  const selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })} = segments.find(s => s.id === selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Id);
+  const selectedSegment = segments.find(s => s.id === selectedSegmentId);
 
   const findNextAvailableTime = (): number => {
     if (segments.length === 0) return 0;
-    const sorted{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s = [...segments].sort((a, b) => a.startTime - b.startTime);
-    const last{tx({ de: "Segment", en: "Segment", es: "Segmento" })} = sorted{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s[sorted{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s.length - 1];
-    return Math.min(last{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.startTime + last{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.duration, totalDuration - 3);
+    const sortedSegments = [...segments].sort((a, b) => a.startTime - b.startTime);
+    const lastSegment = sortedSegments[sortedSegments.length - 1];
+    return Math.min(lastSegment.startTime + lastSegment.duration, totalDuration - 3);
   };
 
-  const add{tx({ de: "Segment", en: "Segment", es: "Segmento" })} = () => {
-    const new{tx({ de: "Segment", en: "Segment", es: "Segmento" })}: Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })} = {
+  const addSegment = () => {
+    const newSegment: ScriptSegment = {
       id: `segment-${Date.now()}`,
       text: '',
       startTime: findNextAvailableTime(),
@@ -130,20 +130,20 @@ export const TimelineScriptEditor = ({
       locked: false
     };
     
-    on{tx({ de: "Segment", en: "Segment", es: "Segmento" })}sChange([...segments, new{tx({ de: "Segment", en: "Segment", es: "Segmento" })}]);
-    setSelected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Id(new{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.id);
+    onSegmentsChange([...segments, newSegment]);
+    setSelectedSegmentId(newSegment.id);
     
     toast({
       title: tx({ de: "Segment", en: "Segment", es: "Segmento" }),
-      description: tx({ de: "Neues {tx({ de: "Segment", en: "Segment", es: "Segmento" })} zur Timeline hinzugefügt", en: "New segment added to the timeline", es: "Nuevo segmento añadido a la línea de tiempo" })
+      description: tx({ de: "Neues Segment zur Timeline hinzugefügt", en: "New segment added to the timeline", es: "Nuevo segmento añadido a la línea de tiempo" })
     });
   };
 
-  const autoSync{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s = async () => {
+  const autoSyncSegments = async () => {
     if (segments.length === 0) {
       toast({
-        title: tx({ de: "Keine {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e vorhanden", en: "No segments present", es: "No hay segmentos presentes" }),
-        description: tx({ de: "Füge zuerst Text-{tx({ de: "Segment", en: "Segment", es: "Segmento" })}e hinzu oder nutze 'Auto-Split'", en: "First add text segments or use 'Auto-Split'", es: "Primero añade segmentos de texto o usa 'Auto-Split'" }),
+        title: tx({ de: "Keine Segmente vorhanden", en: "No segments present", es: "No hay segmentos presentes" }),
+        description: tx({ de: "Füge zuerst Text-Segmente hinzu oder nutze 'Auto-Split'", en: "First add text segments or use 'Auto-Split'", es: "Primero añade segmentos de texto o usa 'Auto-Split'" }),
         variant: "destructive"
       });
       return;
@@ -158,7 +158,7 @@ export const TimelineScriptEditor = ({
       if (!fullScript.trim()) {
         toast({
           title: tx({ de: "Keine Texte vorhanden", en: "No texts available", es: "No hay textos disponibles" }),
-          description: tx({ de: "Füge Text zu deinen {tx({ de: "Segment", en: "Segment", es: "Segmento" })}en hinzu", en: "Add text to your segments", es: "Añade texto a tus segmentos" }),
+          description: tx({ de: "Füge Text zu deinen Segmenten hinzu", en: "Add text to your segments", es: "Añade texto a tus segmentos" }),
           variant: "destructive"
         });
         setIsAutoSyncing(false);
@@ -171,42 +171,42 @@ export const TimelineScriptEditor = ({
           scriptText: fullScript,
           imageCount: Math.max(mediaUrls.length, segments.length),
           targetDuration: totalDuration,
-          existing{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s: segments.map(s => ({ text: s.text }))
+          existingSegments: segments.map(s => ({ text: s.text }))
         }
       });
 
       if (error) throw error;
 
       if (!data.segments || data.segments.length === 0) {
-        throw new Error(tx({ de: 'Keine {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e zurückgegeben', en: 'No segments returned', es: 'No se devolvieron segmentos' }));
+        throw new Error(tx({ de: 'Keine Segmente zurückgegeben', en: 'No segments returned', es: 'No se devolvieron segmentos' }));
       }
 
       // Update segments with analyzed timings
-      const synced{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s: Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })}[] = data.segments.map((analyzed: any, index: number) => {
-        const existing{tx({ de: "Segment", en: "Segment", es: "Segmento" })} = segments[index] || segments[0];
+      const syncedSegments: ScriptSegment[] = data.segments.map((analyzed: any, index: number) => {
+        const existingSegment = segments[index] || segments[0];
         
         return {
-          id: existing{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.id,
-          text: analyzed.text || existing{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.text,
+          id: existingSegment.id,
+          text: analyzed.text || existingSegment.text,
           startTime: analyzed.startTime || 0,
           duration: analyzed.duration || 3,
-          voiceSettings: existing{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.voiceSettings,
+          voiceSettings: existingSegment.voiceSettings,
           imageIndex: analyzed.imageIndex !== undefined ? analyzed.imageIndex : index % Math.max(mediaUrls.length, 1),
           subtitleSettings: {
             wordTiming: analyzed.wordTimings || []
           },
-          locked: existing{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.locked
+          locked: existingSegment.locked
         };
       });
 
-      on{tx({ de: "Segment", en: "Segment", es: "Segmento" })}sChange(synced{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s);
+      onSegmentsChange(syncedSegments);
       
       toast({
-        title: tx({ de: "✓ {tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" })} erfolgreich", en: "✓ Auto-sync successful", es: "✓ Sincronización automática exitosa" }),
-        description: tx({ de: `${synced{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s.length} {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e mit präzisem Timing und Untertiteln synchronisiert`, en: `${synced{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s.length} segments synchronized with precise timing and subtitles`, es: `${synced{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s.length} segmentos sincronizados con timing preciso y subtítulos` })
+        title: tx({ de: "✓ Auto-Sync erfolgreich", en: "✓ Auto-sync successful", es: "✓ Sincronización automática exitosa" }),
+        description: tx({ de: `${syncedSegments.length} Segmente mit präzisem Timing und Untertiteln synchronisiert`, en: `${syncedSegments.length} segments synchronized with precise timing and subtitles`, es: `${syncedSegments.length} segmentos sincronizados con timing preciso y subtítulos` })
       });
     } catch (error) {
-      console.error('{tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" })} error:', error);
+      console.error('Auto-Sync error:', error);
       toast({
         title: tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" }),
         description: error instanceof Error ? error.message : tx({ de: 'Unbekannter Fehler', en: 'Unknown error', es: 'Error desconocido' }),
@@ -224,7 +224,7 @@ export const TimelineScriptEditor = ({
     if (!fullText) {
       toast({
         title: tx({ de: "Kein Text vorhanden", en: "No text available", es: "No hay texto disponible" }),
-        description: tx({ de: "Füge zuerst Text zu deinen {tx({ de: "Segment", en: "Segment", es: "Segmento" })}en hinzu", en: "First add text to your segments", es: "Primero añade texto a tus segmentos" }),
+        description: tx({ de: "Füge zuerst Text zu deinen Segmenten hinzu", en: "First add text to your segments", es: "Primero añade texto a tus segmentos" }),
         variant: "destructive"
       });
       return;
@@ -233,13 +233,13 @@ export const TimelineScriptEditor = ({
     setIsAutoSyncing(true);
     
     try {
-      const target{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Count = Math.max(mediaUrls.length, 3);
+      const targetSegmentCount = Math.max(mediaUrls.length, 3);
       
       // Call analyze-script to intelligently split the text
       const { data, error } = await supabase.functions.invoke('analyze-script-for-video', {
         body: {
           scriptText: fullText,
-          imageCount: target{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Count,
+          imageCount: targetSegmentCount,
           targetDuration: totalDuration
         }
       });
@@ -247,11 +247,11 @@ export const TimelineScriptEditor = ({
       if (error) throw error;
 
       if (!data.segments || data.segments.length === 0) {
-        throw new Error(tx({ de: 'Keine {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e zurückgegeben', en: 'No segments returned', es: 'No se devolvieron segmentos' }));
+        throw new Error(tx({ de: 'Keine Segmente zurückgegeben', en: 'No segments returned', es: 'No se devolvieron segmentos' }));
       }
 
       // Create new segments from AI analysis
-      const new{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s: Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })}[] = data.segments.map((analyzed: any, index: number) => ({
+      const newSegments: ScriptSegment[] = data.segments.map((analyzed: any, index: number) => ({
         id: `segment-split-${Date.now()}-${index}`,
         text: analyzed.text,
         startTime: analyzed.startTime || 0,
@@ -267,11 +267,11 @@ export const TimelineScriptEditor = ({
         locked: false
       }));
 
-      on{tx({ de: "Segment", en: "Segment", es: "Segmento" })}sChange(new{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s);
+      onSegmentsChange(newSegments);
       
       toast({
-        title: tx({ de: "✓ Text in {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e aufgeteilt", en: "✓ Text split into segments", es: "✓ Texto dividido en segmentos" }),
-        description: `${new{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s.length} intelligente {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e erstellt`
+        title: tx({ de: "✓ Text in Segmente aufgeteilt", en: "✓ Text split into segments", es: "✓ Texto dividido en segmentos" }),
+        description: `${newSegments.length} intelligente Segmente erstellt`
       });
     } catch (error) {
       console.error('Auto-Split error:', error);
@@ -285,31 +285,31 @@ export const TimelineScriptEditor = ({
     }
   };
 
-  const update{tx({ de: "Segment", en: "Segment", es: "Segmento" })} = (id: string, updates: Partial<Script{tx({ de: "Segment", en: "Segment", es: "Segmento" })}>) => {
-    on{tx({ de: "Segment", en: "Segment", es: "Segmento" })}sChange(
+  const updateSegment = (id: string, updates: Partial<ScriptSegment>) => {
+    onSegmentsChange(
       segments.map(seg => {
         if (seg.id === id) {
-          const updated{tx({ de: "Segment", en: "Segment", es: "Segmento" })} = { ...seg, ...updates };
+          const updatedSegment = { ...seg, ...updates };
           
           // Auto-calculate duration if text changed
           if (updates.text !== undefined) {
-            updated{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.duration = calculate{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Duration(
-              updated{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.text, 
-              updated{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.voiceSettings?.speed || voiceSpeed
+            updatedSegment.duration = calculateSegmentDuration(
+              updatedSegment.text, 
+              updatedSegment.voiceSettings?.speed || voiceSpeed
             );
           }
           
-          return updated{tx({ de: "Segment", en: "Segment", es: "Segmento" })};
+          return updatedSegment;
         }
         return seg;
       })
     );
   };
 
-  const delete{tx({ de: "Segment", en: "Segment", es: "Segmento" })} = (id: string) => {
-    on{tx({ de: "Segment", en: "Segment", es: "Segmento" })}sChange(segments.filter(seg => seg.id !== id));
-    if (selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Id === id) {
-      setSelected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Id(null);
+  const deleteSegment = (id: string) => {
+    onSegmentsChange(segments.filter(seg => seg.id !== id));
+    if (selectedSegmentId === id) {
+      setSelectedSegmentId(null);
     }
     
     toast({
@@ -338,7 +338,7 @@ export const TimelineScriptEditor = ({
     // Clamp to valid range
     newStartTime = Math.max(0, Math.min(newStartTime, totalDuration - segment.duration));
     
-    update{tx({ de: "Segment", en: "Segment", es: "Segmento" })}(segment.id, { startTime: newStartTime });
+    updateSegment(segment.id, { startTime: newStartTime });
   };
 
   // Generate timeline ruler marks
@@ -354,9 +354,9 @@ export const TimelineScriptEditor = ({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>{tx({ de: "Timeline Script Editor", en: "Timeline Script Editor", es: "Editor de guiones de línea de tiempo" })}</CardTitle>
+              <CardTitle>Timeline Script Editor</CardTitle>
               <CardDescription>
-                {tx({ de: "Platziere Text-{tx({ de: "Segment", en: "Segment", es: "Segmento" })}e präzise auf der Zeitachse", en: "Place text segments precisely on the timeline", es: "Coloque segmentos de texto con precisión en la línea de tiempo" })}
+                Platziere Text-Segmente präzise auf der Zeitachse
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -365,7 +365,7 @@ export const TimelineScriptEditor = ({
                 size="sm" 
                 variant="outline"
                 disabled={isAutoSyncing || segments.length === 0}
-                title={tx({ de: "Text intelligent in mehrere {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e aufteilen", en: "Intelligently split text into multiple segments", es: "Divida el texto de forma inteligente en varios segmentos" })}
+                title=Text intelligent in mehrere Segmente aufteilen
               >
                 {isAutoSyncing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -374,27 +374,27 @@ export const TimelineScriptEditor = ({
                 )}
               </Button>
               <Button 
-                onClick={autoSync{tx({ de: "Segment", en: "Segment", es: "Segmento" })}s} 
+                onClick={autoSyncSegments} 
                 size="sm" 
                 variant="secondary"
                 disabled={isAutoSyncing || segments.length === 0}
-                title={tx({ de: "Segment", en: "Segment", es: "Segmento" })}
+                title=Segment
               >
                 {isAutoSyncing ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {tx({ de: "Synchronisiere...", en: "Syncing...", es: "Sincronizando..." })}
+                    Synchronisiere...
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4 mr-2" />
-                    {tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" })}
+                    Auto-Sync
                   </>
                 )}
               </Button>
-              <Button onClick={add{tx({ de: "Segment", en: "Segment", es: "Segmento" })} size="sm">
+              <Button onClick={addSegment size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                {tx({ de: "Segment", en: "Segment", es: "Segmento" })}
+                Segment
               </Button>
             </div>
           </div>
@@ -402,7 +402,7 @@ export const TimelineScriptEditor = ({
         <CardContent className="space-y-6">
           {/* Timeline Ruler */}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">{tx({ de: "Zeitachse (Gesamt: ${totalDuration}s)", en: "Timeline (Total: ${totalDuration}s)", es: "Línea de tiempo (Total: ${totalDuration}s)" })}</Label>
+            <Label className="text-xs text-muted-foreground">Zeitachse (Gesamt: ${totalDuration}s)</Label>
             <div className="relative border rounded-lg p-4 bg-muted/30 min-h-32">
               {/* Time marks */}
               <div className="absolute top-0 left-0 right-0 h-6 border-b flex items-end">
@@ -426,19 +426,19 @@ export const TimelineScriptEditor = ({
               >
                 <div ref={timelineRef} className="relative mt-8 h-20 bg-background/50 rounded border">
                   {segments.map(segment => (
-                    <Timeline{tx({ de: "Segment", en: "Segment", es: "Segmento" })}
+                    <TimelineSegment
                       key={segment.id}
                       segment={segment}
                       totalDuration={totalDuration}
-                      isSelected={selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Id === segment.id}
-                      onClick={() => setSelected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}Id(segment.id)}
-                      onUpdate={update{tx({ de: "Segment", en: "Segment", es: "Segmento" })}
+                      isSelected={selectedSegmentId === segment.id}
+                      onClick={() => setSelectedSegmentId(segment.id)}
+                      onUpdate={updateSegment
                     />
                   ))}
                   
                   {segments.length === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                      {tx({ de: 'Klicke "{tx({ de: "Segment", en: "Segment", es: "Segmento" })} hinzufügen" um zu starten', en: 'Click "Add segment" to start', es: 'Haz clic en "Agregar segmento" para comenzar' })}
+                      Klicke "Segment hinzufügen" um zu starten
                     </div>
                   )}
                 </div>
@@ -446,28 +446,28 @@ export const TimelineScriptEditor = ({
             </div>
           </div>
 
-          {/* {tx({ de: "Segment", en: "Segment", es: "Segmento" })} Details */}
-          {selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })} && (
+          {/* Segment Details */}
+          {selectedSegment && (
             <Card className="border-primary/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{tx({ de: "Segment", en: "Segment", es: "Segmento" })}</CardTitle>
+                  <CardTitle className="text-base">Segment</CardTitle>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => update{tx({ de: "Segment", en: "Segment", es: "Segmento" })}(selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.id, { locked: !selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.locked })}
+                      onClick={() => updateSegment(selectedSegment.id, { locked: !selectedSegment.locked })}
                     >
-                      {selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.locked ? (
-                        <><Lock className="h-4 w-4 mr-2" /> {tx({ de: "Entsperren", en: "Unlock", es: "Desbloquear" })}</>
+                      {selectedSegment.locked ? (
+                        <><Lock className="h-4 w-4 mr-2" /> Entsperren</>
                       ) : (
-                        <><Unlock className="h-4 w-4 mr-2" /> {tx({ de: "Sperren", en: "Lock", es: "Bloquear" })}</>
+                        <><Unlock className="h-4 w-4 mr-2" /> Sperren</>
                       )}
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => delete{tx({ de: "Segment", en: "Segment", es: "Segmento" })}(selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.id)}
+                      onClick={() => deleteSegment(selectedSegment.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -478,9 +478,9 @@ export const TimelineScriptEditor = ({
                 <div className="space-y-2">
                   <Label>Text</Label>
                   <Textarea
-                    value={selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.text}
-                    onChange={(e) => update{tx({ de: "Segment", en: "Segment", es: "Segmento" })}(selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.id, { text: e.target.value })}
-                    placeholder="{tx({ de: "Segment", en: "Segment", es: "Segmento" })}-Text eingeben..."
+                    value={selectedSegment.text}
+                    onChange={(e) => updateSegment(selectedSegment.id, { text: e.target.value })}
+                    placeholder="Segment-Text eingeben..."
                     rows={3}
                   />
                 </div>
@@ -493,8 +493,8 @@ export const TimelineScriptEditor = ({
                       step="0.5"
                       min="0"
                       max={totalDuration}
-                      value={selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.startTime}
-                      onChange={(e) => update{tx({ de: "Segment", en: "Segment", es: "Segmento" })}(selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.id, { startTime: parseFloat(e.target.value) || 0 })}
+                      value={selectedSegment.startTime}
+                      onChange={(e) => updateSegment(selectedSegment.id, { startTime: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
 
@@ -504,8 +504,8 @@ export const TimelineScriptEditor = ({
                       type="number"
                       step="0.5"
                       min="0.5"
-                      value={selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.duration.toFixed(1)}
-                      onChange={(e) => update{tx({ de: "Segment", en: "Segment", es: "Segmento" })}(selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.id, { duration: parseFloat(e.target.value) || 1 })}
+                      value={selectedSegment.duration.toFixed(1)}
+                      onChange={(e) => updateSegment(selectedSegment.id, { duration: parseFloat(e.target.value) || 1 })}
                     />
                   </div>
 
@@ -514,7 +514,7 @@ export const TimelineScriptEditor = ({
                     <Input
                       type="number"
                       disabled
-                      value={(selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.startTime + selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.duration).toFixed(1)}
+                      value={(selectedSegment.startTime + selectedSegment.duration).toFixed(1)}
                       className="bg-muted"
                     />
                   </div>
@@ -522,16 +522,16 @@ export const TimelineScriptEditor = ({
 
                 {mediaUrls.length > 0 && (
                   <div className="space-y-2">
-                    <Label>{tx({ de: "Bild während {tx({ de: "Segment", en: "Segment", es: "Segmento" })}", en: "Image during segment", es: "Imagen durante el segmento" })}</Label>
+                    <Label>Bild während Segment</Label>
                     <Select
-                      value={selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.imageIndex?.toString() || ''}
-                      onValueChange={(value) => update{tx({ de: "Segment", en: "Segment", es: "Segmento" })}(selected{tx({ de: "Segment", en: "Segment", es: "Segmento" })}.id, { imageIndex: parseInt(value) })}
+                      value={selectedSegment.imageIndex?.toString() || ''}
+                      onValueChange={(value) => updateSegment(selectedSegment.id, { imageIndex: parseInt(value) })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder={tx({ de: "Kein Bild ausgewählt", en: "No image selected", es: "Ninguna imagen seleccionada" })} />
+                        <SelectValue placeholder=Kein Bild ausgewählt />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="-1">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</SelectItem>
+                        <SelectItem value="-1">Kein Bild</SelectItem>
                         {mediaUrls.map((url, index) => (
                           <SelectItem key={index} value={index.toString()}>
                             Bild {index + 1}
@@ -543,9 +543,9 @@ export const TimelineScriptEditor = ({
                 )}
 
                 <div className="pt-2 text-xs text-muted-foreground space-y-1">
-                  <div>💡 <strong>Tipp:</strong> {tx({ de: "Ziehe {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e auf der Timeline um die Position zu ändern", en: "Drag segments on the timeline to change positions", es: "Arrastre segmentos en la línea de tiempo para cambiar de posición" })}</div>
-                  <div>✨ <strong>Auto-Split:</strong> {tx({ de: "Teilt Text intelligent in mehrere {tx({ de: "Segment", en: "Segment", es: "Segmento" })}e auf", en: "Intelligently splits text into multiple segments", es: "Divide inteligentemente el texto en múltiples segmentos" })}</div>
-                  <div>🎯 <strong>{tx({ de: "Auto-Sync", en: "Auto-Sync", es: "Sincronización automática" })}:</strong> {tx({ de: "Optimiert Timing und generiert word-by-word Untertitel", en: "Optimizes timing and generates word-by-word subtitles", es: "Optimiza el tiempo y genera subtítulos palabra por palabra." })}</div>
+                  <div>💡 <strong>Tipp:</strong> Ziehe Segmente auf der Timeline um die Position zu ändern</div>
+                  <div>✨ <strong>Auto-Split:</strong> Teilt Text intelligent in mehrere Segmente auf</div>
+                  <div>🎯 <strong>Auto-Sync:</strong> Optimiert Timing und generiert word-by-word Untertitel</div>
                 </div>
               </CardContent>
             </Card>
@@ -554,7 +554,7 @@ export const TimelineScriptEditor = ({
           {/* Summary */}
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg text-sm">
             <span className="text-muted-foreground">
-              {segments.length} {tx({ de: "Segment", en: "Segment", es: "Segmento" })}{segments.length !== 1 ? 'e' : ''}
+              {segments.length} Segment{segments.length !== 1 ? 'e' : ''}
             </span>
             <span className="font-medium">
               Gesamtdauer: {segments.reduce((sum, s) => Math.max(sum, s.startTime + s.duration), 0).toFixed(1)}s / {totalDuration}s

@@ -155,10 +155,10 @@ export default function LocationEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            {location ? tx({ de: 'Location bearbeiten', en: 'Edit Location', es: 'Editar ubicación' }) : tx({ de: 'Neue {tx({ de: 'Location anlegen', en: 'Create Location', es: 'Crear ubicación' })}', en: 'Create New Location', es: 'Crear nueva ubicación' })}
+            {location ? tx({ de: 'Location bearbeiten', en: 'Edit Location', es: 'Editar ubicación' }) : tx({ de: 'Neue Location anlegen', en: 'Create New Location', es: 'Crear nueva ubicación' })}
           </DialogTitle>
           <DialogDescription>
-            {tx({ de: 'Schauplätze einmal definieren — in jedem Projekt wiederverwenden.', en: 'Define locations once — reuse in every project.', es: 'Define las ubicaciones una vez y reutilízalas en cada proyecto.' })}
+            Schauplätze einmal definieren — in jedem Projekt wiederverwenden.
           </DialogDescription>
         </DialogHeader>
 
@@ -167,14 +167,14 @@ export default function LocationEditor({
             <div className="flex gap-2.5">
               <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                {tx({ de: 'Lade ein echtes Foto deiner Location hoch — die KI orientiert sich daran und', en: 'Upload a real photo of your location — the AI uses it as a guide and', es: 'Sube una foto real de tu ubicación: la IA la usa como guía y' })}
-                {tx({ de: 'hält Schauplätze über mehrere Szenen visuell konsistent.', en: 'keeps locations visually consistent across multiple scenes.', es: 'mantiene las ubicaciones visualmente coherentes en varias escenas.' })}
+                Lade ein echtes Foto deiner Location hoch — die KI orientiert sich daran und
+                hält Schauplätze über mehrere Szenen visuell konsistent.
               </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">{tx({ de: 'Name *', en: 'Name *', es: 'Nombre *' })}</Label>
+            <Label className="text-xs">Name *</Label>
             <Input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
@@ -184,12 +184,12 @@ export default function LocationEditor({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs">{tx({ de: 'Referenzbild (optional)', en: 'Reference image (optional)', es: 'Imagen de referencia (opcional)' })}</Label>
+            <Label className="text-xs">Referenzbild (optional)</Label>
             {!hasConsent && !location && (
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
                 <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  {tx({ de: 'Beim ersten Upload bestätigst du einmalig die Bildrechte.', en: 'With the first upload you confirm the image rights once.', es: 'Con la primera carga confirmas los derechos de imagen una vez.' })} Danach läuft jeder
+                  Beim ersten Upload bestätigst du einmalig die Bildrechte. Danach läuft jeder
                   weitere Upload ohne Rückfrage.
                 </p>
               </div>
@@ -212,7 +212,7 @@ export default function LocationEditor({
                     onClick={() => setDraft((d) => ({ ...d, reference_image_url: null }))}
                   >
                     <X className="h-3 w-3 mr-1" />
-                    {tx({ de: 'Entfernen', en: 'Remove', es: 'Eliminar' })}
+                    Entfernen
                   </Button>
                 </div>
               </div>
@@ -230,7 +230,7 @@ export default function LocationEditor({
                 />
                 {uploading ? (
                   <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: 'Lädt hoch...', en: 'Uploading...', es: 'Cargando...' })}
+                    <Loader2 className="h-4 w-4 animate-spin" /> Lädt hoch...
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-xs">
@@ -286,7 +286,7 @@ export default function LocationEditor({
                 className="bg-background/60 text-sm"
               />
               <Button variant="outline" size="sm" onClick={addTag}>
-                {tx({ de: 'Hinzufügen', en: 'Add', es: 'Agregar' })}
+                Hinzufügen
               </Button>
             </div>
             {draft.tags.length > 0 && (
@@ -309,7 +309,7 @@ export default function LocationEditor({
 
         <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            {tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}
+            Abbrechen
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}

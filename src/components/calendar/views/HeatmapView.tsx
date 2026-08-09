@@ -105,7 +105,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                   Heatmap-Radar
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {tx({ de: 'Geplante Posts · Optimale Zeiten · Konflikte — auf einen Blick', en: 'Scheduled posts · Optimal times · Conflicts — at a glance', es: 'Publicaciones programadas · Horarios óptimos · Conflictos — de un vistazo' })}
+                  Geplante Posts · Optimale Zeiten · Konflikte — auf einen Blick
                 </p>
               </div>
             </div>
@@ -131,16 +131,16 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
           <div className="flex items-center gap-4 text-[11px] font-mono tracking-wider text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_6px_hsla(43,90%,68%,0.8)]" />
-              {totalPosts} {tx({ de: 'POSTS {tx({ de: 'GEPLANT', en: 'PLANNED', es: 'PLANIFICADO' })}', en: 'POSTS PLANNED', es: 'POSTS PLANIFICADOS' })}
+              {totalPosts} POSTS GEPLANT
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
-              {goldenSlotCount} {tx({ de: 'OPTIMALE SLOTS', en: 'OPTIMAL SLOTS', es: 'SLOTS ÓPTIMOS' })}
+              {goldenSlotCount} OPTIMALE SLOTS
             </span>
             {conflicts.length > 0 && (
               <span className="flex items-center gap-1.5 text-red-400">
                 <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-                {conflicts.length} {tx({ de: 'KONFLIKT', en: 'CONFLICT', es: 'CONFLICTO' })}{conflicts.length === 1 ? "" : "E"}
+                {conflicts.length} KONFLIKT{conflicts.length === 1 ? "" : "E"}
               </span>
             )}
           </div>
@@ -247,7 +247,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                               </div>
                               {score && (
                                 <div className="text-[11px] text-cyan-300">
-                                  {tx({ de: 'Posting-Score:', en: 'Posting score:', es: 'Puntuación de publicación:' })} <span className="font-mono font-bold">{Math.round(score.score)}/100</span>
+                                  Posting-Score: <span className="font-mono font-bold">{Math.round(score.score)}/100</span>
                                   {score.reasons.length > 0 && (
                                     <ul className="mt-1 text-muted-foreground list-disc list-inside text-[10px]">
                                       {score.reasons.slice(0, 2).map((r, i) => (
@@ -271,12 +271,12 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
                               )}
                               {!hasPosts && !score && (
                                 <div className="text-[10px] text-muted-foreground">
-                                  {tx({ de: 'Klick: Post für diesen Slot erstellen', en: 'Click: Create post for this slot', es: 'Click: Crear publicación para este espacio' })}
+                                  Klick: Post für diesen Slot erstellen
                                 </div>
                               )}
                               {!hasPosts && score && (
                                 <div className="text-[10px] text-primary/80 italic">
-                                  {tx({ de: 'Goldene Lücke — Klick zum Befüllen', en: 'Golden gap — click to fill', es: 'Brecha dorada: haz clic para completar' })}
+                                  Goldene Lücke — Klick zum Befüllen
                                 </div>
                               )}
                             </div>
@@ -293,18 +293,18 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <div className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-white/5 text-[10px] font-mono tracking-wider text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_6px_hsla(43,90%,68%,0.8)]" />
-                {tx({ de: 'GEPLANT', en: 'PLANNED', es: 'PLANIFICADO' })}
+                GEPLANT
               </span>
               <span className="flex items-center gap-1.5">
                 <span
                   className="w-2.5 h-2.5 rounded-full"
                   style={{ background: "radial-gradient(circle, rgba(34,211,238,0.6), transparent)" }}
                 />
-                {tx({ de: 'OPTIMALE ZEIT', en: 'OPTIMAL TIME', es: 'HORA ÓPTIMA' })}
+                OPTIMALE ZEIT
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full ring-2 ring-red-400 bg-primary animate-pulse" />
-                {tx({ de: 'KONFLIKT', en: 'CONFLICT', es: 'CONFLICTO' })} (≥3)
+                KONFLIKT (≥3)
               </span>
             </div>
           </motion.div>
@@ -314,7 +314,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<Sparkles className="w-4 h-4" />}
               tone="gold"
-              title={tx({ de: 'Goldene Lücke', en: 'Golden Gap', es: 'Brecha de oro' })}
+              title=Goldene Lücke
               body={
                 goldenGap
                   ? `${DAY_LABELS_LONG_DE[goldenGap.day]} ${String(goldenGap.hour).padStart(2, "0")}:00 — Score ${goldenGap.score}, kein Post geplant.`
@@ -332,7 +332,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<AlertTriangle className="w-4 h-4" />}
               tone={conflicts.length > 0 ? "red" : "muted"}
-              title={tx({ de: 'Konflikt-Warnung', en: 'Conflict Warning', es: 'Advertencia de conflicto' })}
+              title=Konflikt-Warnung
               body={
                 conflicts.length > 0
                   ? tx({ de: `${conflicts.length} Slot${conflicts.length === 1 ? "" : "s"} mit ≥3 Posts gleichzeitig — Reach kannibalisiert sich.`, en: `${conflicts.length} slot${conflicts.length === 1 ? "" : "s"} with ≥3 posts at the same time — reach cannibalizes itself.`, es: `${conflicts.length} franja${conflicts.length === 1 ? "" : "s"} con ≥3 publicaciones a la vez: el alcance se canibaliza.` })
@@ -342,7 +342,7 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             <InsightCard
               icon={<PieChart className="w-4 h-4" />}
               tone="cyan"
-              title={tx({ de: 'Channel-Balance', en: 'Channel Balance', es: 'Equilibrio de canales' })}
+              title=Channel-Balance
               body={
                 channelDist.length > 0
                   ? channelDist
@@ -364,17 +364,17 @@ export function HeatmapView({ posts, onPostClick, onDateClick }: HeatmapViewProp
             >
               <CalendarPlus className="w-8 h-8 text-primary/60 mx-auto mb-2" />
               <p className="text-sm text-foreground/90 mb-1">
-                {tx({ de: 'Noch keine Posts geplant — die cyan-Schimmer zeigen dir bereits, wann deine Audience aktiv ist.', en: 'No posts planned yet — the cyan shimmers already show you when your audience is active.', es: 'Todavía no hay publicaciones planificadas: los brillos cian ya te muestran cuándo tu audiencia está activa.' })}
+                Noch keine Posts geplant — die cyan-Schimmer zeigen dir bereits, wann deine Audience aktiv ist.
               </p>
               <p className="text-xs text-muted-foreground mb-3">
-                {tx({ de: 'Klick auf eine Zelle, um direkt einen Post für diesen Slot zu erstellen.', en: 'Click on a cell to directly create a post for this slot.', es: 'Haz clic en una celda para crear directamente una publicación para ese espacio.' })}
+                Klick auf eine Zelle, um direkt einen Post für diesen Slot zu erstellen.
               </p>
               <Button
                 size="sm"
                 onClick={() => onDateClick?.(new Date())}
                 className="h-8 text-xs bg-gradient-to-r from-primary to-amber-500"
               >
-                <CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> {tx({ de: 'Ersten Post erstellen', en: 'Create first post', es: 'Crear primera publicación' })}
+                <CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> Ersten Post erstellen
               </Button>
             </motion.div>
           )}

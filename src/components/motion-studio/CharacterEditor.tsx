@@ -224,8 +224,8 @@ export default function CharacterEditor({
             {character ? tx({ de: character ? 'Charakter bearbeiten' : 'Neuen Charakter anlegen', en: character ? 'Edit character' : 'Create new character', es: character ? 'Editar personaje' : 'Crear nuevo personaje' })}
           </DialogTitle>
           <DialogDescription>
-            {tx({ de: 'Speichere wiederverwendbare Charaktere mit Reference-Image für visuelle Konsistenz', en: 'Save reusable characters with a reference image for visual consistency', es: 'Guarda personajes reutilizables con una imagen de referencia para lograr coherencia visual' })}
-            {tx({ de: 'über alle Motion-Studio-Projekte hinweg.', en: 'across all Motion Studio projects.', es: 'en todos los proyectos de Motion Studio.' })}
+            Speichere wiederverwendbare Charaktere mit Reference-Image für visuelle Konsistenz
+            über alle Motion-Studio-Projekte hinweg.
           </DialogDescription>
         </DialogHeader>
 
@@ -235,11 +235,11 @@ export default function CharacterEditor({
             <div className="flex gap-2.5">
               <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-xs font-semibold">{tx({ de: 'Sherlock-Holmes-Effekt', en: 'Sherlock Holmes Effect', es: 'Efecto Sherlock Holmes' })}</p>
+                <p className="text-xs font-semibold">Sherlock-Holmes-Effekt</p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  {tx({ de: 'Markante Kleidung & Objekte beschreibst du am besten auf Englisch — die KI', en: 'It is best to describe striking clothing & objects in English — the AI', es: 'Es mejor describir la ropa y los objetos llamativos en inglés: la IA' })}
-                  {tx({ de: 'wiederholt diese viel zuverlässiger als Gesichter. Ein Reference-Image', en: 'repeats them much more reliably than faces. A reference image', es: 'los repite con mucha más fiabilidad que las caras. Una imagen de referencia' })}
-                  {tx({ de: 'verbessert die Konsistenz nochmal deutlich.', en: 'significantly improves consistency again.', es: 'mejora significativamente la consistencia de nuevo.' })}
+                  Markante Kleidung & Objekte beschreibst du am besten auf Englisch — die KI
+                  wiederholt diese viel zuverlässiger als Gesichter. Ein Reference-Image
+                  verbessert die Konsistenz nochmal deutlich.
                 </p>
               </div>
             </div>
@@ -259,7 +259,7 @@ export default function CharacterEditor({
           {/* Reference Image */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">{tx({ de: 'Referenzbild (optional, sehr empfohlen)', en: 'Reference image (optional, highly recommended)', es: 'Imagen de referencia (opcional, muy recomendada)' })}</Label>
+              <Label className="text-xs">Referenzbild (optional, sehr empfohlen)</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -274,7 +274,7 @@ export default function CharacterEditor({
                 ) : (
                   <Wand2 className="h-3 w-3" />
                 )}
-                {tx({ de: 'Sheet generieren', en: 'Generate sheet', es: 'Generar hoja' })}
+                Sheet generieren
               </Button>
             </div>
 
@@ -297,7 +297,7 @@ export default function CharacterEditor({
                 />
                 <div className="flex-1 space-y-2">
                   <p className="text-[11px] text-muted-foreground">
-                    {tx({ de: 'Wird als Image-to-Video-Referenz an Hailuo / Kling / Wan übergeben.', en: 'Passed to Hailuo / Kling / Wan as an image-to-video reference.', es: 'Se pasa a Hailuo / Kling / Wan como referencia de imagen a vídeo.' })}
+                    Wird als Image-to-Video-Referenz an Hailuo / Kling / Wan übergeben.
                   </p>
                   <Button
                     variant="ghost"
@@ -306,7 +306,7 @@ export default function CharacterEditor({
                     onClick={() => setDraft((d) => ({ ...d, reference_image_url: null }))}
                   >
                     <X className="h-3 w-3 mr-1" />
-                    {tx({ de: 'Entfernen', en: 'Remove', es: 'Eliminar' })}
+                    Entfernen
                   </Button>
                 </div>
               </div>
@@ -324,7 +324,7 @@ export default function CharacterEditor({
                 />
                 {uploading ? (
                   <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> {tx({ de: 'Lädt hoch...', en: 'Uploading...', es: 'Subiendo...' })}
+                    <Loader2 className="h-4 w-4 animate-spin" /> Lädt hoch...
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-xs">
@@ -344,7 +344,7 @@ export default function CharacterEditor({
           )}
 
           <div className="space-y-1.5">
-            <Label className="text-xs">{tx({ de: 'Aussehen (Englisch empfohlen) *', en: 'Appearance (English recommended) *', es: 'Aspecto (se recomienda inglés) *' })}</Label>
+            <Label className="text-xs">Aussehen (Englisch empfohlen) *</Label>
             <Textarea
               value={draft.description}
               onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
@@ -356,7 +356,7 @@ export default function CharacterEditor({
 
           {/* Signature Items */}
           <div className="space-y-1.5">
-            <Label className="text-xs">{tx({ de: 'Markante Kleidung & Objekte (Englisch empfohlen)', en: 'Striking clothing & objects (English recommended)', es: 'Ropa y objetos llamativos (se recomienda inglés)' })}</Label>
+            <Label className="text-xs">Markante Kleidung & Objekte (Englisch empfohlen)</Label>
             <Textarea
               value={draft.signature_items}
               onChange={(e) => setDraft((d) => ({ ...d, signature_items: e.target.value }))}
@@ -365,8 +365,8 @@ export default function CharacterEditor({
               className="bg-background/60 resize-none text-sm"
             />
             <p className="text-[10px] text-muted-foreground">
-              {tx({ de: 'Diese Details werden in JEDER Szene wiederholt — der Zuschauer erkennt den Charakter', en: 'These details are repeated in EVERY scene — the viewer recognizes the character', es: 'Estos detalles se repiten en CADA escena: el espectador reconoce al personaje.' })}
-              {tx({ de: 'daran.', en: 'by them.', es: 'por ellos.' })}
+              Diese Details werden in JEDER Szene wiederholt — der Zuschauer erkennt den Charakter
+              daran.
             </p>
           </div>
 
@@ -398,7 +398,7 @@ export default function CharacterEditor({
                 className="bg-background/60 text-sm"
               />
               <Button variant="outline" size="sm" onClick={addTag}>
-                {tx({ de: 'Hinzufügen', en: 'Add', es: 'Añadir' })}
+                Hinzufügen
               </Button>
             </div>
             {draft.tags.length > 0 && (
@@ -421,7 +421,7 @@ export default function CharacterEditor({
 
         <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            {tx({ de: '{tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}', en: 'Cancel', es: 'Cancelar' })}
+            Abbrechen
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}

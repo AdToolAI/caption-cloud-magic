@@ -393,7 +393,7 @@ export default function MediaLibrary() {
                 : isMotionStudioClip
                   ? `${motionModel} · ${metadata?.duration_seconds ?? '?'}s${metadata?.prompt ? ` · ${String(metadata.prompt).slice(0, 50)}…` : ''}`
                   : isUniversalCreator
-                    ? tx({ de: '{tx({ de: "Gerendert", en: "Rendered", es: "Renderizado" })} mit Universal Creator', en: 'Rendered with Universal Creator', es: 'Renderizado con Universal Creator' })
+                    ? tx({ de: 'Gerendert mit Universal Creator', en: 'Rendered with Universal Creator', es: 'Renderizado con Universal Creator' })
                     : '',
           url: video.output_url || '',
           thumbUrl: video.output_url || '',
@@ -726,7 +726,7 @@ export default function MediaLibrary() {
       }
     } catch (error: any) {
       toast({
-        title: tx({ de: 'Fehler beim {tx({ de: "Löschen", en: "Delete", es: "Borrar" })}', en: 'Delete failed', es: 'Error al eliminar' }),
+        title: tx({ de: 'Fehler beim Löschen', en: 'Delete failed', es: 'Error al eliminar' }),
         description: error.message,
         variant: 'destructive',
       });
@@ -895,7 +895,7 @@ export default function MediaLibrary() {
     
     if (!firstImageItem) {
       toast({
-        title: tx({ de: "⚠️ Kein Bild {tx({ de: "ausgewählt", en: "selected", es: "seleccionado" })}", en: "⚠️ No image selected", es: "⚠️ Ninguna imagen seleccionada" }),
+        title: tx({ de: "⚠️ Kein Bild ausgewählt", en: "⚠️ No image selected", es: "⚠️ Ninguna imagen seleccionada" }),
         description: tx({ de: "Smart Background funktioniert nur mit Bildern.", en: "Smart Background only works with images.", es: "Fondo inteligente solo funciona con imágenes." }),
         variant: "destructive",
       });
@@ -1022,14 +1022,14 @@ export default function MediaLibrary() {
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
                   <FolderOpen className="h-4 w-4" />
-                  {tx({ de: "Alle", en: "All", es: "Todos" })}
+                  Alle
                 </TabsTrigger>
                 <TabsTrigger 
                   value="upload" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
                   <Upload className="h-4 w-4" />
-                  {tx({ de: "Uploads", en: "Uploads", es: "Cargas" })}
+                  Uploads
                 </TabsTrigger>
                 <TabsTrigger 
                   value="ai" 
@@ -1043,21 +1043,21 @@ export default function MediaLibrary() {
                   className="flex items-center gap-2 data-[state=active]:bg-cyan-500/20 data-[state=active]:shadow-[0_0_15px_hsla(180,80%,60%,0.2)]"
                 >
                   <Video className="h-4 w-4" />
-                  {tx({ de: "Gerendert", en: "Rendered", es: "Renderizado" })}
+                  Gerendert
                 </TabsTrigger>
                 <TabsTrigger 
                   value="campaign" 
                   className="flex items-center gap-2 data-[state=active]:bg-orange-500/20 data-[state=active]:shadow-[0_0_15px_hsla(30,80%,60%,0.2)]"
                 >
                   <Layers className="h-4 w-4" />
-                  {tx({ de: "Kampagnen", en: "Campaigns", es: "Campañas" })}
+                  Kampagnen
                 </TabsTrigger>
                 <TabsTrigger 
                   value="albums" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
                 >
                   <Images className="h-4 w-4" />
-                  {tx({ de: "Alben", en: "Albums", es: "Álbumes" })}
+                  Alben
                 </TabsTrigger>
                 <TabsTrigger 
                   value="cloud" 
@@ -1082,28 +1082,28 @@ export default function MediaLibrary() {
         <CardContent className="pt-6">
           <div className="flex gap-4 flex-wrap items-end">
             <div className="flex-1 min-w-[200px]">
-              <Label>{tx({ de: "Suche", en: "Search", es: "Buscar" })}</Label>
+              <Label>Suche</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={tx({ de: "Medien suchen...", en: "Search media...", es: "Buscar medios..." })}
+                  placeholder=Medien suchen...
                   className="pl-10"
                 />
               </div>
             </div>
 
             <div>
-              <Label>{tx({ de: "Dateityp", en: "File Type", es: "Tipo de archivo" })}</Label>
+              <Label>Dateityp</Label>
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{tx({ de: "Alle Typen", en: "All Types", es: "Todos los tipos" })}</SelectItem>
-                  <SelectItem value="image">{tx({ de: "Bilder", en: "Images", es: "Imágenes" })}</SelectItem>
-                  <SelectItem value="video">{tx({ de: "Videos", en: "Videos", es: "Videos" })}</SelectItem>
+                  <SelectItem value="all">Alle Typen</SelectItem>
+                  <SelectItem value="image">Bilder</SelectItem>
+                  <SelectItem value="video">Videos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1112,7 +1112,7 @@ export default function MediaLibrary() {
           {selectedAssets.length > 0 && (
             <div className="flex items-center gap-4 p-4 border-t bg-muted/30 flex-wrap mt-4">
               <span className="text-sm text-muted-foreground">
-                {selectedAssets.length} {tx({ de: "ausgewählt", en: "selected", es: "seleccionado" })}
+                {selectedAssets.length} ausgewählt
               </span>
               <div className="flex gap-2 flex-wrap">
                 <Button
@@ -1121,7 +1121,7 @@ export default function MediaLibrary() {
                   onClick={bulkSendToAIPostGenerator}
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
-                  {tx({ de: "An Generator", en: "To generator", es: "Al generador" })} ({selectedAssets.length})
+                  An Generator ({selectedAssets.length})
                 </Button>
                 <Button
                   variant="outline"
@@ -1129,7 +1129,7 @@ export default function MediaLibrary() {
                   onClick={bulkSendToComposer}
                 >
                   <Send className="h-4 w-4 mr-2" />
-                  {tx({ de: "An Composer", en: "To composer", es: "Al compositor" })} ({selectedAssets.length})
+                  An Composer ({selectedAssets.length})
                 </Button>
                 <Button
                   variant="outline"
@@ -1137,7 +1137,7 @@ export default function MediaLibrary() {
                   onClick={bulkSendToCalendar}
                 >
                   <Calendar className="h-4 w-4 mr-2" />
-                  {tx({ de: "In Kalender", en: "To calendar", es: "Al calendario" })} ({selectedAssets.length})
+                  In Kalender ({selectedAssets.length})
                 </Button>
                 <Button
                   variant="outline"
@@ -1159,7 +1159,7 @@ export default function MediaLibrary() {
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  {tx({ de: "Löschen", en: "Delete", es: "Borrar" })} ({selectedAssets.length})
+                  Löschen ({selectedAssets.length})
                 </Button>
               </div>
             </div>
@@ -1256,7 +1256,7 @@ export default function MediaLibrary() {
                             <Play className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>{tx({ de: "Video abspielen", en: "Play video", es: "Reproducir video" })}</TooltipContent>
+                        <TooltipContent>Video abspielen</TooltipContent>
                       </Tooltip>
                     )}
                     
@@ -1270,7 +1270,7 @@ export default function MediaLibrary() {
                           <Sparkles className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{tx({ de: "An KI-Post-Generator senden", en: "Send to AI post generator", es: "Enviar al generador de publicaciones de IA" })}</TooltipContent>
+                      <TooltipContent>An KI-Post-Generator senden</TooltipContent>
                     </Tooltip>
                     
                     <Tooltip>
@@ -1283,7 +1283,7 @@ export default function MediaLibrary() {
                           <Send className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{tx({ de: "An Composer", en: "To composer", es: "Al compositor" })} senden</TooltipContent>
+                      <TooltipContent>An Composer senden</TooltipContent>
                     </Tooltip>
                     
                     <Tooltip>
@@ -1296,7 +1296,7 @@ export default function MediaLibrary() {
                           <Calendar className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{tx({ de: "In Kalender", en: "To calendar", es: "Al calendario" })} einplanen</TooltipContent>
+                      <TooltipContent>In Kalender einplanen</TooltipContent>
                     </Tooltip>
                     
                     {item.type === 'image' && (
@@ -1310,7 +1310,7 @@ export default function MediaLibrary() {
                             <Layers className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>{tx({ de: "Hintergrund ersetzen", en: "Replace background", es: "Reemplazar fondo" })}</TooltipContent>
+                        <TooltipContent>Hintergrund ersetzen</TooltipContent>
                       </Tooltip>
                     )}
                     
@@ -1325,7 +1325,7 @@ export default function MediaLibrary() {
                             <Download className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>{tx({ de: "Herunterladen", en: "Download", es: "Descargar" })}</TooltipContent>
+                        <TooltipContent>Herunterladen</TooltipContent>
                       </Tooltip>
                     )}
                     
@@ -1339,7 +1339,7 @@ export default function MediaLibrary() {
                           <FolderPlus className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{tx({ de: "In Album speichern", en: "Save to album", es: "Guardar en álbum" })}</TooltipContent>
+                      <TooltipContent>In Album speichern</TooltipContent>
                     </Tooltip>
 
                     <Tooltip>
@@ -1364,7 +1364,7 @@ export default function MediaLibrary() {
                           />
                         </div>
                       </TooltipTrigger>
-                      <TooltipContent>{tx({ de: "Lizenz-Zertifikat", en: "License certificate", es: "Certificado de licencia" })}</TooltipContent>
+                      <TooltipContent>Lizenz-Zertifikat</TooltipContent>
                     </Tooltip>
                     
                     <Tooltip>
@@ -1377,7 +1377,7 @@ export default function MediaLibrary() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{tx({ de: "Löschen", en: "Delete", es: "Borrar" })}</TooltipContent>
+                      <TooltipContent>Löschen</TooltipContent>
                     </Tooltip>
                   </>
 
@@ -1428,7 +1428,7 @@ export default function MediaLibrary() {
         <Card className="p-12">
           <div className="text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg font-medium mb-2">{tx({ de: "Keine Medien gefunden", en: "No media found", es: "No se encontraron medios" })}</p>
+            <p className="text-lg font-medium mb-2">Keine Medien gefunden</p>
             <p className="text-sm text-muted-foreground mb-4">Laden Sie Ihre ersten Dateien hoch</p>
             <Button asChild>
               <label htmlFor="file-upload" className="cursor-pointer">

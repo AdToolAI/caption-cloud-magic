@@ -129,7 +129,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
       toast.success(tx({ de: 'Stimme erfolgreich isoliert!', en: 'Voice successfully isolated!', es: '¡Voz aislada con éxito!' }));
     } catch (error) {
       console.error('Isolation error:', error);
-      toast.error(tx({ de: 'Fehler bei der {tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" })}', en: 'Voice isolation error', es: 'Error de aislamiento de voz' }));
+      toast.error(tx({ de: 'Fehler bei der Stimmisolierung', en: 'Voice isolation error', es: 'Error de aislamiento de voz' }));
     } finally {
       setIsProcessing(false);
     }
@@ -173,8 +173,8 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
             <Sparkles className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold">{tx({ de: "KI-Audio-Bearbeitung", en: "AI Audio Editing", es: "Edición de audio por IA" })}</h3>
-            <p className="text-xs text-muted-foreground">{tx({ de: "Wähle zwischen Enhancement oder Isolation", en: "Choose between Enhancement or Isolation", es: "Elige entre Mejora o Aislamiento" })}</p>
+            <h3 className="font-semibold">KI-Audio-Bearbeitung</h3>
+            <p className="text-xs text-muted-foreground">Wähle zwischen Enhancement oder Isolation</p>
           </div>
         </div>
 
@@ -183,11 +183,11 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
           <TabsList className="grid w-full grid-cols-2 bg-muted/30">
             <TabsTrigger value="enhance" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <Wand2 className="w-4 h-4 mr-2" />
-              {tx({ de: "Audio-Verbesserung", en: "Audio enhancement", es: "Mejora de audio" })}
+              Audio-Verbesserung
             </TabsTrigger>
             <TabsTrigger value="isolate" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400">
               <Mic className="w-4 h-4 mr-2" />
-              {tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" })}
+              Stimmisolierung
             </TabsTrigger>
           </TabsList>
 
@@ -195,7 +195,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
           <TabsContent value="enhance" className="space-y-6 mt-4">
             {/* Presets */}
             <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">{tx({ de: "Schnell-Presets", en: "Quick presets", es: "Preajustes rápidos" })}</Label>
+              <Label className="text-xs text-muted-foreground mb-2 block">Schnell-Presets</Label>
               <div className={`grid gap-2 ${isFullWidth ? 'grid-cols-4' : 'grid-cols-2'}`}>
                 {presets.map((preset) => (
                   <motion.button
@@ -218,7 +218,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
             {/* Individual Enhancements */}
             <div className="space-y-4">
-              <Label className="text-xs text-muted-foreground">{tx({ de: "Einzelne Optimierungen", en: "Individual optimizations", es: "Optimizaciones individuales" })}</Label>
+              <Label className="text-xs text-muted-foreground">Einzelne Optimierungen</Label>
               
               {enhancements.map((enhancement) => (
                 <motion.div
@@ -286,17 +286,17 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               {isProcessing ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  {tx({ de: "Optimiere Audio...", en: "Optimizing audio...", es: "Optimizando audio..." })}
+                  Optimiere Audio...
                 </>
               ) : processedUrl && activeMode === 'enhance' ? (
                 <>
                   <Check className="w-5 h-5 mr-2" />
-                  {tx({ de: "Erneut optimieren", en: "Optimize again", es: "Optimizar de nuevo" })}
+                  Erneut optimieren
                 </>
               ) : (
                 <>
                   <Wand2 className="w-5 h-5 mr-2" />
-                  {tx({ de: "Audio verbessern", en: "Improve audio", es: "Mejorar el audio" })}
+                  Audio verbessern
                 </>
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
@@ -305,8 +305,8 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
             {/* Info box */}
             <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
               <p className="text-xs text-muted-foreground">
-                <strong>{tx({ de: "Audio-Verbesserung", en: "Audio enhancement", es: "Mejora de audio" })}</strong> optimiert die Gesamtqualität: Rauschen wird reduziert, 
-                {tx({ de: "Stimmen werden klarer, und die Lautstärke wird normalisiert. Musik und alle Sounds bleiben erhalten.", en: "Voices become clearer and the volume is normalized. Music and all sounds are preserved.", es: "Las voces se vuelven más claras y el volumen se normaliza. Se conservan la música y todos los sonidos." })}
+                <strong>Audio-Verbesserung</strong> optimiert die Gesamtqualität: Rauschen wird reduziert, 
+                Stimmen werden klarer, und die Lautstärke wird normalisiert. Musik und alle Sounds bleiben erhalten.
               </p>
             </div>
           </TabsContent>
@@ -318,11 +318,11 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-medium text-amber-500">{tx({ de: "Wichtiger Hinweis", en: "Important NOTE", es: "NOTA IMPORTANTE" })}</h4>
+                  <h4 className="text-sm font-medium text-amber-500">Wichtiger Hinweis</h4>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Die {tx({ de: "Stimmisolierung", en: "Voice isolation", es: "Aislamiento de voz" })} entfernt <strong>alle</strong> Hintergrundgeräusche und Musik. 
-                    {tx({ de: "Nur die reine Stimme bleibt erhalten. Ideal für Videos mit störender Hintergrundmusik", en: "Only the pure voice remains. Ideal for videos with annoying background music", es: "Solo queda la voz pura. Ideal para vídeos con música de fondo molesta" })} 
-                    {tx({ de: "oder Interviews mit Umgebungslärm.", en: "or interviews with ambient noise.", es: "o entrevistas con ruido ambiental." })}
+                    Die Stimmisolierung entfernt <strong>alle</strong> Hintergrundgeräusche und Musik. 
+                    Nur die reine Stimme bleibt erhalten. Ideal für Videos mit störender Hintergrundmusik 
+                    oder Interviews mit Umgebungslärm.
                   </p>
                 </div>
               </div>
@@ -330,7 +330,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
             {/* Use Cases */}
             <div className="space-y-3">
-              <Label className="text-xs text-muted-foreground">{tx({ de: "Ideal für:", en: "Ideal for:", es: "Ideal para:" })}</Label>
+              <Label className="text-xs text-muted-foreground">Ideal für:</Label>
               <div className="grid gap-2">
                 {[
                   { label: tx({ de: 'Videos mit Hintergrundmusik', en: 'Videos with background music', es: 'Vídeos con música de fondo.' }), desc: tx({ de: 'Musik komplett entfernen', en: 'Completely remove music', es: 'Eliminar completamente la música' }) },
@@ -356,17 +356,17 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
               {isProcessing ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  {tx({ de: "Isoliere Stimme...", en: "Isolating voice...", es: "Aislando voz..." })}
+                  Isoliere Stimme...
                 </>
               ) : processedUrl && activeMode === 'isolate' ? (
                 <>
                   <Check className="w-5 h-5 mr-2" />
-                  {tx({ de: "Erneut isolieren", en: "Isolate again", es: "Aislar de nuevo" })}
+                  Erneut isolieren
                 </>
               ) : (
                 <>
                   <Mic className="w-5 h-5 mr-2" />
-                  {tx({ de: "Stimme isolieren", en: "Isolate voice", es: "Aislar voz" })}
+                  Stimme isolieren
                 </>
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
@@ -375,8 +375,8 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
             {/* Technical Info */}
             <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
               <p className="text-xs text-muted-foreground">
-                {tx({ de: "<strong>Powered by ElevenLabs Audio Isolation API</strong> – Nutzt KI, um Sprache", en: "<strong>Powered by ElevenLabs Audio Isolation API</strong> – Uses AI to convert speech", es: "<strong>Impulsado por la API de aislamiento de audio de ElevenLabs</strong>: utiliza IA para convertir voz" })} 
-                {tx({ de: "präzise von allen anderen Audioelementen zu trennen.", en: "precisely separate it from all other audio elements.", es: "separarlo con precisión de todos los demás elementos de audio." })}
+                <strong>Powered by ElevenLabs Audio Isolation API</strong> – Nutzt KI, um Sprache 
+                präzise von allen anderen Audioelementen zu trennen.
               </p>
             </div>
           </TabsContent>
@@ -390,7 +390,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
             className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-center"
           >
             <p className="text-sm text-primary">
-              {tx({ de: "✓ Wechsle zum "Vergleich"-Tab für Vorher/Nachher", en: "✓ Switch to the "Comparison" tab for before/after", es: "✓ Cambie a la pestaña "Comparación" para ver antes y después" })}
+              ✓ Wechsle zum "Vergleich"-Tab für Vorher/Nachher
             </p>
           </motion.div>
         )}

@@ -85,8 +85,8 @@ export default function SocialMediaSettings() {
           // Show toast
           toast.info(
             reconnectPlatform 
-              ? `${targetPlatform} ${tx({ de: 'Token erneuern', en: 'renew token', es: 'renovar token' })}` 
-              : `${targetPlatform} ${tx({ de: 'verbinden', en: 'connect', es: 'conectar' })}`,
+              ? `${targetPlatform} $Token erneuern` 
+              : `${targetPlatform} $verbinden`,
             { 
               description: reconnectPlatform 
                 ? tx({ de: 'Klicke auf den Developer Portal Button um dein Token zu erneuern.', en: 'Click on the Developer Portal button to renew your token.', es: 'Haga clic en el botón Portal de desarrollador para renovar su token.' })
@@ -120,7 +120,7 @@ export default function SocialMediaSettings() {
   return (
     <div className="container max-w-5xl mx-auto py-8 px-4">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{tx({ de: 'Social Media Verbindungen', en: 'Social media connections', es: 'Conexiones de redes sociales' })}</h1>
+        <h1 className="text-3xl font-bold mb-2">Social Media Verbindungen</h1>
         <p className="text-muted-foreground">
           Verwalte deine Verbindungen zu verschiedenen Social Media Plattformen
         </p>
@@ -129,13 +129,13 @@ export default function SocialMediaSettings() {
       <Alert className="mb-6">
         <AlertDescription>
           Um Social Media Publishing zu nutzen, müssen die entsprechenden API-Tokens als Secrets konfiguriert werden.
-          {tx({ de: 'Die Token-Namen sind: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.', en: 'The token names are: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.', es: 'Los nombres de los tokens son: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.' })}
+          Die Token-Namen sind: INSTAGRAM_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN, YOUTUBE_ACCESS_TOKEN, etc.
         </AlertDescription>
       </Alert>
 
       {loading ? (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">{tx({ de: 'Lade Verbindungen...', en: 'Loading connections...', es: 'Cargando conexiones...' })}</p>
+          <p className="text-muted-foreground">Lade Verbindungen...</p>
         </div>
       ) : (
         <div className="grid gap-6">
@@ -161,12 +161,12 @@ export default function SocialMediaSettings() {
                         {connected ? (
                           <div className="flex items-center gap-1 text-sm text-green-600">
                             <CheckCircle className="h-4 w-4" />
-                            <span>{tx({ de: 'Verbunden', en: 'Connected', es: 'Conectado' })}</span>
+                            <span>Verbunden</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">
                             <XCircle className="h-4 w-4" />
-                            <span>{tx({ de: 'Nicht verbunden', en: 'Not connected', es: 'No conectado' })}</span>
+                            <span>Nicht verbunden</span>
                           </div>
                         )}
                       </div>
@@ -202,19 +202,19 @@ export default function SocialMediaSettings() {
       )}
 
       <Card className="p-6 mt-6">
-        <h3 className="text-lg font-semibold mb-4">{tx({ de: 'Setup-Anleitung', en: 'Setup guide', es: 'Guía de configuración' })}</h3>
+        <h3 className="text-lg font-semibold mb-4">Setup-Anleitung</h3>
         <div className="space-y-3 text-sm text-muted-foreground">
           <p>
-            <strong><strong>{tx({ de: 'Schritt 1', en: 'Step 1', es: 'Paso 1' })}:</strong> {tx({ de: 'Erstelle Developer Apps auf den jeweiligen Plattformen', en: 'Create developer apps on the respective platforms', es: 'Crear aplicaciones de desarrollador en las plataformas respectivas' })}
+            <strong><strong>Schritt 1:</strong> Erstelle Developer Apps auf den jeweiligen Plattformen
           </p>
           <p>
-            <strong><strong>{tx({ de: 'Schritt 2', en: 'Step 2', es: 'Paso 2' })}:</strong> {tx({ de: 'Generiere Access Tokens mit den benötigten Permissions', en: 'Generate access tokens with the required permissions', es: 'Generar tokens de acceso con los permisos requeridos' })}
+            <strong><strong>Schritt 2:</strong> Generiere Access Tokens mit den benötigten Permissions
           </p>
           <p>
-            <strong><strong>{tx({ de: 'Schritt 3', en: 'Step 3', es: 'Paso 3' })}:</strong> {tx({ de: 'Füge die Tokens als Secrets hinzu (z.B. INSTAGRAM_ACCESS_TOKEN)', en: 'Add the tokens as secrets (e.g., INSTAGRAM_ACCESS_TOKEN)', es: 'Agregar los tokens como secretos (por ejemplo, INSTAGRAM_ACCESS_TOKEN)' })}
+            <strong><strong>Schritt 3:</strong> Füge die Tokens als Secrets hinzu (z.B. INSTAGRAM_ACCESS_TOKEN)
           </p>
           <p>
-            <strong><strong>{tx({ de: 'Schritt 4', en: 'Step 4', es: 'Paso 4' })}:</strong> {tx({ de: 'Aktiviere die Verbindung hier im Dashboard', en: 'Activate the connection here in the dashboard', es: 'Activa la conexión aquí en el tablero' })}
+            <strong><strong>Schritt 4:</strong> Aktiviere die Verbindung hier im Dashboard
           </p>
         </div>
       </Card>

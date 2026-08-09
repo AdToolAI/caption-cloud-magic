@@ -84,7 +84,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
             </div>
           ) : variants.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {tx({ de: "Noch keine Varianten {tx({ de: "erstellt", en: "created", es: "creadas" })}", en: "No variants created yet", es: "Aún no se han creado variantes" })}
+              Noch keine Varianten erstellt
             </div>
           ) : (
             <div className="space-y-4">
@@ -105,10 +105,10 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
                       </div>
                       <div className="text-sm text-muted-foreground space-y-1">
                         {variant.file_size_mb && (
-                          <div>{tx({ de: "Größe:", en: "Size:", es: "Tamaño:" })} {variant.file_size_mb.toFixed(2)} MB</div>
+                          <div>Größe: {variant.file_size_mb.toFixed(2)} MB</div>
                         )}
                         {variant.duration_sec && (
-                          <div>{tx({ de: "Dauer:", en: "Duration:", es: "Duración:" })} {variant.duration_sec}s</div>
+                          <div>Dauer: {variant.duration_sec}s</div>
                         )}
                       </div>
                     </div>
@@ -145,7 +145,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            {tx({ de: "Neue Varianten erstellen", en: "Create new variants", es: "Crear nuevas variantes" })}
+            Neue Varianten erstellen
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -177,7 +177,7 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
 
           {/* Aspect Ratios */}
           <div className="space-y-3">
-            <Label className="text-base font-semibold">{tx({ de: "Seitenverhältnisse", en: "Aspect ratios", es: "Relaciones de aspecto" })}</Label>
+            <Label className="text-base font-semibold">Seitenverhältnisse</Label>
             <div className="grid grid-cols-2 gap-3">
               {ASPECT_RATIO_PROFILES.map(ratio => (
                 <div
@@ -221,11 +221,11 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
           {/* Summary */}
           <div className="p-4 bg-muted rounded-lg">
             <div className="text-sm text-muted-foreground">
-              {tx({ de: "Es werden", en: "Creating", es: "Se crearán" })} {selectedFormats.length} × {selectedRatios.length} = {' '}
+              Es werden {selectedFormats.length} × {selectedRatios.length} = {' '}
               <span className="font-semibold text-foreground">
-                {selectedFormats.length * selectedRatios.length} {tx({ de: "Varianten", en: "variants", es: "variantes" })}
+                {selectedFormats.length * selectedRatios.length} Varianten
               </span>
-              {' '}{tx({ de: "erstellt", en: "created", es: "creadas" })}
+              {' '}erstellt
             </div>
           </div>
 
@@ -239,12 +239,12 @@ export function VariantManager({ videoCreationId }: VariantManagerProps) {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {tx({ de: "Erstelle Varianten...", en: "Creating variants...", es: "Creando variantes..." })}
+                Erstelle Varianten...
               </>
             ) : (
               <>
                 <Plus className="mr-2 h-4 w-4" />
-                {selectedFormats.length * selectedRatios.length} {tx({ de: "Varianten", en: "variants", es: "variantes" })} erstellen
+                {selectedFormats.length * selectedRatios.length} Varianten erstellen
               </>
             )}
           </Button>

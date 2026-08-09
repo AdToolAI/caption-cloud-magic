@@ -356,8 +356,8 @@ export function SceneAnalysisStep({
     // Pass empty global effects, but scene-specific effects
     onApplySuggestions({}, newSceneEffects);
     
-    const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} {tx({ de: 'Transitions übersprungen', en: 'Transitions skipped', es: 'Transiciones omitidas' })})` : '';
-    toast.success(tx({ de: `${appliedCount} {tx({ de: `visuelle Effekte für ${scenes.length} Szenen angewendet`, en: `visual effects applied to ${scenes.length} scenes`, es: `efectos visuales aplicados a ${scenes.length} escenas` })}${transitionInfo}`, en: `${appliedCount} visual effects applied to ${scenes.length} scenes${transitionInfo}`, es: `${appliedCount} efectos visuales aplicados a ${scenes.length} escenas${transitionInfo}` }));
+    const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transitions übersprungen)` : '';
+    toast.success(tx({ de: `${appliedCount} visuelle Effekte für ${scenes.length} Szenen angewendet${transitionInfo}`, en: `${appliedCount} visual effects applied to ${scenes.length} scenes${transitionInfo}`, es: `${appliedCount} efectos visuales aplicados a ${scenes.length} escenas${transitionInfo}` }));
   };
 
   // Apply suggestions for single scene
@@ -395,7 +395,7 @@ export function SceneAnalysisStep({
     onApplySuggestions({}, { [scene.id]: sceneEffect as SceneEffects });
     
     const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transition übersprungen)` : '';
-    toast.success(tx({ de: `${appliedCount} {tx({ de: 'Effekte für Szene angewendet', en: 'Effects applied to scene', es: 'Efectos aplicados a la escena' })}${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`, en: `${appliedCount} effects applied to scene${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`, es: `${appliedCount} efectos aplicados a la escena${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})` }));
+    toast.success(tx({ de: `${appliedCount} Effekte für Szene angewendet${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`, en: `${appliedCount} effects applied to scene${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`, es: `${appliedCount} efectos aplicados a la escena${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})` }));
   };
 
   // Clear effects for a scene
@@ -705,7 +705,7 @@ export function SceneAnalysisStep({
                         <div
                           className={`${colors[index % colors.length]} rounded-l ${index === scenes.length - 1 ? 'rounded-r' : ''} cursor-pointer 
                             transition-all relative group flex-1 ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
-                          title={tx({ de: `Szene ${index + 1}: ${scene.description}`, en: `Scene ${index + 1}: ${scene.description}`, es: `Escena ${index + 1}: ${scene.description}` })}
+                          title=Szene ${index + 1}: ${scene.description}
                         >
                           {hasEffects && (
                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white z-10" />
@@ -798,7 +798,7 @@ export function SceneAnalysisStep({
           {isAnalyzing ? (
             <div className="space-y-4">
               <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
-              <h3 className="text-lg font-semibold">{tx({ de: "KI analysiert dein Video...", en: "AI analyzes your video...", es: "La IA analiza tu vídeo..." })}</h3>
+              <h3 className="text-lg font-semibold">KI analysiert dein Video...</h3>
               <p className="text-muted-foreground">
                 Die KI erkennt Szenen und erstellt Verbesserungsvorschläge
               </p>

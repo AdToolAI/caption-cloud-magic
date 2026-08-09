@@ -58,7 +58,7 @@ export default function ContentProjects() {
     );
   };
 
-  const handle{tx({ de: "Download", en: "Download", es: "Descargar" })} = async (url: string, filename: string) => {
+  const handleDownload = async (url: string, filename: string) => {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -72,7 +72,7 @@ export default function ContentProjects() {
       window.URL.revokeObjectURL(downloadUrl);
       toast.success(tx({ de: "Video wird heruntergeladen", en: "Video is downloading", es: "El vídeo se está descargando." }));
     } catch (error) {
-      console.error("{tx({ de: "Download", en: "Download", es: "Descargar" })} error:", error);
+      console.error("Download error:", error);
       toast.error(tx({ de: "Fehler beim Herunterladen", en: "Error downloading", es: "Error al descargar" }));
     }
   };
@@ -96,7 +96,7 @@ export default function ContentProjects() {
     <>
       <SEO 
         title="Meine Videos | Content Studio"
-        description={tx({ de: "Verwalte deine erstellten Video-Projekte aus dem Content Studio", en: "Manage your created video projects from the Content Studio", es: "Gestiona tus proyectos de vídeo creados desde el Content Studio" })}
+        description=Verwalte deine erstellten Video-Projekte aus dem Content Studio
       />
       <div className="container max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
@@ -111,25 +111,25 @@ export default function ContentProjects() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>{tx({ de: "Gesamt", en: "Total", es: "Total" })}</CardDescription>
+              <CardDescription>Gesamt</CardDescription>
               <CardTitle className="text-3xl">{statusCounts.all}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>{tx({ de: "Fertig", en: "Ready", es: "Listo" })}</CardDescription>
+              <CardDescription>Fertig</CardDescription>
               <CardTitle className="text-3xl text-green-600">{statusCounts.completed}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>{tx({ de: "In Bearbeitung", en: "In progress", es: "En progreso" })}</CardDescription>
+              <CardDescription>In Bearbeitung</CardDescription>
               <CardTitle className="text-3xl text-blue-600">{statusCounts.rendering}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>{tx({ de: "Entwürfe", en: "Drafts", es: "Borradores" })}</CardDescription>
+              <CardDescription>Entwürfe</CardDescription>
               <CardTitle className="text-3xl text-gray-600">{statusCounts.draft}</CardTitle>
             </CardHeader>
           </Card>
@@ -138,11 +138,11 @@ export default function ContentProjects() {
         {/* Filter Tabs */}
         <Tabs value={selectedStatus} onValueChange={setSelectedStatus} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">{tx({ de: "Alle", en: "All", es: "Todo" })} ({statusCounts.all})</TabsTrigger>
-            <TabsTrigger value="completed">{tx({ de: "Fertig", en: "Ready", es: "Listo" })} ({statusCounts.completed})</TabsTrigger>
-            <TabsTrigger value="rendering">{tx({ de: "Rendering", en: "Rendering", es: "Renderizado" })} ({statusCounts.rendering})</TabsTrigger>
-            <TabsTrigger value="draft">{tx({ de: "Entwürfe", en: "Drafts", es: "Borradores" })} ({statusCounts.draft})</TabsTrigger>
-            <TabsTrigger value="failed">{tx({ de: "Fehler", en: "Error", es: "Error" })} ({statusCounts.failed})</TabsTrigger>
+            <TabsTrigger value="all">Alle ({statusCounts.all})</TabsTrigger>
+            <TabsTrigger value="completed">Fertig ({statusCounts.completed})</TabsTrigger>
+            <TabsTrigger value="rendering">Rendering ({statusCounts.rendering})</TabsTrigger>
+            <TabsTrigger value="draft">Entwürfe ({statusCounts.draft})</TabsTrigger>
+            <TabsTrigger value="failed">Fehler ({statusCounts.failed})</TabsTrigger>
           </TabsList>
 
           <TabsContent value={selectedStatus} className="mt-6">
@@ -193,22 +193,22 @@ export default function ContentProjects() {
                               onClick={() => window.open(outputUrls[0], "_blank")}
                             >
                               <Play className="h-4 w-4 mr-2" />
-                              {tx({ de: "Ansehen", en: "View", es: "Ver" })}
+                              Ansehen
                             </Button>
                             <Button
                               size="sm"
                               className="flex-1"
-                              onClick={() => handle{tx({ de: "Download", en: "Download", es: "Descargar" })}(outputUrls[0], `${project.project_name}.mp4`)}
+                              onClick={() => handleDownload(outputUrls[0], `${project.project_name}.mp4`)}
                             >
-                              <{tx({ de: "Download", en: "Download", es: "Descargar" })} className="h-4 w-4 mr-2" />
-                              {tx({ de: "Download", en: "Download", es: "Descargar" })}
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
                             </Button>
                           </div>
                         )}
                         {project.status === "rendering" && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
                             <RefreshCw className="h-4 w-4 animate-spin" />
-                            <span>{tx({ de: "Video wird erstellt...", en: "Video is being created...", es: "El video se está creando..." })}</span>
+                            <span>Video wird erstellt...</span>
                           </div>
                         )}
                       </CardContent>
@@ -220,14 +220,14 @@ export default function ContentProjects() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Film className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <CardTitle className="mb-2">{tx({ de: "Keine Videos gefunden", en: "No videos found", es: "No se encontraron vídeos" })}</CardTitle>
+                  <CardTitle className="mb-2">Keine Videos gefunden</CardTitle>
                   <CardDescription>
                     {selectedStatus === "all"
                       ? tx({ de: "Erstelle dein erstes Video im Content Studio", en: "Create your first video in Content Studio", es: "Crea tu primer vídeo en Content Studio" })
                       : tx({ de: `Keine Videos mit Status "${selectedStatus}"`, en: `No videos with status "${selectedStatus}"`, es: `No hay vídeos con estado "${selectedStatus}"` })}
                   </CardDescription>
                   <Button className="mt-4" onClick={() => window.location.href = "/content-studio"}>
-                    {tx({ de: "Zum Content Studio", en: "To Content Studio", es: "Al Content Studio" })}
+                    Zum Content Studio
                   </Button>
                 </CardContent>
               </Card>

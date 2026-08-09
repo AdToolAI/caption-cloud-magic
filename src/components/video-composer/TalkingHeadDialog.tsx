@@ -35,7 +35,7 @@ interface TalkingHeadDialogProps {
     imageUrl?: string;
     voiceId?: string;
     aspectRatio?: '16:9' | '9:16' | '1:1';
-    avatar{tx({ de: "Name", en: "Name", es: "Nombre" })}?: string;
+    avatarName?: string;
   };
 }
 
@@ -77,11 +77,11 @@ export default function TalkingHeadDialog({
 
   const [imageUrl, setImageUrl] = useState('');
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
-  const [selectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })}, setSelectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })}] = useState<string | null>(null);
+  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [script, setScript] = useState('');
   const [voiceId, setVoiceId] = useState(PRESET_VOICES[0].id);
-  const [voice{tx({ de: "Name", en: "Name", es: "Nombre" })}, setVoice{tx({ de: "Name", en: "Name", es: "Nombre" })}] = useState<string>(PRESET_VOICES[0].name);
+  const [voiceName, setVoiceName] = useState<string>(PRESET_VOICES[0].name);
   const [voiceLanguage, setVoiceLanguage] = useState<string>('de');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16');
   const [resolution, setResolution] = useState<'480p' | '720p'>('720p');
@@ -89,7 +89,7 @@ export default function TalkingHeadDialog({
 
   // Inline "new character" form
   const [showNewForm, setShowNewForm] = useState(false);
-  const [new{tx({ de: "Name", en: "Name", es: "Nombre" })}, setNew{tx({ de: "Name", en: "Name", es: "Nombre" })}] = useState('');
+  const [newName, setNewName] = useState('');
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [uploadingNewPhoto, setUploadingNewPhoto] = useState(false);
 
@@ -105,7 +105,7 @@ export default function TalkingHeadDialog({
       if (presetAvatar.imageUrl) setImageUrl(presetAvatar.imageUrl);
       if (presetAvatar.voiceId) setVoiceId(presetAvatar.voiceId);
       if (presetAvatar.aspectRatio) setAspectRatio(presetAvatar.aspectRatio);
-      if (presetAvatar.avatar{tx({ de: "Name", en: "Name", es: "Nombre" })}) setSelectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })}(presetAvatar.avatar{tx({ de: "Name", en: "Name", es: "Nombre" })});
+      if (presetAvatar.avatarName) setSelectedCharName(presetAvatar.avatarName);
     }
   }, [open, presetAvatar]);
 
@@ -120,10 +120,10 @@ export default function TalkingHeadDialog({
       setImageUrl('');
       setScript('');
       setSelectedCharId(null);
-      setSelectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })}(null);
+      setSelectedCharName(null);
       setShowNewForm(false);
       setShowLibrary(false);
-      setNew{tx({ de: "Name", en: "Name", es: "Nombre" })}('');
+      setNewName('');
       setNewPhotoUrl('');
     }
   }, [open]);
@@ -139,10 +139,10 @@ export default function TalkingHeadDialog({
     }
     setImageUrl(c.referenceImageUrl);
     setSelectedCharId(c.id);
-    setSelectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })}(c.name);
+    setSelectedCharName(c.name);
   };
 
-  // Upload photo for the inline "neuer {tx({ de: "Charakter", en: "Character", es: "Personaje" })}" form
+  // Upload photo for the inline "neuer Charakter" form
   const uploadInlinePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -169,8 +169,8 @@ export default function TalkingHeadDialog({
   };
 
   const commitNewCharacter = () => {
-    if (!new{tx({ de: "Name", en: "Name", es: "Nombre" })}.trim()) {
-      toast({ title: '{tx({ de: "Name", en: "Name", es: "Nombre" })} fehlt', description: tx({ de: 'Bitte gib dem {tx({ de: "Charakter", en: "Character", es: "Personaje" })} einen {tx({ de: "Name", en: "Name", es: "Nombre" })}n.', en: 'Please give the character a name.', es: 'Por favor, dale un nombre al personaje.' }), variant: 'destructive' });
+    if (!newName.trim()) {
+      toast({ title: 'Name fehlt', description: tx({ de: 'Bitte gib dem Charakter einen Namen.', en: 'Please give the character a name.', es: 'Por favor, dale un nombre al personaje.' }), variant: 'destructive' });
       return;
     }
     if (!newPhotoUrl) {
@@ -179,11 +179,11 @@ export default function TalkingHeadDialog({
     }
     if (!canAddToBriefing) return;
 
-    const baseId = makeCharId(new{tx({ de: "Name", en: "Name", es: "Nombre" })}.trim());
+    const baseId = makeCharId(newName.trim());
     const uniqueId = cast.some((c) => c.id === baseId) ? `${baseId}-${Date.now().toString(36)}` : baseId;
     const character: ComposerCharacter = {
       id: uniqueId,
-      name: new{tx({ de: "Name", en: "Name", es: "Nombre" })}.trim(),
+      name: newName.trim(),
       appearance: '',
       signatureItems: '',
       referenceImageUrl: newPhotoUrl,
@@ -191,13 +191,13 @@ export default function TalkingHeadDialog({
     onAddBriefingCharacter!(character);
     setImageUrl(newPhotoUrl);
     setSelectedCharId(uniqueId);
-    setSelectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })}(character.name);
+    setSelectedCharName(character.name);
     setShowNewForm(false);
-    setNew{tx({ de: "Name", en: "Name", es: "Nombre" })}('');
+    setNewName('');
     setNewPhotoUrl('');
     toast({
-      title: '{tx({ de: "Charakter", en: "Character", es: "Personaje" })} hinzugefügt',
-      description: tx({ de: `"${character.name}" ist jetzt Teil deines {tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" })}s.`, en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }),
+      title: 'Charakter hinzugefügt',
+      description: tx({ de: `"${character.name}" ist jetzt Teil deines Briefing-Casts.`, en: `"${character.name}" is now part of your briefing cast.`, es: `"${character.name}" ahora forma parte de tu elenco del briefing.` }),
     });
   };
 
@@ -228,12 +228,12 @@ export default function TalkingHeadDialog({
     onAddBriefingCharacter!(character);
     setImageUrl(photo);
     setSelectedCharId(uniqueId);
-    setSelectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })}(av.name);
+    setSelectedCharName(av.name);
     if (av.default_voice_id) setVoiceId(av.default_voice_id);
     setShowLibrary(false);
     toast({
       title: 'Avatar importiert',
-      description: tx({ de: `"${av.name}" wurde in deinen {tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" })} übernommen.`, en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }),
+      description: tx({ de: `"${av.name}" wurde in deinen Briefing-Cast übernommen.`, en: `"${av.name}" has been added to your briefing cast.`, es: `"${av.name}" se ha añadido a tu elenco del briefing.` }),
     });
   };
 
@@ -243,8 +243,8 @@ export default function TalkingHeadDialog({
   const handleGenerate = async () => {
     if (!imageUrl || !selectedCharId) {
       toast({
-        title: '{tx({ de: "Charakter", en: "Character", es: "Personaje" })} fehlt',
-        description: tx({ de: 'Bitte wähle einen {tx({ de: "Charakter", en: "Character", es: "Personaje" })} aus deinem {tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" })} oder lege einen neuen an.', en: 'Please select a character from your briefing cast or create a new one.', es: 'Por favor, selecciona un personaje de tu elenco de briefing o crea uno nuevo.' }),
+        title: 'Charakter fehlt',
+        description: tx({ de: 'Bitte wähle einen Charakter aus deinem Briefing-Cast oder lege einen neuen an.', en: 'Please select a character from your briefing cast or create a new one.', es: 'Por favor, selecciona un personaje de tu elenco de briefing o crea uno nuevo.' }),
         variant: 'destructive',
       });
       return;
@@ -287,45 +287,45 @@ export default function TalkingHeadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent class{tx({ de: "Name", en: "Name", es: "Nombre" })}="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-center gap-2">
-            <Mic class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-5 w-5 text-primary" />
-            {tx({ de: "Talking-Head erstellen", en: "Create talking head", es: "Crear cabeza parlante" })}
+          <DialogTitle className="flex items-center gap-2">
+            <Mic className="h-5 w-5 text-primary" />
+            Talking-Head erstellen
           </DialogTitle>
           <DialogDescription>
-            {tx({ de: "Wähle einen {tx({ de: "Charakter", en: "Character", es: "Personaje" })} aus deinem {tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" })} (oder lege einen neuen an), schreibe ein Skript und wähle eine Stimme — der {tx({ de: "Charakter", en: "Character", es: "Personaje" })} spricht den Text mit Lip-Sync.", en: "Select a character from your briefing cast (or create a new one), write a script and choose a voice — the character speaks the text with lip sync.", es: "Selecciona un personaje de tu elenco de briefing (o crea uno nuevo), escribe un guión y elige una voz; el personaje pronunciará el texto con sincronización de labios." })}
+            Wähle einen Charakter aus deinem Briefing-Cast (oder lege einen neuen an), schreibe ein Skript und wähle eine Stimme — der Charakter spricht den Text mit Lip-Sync.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="character" class{tx({ de: "Name", en: "Name", es: "Nombre" })}="space-y-4">
-          <TabsList class{tx({ de: "Name", en: "Name", es: "Nombre" })}="grid w-full grid-cols-3">
+        <Tabs defaultValue="character" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="character">
-              <ImageIcon class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-2" /> {tx({ de: "Charakter", en: "Character", es: "Personaje" })}
+              <ImageIcon className="h-4 w-4 mr-2" /> Charakter
             </TabsTrigger>
             <TabsTrigger value="script" disabled={!imageUrl || !selectedCharId}>
-              <Sparkles class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-2" /> {tx({ de: "Skript & Stimme", en: "Script & Voice", es: "Guión y voz" })}
+              <Sparkles className="h-4 w-4 mr-2" /> Skript & Stimme
             </TabsTrigger>
             <TabsTrigger value="dialog" disabled={cast.length < 2}>
-              <User class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-2" /> {tx({ de: `Dialog (${cast.length})`, en: `Dialogue (${cast.length})`, es: `Diálogo (${cast.length})` })}
+              <User className="h-4 w-4 mr-2" /> Dialog (${cast.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="character" class{tx({ de: "Name", en: "Name", es: "Nombre" })}="space-y-4">
+          <TabsContent value="character" className="space-y-4">
             {/* Briefing cast grid */}
             <div>
-              <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-center justify-between mb-2">
-                <Label class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-center gap-2">
-                  <User class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 text-primary" />
-                  {tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" })}
+              <div className="flex items-center justify-between mb-2">
+                <Label className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  Briefing-Cast
                 </Label>
                 {cast.length > 0 && (
-                  <span class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs text-muted-foreground">{cast.length} {tx({ de: "Charakter", en: "Character", es: "Personaje" })}{cast.length === 1 ? '' : 'e'}</span>
+                  <span className="text-xs text-muted-foreground">{cast.length} Charakter{cast.length === 1 ? '' : 'e'}</span>
                 )}
               </div>
 
               {cast.length > 0 ? (
-                <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {cast.map((c) => {
                     const url = c.referenceImageUrl;
                     const selected = selectedCharId === c.id;
@@ -334,7 +334,7 @@ export default function TalkingHeadDialog({
                         key={c.id}
                         type="button"
                         onClick={() => pickCastCharacter(c)}
-                        class{tx({ de: "Name", en: "Name", es: "Nombre" })}={cn(
+                        className={cn(
                           'group relative aspect-square rounded-lg overflow-hidden border-2 transition-all',
                           selected
                             ? 'border-primary ring-2 ring-primary/40 shadow-[0_0_18px_-4px_hsl(var(--primary)/0.6)]'
@@ -343,18 +343,18 @@ export default function TalkingHeadDialog({
                         title={c.name}
                       >
                         {url ? (
-                          <img src={url} alt={c.name} class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-full h-full object-cover" />
+                          <img src={url} alt={c.name} className="w-full h-full object-cover" />
                         ) : (
-                          <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-full h-full flex items-center justify-center bg-muted">
-                            <User class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-6 w-6 text-muted-foreground" />
+                          <div className="w-full h-full flex items-center justify-center bg-muted">
+                            <User className="h-6 w-6 text-muted-foreground" />
                           </div>
                         )}
-                        <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-1.5 py-1">
-                          <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-[10px] font-medium text-white truncate">{c.name}</div>
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-1.5 py-1">
+                          <div className="text-[10px] font-medium text-white truncate">{c.name}</div>
                         </div>
                         {selected && (
-                          <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="absolute top-1 right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                            <Check class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-3 w-3 text-primary-foreground" />
+                          <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                            <Check className="h-3 w-3 text-primary-foreground" />
                           </div>
                         )}
                       </button>
@@ -362,22 +362,22 @@ export default function TalkingHeadDialog({
                   })}
                 </div>
               ) : (
-                <p class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs text-muted-foreground">
-                  Dein {tx({ de: "Briefing-Cast", en: "Briefing Cast", es: "Elenco del informe" })} ist noch leer. Lege unten einen neuen {tx({ de: "Charakter", en: "Character", es: "Personaje" })} an oder importiere einen aus deiner Avatar-Bibliothek.
+                <p className="text-xs text-muted-foreground">
+                  Dein Briefing-Cast ist noch leer. Lege unten einen neuen Charakter an oder importiere einen aus deiner Avatar-Bibliothek.
                 </p>
               )}
             </div>
 
             {/* Action buttons */}
             {canAddToBriefing && (
-              <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => { setShowNewForm((v) => !v); setShowLibrary(false); }}
                 >
-                  <Plus class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-1.5" />
-                  Neuen {tx({ de: "Charakter", en: "Character", es: "Personaje" })} ins Briefing aufnehmen
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Neuen Charakter ins Briefing aufnehmen
                 </Button>
                 {unlinkedLibraryAvatars.length > 0 && (
                   <Button
@@ -385,8 +385,8 @@ export default function TalkingHeadDialog({
                     size="sm"
                     onClick={() => { setShowLibrary((v) => !v); setShowNewForm(false); }}
                   >
-                    <Library class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-1.5" />
-                    {tx({ de: `Aus Avatar-Bibliothek importieren (${unlinkedLibraryAvatars.length})`, en: `Import from avatar library (${unlinkedLibraryAvatars.length})`, es: `Importar de la biblioteca de avatares (${unlinkedLibraryAvatars.length})` })}
+                    <Library className="h-4 w-4 mr-1.5" />
+                    Aus Avatar-Bibliothek importieren (${unlinkedLibraryAvatars.length})
                   </Button>
                 )}
               </div>
@@ -394,41 +394,41 @@ export default function TalkingHeadDialog({
 
             {/* Inline new-character form */}
             {showNewForm && canAddToBriefing && (
-              <Card class{tx({ de: "Name", en: "Name", es: "Nombre" })}="p-3 space-y-3 border-primary/30 bg-primary/5">
-                <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-center gap-2 text-sm font-medium">
-                  <Plus class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 text-primary" />
-                  Neuer {tx({ de: "Charakter", en: "Character", es: "Personaje" })}
+              <Card className="p-3 space-y-3 border-primary/30 bg-primary/5">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Plus className="h-4 w-4 text-primary" />
+                  Neuer Charakter
                 </div>
-                <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="grid grid-cols-[1fr_auto] gap-3 items-end">
+                <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
                   <div>
-                    <Label htmlFor="new-char-name" class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs">{tx({ de: "Name", en: "Name", es: "Nombre" })}</Label>
+                    <Label htmlFor="new-char-name" className="text-xs">Name</Label>
                     <Input
                       id="new-char-name"
-                      value={new{tx({ de: "Name", en: "Name", es: "Nombre" })}
-                      onChange={(e) => setNew{tx({ de: "Name", en: "Name", es: "Nombre" })}(e.target.value)}
+                      value={newName
+                      onChange={(e) => setNewName(e.target.value)}
                       placeholder="z. B. Sarah"
-                      class{tx({ de: "Name", en: "Name", es: "Nombre" })}="mt-1"
+                      className="mt-1"
                     />
                   </div>
-                  <label class{tx({ de: "Name", en: "Name", es: "Nombre" })}={cn(
+                  <label className={cn(
                     'h-16 w-16 rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden',
                     uploadingNewPhoto ? 'border-primary' : 'border-muted hover:border-primary/60'
                   )}>
                     {uploadingNewPhoto ? (
-                      <Loader2 class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-5 w-5 animate-spin text-primary" />
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     ) : newPhotoUrl ? (
-                      <img src={newPhotoUrl} alt="preview" class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-full h-full object-cover" />
+                      <img src={newPhotoUrl} alt="preview" className="w-full h-full object-cover" />
                     ) : (
-                      <Upload class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-5 w-5 text-muted-foreground" />
+                      <Upload className="h-5 w-5 text-muted-foreground" />
                     )}
-                    <input type="file" accept="image/*" class{tx({ de: "Name", en: "Name", es: "Nombre" })}="hidden" onChange={uploadInlinePhoto} disabled={uploadingNewPhoto} />
+                    <input type="file" accept="image/*" className="hidden" onChange={uploadInlinePhoto} disabled={uploadingNewPhoto} />
                   </label>
                 </div>
-                <p class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-[10px] text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground">
                   Wird auch in der Cast Consistency Map und in anderen Szenen verfügbar.
                 </p>
-                <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex gap-2">
-                  <Button size="sm" onClick={commitNewCharacter} disabled={!new{tx({ de: "Name", en: "Name", es: "Nombre" })}.trim() || !newPhotoUrl}>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={commitNewCharacter} disabled={!newName.trim() || !newPhotoUrl}>
                     Hinzufügen & auswählen
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowNewForm(false)}>
@@ -440,12 +440,12 @@ export default function TalkingHeadDialog({
 
             {/* Library import picker */}
             {showLibrary && canAddToBriefing && (
-              <Card class{tx({ de: "Name", en: "Name", es: "Nombre" })}="p-3 space-y-2 border-border/40">
-                <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-center gap-2 text-sm font-medium">
-                  <Library class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 text-primary" />
+              <Card className="p-3 space-y-2 border-border/40">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Library className="h-4 w-4 text-primary" />
                   Avatar-Bibliothek
                 </div>
-                <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto">
                   {unlinkedLibraryAvatars.map((av) => {
                     const url = av.portrait_url || av.reference_image_url;
                     return (
@@ -453,18 +453,18 @@ export default function TalkingHeadDialog({
                         key={av.id}
                         type="button"
                         onClick={() => importFromLibrary(av as any)}
-                        class{tx({ de: "Name", en: "Name", es: "Nombre" })}="aspect-square rounded-lg overflow-hidden border border-border/40 hover:border-primary/60 group relative"
+                        className="aspect-square rounded-lg overflow-hidden border border-border/40 hover:border-primary/60 group relative"
                         title={`${av.name} importieren`}
                       >
                         {url ? (
-                          <img src={url} alt={av.name} class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-full h-full object-cover" />
+                          <img src={url} alt={av.name} className="w-full h-full object-cover" />
                         ) : (
-                          <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-full h-full flex items-center justify-center bg-muted">
-                            <User class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-6 w-6 text-muted-foreground" />
+                          <div className="w-full h-full flex items-center justify-center bg-muted">
+                            <User className="h-6 w-6 text-muted-foreground" />
                           </div>
                         )}
-                        <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-1.5 py-1">
-                          <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-[10px] font-medium text-white truncate">{av.name}</div>
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-1.5 py-1">
+                          <div className="text-[10px] font-medium text-white truncate">{av.name}</div>
                         </div>
                       </button>
                     );
@@ -475,13 +475,13 @@ export default function TalkingHeadDialog({
 
             {/* Selected preview */}
             {imageUrl && selectedCharId && (
-              <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="rounded-lg border border-border/40 p-3 bg-muted/30">
-                <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-start gap-3">
-                  <img src={imageUrl} alt="Selected" class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-20 h-20 rounded-md object-cover border border-border/40" />
-                  <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex-1 min-w-0">
-                    <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-sm font-medium">{selectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })} || tx({ de: "Charakter", en: "Character", es: "Personaje" })}</div>
-                    <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs text-muted-foreground mt-0.5">
-                      Bereit für Lip-Sync — wechsle in den Tab „{tx({ de: "Skript & Stimme", en: "Script & Voice", es: "Guión y voz" })}".
+              <div className="rounded-lg border border-border/40 p-3 bg-muted/30">
+                <div className="flex items-start gap-3">
+                  <img src={imageUrl} alt="Selected" className="w-20 h-20 rounded-md object-cover border border-border/40" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium">{selectedCharName || tx({ de: "Charakter", en: "Character", es: "Personaje" })}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Bereit für Lip-Sync — wechsle in den Tab „Skript & Stimme".
                     </div>
                   </div>
                   <Button
@@ -490,7 +490,7 @@ export default function TalkingHeadDialog({
                     onClick={() => {
                       setImageUrl('');
                       setSelectedCharId(null);
-                      setSelectedChar{tx({ de: "Name", en: "Name", es: "Nombre" })}(null);
+                      setSelectedCharName(null);
                     }}
                   >
                     Wechseln
@@ -500,18 +500,18 @@ export default function TalkingHeadDialog({
             )}
           </TabsContent>
 
-          <TabsContent value="script" class{tx({ de: "Name", en: "Name", es: "Nombre" })}="space-y-4">
+          <TabsContent value="script" className="space-y-4">
             <div>
               <Label htmlFor="script">Skript</Label>
               <Textarea
                 id="script"
                 value={script}
                 onChange={(e) => setScript(e.target.value)}
-                placeholder={tx({ de: "Hi, ich bin dein neuer KI-Avatar. Hier kommt mein Text...", en: "Hi, I am your new AI avatar. Here comes my text...", es: "Hola, soy tu nuevo avatar de IA. Aquí viene mi texto..." })}
+                placeholder=Hi, ich bin dein neuer KI-Avatar. Hier kommt mein Text...
                 rows={5}
-                class{tx({ de: "Name", en: "Name", es: "Nombre" })}="mt-1"
+                className="mt-1"
               />
-              <p class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {script.length} Zeichen • ~{estimatedDurationSec}s Dauer
               </p>
             </div>
@@ -520,18 +520,18 @@ export default function TalkingHeadDialog({
               <Label>Stimme</Label>
               <VoiceSlot
                 voiceId={voiceId}
-                voice{tx({ de: "Name", en: "Name", es: "Nombre" })}={voice{tx({ de: "Name", en: "Name", es: "Nombre" })}
+                voiceName={voiceName
                 language={voiceLanguage}
                 category="characters"
-                onChange={({ voiceId: id, voice{tx({ de: "Name", en: "Name", es: "Nombre" })}: name, language: lang }) => {
+                onChange={({ voiceId: id, voiceName: name, language: lang }) => {
                   setVoiceId(id);
-                  setVoice{tx({ de: "Name", en: "Name", es: "Nombre" })}(name);
+                  setVoiceName(name);
                   setVoiceLanguage(lang);
                 }}
               />
             </div>
 
-            <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Format</Label>
                 <Select value={aspectRatio} onValueChange={(v: '16:9' | '9:16' | '1:1') => setAspectRatio(v)}>
@@ -557,18 +557,18 @@ export default function TalkingHeadDialog({
 
             {availableScenes && availableScenes.length > 0 && (
               <div>
-                <Label>Ziel <span class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-muted-foreground font-normal">(optional)</span></Label>
+                <Label>Ziel <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <Select value={targetSceneId} onValueChange={setTargetSceneId}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Nur in Media Library</SelectItem>
-                    <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">{tx({ de: "An Szene anhängen", en: "Attach to scene", es: "Adjuntar a la escena" })}</div>
+                    <div className="px-2 py-1 mt-1 text-xs font-semibold text-muted-foreground">An Szene anhängen</div>
                     {availableScenes.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {targetSceneId === '__none__'
                     ? 'Video erscheint nur in deiner Video-History.'
                     : tx({ de: 'Video wird automatisch der gewählten Szene als Clip zugewiesen.', en: 'Video is automatically assigned to the selected scene as a clip.', es: 'El video se asigna automáticamente a la escena seleccionada como un clip.' })}
@@ -576,11 +576,11 @@ export default function TalkingHeadDialog({
               </div>
             )}
 
-            <Card class{tx({ de: "Name", en: "Name", es: "Nombre" })}="p-3 bg-muted/30 border-border/40">
-              <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-start gap-2 text-xs text-muted-foreground">
-                <AlertCircle class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mt-0.5 text-primary shrink-0" />
+            <Card className="p-3 bg-muted/30 border-border/40">
+              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
                 <div>
-                  Geschätzte Kosten: <span class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-primary font-semibold">€{cost.toFixed(2)}</span> ·
+                  Geschätzte Kosten: <span className="text-primary font-semibold">€{cost.toFixed(2)}</span> ·
                   Generierung dauert 1–3 Minuten · Powered by HeyGen Photo-Avatar
                 </div>
               </div>
@@ -589,18 +589,18 @@ export default function TalkingHeadDialog({
             <Button
               onClick={handleGenerate}
               disabled={loading || !imageUrl || !selectedCharId || !script.trim()}
-              class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-full"
+              className="w-full"
               size="lg"
             >
               {loading ? (
-                <><Loader2 class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-2 animate-spin" /> Generiere …</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere …</>
               ) : (
-                <><Mic class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-2" /> Talking-Head generieren (€{cost.toFixed(2)})</>
+                <><Mic className="h-4 w-4 mr-2" /> Talking-Head generieren (€{cost.toFixed(2)})</>
               )}
             </Button>
           </TabsContent>
 
-          <TabsContent value="dialog" class{tx({ de: "Name", en: "Name", es: "Nombre" })}="space-y-4">
+          <TabsContent value="dialog" className="space-y-4">
             <DialogModeTab
               cast={cast}
               voices={[
@@ -658,7 +658,7 @@ interface VoiceOption {
 
 interface DialogBlock {
   speakerId: string;       // ComposerCharacter.id
-  speaker{tx({ de: "Name", en: "Name", es: "Nombre" })}: string;
+  speakerName: string;
   text: string;
   voiceId: string;         // chosen voice for this speaker
 }
@@ -689,7 +689,7 @@ interface DialogModeTabProps {
 function parseDialogScript(script: string, cast: ComposerCharacter[]): DialogBlock[] {
   return sharedParseDialogScript(script, cast).map((b) => ({
     speakerId: b.speakerId,
-    speaker{tx({ de: "Name", en: "Name", es: "Nombre" })}: b.speaker{tx({ de: "Name", en: "Name", es: "Nombre" })},
+    speakerName: b.speakerName,
     text: b.text,
     voiceId: '',
   }));
@@ -735,7 +735,7 @@ function DialogModeTab({
     if (blocks.length === 0) {
       toast({
         title: tx({ de: 'Kein gültiges Dialog-Skript', en: 'Not a valid dialog script', es: 'No es un script de diálogo válido' }),
-        description: tx({ de: 'Format: "Sarah: Hallo!" — der {tx({ de: "Name", en: "Name", es: "Nombre" })} muss exakt einem Cast-{tx({ de: "Charakter", en: "Character", es: "Personaje" })} entsprechen.', en: 'Format: "Sarah: Hello!" — the name must exactly match a cast character.', es: 'Formato: "Sarah: ¡Hola!" — el nombre debe coincidir exactamente con un personaje del elenco.' }),
+        description: tx({ de: 'Format: "Sarah: Hallo!" — der Name muss exakt einem Cast-Charakter entsprechen.', en: 'Format: "Sarah: Hello!" — the name must exactly match a cast character.', es: 'Formato: "Sarah: ¡Hola!" — el nombre debe coincidir exactamente con un personaje del elenco.' }),
         variant: 'destructive',
       });
       return;
@@ -806,10 +806,10 @@ function DialogModeTab({
   };
 
   return (
-    <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="space-y-4">
-      <Card class{tx({ de: "Name", en: "Name", es: "Nombre" })}="p-3 bg-primary/5 border-primary/30">
-        <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-sm font-medium mb-1">{tx({ de: "Drehbuch-Modus für Multi-Speaker-Szenen", en: "Script mode for multi-speaker scenes", es: "Modo guion para escenas con varios oradores" })}</div>
-        <p class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs text-muted-foreground">
+    <div className="space-y-4">
+      <Card className="p-3 bg-primary/5 border-primary/30">
+        <div className="text-sm font-medium mb-1">Drehbuch-Modus für Multi-Speaker-Szenen</div>
+        <p className="text-xs text-muted-foreground">
           Schreibe einen Dialog wie ein Drehbuch — pro Sprecher entsteht ein
           eigener Talking-Head-Clip. Im Director's Cut werden sie als
           Shot-Reverse-Shot zusammengeschnitten.
@@ -824,27 +824,27 @@ function DialogModeTab({
           onChange={(e) => setScript(e.target.value)}
           placeholder={`${cast[0]?.name ?? 'Sarah'}: Hi!\n${cast[1]?.name ?? 'Matthew'}: Hi ${cast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`}
           rows={7}
-          class{tx({ de: "Name", en: "Name", es: "Nombre" })}="mt-1 font-mono text-sm"
+          className="mt-1 font-mono text-sm"
         />
-        <p class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs text-muted-foreground mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           {blocks.length} Block{blocks.length === 1 ? '' : 'e'} erkannt · {speakers.length} Sprecher · ~{estimatedDurationSec}s gesamt
         </p>
       </div>
 
       {speakers.length > 0 && (
-        <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="space-y-2">
-          <Label>{tx({ de: "Stimme pro Sprecher", en: "Voice per speaker", es: "Voz por orador" })}</Label>
-          <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="space-y-2">
+        <div className="space-y-2">
+          <Label>Stimme pro Sprecher</Label>
+          <div className="space-y-2">
             {speakers.map((sp) => (
-              <div key={sp.id} class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-center gap-3 p-2 rounded-md border border-border/40 bg-muted/20">
-                <img src={sp.referenceImageUrl} alt={sp.name} class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-10 w-10 rounded object-cover" />
-                <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex-1 text-sm font-medium">{sp.name}</div>
+              <div key={sp.id} className="flex items-center gap-3 p-2 rounded-md border border-border/40 bg-muted/20">
+                <img src={sp.referenceImageUrl} alt={sp.name} className="h-10 w-10 rounded object-cover" />
+                <div className="flex-1 text-sm font-medium">{sp.name}</div>
                 <Select
                   value={voicePerSpeaker[sp.id] || ''}
                   onValueChange={(v) => setVoicePerSpeaker((prev) => ({ ...prev, [sp.id]: v }))}
                 >
-                  <SelectTrigger class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-[200px]">
-                    <SelectValue placeholder={tx({ de: "Stimme wählen", en: "Select voice", es: "Seleccionar voz" })} />
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder=Stimme wählen />
                   </SelectTrigger>
                   <SelectContent>
                     {voices.map((v) => (
@@ -858,7 +858,7 @@ function DialogModeTab({
         </div>
       )}
 
-      <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Format</Label>
           <Select value={aspectRatio} onValueChange={(v: '16:9' | '9:16' | '1:1') => setAspectRatio(v)}>
@@ -884,7 +884,7 @@ function DialogModeTab({
 
       {availableScenes && availableScenes.length > 0 && (
         <div>
-          <Label>Anker-Szene <span class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-muted-foreground font-normal">(optional)</span></Label>
+          <Label>Anker-Szene <span className="text-muted-foreground font-normal">(optional)</span></Label>
           <Select value={targetSceneId} onValueChange={setTargetSceneId}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -894,31 +894,31 @@ function DialogModeTab({
               ))}
             </SelectContent>
           </Select>
-          <p class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Alle Dialog-Clips werden in der Reihenfolge an diese Szene angehängt.
             Wechsle danach in den Director's Cut für Shot-Reverse-Shot-Schnitt.
           </p>
         </div>
       )}
 
-      <Card class{tx({ de: "Name", en: "Name", es: "Nombre" })}="p-3 bg-muted/30 border-border/40">
-        <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="flex items-start gap-2 text-xs text-muted-foreground">
-          <AlertCircle class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mt-0.5 text-primary shrink-0" />
+      <Card className="p-3 bg-muted/30 border-border/40">
+        <div className="flex items-start gap-2 text-xs text-muted-foreground">
+          <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
           <div>
-            Geschätzte Gesamt-Kosten: <span class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-primary font-semibold">€{totalCost.toFixed(2)}</span>{' '}
+            Geschätzte Gesamt-Kosten: <span className="text-primary font-semibold">€{totalCost.toFixed(2)}</span>{' '}
             ({blocks.length} × HeyGen Talking-Head) · Generierung läuft sequentiell
           </div>
         </div>
       </Card>
 
       {progress && (
-        <Card class{tx({ de: "Name", en: "Name", es: "Nombre" })}="p-3 bg-primary/5 border-primary/30">
-          <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="text-xs">
+        <Card className="p-3 bg-primary/5 border-primary/30">
+          <div className="text-xs">
             Generiere Block {progress.current} / {progress.total} …
           </div>
-          <div class{tx({ de: "Name", en: "Name", es: "Nombre" })}="mt-2 h-1.5 bg-muted rounded overflow-hidden">
+          <div className="mt-2 h-1.5 bg-muted rounded overflow-hidden">
             <div
-              class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-full bg-primary transition-all"
+              className="h-full bg-primary transition-all"
               style={{ width: `${(progress.current / progress.total) * 100}%` }}
             />
           </div>
@@ -928,13 +928,13 @@ function DialogModeTab({
       <Button
         onClick={handleGenerateDialog}
         disabled={generating || blocks.length === 0 || speakers.some((s) => !voicePerSpeaker[s.id])}
-        class{tx({ de: "Name", en: "Name", es: "Nombre" })}="w-full"
+        className="w-full"
         size="lg"
       >
         {generating ? (
-          <><Loader2 class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-2 animate-spin" /> Generiere Dialog ({progress?.current ?? 0}/{progress?.total ?? blocks.length}) …</>
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere Dialog ({progress?.current ?? 0}/{progress?.total ?? blocks.length}) …</>
         ) : (
-          <><Mic class{tx({ de: "Name", en: "Name", es: "Nombre" })}="h-4 w-4 mr-2" /> Dialog generieren ({blocks.length} Clips · €{totalCost.toFixed(2)})</>
+          <><Mic className="h-4 w-4 mr-2" /> Dialog generieren ({blocks.length} Clips · €{totalCost.toFixed(2)})</>
         )}
       </Button>
     </div>

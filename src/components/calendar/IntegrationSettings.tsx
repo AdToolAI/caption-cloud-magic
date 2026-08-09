@@ -19,7 +19,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [google{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}, setGoogle{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}] = useState(false);
+  const [googleVerbunden, setGoogleVerbunden] = useState(false);
   const [syncDirection, setSyncDirection] = useState<string>("push");
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
     }
 
     if (data) {
-      setGoogle{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}(data.google_calendar_connected || false);
+      setGoogleVerbunden(data.google_calendar_connected || false);
       setSyncDirection(data.google_sync_direction || "push");
     }
 
@@ -63,12 +63,12 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
       // Open OAuth window
       window.location.href = data.authorization_url;
     } catch (error: any) {
-      console.error("Failed to connect {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}:", error);
-      toast.error(tx({ de: "Fehler beim Verbinden mit {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}", en: "Failed to connect {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}", es: "Error al conectar con {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}" }));
+      console.error("Failed to connect Google Calendar:", error);
+      toast.error(tx({ de: "Fehler beim Verbinden mit Google Calendar", en: "Failed to connect Google Calendar", es: "Error al conectar con Google Calendar" }));
     }
   };
 
-  const handle{tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}Google = async () => {
+  const handleTrennenGoogle = async () => {
     try {
       const { error } = await supabase.functions.invoke(
         "calendar-google-oauth/disconnect",
@@ -79,10 +79,10 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
 
       if (error) throw error;
 
-      setGoogle{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}(false);
+      setGoogleVerbunden(false);
       toast.success(tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" }));
     } catch (error: any) {
-      console.error("Failed to disconnect {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}:", error);
+      console.error("Failed to disconnect Google Calendar:", error);
       toast.error(tx({ de: "Fehler beim Trennen", en: "Failed to disconnect", es: "Error al desconectar" }));
     }
   };
@@ -128,7 +128,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
   };
 
   if (loading) {
-    return <div className="text-center py-8">{tx({ de: "Integrationen werden geladen...", en: "Loading integrations...", es: "Cargando integraciones..." })}</div>;
+    return <div className="text-center py-8">Integrationen werden geladen...</div>;
   }
 
   return (
@@ -136,11 +136,11 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="google" className="gap-2">
           <Calendar className="w-4 h-4" />
-          {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}
+          Google Calendar
         </TabsTrigger>
         <TabsTrigger value="notifications" className="gap-2">
           <MessageSquare className="w-4 h-4" />
-          {tx({ de: "Benachrichtigungen", en: "Notifications", es: "Notificaciones" })}
+          Benachrichtigungen
         </TabsTrigger>
       </TabsList>
 
@@ -149,51 +149,51 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>{tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })} Integration</CardTitle>
+                <CardTitle>Google Calendar Integration</CardTitle>
                 <CardDescription>
-                  Sync your calendar events with {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}
+                  Sync your calendar events with Google Calendar
                 </CardDescription>
               </div>
-              {google{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })} ? (
+              {googleVerbunden ? (
                 <Badge variant="default" className="gap-2">
-                  {tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}
+                  Verbunden
                 </Badge>
               ) : (
                 <Badge variant="outline" className="gap-2">
-                  Not {tx({ de: "Verbunden", en: "Connected", es: "Conectado" })}
+                  Not Verbunden
                 </Badge>
               )}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!google{tx({ de: "Verbunden", en: "Connected", es: "Conectado" })} ? (
+            {!googleVerbunden ? (
               <Button onClick={handleConnectGoogle} className="w-full">
                 <Calendar className="w-4 h-4 mr-2" />
-                Connect {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}
+                Connect Google Calendar
               </Button>
             ) : (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">{tx({ de: "Sync-Richtung", en: "Sync direction", es: "Dirección de sincronización" })}</label>
+                  <label className="text-sm font-medium">Sync-Richtung</label>
                   <Select value={syncDirection} onValueChange={handleSyncDirectionChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="push">
-                        {tx({ de: "Nur Push (Kalender → Google)", en: "Push Only (Calendar → Google)", es: "Solo push (Calendario → Google)" })}
+                        Nur Push (Kalender → Google)
                       </SelectItem>
                       <SelectItem value="pull">
-                        {tx({ de: "Nur Pull (Google → Kalender)", en: "Pull Only (Google → Calendar)", es: "Solo pull (Google → Calendario)" })}
+                        Nur Pull (Google → Kalender)
                       </SelectItem>
                       <SelectItem value="two_way">
-                        {tx({ de: "Zwei-Wege-Sync", en: "Two-way sync", es: "Sincronización bidireccional" })}
+                        Zwei-Wege-Sync
                       </SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    {syncDirection === "push" && "Events are synced from your calendar to {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })}"}
-                    {syncDirection === "pull" && "Events are synced from {tx({ de: "Google Calendar", en: "Google Calendar", es: "Google Calendar" })} to your calendar"}
+                    {syncDirection === "push" && "Events are synced from your calendar to Google Calendar"}
+                    {syncDirection === "pull" && "Events are synced from Google Calendar to your calendar"}
                     {syncDirection === "two_way" && tx({ de: "Ereignisse werden in beide Richtungen synchronisiert", en: "Events are synced in both directions", es: "Los eventos se sincronizan en ambas direcciones." })}
                   </p>
                 </div>
@@ -205,10 +205,10 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={handle{tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}Google}
+                    onClick={handleTrennenGoogle}
                   >
                     <Link2Off className="w-4 h-4 mr-2" />
-                    {tx({ de: "Trennen", en: "Disconnect", es: "Desconectar" })}
+                    Trennen
                   </Button>
                 </div>
               </>

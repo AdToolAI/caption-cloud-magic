@@ -137,7 +137,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       for (const file of Array.from(files).slice(0, room)) {
         if (!file.type.startsWith('image/')) continue;
         if (file.size > 12 * 1024 * 1024) {
-          toast({ title: `${file.name} ${tx({ de: 'ist zu groß', en: 'is too large', es: 'es demasiado grande' })}`, description: tx({ de: 'Maximal 12 MB pro Bild.', en: 'Maximum 12 MB per image.', es: 'Máximo 12 MB por imagen.' }), variant: 'destructive' });
+          toast({ title: `${file.name} $ist zu groß`, description: tx({ de: 'Maximal 12 MB pro Bild.', en: 'Maximum 12 MB per image.', es: 'Máximo 12 MB por imagen.' }), variant: 'destructive' });
           continue;
         }
 
@@ -294,7 +294,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
           <Sparkles className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h2 className="font-serif text-xl">{tx({ de: "Was sollen wir für dich drehen?", en: "What should we shoot for you?", es: "¿Qué deberíamos grabar para ti?" })}</h2>
+          <h2 className="font-serif text-xl">Was sollen wir für dich drehen?</h2>
           <p className="text-sm text-muted-foreground">
             Ein Satz genügt. Du bekommst fünf Ideen, die wir auch wirklich umsetzen können.
           </p>
@@ -305,14 +305,14 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         value={brief}
         onChange={(e) => setBrief(e.target.value)}
         rows={3}
-        placeholder={tx({ de: "z. B. Werbespot für unsere neue Kaffeemischung — für Leute, die morgens keine Zeit haben.", en: "e.g. Commercial for our new coffee blend — for people who don't have time in the morning.", es: "p. ej. Anuncio de nuestro nuevo café — para gente que no tiene tiempo por la mañana." })}
+        placeholder=z. B. Werbespot für unsere neue Kaffeemischung — für Leute, die morgens keine Zeit haben.
         className="resize-none text-base"
       />
 
       {/* -------------------------------------------------------- own images */}
       <div className="mt-5">
         <div className="mb-2 flex items-center justify-between">
-          <Label className="text-sm">{tx({ de: 'Eigene Bilder (optional)', en: 'Own images (optional)', es: 'Imágenes propias (opcional)' })}</Label>
+          <Label className="text-sm">Eigene Bilder (optional)</Label>
           <span className="text-xs text-muted-foreground">{assets.length}/{MAX_ASSETS}</span>
         </div>
 
@@ -333,7 +333,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
                       type="button"
                       onClick={() => removeAsset(asset)}
                       className="text-muted-foreground transition-colors hover:text-destructive"
-                      aria-label={tx({ de: "Bild entfernen", en: "Remove image", es: "Eliminar imagen" })}
+                      aria-label=Bild entfernen
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -412,7 +412,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
       {/* ------------------------------------------------------------ choices */}
       <div className="mt-6 grid gap-5 md:grid-cols-2">
         <div className="space-y-2">
-          <Label className="text-sm">{tx({ de: 'Format', en: 'Format', es: 'Formato' })}</Label>
+          <Label className="text-sm">Format</Label>
           <Select value={options.aspect} onValueChange={(v) => set('aspect', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -424,7 +424,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm">{tx({ de: 'Sprache', en: 'Language', es: 'Idioma' })}</Label>
+          <Label className="text-sm">Sprache</Label>
           <Select value={options.language} onValueChange={(v) => set('language', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -437,7 +437,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
 
         <div className="space-y-2 md:col-span-2">
           <div className="flex items-center justify-between">
-            <Label className="text-sm">{tx({ de: 'Länge', en: 'Length', es: 'Longitud' })}</Label>
+            <Label className="text-sm">Länge</Label>
             <span className="text-sm text-muted-foreground">{options.duration} {tx({ de: 'Sekunden', en: 'seconds', es: 'segundos' })</span>
           </div>
           <Slider
@@ -471,7 +471,7 @@ export function AutopilotIdeaLauncher({ onIdeas }: Props) {
           {options.lipSync && (
             <div className="mt-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{tx({ de: "Sprecher im Bild", en: "Speaker in picture", es: "Locutor en imagen" })}</span>
+                <span className="text-xs text-muted-foreground">Sprecher im Bild</span>
                 <span className="text-xs font-medium">{options.lipSyncSpeakers}</span>
               </div>
               <Slider

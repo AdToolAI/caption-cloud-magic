@@ -231,21 +231,21 @@ export default function SnippetBuilderDialog({
             {isEdit ? tx({ de: 'Snippet bearbeiten', en: 'Edit snippet', es: 'Editar fragmento' }) : tx({ de: 'Neues Snippet', en: 'New snippet', es: 'Nuevo fragmento' })}
           </DialogTitle>
           <DialogDescription>
-            {tx({ de: 'Speichere wiederverwendbare Szenen-Bausteine — optional teilbar mit der Community.', en: 'Save reusable scene components — optionally shareable with the community.', es: 'Guarde componentes de escena reutilizables, opcionalmente compartibles con la comunidad.' })}
+            Speichere wiederverwendbare Szenen-Bausteine — optional teilbar mit der Community.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Thumbnail */}
           <div>
-            <Label className="text-xs">{tx({ de: 'Vorschaubild', en: 'Preview image', es: 'Imagen de vista previa' })} + "</Label>"
+            <Label className="text-xs">Vorschaubild + "</Label>"
             <div className="mt-1 flex items-center gap-3">
               <div className="h-24 w-40 rounded-md border border-border/60 bg-background/60 overflow-hidden flex items-center justify-center">
                 {thumbnailUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={thumbnailUrl} alt="Vorschau" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-[10px] text-muted-foreground">{tx({ de: "Kein Bild", en: "No picture", es: "Sin imagen" })}</span>
+                  <span className="text-[10px] text-muted-foreground">Kein Bild</span>
                 )}
               </div>
               <div className="flex flex-col gap-1.5">
@@ -268,7 +268,7 @@ export default function SnippetBuilderDialog({
                   className="h-7 gap-1.5 text-[11px]"
                 >
                   {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                  {tx({ de: 'Hochladen', en: 'Upload', es: 'Subir' })}
+                  Hochladen
                 </Button>
                 {thumbnailUrl && (
                   <Button
@@ -277,7 +277,7 @@ export default function SnippetBuilderDialog({
                     onClick={() => setThumbnailUrl(null)}
                     className="h-7 text-[11px] text-muted-foreground"
                   >
-                    {tx({ de: 'Entfernen', en: 'Remove', es: 'Eliminar' })}
+                    Entfernen
                   </Button>
                 )}
               </div>
@@ -286,7 +286,7 @@ export default function SnippetBuilderDialog({
 
           {/* Name */}
           <div>
-            <Label className="text-xs">{tx({ de: 'Name', en: 'Name', es: 'Nombre' })} + "</Label>"
+            <Label className="text-xs">Name + "</Label>"
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -297,7 +297,7 @@ export default function SnippetBuilderDialog({
 
           {/* Category */}
           <div>
-            <Label className="text-xs">{tx({ de: 'Kategorie', en: 'Category', es: 'Categoría' })} + "</Label>"
+            <Label className="text-xs">Kategorie + "</Label>"
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="bg-background/60 mt-1">
                 <SelectValue />
@@ -314,18 +314,18 @@ export default function SnippetBuilderDialog({
 
           {/* Description */}
           <div>
-            <Label className="text-xs">{tx({ de: 'Beschreibung (optional)', en: 'Description (optional)', es: 'Descripción (opcional)' })} + "</Label>"
+            <Label className="text-xs">Beschreibung (optional) + "</Label>"
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={tx({ de: "Kurzbeschreibung für die Library-Karte", en: "Short description for the library card", es: "Breve descripción de la tarjeta de la biblioteca" })}
+              placeholder=Kurzbeschreibung für die Library-Karte
               className="bg-background/60 mt-1"
             />
           </div>
 
           {/* Prompt */}
           <div>
-            <Label className="text-xs">{tx({ de: 'Prompt', en: 'Prompt', es: 'Prompt' })} + "</Label>"
+            <Label className="text-xs">Prompt + "</Label>"
             <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -338,7 +338,7 @@ export default function SnippetBuilderDialog({
 
           {/* Duration */}
           <div>
-            <Label className="text-xs">{tx({ de: "Dauer (Sekunden, optional)", en: "Duration (seconds, optional)", es: "Duración (segundos, opcional)" })}</Label>
+            <Label className="text-xs">Dauer (Sekunden, optional)</Label>
             <Input
               type="number"
               min={1}
@@ -352,7 +352,7 @@ export default function SnippetBuilderDialog({
 
           {/* Tags */}
           <div>
-            <Label className="text-xs">{tx({ de: 'Tags', en: 'Tags', es: 'Etiquetas' })} + "</Label>"
+            <Label className="text-xs">Tags + "</Label>"
             <div className="flex gap-1.5 mt-1">
               <Input
                 value={tagDraft}
@@ -389,11 +389,11 @@ export default function SnippetBuilderDialog({
             <Globe2 className="h-4 w-4 text-primary mt-0.5" />
             <div className="flex-1">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-semibold">{tx({ de: 'Mit Community teilen', en: 'Share with community', es: 'Compartir con la comunidad' })} + "</Label>"
+                <Label className="text-xs font-semibold">Mit Community teilen + "</Label>"
                 <Switch checked={isPublic} onCheckedChange={setIsPublic} disabled={!canPublish && !isPublic} />
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
-                {tx({ de: 'Öffentliche Snippets erscheinen in der Community-Library. Andere User können liken und klonen — Cast & Location bleiben privat.', en: 'Public snippets appear in the community library. Other users can like and clone — Cast & Location remain private.', es: 'Los fragmentos públicos aparecen en la biblioteca comunitaria. Otros usuarios pueden dar me gusta y clonar; el reparto y la ubicación permanecen privados.' })}
+                Öffentliche Snippets erscheinen in der Community-Library. Andere User können liken und klonen — Cast & Location bleiben privat.
               </p>
               {!canPublish && (
                 <p className="text-[10px] text-amber-500 mt-1">
@@ -406,7 +406,7 @@ export default function SnippetBuilderDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {tx({ de: 'Abbrechen', en: 'Cancel', es: 'Cancelar' })}
+            Abbrechen
           </Button>
           <Button onClick={handleSave} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}

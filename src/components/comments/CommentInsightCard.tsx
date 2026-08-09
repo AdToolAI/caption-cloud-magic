@@ -48,23 +48,23 @@ export function CommentInsightCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">{tx({ de: "Beleg", en: "Evidence", es: "Evidencia" })}</p>
+          <p className="text-sm font-medium text-muted-foreground">Beleg</p>
           <p className="text-sm">{evidence}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-muted-foreground">{tx({ de: "Interpretation", en: "Interpretation", es: "Interpretación" })}</p>
+          <p className="text-sm font-medium text-muted-foreground">Interpretation</p>
           <p className="text-sm">{interpretation}</p>
         </div>
         <div className="bg-muted/50 p-3 rounded-lg">
-          <p className="text-sm font-medium mb-2">{tx({ de: "📋 Empfohlene Maßnahme", en: "📋 Recommended action", es: "📋 Acción recomendada" })}</p>
+          <p className="text-sm font-medium mb-2">📋 Empfohlene Maßnahme</p>
           <p className="text-sm">{action}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="text-xs">
-            {tx({ de: "Als Aufgabe speichern", en: "Save as task", es: "Guardar como tarea" })}
+            Als Aufgabe speichern
           </Button>
           <Button size="sm" variant="ghost" className="text-xs">
-            {tx({ de: "In CSV exportieren", en: "Export to CSV", es: "Exportar a CSV" })}
+            In CSV exportieren
           </Button>
         </div>
       </CardContent>

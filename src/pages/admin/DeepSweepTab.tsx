@@ -80,9 +80,9 @@ const STATUS_ICON: Record<string, any> = {
 const FLOW_NAMES = [
   "Composer Multi-Scene Stitch",
   "Director's Cut Lambda Render",
-  {tx({ de: "Auto-Director (Brief → Video)", en: "Auto-Director (Letter → Video)", es: "Director automático (Carta → Vídeo)" })},
+  Auto-Director (Brief → Video),
   "Talking Head (HeyGen)",
-  {tx({ de: "Universal Video Creator", en: "Universal Video Creator", es: "Creador de vídeos universal" })},
+  Universal Video Creator,
   "Magic Edit (FLUX Fill)",
 ];
 
@@ -216,7 +216,7 @@ export function DeepSweepTab() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-              {tx({ de: 'Neu laden', en: 'Reload', es: 'Recargar' })}
+              Neu laden
             </Button>
             {isStale && (
               <Button
@@ -224,14 +224,14 @@ export function DeepSweepTab() {
                 size="sm"
                 onClick={finalizeStaleRun}
                 disabled={finalizing}
-                title={tx({ de: `Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.`, en: `Run has been running for ${Math.round(runAgeMinutes)} min - the edge function wall clock limit has probably struck.`, es: `Run ha estado ejecutándose durante ${Math.round(runAgeMinutes)} min; probablemente se haya alcanzado el límite del reloj de pared de la función de borde.` })}
+                title=Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.
               >
                 {finalizing ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                 ) : (
                   <XCircle className="h-4 w-4 mr-1" />
                 )}
-                {tx({ de: 'Lauf abbrechen', en: 'Cancel run', es: 'Cancelar ejecución' })} ({Math.round(runAgeMinutes)} min)
+                Lauf abbrechen ({Math.round(runAgeMinutes)} min)
               </Button>
             )}
             <AlertDialog>
@@ -250,22 +250,22 @@ export function DeepSweepTab() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{tx({ de: "Deep Sweep mit echten Renders starten?", en: "Start Deep Sweep with real renders?", es: "¿Iniciar Deep Sweep con renders reales?" })}</AlertDialogTitle>
+                  <AlertDialogTitle>Deep Sweep mit echten Renders starten?</AlertDialogTitle>
                   <AlertDialogDescription>
                     Diese Aktion löst <strong>echte bezahlte API-Calls</strong> aus
                     (Replicate, HeyGen, ElevenLabs, AWS Lambda). Erwarteter Verbrauch:
                     ~12 €. Hard-Cap: 50 €. Dauer: 10-12 Minuten.
                     <br /><br />
-                    {tx({ de: "Hard-Lock: Max 1 Sweep alle 6h.", en: "Hard-Lock: Max 1 sweep every 6h.", es: "Hard-Lock: Máximo 1 barrido cada 6 h." })}
+                    Hard-Lock: Max 1 Sweep alle 6h.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>{tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}</AlertDialogCancel>
+                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={startSweep}
                     className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
                   >
-                    {tx({ de: "Sweep starten", en: "Start sweep", es: "Iniciar barrido" })}
+                    Sweep starten
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -299,7 +299,7 @@ export function DeepSweepTab() {
       {/* Live Flow Status */}
       <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
         <h4 className="text-sm font-semibold text-slate-300 mb-3">
-          {tx({ de: "Aktueller Lauf — 6 Flows", en: "Current run — 6 flows", es: "Ejecución actual — 6 flujos" })}
+          Aktueller Lauf — 6 Flows
         </h4>
         <div className="space-y-2">
           {FLOW_NAMES.map((name, idx) => {
@@ -364,7 +364,7 @@ export function DeepSweepTab() {
                         ) : (
                           <RefreshCw className="h-3 w-3 mr-1" />
                         )}
-                        {tx({ de: "Portrait neu provisionieren", en: "Reprovision portrait", es: "Reprovisionar retrato" })}
+                        Portrait neu provisionieren
                       </Button>
                     )}
                   {flow?.flow_index === 6 &&
@@ -382,7 +382,7 @@ export function DeepSweepTab() {
                         ) : (
                           <RefreshCw className="h-3 w-3 mr-1" />
                         )}
-                        {tx({ de: "Bootstrap jetzt ausführen", en: "Execute bootstrap now", es: "Ejecutar bootstrap ahora" })}
+                        Bootstrap jetzt ausführen
                       </Button>
                     )}
                 </div>
@@ -405,7 +405,7 @@ export function DeepSweepTab() {
       {/* History */}
       {history.length > 1 && (
         <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
-          <h4 className="text-sm font-semibold text-slate-300 mb-3">{tx({ de: "Letzte 10 Läufe", en: "Last 10 runs", es: "Últimas 10 ejecuciones" })}</h4>
+          <h4 className="text-sm font-semibold text-slate-300 mb-3">Letzte 10 Läufe</h4>
           <div className="space-y-1.5">
             {history.slice(1).map((r) => {
               const pr = r.flows_total > 0

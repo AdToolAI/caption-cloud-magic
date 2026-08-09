@@ -77,9 +77,9 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
   };
 
   const quick = [
-    {tx({ de: "Ist die Headline stark genug?", en: "Is the headline strong enough?", es: "¿Es el titular lo suficientemente fuerte?" })},
-    {tx({ de: "Passt der Ton zur Plattform?", en: "Does the tone fit the platform?", es: "¿El tono se ajusta a la plataforma?" })},
-    {tx({ de: "Wie mache ich den CTA konkreter?", en: "How do I make the CTA more specific?", es: "¿Cómo hago que el CTA sea más específico?" })},
+    Ist die Headline stark genug?,
+    Passt der Ton zur Plattform?,
+    Wie mache ich den CTA konkreter?,
   ];
 
   return (
@@ -89,7 +89,7 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
           <SheetTitle className="flex items-center gap-2 font-display">
             <MessageSquare className="h-4 w-4 text-primary" /> Coach
           </SheetTitle>
-          <SheetDescription>{tx({ de: "Feedback zu genau dem Entwurf, der gerade offen ist.", en: "Feedback on the exact draft that is currently open.", es: "Comentarios sobre el borrador exacto que está abierto actualmente." })}</SheetDescription>
+          <SheetDescription>Feedback zu genau dem Entwurf, der gerade offen ist.</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="mt-4 flex-1 pr-3">
@@ -121,7 +121,7 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
             ))}
             {busy && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> {tx({ de: "denkt nach …", en: "thinking …", es: "pensando …" })}
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> denkt nach …
               </div>
             )}
             <div ref={endRef} />
@@ -135,7 +135,7 @@ export function CoachPanel({ open, onOpenChange }: { open: boolean; onOpenChange
             send(input);
           }}
         >
-          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={tx({ de: "Frag den Coach …", en: "Ask the coach …", es: "Pregunta al coach …" })} />
+          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder=Frag den Coach … />
           <Button type="submit" size="icon" disabled={busy}>
             <Send className="h-4 w-4" />
           </Button>

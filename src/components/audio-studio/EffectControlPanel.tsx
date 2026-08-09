@@ -141,7 +141,7 @@ export function EffectControlPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sliders className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-sm">{tx({ de: 'Effekt-Mixer', en: 'Effect Mixer', es: 'Mezclador de efectos' })}</h3>
+          <h3 className="font-semibold text-sm">Effekt-Mixer</h3>
           <span className="text-xs text-muted-foreground">
             ({enabledCount}/{totalEffects})
           </span>
@@ -241,12 +241,12 @@ export function EffectControlPanel({
         {isProcessing ? (
           <>
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            {tx({ de: 'Verarbeite...', en: 'Processing...', es: 'Procesando...' })}
+            Verarbeite...
           </>
         ) : (
           <>
             <RefreshCw className="w-4 h-4 mr-2" />
-            {tx({ de: 'Neu verarbeiten', en: 'Reprocess', es: 'Reprocesar' })}
+            Neu verarbeiten
           </>
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
@@ -254,7 +254,7 @@ export function EffectControlPanel({
       
       {/* Info */}
       <p className="text-[10px] text-muted-foreground text-center">
-        {tx({ de: 'Klicke auf einzelne Effekte um sie ein/auszuschalten, dann "{tx({ de: 'Neu verarbeiten', en: 'Reprocess', es: 'Reprocesar' })}".', en: 'Click individual effects to toggle them, then "Reprocess".', es: 'Haz clic en los efectos para activarlos o desactivarlos y luego "Reprocesar".' })}
+        Klicke auf einzelne Effekte um sie ein/auszuschalten, dann "Neu verarbeiten".
       </p>
     </div>
   );

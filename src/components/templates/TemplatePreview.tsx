@@ -76,23 +76,23 @@ export const TemplatePreview = ({
             <div className="flex gap-2">
               <Button onClick={() => onUse(template)} className="flex-1">
                 <Play className="mr-2 h-4 w-4" />
-                {tx({ de: 'Template verwenden', en: 'Use template', es: 'Usar plantilla' })}
+                Template verwenden
               </Button>
               <Button
                 variant="outline"
                 onClick={() => onDuplicate(template.id)}
               >
                 <Copy className="mr-2 h-4 w-4" />
-                {tx({ de: 'Duplizieren', en: 'Duplicate', es: 'Duplicar' })}
+                Duplizieren
               </Button>
             </div>
 
             {/* Details */}
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold mb-2">{tx({ de: 'Beschreibung', en: 'Description', es: 'Descripción' })}</h3>
+                <h3 className="font-semibold mb-2">Beschreibung</h3>
                 <p className="text-sm text-muted-foreground">
-                  {template.description || 'Keine {tx({ de: 'Beschreibung', en: 'Description', es: 'Descripción' })} verfügbar'}
+                  {template.description || 'Keine Beschreibung verfügbar'}
                 </p>
               </div>
 
@@ -100,20 +100,20 @@ export const TemplatePreview = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="text-sm font-medium mb-2">{tx({ de: 'Kategorie', en: 'Category', es: 'Categoría' })}</h4>
+                  <h4 className="text-sm font-medium mb-2">Kategorie</h4>
                   <Badge variant="outline">
                     {getCategoryLabel(template.category)}
                   </Badge>
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-medium mb-2">{tx({ de: 'Format', en: 'Format', es: 'Formato' })}</h4>
+                  <h4 className="text-sm font-medium mb-2">Format</h4>
                   <Badge variant="outline">{template.aspect_ratio || '16:9'}</Badge>
                 </div>
 
                 {template.duration && (
                   <div>
-                    <h4 className="text-sm font-medium mb-2">{tx({ de: 'Dauer', en: 'Duration', es: 'Duración' })}</h4>
+                    <h4 className="text-sm font-medium mb-2">Dauer</h4>
                     <div className="flex items-center gap-1 text-sm">
                       <Clock className="h-4 w-4" />
                       {template.duration}s
@@ -122,7 +122,7 @@ export const TemplatePreview = ({
                 )}
 
                 <div>
-                  <h4 className="text-sm font-medium mb-2">{tx({ de: 'Verwendungen', en: 'Uses', es: 'Usos' })}</h4>
+                  <h4 className="text-sm font-medium mb-2">Verwendungen</h4>
                   <p className="text-sm">{template.usage_count || 0}×</p>
                 </div>
               </div>
@@ -132,7 +132,7 @@ export const TemplatePreview = ({
               {/* Customizable Fields */}
               {template.customizable_fields && template.customizable_fields.length > 0 && (
                 <div>
-                  <h3 className="font-semibold mb-3">{tx({ de: 'Anpassbare Felder', en: 'Customizable fields', es: 'Campos personalizables' })}</h3>
+                  <h3 className="font-semibold mb-3">Anpassbare Felder</h3>
                   <div className="grid gap-2">
                     {template.customizable_fields.map((field: any, index: number) => (
                       <div
@@ -176,7 +176,7 @@ export const TemplatePreview = ({
                 <>
                   <Separator />
                   <div>
-                    <h3 className="font-semibold mb-3">{tx({ de: 'Versionshistorie', en: 'Version history', es: 'Historial de versiones' })}</h3>
+                    <h3 className="font-semibold mb-3">Versionshistorie</h3>
                     <div className="space-y-2">
                       {versions.map((version: any) => (
                         <div
@@ -188,7 +188,7 @@ export const TemplatePreview = ({
                               Version {version.version_number}
                             </span>
                             {version.is_published && (
-                              <Badge variant="secondary">{tx({ de: 'Veröffentlicht', en: 'Published', es: 'Publicado' })}</Badge>
+                              <Badge variant="secondary">Veröffentlicht</Badge>
                             )}
                           </div>
                           {version.change_notes && (

@@ -54,8 +54,8 @@ export function ProactiveAlertBanner() {
             <div className="flex items-center gap-2 mb-1">
               <h4 className="font-semibold text-foreground">
                 {errorCount > 0 
-                  ? `${errorCount} kritische${{errorCount > 1 ? tx({ de: ' Probleme', en: ' problems', es: ' problemas' }) : tx({ de: 's Problem', en: ' problem', es: ' problema' })}} {tx({ de: 'erkannt', en: 'detected', es: 'detectado' })}`
-                  : `${warningCount} {tx({ de: 'Warnung', en: 'Warning', es: 'Advertencia' })}${{warningCount > 1 ? tx({ de: 'en', en: 's', es: 's' }) : ''}}`
+                  ? `${errorCount} kritische${{errorCount > 1 ? tx({ de: ' Probleme', en: ' problems', es: ' problemas' }) : tx({ de: 's Problem', en: ' problem', es: ' problema' })}} erkannt`
+                  : `${warningCount} Warnung${{warningCount > 1 ? tx({ de: 'en', en: 's', es: 's' }) : ''}}`
                 }
               </h4>
               {isLoading && (
@@ -87,7 +87,7 @@ export function ProactiveAlertBanner() {
                 ))}
                 {diagnostics.length > 3 && (
                   <span className="text-xs px-2 py-1 text-muted-foreground">
-                    +{diagnostics.length - 3} {tx({ de: 'weitere', en: 'more', es: 'más' })}
+                    +{diagnostics.length - 3} weitere
                   </span>
                 )}
               </div>
@@ -113,7 +113,7 @@ export function ProactiveAlertBanner() {
                 disabled={isLoading}
               >
                 <RefreshCw className={cn("w-3 h-3 mr-1", isLoading && "animate-spin")} />
-                {tx({ de: 'Prüfen', en: 'Check', es: 'Comprobar' })}
+                Prüfen
               </Button>
             </div>
           </div>

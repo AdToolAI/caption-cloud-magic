@@ -74,7 +74,7 @@ export function CalendarAlerts({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{tx({ de: "Warnungen & Aufgaben", en: "Warnings & Tasks", es: "Advertencias y tareas" })}</CardTitle>
+          <CardTitle>Warnungen & Aufgaben</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -91,13 +91,13 @@ export function CalendarAlerts({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{tx({ de: "Warnungen & Aufgaben", en: "Warnings & Tasks", es: "Advertencias y tareas" })}</CardTitle>
+          <CardTitle>Warnungen & Aufgaben</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
             <Info className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p className="font-medium">{tx({ de: "Alles im grünen Bereich! ✅", en: "Everything is fine! ✅", es: "¡Todo está bien! ✅" })}</p>
-            <p className="text-sm mt-1">{tx({ de: "Keine Warnungen oder offenen Aufgaben.", en: "No warnings or open tasks.", es: "Sin advertencias ni tareas abiertas." })}</p>
+            <p className="font-medium">Alles im grünen Bereich! ✅</p>
+            <p className="text-sm mt-1">Keine Warnungen oder offenen Aufgaben.</p>
           </div>
         </CardContent>
       </Card>
@@ -107,7 +107,7 @@ export function CalendarAlerts({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{tx({ de: "Warnungen & Aufgaben", en: "Warnings & Tasks", es: "Advertencias y tareas" })}</CardTitle>
+        <CardTitle>Warnungen & Aufgaben</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -128,7 +128,7 @@ export function CalendarAlerts({
                         <span className={`text-sm font-medium ${config.color}`}>
                           {alert.type === 'conflict' ? 'Konflikt erkannt' : tx({ de: 'Konflikt erkannt', en: 'Conflict detected', es: 'Conflicto detectado' }) : 
                            alert.type === 'overdue' ? 'Überfällig' : tx({ de: 'Überfällig', en: 'Overdue', es: 'Vencido' }) : 
-                           {tx({ de: 'Leere Tage', en: 'Empty days', es: 'Días vacíos' })}
+                           Leere Tage
                         </span>
                       </div>
                       <p className="text-sm text-foreground mb-3">{alert.message}</p>

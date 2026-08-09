@@ -40,7 +40,7 @@ const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime',
 const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
 const ENHANCE_DEFAULT_TEXT =
-  {tx({ de: "Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.", en: "Adopt this image 1:1 and improve quality, realism, light consistency, and detail — keep all people, clothing, composition, and background exactly as is.", es: "Adopta esta imagen 1:1 y mejora la calidad, el realismo, la consistencia de la luz y el detalle — mantén a todas las personas, la ropa, la composición y el fondo exactamente como están." })};
+  Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.;
 
 export function PromptHelperDialog({
   open, onOpenChange, initialUserText = '',
@@ -129,11 +129,11 @@ export function PromptHelperDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wand2 className="h-5 w-5 text-primary" />
-            {tx({ de: 'Prompt-Helfer', en: 'Prompt Helper', es: 'Ayudante de prompts' })}
+            Prompt-Helfer
           </DialogTitle>
           <DialogDescription>
-            {tx({ de: "Sag mir mit deinen Worten was du willst — ich baue daraus den perfekten Prompt", en: "Tell me in your own words what you want — I'll use it to build the perfect prompt", es: "Dime en tus propias palabras lo que quieres — lo usaré para construir el prompt perfecto" })}
-            {tx({ de: "und empfehle das beste Modell.", en: "and recommend the best model.", es: "y recomendar el mejor modelo." })}
+            Sag mir mit deinen Worten was du willst — ich baue daraus den perfekten Prompt
+            und empfehle das beste Modell.
           </DialogDescription>
         </DialogHeader>
 
@@ -152,11 +152,11 @@ export function PromptHelperDialog({
             )}
 
             <div className="space-y-2">
-              <Label className="text-xs">{tx({ de: "Was willst du? (beliebige Sprache)", en: "What do you want? (any language)", es: "¿Qué deseas? (cualquier idioma)" })}</Label>
+              <Label className="text-xs">Was willst du? (beliebige Sprache)</Label>
               <Textarea
                 value={userText}
                 onChange={(e) => setUserText(e.target.value)}
-                placeholder={tx({ de: "z. B. Mach das Bild realistisch und detailliert, behalte alle Personen", en: "e.g. Make the image realistic and detailed, keep all people", es: "ej. Haz la imagen realista y detallada, mantén a todas las personas" })}
+                placeholder=z. B. Mach das Bild realistisch und detailliert, behalte alle Personen
                 rows={3}
                 className="resize-none bg-background/50"
               />
@@ -178,8 +178,8 @@ export function PromptHelperDialog({
             </div>
 
             <Button onClick={() => handleGenerate()} disabled={loading || !userText.trim()} className="w-full">
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: "Analysiere…", en: "Analyzing…", es: "Analizando…" })}</>
-                       : <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: "Prompt bauen", en: "Build prompt", es: "Construir prompt" })}</>}
+              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analysiere…</>
+                       : <><Sparkles className="h-4 w-4 mr-2" /> Prompt bauen</>}
             </Button>
 
             {result && (
@@ -205,7 +205,7 @@ export function PromptHelperDialog({
 
                 {/* Master prompt */}
                 <PromptCard
-                  label={tx({ de: "Master-Prompt (empfohlen)", en: "Master prompt (recommended)", es: "Prompt maestro (recomendado)" })}
+                  label=Master-Prompt (empfohlen)
                   prompt={result.masterPrompt}
                   highlight
                   onUse={() => handleApply(result.masterPrompt)}
@@ -214,7 +214,7 @@ export function PromptHelperDialog({
                 {result.alternatives.map((alt, i) => (
                   <PromptCard
                     key={i}
-                    label={tx({ de: `Kurz-Variante ${i + 1}`, en: `Short variant ${i + 1}`, es: `Variante corta ${i + 1}` })}
+                    label=Kurz-Variante ${i + 1}
                     prompt={alt}
                     onUse={() => handleApply(alt)}
                   />
@@ -238,7 +238,7 @@ function PromptCard({ label, prompt, highlight, onUse }: {
       <div className="flex items-center justify-between">
         <Label className="text-xs font-semibold">{label}</Label>
         <Button size="sm" variant={highlight ? "default" : "outline"} onClick={onUse}>
-          <Check className="h-3.5 w-3.5 mr-1" /> {tx({ de: "Übernehmen", en: "Apply", es: "Aplicar" })}
+          <Check className="h-3.5 w-3.5 mr-1" /> Übernehmen
         </Button>
       </div>
       <p className="text-xs text-foreground/90 leading-relaxed">{prompt}</p>

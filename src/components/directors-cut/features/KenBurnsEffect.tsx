@@ -161,13 +161,13 @@ export function KenBurnsEffect({
     <Card className="bg-background/40 backdrop-blur-xl border-border/50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">{tx({ de: "Move className="h-4 w-4 text-primary" /> {tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })}", en: "Ken Burns Effect", es: "Efecto Ken Burns" })}
-            Move className="h-4 w-4 text-primary" /> {tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })}
+          <CardTitle className="text-base flex items-center gap-2">Move className="h-4 w-4 text-primary" /> Ken Burns Effekt
+            Move className="h-4 w-4 text-primary" /> Ken Burns Effekt
           </CardTitle>
           <div className="flex items-center gap-2">
             {hasEffect && (
               <Badge variant="secondary" className="text-xs">
-                {tx({ de: 'Aktiv', en: 'Active', es: 'Activo' })}
+                Aktiv
               </Badge>
             )}
             <Badge variant="outline" className="text-xs">
@@ -176,14 +176,14 @@ export function KenBurnsEffect({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          {tx({ de: "Professionelle Kamerabewegungen mit Zoom und Pan", en: "Professional camera movements with zoom and pan", es: "Movimientos de cámara profesionales con zoom y panorámica" })}
+          Professionelle Kamerabewegungen mit Zoom und Pan
         </p>
       </CardHeader>
       
       <CardContent className="space-y-4">
         {/* Presets Grid */}
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">{tx({ de: "Schnell-Presets", en: "Quick presets", es: "Preajustes rápidos" })}</Label>
+          <Label className="text-xs text-muted-foreground">Schnell-Presets</Label>
           <div className="grid grid-cols-4 gap-2">
             {PRESETS.map((preset) => {
               const Icon = preset.icon;
@@ -220,7 +220,7 @@ export function KenBurnsEffect({
         
         {/* Advanced Mode Toggle */}
         <div className="flex items-center justify-between pt-2 border-t border-border/30">
-          <Label className="text-xs">{tx({ de: "Erweiterte Einstellungen", en: "Advanced settings", es: "Configuración avanzada" })}</Label>
+          <Label className="text-xs">Erweiterte Einstellungen</Label>
           <Switch
             checked={isAdvancedMode}
             onCheckedChange={setIsAdvancedMode}
@@ -245,7 +245,7 @@ export function KenBurnsEffect({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{tx({ de: "Start", en: "Start", es: "Comienzo" })}</span>
+                      <span>Start</span>
                       <span>{Math.round(currentKeyframe.startZoom * 100)}%</span>
                     </div>
                     <Slider
@@ -260,7 +260,7 @@ export function KenBurnsEffect({
                   
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{tx({ de: "Ende", en: "End", es: "Fin" })}</span>
+                      <span>Ende</span>
                       <span>{Math.round(currentKeyframe.endZoom * 100)}%</span>
                     </div>
                     <Slider
@@ -353,7 +353,7 @@ export function KenBurnsEffect({
               
               {/* Easing */}
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">{tx({ de: "Bewegungskurve", en: "Motion curve", es: "Curva de movimiento" })}</Label>
+                <Label className="text-xs text-muted-foreground">Bewegungskurve</Label>
                 <div className="flex gap-2">
                   {EASINGS.map((easing) => (
                     <Button
@@ -378,7 +378,7 @@ export function KenBurnsEffect({
                   className="flex-1 text-xs"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
-                  {tx({ de: "Zurücksetzen", en: "Reset", es: "Reiniciar" })}
+                  Zurücksetzen
                 </Button>
                 <Button
                   size="sm"
@@ -386,7 +386,7 @@ export function KenBurnsEffect({
                   onClick={removeEffect}
                   className="text-xs"
                 >
-                  {tx({ de: "Entfernen", en: "Remove", es: "Eliminar" })}
+                  Entfernen
                 </Button>
               </div>
             </motion.div>
@@ -397,7 +397,7 @@ export function KenBurnsEffect({
         {!hasEffect && (
           <div className="text-center py-4 text-muted-foreground">
             <Move className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-xs">Wähle ein Preset um den Move className="h-4 w-4 text-primary" /> {tx({ de: 'Ken Burns Effekt', en: 'Ken Burns Effect', es: 'Efecto Ken Burns' })} zu aktivieren</p>
+            <p className="text-xs">Wähle ein Preset um den Move className="h-4 w-4 text-primary" /> Ken Burns Effekt zu aktivieren</p>
           </div>
         )}
       </CardContent>
